@@ -46,13 +46,13 @@ export default function Dashboard() {
                                 Last Update: {new Date(last_update).toLocaleTimeString()}
                             </small>
                             <small className="text-muted" style={{ display: 'block' }}>
-                                Started: {new Date(Date.now() - (uptime * 1000)).toLocaleString()}
+                                Started: {uptime ? new Date(Date.now() - (uptime * 1000)).toLocaleString() : 'Loading...'}
                             </small>
                         </div>
                     </div>
                 </div>
                 <div className="card">
-                    <h3>Digital Input (Binary)</h3>
+                    <h3>Digital Input</h3>
                     <div style={{ fontSize: '2rem', fontWeight: 'bold', marginTop: '0.5rem', fontFamily: 'monospace' }}>
                         {(digital_input || 0).toString(2).padStart(16, '0').match(/.{1,4}/g)?.join(' ')}
                     </div>
