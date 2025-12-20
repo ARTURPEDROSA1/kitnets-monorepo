@@ -63,6 +63,29 @@ export default function Dashboard() {
                     </div>
                     <small className="text-muted">Register 30016</small>
                 </div>
+                {data.aggregates && (
+                    <div className="card" style={{ gridColumn: '1 / -1' }}>
+                        <h3>Aggregated Consumption</h3>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
+                            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px' }}>
+                                <div className="text-muted" style={{ fontSize: '0.9rem' }}>Current Total (m³)</div>
+                                <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--accent)' }}>{data.aggregates.total_effective_m3.toFixed(3)}</div>
+                            </div>
+                            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px' }}>
+                                <div className="text-muted" style={{ fontSize: '0.9rem' }}>Today (m³)</div>
+                                <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{data.aggregates.today_m3.toFixed(3)}</div>
+                            </div>
+                            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px' }}>
+                                <div className="text-muted" style={{ fontSize: '0.9rem' }}>This Month (m³)</div>
+                                <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{data.aggregates.month_m3.toFixed(3)}</div>
+                            </div>
+                            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px' }}>
+                                <div className="text-muted" style={{ fontSize: '0.9rem' }}>Last Month (m³)</div>
+                                <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{data.aggregates.prev_month_m3.toFixed(3)}</div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
 
             <h2>Live Meters</h2>

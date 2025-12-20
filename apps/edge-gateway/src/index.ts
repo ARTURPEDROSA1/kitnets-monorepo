@@ -172,18 +172,74 @@ server.get('/api/dashboard', async (req, reply) => {
     const meters = await db.all<MeterConfig>('SELECT * FROM meter_config WHERE enabled = 1');
     const dbOk = await db.healthCheck();
 
-    const data = meters.map(m => ({
-        ...m,
-        current_counter: modbusService.latestCounters[m.meter_id] || 0,
-        status: modbusService.latestCounters[m.meter_id] !== undefined ? 'OK' : 'WAITING'
-    }));
+    // Aggregations
+    let total_effective_m3 = 0;
+    let today_m3 = 0;
+    let month_m3 = 0;
+    let prev_month_m3 = 0;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1; // 1-12
+    const prevDate = new Date(currentYear, currentMonth - 2, 1); // prev month
+    const prevYear = prevDate.getFullYear();
+    const prevMonth = prevDate.getMonth() + 1;
+
+    // 1. Prev Month Total (from DB)
+    const prevMonthRow = await db.get<{ sum: number }>(
+        'SELECT sum(monthly_m3) as sum FROM monthly_consumption WHERE year = ? AND month = ?',
+        [prevYear, prevMonth]
+    );
+    prev_month_m3 = prevMonthRow?.sum || 0;
+
+    // 2. This Month (Stored Days)
+    const thisMonthStored = await db.get<{ sum: number }>(
+        `SELECT sum(daily_liters) as sum FROM daily_snapshots WHERE date LIKE ? AND date < ?`,
+        [`${currentYear}-${String(currentMonth).padStart(2, '0')}%`, todayStr]
+    );
+    const monthStoredM3 = (thisMonthStored?.sum || 0) / 1000;
+
+    const meterData = meters.map(m => {
+        const current = modbusService.latestCounters[m.meter_id] || 0;
+
+        // Effective Total
+        const raw = (current * m.pulse_volume_liters) / 1000;
+        const effective = (m.physical_meter_offset_m3 || 0) + raw;
+        total_effective_m3 += effective;
+
+        // Today Live
+        const startOfDay = modbusService.dailyStartCounters[m.meter_id] || current; // If missing, assume 0 delta
+        let delta = 0;
+        if (current >= startOfDay) delta = current - startOfDay;
+        else delta = (4294967295 - startOfDay) + current + 1;
+
+        const todayLiters = delta * m.pulse_volume_liters;
+        today_m3 += (todayLiters / 1000);
+
+        return {
+            ...m,
+            current_counter: current,
+            status: modbusService.latestCounters[m.meter_id] !== undefined ? 'OK' : 'WAITING',
+            effective_m3: effective
+        };
+    });
+
+    month_m3 = monthStoredM3 + today_m3;
+
     return {
         gateway_status: modbusService.status,
         db_status: dbOk ? 'OK' : 'ERROR',
         uptime: process.uptime(),
         digital_input: modbusService.digitalInputRegisterValue,
-        meters: data,
-        last_update: modbusService.lastUpdate
+        meters: meterData,
+        last_update: modbusService.lastUpdate,
+        aggregates: {
+            total_effective_m3,
+            today_m3,
+            month_m3,
+            prev_month_m3
+        }
     };
 });
 
