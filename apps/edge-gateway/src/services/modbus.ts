@@ -22,15 +22,66 @@ export class ModbusService extends EventEmitter {
 
     async start() {
         await this.connect();
+        await this.initDailyStats(); // Load 'start of day' values from DB
+
         // Start polling loop
         this.intervalTimer = setInterval(async () => {
+            // ...
             if (this.status === 'DOWN' && !this.client.isOpen) {
-                console.log("Attempting reconnection...");
                 await this.connect();
             } else {
                 await this.poll();
+                // If dailyStartCounters are empty (fresh install), set them to current on first successful poll
+                this.ensureStartCounters();
             }
         }, CONFIG.MODBUS.POLL_INTERVAL_MS);
+    }
+
+    // New helper to seed start counters if missing
+    private ensureStartCounters() {
+        for (const id in this.latestCounters) {
+            if (this.dailyStartCounters[id] === undefined) {
+                // No history found, so "Start of Day" = "Now" (First run behavior)
+                this.dailyStartCounters[id] = this.latestCounters[id];
+            }
+        }
+    }
+
+    public async initDailyStats() {
+        try {
+            // Find "Start of Today" value for each meter.
+            // Logic: 
+            // 1. Look for a daily_snapshot for TODAY (maybe we crashed and restarted).
+            //    Record uses 'counter_value_end_day' but that's for END of day.
+            //    Wait, daily_snapshots stores the delta for a specific date.
+            //    The 'start' of Today is the 'end' of Yesterday.
+
+            const todayStr = new Date().toISOString().split('T')[0];
+            const now = new Date();
+            const yesterday = new Date(now);
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+            const meters = await db.all<MeterConfig>('SELECT meter_id FROM meter_config');
+
+            for (const m of meters) {
+                // Try to get Yesterday's End (which is Today's Start)
+                const yesterdayRow = await db.get<{ counter_value_end_day: number }>(
+                    "SELECT counter_value_end_day FROM daily_snapshots WHERE meter_id = ? AND date = ?",
+                    [m.meter_id, yesterdayStr]
+                );
+
+                if (yesterdayRow) {
+                    this.dailyStartCounters[m.meter_id] = yesterdayRow.counter_value_end_day;
+                } else {
+                    // If no yesterday, maybe we have a partial snapshot for today?
+                    // Or just leave undefined, and 'ensureStartCounters' will pick it up as "current"
+                }
+            }
+            console.log("Initialized Daily Start Counters:", this.dailyStartCounters);
+        } catch (e) {
+            console.error("Failed to init daily stats:", e);
+        }
     }
 
     private async connect() {
