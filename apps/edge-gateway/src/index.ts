@@ -113,7 +113,37 @@ server.put('/api/config', async (req, reply) => {
 
 server.get('/api/meters/:id/daily', async (req: any, reply) => {
     const { id } = req.params;
-    const history = await db.all('SELECT * FROM daily_snapshots WHERE meter_id = ? ORDER BY date DESC LIMIT 365', [id]);
+    const history = await db.all<any>('SELECT * FROM daily_snapshots WHERE meter_id = ? ORDER BY date DESC LIMIT 365', [id]);
+
+    // Inject "Today" live data if not present in DB
+    const todayStr = new Date().toISOString().split('T')[0];
+    const hasToday = history.some(r => r.date === todayStr);
+
+    if (!hasToday) {
+        // Calculate live today
+        const meter = await db.get<MeterConfig>('SELECT * FROM meter_config WHERE meter_id = ?', [id]);
+        if (meter) {
+            const current = modbusService.latestCounters[id] || 0;
+            const startOfDay = modbusService.dailyStartCounters[id] || current;
+
+            let delta = 0;
+            if (current >= startOfDay) delta = current - startOfDay;
+            else delta = (4294967295 - startOfDay) + current + 1;
+
+            const todayLiters = delta * meter.pulse_volume_liters;
+
+            // Allow showing live bar even if 0, but usually charts handle 0 fine.
+            history.unshift({
+                id: -1, // temporary ID
+                meter_id: id,
+                date: todayStr,
+                daily_liters: todayLiters,
+                effective_m3: (meter.physical_meter_offset_m3 || 0) + ((current * meter.pulse_volume_liters) / 1000), // Approximate effective for chart tooltip if needed
+                is_live: true // Flag for frontend if needed
+            });
+        }
+    }
+
     return history;
 });
 
