@@ -38,9 +38,14 @@ export default function Dashboard() {
                 <div className="card">
                     <h3>Gateway Health</h3>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '1rem' }}>
-                        <span className={`status-badge status-${gateway_status === 'HEALTHY' ? 'ok' : 'down'}`}>
-                            {gateway_status}
-                        </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            <span className={`status-badge status-${gateway_status === 'HEALTHY' ? 'ok' : 'down'}`}>
+                                PLC: {gateway_status}
+                            </span>
+                            <span className={`status-badge status-${(data as any).db_status === 'OK' ? 'ok' : 'down'}`}>
+                                DB: {(data as any).db_status || 'Checking...'}
+                            </span>
+                        </div>
                         <div>
                             <small className="text-muted" style={{ display: 'block' }}>
                                 Last Update: {new Date(last_update).toLocaleTimeString()}

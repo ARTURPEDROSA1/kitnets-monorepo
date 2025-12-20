@@ -170,6 +170,8 @@ server.post('/api/meters/poll', async (req, reply) => {
 
 server.get('/api/dashboard', async (req, reply) => {
     const meters = await db.all<MeterConfig>('SELECT * FROM meter_config WHERE enabled = 1');
+    const dbOk = await db.healthCheck();
+
     const data = meters.map(m => ({
         ...m,
         current_counter: modbusService.latestCounters[m.meter_id] || 0,
@@ -177,6 +179,8 @@ server.get('/api/dashboard', async (req, reply) => {
     }));
     return {
         gateway_status: modbusService.status,
+        db_status: dbOk ? 'OK' : 'ERROR',
+        uptime: process.uptime(),
         digital_input: modbusService.digitalInputRegisterValue,
         meters: data,
         last_update: modbusService.lastUpdate
