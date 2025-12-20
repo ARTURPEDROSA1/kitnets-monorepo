@@ -33,21 +33,25 @@ export class MqttService {
     }
 
     public publishEvent(payload: GatewayStatusPayload) {
+        if (!this.client) return;
         const topic = `${CONFIG.MQTT.TOPIC_PREFIX}/gateway/events`;
         this.client.publish(topic, JSON.stringify(payload), { qos: 1 });
     }
 
     public publishDaily(meterId: string, data: any) {
+        if (!this.client) return;
         const topic = `${CONFIG.MQTT.TOPIC_PREFIX}/meters/${meterId}/daily`;
         this.client.publish(topic, JSON.stringify(data), { qos: 1 });
     }
 
     public publishMonthly(meterId: string, data: any) {
+        if (!this.client) return;
         const topic = `${CONFIG.MQTT.TOPIC_PREFIX}/meters/${meterId}/monthly`;
         this.client.publish(topic, JSON.stringify(data), { qos: 1 });
     }
 
     public publishLive(meterId: string, data: any) {
+        if (!this.client) return;
         const topic = `${CONFIG.MQTT.TOPIC_PREFIX}/meters/${meterId}/live`;
         this.client.publish(topic, JSON.stringify(data), { qos: 1 });
     }
