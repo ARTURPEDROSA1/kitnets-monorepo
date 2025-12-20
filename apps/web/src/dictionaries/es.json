@@ -1,0 +1,445 @@
+{
+    "menu": {
+        "advertise": "Anunciar",
+        "rent": "Alquilar",
+        "buy": "Comprar",
+        "launches": "Lanzamientos",
+        "calculators": "Calculadoras",
+        "usefulLinks": "Enlaces Útiles",
+        "faq": "Preguntas Frecuentes",
+        "brokers": "Corredores",
+        "agencies": "Inmobiliarias",
+        "residents": "Residentes",
+        "owners": "Propietarios",
+        "developers": "Constructoras",
+        "back": "Volver"
+    },
+    "filters": {
+        "title": "Filtrar resultados",
+        "location": "Ubicación",
+        "propertyType": "Tipo de propiedad",
+        "selectPlaceholder": "Ninguno seleccionado",
+        "kitnet": "Kitnet",
+        "studio": "Estudio",
+        "luxuryStudio": "Estudio de Lujo",
+        "flat": "Flat",
+        "apartment": "Apartamento",
+        "barracao": "Casita",
+        "house": "Casa",
+        "penthouse": "Ático",
+        "duplex": "Dúplex",
+        "pilotis": "Pilotis",
+        "townhouse": "Sobrado",
+        "bedrooms": "Dormitorios",
+        "price": "Precio",
+        "min": "mín",
+        "max": "máx",
+        "area": "Área",
+        "parking": "Plazas de aparcamiento",
+        "bathrooms": "Baños",
+        "listingHas": "El anuncio tiene",
+        "virtualTour": "Visita Virtual",
+        "video": "Video",
+        "floorPlan": "Plano de planta",
+        "features": "Filtrar por características",
+        "amenities": "Comodidades",
+        "locationOptions": "Opciones de ubicación",
+        "seeResults": "Ver resultados",
+        "createAlert": "Crear alerta",
+        "searchPlaceholder": "Busca ciudad o barrio...",
+        "moreFilters": "Más filtros",
+        "clear": "Limpiar",
+        "areaUnit": "Área (m²)",
+        "useful": "Útil",
+        "total": "Total",
+        "from": "De",
+        "to": "a",
+        "furnished": "Amueblado",
+        "balcony": "Balcón",
+        "petFriendly": "Pet Friendly",
+        "nearMetro": "Cerca del Metro"
+    },
+    "home": {
+        "welcome": "Bienvenido a Kitnets.com",
+        "subtitle": "Encuentra tu kitnet ideal.",
+        "cta": "Comenzar"
+    },
+    "onboarding": {
+        "intent": {
+            "title": "¿Cómo quieres usar Kitnets.com?",
+            "options": {
+                "find": {
+                    "label": "Encontrar una propiedad",
+                    "description": "Alquiler, compra o lanzamientos"
+                },
+                "list": {
+                    "label": "Anunciar una propiedad",
+                    "description": "Alquile o venda con datos y control"
+                },
+                "manage": {
+                    "label": "Gestionar propiedades",
+                    "description": "Panel, métricas, contratos y mercado"
+                }
+            }
+        },
+        "role": {
+            "question": "Usted es:",
+            "options": {
+                "owner": "Propietario(a)",
+                "broker": "Corredor(a)",
+                "agency": "Inmobiliaria",
+                "developer": "Constructora"
+            }
+        },
+        "value": {
+            "prefix": "Podrás:",
+            "find": [
+                "Recibir alertas de primera mano",
+                "Filtrar por barrios y precios reales",
+                "Agendar visitas sin burocracia"
+            ],
+            "list": [
+                "Anunciar en minutos",
+                "Recibir leads calificados",
+                "Seguir el mercado en tiempo real"
+            ],
+            "manage": [
+                "Usar herramientas exclusivas",
+                "Acceder a datos de mercado",
+                "Centralizar contratos y cobros"
+            ]
+        },
+        "email": {
+            "title": "Crea tu cuenta en segundos",
+            "placeholder": "Tu mejor correo",
+            "helper": "Enviaremos un enlace mágico. Sin contraseña.",
+            "cta": "Continuar"
+        },
+        "success": {
+            "title": "¡Casi listo!",
+            "message": "Enviamos un enlace mágico a tu correo. Haz clic para entrar."
+        }
+    },
+    "homeContent": {
+        "mainTitle": "Kitnets.com — La plataforma completa para kitnets, estudios y propiedades compactas",
+        "mainIntro": [
+            "Kitnets.com es la primera plataforma en Brasil creada exclusivamente para kitnets, estudios y propiedades compactas, combinando la búsqueda inteligente de propiedades, la gestión profesional de alquileres y datos de mercado en tiempo real.",
+            "Aquí, los residentes, propietarios, corredores, inmobiliarias y constructoras operan en el mismo ecosistema, con información organizada, procesos digitales e inteligencia para tomar mejores decisiones."
+        ],
+        "sections": [
+            {
+                "title": "Encuentre su kitnet ideal con más precisión",
+                "description": "Si está buscando un kitnet para alquilar o comprar, Kitnets.com ofrece:",
+                "items": [
+                    "Anuncios centrados en propiedades compactas",
+                    "Filtros inteligentes por ciudad, barrio y precio",
+                    "Alertas automáticas cuando hay nuevas propiedades disponibles",
+                    "Menos anuncios irrelevantes, más oportunidades reales"
+                ],
+                "footer": "Usted no pierde tiempo. Usted encuentra lo que busca."
+            },
+            {
+                "title": "Una nueva forma de anunciar propiedades",
+                "description": "Para corredores, inmobiliarias y propietarios, Kitnets.com es más que un portal de anuncios. Es una plataforma profesional para:",
+                "items": [
+                    "Anunciar propiedades a un público altamente cualificado",
+                    "Gestionar contratos, alquileres y ajustes",
+                    "Centralizar la comunicación con los residentes",
+                    "Eliminar hojas de cálculo, controles manuales y datos dispersos"
+                ],
+                "footer": "Todo en un solo sistema."
+            },
+            {
+                "title": "Gestión inmobiliaria como nunca existió en Brasil",
+                "description": "Kitnets.com funciona como un SaaS inmobiliario completo, ofreciendo:",
+                "items": [
+                    "Paneles claros y en tiempo real",
+                    "Informes automáticos",
+                    "Métricas de rendimiento y rentabilidad",
+                    "KPIs inéditos en el mercado brasileño",
+                    "Historial organizado de propiedades, contratos y valores"
+                ],
+                "footer": "Aquí, las propiedades dejan de ser una “caja negra” y pasan a ser activos monitoreados con datos."
+            },
+            {
+                "title": "Inteligencia de mercado para decidir mejor",
+                "description": "Kitnets.com utiliza datos reales del mercado para generar insights como:",
+                "items": [
+                    "Rangos de precios por barrio y ciudad",
+                    "Tendencias de alquiler y demanda",
+                    "Comparativos regionales",
+                    "Apoyo en la decisión de nuevas inversiones"
+                ],
+                "footer": "Ideal para quien quiere invertir, expandir o cambiar de ciudad con más seguridad."
+            },
+            {
+                "title": "Una plataforma para todos los involucrados",
+                "description": "En Kitnets.com:",
+                "items": [
+                    "Los residentes reciben alertas, siguen el mercado y abren solicitudes de mantenimiento",
+                    "Los propietarios siguen el rendimiento, los contratos y la rentabilidad",
+                    "Los corredores e inmobiliarias escalan su operación con menos costos",
+                    "Las constructoras validan la demanda y encuentran a los inversores adecuados"
+                ],
+                "footer": "Todos conectados, con datos consistentes y procesos claros."
+            },
+            {
+                "title": "Creado para la era de la Inteligencia Artificial",
+                "description": "Kitnets.com fue diseñado desde el principio para la era de la IA, con:",
+                "items": [
+                    "Datos estructurados",
+                    "Automatización de procesos",
+                    "Base para agentes inteligentes e informes avanzados",
+                    "Preparación para el futuro del mercado inmobiliario"
+                ],
+                "footer": "No es solo un sitio de propiedades. Es una infraestructura digital para el mercado de propiedades compactas."
+            },
+            {
+                "title": "Kitnets.com es para usted si:",
+                "items": [
+                    "Busca un kitnet o estudio",
+                    "Quiere anunciar propiedades con más eficiencia",
+                    "Desea gestionar alquileres de forma profesional",
+                    "Busca datos reales para invertir mejor",
+                    "Quiere salir de las hojas de cálculo y la improvisación"
+                ]
+            }
+        ],
+        "finalCta": {
+            "title": "Encuentra. Anuncia. Gestiona. Decide con datos.",
+            "subtitle": "Kitnets.com es el nuevo estándar para el mercado de kitnets y propiedades compactas en Brasil."
+        }
+    },
+    "rentPage": {
+        "title": "Propiedades en Alquiler",
+        "subtitle": "Encuentra kitnets, estudios y apartamentos ideales para ti.",
+        "foundProperties": "propiedades encontradas",
+        "sortBy": "Ordenar por:",
+        "sortOptions": {
+            "relevant": "Más relevantes",
+            "newest": "Más recientes",
+            "priceDesc": "Mayor Precio",
+            "priceAsc": "Menor Precio",
+            "sqmDesc": "Mayor Área",
+            "sqmAsc": "Menor Área"
+        },
+        "propertyImage": "Imagen de la Propiedad",
+        "rent": "Alquiler",
+        "perMonth": "/mes",
+        "seeDetails": "Ver Detalles",
+        "map": "Mapa",
+        "createAlert": "Crear Alerta"
+    },
+    "buyPage": {
+        "title": "Propiedades en Venta",
+        "subtitle": "Encuentra la casa o apartamento de tus sueños.",
+        "foundProperties": "propiedades encontradas",
+        "sortBy": "Ordenar por:",
+        "sortOptions": {
+            "relevant": "Más relevantes",
+            "newest": "Más recientes",
+            "priceDesc": "Mayor Precio",
+            "priceAsc": "Menor Precio",
+            "sqmDesc": "Mayor Área",
+            "sqmAsc": "Menor Área"
+        },
+        "propertyImage": "Imagen de la Propiedad",
+        "price": "Precio",
+        "seeDetails": "Ver Detalles",
+        "map": "Mapa",
+        "createAlert": "Crear Alerta"
+    },
+    "launchesPage": {
+        "title": "Lanzamientos y Emprendimientos",
+        "subtitle": "Encuentra los mejores lanzamientos inmobiliarios.",
+        "foundProperties": "emprendimientos encontrados",
+        "sortBy": "Ordenar por:",
+        "sortOptions": {
+            "relevant": "Más relevantes",
+            "newest": "Más recientes",
+            "priceDesc": "Mayor precio",
+            "priceAsc": "Menor precio",
+            "sqmDesc": "Mayor área",
+            "sqmAsc": "Menor área"
+        },
+        "propertyImage": "Imagen del Emprendimiento",
+        "price": "Precio",
+        "seeDetails": "Ver Detalles",
+        "map": "Mapa",
+        "createAlert": "Crear Alerta"
+    },
+    "footer": {
+        "legalNotice": "Aviso Legal",
+        "termsOfUse": "Términos de Uso",
+        "privacyPolicy": "Política de Privacidad",
+        "cookiePolicy": "Política de Cookies",
+        "disclosure": "Divulgación"
+    },
+    "login": {
+        "email": "Correo electrónico",
+        "password": "Contraseña",
+        "signIn": "Iniciar Sesión",
+        "signUp": "Registrarse",
+        "forgotPassword": "¿Olvidaste tu contraseña?"
+    },
+    "brokerLogin": {
+        "title": "Login Corredor",
+        "subtitle": "Accede a tu cuenta para gestionar propiedades y contratos.",
+        "whyRegisterTitle": "Por qué los corredores individuales deben registrarse en Kitnets.com",
+        "whyRegisterText1": "Kitnets.com fue creado para ser la principal plataforma especializada en kitnets, estudios y propiedades compactas en Brasil — un mercado con alta rotación, gran demanda y necesidad de gestión eficiente.",
+        "whyRegisterText2": "Al registrarse como corredor individual, no solo anuncia propiedades: obtiene un sistema completo para vender, alquilar y administrar contratos y alquileres, todo en un solo lugar."
+    },
+    "agencyLogin": {
+        "title": "Login Inmobiliaria",
+        "subtitle": "Gestión completa para su inmobiliaria.",
+        "whyRegisterTitle": "Por qué las inmobiliarias deben registrarse en Kitnets.com",
+        "intro": [],
+        "benefits": [],
+        "cta": "Registre su inmobiliaria, anuncie sus propiedades y use la tecnología a su favor."
+    },
+    "residentLogin": {
+        "title": "Login Residente",
+        "subtitle": "Administre sus alquileres y alertas.",
+        "whyRegisterTitle": "Por qué los residentes deberían usar Kitnets.com",
+        "intro": [],
+        "benefits": [],
+        "cta": "Cree sus alertas, siga el mercado y administre su alquiler en un solo lugar."
+    },
+    "ownerLogin": {
+        "title": "Login Propietario",
+        "subtitle": "Gestión completa de su patrimonio.",
+        "whyRegisterTitle": "Por qué los propietarios deberían usar Kitnets.com",
+        "intro": [],
+        "benefits": [],
+        "cta": "Gestione mejor. Decida con datos. Invierta con inteligencia."
+    },
+    "developerLogin": {
+        "title": "Login Constructora",
+        "subtitle": "Gestión e inteligencia de mercado.",
+        "whyRegisterTitle": "Por qué las constructoras deberían usar Kitnets.com",
+        "intro": [],
+        "benefits": [],
+        "cta": "Liste sus lanzamientos, encuentre a los inversores adecuados y decida con datos."
+    },
+    "lists": {
+        "features": [
+            "Accesible",
+            "Piscina",
+            "Parque Infantil",
+            "Portería 24h",
+            "Vista al Mar",
+            "Piso Alto",
+            "Armario Empotrado",
+            "Jardín",
+            "Estacionamiento Cubierto",
+            "Cancha de Fútbol"
+        ],
+        "amenities": [
+            "Ascensor Social",
+            "Ascensor de Servicio",
+            "Gimnasio",
+            "Aire Acondicionado",
+            "Bodega",
+            "Calentador",
+            "Calefacción Solar",
+            "Bicicletero",
+            "Lavandería",
+            "Sala de Masajes",
+            "Amueblado",
+            "Circuito de TV"
+        ],
+        "locationOptions": [
+            "Cerca Escuela Infantil",
+            "Cerca Universidad",
+            "Cerca Farmacia",
+            "Cerca Hospital",
+            "Cerca Mercado",
+            "Cerca Metro",
+            "Cerca Costa",
+            "Cerca Panadería",
+            "Cerca Parque",
+            "Cerca Parada",
+            "Cerca Restaurante"
+        ]
+    },
+    "mortgageCalculatorPage": {
+        "title": "Simulador de Amortización de Hipoteca (SAC y PRICE)",
+        "subtitle": "El poder de la amortización: descubra lo que los bancos no explican sobre intereses, plazos y ahorro.",
+        "intro": {
+            "text1": "Pocas personas lo saben, pero la forma en que amortiza una hipoteca puede ahorrar decenas — o incluso cientos — de miles en intereses.",
+            "text2": "Los bancos no explican esto claramente porque cuanto más tiempo tarde en pagar el préstamo, más intereses y seguros pagará.",
+            "text3": "La buena noticia es que con la estrategia correcta, puede poner este juego a su favor.",
+            "listTitle": "Con este Simulador de Amortización Inmobiliaria (SAC y PRICE), puede visualizar exactamente:",
+            "listItems": [
+                "Cómo evoluciona el saldo deudor a lo largo del tiempo",
+                "El impacto real de las amortizaciones anticipadas",
+                "La diferencia entre reducir la cuota o reducir el plazo",
+                "Cuánto ahorra en intereses, MIP y DFI",
+                "El efecto del uso del FGTS cada 24 meses"
+            ],
+            "text4": "Todo esto con una tabla detallada, similar a la del banco, y gráficos claros que muestran el antes y el después de las amortizaciones."
+        },
+        "whatToSimulate": {
+            "title": "Lo que este simulador le permite hacer",
+            "list1Title": "Comparar SAC vs PRICE de forma transparente",
+            "list2Title": "Simular amortizaciones con:",
+            "list2Items": [
+                "FGTS",
+                "Dinero extra (bono, ahorros, ingresos extra)"
+            ],
+            "list3Title": "Elegir el efecto de la amortización:",
+            "list3Items": [
+                "Reducir el valor de la cuota",
+                "Reducir el plazo del financiamiento"
+            ],
+            "list4Title": "Visualizar:",
+            "list4Items": [
+                "Ahorro total en intereses",
+                "Reducción del tiempo de financiamiento",
+                "Evolución del saldo deudor mes a mes"
+            ],
+            "list5Title": "Acceder a una tabla detallada, en el estándar de los bancos, con:",
+            "list5Items": [
+                "Intereses",
+                "Amortización",
+                "Seguros (MIP / DFI)",
+                "Amortizaciones extras destacadas"
+            ]
+        },
+        "whyAmortize": {
+            "title": "¿Por qué amortizar cambia todo?",
+            "subtitle": "¿Por qué es tan poderosa la amortización anticipada?",
+            "text1": "En una hipoteca, los intereses y el seguro MIP se calculan sobre el saldo deudor.",
+            "text2": "Cuando amortiza antes:",
+            "listItems": [
+                "El saldo cae más rápido",
+                "Los intereses futuros disminuyen",
+                "El seguro obligatorio (MIP) también se vuelve más barato",
+                "El costo total del financiamiento se desploma"
+            ],
+            "text3": "Es decir: amortizar temprano vale mucho más que amortizar tarde.",
+            "text4": "Este simulador muestra esto de forma visual y numérica — algo que normalmente solo aparece escondido en las hojas de cálculo técnicas de los bancos."
+        },
+        "fgtsSection": {
+            "title": "Usar el FGTS para amortizar: ¿vale la pena?",
+            "text1": "En la mayoría de los préstamos, el FGTS se puede usar cada 24 meses para amortización.",
+            "listTitle": "Aquí puede simular:",
+            "listItems": [
+                "Cuándo usar el FGTS",
+                "Cuánto amortizar",
+                "Si es mejor reducir cuota o plazo",
+                "El impacto real en el valor final pagado"
+            ],
+            "text2": "Así, decide con base en números — no en suposiciones."
+        },
+        "ctaSection": {
+            "title": "Simule ahora y vea cuánto puede ahorrar",
+            "text1": "Complete los datos de su financiamiento, pruebe diferentes estrategias de amortización y descubra cuánto tiempo y dinero puede ahorrar.",
+            "text2": "En muchos casos, el ahorro supera los R$ 100 mil en intereses a lo largo del contrato."
+        },
+        "meta": {
+            "title": "Simulador de Amortización de Hipoteca (SAC y PRICE) | Kitnets.com",
+            "description": "Simule amortizaciones de hipoteca (SAC o PRICE), use FGTS o dinero extra y descubra cuánto puede ahorrar en intereses, plazo y costo total."
+        }
+    }
+}

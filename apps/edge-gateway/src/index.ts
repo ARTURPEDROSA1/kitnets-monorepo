@@ -1,0 +1,165 @@
+import Fastify from 'fastify';
+import cors from '@fastify/cors';
+import staticFiles from '@fastify/static';
+import path from 'path';
+import { CONFIG } from './config';
+import { modbusService } from './services/modbus';
+import { mqttService } from './services/mqtt';
+import { startScheduler } from './services/scheduler';
+import db from './database/db';
+import { MeterConfig } from './types';
+
+const server = Fastify({
+    logger: true
+});
+
+server.register(cors, {
+    origin: true
+});
+
+// Serve static frontend
+server.register(staticFiles, {
+    root: path.join(__dirname, '../client/dist'),
+    prefix: '/',
+    // Fallback?
+    // SPA fallback: if file not found, serve index.html?
+    // @fastify/static supports wildcards but for SPA fallback we usually register a wildcard route.
+});
+
+server.setNotFoundHandler((req, reply) => {
+    // Check if API call
+    if (req.raw.url && req.raw.url.startsWith('/api')) {
+        reply.code(404).send({ error: 'Endpoint not found' });
+    } else {
+        // Serve index.html for client routing
+        reply.sendFile('index.html');
+    }
+});
+
+// API Routes
+server.get('/api/health', async (request, reply) => {
+    return {
+        status: modbusService.status,
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        modbus_last_update: modbusService.lastUpdate,
+        digital_input: modbusService.digitalInputRegisterValue
+    };
+});
+
+server.get('/api/config', async (req, reply) => {
+    const meters = await db.all('SELECT * FROM meter_config');
+    return {
+        config: CONFIG,
+        meters
+    };
+});
+
+server.put('/api/config', async (req, reply) => {
+    const body = req.body as any;
+    try {
+        if (body.meters) {
+            for (const m of body.meters) {
+                await db.run(
+                    `UPDATE meter_config SET display_name=?, pulse_volume_liters=?, counter_lsb_register=?, counter_msb_register=?, physical_meter_offset_m3=?, enabled=? WHERE meter_id=?`,
+                    [m.display_name, m.pulse_volume_liters, m.counter_lsb_register, m.counter_msb_register, m.physical_meter_offset_m3, m.enabled, m.meter_id]
+                );
+            }
+        }
+        return { success: true };
+    } catch (e) {
+        server.log.error(e);
+        reply.code(500).send({ error: "Failed to update config" });
+    }
+});
+
+server.get('/api/meters/:id/daily', async (req: any, reply) => {
+    const { id } = req.params;
+    const history = await db.all('SELECT * FROM daily_snapshots WHERE meter_id = ? ORDER BY date DESC LIMIT 365', [id]);
+    return history;
+});
+
+server.get('/api/meters/:id/monthly', async (req: any, reply) => {
+    const { id } = req.params;
+    const history = await db.all('SELECT * FROM monthly_consumption WHERE meter_id = ? ORDER BY year DESC, month DESC LIMIT 60', [id]);
+    return history;
+});
+
+server.post('/api/meters/:id/reset', async (req: any, reply) => {
+    const { id } = req.params;
+
+    // Logic to map meter ID to counter index for reset
+    // Default Map:
+    // C1: 40023(LSB) -> Index 1
+    // C2: 40025 -> Index 2
+    // C3: 40027 -> Index 3
+    // C4: 40029 -> Index 4
+    // C5: 40031 -> Index 5
+
+    try {
+        const meter = await db.get<MeterConfig>('SELECT * FROM meter_config WHERE meter_id = ?', [id]);
+        if (!meter) {
+            reply.code(404).send({ error: "Meter not found" });
+            return;
+        }
+
+        const base = 40023;
+        const offset = meter.counter_lsb_register - base;
+
+        let index = -1;
+        // Check if registers match standard spacing
+        if (offset >= 0 && offset % 2 === 0) {
+            index = (offset / 2) + 1;
+        }
+
+        if (index < 1 || index > 32) { // 32 is max bits in 32-bit register usually, though Modbus reset likely supports fewer.
+            // If we can't determine index, we fail for safety.
+            reply.code(400).send({ error: "Cannot determine reset bit index from register address" });
+            return;
+        }
+
+        await modbusService.resetCounter(index);
+        return { success: true, message: `Counter ${index} reset triggered` };
+    } catch (e) {
+        reply.code(500).send({ error: "Reset failed", details: String(e) });
+    }
+});
+
+server.post('/api/meters/poll', async (req, reply) => {
+    await (modbusService as any).poll();
+    return {
+        latest: modbusService.latestCounters,
+        digital: modbusService.digitalInputRegisterValue
+    };
+});
+
+server.get('/api/dashboard', async (req, reply) => {
+    const meters = await db.all<MeterConfig>('SELECT * FROM meter_config WHERE enabled = 1');
+    const data = meters.map(m => ({
+        ...m,
+        current_counter: modbusService.latestCounters[m.meter_id] || 0,
+        status: modbusService.latestCounters[m.meter_id] !== undefined ? 'OK' : 'WAITING'
+    }));
+    return {
+        gateway_status: modbusService.status,
+        digital_input: modbusService.digitalInputRegisterValue,
+        meters: data,
+        last_update: modbusService.lastUpdate
+    };
+});
+
+
+const start = async () => {
+    try {
+        await modbusService.start();
+        startScheduler();
+
+        await server.listen({ port: CONFIG.SERVER.PORT, host: CONFIG.SERVER.HOST });
+        console.log(`Server listening at http://${CONFIG.SERVER.HOST}:${CONFIG.SERVER.PORT}`);
+    } catch (err) {
+        server.log.error(err);
+        process.exit(1);
+    }
+};
+
+start();
