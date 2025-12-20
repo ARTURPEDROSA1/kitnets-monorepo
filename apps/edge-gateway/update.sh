@@ -1,46 +1,24 @@
 #!/bin/bash
 set -e
 
-# Kitnets Gateway Updater
-# v1.2
+# Resolve Repository Root (Assuming script is in apps/edge-gateway)
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
+REPO_ROOT=$(realpath "$SCRIPT_DIR/../../..")
 
-INSTALL_DIR="/opt/kitnets-gateway"
+echo ">>> Kitnets Gateway Updater <<<"
 
-echo "Updating Kitnets Gateway..."
+# 1. Reset critical scripts to avoid merge conflicts
+echo "[1/3] Resetting scripts to avoid conflicts..."
+cd "$REPO_ROOT"
+git checkout apps/edge-gateway/install.sh
+git checkout apps/edge-gateway/update.sh 2>/dev/null || true
 
-if [ ! -d "$INSTALL_DIR" ]; then
-    echo "Error: Directory $INSTALL_DIR not found. Is it installed?"
-    exit 1
-fi
+# 2. Pull latest code
+echo "[2/3] Pulling latest source code..."
+git pull
 
-cd $INSTALL_DIR
-
-# 1. Pull latest code (Assumes git)
-echo "[1/3] Pulling latest changes..."
-# If it's a git repo
-if [ -d ".git" ]; then
-    git pull
-else
-    echo "Not a git repository. Skipping git pull. Please copy new files manually if not using git."
-fi
-
-# 2. Rebuild
-echo "[2/3] Rebuilding..."
-npm install
-npm run build --if-present
-
-if [ -d "client" ]; then
-    cd client
-    npm install
-    npm run build
-    cd ..
-fi
-
-# 3. Restart
-echo "[3/3] Restarting Service..."
-sudo systemctl restart kitnets-gateway
-
-echo "========================================"
-echo "Update Complete!"
-echo "Version: $(node -p "require('./package.json').version")"
-echo "========================================"
+# 3. Execute Installer
+echo "[3/3] Launching installer..."
+cd apps/edge-gateway
+chmod +x install.sh
+sudo ./install.sh
