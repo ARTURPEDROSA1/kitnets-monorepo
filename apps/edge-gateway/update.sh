@@ -3,7 +3,7 @@ set -e
 
 # Resolve Repository Root (Assuming script is in apps/edge-gateway)
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
-REPO_ROOT=$(realpath "$SCRIPT_DIR/../../..")
+REPO_ROOT=$(realpath "$SCRIPT_DIR/../..")
 
 echo ">>> Kitnets Gateway Updater <<<"
 
