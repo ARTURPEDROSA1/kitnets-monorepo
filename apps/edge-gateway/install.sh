@@ -29,12 +29,24 @@ if [ ! -d "$INSTALL_DIR" ]; then
     sudo mkdir -p $INSTALL_DIR
 fi
 
-# Use rsync if available for safe sync (preserves .env, skips .git/node_modules)
+# Use rsync if available for safe sync (preserves .env and data/, skips .git/node_modules)
 if command -v rsync &> /dev/null; then
-    sudo rsync -av --exclude='.env' --exclude='.git' --exclude='node_modules' --exclude='dist' --exclude='client/node_modules' --exclude='client/dist' ./ $INSTALL_DIR/
+    sudo rsync -av --exclude='.env' --exclude='data' --exclude='.git' --exclude='node_modules' --exclude='dist' --exclude='client/node_modules' --exclude='client/dist' ./ $INSTALL_DIR/
 else
-    echo "rsync not found, using cp. (Ensure you do not have a .env file in your source folder that overwrites production config)"
-    sudo cp -r ./* $INSTALL_DIR/
+    echo "rsync not found. Installing..."
+    if command -v apt-get &> /dev/null; then
+        sudo apt-get install -y rsync
+        sudo rsync -av --exclude='.env' --exclude='data' --exclude='.git' --exclude='node_modules' --exclude='dist' --exclude='client/node_modules' --exclude='client/dist' ./ $INSTALL_DIR/
+    else
+        echo "Warning: Using cp. This might overwrite data if not careful."
+        # Backup data if exists
+        if [ -d "$INSTALL_DIR/data" ]; then
+             sudo cp -r $INSTALL_DIR/data $INSTALL_DIR/data_backup_$(date +%s)
+        fi
+        sudo cp -r ./* $INSTALL_DIR/
+        # Restore is manual if needed, but cp overwrites.
+        # Ideally we just insist on rsync.
+    fi
 fi
 
 # Fix permissions
