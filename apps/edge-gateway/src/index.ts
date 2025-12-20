@@ -226,6 +226,7 @@ server.get('/api/dashboard', async (req, reply) => {
     });
 
     month_m3 = monthStoredM3 + today_m3;
+    const today_liters = today_m3 * 1000;
 
     return {
         gateway_status: modbusService.status,
@@ -237,6 +238,7 @@ server.get('/api/dashboard', async (req, reply) => {
         aggregates: {
             total_effective_m3,
             today_m3,
+            today_liters,
             month_m3,
             prev_month_m3
         }
