@@ -36,12 +36,15 @@ server.setNotFoundHandler((req, reply) => {
     }
 });
 
+const BUILD_ID = Date.now().toString();
+
 // API Routes
 server.get('/api/health', async (request, reply) => {
     return {
         status: modbusService.status,
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
+        build_id: BUILD_ID,
         modbus_last_update: modbusService.lastUpdate,
         digital_input: modbusService.digitalInputRegisterValue
     };
