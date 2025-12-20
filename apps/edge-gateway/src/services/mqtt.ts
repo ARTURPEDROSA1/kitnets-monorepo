@@ -3,9 +3,16 @@ import { CONFIG } from '../config';
 import { GatewayStatusPayload, GatewayHealth } from '../types';
 
 export class MqttService {
-    private client: mqtt.MqttClient;
+    private client: mqtt.MqttClient | null = null;
 
     constructor() {
+        // Lazy init
+    }
+
+    public start() {
+        if (this.client) return;
+
+        console.log(`Starting MQTT Service with broker: ${CONFIG.MQTT.BROKER_URL}`);
         this.client = mqtt.connect(CONFIG.MQTT.BROKER_URL, {
             reconnectPeriod: 5000,
         });
@@ -14,8 +21,8 @@ export class MqttService {
             console.log(`Connected to MQTT Broker at ${CONFIG.MQTT.BROKER_URL}`);
             this.publishEvent({
                 event: 'gateway_status',
-                status: 'HEALTHY', // Should get actual status
-                gateway_ip: CONFIG.MODBUS.HOST, // Or local IP
+                status: 'HEALTHY',
+                gateway_ip: CONFIG.MODBUS.HOST,
                 timestamp: new Date().toISOString()
             });
         });
