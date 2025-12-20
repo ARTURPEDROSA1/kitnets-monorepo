@@ -1,0 +1,825 @@
+{
+    "menu": {
+        "advertise": "Anunciar",
+        "rent": "Alugar",
+        "buy": "Comprar",
+        "launches": "Lançamentos",
+        "calculators": "Calculadoras",
+        "usefulLinks": "Links Uteis",
+        "faq": "Perguntas frequentes",
+        "brokers": "Corretores",
+        "agencies": "Imobiliarias",
+        "residents": "Moradores",
+        "owners": "Proprietarios",
+        "developers": "Construtoras",
+        "back": "Voltar"
+    },
+    "filters": {
+        "title": "Filtrar resultados",
+        "location": "Localização",
+        "propertyType": "Tipo do imóvel",
+        "selectPlaceholder": "Nenhum selecionado",
+        "kitnet": "Kitnet",
+        "studio": "Studio",
+        "luxuryStudio": "Studio Luxo",
+        "flat": "Flat",
+        "apartment": "Apartamento",
+        "barracao": "Barracão",
+        "house": "Casa",
+        "penthouse": "Cobertura",
+        "duplex": "Duplex",
+        "pilotis": "Pilotis",
+        "townhouse": "Sobrado",
+        "bedrooms": "Número de quartos",
+        "price": "Valor",
+        "min": "mínimo",
+        "max": "máximo",
+        "area": "Área",
+        "parking": "Número de vagas",
+        "bathrooms": "Número de banheiros",
+        "listingHas": "Anúncio possui",
+        "virtualTour": "Tour Virtual",
+        "video": "Vídeo",
+        "floorPlan": "Desenho da planta",
+        "features": "Filtrar por características",
+        "amenities": "Comodidade",
+        "locationOptions": "Opções de localização",
+        "seeResults": "Ver resultados",
+        "createAlert": "Criar alerta",
+        "searchPlaceholder": "Digite uma cidade ou bairro...",
+        "moreFilters": "Mais filtros",
+        "clear": "Limpar",
+        "areaUnit": "Área (m²)",
+        "useful": "Útil",
+        "total": "Total",
+        "from": "De",
+        "to": "até",
+        "furnished": "Mobiliado",
+        "balcony": "Varanda",
+        "petFriendly": "Pet Friendly",
+        "nearMetro": "Metrô prox."
+    },
+    "home": {
+        "welcome": "Bem-vindo ao Kitnets.com",
+        "subtitle": "Encontre sua kitnet ideal.",
+        "cta": "Começar"
+    },
+    "onboarding": {
+        "intent": {
+            "title": "Como você quer usar o Kitnets.com?",
+            "options": {
+                "find": {
+                    "label": "Encontrar um imóvel",
+                    "description": "Aluguel, compra ou lançamentos"
+                },
+                "list": {
+                    "label": "Anunciar um imóvel",
+                    "description": "Alugue ou venda com dados e controle"
+                },
+                "manage": {
+                    "label": "Gerenciar imóveis",
+                    "description": "Painel, métricas, contratos e mercado"
+                }
+            }
+        },
+        "role": {
+            "question": "Você é:",
+            "options": {
+                "owner": "Proprietário(a)",
+                "broker": "Corretor(a)",
+                "agency": "Imobiliária",
+                "developer": "Construtora"
+            }
+        },
+        "value": {
+            "prefix": "Você vai poder:",
+            "find": [
+                "Receber alertas em primeira mão",
+                "Filtrar por bairros e preços reais",
+                "Agendar visitas sem burocracia"
+            ],
+            "list": [
+                "Anunciar em minutos",
+                "Receber leads qualificados",
+                "Acompanhar o mercado em tempo real"
+            ],
+            "manage": [
+                "Usar ferramentas exclusivas",
+                "Acessar dados de mercado",
+                "Centralizar contratos e recebimentos"
+            ]
+        },
+        "email": {
+            "title": "Crie sua conta em segundos",
+            "placeholder": "Seu melhor email",
+            "helper": "Enviaremos um link mágico. Sem senha.",
+            "cta": "Continuar"
+        },
+        "success": {
+            "title": "Quase lá!",
+            "message": "Enviamos um link mágico para o seu email. Clique nele para entrar."
+        }
+    },
+    "homeContent": {
+        "mainTitle": "Kitnets.com — A plataforma completa para kitnets, studios e imóveis compactos",
+        "mainIntro": [
+            "O Kitnets.com é a primeira plataforma no Brasil criada exclusivamente para kitnets, studios e imóveis compactos, unindo busca inteligente de imóveis, gestão profissional de aluguéis e dados de mercado em tempo real.",
+            "Aqui, moradores, proprietários, corretores, imobiliárias e construtoras operam no mesmo ecossistema, com informações organizadas, processos digitais e inteligência para tomar melhores decisões."
+        ],
+        "sections": [
+            {
+                "title": "Encontre sua kitnet ideal com mais precisão",
+                "description": "Se você está procurando uma kitnet para alugar ou comprar, o Kitnets.com oferece:",
+                "items": [
+                    "Anúncios focados em imóveis compactos",
+                    "Filtros inteligentes por cidade, bairro e preço",
+                    "Alertas automáticos quando novos imóveis ficam disponíveis",
+                    "Menos anúncios irrelevantes, mais oportunidades reais"
+                ],
+                "footer": "Você não perde tempo. Você encontra o que procura."
+            },
+            {
+                "title": "Uma nova forma de anunciar imóveis",
+                "description": "Para corretores, imobiliárias e proprietários, o Kitnets.com é mais do que um portal de anúncios. É uma plataforma profissional para:",
+                "items": [
+                    "Anunciar imóveis com público altamente qualificado",
+                    "Gerenciar contratos, aluguéis e reajustes",
+                    "Centralizar comunicação com moradores",
+                    "Eliminar planilhas, controles manuais e dados dispersos"
+                ],
+                "footer": "Tudo em um único sistema."
+            },
+            {
+                "title": "Gestão imobiliária como nunca existiu no Brasil",
+                "description": "O Kitnets.com funciona como um SaaS imobiliário completo, oferecendo:",
+                "items": [
+                    "Dashboards claros e em tempo real",
+                    "Relatórios automáticos",
+                    "Métricas de desempenho e rentabilidade",
+                    "KPIs inéditos no mercado brasileiro",
+                    "Histórico organizado de imóveis, contratos e valores"
+                ],
+                "footer": "Aqui, imóveis deixam de ser “caixa preta” e passam a ser ativos monitorados com dados."
+            },
+            {
+                "title": "Inteligência de mercado para decidir melhor",
+                "description": "O Kitnets.com utiliza dados reais do mercado para gerar insights como:",
+                "items": [
+                    "Faixas de preço por bairro e cidade",
+                    "Tendências de aluguel e demanda",
+                    "Comparativos regionais",
+                    "Apoio à decisão de novos investimentos"
+                ],
+                "footer": "Ideal para quem quer investir, expandir ou mudar de cidade com mais segurança."
+            },
+            {
+                "title": "Uma plataforma para todos os envolvidos",
+                "description": "No Kitnets.com:",
+                "items": [
+                    "Moradores recebem alertas, acompanham o mercado e abrem solicitações de manutenção",
+                    "Proprietários acompanham desempenho, contratos e rentabilidade",
+                    "Corretores e imobiliárias escalam sua operação com menos custo",
+                    "Construtoras validam demanda e encontram investidores"
+                ],
+                "footer": "Todos conectados, com dados consistentes e processos claros."
+            },
+            {
+                "title": "Criado para a era da Inteligência Artificial",
+                "description": "O Kitnets.com foi arquitetado desde o início para a era da IA, com:",
+                "items": [
+                    "Dados estruturados",
+                    "Automação de processos",
+                    "Base para agentes inteligentes e relatórios avançados",
+                    "Preparação para o futuro do mercado imobiliário"
+                ],
+                "footer": "Não é apenas um site de imóveis. É uma infraestrutura digital para o mercado de imóveis compactos."
+            },
+            {
+                "title": "Kitnets.com é para você se:",
+                "items": [
+                    "Procura uma kitnet ou studio",
+                    "Quer anunciar imóveis com mais eficiência",
+                    "Deseja gerenciar aluguéis de forma profissional",
+                    "Busca dados reais para investir melhor",
+                    "Quer sair das planilhas e do improviso"
+                ]
+            }
+        ],
+        "finalCta": {
+            "title": "Encontre. Anuncie. Gerencie. Decida com dados.",
+            "subtitle": "O Kitnets.com é o novo padrão para o mercado de kitnets e imóveis compactos no Brasil."
+        }
+    },
+    "rentPage": {
+        "title": "Imóveis para Alugar",
+        "subtitle": "Encontre kitnets, studios e apartamentos ideais para você.",
+        "foundProperties": "imóveis encontrados",
+        "sortBy": "Ordenar por:",
+        "sortOptions": {
+            "relevant": "Mais relevantes",
+            "newest": "Mais recentes",
+            "priceDesc": "Maior preço",
+            "priceAsc": "Menor preço",
+            "sqmDesc": "Maior área",
+            "sqmAsc": "Menor área"
+        },
+        "propertyImage": "Imagem do Imóvel",
+        "rent": "Aluguel",
+        "perMonth": "/mês",
+        "seeDetails": "Ver Detalhes",
+        "map": "Mapa",
+        "createAlert": "Criar alerta"
+    },
+    "buyPage": {
+        "title": "Imóveis para Comprar",
+        "subtitle": "Encontre a casa ou apartamento dos seus sonhos.",
+        "foundProperties": "imóveis encontrados",
+        "sortBy": "Ordenar por:",
+        "sortOptions": {
+            "relevant": "Mais relevantes",
+            "newest": "Mais recentes",
+            "priceDesc": "Maior preço",
+            "priceAsc": "Menor preço",
+            "sqmDesc": "Maior área",
+            "sqmAsc": "Menor área"
+        },
+        "propertyImage": "Imagem do Imóvel",
+        "price": "Preço",
+        "seeDetails": "Ver Detalhes",
+        "map": "Mapa",
+        "createAlert": "Criar alerta"
+    },
+    "launchesPage": {
+        "title": "Lançamentos e Empreendimentos",
+        "subtitle": "Encontre os melhores lançamentos imobiliários.",
+        "foundProperties": "empreendimentos encontrados",
+        "sortBy": "Ordenar por:",
+        "sortOptions": {
+            "relevant": "Mais relevantes",
+            "newest": "Mais recentes",
+            "priceDesc": "Maior preço",
+            "priceAsc": "Menor preço",
+            "sqmDesc": "Maior área",
+            "sqmAsc": "Menor área"
+        },
+        "propertyImage": "Imagem do Empreendimento",
+        "price": "Preço",
+        "seeDetails": "Ver Detalhes",
+        "map": "Mapa",
+        "createAlert": "Criar alerta"
+    },
+    "footer": {
+        "legalNotice": "Aviso Legal",
+        "termsOfUse": "Termos de Uso",
+        "privacyPolicy": "Política de Privacidade",
+        "cookiePolicy": "Política de Cookies",
+        "disclosure": "Disclosure"
+    },
+    "login": {
+        "email": "Email",
+        "password": "Senha",
+        "signIn": "Entrar",
+        "signUp": "Cadastre-se",
+        "forgotPassword": "Esqueci minha senha"
+    },
+    "brokerLogin": {
+        "title": "Login Corretor",
+        "subtitle": "Acesse sua conta para gerenciar imóveis e contratos.",
+        "whyRegisterTitle": "Por que corretores individuais devem se cadastrar no Kitnets.com",
+        "intro": [
+            "O Kitnets.com foi criado para ser a principal plataforma especializada em kitnets, studios e imóveis compactos no Brasil — um mercado com alta rotatividade, grande demanda e necessidade de gestão eficiente.",
+            "Ao se cadastrar como corretor individual, você não apenas anuncia imóveis: você passa a contar com um sistema completo para vender, alugar e administrar contratos e aluguéis, tudo em um só lugar."
+        ],
+        "benefits": [
+            {
+                "title": "Mais visibilidade para seus anúncios",
+                "items": [
+                    "Plataforma focada exclusivamente em imóveis compactos",
+                    "Público altamente qualificado (inquilinos, investidores e proprietários)",
+                    "Anúncios com maior taxa de conversão do que portais genéricos",
+                    "Posicionamento orgânico (SEO) voltado para buscas como “kitnet para alugar”, “studio para investir”, etc."
+                ]
+            },
+            {
+                "title": "Ferramentas profissionais de gestão (SaaS)",
+                "description": "O Kitnets.com vai além do anúncio. Você tem acesso a um painel profissional para:",
+                "items": [
+                    "Gerenciar todos os seus imóveis em um único dashboard",
+                    "Controlar contratos de aluguel (datas, reajustes, vencimentos)",
+                    "Acompanhar valores de aluguel, taxas e repasses",
+                    "Receber alertas de vencimento e renovação de contrato",
+                    "Centralizar informações do imóvel, proprietário e inquilino",
+                    "Menos planilhas. Menos retrabalho. Mais controle."
+                ]
+            },
+            {
+                "title": "Gestão de contratos com inteligência",
+                "items": [
+                    "Registro estruturado de contratos",
+                    "Controle de índices de reajuste (IPCA, FipeZap, VAR, etc.)",
+                    "Histórico de reajustes e valores",
+                    "Organização profissional para auditorias, renovações e negociações",
+                    "Ideal para quem administra vários imóveis e precisa escala sem perder controle."
+                ]
+            },
+            {
+                "title": "Geração de leads qualificados",
+                "items": [
+                    "Contato direto com interessados reais",
+                    "Leads que já sabem o que querem: kitnets e studios",
+                    "Redução do tempo médio para fechamento de negócio"
+                ]
+            },
+            {
+                "title": "Credibilidade e autoridade profissional",
+                "description": "Ao estar presente no Kitnets.com, você:",
+                "items": [
+                    "Aumenta sua presença digital",
+                    "Fortalece sua marca pessoal como corretor especialista",
+                    "Transmite mais profissionalismo para proprietários e investidores"
+                ]
+            },
+            {
+                "title": "Plataforma em constante evolução",
+                "description": "O Kitnets.com está sendo desenvolvido como um ecossistema completo, com:",
+                "items": [
+                    "Calculadoras imobiliárias (rentabilidade, financiamento, aluguel x compra)",
+                    "Automação de processos",
+                    "Futuras integrações com assinatura digital, pagamentos e relatórios avançados",
+                    "Você entra agora e cresce junto com a plataforma."
+                ]
+            },
+            {
+                "title": "Para quem o Kitnets.com é ideal?",
+                "items": [
+                    "Corretores autônomos",
+                    "Corretores especializados em locação",
+                    "Profissionais que trabalham com imóveis de alta rotatividade",
+                    "Corretores que querem reduzir trabalho operacional e focar em fechar negócios"
+                ]
+            }
+        ],
+        "cta": "Cadastre-se gratuitamente, anuncie seus imóveis e gerencie seus contratos com mais eficiência. O Kitnets.com foi feito para quem vive o mercado imobiliário na prática."
+    },
+    "agencyLogin": {
+        "title": "Login Imobiliária",
+        "subtitle": "Gestão completa para sua imobiliária.",
+        "whyRegisterTitle": "Por que imobiliárias devem se cadastrar no Kitnets.com",
+        "intro": [
+            "O Kitnets.com é uma plataforma imobiliária criada desde o início para a era da Inteligência Artificial, com foco em parceria com imobiliárias, automação de processos e uso inteligente de dados para gerar mais negócios, com menos custo operacional.",
+            "Nosso objetivo não é substituir imobiliárias. É potencializar o trabalho delas."
+        ],
+        "benefits": [
+            {
+                "title": "Especialização que gera resultado",
+                "description": "O Kitnets.com é verticalizado em um dos segmentos mais ativos do mercado imobiliário: kitnets, studios e imóveis compactos. Isso significa:",
+                "items": [
+                    "Público altamente segmentado e qualificado",
+                    "Maior taxa de conversão em locação e venda",
+                    "Menor desperdício de leads genéricos",
+                    "Visibilidade onde a demanda realmente existe: Enquanto portais generalistas competem por atenção, o Kitnets.com entrega intenção real de negócio."
+                ]
+            },
+            {
+                "title": "Plataforma pensada para a era da IA",
+                "description": "O mercado mudou. O cliente mudou. E a forma de operar também precisa mudar. O Kitnets.com foi arquitetado para:",
+                "items": [
+                    "Estruturar dados imobiliários de forma padronizada",
+                    "Automatizar tarefas operacionais repetitivas",
+                    "Preparar sua imobiliária para integração com agentes de IA",
+                    "Transformar dados em decisões melhores",
+                    "Isso significa menos trabalho manual e mais foco em relacionamento, negociação e crescimento."
+                ]
+            },
+            {
+                "title": "SaaS completo para gestão imobiliária",
+                "description": "Ao se cadastrar, sua imobiliária tem acesso a um sistema profissional de gestão, incluindo:",
+                "items": [
+                    "Cadastro e gestão centralizada de imóveis",
+                    "Controle de contratos e vencimentos",
+                    "Gestão de reajustes (IPCA, FipeZap, VAR, entre outros)",
+                    "Organização de proprietários, inquilinos e corretores",
+                    "Histórico completo de valores, contratos e negociações",
+                    "Tudo estruturado para escala operacional, mesmo com equipes enxutas."
+                ]
+            },
+            {
+                "title": "Geração de leads qualificados (e dados proprietários)",
+                "items": [
+                    "Leads focados exclusivamente em imóveis compactos",
+                    "Contato direto com interessados reais",
+                    "Dados que pertencem à sua imobiliária",
+                    "Redução de dependência de portais caros e genéricos: O Kitnets.com ajuda sua imobiliária a construir base própria de dados e relacionamento, ativo estratégico no longo prazo."
+                ]
+            },
+            {
+                "title": "Parceria, não competição",
+                "description": "O modelo do Kitnets.com é:",
+                "items": [
+                    "Sem intermediação forçada",
+                    "Sem disputar cliente final com a imobiliária",
+                    "Sem canibalizar sua marca",
+                    "Sua imobiliária mantém o relacionamento com clientes",
+                    "Usa a plataforma como canal e ferramenta",
+                    "Ganha eficiência, visibilidade e inteligência"
+                ]
+            },
+            {
+                "title": "Preparação para o futuro do mercado imobiliário",
+                "description": "Nos próximos anos:",
+                "items": [
+                    "A IA fará triagem de leads",
+                    "Contratos serão analisados automaticamente",
+                    "Reajustes e riscos serão calculados em tempo real",
+                    "Plataformas que não estruturarem dados ficarão para trás",
+                    "O Kitnets.com existe para garantir que imobiliárias estejam na frente dessa transformação, não reagindo a ela."
+                ]
+            },
+            {
+                "title": "Para quais imobiliárias o Kitnets.com é ideal?",
+                "items": [
+                    "Imobiliárias de locação residencial",
+                    "Especialistas em imóveis compactos",
+                    "Operações com alto volume e alta rotatividade",
+                    "Empresas que querem escalar sem inflar custos"
+                ]
+            }
+        ],
+        "cta": "Cadastre sua imobiliária, anuncie seus imóveis e use a tecnologia a seu favor. O Kitnets.com é a ponte entre o mercado imobiliário tradicional e a nova era orientada por dados e inteligência artificial."
+    },
+    "residentLogin": {
+        "title": "Login Morador",
+        "subtitle": "Gerencie seus alugueis e alertas.",
+        "whyRegisterTitle": "Por que moradores devem usar o Kitnets.com",
+        "intro": [
+            "O Kitnets.com foi criado para tornar a vida de quem aluga um imóvel mais simples, previsível e transparente — especialmente para quem busca kitnets, studios e imóveis compactos.",
+            "Mais do que um portal de anúncios, o Kitnets.com funciona como um centro inteligente de informações e serviços para moradores."
+        ],
+        "benefits": [
+            {
+                "title": "Alertas personalizados para o imóvel ideal",
+                "description": "Cansado de perder boas oportunidades? No Kitnets.com você pode:",
+                "items": [
+                    "Criar alertas personalizados por bairro, cidade e faixa de preço",
+                    "Definir características do imóvel ideal (tipo, metragem, mobiliado, etc.)",
+                    "Receber notificações assim que um imóvel compatível for anunciado",
+                    "Você deixa de “caçar anúncios” e passa a ser avisado automaticamente quando seu imóvel dos sonhos aparece."
+                ]
+            },
+            {
+                "title": "Planejando mudar de cidade? Use dados reais",
+                "description": "Se você está pensando em se mudar para outra cidade, o Kitnets.com ajuda você a tomar decisões mais seguras, com informações como:",
+                "items": [
+                    "Faixas de preço de aluguel por região",
+                    "Tendência do mercado local",
+                    "Comparação entre bairros",
+                    "Histórico de reajustes e variações de aluguel",
+                    "Tudo com base em dados reais do mercado — não apenas anúncios isolados."
+                ]
+            },
+            {
+                "title": "Comunicação direta e organizada com imobiliária ou proprietário",
+                "description": "Quando sua imobiliária ou proprietário utiliza o Kitnets.com, você pode:",
+                "items": [
+                    "Abrir solicitações de manutenção diretamente pela plataforma",
+                    "Registrar problemas com histórico e acompanhamento",
+                    "Centralizar comunicação em um único canal",
+                    "Evitar mensagens perdidas por WhatsApp ou e-mail",
+                    "Mais transparência, menos ruído, menos estresse."
+                ]
+            },
+            {
+                "title": "Histórico e organização do seu aluguel",
+                "description": "O Kitnets.com ajuda você a manter tudo organizado:",
+                "items": [
+                    "Dados do imóvel e do contrato",
+                    "Datas importantes (vencimento, reajuste, renovação)",
+                    "Histórico de solicitações e atendimentos",
+                    "Informações claras sobre valores e condições",
+                    "Você sabe exatamente onde está e o que esperar."
+                ]
+            },
+            {
+                "title": "Uma experiência feita para a era digital",
+                "description": "O Kitnets.com foi pensado para:",
+                "items": [
+                    "Ser simples de usar",
+                    "Funcionar como um “assistente imobiliário”",
+                    "Reduzir incertezas na hora de alugar",
+                    "Dar mais poder de decisão ao morador",
+                    "Tudo isso respeitando privacidade e sem burocracia desnecessária."
+                ]
+            },
+            {
+                "title": "Para quem o Kitnets.com é ideal?",
+                "items": [
+                    "Quem busca alugar uma kitnet ou studio",
+                    "Quem quer receber alertas automáticos",
+                    "Quem pretende mudar de cidade",
+                    "Quem quer mais organização e transparência na locação"
+                ]
+            }
+        ],
+        "cta": "Crie seus alertas, acompanhe o mercado e gerencie seu aluguel em um só lugar. O Kitnets.com foi feito para ajudar você a encontrar e viver melhor no imóvel certo"
+    },
+    "ownerLogin": {
+        "title": "Login Proprietário",
+        "subtitle": "Gestão completa do seu patrimônio.",
+        "whyRegisterTitle": "Por que proprietários devem usar o Kitnets.com",
+        "intro": [
+            "O Kitnets.com foi criado para transformar a forma como proprietários gerenciam e expandem seu patrimônio imobiliário.",
+            "É uma plataforma SaaS de gestão, análise e inteligência, pensada para o proprietário moderno — aquele que trata imóveis como ativos financeiros.",
+            "Aqui, você deixa para trás planilhas, contratos perdidos e controles manuais."
+        ],
+        "benefits": [
+            {
+                "title": "Um único dashboard para todo o seu patrimônio",
+                "description": "No Kitnets.com, todos os seus imóveis ficam organizados em um painel central, com visão clara e em tempo real de:",
+                "items": [
+                    "Imóveis alugados, vagos e em negociação",
+                    "Contratos ativos, vencimentos e renovações",
+                    "Valores de aluguel, reajustes e histórico",
+                    "Inadimplência, vacância e fluxo de caixa",
+                    "Tudo estruturado, auditável e sempre atualizado."
+                ]
+            },
+            {
+                "title": "KPIs e métricas como você nunca viu no Brasil",
+                "description": "O Kitnets.com foi desenhado para entregar indicadores que o mercado brasileiro simplesmente não oferece hoje, como:",
+                "items": [
+                    "Rentabilidade por imóvel, bairro e cidade",
+                    "Evolução real do aluguel vs. inflação",
+                    "Vacância média e custo do imóvel vazio",
+                    "Performance de imobiliárias e corretores",
+                    "Comparação do seu portfólio com o mercado local",
+                    "Você não “acha” que está indo bem. Você sabe."
+                ]
+            },
+            {
+                "title": "Relatórios claros para decisões melhores",
+                "items": [
+                    "Relatórios automáticos e exportáveis",
+                    "Visão mensal, anual e histórica",
+                    "Comparativos entre imóveis",
+                    "Base sólida para renegociação, venda ou expansão",
+                    "Ideal para quem tem um imóvel — ou dezenas deles."
+                ]
+            },
+            {
+                "title": "Inteligência para novos investimentos",
+                "description": "Pensando em comprar outro imóvel? O Kitnets.com entrega:",
+                "items": [
+                    "Insights sobre preços e aluguéis na sua região",
+                    "Tendências locais de valorização e demanda",
+                    "Comparação entre bairros e cidades",
+                    "Simulações de rentabilidade antes de investir",
+                    "Você avalia oportunidades com dados reais, não apenas feeling."
+                ]
+            },
+            {
+                "title": "Uma plataforma única para proprietário, imobiliária e inquilino",
+                "description": "Quando todos usam o Kitnets.com:",
+                "items": [
+                    "Comunicação é centralizada",
+                    "Contratos ficam organizados",
+                    "Solicitações de manutenção são rastreáveis",
+                    "Informações são consistentes para todos",
+                    "Menos conflitos. Mais transparência. Mais confiança."
+                ]
+            },
+            {
+                "title": "Autogestão ou com imobiliária: você escolhe",
+                "description": "Se você:",
+                "items": [
+                    "Administra seus imóveis sozinho, o Kitnets.com é sua central de controle",
+                    "Trabalha com imobiliária, usa a mesma plataforma que ela",
+                    "Troca de imobiliária sem perder histórico ou dados",
+                    "Seus dados continuam sendo seus."
+                ]
+            },
+            {
+                "title": "Adeus planilhas e controles improvisados",
+                "items": [
+                    "Nada de múltiplos arquivos de Excel",
+                    "Nada de contratos perdidos em e-mails",
+                    "Nada de anotações desconectadas",
+                    "O Kitnets.com profissionaliza sua gestão imobiliária."
+                ]
+            },
+            {
+                "title": "Para quais proprietários o Kitnets.com é ideal?",
+                "items": [
+                    "Proprietários de kitnets e studios",
+                    "Investidores com foco em renda recorrente",
+                    "Quem quer profissionalizar a gestão",
+                    "Quem pensa em escalar seu portfólio"
+                ]
+            }
+        ],
+        "cta": "Gerencie melhor. Decida com dados. Invista com inteligência. O Kitnets.com é a plataforma definitiva para proprietários que querem controle total e visão estratégica sobre seus imóveis."
+    },
+    "developerLogin": {
+        "title": "Login Construtora",
+        "subtitle": "Gestão de lançamentos e inteligência de mercado.",
+        "whyRegisterTitle": "Por que construtoras devem usar o Kitnets.com",
+        "intro": [
+            "O Kitnets.com é uma plataforma imobiliária criada para a nova dinâmica do mercado: dados, velocidade e precisão.",
+            "Para construtoras, ele funciona como um canal de distribuição, validação de demanda e inteligência de investimento, especialmente no segmento de kitnets, studios e imóveis compactos.",
+            "Aqui, lançamentos não são apenas anunciados — eles são conectados ao público certo."
+        ],
+        "benefits": [
+            {
+                "title": "Lançamentos direcionados ao investidor ideal",
+                "description": "O Kitnets.com conecta seus empreendimentos diretamente a:",
+                "items": [
+                    "Investidores focados em renda com aluguel",
+                    "Compradores que entendem o mercado de imóveis compactos",
+                    "Corretores e imobiliárias especializadas no segmento",
+                    "Menos curiosos. Mais compradores qualificados."
+                ]
+            },
+            {
+                "title": "Exposição estratégica para novos empreendimentos",
+                "description": "Ao listar seus lançamentos, sua construtora ganha:",
+                "items": [
+                    "Visibilidade em uma plataforma verticalizada",
+                    "Destaque para imóveis pensados para locação",
+                    "Comunicação clara de métricas relevantes para investidores",
+                    "Maior velocidade na absorção das unidades",
+                    "Ideal para projetos voltados a alta rotatividade e renda recorrente."
+                ]
+            },
+            {
+                "title": "Inteligência de mercado para decidir onde construir",
+                "description": "O Kitnets.com entrega dados que ajudam a construtora a decidir melhor antes de lançar, como:",
+                "items": [
+                    "Demanda por kitnets por bairro e cidade",
+                    "Faixas de preço de aluguel e venda",
+                    "Vacância e velocidade de absorção",
+                    "Comparação entre regiões e perfis de público",
+                    "Dados reais para reduzir risco de lançamento."
+                ]
+            },
+            {
+                "title": "Validação de projetos antes da obra",
+                "items": [
+                    "Interesse real de investidores",
+                    "Teste de preço e tipologia",
+                    "Feedback do mercado antes do lançamento oficial",
+                    "Você ajusta produto, preço e localização antes de comprometer capital."
+                ]
+            },
+            {
+                "title": "Relatórios e insights contínuos",
+                "items": [
+                    "Acompanhamento de desempenho dos lançamentos",
+                    "Métricas de interesse e conversão",
+                    "Insights sobre comportamento de investidores",
+                    "Dados históricos para planejamento estratégico",
+                    "Tudo estruturado para decisões de longo prazo."
+                ]
+            },
+            {
+                "title": "Parceria com o ecossistema imobiliário",
+                "description": "No Kitnets.com, construtoras:",
+                "items": [
+                    "Se conectam com imobiliárias e corretores especializados",
+                    "Acessam investidores recorrentes",
+                    "Ganham canal direto com quem compra para alugar",
+                    "A plataforma atua como hub do mercado de imóveis compactos."
+                ]
+            },
+            {
+                "title": "Para quais construtoras o Kitnets.com é ideal?",
+                "items": [
+                    "Construtoras focadas em imóveis compactos",
+                    "Incorporadoras com estratégia de renda",
+                    "Projetos voltados a investidores",
+                    "Empresas orientadas por dados"
+                ]
+            }
+        ],
+        "cta": "Liste seus lançamentos, encontre os investidores certos e decida com dados. O Kitnets.com é a plataforma que conecta construção, investimento e inteligência imobiliária em um único ecossistema."
+    },
+    "lists": {
+        "features": [
+            "Acessível",
+            "Piscina",
+            "Play Ground",
+            "Portaria 24 horas",
+            "Vista Para O Mar",
+            "Andar Alto",
+            "Armário Embutido",
+            "Garden",
+            "Estacionamento Coberto",
+            "Quadra Futebol"
+        ],
+        "amenities": [
+            "Elevador Social",
+            "Elevador de Serviço",
+            "Academia",
+            "Ar condicionado",
+            "Adega",
+            "Aquecedor",
+            "Aquecimento Solar",
+            "Bicicletário",
+            "Lavanderia",
+            "Sala De Massagem",
+            "Mobiliado",
+            "Circuito De Tv"
+        ],
+        "locationOptions": [
+            "Próximo Escola Infantil",
+            "Próximo Faculdade",
+            "Próximo Farmacia",
+            "Próximo Hospital",
+            "Próximo Mercado",
+            "Próximo Metro",
+            "Próximo Costa",
+            "Próximo Padaria",
+            "Próximo Parque",
+            "Próximo Ponto",
+            "Próximo Restaurante"
+        ]
+    },
+    "mortgageCalculatorPage": {
+        "title": "Simulador de Amortização de Financiamento Imobiliário (SAC e PRICE)",
+        "subtitle": "O poder da amortização: descubra o que os bancos não explicam sobre juros, prazo e economia.",
+        "intro": {
+            "text1": "Poucas pessoas sabem, mas a forma como você amortiza um financiamento imobiliário pode economizar dezenas — ou até centenas — de milhares de reais em juros.",
+            "text2": "Os bancos não explicam isso com clareza, porque quanto mais tempo você demora para quitar o financiamento, mais juros e seguros você paga.",
+            "text3": "A boa notícia é que, com a estratégia certa, você pode virar esse jogo a seu favor.",
+            "listTitle": "Com este Simulador de Amortização Imobiliária (SAC e PRICE), você consegue visualizar exatamente:",
+            "listItems": [
+                "Como o saldo devedor evolui ao longo do tempo",
+                "O impacto real das amortizações antecipadas",
+                "A diferença entre reduzir parcela ou reduzir prazo",
+                "Quanto você economiza em juros, MIP e DFI",
+                "O efeito do uso do FGTS a cada 24 meses"
+            ],
+            "text4": "Tudo isso com uma tabela detalhada, semelhante à do banco, e gráficos claros que mostram o antes e o depois das amortizações."
+        },
+        "whatToSimulate": {
+            "title": "O que este simulador permite fazer",
+            "list1Title": "Comparar SAC vs PRICE de forma transparente",
+            "list2Title": "Simular amortizações com:",
+            "list2Items": [
+                "FGTS",
+                "Dinheiro extra (bônus, PLR, poupança, renda extra)"
+            ],
+            "list3Title": "Escolher o efeito da amortização:",
+            "list3Items": [
+                "Reduzir o valor da parcela",
+                "Reduzir o prazo do financiamento"
+            ],
+            "list4Title": "Visualizar:",
+            "list4Items": [
+                "Economia total em juros",
+                "Redução do tempo do financiamento",
+                "Evolução do saldo devedor mês a mês"
+            ],
+            "list5Title": "Acessar uma tabela detalhada, no padrão dos bancos, com:",
+            "list5Items": [
+                "Juros",
+                "Amortização",
+                "Seguros (MIP / DFI)",
+                "Amortizações extras destacadas"
+            ]
+        },
+        "whyAmortize": {
+            "title": "Por que amortizar muda tudo?",
+            "subtitle": "Por que a amortização antecipada é tão poderosa?",
+            "text1": "No financiamento imobiliário, os juros e o seguro MIP são calculados sobre o saldo devedor.",
+            "text2": "Quando você amortiza antes:",
+            "listItems": [
+                "O saldo cai mais rápido",
+                "Os juros futuros diminuem",
+                "O seguro obrigatório (MIP) também fica mais barato",
+                "O custo total do financiamento despenca"
+            ],
+            "text3": "Ou seja: amortizar cedo vale muito mais do que amortizar tarde.",
+            "text4": "Este simulador mostra isso de forma visual e numérica — algo que normalmente só aparece escondido em planilhas técnicas dos bancos."
+        },
+        "fgtsSection": {
+            "title": "Usar o FGTS para amortizar: vale a pena?",
+            "text1": "Na maioria dos financiamentos, o FGTS pode ser usado a cada 24 meses para amortização.",
+            "listTitle": "Aqui você consegue simular:",
+            "listItems": [
+                "Quando usar o FGTS",
+                "Quanto amortizar",
+                "Se é melhor reduzir parcela ou prazo",
+                "O impacto real no valor final pago"
+            ],
+            "text2": "Assim, você decide com base em números — não em achismos."
+        },
+        "ctaSection": {
+            "title": "Simule agora e veja quanto você pode economizar",
+            "text1": "Preencha os dados do seu financiamento, teste diferentes estratégias de amortização e descubra quanto tempo e dinheiro você pode economizar.",
+            "text2": "Em muitos casos, a economia passa de R$ 100 mil em juros ao longo do contrato."
+        },
+        "meta": {
+            "title": "Simulador de Amortização de Financiamento Imobiliário (SAC e PRICE) | Kitnets.com",
+            "description": "Simule amortizações no financiamento imobiliário (SAC ou PRICE), use FGTS ou dinheiro extra e descubra quanto você pode economizar em juros, prazo e custo total."
+        }
+    }
+}
