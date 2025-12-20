@@ -19,6 +19,13 @@ export class DatabaseService {
 
     private init() {
         this.db.serialize(() => {
+            // system_settings (v1.2)
+            this.db.run(`
+            CREATE TABLE IF NOT EXISTS system_settings (
+                key TEXT PRIMARY KEY, 
+                value TEXT
+            )`);
+
             // meter_config
             this.db.run(`
             CREATE TABLE IF NOT EXISTS meter_config (

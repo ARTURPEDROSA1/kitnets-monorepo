@@ -47,12 +47,47 @@ server.get('/api/health', async (request, reply) => {
     };
 });
 
+// GET Settings (System + Meters)
 server.get('/api/config', async (req, reply) => {
     const meters = await db.all('SELECT * FROM meter_config');
+    const systemRows = await db.all<{ key: string, value: string }>('SELECT * FROM system_settings');
+
+    // Merge DB settings into the CONFIG object for display
+    const mergedConfig = JSON.parse(JSON.stringify(CONFIG)); // Deep copy defaults
+
+    systemRows.forEach(row => {
+        if (row.key === 'MODBUS_HOST') mergedConfig.MODBUS.HOST = row.value;
+        if (row.key === 'POLL_INTERVAL_MS') mergedConfig.MODBUS.POLL_INTERVAL_MS = parseInt(row.value);
+        if (row.key === 'MQTT_BROKER_URL') mergedConfig.MQTT.BROKER_URL = row.value;
+    });
+
     return {
-        config: CONFIG,
+        config: mergedConfig,
         meters
     };
+});
+
+// Update System Settings
+server.put('/api/settings', async (req, reply) => {
+    const body = req.body as any;
+    try {
+        if (body.MODBUS_HOST) await db.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', ['MODBUS_HOST', body.MODBUS_HOST]);
+        if (body.POLL_INTERVAL_MS) await db.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', ['POLL_INTERVAL_MS', String(body.POLL_INTERVAL_MS)]);
+        if (body.MQTT_BROKER_URL) await db.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', ['MQTT_BROKER_URL', body.MQTT_BROKER_URL]);
+
+        return { success: true };
+    } catch (e) {
+        server.log.error(e);
+        reply.code(500).send({ error: "Failed to update settings" });
+    }
+});
+
+// Restart Service
+server.post('/api/restart', async (req, reply) => {
+    setTimeout(() => {
+        process.exit(0); // Systemd will restart it
+    }, 1000);
+    return { success: true, message: "Restarting..." };
 });
 
 server.put('/api/config', async (req, reply) => {
@@ -151,7 +186,18 @@ server.get('/api/dashboard', async (req, reply) => {
 
 const start = async () => {
     try {
+        // Load System Settings overrides
+        const settings = await db.all<{ key: string, value: string }>('SELECT * FROM system_settings');
+        settings.forEach(row => {
+            if (row.key === 'MODBUS_HOST') CONFIG.MODBUS.HOST = row.value;
+            if (row.key === 'POLL_INTERVAL_MS') CONFIG.MODBUS.POLL_INTERVAL_MS = parseInt(row.value);
+            if (row.key === 'MQTT_BROKER_URL') CONFIG.MQTT.BROKER_URL = row.value;
+        });
+
+        console.log("Starting with Config:", JSON.stringify(CONFIG, null, 2));
+
         await modbusService.start();
+        mqttService.start(); // Start MQTT lazy
         startScheduler();
 
         await server.listen({ port: CONFIG.SERVER.PORT, host: CONFIG.SERVER.HOST });
