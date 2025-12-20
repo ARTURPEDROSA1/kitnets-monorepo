@@ -1,67 +1,73 @@
 #!/bin/bash
 set -e
 
-# Kitnets Gateway Installer (Ubuntu/Pi)
-# v1.2
+# Kitnets Gateway Deployment Script
+# v1.3 - Seamless Update Support
 
-echo "Installing Kitnets Smart Gateway..."
+INSTALL_DIR="/opt/kitnets-gateway"
 
-# 1. Prerequisites
-echo "[1/4] Installing system dependencies..."
-if command -v apt-get &> /dev/null; then
-    sudo apt-get update
-    sudo apt-get install -y nodejs npm build-essential sqlite3 python3 make
+echo ">>> Kitnets Gateway Deployment (v1.3) <<<"
+
+# 1. Environment Check
+echo "[1/5] Checking Environment..."
+if ! command -v node &> /dev/null; then
+    echo "Node.js not found. Installing system dependencies..."
+    if command -v apt-get &> /dev/null; then
+        sudo apt-get update
+        sudo apt-get install -y nodejs npm build-essential sqlite3 python3 make
+    else
+        echo "Error: apt-get not found and Node is missing. Please install Node.js manually."
+        exit 1
+    fi
 else
-    echo "Warning: apt-get not found. Ensure Node.js and build tools are installed."
+    echo "Node.js $(node -v) found. Skipping system package install."
 fi
 
-# 2. Setup Directory
-INSTALL_DIR="/opt/kitnets-gateway"
-echo "[2/4] Setting up directory at $INSTALL_DIR..."
-
-if [ "$PWD" != "$INSTALL_DIR" ]; then
+# 2. Prepare Target Directory
+echo "[2/5] Syncing files to $INSTALL_DIR..."
+if [ ! -d "$INSTALL_DIR" ]; then
     sudo mkdir -p $INSTALL_DIR
-    # Assuming we are running from the source folder, copy everything
-    # In a real curl|bash scenario, we would git clone here.
-    # For now, we assume user copied files or we cp from current.
+fi
+
+# Use rsync if available for safe sync (preserves .env, skips .git/node_modules)
+if command -v rsync &> /dev/null; then
+    sudo rsync -av --exclude='.env' --exclude='.git' --exclude='node_modules' --exclude='dist' --exclude='client/node_modules' --exclude='client/dist' ./ $INSTALL_DIR/
+else
+    echo "rsync not found, using cp. (Ensure you do not have a .env file in your source folder that overwrites production config)"
     sudo cp -r ./* $INSTALL_DIR/
 fi
 
 # Fix permissions
 sudo chown -R $USER:$USER $INSTALL_DIR
 
-# 3. Build Application
-echo "[3/4] Installing Node packages and Building..."
+# 3. Build Backend
+echo "[3/5] Building Backend Service..."
 cd $INSTALL_DIR
-npm install
-npm run build --if-present
+npm install --silent
+npm run build
 
-# Build Frontend if present
+# 4. Build Frontend
+echo "[4/5] Building Frontend..."
 if [ -d "client" ]; then
-    echo "Building frontend..."
     cd client
-    npm install
+    npm install --silent
     npm run build
     cd ..
 fi
 
-# 4. Configure Service
-echo "[4/4] Configuring Systemd Service..."
+# 5. Service Management
+echo "[5/5] Restarting Service..."
 SERVICE_FILE="kitnets-gateway.service"
 if [ -f "$SERVICE_FILE" ]; then
     sudo cp $SERVICE_FILE /etc/systemd/system/
     sudo systemctl daemon-reload
     sudo systemctl enable kitnets-gateway
     sudo systemctl restart kitnets-gateway
-    echo "Service started!"
 else
-    echo "Error: Service file not found."
-    exit 1
+    echo "Warning: Service file not found."
 fi
 
 echo "========================================"
-echo "Installation Complete! (v1.2)"
-echo "Effective User: $USER"
+echo "Deployment Complete!"
 echo "Service Status: $(systemctl is-active kitnets-gateway)"
-echo "Web Interface: http://$(hostname -I | awk '{print $1}'):3000"
 echo "========================================"
