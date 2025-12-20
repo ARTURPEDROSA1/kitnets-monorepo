@@ -137,6 +137,15 @@ export class DatabaseService {
             });
         });
     }
+
+    public healthCheck(): Promise<boolean> {
+        return new Promise((resolve) => {
+            this.db.get("SELECT 1", (err) => {
+                if (err) resolve(false);
+                else resolve(true);
+            });
+        });
+    }
 }
 
 const db = new DatabaseService();
