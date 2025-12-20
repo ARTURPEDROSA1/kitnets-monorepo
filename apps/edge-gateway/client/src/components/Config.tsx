@@ -5,8 +5,13 @@ export default function Config() {
     const [loading, setLoading] = useState(false);
     const [restartNeeded, setRestartNeeded] = useState(false);
 
+    const [initialSystemConfig, setInitialSystemConfig] = useState<any>(null);
+
     useEffect(() => {
-        fetch('/api/config').then(r => r.json()).then(setConfig);
+        fetch('/api/config').then(r => r.json()).then(data => {
+            setConfig(data);
+            setInitialSystemConfig(JSON.parse(JSON.stringify(data.config))); // Deep copy for comparison
+        });
     }, []);
 
     const save = async () => {
@@ -30,13 +35,43 @@ export default function Config() {
                 })
             });
 
+            // Check if vital system settings changed (requiring restart)
+            const systemChanged =
+                config.config.MODBUS.HOST !== initialSystemConfig.MODBUS.HOST ||
+                config.config.MODBUS.POLL_INTERVAL_MS !== initialSystemConfig.MODBUS.POLL_INTERVAL_MS ||
+                config.config.MQTT.BROKER_URL !== initialSystemConfig.MQTT.BROKER_URL;
+
             alert('Saved successfully!');
-            setRestartNeeded(true);
+
+            if (systemChanged) {
+                setRestartNeeded(true);
+            } else {
+                // Update "initial" so subsequent saves don't think it changed from original boot if we didn't restart
+                setInitialSystemConfig(JSON.parse(JSON.stringify(config.config)));
+            }
+
         } catch (e) {
             alert('Error saving configuration');
         }
         setLoading(false);
     };
+
+    // ... (rest of the file) ...
+
+    <div className="form-group">
+        <label>Physical Offset (m³) <span style={{ color: 'var(--accent)', fontSize: '0.7em' }}>NEW (v1.2)</span></label>
+        <input
+            type="number"
+            step="0.001"
+            placeholder="0.000"
+            value={m.physical_meter_offset_m3 === undefined || m.physical_meter_offset_m3 === null ? '' : m.physical_meter_offset_m3}
+            onChange={e => {
+                const val = e.target.value;
+                updateMeter(i, 'physical_meter_offset_m3', val === '' ? 0 : parseFloat(val))
+            }}
+        />
+        <small className="text-muted" style={{ fontSize: '0.75rem' }}>Reading on physical meter.</small>
+    </div>
 
     const restartService = async () => {
         try {
@@ -191,8 +226,18 @@ export default function Config() {
                                 type="number"
                                 step="0.001"
                                 placeholder="0.000"
-                                value={m.physical_meter_offset_m3 || 0}
-                                onChange={e => updateMeter(i, 'physical_meter_offset_m3', parseFloat(e.target.value))}
+                                value={m.physical_meter_offset_m3 === undefined || m.physical_meter_offset_m3 === null ? '' : m.physical_meter_offset_m3}
+                                onChange={e => {
+                                    const val = e.target.value;
+                                    // Store as string temporarily to allow deletion
+                                    updateMeter(i, 'physical_meter_offset_m3', val);
+                                }}
+                                onBlur={e => {
+                                    // Ensure it's a number on blur
+                                    let val = parseFloat(e.target.value);
+                                    if (isNaN(val)) val = 0;
+                                    updateMeter(i, 'physical_meter_offset_m3', val);
+                                }}
                             />
                             <small className="text-muted" style={{ fontSize: '0.75rem' }}>Reading on physical meter.</small>
                         </div>
