@@ -30,7 +30,7 @@ export default function Dashboard() {
 
     if (!data) return <div className="card">Loading...</div>;
 
-    const { gateway_status, digital_input, meters, last_update } = data;
+    const { gateway_status, digital_input, meters, last_update, uptime } = data;
 
     return (
         <div className="dashboard">
@@ -41,16 +41,22 @@ export default function Dashboard() {
                         <span className={`status-badge status-${gateway_status === 'HEALTHY' ? 'ok' : 'down'}`}>
                             {gateway_status}
                         </span>
-                        <small className="text-muted">
-                            Last Update: {new Date(last_update).toLocaleTimeString()}
-                        </small>
+                        <div>
+                            <small className="text-muted" style={{ display: 'block' }}>
+                                Last Update: {new Date(last_update).toLocaleTimeString()}
+                            </small>
+                            <small className="text-muted" style={{ display: 'block' }}>
+                                Started: {new Date(Date.now() - (uptime * 1000)).toLocaleString()}
+                            </small>
+                        </div>
                     </div>
                 </div>
                 <div className="card">
-                    <h3>Digital Input (30016)</h3>
-                    <div style={{ fontSize: '2rem', fontWeight: 'bold', marginTop: '0.5rem' }}>
-                        {digital_input}
+                    <h3>Digital Input (Binary)</h3>
+                    <div style={{ fontSize: '2rem', fontWeight: 'bold', marginTop: '0.5rem', fontFamily: 'monospace' }}>
+                        {(digital_input || 0).toString(2).padStart(16, '0').match(/.{1,4}/g)?.join(' ')}
                     </div>
+                    <small className="text-muted">Register 30016</small>
                 </div>
             </div>
 
