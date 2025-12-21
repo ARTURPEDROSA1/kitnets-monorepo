@@ -3,6 +3,7 @@ import { CONFIG } from "../config";
 import db from "../database/db";
 import { MeterConfig, GatewayHealth } from "../types";
 import { EventEmitter } from "events";
+import { loadRuntimeState, saveRuntimeState } from "./state";
 
 export class ModbusService extends EventEmitter {
     private client: ModbusRTU;
@@ -22,12 +23,13 @@ export class ModbusService extends EventEmitter {
 
     async start() {
         await this.connect();
-        await this.initDailyStats(); // Load 'start of day' values from DB
+        await this.initDailyStats(); // Load 'start of day' values from DB or State
 
         // Start polling loop
         this.intervalTimer = setInterval(async () => {
-            // ...
+            // Check connection status
             if (this.status === 'DOWN' && !this.client.isOpen) {
+                console.log("Attempting reconnection...");
                 await this.connect();
             } else {
                 await this.poll();
@@ -39,46 +41,55 @@ export class ModbusService extends EventEmitter {
 
     // New helper to seed start counters if missing
     private ensureStartCounters() {
+        let changed = false;
         for (const id in this.latestCounters) {
             if (this.dailyStartCounters[id] === undefined) {
                 // No history found, so "Start of Day" = "Now" (First run behavior)
                 this.dailyStartCounters[id] = this.latestCounters[id];
+                changed = true;
             }
+        }
+        if (changed) {
+            saveRuntimeState(this.dailyStartCounters);
         }
     }
 
     public async initDailyStats() {
         try {
-            // Find "Start of Today" value for each meter.
-            // Logic: 
-            // 1. Look for a daily_snapshot for TODAY (maybe we crashed and restarted).
-            //    Record uses 'counter_value_end_day' but that's for END of day.
-            //    Wait, daily_snapshots stores the delta for a specific date.
-            //    The 'start' of Today is the 'end' of Yesterday.
-
             const todayStr = new Date().toISOString().split('T')[0];
             const now = new Date();
             const yesterday = new Date(now);
             yesterday.setDate(yesterday.getDate() - 1);
             const yesterdayStr = yesterday.toISOString().split('T')[0];
 
-            const meters = await db.all<MeterConfig>('SELECT meter_id FROM meter_config');
+            // 1. Try loading from Runtime State File (Crash Recovery)
+            const savedState = loadRuntimeState();
+            if (savedState) {
+                this.dailyStartCounters = savedState;
+                console.log("Loaded Daily Start Counters from State File:", this.dailyStartCounters);
+            } else {
+                // 2. Fallback to DB
+                console.log("No state file found, checking DB for previous day...");
+                const meters = await db.all<MeterConfig>('SELECT meter_id FROM meter_config');
 
-            for (const m of meters) {
-                // Try to get Yesterday's End (which is Today's Start)
-                const yesterdayRow = await db.get<{ counter_value_end_day: number }>(
-                    "SELECT counter_value_end_day FROM daily_snapshots WHERE meter_id = ? AND date = ?",
-                    [m.meter_id, yesterdayStr]
-                );
+                for (const m of meters) {
+                    const yesterdayRow = await db.get<{ counter_value_end_day: number }>(
+                        "SELECT counter_value_end_day FROM daily_snapshots WHERE meter_id = ? AND date = ?",
+                        [m.meter_id, yesterdayStr]
+                    );
 
-                if (yesterdayRow) {
-                    this.dailyStartCounters[m.meter_id] = yesterdayRow.counter_value_end_day;
-                } else {
-                    // If no yesterday, maybe we have a partial snapshot for today?
-                    // Or just leave undefined, and 'ensureStartCounters' will pick it up as "current"
+                    if (yesterdayRow) {
+                        this.dailyStartCounters[m.meter_id] = yesterdayRow.counter_value_end_day;
+                    }
                 }
             }
             console.log("Initialized Daily Start Counters:", this.dailyStartCounters);
+
+            // Save initial state if loaded
+            if (Object.keys(this.dailyStartCounters).length > 0) {
+                saveRuntimeState(this.dailyStartCounters);
+            }
+
         } catch (e) {
             console.error("Failed to init daily stats:", e);
         }
