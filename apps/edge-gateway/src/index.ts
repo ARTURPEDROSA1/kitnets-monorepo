@@ -210,6 +210,8 @@ server.get('/api/dashboard', async (req, reply) => {
     let today_m3 = 0;
     let month_m3 = 0;
     let prev_month_m3 = 0;
+    let yesterday_m3 = 0;
+    let yesterday_liters = 0;
 
     const todayStr = new Date().toISOString().split('T')[0];
     const now = new Date();
@@ -219,6 +221,11 @@ server.get('/api/dashboard', async (req, reply) => {
     const prevYear = prevDate.getFullYear();
     const prevMonth = prevDate.getMonth() + 1;
 
+    // Yesterday Date
+    const yesterDate = new Date(now);
+    yesterDate.setDate(yesterDate.getDate() - 1);
+    const yesterdayStr = yesterDate.toISOString().split('T')[0];
+
     // 1. Prev Month Total (from DB)
     const prevMonthRow = await db.get<{ sum: number }>(
         'SELECT sum(monthly_m3) as sum FROM monthly_consumption WHERE year = ? AND month = ?',
@@ -226,7 +233,15 @@ server.get('/api/dashboard', async (req, reply) => {
     );
     prev_month_m3 = prevMonthRow?.sum || 0;
 
-    // 2. This Month (Stored Days)
+    // 2. Yesterday Total (from DB)
+    const yesterdayRow = await db.get<{ sum: number }>(
+        'SELECT sum(daily_liters) as sum FROM daily_snapshots WHERE date = ?',
+        [yesterdayStr]
+    );
+    yesterday_liters = yesterdayRow?.sum || 0;
+    yesterday_m3 = yesterday_liters / 1000;
+
+    // 3. This Month (Stored Days)
     const thisMonthStored = await db.get<{ sum: number }>(
         `SELECT sum(daily_liters) as sum FROM daily_snapshots WHERE date LIKE ? AND date < ?`,
         [`${currentYear}-${String(currentMonth).padStart(2, '0')}%`, todayStr]
@@ -242,10 +257,24 @@ server.get('/api/dashboard', async (req, reply) => {
         total_effective_m3 += effective;
 
         // Today Live
-        const startOfDay = modbusService.dailyStartCounters[m.meter_id] || current; // If missing, assume 0 delta
+        // If dailyStartCounters is missing (restarted mid-day without history), use current to report 0 for today
+        // rather than full lifetime consumption which is confusing.
+        // We ensure dailyStartCounters are populated in modbus service, but as fallback:
+        // if startOfDay is 0, it implies we missed initialization. 
+        // Better to explicitly check modbusService.dailyStartCounters
+        let startOfDay = modbusService.dailyStartCounters[m.meter_id];
+
+        if (startOfDay === undefined) {
+            startOfDay = current; // Fallback to 0 consumption today if unknown
+        }
+
         let delta = 0;
         if (current >= startOfDay) delta = current - startOfDay;
         else delta = (4294967295 - startOfDay) + current + 1;
+
+        // Sanity check: if delta is impossibly high (e.g. > 100,000 pulses in a day for domestic) and startOfDay was suspiciously 0?
+        // But startOfDay=0 is valid for a new meter. 
+        // We trust the subtraction logic.
 
         const todayLiters = delta * m.pulse_volume_liters;
         today_m3 += (todayLiters / 1000);
@@ -259,7 +288,7 @@ server.get('/api/dashboard', async (req, reply) => {
     });
 
     month_m3 = monthStoredM3 + today_m3;
-    const today_liters = today_m3 * 1000;
+    const today_liters_aggregated = today_m3 * 1000;
 
     return {
         gateway_status: modbusService.status,
@@ -271,7 +300,9 @@ server.get('/api/dashboard', async (req, reply) => {
         aggregates: {
             total_effective_m3,
             today_m3,
-            today_liters,
+            today_liters: today_liters_aggregated,
+            yesterday_m3,
+            yesterday_liters,
             month_m3,
             prev_month_m3
         }

@@ -85,6 +85,18 @@ export default function Dashboard() {
                                 </div>
                             </div>
 
+                            {/* 3rd Line: Yesterday */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px' }}>
+                                    <div className="text-muted" style={{ fontSize: '0.9rem' }}>Yesterday (Liters)</div>
+                                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{Math.round(data.aggregates.yesterday_liters || 0).toLocaleString()} L</div>
+                                </div>
+                                <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px' }}>
+                                    <div className="text-muted" style={{ fontSize: '0.9rem' }}>Yesterday (m³)</div>
+                                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{(data.aggregates.yesterday_m3 || 0).toFixed(3)} m³</div>
+                                </div>
+                            </div>
+
                             {/* 3rd Line: Monthly */}
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                 <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px' }}>
