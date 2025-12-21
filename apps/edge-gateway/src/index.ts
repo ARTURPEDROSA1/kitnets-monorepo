@@ -147,6 +147,62 @@ server.get('/api/meters/:id/daily', async (req: any, reply) => {
     return history;
 });
 
+server.get('/api/history-consolidated/:type', async (req: any, reply) => {
+    const { type } = req.params;
+    const isDaily = type === 'daily';
+    const meters = await db.all<MeterConfig>('SELECT * FROM meter_config WHERE enabled = 1');
+
+    // Grouped Result Map
+    const dataMap: Record<string, any> = {};
+
+    // 1. Fetch History from DB
+    let records: any[] = [];
+    if (isDaily) {
+        records = await db.all('SELECT * FROM daily_snapshots ORDER BY date DESC LIMIT 365'); // Limit might affect total grouping if meters differ
+        // Better: Select distinct dates first? No, just get all recent data.
+        // Actually, for multiple meters, LIMIT 365 on the whole table is risky. 
+        // We want last 30 days for ALL meters? Or last 365 days?
+        // Let's do LIMIT 2000 to cover typically 5 meters * 365 days.
+        records = await db.all('SELECT * FROM daily_snapshots WHERE date > date("now", "-60 days") ORDER BY date ASC');
+    } else {
+        records = await db.all('SELECT * FROM monthly_consumption ORDER BY year ASC, month ASC');
+    }
+
+    records.forEach(r => {
+        const key = isDaily ? r.date : `${r.year}-${String(r.month).padStart(2, '0')}`;
+        if (!dataMap[key]) dataMap[key] = { date: key };
+
+        // Use Display Name or ID as key? 
+        // Ideally use ID as key for data, and map to Name in frontend.
+        // Value: Daily -> liters, Monthly -> m3
+        dataMap[key][r.meter_id] = isDaily ? r.daily_liters : r.monthly_m3;
+    });
+
+    // 2. Inject TODAY (Live) data for Daily view
+    if (isDaily) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        if (!dataMap[todayStr]) dataMap[todayStr] = { date: todayStr };
+
+        for (const m of meters) {
+            const current = modbusService.latestCounters[m.meter_id] || 0;
+            let startOfDay = modbusService.dailyStartCounters[m.meter_id];
+            if (startOfDay === undefined) startOfDay = current;
+
+            let delta = 0;
+            if (current >= startOfDay) delta = current - startOfDay;
+            else delta = (4294967295 - startOfDay) + current + 1;
+
+            const todayLiters = delta * m.pulse_volume_liters;
+
+            // Only overwrite/set if not finalized in DB (which it shouldn't be for today)
+            dataMap[todayStr][m.meter_id] = todayLiters;
+        }
+    }
+
+    // Convert to Array and Sort
+    return Object.values(dataMap).sort((a: any, b: any) => a.date.localeCompare(b.date));
+});
+
 server.get('/api/meters/:id/monthly', async (req: any, reply) => {
     const { id } = req.params;
     const history = await db.all('SELECT * FROM monthly_consumption WHERE meter_id = ? ORDER BY year DESC, month DESC LIMIT 60', [id]);
