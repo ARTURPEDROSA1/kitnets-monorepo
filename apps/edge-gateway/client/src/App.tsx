@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import Dashboard from './components/Dashboard'
 import Config from './components/Config'
 import History from './components/History'
+import DataTable from './components/DataTable'
 import './App.css'
 
 function App() {
@@ -40,6 +41,7 @@ function App() {
         <nav>
           <button onClick={() => setTab('dashboard')} disabled={tab === 'dashboard'}>Dashboard</button>
           <button onClick={() => setTab('history')} disabled={tab === 'history'}>History</button>
+          <button onClick={() => setTab('data')} disabled={tab === 'data'}>Details</button>
           <button onClick={() => setTab('config')} disabled={tab === 'config'}>Configuration</button>
         </nav>
       </header>
@@ -47,6 +49,7 @@ function App() {
         {tab === 'dashboard' && <Dashboard />}
         {tab === 'config' && <Config />}
         {tab === 'history' && <History />}
+        {tab === 'data' && <DataTable />}
       </main>
     </div>
   )
