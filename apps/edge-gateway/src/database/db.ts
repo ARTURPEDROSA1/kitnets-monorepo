@@ -90,9 +90,10 @@ export class DatabaseService {
                 UNIQUE(meter_id, year, month)
             )`);
 
-            // Seed defaults
+            // Seed defaults...
             this.db.get("SELECT count(*) as c FROM meter_config", [], (err, row: any) => {
                 if (!err && row && row.c === 0) {
+                    // ... seeding logic ...
                     const defaults = [
                         { meter_id: 'HIDROMETRO35', display_name: 'Kitnet c/ Garagem', pulse_volume_liters: 10, counter_lsb_register: 40023, counter_msb_register: 40024 },
                         { meter_id: 'HIDROMETRO35A', display_name: 'Kitnet 35A', pulse_volume_liters: 10, counter_lsb_register: 40025, counter_msb_register: 40026 },
@@ -107,6 +108,12 @@ export class DatabaseService {
                     stmt.finalize();
                     console.log("Seeded default meters.");
                 }
+            });
+
+            // Cleanup Anomalies (Fix for "Start of Day" reset bug)
+            // If consumption is > 50,000 Liters in one day, it's definitely an error for these units.
+            this.db.run(`DELETE FROM daily_snapshots WHERE daily_liters > 50000`, (err) => {
+                if (!err) console.log("Cleaned up anomalous daily snapshots.");
             });
         });
     }

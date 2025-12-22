@@ -4,6 +4,7 @@ import "../globals.css";
 import { ThemeProvider } from "../../components/theme-provider";
 import { Sidebar } from "../../components/Sidebar";
 import { Footer } from "../../components/Footer";
+import { ClerkProvider } from "@clerk/nextjs";
 
 const geistSans = Geist({
     variable: "--font-geist-sans",
@@ -33,25 +34,27 @@ export default async function RootLayout({
 }) {
     const { lang } = await params;
     return (
-        <html lang={lang} suppressHydrationWarning>
-            <body
-                className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white dark:bg-black text-black dark:text-white`}
-            >
-                <ThemeProvider
-                    attribute="class"
-                    defaultTheme="system"
-                    enableSystem
-                    disableTransitionOnChange
+        <ClerkProvider>
+            <html lang={lang} suppressHydrationWarning>
+                <body
+                    className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white dark:bg-black text-black dark:text-white`}
                 >
-                    <Sidebar lang={lang} />
-                    <div className="sm:ml-64 flex min-h-screen flex-col pt-16 sm:pt-0">
-                        <div className="flex-1 p-4">
-                            {children}
+                    <ThemeProvider
+                        attribute="class"
+                        defaultTheme="system"
+                        enableSystem
+                        disableTransitionOnChange
+                    >
+                        <Sidebar lang={lang} />
+                        <div className="sm:ml-64 flex min-h-screen flex-col pt-16 sm:pt-0">
+                            <div className="flex-1 p-4">
+                                {children}
+                            </div>
+                            <Footer lang={lang} />
                         </div>
-                        <Footer lang={lang} />
-                    </div>
-                </ThemeProvider>
-            </body>
-        </html>
+                    </ThemeProvider>
+                </body>
+            </html>
+        </ClerkProvider>
     );
 }

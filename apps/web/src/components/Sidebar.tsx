@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@kitnets/ui";
+import { SignOutButton, useAuth } from "@clerk/nextjs";
 import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Search, Bell, ChevronDown, Rocket, HardHat, Briefcase, Building2, User, KeyRound, Menu, TrendingUp, PiggyBank, Coins } from "lucide-react";
 import { useTheme } from "next-themes";
 import Image from "next/image";
@@ -19,6 +20,7 @@ export function Sidebar({ lang }: { lang: string }) {
     const pathname = usePathname();
     const router = useRouter();
     const { setTheme, theme } = useTheme();
+    const { isSignedIn } = useAuth();
     const [sidebarView, setSidebarView] = React.useState<'main' | 'rent-filters' | 'buy-filters' | 'launches-filters' | 'calculators-menu'>('main');
     const [expandedSections, setExpandedSections] = React.useState<Record<string, boolean>>({});
     const [isMobileOpen, setIsMobileOpen] = React.useState(false);
@@ -203,51 +205,78 @@ export function Sidebar({ lang }: { lang: string }) {
                                     </Link>
                                 </li>
                                 <li className="my-2 border-t border-border" />
-                                <li>
-                                    <Link
-                                        href={lang === 'pt' ? '/login/corretor' : `/${lang}/login/corretor`}
-                                        className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
-                                    >
-                                        <Briefcase className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                        <span className="ms-3">{dict.menu.brokers}</span>
-                                    </Link>
-                                </li>
-                                <li>
-                                    <Link
-                                        href={lang === 'pt' ? '/login/imobiliaria' : `/${lang}/login/imobiliaria`}
-                                        className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
-                                    >
-                                        <Building2 className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                        <span className="ms-3">{dict.menu.agencies}</span>
-                                    </Link>
-                                </li>
-                                <li>
-                                    <Link
-                                        href={lang === 'pt' ? '/login' : `/${lang}/login`}
-                                        className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
-                                    >
-                                        <User className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                        <span className="ms-3">{dict.menu.residents}</span>
-                                    </Link>
-                                </li>
-                                <li>
-                                    <Link
-                                        href={lang === 'pt' ? '/login/proprietario' : `/${lang}/login/proprietario`}
-                                        className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
-                                    >
-                                        <KeyRound className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                        <span className="ms-3">{dict.menu.owners}</span>
-                                    </Link>
-                                </li>
-                                <li>
-                                    <Link
-                                        href={lang === 'pt' ? '/login/construtora' : `/${lang}/login/construtora`}
-                                        className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
-                                    >
-                                        <HardHat className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                        <span className="ms-3">{dict.menu.developers}</span>
-                                    </Link>
-                                </li>
+                                {isSignedIn ? (
+                                    <li>
+                                        <SignOutButton>
+                                            <button className="flex w-full items-center rounded-lg p-2 text-foreground hover:bg-red-50 hover:text-red-600 group">
+                                                <svg
+                                                    className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-red-600"
+                                                    aria-hidden="true"
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    fill="none"
+                                                    viewBox="0 0 18 16"
+                                                >
+                                                    <path
+                                                        stroke="currentColor"
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        strokeWidth="2"
+                                                        d="M1 8h11m0 0L8 4m4 4-4 4m4-11h3a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-3"
+                                                    />
+                                                </svg>
+                                                <span className="ms-3">Sair</span>
+                                            </button>
+                                        </SignOutButton>
+                                    </li>
+                                ) : (
+                                    <>
+                                        <li>
+                                            <Link
+                                                href={lang === 'pt' ? '/login/corretor' : `/${lang}/login/corretor`}
+                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                            >
+                                                <Briefcase className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                <span className="ms-3">{dict.menu.brokers}</span>
+                                            </Link>
+                                        </li>
+                                        <li>
+                                            <Link
+                                                href={lang === 'pt' ? '/login/imobiliaria' : `/${lang}/login/imobiliaria`}
+                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                            >
+                                                <Building2 className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                <span className="ms-3">{dict.menu.agencies}</span>
+                                            </Link>
+                                        </li>
+                                        <li>
+                                            <Link
+                                                href={lang === 'pt' ? '/login' : `/${lang}/login`}
+                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                            >
+                                                <User className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                <span className="ms-3">{dict.menu.residents}</span>
+                                            </Link>
+                                        </li>
+                                        <li>
+                                            <Link
+                                                href={lang === 'pt' ? '/login/proprietario' : `/${lang}/login/proprietario`}
+                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                            >
+                                                <KeyRound className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                <span className="ms-3">{dict.menu.owners}</span>
+                                            </Link>
+                                        </li>
+                                        <li>
+                                            <Link
+                                                href={lang === 'pt' ? '/login/construtora' : `/${lang}/login/construtora`}
+                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                            >
+                                                <HardHat className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                <span className="ms-3">{dict.menu.developers}</span>
+                                            </Link>
+                                        </li>
+                                    </>
+                                )}
                             </ul>
                         </div>
                     ) : sidebarView === 'rent-filters' || sidebarView === 'buy-filters' || sidebarView === 'launches-filters' ? (
