@@ -8,7 +8,9 @@
     ],
     "scripts": {
         "build": "turbo run build",
-        "dev": "turbo run dev",
+        "dev": "turbo run dev --filter=!edge-gateway",
+        "dev:all": "turbo run dev",
+        "dev:web": "turbo run dev --filter=web",
         "lint": "turbo run lint",
         "format": "prettier --write \"**/*.{ts,tsx,md}\""
     },

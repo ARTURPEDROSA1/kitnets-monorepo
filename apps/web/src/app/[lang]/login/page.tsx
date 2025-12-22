@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Button } from "@kitnets/ui";
 import { getDictionary } from "../../../dictionaries";
+import LoginForm from "./LoginForm";
 
 export default async function LoginPage({ params }: { params: Promise<{ lang: "en" | "pt" | "es" }> }) {
     const { lang } = await params;
@@ -17,53 +18,7 @@ export default async function LoginPage({ params }: { params: Promise<{ lang: "e
                         </p>
                     </div>
 
-                    <form className="space-y-6">
-                        <div>
-                            <label htmlFor="email" className="block text-sm font-medium text-foreground">
-                                {dict.login.email}
-                            </label>
-                            <div className="mt-1">
-                                <input
-                                    id="email"
-                                    name="email"
-                                    type="email"
-                                    autoComplete="email"
-                                    required
-                                    className="appearance-none block w-full px-3 py-2 border border-input rounded-md shadow-sm bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
-                                />
-                            </div>
-                        </div>
-
-                        <div>
-                            <label htmlFor="password" className="block text-sm font-medium text-foreground">
-                                {dict.login.password}
-                            </label>
-                            <div className="mt-1">
-                                <input
-                                    id="password"
-                                    name="password"
-                                    type="password"
-                                    autoComplete="current-password"
-                                    required
-                                    className="appearance-none block w-full px-3 py-2 border border-input rounded-md shadow-sm bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="flex items-center justify-end">
-                            <div className="text-sm">
-                                <a href="#" className="font-medium text-primary hover:text-primary/80">
-                                    {dict.login.forgotPassword}
-                                </a>
-                            </div>
-                        </div>
-
-                        <div>
-                            <Button type="submit" className="w-full flex justify-center py-2 px-4 shadow-sm text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90">
-                                {dict.login.signIn}
-                            </Button>
-                        </div>
-                    </form>
+                    <LoginForm dict={dict} lang={lang} />
 
                     <div className="mt-6">
                         <div className="relative">

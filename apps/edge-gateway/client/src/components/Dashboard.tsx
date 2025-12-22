@@ -70,18 +70,18 @@ export default function Dashboard() {
                             {/* 1st Line: Total */}
                             <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
                                 <div className="text-muted" style={{ fontSize: '1rem' }}>Current Total</div>
-                                <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--accent)' }}>{data.aggregates.total_effective_m3.toFixed(3)} m³</div>
+                                <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--accent)' }}>{data.aggregates.total_effective_m3.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m³</div>
                             </div>
 
                             {/* 2nd Line: Today */}
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                 <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px' }}>
                                     <div className="text-muted" style={{ fontSize: '0.9rem' }}>Today (Liters)</div>
-                                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{Math.round(data.aggregates.today_liters).toLocaleString()} L</div>
+                                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{Math.round(data.aggregates.today_liters).toLocaleString('pt-BR')} L</div>
                                 </div>
                                 <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px' }}>
                                     <div className="text-muted" style={{ fontSize: '0.9rem' }}>Today (m³)</div>
-                                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{data.aggregates.today_m3.toFixed(3)} m³</div>
+                                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{data.aggregates.today_m3.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m³</div>
                                 </div>
                             </div>
 
@@ -89,23 +89,23 @@ export default function Dashboard() {
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                 <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px' }}>
                                     <div className="text-muted" style={{ fontSize: '0.9rem' }}>Yesterday (Liters)</div>
-                                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{Math.round(data.aggregates.yesterday_liters || 0).toLocaleString()} L</div>
+                                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{Math.round(data.aggregates.yesterday_liters || 0).toLocaleString('pt-BR')} L</div>
                                 </div>
                                 <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px' }}>
                                     <div className="text-muted" style={{ fontSize: '0.9rem' }}>Yesterday (m³)</div>
-                                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{(data.aggregates.yesterday_m3 || 0).toFixed(3)} m³</div>
+                                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{(data.aggregates.yesterday_m3 || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m³</div>
                                 </div>
                             </div>
 
-                            {/* 3rd Line: Monthly */}
+                            {/* 4th Line: Monthly */}
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                 <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px' }}>
                                     <div className="text-muted" style={{ fontSize: '0.9rem' }}>This Month</div>
-                                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{data.aggregates.month_m3.toFixed(3)} m³</div>
+                                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{data.aggregates.month_m3.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m³</div>
                                 </div>
                                 <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '8px' }}>
                                     <div className="text-muted" style={{ fontSize: '0.9rem' }}>Last Month</div>
-                                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{data.aggregates.prev_month_m3.toFixed(3)} m³</div>
+                                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{data.aggregates.prev_month_m3.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m³</div>
                                 </div>
                             </div>
                         </div>

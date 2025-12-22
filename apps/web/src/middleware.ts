@@ -1,36 +1,40 @@
+
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
 
-let locales = ["en", "pt", "es"];
-let defaultLocale = "pt";
+const isProtectedRoute = createRouteMatcher(["/dashboard(.*)"]);
+const locales = ["en", "pt", "es"];
+const defaultLocale = "pt";
 
-export function middleware(request: NextRequest) {
-    const pathname = request.nextUrl.pathname;
+export default clerkMiddleware(async (auth, req) => {
+    // 1. Check for Clerk Authentication on protected routes
+    if (isProtectedRoute(req)) await auth.protect();
 
-    // Check if there is any supported locale in the pathname
+    // 2. Internationalization (i18n) Routing
+    const { pathname } = req.nextUrl;
+
+    // Skip if it's an API route or static file (already handled by config matcher mostly, but safety check)
+    // Also skip if it's a Clerk internal route if any leak through, typically they don't with the matcher.
+
+    // Check if the path already has a locale
     const pathnameHasLocale = locales.some(
         (locale) => pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`
     );
 
-    if (pathnameHasLocale) {
-        // If the path starts with /pt, redirect to / (canonicalize)
-        if (pathname.startsWith(`/${defaultLocale}/`) || pathname === `/${defaultLocale}`) {
-            const newPath = pathname.replace(`/${defaultLocale}`, "") || "/";
-            return NextResponse.redirect(new URL(newPath, request.url));
-        }
-        return;
-    }
+    if (pathnameHasLocale) return;
 
-    // If no locale, rewrite to default locale (pt)
-    // This allows the [lang] folder to handle the request properly
-    return NextResponse.rewrite(
-        new URL(`/${defaultLocale}${pathname}`, request.url)
-    );
-}
+    // If no locale, redirect to default locale
+    const locale = defaultLocale;
+    const newUrl = new URL(`/${locale}${pathname === "/" ? "" : pathname}`, req.url);
+
+    return NextResponse.redirect(newUrl);
+});
 
 export const config = {
     matcher: [
-        // Skip all internal paths (_next)
-        "/((?!_next|favicon.ico|kitnets-logo.png|.*\\..*).*)",
+        // Skip Next.js internals and all static files, unless found in search params
+        '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+        // Always run for API routes
+        '/(api|trpc)(.*)',
     ],
 };
