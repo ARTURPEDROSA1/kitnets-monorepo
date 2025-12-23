@@ -17,7 +17,9 @@ type AnunciarAction =
     | { type: "UPDATE_LOCATION"; payload: Partial<ListingData["location"]> }
     | { type: "UPDATE_DETAILS"; payload: Partial<ListingData["details"]> }
     | { type: "UPDATE_MEDIA"; payload: Partial<ListingData["media"]> }
-    | { type: "UPDATE_CONTACT"; payload: Partial<ListingData["contact"]> };
+    | { type: "UPDATE_CONTACT"; payload: Partial<ListingData["contact"]> }
+    | { type: "UPDATE_IDENTITY"; payload: Partial<ListingData["identity"]> }
+    | { type: "UPDATE_OWNERSHIP"; payload: Partial<ListingData["ownership"]> };
 
 const initialState: AnunciarState = {
     currentStep: 0,
@@ -44,7 +46,20 @@ const initialState: AnunciarState = {
         },
         media: { photos: [], video: null, pdf: null },
         description: "",
-        contact: { email: "" },
+        contact: { email: "", phone: "", whatsapp: false },
+        identity: {
+            cpf: "",
+            cnpj: "",
+            creci: "",
+            fullName: "",
+            businessName: "",
+            tradeName: "",
+            birthDate: "",
+        },
+        ownership: {
+            documents: [],
+            verified: false,
+        },
     },
 };
 
@@ -77,6 +92,10 @@ function reducer(state: AnunciarState, action: AnunciarAction): AnunciarState {
             return { ...state, data: { ...state.data, media: { ...state.data.media, ...action.payload } } };
         case "UPDATE_CONTACT":
             return { ...state, data: { ...state.data, contact: { ...state.data.contact, ...action.payload } } };
+        case "UPDATE_IDENTITY":
+            return { ...state, data: { ...state.data, identity: { ...state.data.identity, ...action.payload } } };
+        case "UPDATE_OWNERSHIP":
+            return { ...state, data: { ...state.data, ownership: { ...state.data.ownership, ...action.payload } } };
         default:
             return state;
     }
@@ -93,6 +112,28 @@ export function AnunciarProvider({ children, lang = 'pt' }: { children: ReactNod
         const roleParam = searchParams.get('role');
         const stepParam = searchParams.get('step');
         const emailParam = searchParams.get('email'); // Get email from URL
+        const hydrateParam = searchParams.get('hydrate');
+
+        if (hydrateParam === 'true') {
+            const storedDraft = localStorage.getItem('kitnets_draft_listing');
+            if (storedDraft) {
+                try {
+                    const parsedDraft = JSON.parse(storedDraft);
+                    dispatch({ type: "UPDATE_DATA", payload: parsedDraft });
+                    // Provide a small delay or ensure state works before setting step? No, reducer is sync.
+
+                    // If step param is also present, it overrides. If not, default to review?
+                    // User request implies going nicely to review.
+                    // But if 'step' param is explicit, let it win. Use stepParam logic below.
+                    if (!stepParam) {
+                        const reviewIndex = STEPS.indexOf('review');
+                        if (reviewIndex > -1) dispatch({ type: "GOTO_STEP", index: reviewIndex });
+                    }
+                } catch (e) {
+                    console.error("Failed to parse draft listing", e);
+                }
+            }
+        }
 
         if (roleParam) {
             // Map string to UserRole validation
@@ -112,8 +153,8 @@ export function AnunciarProvider({ children, lang = 'pt' }: { children: ReactNod
             }
         }
 
-        // 3. If no email from URL, try localStorage (Auto-fill)
-        if (!emailParam) {
+        // 3. If no email from URL, try localStorage (Auto-fill) and NOT hydrating full draft
+        if (!emailParam && hydrateParam !== 'true') {
             const storedEmail = localStorage.getItem('kitnets_user_email');
             if (storedEmail) {
                 dispatch({ type: "UPDATE_CONTACT", payload: { email: storedEmail } });

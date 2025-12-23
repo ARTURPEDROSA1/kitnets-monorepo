@@ -4,6 +4,7 @@ import db from "../database/db";
 import { MeterConfig, GatewayHealth } from "../types";
 import { EventEmitter } from "events";
 import { loadRuntimeState, saveRuntimeState } from "./state";
+import { getLocalDateStr } from "../utils/date";
 
 export class ModbusService extends EventEmitter {
     private client: ModbusRTU;
@@ -56,11 +57,11 @@ export class ModbusService extends EventEmitter {
 
     public async initDailyStats() {
         try {
-            const todayStr = new Date().toISOString().split('T')[0];
+            const todayStr = getLocalDateStr();
             const now = new Date();
             const yesterday = new Date(now);
             yesterday.setDate(yesterday.getDate() - 1);
-            const yesterdayStr = yesterday.toISOString().split('T')[0];
+            const yesterdayStr = getLocalDateStr(yesterday);
 
             // 1. Try loading from Runtime State File (Crash Recovery)
             const savedState = loadRuntimeState();

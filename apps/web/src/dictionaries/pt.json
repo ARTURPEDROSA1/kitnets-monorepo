@@ -280,7 +280,13 @@
         "password": "Senha",
         "signIn": "Entrar",
         "signUp": "Cadastre-se",
-        "forgotPassword": "Esqueci minha senha"
+        "forgotPassword": "Esqueci minha senha",
+        "errors": {
+            "accountNotFound": "Conta não encontrada.",
+            "incorrectPassword": "Senha incorreta.",
+            "sessionExists": "Você já está logado. Redirecionando...",
+            "generic": "Email ou senha inválidos."
+        }
     },
     "brokerLogin": {
         "title": "Login Corretor",
@@ -820,6 +826,95 @@
         "meta": {
             "title": "Simulador de Amortização de Financiamento Imobiliário (SAC e PRICE) | Kitnets.com",
             "description": "Simule amortizações no financiamento imobiliário (SAC ou PRICE), use FGTS ou dinheiro extra e descubra quanto você pode economizar em juros, prazo e custo total."
+        }
+    },
+    "profile": {
+        "tabs": {
+            "ownership": "Dados da Propriedade",
+            "basics": "Dados do Proprietário",
+            "security": "Gerenciar Propriedade"
+        },
+        "header": {
+            "changePhoto": "Alterar Foto",
+            "emailVerified": "Email Verificado",
+            "verificationPending": "Verificação Pendente",
+            "verifyProfile": "Verificar Perfil",
+            "premium": "Premium"
+        },
+        "progress": {
+            "completion": "Completude do Perfil",
+            "verified": "(Verificado)",
+            "verifyBadge": "Verifique seu perfil para obter o selo oficial."
+        },
+        "ownership": {
+            "title": "Verificação de Propriedade",
+            "description": "Para garantir a segurança da plataforma, solicitamos comprovantes de propriedade dos imóveis. Nossa IA analisará os documentos para extrair endereços e confirmar a titularidade.",
+            "acceptedDocs": "Documentos aceitos:",
+            "docs": {
+                "utility": "Conta de consumo (Água, Luz, Gás)",
+                "common": "Mais comum",
+                "iptu": "Carnê do IPTU",
+                "purchase": "Contrato de Compra e Venda",
+                "registry": "Matrícula do Imóvel (Registro no Cartório)",
+                "deed": "Escritura Pública",
+                "rental": "Contrato de Aluguel anterior"
+            },
+            "uploadTitle": "Upload de Documentos",
+            "uploadPlaceholder": "Clique para selecionar arquivos",
+            "uploadDrop": "ou arraste e solte aqui (PDF, JPG, PNG)",
+            "pendingUpload": "Pendente de envio",
+            "status": {
+                "approved": "Aprovado",
+                "rejected": "Rejeitado",
+                "review": "Em Análise"
+            },
+            "addProperty": "+ Adicionar Outra Propriedade",
+            "sendDocs": "Enviar Documentos"
+        },
+        "basics": {
+            "fullName": "Nome Completo",
+            "nameHelp": "Nome exibido publicamente.",
+            "email": "Email",
+            "phone": "Telefone / WhatsApp",
+            "birthDate": "Data de Nascimento",
+            "cpf": "CPF",
+            "addressTitle": "Endereço",
+            "cep": "CEP",
+            "searching": "Buscando...",
+            "cepNotFound": "CEP não encontrado.",
+            "cepError": "Erro ao buscar CEP.",
+            "city": "Cidade",
+            "state": "Estado",
+            "street": "Rua",
+            "number": "Número",
+            "neighborhood": "Bairro",
+            "complement": "Complemento (Opcional)",
+            "save": "Salvar Alterações"
+        },
+        "security": {
+            "contactPrefs": "Preferências de Contato",
+            "emailNotifs": "Receber notificações por email",
+            "alertNotifs": "Receber alertas de novos imóveis",
+            "dangerZone": "Zona de Perigo",
+            "dangerDesc": "Ações irreversíveis ou que requerem atenção.",
+            "deleteAccount": "Excluir Conta",
+            "deleteDesc": "Sua conta e todos os dados serão excluídos imediatamente e permanentemente."
+        },
+        "deleteModal": {
+            "title": "Excluir Conta Permanentemente",
+            "desc": "Tem certeza que deseja excluir sua conta? Esta ação é irreversível. Todos os seus dados, imóveis e configurações serão apagados imediatamente.",
+            "irreversible": "irreversível",
+            "cancel": "Cancelar",
+            "confirm": "Sim, Excluir Tudo"
+        },
+        "alerts": {
+            "photoUpdated": "Foto de perfil atualizada!",
+            "photoError": "Erro ao atualizar foto.",
+            "authError": "Erro de autenticação: Token Supabase não encontrado.",
+            "uploadError": "Erro upload arquivo",
+            "success": "Perfil atualizado com sucesso!",
+            "saveError": "Falha ao salvar",
+            "deleteError": "Erro ao excluir conta. Tente novamente."
         }
     }
 }

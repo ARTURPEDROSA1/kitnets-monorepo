@@ -1,6 +1,7 @@
 export type UserRole = 'builder' | 'broker' | 'agency' | 'owner';
 export type ListingIntent = 'launch' | 'sale' | 'rent';
 export type PropertyType = 'kitnet' | 'apartment' | 'house' | 'commercial' | 'land' | 'other';
+import { OwnershipClaim } from '@/types/ownership';
 
 export interface ListingData {
     role: UserRole | null;
@@ -34,18 +35,35 @@ export interface ListingData {
         financing: boolean;
     };
     media: {
-        photos: File[]; // In a real app we might store URLs or blobs, here File is fine for local state
+        photos: (File | string)[]; // Can be File objects or URL strings
         video: File | null;
         pdf: File | null;
     };
     description: string;
     contact: {
         email: string;
+        phone: string;
+        whatsapp: boolean;
+    };
+    identity: {
+        cpf: string;
+        cnpj: string;
+        creci: string; // Only for broker
+        fullName: string; // For CPF
+        businessName: string; // Razão Social for CNPJ
+        tradeName: string; // Nome Fantasia
+        birthDate: string;
+    };
+    ownership: {
+        documents: File[];
+        verified: boolean;
+        claim?: OwnershipClaim | null;
     };
 }
 
 export type StepId =
     | 'profile'
+    | 'identity'
     | 'intent'
     | 'type'
     | 'location'
@@ -53,6 +71,7 @@ export type StepId =
     | 'media'
     | 'description'
     | 'contact'
+    | 'ownership'
     | 'review'
     | 'success';
 
@@ -65,6 +84,7 @@ export const STEPS: StepId[] = [
     'media',
     'description',
     'contact',
+    'ownership',
     'review',
     'success'
 ];

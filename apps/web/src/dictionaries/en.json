@@ -280,7 +280,13 @@
         "password": "Password",
         "signIn": "Sign In",
         "signUp": "Sign Up",
-        "forgotPassword": "Forgot password?"
+        "forgotPassword": "Forgot password?",
+        "errors": {
+            "accountNotFound": "Couldn't find your account.",
+            "incorrectPassword": "Incorrect password.",
+            "sessionExists": "You are already logged in. Redirecting...",
+            "generic": "Invalid email or password."
+        }
     },
     "brokerLogin": {
         "title": "Broker Login",
@@ -440,6 +446,95 @@
         "meta": {
             "title": "Mortgage Amortization Simulator (SAC and PRICE) | Kitnets.com",
             "description": "Simulate mortgage amortizations (SAC or PRICE), use FGTS or extra money, and discover how much you can save on interest, term, and total cost."
+        }
+    },
+    "profile": {
+        "tabs": {
+            "ownership": "Property Data",
+            "basics": "Owner Data",
+            "security": "Security & Privacy"
+        },
+        "header": {
+            "changePhoto": "Change Photo",
+            "emailVerified": "Email Verified",
+            "verificationPending": "Verification Pending",
+            "verifyProfile": "Verify Profile",
+            "premium": "Premium"
+        },
+        "progress": {
+            "completion": "Profile Completion",
+            "verified": "(Verified)",
+            "verifyBadge": "Verify your profile to get the official badge."
+        },
+        "ownership": {
+            "title": "Property Verification",
+            "description": "To ensure platform security, we request proof of property ownership. Our AI will analyze documents to extract addresses and confirm ownership.",
+            "acceptedDocs": "Accepted documents:",
+            "docs": {
+                "utility": "Utility Bill (Water, electricity, gas)",
+                "common": "Most common",
+                "iptu": "Property Tax Bill",
+                "purchase": "Purchase Agreement",
+                "registry": "Property Registration",
+                "deed": "Public Deed",
+                "rental": "Previous Rental Contract"
+            },
+            "uploadTitle": "Document Upload",
+            "uploadPlaceholder": "Click to select files",
+            "uploadDrop": "or drag and drop here (PDF, JPG, PNG)",
+            "pendingUpload": "Pending upload",
+            "status": {
+                "approved": "Approved",
+                "rejected": "Rejected",
+                "review": "Under Review"
+            },
+            "addProperty": "+ Add Another Property",
+            "sendDocs": "Send Documents"
+        },
+        "basics": {
+            "fullName": "Full Name",
+            "nameHelp": "Name displayed publicly.",
+            "email": "Email",
+            "phone": "Phone / WhatsApp",
+            "birthDate": "Date of Birth",
+            "cpf": "CPF (Tax ID)",
+            "addressTitle": "Address",
+            "cep": "Zip Code",
+            "searching": "Searching...",
+            "cepNotFound": "Zip Code not found.",
+            "cepError": "Error searching Zip Code.",
+            "city": "City",
+            "state": "State",
+            "street": "Street",
+            "number": "Number",
+            "neighborhood": "Neighborhood",
+            "complement": "Complement (Optional)",
+            "save": "Save Changes"
+        },
+        "security": {
+            "contactPrefs": "Contact Preferences",
+            "emailNotifs": "Receive email notifications",
+            "alertNotifs": "Receive new property alerts",
+            "dangerZone": "Danger Zone",
+            "dangerDesc": "Irreversible actions or those requiring attention.",
+            "deleteAccount": "Delete Account",
+            "deleteDesc": "Your account and all data will be deleted immediately and permanently."
+        },
+        "deleteModal": {
+            "title": "Delete Account Permanently",
+            "desc": "Are you sure you want to delete your account? This action is irreversible. All your data, properties, and settings will be erased immediately.",
+            "irreversible": "irreversible",
+            "cancel": "Cancel",
+            "confirm": "Yes, Delete Everything"
+        },
+        "alerts": {
+            "photoUpdated": "Profile photo updated!",
+            "photoError": "Error updating photo.",
+            "authError": "Authentication error: Supabase Token not found.",
+            "uploadError": "File upload error",
+            "success": "Profile updated successfully!",
+            "saveError": "Failed to save",
+            "deleteError": "Error deleting account. Try again."
         }
     }
 }

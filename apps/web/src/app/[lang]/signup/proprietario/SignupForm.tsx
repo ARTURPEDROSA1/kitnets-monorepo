@@ -35,9 +35,15 @@ export default function OwnerSignupPage({ lang }: { lang: "en" | "pt" | "es" }) 
         }
 
         try {
+            const nameParts = name.trim().split(' ');
+            const firstName = nameParts[0];
+            const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : "";
+
             await signUp.create({
                 emailAddress,
                 password,
+                firstName,
+                lastName
             });
 
             await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
@@ -68,6 +74,7 @@ export default function OwnerSignupPage({ lang }: { lang: "en" | "pt" | "es" }) 
 
                 // Create profile in Supabase
                 const { error: dbError } = await supabase.from('profiles').insert({
+                    id: crypto.randomUUID(),
                     clerk_id: completeSignUp.createdUserId,
                     role: 'landlord',
                     full_name: name,
