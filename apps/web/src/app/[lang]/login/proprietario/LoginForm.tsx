@@ -8,7 +8,29 @@ import { Button } from "@kitnets/ui";
 import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 
-export default function LoginForm({ dict, lang }: { dict: any; lang: string }) {
+interface ClerkError {
+    errors?: {
+        code: string;
+        message: string;
+    }[];
+}
+
+interface Dict {
+    login: {
+        email: string;
+        password: string;
+        forgotPassword: string;
+        signIn: string;
+        errors: {
+            sessionExists: string;
+            accountNotFound: string;
+            incorrectPassword: string;
+            generic: string;
+        };
+    };
+}
+
+export default function LoginForm({ dict, lang }: { dict: Dict; lang: string }) {
     const { isLoaded, signIn, setActive } = useSignIn();
     const router = useRouter();
 
@@ -33,13 +55,20 @@ export default function LoginForm({ dict, lang }: { dict: any; lang: string }) {
             } else {
                 console.error(JSON.stringify(result, null, 2));
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error(JSON.stringify(err, null, 2));
-            if (err.errors?.[0]?.code === "session_exists") {
-                setError("Você já está logado. Redirecionando...");
+            const clerkError = err as ClerkError;
+            const code = clerkError.errors?.[0]?.code;
+
+            if (code === "session_exists") {
+                setError(dict.login.errors.sessionExists);
                 setTimeout(() => router.push("/dashboard"), 1000);
+            } else if (code === "form_identifier_not_found") {
+                setError(dict.login.errors.accountNotFound);
+            } else if (code === "form_password_incorrect") {
+                setError(dict.login.errors.incorrectPassword);
             } else {
-                setError(err.errors?.[0]?.message || "Invalid email or password");
+                setError(dict.login.errors.generic);
             }
         }
     };
@@ -91,9 +120,9 @@ export default function LoginForm({ dict, lang }: { dict: any; lang: string }) {
 
             <div className="flex items-center justify-end">
                 <div className="text-sm">
-                    <a href={lang === 'pt' ? '/forgot-password' : `/${lang}/forgot-password`} className="font-medium text-primary hover:text-primary/80">
+                    <Link href={lang === 'pt' ? '/forgot-password' : `/${lang}/forgot-password`} className="font-medium text-primary hover:text-primary/80">
                         {dict.login.forgotPassword}
-                    </a>
+                    </Link>
                 </div>
             </div>
 

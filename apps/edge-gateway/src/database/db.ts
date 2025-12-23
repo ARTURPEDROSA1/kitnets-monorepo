@@ -115,6 +115,11 @@ export class DatabaseService {
             this.db.run(`DELETE FROM daily_snapshots WHERE daily_liters > 50000`, (err) => {
                 if (!err) console.log("Cleaned up anomalous daily snapshots.");
             });
+
+            // Cleanup Future Dates (Fix for UTC/Local mismatch)
+            this.db.run(`DELETE FROM daily_snapshots WHERE date > date('now', 'localtime')`, (err) => {
+                if (!err) console.log("Cleaned up future daily snapshots.");
+            });
         });
     }
 

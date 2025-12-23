@@ -13,12 +13,17 @@ import { Step8Contact } from "./Step8Contact";
 import { Step9Review } from "./Step9Review";
 import { Step10Success } from "./Step10Success";
 
+import { StepIdentity } from "./StepIdentity";
+import { StepOwnership } from "./StepOwnership";
+
 export function AnunciarFlow() {
     const { stepId } = useAnunciar();
 
     switch (stepId) {
         case "profile":
             return <Step1Profile />;
+        case "identity":
+            return <StepIdentity />;
         case "intent":
             return <Step2Intent />;
         case "type":
@@ -33,6 +38,8 @@ export function AnunciarFlow() {
             return <Step7Description />;
         case "contact":
             return <Step8Contact />;
+        case "ownership":
+            return <StepOwnership />;
         case "review":
             return <Step9Review />;
         case "success":

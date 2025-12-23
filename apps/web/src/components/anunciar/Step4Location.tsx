@@ -124,15 +124,38 @@ export function Step4Location() {
                     "space-y-4 transition-all duration-500 ease-in-out overflow-hidden",
                     addressFound ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
                 )}>
-                    <div className="p-4 bg-muted/50 rounded-lg border border-border space-y-3">
-                        <div>
-                            <span className="text-xs font-semibold text-muted-foreground uppercase">Endereço Encontrado</span>
-                            <p className="font-medium text-foreground mt-1">
-                                {location.street}, {location.neighborhood}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                                {location.city} - {location.state}
-                            </p>
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium leading-none">Endereço</label>
+                            <Input
+                                value={location.street}
+                                onChange={(e) => updateData({ location: { ...location, street: e.target.value } })}
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium leading-none">Bairro</label>
+                                <Input
+                                    value={location.neighborhood}
+                                    onChange={(e) => updateData({ location: { ...location, neighborhood: e.target.value } })}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium leading-none">Cidade - UF</label>
+                                <div className="flex gap-2">
+                                    <Input
+                                        className="flex-1"
+                                        value={location.city}
+                                        onChange={(e) => updateData({ location: { ...location, city: e.target.value } })}
+                                    />
+                                    <Input
+                                        className="w-16 text-center"
+                                        value={location.state}
+                                        onChange={(e) => updateData({ location: { ...location, state: e.target.value } })}
+                                        maxLength={2}
+                                    />
+                                </div>
+                            </div>
                         </div>
                     </div>
 

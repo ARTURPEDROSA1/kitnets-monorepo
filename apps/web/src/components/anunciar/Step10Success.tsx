@@ -4,7 +4,7 @@ import React from "react";
 import { StepLayout } from "./StepLayout";
 import { useAnunciar } from "./AnunciarContext";
 import { Button } from "@kitnets/ui";
-import { CheckCircle, LayoutDashboard, PlusCircle } from "lucide-react";
+import { CheckCircle, Eye, PlusCircle } from "lucide-react";
 import Link from "next/link";
 
 export function Step10Success() {
@@ -31,9 +31,9 @@ export function Step10Success() {
                         asChild
                         className="w-full h-12 text-lg gap-2 shadow-lg"
                     >
-                        <Link href={getLink("/dashboard")}>
-                            <LayoutDashboard className="w-5 h-5" />
-                            Ver Painel
+                        <Link href={getLink("/alugar")}>
+                            <Eye className="w-5 h-5" />
+                            Ver Anúncio
                         </Link>
                     </Button>
 

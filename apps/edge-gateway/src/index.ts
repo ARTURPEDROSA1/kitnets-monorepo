@@ -6,6 +6,7 @@ import { CONFIG } from './config';
 import { modbusService } from './services/modbus';
 import { mqttService } from './services/mqtt';
 import { startScheduler } from './services/scheduler';
+import { getLocalDateStr } from "./utils/date";
 import db from './database/db';
 import { MeterConfig } from './types';
 
@@ -180,7 +181,7 @@ server.get('/api/history-consolidated/:type', async (req: any, reply) => {
 
     // 2. Inject TODAY (Live) data for Daily view
     if (isDaily) {
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = getLocalDateStr();
         if (!dataMap[todayStr]) dataMap[todayStr] = { date: todayStr };
 
         for (const m of meters) {
@@ -269,7 +270,7 @@ server.get('/api/dashboard', async (req, reply) => {
     let yesterday_m3 = 0;
     let yesterday_liters = 0;
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getLocalDateStr();
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth() + 1; // 1-12
@@ -280,7 +281,7 @@ server.get('/api/dashboard', async (req, reply) => {
     // Yesterday Date
     const yesterDate = new Date(now);
     yesterDate.setDate(yesterDate.getDate() - 1);
-    const yesterdayStr = yesterDate.toISOString().split('T')[0];
+    const yesterdayStr = getLocalDateStr(yesterDate);
 
     // 1. Prev Month Total (from DB)
     const prevMonthRow = await db.get<{ sum: number }>(

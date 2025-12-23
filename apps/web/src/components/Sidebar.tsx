@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@kitnets/ui";
 import { SignOutButton, useAuth } from "@clerk/nextjs";
-import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Search, Bell, ChevronDown, Rocket, HardHat, Briefcase, Building2, User, KeyRound, Menu, TrendingUp, PiggyBank, Coins } from "lucide-react";
+import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Search, Bell, ChevronDown, Rocket, HardHat, Briefcase, Building2, User, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard } from "lucide-react";
 import { useTheme } from "next-themes";
 import Image from "next/image";
 import { getDictionary } from "../dictionaries";
@@ -176,15 +176,13 @@ export function Sidebar({ lang }: { lang: string }) {
                                     </button>
                                 </li>
                                 <li>
-                                    <li>
-                                        <button
-                                            onClick={toggleCalculatorsMenu}
-                                            className="w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group text-left"
-                                        >
-                                            <Calculator className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                            <span className="ms-3">{dict.menu.calculators}</span>
-                                        </button>
-                                    </li>
+                                    <button
+                                        onClick={toggleCalculatorsMenu}
+                                        className="w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group text-left"
+                                    >
+                                        <Calculator className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                        <span className="ms-3">{dict.menu.calculators}</span>
+                                    </button>
                                 </li>
                                 <li>
                                     <Link
@@ -206,28 +204,48 @@ export function Sidebar({ lang }: { lang: string }) {
                                 </li>
                                 <li className="my-2 border-t border-border" />
                                 {isSignedIn ? (
-                                    <li>
-                                        <SignOutButton>
-                                            <button className="flex w-full items-center rounded-lg p-2 text-foreground hover:bg-red-50 hover:text-red-600 group">
-                                                <svg
-                                                    className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-red-600"
-                                                    aria-hidden="true"
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                    fill="none"
-                                                    viewBox="0 0 18 16"
-                                                >
-                                                    <path
-                                                        stroke="currentColor"
-                                                        strokeLinecap="round"
-                                                        strokeLinejoin="round"
-                                                        strokeWidth="2"
-                                                        d="M1 8h11m0 0L8 4m4 4-4 4m4-11h3a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-3"
-                                                    />
-                                                </svg>
-                                                <span className="ms-3">Sair</span>
-                                            </button>
-                                        </SignOutButton>
-                                    </li>
+                                    <>
+                                        <li>
+                                            <Link
+                                                href={lang === 'pt' ? '/dashboard' : `/${lang}/dashboard`}
+                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                            >
+                                                <LayoutDashboard className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                <span className="ms-3">Dashboard</span>
+                                            </Link>
+                                        </li>
+                                        <li>
+                                            <Link
+                                                href={lang === 'pt' ? '/profile' : `/${lang}/profile`}
+                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                            >
+                                                <User className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                <span className="ms-3">Meu Perfil</span>
+                                            </Link>
+                                        </li>
+                                        <li>
+                                            <SignOutButton>
+                                                <button className="flex w-full items-center rounded-lg p-2 text-foreground hover:bg-red-50 hover:text-red-600 group">
+                                                    <svg
+                                                        className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-red-600"
+                                                        aria-hidden="true"
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                        fill="none"
+                                                        viewBox="0 0 18 16"
+                                                    >
+                                                        <path
+                                                            stroke="currentColor"
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                            strokeWidth="2"
+                                                            d="M1 8h11m0 0L8 4m4 4-4 4m4-11h3a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-3"
+                                                        />
+                                                    </svg>
+                                                    <span className="ms-3">Sair</span>
+                                                </button>
+                                            </SignOutButton>
+                                        </li>
+                                    </>
                                 ) : (
                                     <>
                                         <li>
