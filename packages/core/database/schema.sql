@@ -71,6 +71,23 @@ create table public.readings (
   timestamp timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
+-- Enable RLS for IoT tables
+alter table public.gateways enable row level security;
+alter table public.meters enable row level security;
+alter table public.readings enable row level security;
+
+-- Policies for IoT
+create policy "Users can all own gateways" on public.gateways for all
+using ( owner_id in (select id from public.profiles where clerk_id = (select auth.jwt() ->> 'sub')) )
+with check ( owner_id in (select id from public.profiles where clerk_id = (select auth.jwt() ->> 'sub')) );
+
+create policy "Users can all own meters" on public.meters for all
+using ( gateway_id in (select id from public.gateways where owner_id in (select id from public.profiles where clerk_id = (select auth.jwt() ->> 'sub'))) )
+with check ( gateway_id in (select id from public.gateways where owner_id in (select id from public.profiles where clerk_id = (select auth.jwt() ->> 'sub'))) );
+
+create policy "Users can view own readings" on public.readings for select
+using ( meter_id in (select id from public.meters where gateway_id in (select id from public.gateways where owner_id in (select id from public.profiles where clerk_id = (select auth.jwt() ->> 'sub')))) );
+
 -- Create index for faster time-series queries
 
 -- Add extra profile fields

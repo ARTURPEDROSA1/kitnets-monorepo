@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { FaqSection } from './components/FaqSection';
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
     description: 'Tudo o que você precisa saber sobre a Kitnets.com — rápido, claro e sem complicação.',
 };
 
-export default function FaqPage() {
+export default function FaqPage({ params: { lang } }: { params: { lang: string } }) {
     // Generate JSON-LD for SEO
     const jsonLd = {
         '@context': 'https://schema.org',
@@ -68,12 +69,12 @@ export default function FaqPage() {
                     <p className="text-muted-foreground mb-6">
                         Crie sua conta e comece agora.
                     </p>
-                    <a
-                        href="/cadastro"
+                    <Link
+                        href={`/${lang}`}
                         className="inline-flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-full text-white bg-emerald-600 hover:bg-emerald-700 md:text-lg transition-transform hover:scale-105 shadow-lg shadow-emerald-600/20"
                     >
                         Começar agora
-                    </a>
+                    </Link>
                 </div>
             </div>
         </div>

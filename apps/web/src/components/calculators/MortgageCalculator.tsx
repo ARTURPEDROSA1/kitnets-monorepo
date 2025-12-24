@@ -3,7 +3,8 @@
 import React, { useState, useMemo } from 'react';
 import { calculateMortgageWithComparisons, MortgageInputs, System, ExtraPayment, AmortizationEffect } from '@/lib/mortgage';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
-import { Trash2, Plus, Settings, TrendingDown, Maximize2, Minimize2, FileSpreadsheet, FileText } from 'lucide-react';
+import { Trash2, Plus, Settings, TrendingDown, Maximize2, Minimize2, FileSpreadsheet, FileText, Lock, User, Mail, CheckCircle2 } from 'lucide-react';
+import { saveLead } from "@/app/actions/capture-lead";
 
 // UI Helpers using Semantic Colors
 const Card = ({ children, className = "" }: { children: React.ReactNode, className?: string }) => (
@@ -29,12 +30,6 @@ Input.displayName = "Input";
 const Button = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'default' | 'outline' | 'ghost' | 'destructive' }>(
     ({ className, variant = 'default', ...props }, ref) => {
         // Updated to use semantic colors
-        const variants = {
-            default: "bg-primary text-primary-foreground hover:bg-primary/90",
-            outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground text-foreground",
-            ghost: "hover:bg-accent hover:text-accent-foreground text-foreground",
-            destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        };
         // Fallback for primary if not defined (using orange as per brand)
         const brandVariants = {
             default: "bg-orange-600 text-white hover:bg-orange-700",
@@ -77,6 +72,96 @@ const MoneyInput = ({ value, onChange, className, ...props }: { value: number, o
     );
 };
 
+function LeadCaptureModal({ isOpen, onCapture }: { isOpen: boolean; onCapture: () => void }) {
+    const [name, setName] = useState("");
+    const [email, setEmail] = useState("");
+    const [loading, setLoading] = useState(false);
+
+    if (!isOpen) return null;
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+
+        try {
+            await saveLead({
+                name,
+                email,
+                source: "mortgage-amortization-calculator"
+            });
+            onCapture();
+        } catch (error) {
+            console.error("Lead capture error:", error);
+            onCapture();
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+            <div className="bg-background rounded-xl shadow-2xl w-full max-w-md overflow-hidden border animate-in zoom-in-95 duration-300">
+                <div className="bg-muted/30 p-6 border-b">
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="p-2 bg-primary/10 rounded-full">
+                            <Lock className="w-5 h-5 text-primary" />
+                        </div>
+                        <h3 className="text-xl font-bold">Ver Resultado Completo</h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                        Para visualizar a tabela detalhada e os gráficos, precisamos confirmar que você não é um robô.
+                    </p>
+                </div>
+
+                <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                    <div className="space-y-2">
+                        <Label>Seu Nome</Label>
+                        <div className="relative">
+                            <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Como podemos te chamar?"
+                                className="pl-9"
+                                required
+                                autoComplete="name"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Seu Melhor E-mail</Label>
+                        <div className="relative">
+                            <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                type="email"
+                                placeholder="exemplo@email.com"
+                                className="pl-9"
+                                required
+                                autoComplete="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="pt-2">
+                        <Button type="submit" className="w-full h-12 text-lg">
+                            {loading ? "Confirmando..." : "Ver Resultado"}
+                        </Button>
+                    </div>
+
+                    <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg mt-4">
+                        <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
+                        <p>
+                            Fique tranquilo! Você será adicionado à nossa newsletter para receber dicas de investimento. Cancelamento a qualquer momento.
+                        </p>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
 export function MortgageCalculator() {
     // State
     const [propertyValue, setPropertyValue] = useState(500000);
@@ -99,6 +184,10 @@ export function MortgageCalculator() {
 
     // UI State for FGTS Plan
     const [fgtsSimulationAmount, setFgtsSimulationAmount] = useState(8000);
+
+    // Lead Capture State
+    const [isLeadCaptured, setIsLeadCaptured] = useState(false);
+    const [showLeadModal, setShowLeadModal] = useState(false);
 
     // Derived Input
     const financedAmount = propertyValue - downPayment;
@@ -181,6 +270,13 @@ export function MortgageCalculator() {
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <LeadCaptureModal
+                isOpen={showLeadModal}
+                onCapture={() => {
+                    setIsLeadCaptured(true);
+                    setShowLeadModal(false);
+                }}
+            />
             {/* Left Column: Inputs */}
             <div className="lg:col-span-4 space-y-6">
                 <Card className="p-6 space-y-4">
@@ -372,149 +468,167 @@ export function MortgageCalculator() {
             </div>
 
             {/* Right Column: Results & Charts */}
-            <div className="lg:col-span-8 space-y-6">
+            <div className="lg:col-span-8 space-y-6 relative">
 
-                {/* Summary Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <Card className="p-4 bg-orange-50 dark:bg-orange-950/20 border-orange-100 dark:border-orange-900/30">
-                        <Label className="text-orange-900 dark:text-orange-100/70">Total Pago</Label>
-                        <div className="text-2xl font-bold text-orange-700 dark:text-orange-400 mt-1">
-                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact' }).format(result.summary.totalPaid)}
+                {!isLeadCaptured && (
+                    <div className="absolute inset-0 z-10 bg-background/80 backdrop-blur-[2px] flex flex-col items-center justify-start pt-32 text-center rounded-xl border border-border">
+                        <div className="p-4 bg-background rounded-full border shadow-sm mb-6">
+                            <Lock className="w-12 h-12 text-primary" />
                         </div>
-                        <div className="text-xs text-orange-600/80 mt-1">
-                            Total do Investimento
-                        </div>
-                    </Card>
-                    <Card className="p-4">
-                        <Label className="text-muted-foreground">Juros Totais</Label>
-                        <div className="text-2xl font-bold text-foreground mt-1">
-                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact' }).format(result.summary.totalInterest)}
-                        </div>
-                    </Card>
-                    <Card className="p-4">
-                        <Label className="text-muted-foreground">Prazo Final</Label>
-                        <div className="text-2xl font-bold text-foreground mt-1">
-                            {result.summary.finalMonths} <span className="text-base font-normal text-muted-foreground">meses</span>
-                        </div>
-                        {result.summary.monthsSaved > 0 && (
-                            <div className="text-xs text-green-600 font-medium mt-1">
-                                -{result.summary.monthsSaved} meses economizados
+                        <h3 className="text-3xl font-bold mb-3 text-foreground">Desbloquear Simulação</h3>
+                        <p className="text-muted-foreground mb-8 max-w-md text-lg leading-relaxed">
+                            Visualize o cronograma detalhado de amortização, gráficos de saldo devedor e descubra quanto você vai economizar de verdade.
+                        </p>
+                        <Button onClick={() => setShowLeadModal(true)} className="text-lg px-10 h-14 shadow-xl hover:scale-105 transition-transform">
+                            Ver Resultado Completo
+                        </Button>
+                    </div>
+                )}
+
+                <div className={!isLeadCaptured ? "opacity-30 pointer-events-none select-none filter blur-sm transition-all duration-500" : "transition-all duration-500"}>
+
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <Card className="p-4 bg-orange-50 dark:bg-orange-950/20 border-orange-100 dark:border-orange-900/30">
+                            <Label className="text-orange-900 dark:text-orange-100/70">Total Pago</Label>
+                            <div className="text-2xl font-bold text-orange-700 dark:text-orange-400 mt-1">
+                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact' }).format(result.summary.totalPaid)}
                             </div>
-                        )}
-                    </Card>
-                    <Card className="p-4">
-                        <Label className="text-muted-foreground">Economia Total</Label>
-                        <div className="text-2xl font-bold text-green-600 mt-1">
-                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact' }).format(result.summary.interestSaved)}
-                        </div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                            Com amortizações
-                        </div>
-                    </Card>
-                </div>
-
-                {/* Charts */}
-                <Card className="p-6">
-                    <h3 className="text-lg font-semibold mb-6 text-foreground">Evolução do Saldo Devedor</h3>
-                    <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={result.schedule}>
-                                <defs>
-                                    <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#f97316" stopOpacity={0.8} />
-                                        <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <XAxis
-                                    dataKey="month"
-                                    stroke="#888888"
-                                    fontSize={12}
-                                    tickLine={false}
-                                    axisLine={false}
-                                />
-                                <YAxis
-                                    stroke="#888888"
-                                    fontSize={12}
-                                    tickLine={false}
-                                    axisLine={false}
-                                    tickFormatter={(value) => new Intl.NumberFormat('pt-BR', { notation: 'compact', style: 'currency', currency: 'BRL' }).format(value)}
-                                    width={80}
-                                />
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                                <Tooltip
-                                    contentStyle={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
-                                    formatter={(value: number) => formatCurrency(value)}
-                                    labelFormatter={(label) => `Mês ${label}`}
-                                />
-                                <Area type="monotone" dataKey="balance" stroke="#f97316" fillOpacity={1} fill="url(#colorBalance)" name="Saldo Devedor" />
-                            </AreaChart>
-                        </ResponsiveContainer>
+                            <div className="text-xs text-orange-600/80 mt-1">
+                                Total do Investimento
+                            </div>
+                        </Card>
+                        <Card className="p-4">
+                            <Label className="text-muted-foreground">Juros Totais</Label>
+                            <div className="text-2xl font-bold text-foreground mt-1">
+                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact' }).format(result.summary.totalInterest)}
+                            </div>
+                        </Card>
+                        <Card className="p-4">
+                            <Label className="text-muted-foreground">Prazo Final</Label>
+                            <div className="text-2xl font-bold text-foreground mt-1">
+                                {result.summary.finalMonths} <span className="text-base font-normal text-muted-foreground">meses</span>
+                            </div>
+                            {result.summary.monthsSaved > 0 && (
+                                <div className="text-xs text-green-600 font-medium mt-1">
+                                    -{result.summary.monthsSaved} meses economizados
+                                </div>
+                            )}
+                        </Card>
+                        <Card className="p-4">
+                            <Label className="text-muted-foreground">Economia Total</Label>
+                            <div className="text-2xl font-bold text-green-600 mt-1">
+                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact' }).format(result.summary.interestSaved)}
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                                Com amortizações
+                            </div>
+                        </Card>
                     </div>
-                </Card>
 
-                {/* Detailed Table */}
-                <Card className={`p-6 overflow-hidden transition-all duration-300 ${isTableExpanded ? 'fixed inset-4 z-50 h-[calc(100vh-2rem)] shadow-2xl overflow-hidden flex flex-col' : ''} print:shadow-none print:border-none print:fixed print:inset-0 print:z-[100] print:h-auto print:bg-background`}>
-                    <div className="flex justify-between items-center mb-4 print:hidden">
-                        <h3 className="text-lg font-semibold text-foreground">Tabela {system === 'PRICE' ? 'Price' : 'SAC'} Detalhada</h3>
-                        <div className="flex gap-1">
-                            <Button
-                                variant="ghost"
-                                onClick={exportToCSV}
-                                className="h-8 w-8 !p-0"
-                                title="Exportar para Excel (CSV)"
-                            >
-                                <FileSpreadsheet className="h-4 w-4 text-green-600" />
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                onClick={handlePrint}
-                                className="h-8 w-8 !p-0"
-                                title="Imprimir / Salvar PDF"
-                            >
-                                <FileText className="h-4 w-4 text-orange-600" />
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                onClick={() => setIsTableExpanded(!isTableExpanded)}
-                                className="h-8 w-8 !p-0"
-                                title={isTableExpanded ? "Recolher" : "Expandir"}
-                            >
-                                {isTableExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4 text-foreground" />}
-                            </Button>
+                    {/* Charts */}
+                    <Card className="p-6">
+                        <h3 className="text-lg font-semibold mb-6 text-foreground">Evolução do Saldo Devedor</h3>
+                        <div className="h-[300px] w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={result.schedule}>
+                                    <defs>
+                                        <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#f97316" stopOpacity={0.8} />
+                                            <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                                        </linearGradient>
+                                    </defs>
+                                    <XAxis
+                                        dataKey="month"
+                                        stroke="#888888"
+                                        fontSize={12}
+                                        tickLine={false}
+                                        axisLine={false}
+                                    />
+                                    <YAxis
+                                        stroke="#888888"
+                                        fontSize={12}
+                                        tickLine={false}
+                                        axisLine={false}
+                                        tickFormatter={(value) => new Intl.NumberFormat('pt-BR', { notation: 'compact', style: 'currency', currency: 'BRL' }).format(value)}
+                                        width={80}
+                                    />
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                                    <Tooltip
+                                        contentStyle={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
+                                        formatter={(value: any) => formatCurrency(Number(value))}
+                                        labelFormatter={(label) => `Mês ${label}`}
+                                    />
+                                    <Area type="monotone" dataKey="balance" stroke="#f97316" fillOpacity={1} fill="url(#colorBalance)" name="Saldo Devedor" />
+                                </AreaChart>
+                            </ResponsiveContainer>
                         </div>
-                    </div>
-                    <div className={`overflow-x-auto overflow-y-auto ${isTableExpanded ? 'flex-1' : 'max-h-[500px]'} print:overflow-visible print:max-h-none`}>
-                        <table className="w-full text-sm text-left text-foreground">
-                            <thead className="text-xs text-muted-foreground uppercase bg-muted sticky top-0 z-10">
-                                <tr>
-                                    <th className="px-4 py-3">Mês</th>
-                                    <th className="px-4 py-3 text-right">Parcela</th>
-                                    <th className="px-4 py-3 text-right">Amort.</th>
-                                    <th className="px-4 py-3 text-right">Juros</th>
-                                    <th className="px-4 py-3 text-right">Seguros</th>
-                                    <th className="px-4 py-3 text-right font-bold">Extra</th>
-                                    <th className="px-4 py-3 text-right">Saldo</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {result.schedule.map((row) => (
-                                    <tr key={row.month} className="border-b border-border hover:bg-muted/50">
-                                        <td className="px-4 py-3 text-center text-muted-foreground">{row.month}</td>
-                                        <td className="px-4 py-3 text-right font-medium">{formatCurrency(row.payment)}</td>
-                                        <td className="px-4 py-3 text-right text-muted-foreground">{formatCurrency(row.amortization)}</td>
-                                        <td className="px-4 py-3 text-right text-muted-foreground">{formatCurrency(row.interest)}</td>
-                                        <td className="px-4 py-3 text-right text-muted-foreground text-xs">{formatCurrency(row.mip + row.dfi)}</td>
-                                        <td className={`px-4 py-3 text-right font-bold ${row.extraAmortization > 0 ? 'text-green-600 bg-green-50 dark:bg-green-900/20' : 'text-zinc-300 dark:text-zinc-700'}`}>
-                                            {row.extraAmortization > 0 ? formatCurrency(row.extraAmortization) : '-'}
-                                        </td>
-                                        <td className="px-4 py-3 text-right font-medium">{formatCurrency(row.balance)}</td>
+                    </Card>
+
+                    {/* Detailed Table */}
+                    <Card className={`p-6 overflow-hidden transition-all duration-300 ${isTableExpanded ? 'fixed inset-4 z-50 h-[calc(100vh-2rem)] shadow-2xl overflow-hidden flex flex-col' : ''} print:shadow-none print:border-none print:fixed print:inset-0 print:z-[100] print:h-auto print:bg-background`}>
+                        <div className="flex justify-between items-center mb-4 print:hidden">
+                            <h3 className="text-lg font-semibold text-foreground">Tabela {system === 'PRICE' ? 'Price' : 'SAC'} Detalhada</h3>
+                            <div className="flex gap-1">
+                                <Button
+                                    variant="ghost"
+                                    onClick={exportToCSV}
+                                    className="h-8 w-8 !p-0"
+                                    title="Exportar para Excel (CSV)"
+                                >
+                                    <FileSpreadsheet className="h-4 w-4 text-green-600" />
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    onClick={handlePrint}
+                                    className="h-8 w-8 !p-0"
+                                    title="Imprimir / Salvar PDF"
+                                >
+                                    <FileText className="h-4 w-4 text-orange-600" />
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    onClick={() => setIsTableExpanded(!isTableExpanded)}
+                                    className="h-8 w-8 !p-0"
+                                    title={isTableExpanded ? "Recolher" : "Expandir"}
+                                >
+                                    {isTableExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4 text-foreground" />}
+                                </Button>
+                            </div>
+                        </div>
+                        <div className={`overflow-x-auto overflow-y-auto ${isTableExpanded ? 'flex-1' : 'max-h-[500px]'} print:overflow-visible print:max-h-none`}>
+                            <table className="w-full text-sm text-left text-foreground">
+                                <thead className="text-xs text-muted-foreground uppercase bg-muted sticky top-0 z-10">
+                                    <tr>
+                                        <th className="px-4 py-3">Mês</th>
+                                        <th className="px-4 py-3 text-right">Parcela</th>
+                                        <th className="px-4 py-3 text-right">Amort.</th>
+                                        <th className="px-4 py-3 text-right">Juros</th>
+                                        <th className="px-4 py-3 text-right">Seguros</th>
+                                        <th className="px-4 py-3 text-right font-bold">Extra</th>
+                                        <th className="px-4 py-3 text-right">Saldo</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </Card>
+                                </thead>
+                                <tbody>
+                                    {result.schedule.map((row) => (
+                                        <tr key={row.month} className="border-b border-border hover:bg-muted/50">
+                                            <td className="px-4 py-3 text-center text-muted-foreground">{row.month}</td>
+                                            <td className="px-4 py-3 text-right font-medium">{formatCurrency(row.payment)}</td>
+                                            <td className="px-4 py-3 text-right text-muted-foreground">{formatCurrency(row.amortization)}</td>
+                                            <td className="px-4 py-3 text-right text-muted-foreground">{formatCurrency(row.interest)}</td>
+                                            <td className="px-4 py-3 text-right text-muted-foreground text-xs">{formatCurrency(row.mip + row.dfi)}</td>
+                                            <td className={`px-4 py-3 text-right font-bold ${row.extraAmortization > 0 ? 'text-green-600 bg-green-50 dark:bg-green-900/20' : 'text-zinc-300 dark:text-zinc-700'}`}>
+                                                {row.extraAmortization > 0 ? formatCurrency(row.extraAmortization) : '-'}
+                                            </td>
+                                            <td className="px-4 py-3 text-right font-medium">{formatCurrency(row.balance)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </Card>
 
+                </div>
             </div >
         </div >
     );

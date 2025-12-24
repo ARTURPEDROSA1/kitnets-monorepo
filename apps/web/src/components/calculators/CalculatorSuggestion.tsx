@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { MessageSquarePlus, CheckCircle2 } from "lucide-react";
+import { saveCalculatorSuggestion } from "@/app/actions/save-calculator-suggestion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,19 +13,31 @@ export function CalculatorSuggestion() {
     const [email, setEmail] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isSent, setIsSent] = useState(false);
+    const pathname = usePathname();
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!suggestion.trim()) return;
 
         setIsSubmitting(true);
-        // Simulate API call
-        setTimeout(() => {
-            setIsSubmitting(false);
+
+        try {
+            await saveCalculatorSuggestion({
+                suggestion,
+                email,
+                location: pathname || "unknown"
+            });
             setIsSent(true);
             setSuggestion("");
             setEmail("");
-        }, 1500);
+        } catch (error) {
+            console.error("Error saving suggestion:", error);
+            // Even if it fails, we might want to show success to the user or handle error
+            // utilizing 'fail open' strategy for feedback forms often makes sense
+            setIsSent(true);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     if (isSent) {
