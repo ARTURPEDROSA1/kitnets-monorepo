@@ -1,0 +1,13 @@
+
+> edge-gateway@1.2.0 build
+> tsc
+
+src/services/scheduler.ts(1,18): error TS7016: Could not find a declaration file for module 'node-cron'. 'C:/Users/Administrator/Documents/Kitnets/node_modules/node-cron/src/node-cron.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/node-cron` if it exists or add a new declaration (.d.ts) file containing `declare module 'node-cron';`
+npm error Lifecycle script `build` failed with error:
+npm error code 2
+npm error path C:\Users\Administrator\Documents\Kitnets\apps\edge-gateway
+npm error workspace edge-gateway@1.2.0
+npm error location C:\Users\Administrator\Documents\Kitnets\apps\edge-gateway
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c tsc

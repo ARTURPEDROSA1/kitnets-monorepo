@@ -292,8 +292,21 @@
         "title": "Broker Login",
         "subtitle": "Access your account to manage properties and contracts.",
         "whyRegisterTitle": "Why individual brokers should register on Kitnets.com",
-        "whyRegisterText1": "Kitnets.com was created to be the main platform specialized in kitnets, studios and compact properties in Brazil — a market with high turnover, high demand and need for efficient management.",
-        "whyRegisterText2": "By registering as an individual broker, you don't just advertise properties: you get a complete system to sell, rent and manage contracts and rentals, all in one place."
+        "intro": [
+            "Kitnets.com was created to be the main platform specialized in kitnets, studios and compact properties in Brazil — a market with high turnover, high demand and need for efficient management.",
+            "By registering as an individual broker, you don't just advertise properties: you get a complete system to sell, rent and manage contracts and rentals, all in one place."
+        ],
+        "benefits": [
+            {
+                "title": "Professional Tools",
+                "items": [
+                    "Specific advertising for compact properties",
+                    "Lead and automated proposal management",
+                    "Digital contract signing and management"
+                ]
+            }
+        ],
+        "cta": "Create your broker account and access the dashboard."
     },
     "agencyLogin": {
         "title": "Agency Login",

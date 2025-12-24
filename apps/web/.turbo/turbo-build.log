@@ -3,23 +3,266 @@
 > next build
 
    ▲ Next.js 16.0.10 (Turbopack)
+   - Environments: .env.local
+   - Experiments (use with caution):
+     · serverActions
 
+ ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
    Creating an optimized production build ...
- ✓ Compiled successfully in 3.6s
+ ✓ Compiled successfully in 8.0s
    Running TypeScript ...
    Collecting page data using 7 workers ...
-   Generating static pages using 7 workers (0/5) ...
-   Generating static pages using 7 workers (1/5) 
-   Generating static pages using 7 workers (2/5) 
-   Generating static pages using 7 workers (3/5) 
- ✓ Generating static pages using 7 workers (5/5) in 860.2ms
+   Generating static pages using 7 workers (0/118) ...
+   Generating static pages using 7 workers (29/118) 
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+   Generating static pages using 7 workers (58/118) 
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+   Generating static pages using 7 workers (88/118) 
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+ ✓ Generating static pages using 7 workers (118/118) in 3.0s
    Finalizing page optimization ...
 
-Route (app)
-┌ ○ /
-├ ○ /_not-found
-└ ○ /new-listing
+Route (app)                                                    Revalidate  Expire
+┌ ○ /_not-found
+├ ● /[lang]
+│ ├ /en
+│ ├ /pt
+│ └ /es
+├ ● /[lang]/alugar
+│ ├ /en/alugar
+│ ├ /pt/alugar
+│ └ /es/alugar
+├ ● /[lang]/anunciar
+│ ├ /en/anunciar
+│ ├ /pt/anunciar
+│ └ /es/anunciar
+├ ● /[lang]/aviso-legal
+│ ├ /en/aviso-legal
+│ ├ /pt/aviso-legal
+│ └ /es/aviso-legal
+├ ● /[lang]/calculadora-amortizacao-financiamento-imobiliario
+│ ├ /en/calculadora-amortizacao-financiamento-imobiliario
+│ ├ /pt/calculadora-amortizacao-financiamento-imobiliario
+│ └ /es/calculadora-amortizacao-financiamento-imobiliario
+├ ● /[lang]/calculadora-reajuste-aluguel
+│ ├ /en/calculadora-reajuste-aluguel
+│ ├ /pt/calculadora-reajuste-aluguel
+│ └ /es/calculadora-reajuste-aluguel
+├ ● /[lang]/calculadoras/renda-aluguel
+│ ├ /en/calculadoras/renda-aluguel
+│ ├ /pt/calculadoras/renda-aluguel
+│ └ /es/calculadoras/renda-aluguel
+├ ● /[lang]/comprar
+│ ├ /en/comprar
+│ ├ /pt/comprar
+│ └ /es/comprar
+├ ƒ /[lang]/dashboard
+├ ƒ /[lang]/dashboard/gateway/[id]
+├ ● /[lang]/disclosure
+│ ├ /en/disclosure
+│ ├ /pt/disclosure
+│ └ /es/disclosure
+├ ● /[lang]/forgot-password
+│ ├ /en/forgot-password
+│ ├ /pt/forgot-password
+│ └ /es/forgot-password
+├ ○ /[lang]/icon.png
+├ ● /[lang]/indices/[code]                                             1h      1y
+│ ├ /en/indices/cdi                                                    1h      1y
+│ ├ /en/indices/fipezap                                                1h      1y
+│ ├ /en/indices/igpm                                                   1h      1y
+│ └ [+18 more paths]
+├ ● /[lang]/lancamentos
+│ ├ /en/lancamentos
+│ ├ /pt/lancamentos
+│ └ /es/lancamentos
+├ ● /[lang]/links-uteis
+│ ├ /en/links-uteis
+│ ├ /pt/links-uteis
+│ └ /es/links-uteis
+├ ● /[lang]/login
+│ ├ /en/login
+│ ├ /pt/login
+│ └ /es/login
+├ ● /[lang]/login/construtora
+│ ├ /en/login/construtora
+│ ├ /pt/login/construtora
+│ └ /es/login/construtora
+├ ● /[lang]/login/corretor
+│ ├ /en/login/corretor
+│ ├ /pt/login/corretor
+│ └ /es/login/corretor
+├ ● /[lang]/login/imobiliaria
+│ ├ /en/login/imobiliaria
+│ ├ /pt/login/imobiliaria
+│ └ /es/login/imobiliaria
+├ ● /[lang]/login/proprietario
+│ ├ /en/login/proprietario
+│ ├ /pt/login/proprietario
+│ └ /es/login/proprietario
+├ ● /[lang]/new-listing
+│ ├ /en/new-listing
+│ ├ /pt/new-listing
+│ └ /es/new-listing
+├ ● /[lang]/onboarding
+│ ├ /en/onboarding
+│ ├ /pt/onboarding
+│ └ /es/onboarding
+├ ● /[lang]/perguntas-frequentes
+│ ├ /en/perguntas-frequentes
+│ ├ /pt/perguntas-frequentes
+│ └ /es/perguntas-frequentes
+├ ● /[lang]/politica-de-cookies
+│ ├ /en/politica-de-cookies
+│ ├ /pt/politica-de-cookies
+│ └ /es/politica-de-cookies
+├ ● /[lang]/politica-de-privacidade
+│ ├ /en/politica-de-privacidade
+│ ├ /pt/politica-de-privacidade
+│ └ /es/politica-de-privacidade
+├ ● /[lang]/profile
+│ ├ /en/profile
+│ ├ /pt/profile
+│ └ /es/profile
+├ ● /[lang]/signup
+│ ├ /en/signup
+│ ├ /pt/signup
+│ └ /es/signup
+├ ● /[lang]/signup/construtora
+│ ├ /en/signup/construtora
+│ ├ /pt/signup/construtora
+│ └ /es/signup/construtora
+├ ● /[lang]/signup/corretor
+│ ├ /en/signup/corretor
+│ ├ /pt/signup/corretor
+│ └ /es/signup/corretor
+├ ● /[lang]/signup/imobiliaria
+│ ├ /en/signup/imobiliaria
+│ ├ /pt/signup/imobiliaria
+│ └ /es/signup/imobiliaria
+├ ● /[lang]/signup/proprietario
+│ ├ /en/signup/proprietario
+│ ├ /pt/signup/proprietario
+│ └ /es/signup/proprietario
+├ ● /[lang]/termos-de-uso
+│ ├ /en/termos-de-uso
+│ ├ /pt/termos-de-uso
+│ └ /es/termos-de-uso
+├ ƒ /api/enrichment/cpf
+├ ƒ /api/gateways/claim
+├ ƒ /api/ownership/analyze
+├ ○ /robots.txt
+└ ○ /sitemap.xml
 
 
-○  (Static)  prerendered as static content
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+●  (SSG)      prerendered as static HTML (uses generateStaticParams)
+ƒ  (Dynamic)  server-rendered on demand
 

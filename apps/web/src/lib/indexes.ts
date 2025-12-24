@@ -1,5 +1,5 @@
 
-import { createClient } from "@/utils/supabase/server";
+import { createStaticClient } from "@/utils/supabase/static";
 
 export type IndexMetadata = {
     id: string;
@@ -23,7 +23,7 @@ export type IndexValue = {
 };
 
 export async function getIndexMetadata(code: string): Promise<IndexMetadata | null> {
-    const supabase = await createClient();
+    const supabase = createStaticClient();
     const { data, error } = await supabase
         .from("economic_indexes")
         .select("*")
@@ -38,7 +38,7 @@ export async function getIndexMetadata(code: string): Promise<IndexMetadata | nu
 }
 
 export async function getIndexValues(indexId: string, limit = 36): Promise<IndexValue[]> {
-    const supabase = await createClient();
+    const supabase = createStaticClient();
     const { data, error } = await supabase
         .from("economic_index_values")
         .select("*")
@@ -54,7 +54,7 @@ export async function getIndexValues(indexId: string, limit = 36): Promise<Index
 }
 
 export async function getAllIndexes(): Promise<IndexMetadata[]> {
-    const supabase = await createClient();
+    const supabase = createStaticClient();
     const { data, error } = await supabase
         .from("economic_indexes")
         .select("*")

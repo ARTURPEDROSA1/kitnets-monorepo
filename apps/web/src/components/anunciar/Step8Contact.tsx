@@ -74,7 +74,7 @@ export function Step8Contact() {
                         type="email"
                         placeholder="seu@email.com"
                         value={email}
-                        onChange={(e) => updateData({ contact: { email: e.target.value } })}
+                        onChange={(e) => updateData({ contact: { ...state.data.contact, email: e.target.value } })}
                         className="pl-10"
                     />
                 </div>
