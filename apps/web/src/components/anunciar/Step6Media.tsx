@@ -53,7 +53,7 @@ export function Step6Media() {
                     <div className="grid grid-cols-3 gap-4">
                         {photos.map((file, index) => (
                             <div key={index} className="relative aspect-square rounded-lg overflow-hidden bg-muted border">
-                                <img src={URL.createObjectURL(file)} alt="preview" className="w-full h-full object-cover" />
+                                <img src={typeof file === 'string' ? file : URL.createObjectURL(file)} alt="preview" className="w-full h-full object-cover" />
                                 <button
                                     onClick={(e) => { e.stopPropagation(); removePhoto(index); }}
                                     className="absolute top-1 right-1 bg-black/50 hover:bg-destructive text-white rounded-full p-1 transition-colors"

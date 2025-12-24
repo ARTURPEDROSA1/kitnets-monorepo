@@ -1,9 +1,7 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import {
-    LineChart,
-    Line,
     XAxis,
     YAxis,
     CartesianGrid,
@@ -303,12 +301,12 @@ export default function RentAdjustmentCalculator() {
     // Sorting Logic
     const sortedData = useMemo(() => {
         if (!calculationResult?.monthlyData) return [];
-        let sortableItems = [...calculationResult.monthlyData];
+        const sortableItems = [...calculationResult.monthlyData];
 
         if (sortConfig !== null) {
             sortableItems.sort((a: any, b: any) => {
-                let aValue = a[sortConfig.key];
-                let bValue = b[sortConfig.key];
+                const aValue = a[sortConfig.key];
+                const bValue = b[sortConfig.key];
 
                 // Handle different types if necessary, currently mostly numbers/strings
                 if (aValue < bValue) {
@@ -652,7 +650,7 @@ export default function RentAdjustmentCalculator() {
                                                     />
                                                     <Tooltip
                                                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                                                        formatter={(val: number) => [`${val.toFixed(2)}%`, `Variação`]}
+                                                        formatter={(val: any) => [`${Number(val).toFixed(2)}%`, `Variação`]}
                                                     />
                                                     <Area
                                                         type="monotone"

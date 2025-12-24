@@ -292,8 +292,21 @@
         "title": "Login Corredor",
         "subtitle": "Accede a tu cuenta para gestionar propiedades y contratos.",
         "whyRegisterTitle": "Por qué los corredores individuales deben registrarse en Kitnets.com",
-        "whyRegisterText1": "Kitnets.com fue creado para ser la principal plataforma especializada en kitnets, estudios y propiedades compactas en Brasil — un mercado con alta rotación, gran demanda y necesidad de gestión eficiente.",
-        "whyRegisterText2": "Al registrarse como corredor individual, no solo anuncia propiedades: obtiene un sistema completo para vender, alquilar y administrar contratos y alquileres, todo en un solo lugar."
+        "intro": [
+            "Kitnets.com fue creado para ser la principal plataforma especializada en kitnets, estudios y propiedades compactas en Brasil — un mercado con alta rotación, gran demanda y necesidad de gestión eficiente.",
+            "Al registrarse como corredor individual, no solo anuncia propiedades: obtiene un sistema completo para vender, alquilar y administrar contratos y alquileres, todo en un solo lugar."
+        ],
+        "benefits": [
+            {
+                "title": "Herramientas Profesionales",
+                "items": [
+                    "Publicidad específica para propiedades compactas",
+                    "Gestión de leads y propuestas automatizada",
+                    "Firma digital y gestión de contratos"
+                ]
+            }
+        ],
+        "cta": "Crea tu cuenta de corredor y accede al panel."
     },
     "agencyLogin": {
         "title": "Login Inmobiliaria",
