@@ -111,6 +111,7 @@ export function Sidebar({ lang }: { lang: string }) {
                 <button
                     onClick={() => setIsMobileOpen(!isMobileOpen)}
                     className="rounded-md p-2 text-foreground hover:bg-accent"
+                    aria-label="Abrir menu"
                 >
                     <Menu className="h-6 w-6" />
                 </button>
@@ -587,6 +588,7 @@ export function Sidebar({ lang }: { lang: string }) {
                                 <select
                                     value={lang}
                                     onChange={(e) => handleLanguageChange(e.target.value)}
+                                    aria-label="Selecionar idioma"
                                     className="w-full bg-background border border-border text-foreground text-xs rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2"
                                 >
                                     {languages.map((l) => (
@@ -601,6 +603,7 @@ export function Sidebar({ lang }: { lang: string }) {
                                     onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                                     className="h-9 w-9 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                                     title={theme === 'dark' ? "Mudar para modo claro" : "Mudar para modo escuro"}
+                                    aria-label={theme === 'dark' ? "Mudar para modo claro" : "Mudar para modo escuro"}
                                 >
                                     {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
                                 </Button>
