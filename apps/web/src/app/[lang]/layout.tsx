@@ -1,5 +1,6 @@
-import type { Metadata } from "next";
+
 import { Geist, Geist_Mono } from "next/font/google";
+import { getDictionary } from "../../dictionaries";
 import "../globals.css";
 import { ThemeProvider } from "../../components/theme-provider";
 import { Sidebar } from "../../components/Sidebar";
@@ -16,10 +17,32 @@ const geistMono = Geist_Mono({
     subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-    title: "Kitnets.com",
-    description: "Encontre sua kitnet ideal.",
-};
+export async function generateMetadata({ params }: { params: Promise<{ lang: string }> }) {
+    const { lang } = await params;
+    const dict = getDictionary(lang);
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://kitnets.com';
+
+    return {
+        metadataBase: new URL(baseUrl),
+        title: {
+            default: "Kitnets.com",
+            template: `%s | Kitnets.com`,
+        },
+        description: dict.home.subtitle,
+        openGraph: {
+            type: 'website',
+            locale: lang,
+            url: `${baseUrl}/${lang}`,
+            title: 'Kitnets.com',
+            description: dict.home.subtitle,
+            siteName: 'Kitnets.com',
+        },
+        robots: {
+            index: true,
+            follow: true,
+        },
+    };
+}
 
 export async function generateStaticParams() {
     return [{ lang: "en" }, { lang: "pt" }, { lang: "es" }];

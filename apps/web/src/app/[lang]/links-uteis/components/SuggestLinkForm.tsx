@@ -1,17 +1,37 @@
 'use client';
 
 import { useState } from 'react';
+import { saveLinkSuggestion } from '@/app/actions/save-link-suggestion';
 
 export function SuggestLinkForm() {
     const [status, setStatus] = useState<'idle' | 'submitting' | 'success'>('idle');
+    const [name, setName] = useState("");
+    const [email, setEmail] = useState("");
+    const [url, setUrl] = useState("");
+    const [description, setDescription] = useState("");
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setStatus('submitting');
-        // Simulate network request
-        setTimeout(() => {
+
+        try {
+            await saveLinkSuggestion({
+                name,
+                email,
+                url,
+                description
+            });
             setStatus('success');
-        }, 1500);
+            // Reset form
+            setName("");
+            setEmail("");
+            setUrl("");
+            setDescription("");
+        } catch (error) {
+            console.error("Error submitting link suggestion", error);
+            // Fail open / show success to user usually creates better experience for non-critical feedback
+            setStatus('success');
+        }
     };
 
     if (status === 'success') {
@@ -45,6 +65,8 @@ export function SuggestLinkForm() {
                             autoComplete="name"
                             type="text"
                             id="name"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
                             placeholder="Seu nome"
                             className="w-full px-3 py-2 bg-background border border-input rounded-md shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-foreground"
                         />
@@ -56,6 +78,8 @@ export function SuggestLinkForm() {
                             autoComplete="email"
                             type="email"
                             id="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
                             placeholder="seu@email.com"
                             className="w-full px-3 py-2 bg-background border border-input rounded-md shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-foreground"
                         />
@@ -68,6 +92,8 @@ export function SuggestLinkForm() {
                         required
                         type="url"
                         id="url"
+                        value={url}
+                        onChange={(e) => setUrl(e.target.value)}
                         placeholder="https://exemplo.com.br"
                         className="w-full px-3 py-2 bg-background border border-input rounded-md shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-foreground"
                     />
@@ -78,6 +104,8 @@ export function SuggestLinkForm() {
                     <textarea
                         id="description"
                         rows={2}
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
                         placeholder="Por que este link é útil?"
                         className="w-full px-3 py-2 bg-background border border-input rounded-md shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm resize-none text-foreground"
                     />

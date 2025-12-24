@@ -10,6 +10,8 @@ import { useTheme } from "next-themes";
 import Image from "next/image";
 import { getDictionary } from "../dictionaries";
 
+import { FLAGS } from "../lib/flags";
+
 const languages = [
     { code: "pt", label: "Português" },
     { code: "en", label: "English" },
@@ -139,161 +141,179 @@ export function Sidebar({ lang }: { lang: string }) {
                             </Link>
                             <ul className="space-y-2 font-medium">
 
-                                <li>
-                                    <Link
-                                        href={lang === 'pt' ? '/anunciar' : `/${lang}/anunciar`}
-                                        className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
-                                    >
-                                        <Megaphone className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                        <span className="ms-3">{dict.menu.advertise}</span>
-                                    </Link>
-                                </li>
-                                <li>
-                                    <button
-                                        onClick={toggleRentFilters}
-                                        className="w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group text-left"
-                                    >
-                                        <Key className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                        <span className="ms-3">{dict.menu.rent}</span>
-                                    </button>
-                                </li>
-                                <li>
-                                    <button
-                                        onClick={toggleBuyFilters}
-                                        className="w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group text-left"
-                                    >
-                                        <Home className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                        <span className="ms-3">{dict.menu.buy}</span>
-                                    </button>
-                                </li>
-                                <li>
-                                    <button
-                                        onClick={toggleLaunchesFilters}
-                                        className="w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group text-left"
-                                    >
-                                        <Rocket className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                        <span className="ms-3">{dict.menu.launches}</span>
-                                    </button>
-                                </li>
-                                <li>
-                                    <button
-                                        onClick={toggleCalculatorsMenu}
-                                        className="w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group text-left"
-                                    >
-                                        <Calculator className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                        <span className="ms-3">{dict.menu.calculators}</span>
-                                    </button>
-                                </li>
-                                <li>
-                                    <Link
-                                        href={lang === 'pt' ? '/links-uteis' : `/${lang}/links-uteis`}
-                                        className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
-                                    >
-                                        <LinkIcon className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                        <span className="ms-3">{dict.menu.usefulLinks}</span>
-                                    </Link>
-                                </li>
-                                <li>
-                                    <Link
-                                        href={lang === 'pt' ? '/perguntas-frequentes' : `/${lang}/perguntas-frequentes`}
-                                        className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
-                                    >
-                                        <HelpCircle className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                        <span className="ms-3">{dict.menu.faq}</span>
-                                    </Link>
-                                </li>
+                                {FLAGS.SHOW_MARKETPLACE && (
+                                    <>
+                                        <li>
+                                            <Link
+                                                href={lang === 'pt' ? '/anunciar' : `/${lang}/anunciar`}
+                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                            >
+                                                <Megaphone className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                <span className="ms-3">{dict.menu.advertise}</span>
+                                            </Link>
+                                        </li>
+                                        <li>
+                                            <button
+                                                onClick={toggleRentFilters}
+                                                className="w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group text-left"
+                                            >
+                                                <Key className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                <span className="ms-3">{dict.menu.rent}</span>
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <button
+                                                onClick={toggleBuyFilters}
+                                                className="w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group text-left"
+                                            >
+                                                <Home className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                <span className="ms-3">{dict.menu.buy}</span>
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <button
+                                                onClick={toggleLaunchesFilters}
+                                                className="w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group text-left"
+                                            >
+                                                <Rocket className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                <span className="ms-3">{dict.menu.launches}</span>
+                                            </button>
+                                        </li>
+                                    </>
+                                )}
+
+                                {FLAGS.SHOW_CALCULATORS && (
+                                    <li>
+                                        <button
+                                            onClick={toggleCalculatorsMenu}
+                                            className="w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group text-left"
+                                        >
+                                            <Calculator className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                            <span className="ms-3">{dict.menu.calculators}</span>
+                                        </button>
+                                    </li>
+                                )}
+
+                                {FLAGS.SHOW_USEFUL_LINKS && (
+                                    <li>
+                                        <Link
+                                            href={lang === 'pt' ? '/links-uteis' : `/${lang}/links-uteis`}
+                                            className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                        >
+                                            <LinkIcon className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                            <span className="ms-3">{dict.menu.usefulLinks}</span>
+                                        </Link>
+                                    </li>
+                                )}
+
+                                {FLAGS.SHOW_FAQ && (
+                                    <li>
+                                        <Link
+                                            href={lang === 'pt' ? '/perguntas-frequentes' : `/${lang}/perguntas-frequentes`}
+                                            className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                        >
+                                            <HelpCircle className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                            <span className="ms-3">{dict.menu.faq}</span>
+                                        </Link>
+                                    </li>
+                                )}
+
                                 <li className="my-2 border-t border-border" />
                                 {isSignedIn ? (
-                                    <>
-                                        <li>
-                                            <Link
-                                                href={lang === 'pt' ? '/dashboard' : `/${lang}/dashboard`}
-                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
-                                            >
-                                                <LayoutDashboard className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                <span className="ms-3">Dashboard</span>
-                                            </Link>
-                                        </li>
-                                        <li>
-                                            <Link
-                                                href={lang === 'pt' ? '/profile' : `/${lang}/profile`}
-                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
-                                            >
-                                                <User className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                <span className="ms-3">Meu Perfil</span>
-                                            </Link>
-                                        </li>
-                                        <li>
-                                            <SignOutButton>
-                                                <button className="flex w-full items-center rounded-lg p-2 text-foreground hover:bg-red-50 hover:text-red-600 group">
-                                                    <svg
-                                                        className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-red-600"
-                                                        aria-hidden="true"
-                                                        xmlns="http://www.w3.org/2000/svg"
-                                                        fill="none"
-                                                        viewBox="0 0 18 16"
-                                                    >
-                                                        <path
-                                                            stroke="currentColor"
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                            strokeWidth="2"
-                                                            d="M1 8h11m0 0L8 4m4 4-4 4m4-11h3a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-3"
-                                                        />
-                                                    </svg>
-                                                    <span className="ms-3">Sair</span>
-                                                </button>
-                                            </SignOutButton>
-                                        </li>
-                                    </>
+                                    FLAGS.SHOW_DASHBOARD_LINKS && (
+                                        <>
+                                            <li>
+                                                <Link
+                                                    href={lang === 'pt' ? '/dashboard' : `/${lang}/dashboard`}
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                >
+                                                    <LayoutDashboard className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3">Dashboard</span>
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <Link
+                                                    href={lang === 'pt' ? '/profile' : `/${lang}/profile`}
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                >
+                                                    <User className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3">Meu Perfil</span>
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <SignOutButton>
+                                                    <button className="flex w-full items-center rounded-lg p-2 text-foreground hover:bg-red-50 hover:text-red-600 group">
+                                                        <svg
+                                                            className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-red-600"
+                                                            aria-hidden="true"
+                                                            xmlns="http://www.w3.org/2000/svg"
+                                                            fill="none"
+                                                            viewBox="0 0 18 16"
+                                                        >
+                                                            <path
+                                                                stroke="currentColor"
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                                strokeWidth="2"
+                                                                d="M1 8h11m0 0L8 4m4 4-4 4m4-11h3a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-3"
+                                                            />
+                                                        </svg>
+                                                        <span className="ms-3">Sair</span>
+                                                    </button>
+                                                </SignOutButton>
+                                            </li>
+                                        </>
+                                    )
                                 ) : (
-                                    <>
-                                        <li>
-                                            <Link
-                                                href={lang === 'pt' ? '/login/corretor' : `/${lang}/login/corretor`}
-                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
-                                            >
-                                                <Briefcase className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                <span className="ms-3">{dict.menu.brokers}</span>
-                                            </Link>
-                                        </li>
-                                        <li>
-                                            <Link
-                                                href={lang === 'pt' ? '/login/imobiliaria' : `/${lang}/login/imobiliaria`}
-                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
-                                            >
-                                                <Building2 className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                <span className="ms-3">{dict.menu.agencies}</span>
-                                            </Link>
-                                        </li>
-                                        <li>
-                                            <Link
-                                                href={lang === 'pt' ? '/login' : `/${lang}/login`}
-                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
-                                            >
-                                                <User className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                <span className="ms-3">{dict.menu.residents}</span>
-                                            </Link>
-                                        </li>
-                                        <li>
-                                            <Link
-                                                href={lang === 'pt' ? '/login/proprietario' : `/${lang}/login/proprietario`}
-                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
-                                            >
-                                                <KeyRound className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                <span className="ms-3">{dict.menu.owners}</span>
-                                            </Link>
-                                        </li>
-                                        <li>
-                                            <Link
-                                                href={lang === 'pt' ? '/login/construtora' : `/${lang}/login/construtora`}
-                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
-                                            >
-                                                <HardHat className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                <span className="ms-3">{dict.menu.developers}</span>
-                                            </Link>
-                                        </li>
-                                    </>
+                                    FLAGS.SHOW_LOGIN_LINKS && (
+                                        <>
+                                            <li>
+                                                <Link
+                                                    href={lang === 'pt' ? '/login/corretor' : `/${lang}/login/corretor`}
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                >
+                                                    <Briefcase className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3">{dict.menu.brokers}</span>
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <Link
+                                                    href={lang === 'pt' ? '/login/imobiliaria' : `/${lang}/login/imobiliaria`}
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                >
+                                                    <Building2 className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3">{dict.menu.agencies}</span>
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <Link
+                                                    href={lang === 'pt' ? '/login' : `/${lang}/login`}
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                >
+                                                    <User className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3">{dict.menu.residents}</span>
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <Link
+                                                    href={lang === 'pt' ? '/login/proprietario' : `/${lang}/login/proprietario`}
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                >
+                                                    <KeyRound className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3">{dict.menu.owners}</span>
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <Link
+                                                    href={lang === 'pt' ? '/login/construtora' : `/${lang}/login/construtora`}
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                >
+                                                    <HardHat className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3">{dict.menu.developers}</span>
+                                                </Link>
+                                            </li>
+                                        </>
+                                    )
                                 )}
                             </ul>
                         </div>

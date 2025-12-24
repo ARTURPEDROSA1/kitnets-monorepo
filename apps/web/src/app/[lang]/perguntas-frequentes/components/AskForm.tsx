@@ -1,17 +1,33 @@
 'use client';
 
 import { useState } from 'react';
+import { saveFaqQuestion } from '@/app/actions/save-faq-question';
 
 export function AskForm() {
     const [status, setStatus] = useState<'idle' | 'submitting' | 'success'>('idle');
+    const [name, setName] = useState("");
+    const [email, setEmail] = useState("");
+    const [question, setQuestion] = useState("");
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setStatus('submitting');
-        // Simulate network request
-        setTimeout(() => {
+
+        try {
+            await saveFaqQuestion({
+                name,
+                email,
+                question
+            });
             setStatus('success');
-        }, 1500);
+            setName("");
+            setEmail("");
+            setQuestion("");
+        } catch (error) {
+            console.error("Error submitting question:", error);
+            // Fail open
+            setStatus('success');
+        }
     };
 
     if (status === 'success') {
@@ -45,6 +61,8 @@ export function AskForm() {
                             autoComplete="name"
                             type="text"
                             id="name"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
                             placeholder="Seu nome"
                             className="w-full px-3 py-2 bg-background border border-input rounded-md shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-foreground"
                         />
@@ -56,6 +74,8 @@ export function AskForm() {
                             autoComplete="email"
                             type="email"
                             id="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
                             placeholder="seu@email.com"
                             className="w-full px-3 py-2 bg-background border border-input rounded-md shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-foreground"
                         />
@@ -68,6 +88,8 @@ export function AskForm() {
                         required
                         id="question"
                         rows={3}
+                        value={question}
+                        onChange={(e) => setQuestion(e.target.value)}
                         placeholder="O que você gostaria de saber?"
                         className="w-full px-3 py-2 bg-background border border-input rounded-md shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm resize-none text-foreground"
                     />

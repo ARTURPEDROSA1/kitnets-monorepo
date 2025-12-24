@@ -36,6 +36,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { CalculatorSuggestion } from "@/components/calculators/CalculatorSuggestion";
+import { saveLead } from "@/app/actions/capture-lead";
 
 // --- MOCK DATA FOR INDICES (Last 12 months + forecast) ---
 // Values are monthly percentages
@@ -75,6 +76,7 @@ const formatPercent = (value: number) => {
     }).format(value / 100);
 };
 
+
 function LeadCaptureModal({ isOpen, onCapture }: { isOpen: boolean; onCapture: () => void }) {
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
@@ -82,14 +84,27 @@ function LeadCaptureModal({ isOpen, onCapture }: { isOpen: boolean; onCapture: (
 
     if (!isOpen) return null;
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
-        // Simulate API call
-        setTimeout(() => {
-            setLoading(false);
+
+        try {
+            // Save lead to Supabase
+            await saveLead({
+                name,
+                email,
+                source: "rent-adjustment-calculator"
+            });
+
+            // Proceed regardless of backend success/fail to not block user
+            // (In a stricter system, checking result.success might be desired)
             onCapture();
-        }, 1000);
+        } catch (error) {
+            console.error("Lead capture error:", error);
+            onCapture(); // Fail open
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -117,6 +132,7 @@ function LeadCaptureModal({ isOpen, onCapture }: { isOpen: boolean; onCapture: (
                                 placeholder="Como podemos te chamar?"
                                 className="pl-9"
                                 required
+                                autoComplete="name"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                             />
@@ -132,6 +148,7 @@ function LeadCaptureModal({ isOpen, onCapture }: { isOpen: boolean; onCapture: (
                                 placeholder="exemplo@email.com"
                                 className="pl-9"
                                 required
+                                autoComplete="email"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                             />

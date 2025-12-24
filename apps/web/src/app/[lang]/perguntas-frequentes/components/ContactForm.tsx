@@ -1,16 +1,37 @@
 'use client';
 
 import { useState } from 'react';
+import { saveContactMessage } from "@/app/actions/save-contact-message";
 
 export function ContactForm() {
     const [status, setStatus] = useState<'idle' | 'submitting' | 'success'>('idle');
+    const [name, setName] = useState("");
+    const [email, setEmail] = useState("");
+    const [subject, setSubject] = useState("Suporte");
+    const [message, setMessage] = useState("");
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setStatus('submitting');
-        setTimeout(() => {
+
+        try {
+            await saveContactMessage({
+                name,
+                email,
+                subject,
+                message
+            });
             setStatus('success');
-        }, 1500);
+            // Reset form
+            setName("");
+            setEmail("");
+            setSubject("Suporte");
+            setMessage("");
+        } catch (error) {
+            console.error("Error submitting contact message:", error);
+            // Fail open
+            setStatus('success');
+        }
     };
 
     if (status === 'success') {
@@ -47,6 +68,8 @@ export function ContactForm() {
                                 autoComplete="name"
                                 type="text"
                                 id="contact-name"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
                                 className="w-full px-3 py-2 bg-background border border-input rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-foreground"
                             />
                         </div>
@@ -59,6 +82,8 @@ export function ContactForm() {
                                 autoComplete="email"
                                 type="email"
                                 id="contact-email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
                                 className="w-full px-3 py-2 bg-background border border-input rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-foreground"
                             />
                         </div>
@@ -70,13 +95,15 @@ export function ContactForm() {
                         </label>
                         <select
                             id="subject"
+                            value={subject}
+                            onChange={(e) => setSubject(e.target.value)}
                             className="w-full px-3 py-2 bg-background border border-input rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-foreground"
                         >
-                            <option>Suporte</option>
-                            <option>Parcerias</option>
-                            <option>Comercial</option>
-                            <option>Jurídico</option>
-                            <option>Outro</option>
+                            <option value="Suporte">Suporte</option>
+                            <option value="Parcerias">Parcerias</option>
+                            <option value="Comercial">Comercial</option>
+                            <option value="Jurídico">Jurídico</option>
+                            <option value="Outro">Outro</option>
                         </select>
                     </div>
 
@@ -88,6 +115,8 @@ export function ContactForm() {
                             required
                             id="message"
                             rows={4}
+                            value={message}
+                            onChange={(e) => setMessage(e.target.value)}
                             className="w-full px-3 py-2 bg-background border border-input rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-y text-foreground"
                         />
                     </div>

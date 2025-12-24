@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { Button } from "@kitnets/ui";
 import { ChevronDown, Map, Bell } from "lucide-react";
 import { Dictionary } from "../dictionaries";
@@ -122,9 +123,15 @@ export function LaunchesListings({ t }: LaunchesListingsProps) {
                 {listings.map((listing) => (
                     <div key={listing.id} className="group overflow-hidden rounded-xl border border-border bg-card transition-all duration-300 hover:shadow-lg">
                         {/* Image Placeholder */}
-                        <div className="relative flex h-48 items-center justify-center bg-muted">
-                            <span className="text-muted-foreground">{t.propertyImage}</span>
-                            <div className="absolute left-2 top-2 rounded bg-black/60 px-2 py-1 text-xs text-white">
+                        <div className="relative h-48 bg-muted overflow-hidden">
+                            <Image
+                                src={listing.image}
+                                alt={listing.title}
+                                fill
+                                className="object-cover transition-transform duration-500 group-hover:scale-105"
+                                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                            />
+                            <div className="absolute left-2 top-2 rounded bg-black/60 px-2 py-1 text-xs text-white capitalize z-10">
                                 {listing.tags[0]}
                             </div>
                         </div>

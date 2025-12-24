@@ -1,6 +1,7 @@
 import { Button } from "@kitnets/ui";
 import Link from "next/link";
 import { getDictionary } from "../../dictionaries";
+import { FLAGS } from "../../lib/flags";
 
 export default async function Home({ params }: { params: Promise<{ lang: "en" | "pt" | "es" }> }) {
     const { lang } = await params;
@@ -18,11 +19,13 @@ export default async function Home({ params }: { params: Promise<{ lang: "en" | 
                     {dict.home.subtitle}
                 </p>
 
-                <div className="mt-10">
-                    <Link href={lang === 'pt' ? '/onboarding' : `/${lang}/onboarding`}>
-                        <Button size="lg" className="h-12 px-8 text-lg">{dict.home.cta}</Button>
-                    </Link>
-                </div>
+                {FLAGS.SHOW_HOME_CTA && (
+                    <div className="mt-10">
+                        <Link href={lang === 'pt' ? '/onboarding' : `/${lang}/onboarding`}>
+                            <Button size="lg" className="h-12 px-8 text-lg">{dict.home.cta}</Button>
+                        </Link>
+                    </div>
+                )}
             </main>
 
             {/* Marketing Content */}
@@ -74,11 +77,13 @@ export default async function Home({ params }: { params: Promise<{ lang: "en" | 
                         <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto">
                             {dict.homeContent.finalCta.subtitle}
                         </p>
-                        <div className="pt-4">
-                            <Link href={lang === 'pt' ? '/onboarding' : `/${lang}/onboarding`}>
-                                <Button size="lg" className="h-12 px-8 text-lg">{dict.home.cta}</Button>
-                            </Link>
-                        </div>
+                        {FLAGS.SHOW_HOME_CTA && (
+                            <div className="pt-4">
+                                <Link href={lang === 'pt' ? '/onboarding' : `/${lang}/onboarding`}>
+                                    <Button size="lg" className="h-12 px-8 text-lg">{dict.home.cta}</Button>
+                                </Link>
+                            </div>
+                        )}
                     </div>
                 </section>
             )}
