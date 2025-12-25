@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/utils/supabase/server";
+import { cookies } from "next/headers";
 
 export interface SaveLinkSuggestionResponse {
     success: boolean;
@@ -30,6 +31,12 @@ export async function saveLinkSuggestion(data: { name: string; email: string; ur
             console.error("Error saving link suggestion:", error);
             return { success: false, error: "Could not save suggestion" };
         }
+
+        (await cookies()).set("kitnets_user_identified", "true", {
+            maxAge: 60 * 60 * 24 * 365, // 1 year
+            path: "/",
+            httpOnly: false,
+        });
 
         return { success: true };
     } catch (err) {

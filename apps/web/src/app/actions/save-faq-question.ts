@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/utils/supabase/server";
+import { cookies } from "next/headers";
 
 export interface SaveFaqQuestionResponse {
     success: boolean;
@@ -29,6 +30,12 @@ export async function saveFaqQuestion(data: { name?: string; email: string; ques
             console.error("Error saving faq question:", error);
             return { success: false, error: "Could not save question" };
         }
+
+        (await cookies()).set("kitnets_user_identified", "true", {
+            maxAge: 60 * 60 * 24 * 365, // 1 year
+            path: "/",
+            httpOnly: false,
+        });
 
         return { success: true };
     } catch (err) {

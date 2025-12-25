@@ -381,6 +381,10 @@
             "Near Restaurant"
         ]
     },
+    "rentalIncomeCalculatorPage": {
+        "title": "Does rental income cover the mortgage? - Kitnets.com",
+        "description": "Find out in how many years rental income pays off the mortgage. Simulate SAC or PRICE, consider interest, insurance, taxes, vacancy, and annual readjustment."
+    },
     "mortgageCalculatorPage": {
         "title": "Mortgage Amortization Simulator (SAC and PRICE)",
         "subtitle": "The power of amortization: discover what banks don't explain about interest, terms, and savings.",

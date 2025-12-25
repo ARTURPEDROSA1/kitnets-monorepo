@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
     XAxis,
     YAxis,
@@ -36,15 +36,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { CalculatorSuggestion } from "@/components/calculators/CalculatorSuggestion";
 import { saveLead } from "@/app/actions/capture-lead";
 
-// --- MOCK DATA FOR INDICES (Last 12 months + forecast) ---
-// Values are monthly percentages
-const INDEX_HISTORY: Record<string, number[]> = {
-    IPCA: [0.56, 0.42, 0.83, 0.16, 0.38, 0.46, 0.21, 0.38, -0.02, 0.44, 0.56, 0.28], // Dec 23 - Nov 24 (approx)
-    IGPM: [0.74, 0.07, -0.52, -0.47, -0.95, 0.89, 0.81, 0.61, 0.29, 0.62, 1.52, 0.98],
-    INPC: [0.55, 0.57, 0.81, 0.19, 0.37, 0.46, 0.25, 0.46, -0.14, 0.48, 0.61, 0.30],
-    IVAR: [-0.05, 1.15, 0.92, 0.52, 0.54, 0.81, 0.65, 0.12, 0.32, 0.50, 0.75, 0.40],
-    FipeZap: [0.35, 0.40, 0.50, 0.55, 0.60, 0.65, 0.70, 0.80, 0.90, 1.0, 1.1, 1.2], // Rising trend mock
-};
+import { getEconomicData } from "@/app/actions/get-economic-data";
+import { IndexValue } from "@/lib/indexes";
 
 const INDEX_COLORS: Record<string, string> = {
     IPCA: "#16a34a", // green-600
@@ -53,9 +46,6 @@ const INDEX_COLORS: Record<string, string> = {
     IVAR: "#9333ea", // purple-600
     FipeZap: "#db2777", // pink-600
 };
-
-// Start month reference for the mock data (e.g., Dec 2023)
-const MOCK_START_DATE = new Date(2023, 11, 1);
 
 // Helper: Format Currency
 const formatCurrency = (value: number) => {
@@ -173,11 +163,7 @@ function LeadCaptureModal({ isOpen, onCapture }: { isOpen: boolean; onCapture: (
 
 export default function RentAdjustmentCalculator() {
     // --- State ---
-    const [startDate, setStartDate] = useState<string>(() => {
-        const d = new Date();
-        d.setFullYear(d.getFullYear() - 1);
-        return d.toISOString().split('T')[0];
-    });
+    const [startDate, setStartDate] = useState<string>("2023-01-01");
     const [currentRent, setCurrentRent] = useState<number | string>(1500);
     const [method, setMethod] = useState<"index" | "fixed">("index");
     const [selectedIndex, setSelectedIndex] = useState<string>("IPCA");
@@ -191,6 +177,13 @@ export default function RentAdjustmentCalculator() {
     // Lead Capture State
     const [isLeadCaptured, setIsLeadCaptured] = useState(false);
     const [showLeadModal, setShowLeadModal] = useState(false);
+
+    useEffect(() => {
+        const hasCookie = document.cookie.split('; ').some(row => row.trim().startsWith('kitnets_user_identified='));
+        if (hasCookie) {
+            setIsLeadCaptured(true);
+        }
+    }, []);
 
     // View State
     const [viewMode, setViewMode] = useState<"chart" | "table">("chart");
@@ -240,62 +233,12 @@ export default function RentAdjustmentCalculator() {
     }, [startDate, currentRent, method, isEligibleForIndex, fixedPercent]);
 
     // --- Calculation Engine ---
-    const calculationResult = useMemo(() => {
-        if (!startDate || !currentRent) return null;
+    const [calculationResult, setCalculationResult] = useState<any>(null);
 
-        const rentValue = Number(currentRent);
-        let accumulatedRate = 0;
-        let monthlyData: any[] = [];
-        let finalRent = 0;
-        let increaseAmount = 0;
-        let accumulatedPercent = 0;
+    // Replaces the useMemo calculation with an async effect triggered by handleCalculate
+    // We keep this hook for sync validation or simple computed values if needed
+    // but the heavy lifting moves to handleCalculate
 
-        if (method === 'fixed') {
-            const pct = Number(fixedPercent);
-            accumulatedPercent = pct;
-            accumulatedRate = pct / 100;
-            finalRent = rentValue * (1 + accumulatedRate);
-            increaseAmount = finalRent - rentValue;
-        } else {
-            // Index Calculation
-            // For simplicity, we stick to the 12-month fixed mock window data 
-            // In a real app, we would fetch data corresponding to the startDate's anniversary window.
-            // Here we map the last 12 months mock data.
-
-            const indexSeries = INDEX_HISTORY[selectedIndex] || INDEX_HISTORY['IPCA'];
-
-            // Calculate accumulation: (1 + m1) * (1 + m2) ... - 1
-            let accParams = 1;
-
-            monthlyData = indexSeries.map((val, idx) => {
-                const monthDate = new Date(MOCK_START_DATE);
-                monthDate.setMonth(MOCK_START_DATE.getMonth() + idx);
-
-                // Accumulate
-                const monthlyFactor = 1 + (val / 100);
-                accParams *= monthlyFactor;
-
-                return {
-                    month: monthDate.toLocaleDateString("pt-BR", { month: 'short' }),
-                    fullDate: monthDate.toLocaleDateString("pt-BR", { month: 'long', year: 'numeric' }),
-                    value: val,
-                    accumulated: (accParams - 1) * 100
-                };
-            });
-
-            accumulatedRate = accParams - 1;
-            accumulatedPercent = accumulatedRate * 100;
-            finalRent = rentValue * accParams;
-            increaseAmount = finalRent - rentValue;
-        }
-
-        return {
-            finalRent,
-            increaseAmount,
-            accumulatedPercent,
-            monthlyData
-        };
-    }, [startDate, currentRent, method, selectedIndex, fixedPercent]);
 
 
     // Sorting Logic
@@ -329,21 +272,149 @@ export default function RentAdjustmentCalculator() {
         setSortConfig({ key, direction });
     };
 
-    // Handlers
+    const performCalculation = async () => {
+        setIsAnimating(true);
+
+        try {
+            let finalResult = null;
+
+            if (method === 'fixed') {
+                const rentValue = Number(currentRent);
+                const pct = Number(fixedPercent);
+                const accumulatedRate = pct / 100;
+                const finalRent = rentValue * (1 + accumulatedRate);
+
+                finalResult = {
+                    finalRent,
+                    increaseAmount: finalRent - rentValue,
+                    accumulatedPercent: pct,
+                    monthlyData: [],
+                    history: []
+                };
+            } else {
+                // Fetch real data
+                const fetchedData = await getEconomicData(selectedIndex);
+
+                // Perform Multi-Year Calculation
+                const start = new Date(startDate + "T12:00:00");
+                const today = new Date();
+                let currentCalculationRent = Number(currentRent);
+
+                // Identify simulation periods
+                // Period 1: Adjust at Start + 1 year. Index window: Start -> Start + 11 months?
+                // Standard: Adjustment happens on anniversary. Index collection is usually 12 months prior.
+                // Example: Contract Jan 2023. Adj Jan 2024. Index: Jan 2023 - Dec 2023.
+
+                const checkDate = new Date(start);
+                checkDate.setFullYear(checkDate.getFullYear() + 1); // First adjustment
+
+                const adjustments: any[] = [];
+                let lastMonthlyData: any[] = [];
+                let lastAccumulated = 0;
+
+                // Loop through anniversaries until we reach a forecast limit (e.g., Today + 1 year)
+                // We want to calculate 2024, 2025, 2026 (Forecast)
+                const limitDate = new Date(today);
+                limitDate.setFullYear(limitDate.getFullYear() + 1); // Look ahead max 1 year from today for forecast result
+
+                while (checkDate <= limitDate) {
+                    // Define the 12-month window for this adjustment
+                    // Window ends 1 month before adjustment (or includes it? standard is previous 12 months)
+                    // If Adj is Jan 2024 -> Window Jan 2023 to Dec 2023.
+
+                    const windowStart = new Date(checkDate);
+                    windowStart.setFullYear(windowStart.getFullYear() - 1);
+                    // Start of window is exactly 12 months before adjustment date
+
+                    // Filter indices
+                    const windowData = [];
+                    let accRate = 1;
+
+                    // Generate expected months
+                    for (let i = 0; i < 12; i++) {
+                        const targetMonthDate = new Date(windowStart);
+                        targetMonthDate.setMonth(windowStart.getMonth() + i);
+
+                        const y = targetMonthDate.getFullYear();
+                        const m = targetMonthDate.getMonth() + 1;
+
+                        // Find value in fetchedData
+                        const found = fetchedData.find((d: IndexValue) => d.year === y && d.month === m);
+
+                        let val = 0;
+                        if (found) {
+                            val = found.value_percent;
+                        } else {
+                            // Forecast logic: if missing, use last known value from fetchedData
+                            // This covers "allow forecast next 2 months" by repeating last available
+                            const lastKnown = fetchedData[fetchedData.length - 1];
+                            val = lastKnown ? lastKnown.value_percent : 0.5; // fallback
+                        }
+
+                        accRate *= (1 + (val / 100));
+
+                        windowData.push({
+                            month: targetMonthDate.toLocaleDateString("pt-BR", { month: 'short' }),
+                            fullDate: targetMonthDate.toLocaleDateString("pt-BR", { month: 'long', year: 'numeric' }),
+                            value: val,
+                            accumulated: (accRate - 1) * 100
+                        });
+                    }
+
+                    const accumulatedPercent = (accRate - 1) * 100;
+                    const increase = currentCalculationRent * (accRate - 1);
+                    const newRent = currentCalculationRent * accRate;
+
+                    adjustments.push({
+                        date: checkDate.toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit', year: 'numeric' }),
+                        year: checkDate.getFullYear(),
+                        oldRent: currentCalculationRent,
+                        newRent: newRent,
+                        increase,
+                        percent: accumulatedPercent
+                    });
+
+                    currentCalculationRent = newRent;
+                    lastMonthlyData = windowData;
+                    lastAccumulated = accumulatedPercent;
+
+                    // Move to next year
+                    checkDate.setFullYear(checkDate.getFullYear() + 1);
+                }
+
+                // Result is the LAST calculated adjustment (Forecast)
+                // But we display the chain if needed. Currently we assume the "Main Result" is the target forecast.
+                finalResult = {
+                    finalRent: currentCalculationRent,
+                    increaseAmount: adjustments.length > 0 ? adjustments[adjustments.length - 1].increase : 0,
+                    accumulatedPercent: lastAccumulated,
+                    monthlyData: lastMonthlyData,
+                    history: adjustments
+                };
+            }
+
+            setCalculationResult(finalResult);
+            setIsCalculated(true);
+
+            // Scroll
+            setTimeout(() => {
+                const resultsElement = document.getElementById("results-section");
+                if (resultsElement) resultsElement.scrollIntoView({ behavior: "smooth" });
+            }, 100);
+
+        } catch (err) {
+            console.error("Calculation failed", err);
+        } finally {
+            setIsAnimating(false);
+        }
+    };
+
     const handleCalculate = () => {
         if (!isLeadCaptured) {
             setShowLeadModal(true);
             return;
         }
-
-        setIsAnimating(true);
-        setTimeout(() => {
-            setIsCalculated(true);
-            setIsAnimating(false);
-            // Scroll to results
-            const resultsElement = document.getElementById("results-section");
-            if (resultsElement) resultsElement.scrollIntoView({ behavior: "smooth" });
-        }, 800);
+        performCalculation();
     };
 
     return (
@@ -353,14 +424,7 @@ export default function RentAdjustmentCalculator() {
                 onCapture={() => {
                     setIsLeadCaptured(true);
                     setShowLeadModal(false);
-                    // Trigger calculation animation immediately after success
-                    setIsAnimating(true);
-                    setTimeout(() => {
-                        setIsCalculated(true);
-                        setIsAnimating(false);
-                        const resultsElement = document.getElementById("results-section");
-                        if (resultsElement) resultsElement.scrollIntoView({ behavior: "smooth" });
-                    }, 800);
+                    performCalculation();
                 }}
             />
 
@@ -406,6 +470,7 @@ export default function RentAdjustmentCalculator() {
                                     type="date"
                                     value={startDate}
                                     onChange={(e) => setStartDate(e.target.value)}
+                                    min="2023-01-01"
                                     className="w-full"
                                 />
                                 {contractInfo && (
