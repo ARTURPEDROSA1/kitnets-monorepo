@@ -381,6 +381,10 @@
             "Cerca Restaurante"
         ]
     },
+    "rentalIncomeCalculatorPage": {
+        "title": "¿La renta del alquiler paga la hipoteca? - Kitnets.com",
+        "description": "Descubra en cuántos años la renta del alquiler pasa a pagar la hipoteca inmobiliaria. Simule SAC o PRICE, considere intereses, seguros, impuestos, vacancia y reajuste anual."
+    },
     "mortgageCalculatorPage": {
         "title": "Simulador de Amortización de Hipoteca (SAC y PRICE)",
         "subtitle": "El poder de la amortización: descubra lo que los bancos no explican sobre intereses, plazos y ahorro.",

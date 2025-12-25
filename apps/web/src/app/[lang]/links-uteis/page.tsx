@@ -59,14 +59,13 @@ export default function UsefulLinksPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {[
                             { name: "Caixa Econômica Federal", url: "https://www.caixa.gov.br/voce/habitacao", desc: "Principal banco do país para financiamento habitacional e programas como o Minha Casa Minha Vida." },
-                            { name: "Banco do Brasil", url: "https://www.bb.com.br/site/pra-voce/credito/financiamento-imobiliario", desc: "Financiamento para imóveis novos, usados e construção." },
-                            { name: "Itaú Unibanco", url: "https://www.itau.com.br/credito-financiamento/financiamento-imobiliario", desc: "Simulação online, taxa fixa ou indexada." },
-                            { name: "Bradesco", url: "https://banco.bradesco/html/classic/produtos-servicos/emprestimos-e-financiamentos/financiamento-imobiliario.shtm", desc: "Financiamento para compra e construção." },
-                            { name: "Santander Brasil", url: "https://www.santander.com.br/credito-financiamento/financiamento-imobiliario", desc: "Crédito imobiliário com diversas modalidades." },
-                            { name: "BTG Pactual", url: "https://www.btgpactual.com/credito/financiamento-imobiliario", desc: "Foco em clientes de alta renda e investidores." },
-                            { name: "Inter", url: "https://inter.co/pra-voce/credito/financiamento-imobiliario", desc: "Processo digital e integração com conta digital." },
-                            { name: "Sicredi", url: "https://www.sicredi.com.br/site/credito/financiamento-imobiliario", desc: "Cooperativa de crédito com forte atuação regional." },
-                            { name: "Sicoob", url: "https://www.sicoob.com.br/web/sicoob/credito-imobiliario", desc: "Opções para associados de cooperativas." },
+                            { name: "Banco do Brasil", url: "https://www.bb.com.br/site/pra-voce/financiamentos/financiamento-imobiliario/", desc: "Financiamento para imóveis novos, usados e construção." },
+                            { name: "Itaú Unibanco", url: "https://www.itau.com.br/emprestimos-financiamentos/credito-imobiliario", desc: "Simulação online, taxa fixa ou indexada." },
+                            { name: "Bradesco", url: "https://banco.bradesco/html/exclusive/produtos-servicos/emprestimo-e-financiamento/imoveis/credito-imobiliario-aquisicao-de-imoveis.shtm", desc: "Financiamento para compra e construção." },
+                            { name: "Santander Brasil", url: "https://www.santander.com.br/banco/credito-financiamento-imobiliario?utm_urlsuffix=M19726-32897-4&gclsrc=aw.ds&gad_source=1&gad_campaignid=16267363643&gbraid=0AAAAAoYBGN299kZNjDdqtcVwRf_4C9z6K&gclid=CjwKCAiA3rPKBhBZEiwAhPNFQHx-VdQql2JvHsVHlUUacSHKeniw-zcdydpkBSS4TEKyCCewrT0fjRoCUbQQAvD_BwE", desc: "Crédito imobiliário com diversas modalidades." },
+                            { name: "Inter", url: "https://inter.co/pra-voce/financiamento-imobiliario/residencial/?utm_source=google&utm_medium=cpc&utm_campaign=pesquisa+-+financiamento+imobiliario+-+always+on&utm_term=financiamento-imobiliario&utm_content=alwayson&gad_source=1&gad_campaignid=20124926130&gbraid=0AAAAADyYGsc7SGJCamLn4MzcaQCshDpui&gclid=CjwKCAiA3rPKBhBZEiwAhPNFQCsnXG9zayT6lnYmWVuPcaRlQ5-eHFPG8HiMsF8DMJUw6Gbh-V1T7hoCXEYQAvD_BwE", desc: "Processo digital e integração com conta digital." },
+                            { name: "Sicredi", url: "https://www.sicredi.com.br/site/credito/para-voce/credito-imobiliario/", desc: "Cooperativa de crédito com forte atuação regional." },
+                            { name: "Sicoob", url: "https://www.sicoob.com.br/web/creditoimobiliario/simulador", desc: "Opções para associados de cooperativas." },
                         ].map((bank, i) => (
                             <Link
                                 key={i}
@@ -106,11 +105,11 @@ export default function UsefulLinksPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                         {[
                             { name: "Porto Seguro", url: "https://www.portoseguro.com.br/seguro-residencial" },
-                            { name: "SulAmérica", url: "https://portal.sulamericaseguros.com.br/seguro-residencial/" },
-                            { name: "Tokio Marine", url: "https://www.tokiomarine.com.br/seguro-residencial/" },
-                            { name: "Mapfre", url: "https://www.mapfre.com.br/seguros-br/particulares/residencial/" },
-                            { name: "Bradesco Seguros", url: "https://www.bradescoseguros.com.br/clientes/seguros/residencial" },
-                            { name: "Zurich Seguros", url: "https://www.zurich.com.br/pt-br/seguros/residencial" },
+                            { name: "Tokio Marine", url: "https://www.tokiomarine.com.br/seguros-residenciais/seguro-residencial/?utm_source=google&utm_medium=cpc&utm_campaign=crho-tkm-gg-institucional_marca-search-perfor-trafg-aon&utm_content=interesse-keyword-rd&gad_source=1&gad_campaignid=18352223194&gbraid=0AAAAADnO_8thMZd9HpKKK6PDmQu07FcyN&gclid=CjwKCAiA3rPKBhBZEiwAhPNFQBEQWNFsGVnx7S6E4a58I0dcRT9BLD4L1i_XhcMFY5KwRFcNFJ5whhoC0k0QAvD_BwE" },
+                            { name: "Mapfre", url: "https://seguros.mapfre.com.br/imovel/?utm_source=google&utm_medium=cpc&utm_campaign=mapfre_br_home_sem-bra_google_pro_on-going_performance_202405&dcuserid=%25m&utm_campaign=11727147806&utm_medium=cpc&utm_source=google&kwmatch=b&wkwd=mapfre%20seguro%20residencial&product=&gclsrc=aw.ds&gad_source=1&gad_campaignid=11727147806&gbraid=0AAAAADuzuoRIEAYBc9fusz2yri6yOnnNV&gclid=CjwKCAiA3rPKBhBZEiwAhPNFQMXm8I8VHo0GQjUqRBQOPgz3USbp4kteZIhdHKutBZmKLLH-8vBXnxoCjwwQAvD_BwE" },
+                            { name: "Bradesco Seguros", url: "https://loja.bradescoseguros.com.br/page/public/pt/BR/process/enter/HOMEVitrineProcess?productId=HOMEVitrine&activeZone=MyZone&utm_source=GOOGLE-ADS&utm_medium=SEARCH&utm_content=alp_brse_aon_gad_cov_lds_residencial-marca_nu_nu_kew_Nacional_a18-99_bsa02283al_V142447&utm_campaign=alp_brse_search_cpc_aon_residencial-marca_cov_brr_gad_auction_lds_perf_V142447&gad_source=1&gad_campaignid=23096529498&gbraid=0AAAAADjt0wKjBEeboxIWVMoiK5RiLLJp-&gclid=CjwKCAiA3rPKBhBZEiwAhPNFQN7DdvgOMT8ieXAslA7UYrMUFeQx0F6PL_uyN0-Q0rNq3YfWITGIRhoCE4IQAvD_BwE" },
+                            { name: "Zurich Seguros", url: "https://www.zurich.com.br/seguros-para-voce/imoveis/residencia?utm_source=google&utm_medium=cpc&utm_campaign=%28O%29_MEIO_GADS_AON_RESIDENCIA_2025&utm_term=%28O%29_KEYWORD_RESIDENCIA&gad_source=1&gad_campaignid=21794507660&gbraid=0AAAAAoeUOXi5VCafxCfUhR_xXJZ7MW2ae&gclid=CjwKCAiA3rPKBhBZEiwAhPNFQGRT-YIy0ILv2x3kNS-Uv_Vqbc_owgZg-wnJkF03EuEpk3b2AfOOjhoCPg0QAvD_BwE" },
+                            { name: "Caixa Seguradora", url: "https://www.caixaseguradora.com.br/" },
                         ].map((seg, i) => (
                             <Link
                                 key={i}
@@ -146,8 +145,6 @@ export default function UsefulLinksPage() {
                         {[
                             { name: "Lei do Inquilinato (Lei nº 8.245/1991)", url: "http://www.planalto.gov.br/ccivil_03/leis/l8245.htm", desc: "Regula direitos e deveres de locadores e inquilinos no Brasil." },
                             { name: "Código Civil Brasileiro (Lei nº 10.406/2002)", url: "http://www.planalto.gov.br/ccivil_03/leis/2002/l10406.htm", desc: "Base legal para contratos, propriedade e obrigações." },
-                            { name: "Conselho Nacional de Justiça (CNJ)", url: "https://www.cnj.jus.br", desc: "Informações sobre registros, cartórios e atos notariais." },
-                            { name: "Cartórios de Registro de Imóveis (ARISP – exemplo SP)", url: "https://www.arisp.com.br", desc: "Consulta de matrículas e registros imobiliários." },
                         ].map((law, i) => (
                             <Link
                                 key={i}
@@ -180,7 +177,7 @@ export default function UsefulLinksPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         {[
                             { name: "IPCA – Inflação Oficial (IBGE)", url: "https://www.ibge.gov.br/indicadores#ipca", desc: "" },
-                            { name: "IGP-M (FGV)", url: "https://portal.fgv.br/fgv/indices-precos/igpm", desc: "Atenção: cada vez menos recomendado para novos contratos de aluguel.", highlight: true },
+                            { name: "IGP-M (FGV)", url: "https://portal.fgv.br/especiais/igp-m-resultados", desc: "" },
                             { name: "FipeZap – Índice de Preços de Imóveis", url: "https://www.fipe.org.br/pt-br/indices/fipezap/", desc: "" },
                             { name: "Banco Central do Brasil", url: "https://www.bcb.gov.br", desc: "Taxa Selic, crédito, sistema financeiro e regulamentações." },
                         ].map((idx, i) => (
@@ -197,7 +194,7 @@ export default function UsefulLinksPage() {
                                         <ExternalLink className="h-4 w-4 text-muted-foreground" />
                                     </h3>
                                     {idx.desc && (
-                                        <p className={`text-sm ${idx.highlight ? "text-amber-600 dark:text-amber-500 font-medium" : "text-muted-foreground"}`}>
+                                        <p className="text-sm text-muted-foreground">
                                             {idx.desc}
                                         </p>
                                     )}

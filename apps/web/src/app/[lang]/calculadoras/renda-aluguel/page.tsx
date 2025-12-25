@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { saveLead } from "@/app/actions/capture-lead";
+import { saveCalculatorSuggestion } from "@/app/actions/save-calculator-suggestion";
 import {
     LineChart,
     Line,
@@ -43,16 +45,24 @@ function SuggestionForm() {
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
-        // Simulate API call
-        setTimeout(() => {
-            setLoading(false);
+
+        try {
+            await saveCalculatorSuggestion({
+                suggestion,
+                email,
+                location: "rental-income-calculator"
+            });
             setSuccess(true);
             setSuggestion("");
             setEmail("");
-        }, 1500);
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setLoading(false);
+        }
     };
 
     if (success) {
@@ -127,14 +137,23 @@ function LeadCaptureModal({ isOpen, onCapture }: { isOpen: boolean; onCapture: (
 
     if (!isOpen) return null;
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
-        // Simulate API call
-        setTimeout(() => {
-            setLoading(false);
+
+        try {
+            await saveLead({
+                name,
+                email,
+                source: "rental-income-calculator"
+            });
             onCapture();
-        }, 1000);
+        } catch (error) {
+            console.error("Lead capture error:", error);
+            onCapture();
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -212,6 +231,13 @@ export default function RentalIncomeCalculator() {
     const [modifiedFields, setModifiedFields] = useState<Set<string>>(new Set());
     const [isLeadCaptured, setIsLeadCaptured] = useState(false);
 
+    useEffect(() => {
+        const hasCookie = document.cookie.split('; ').some(row => row.trim().startsWith('kitnets_user_identified='));
+        if (hasCookie) {
+            setIsLeadCaptured(true);
+        }
+    }, []);
+
     const trackModification = (fieldId: string) => {
         if (isLeadCaptured) return;
         if (!modifiedFields.has(fieldId)) {
@@ -226,10 +252,10 @@ export default function RentalIncomeCalculator() {
     const showLeadModal = !isLeadCaptured && modifiedFields.size >= 3;
 
     // --- State: Mortgage ---
-    const [propertyPrice, setPropertyPrice] = useState(500000); // 500k
-    const [downPayment, setDownPayment] = useState(100000); // 100k
-    const [interestRate, setInterestRate] = useState(12.0); // 12% a.a.
-    const [loanTerm, setLoanTerm] = useState(360); // 30 years
+    const [propertyPrice, setPropertyPrice] = useState<number | string>(500000); // 500k
+    const [downPayment, setDownPayment] = useState<number | string>(100000); // 100k
+    const [interestRate, setInterestRate] = useState<number | string>(12.0); // 12% a.a.
+    const [loanTerm, setLoanTerm] = useState<number | string>(360); // 30 years
     const [amortizationSystem, setAmortizationSystem] = useState<"SAC" | "PRICE">("SAC");
 
     // Insurance & Fees (Auto + Editable)
@@ -238,28 +264,23 @@ export default function RentalIncomeCalculator() {
     const [downPaymentWarning, setDownPaymentWarning] = useState<string | null>(null);
 
     // --- State: Rental Income ---
-    const [initialRent, setInitialRent] = useState(2500);
-    const [rentReadjustment, setRentReadjustment] = useState(5); // 5% a.a.
-    const [vacancyRate, setVacancyRate] = useState(5); // 5%
-    const [monthlyCosts, setMonthlyCosts] = useState(0); // Condomínio/IPTU etc
-    const [incomeTax, setIncomeTax] = useState(15); // 15%
+    const [initialRent, setInitialRent] = useState<number | string>(2500);
+    const [rentReadjustment, setRentReadjustment] = useState<number | string>(5); // 5% a.a.
+    const [vacancyRate, setVacancyRate] = useState<number | string>(5); // 5%
+    const [monthlyCosts, setMonthlyCosts] = useState<number | string>(0); // Condomínio/IPTU etc
+    const [incomeTax, setIncomeTax] = useState<number | string>(15); // 15%
 
     // Derived
-    const loanAmount = Math.max(0, propertyPrice - downPayment);
+    const loanAmount = Math.max(0, Number(propertyPrice) - Number(downPayment));
 
     // Auto-calculate insurance if not manual
     const autoInsuranceFees = (loanAmount * (insuranceRate / 100)) / 12;
     const monthlyInsuranceFees = manualInsuranceFees !== null ? manualInsuranceFees : autoInsuranceFees;
     const isInsuranceManual = manualInsuranceFees !== null;
 
-    const handleInsuranceChange = (val: number) => {
-        trackModification('insurance');
-        setManualInsuranceFees(val);
-    };
-
     const handleDownPaymentBlur = () => {
-        const minDownPayment = propertyPrice * 0.20;
-        if (downPayment < minDownPayment) {
+        const minDownPayment = Number(propertyPrice) * 0.20;
+        if (Number(downPayment) < minDownPayment) {
             setDownPayment(minDownPayment);
             setDownPaymentWarning(`Entrada ajustada para 20% do valor do imóvel (${formatCurrency(minDownPayment)})`);
         } else {
@@ -269,9 +290,20 @@ export default function RentalIncomeCalculator() {
 
     // --- Calculation Logic ---
     const results = useMemo(() => {
+        const pPrice = Number(propertyPrice);
+        const dPayment = Number(downPayment);
+        const iRate = Number(interestRate);
+        const lTerm = Number(loanTerm);
+        const iRent = Number(initialRent);
+        const rReadjustment = Number(rentReadjustment);
+        const vRate = Number(vacancyRate);
+        const mCosts = Number(monthlyCosts);
+        const iTax = Number(incomeTax);
+
         const data = [];
-        let outstandingBalance = loanAmount;
-        const monthlyRate = interestRate / 100 / 12;
+        const lAmount = Math.max(0, pPrice - dPayment); // Recalculate loan amount inside useMemo to ensure types
+        let outstandingBalance = lAmount;
+        const monthlyRate = iRate / 100 / 12;
 
         let breakEvenMonth = -1;
         let breakEvenData = null;
@@ -280,15 +312,15 @@ export default function RentalIncomeCalculator() {
         // PMT = P * i * (1+i)^n / ((1+i)^n - 1)
         let pricePmt = 0;
         if (monthlyRate > 0) {
-            pricePmt = loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, loanTerm)) / (Math.pow(1 + monthlyRate, loanTerm) - 1);
+            pricePmt = lAmount * (monthlyRate * Math.pow(1 + monthlyRate, lTerm)) / (Math.pow(1 + monthlyRate, lTerm) - 1);
         } else {
-            pricePmt = loanAmount / loanTerm;
+            pricePmt = lAmount / lTerm;
         }
 
         // SAC constant amortization
-        const sacAmort = loanAmount / loanTerm;
+        const sacAmort = lAmount / lTerm;
 
-        for (let m = 1; m <= loanTerm; m++) {
+        for (let m = 1; m <= lTerm; m++) {
             // 1. Mortgage Payment
             let interest = outstandingBalance * monthlyRate;
             let amortization = 0;
@@ -313,10 +345,10 @@ export default function RentalIncomeCalculator() {
             // Year index starting at 0
             const year = Math.floor((m - 1) / 12);
 
-            const adjustedGrossRent = initialRent * Math.pow(1 + rentReadjustment / 100, year);
-            const effectiveRent = adjustedGrossRent * (1 - vacancyRate / 100);
-            const netRentBeforeTax = effectiveRent - monthlyCosts;
-            const netRentAfterTax = netRentBeforeTax * (1 - incomeTax / 100);
+            const adjustedGrossRent = iRent * Math.pow(1 + rReadjustment / 100, year);
+            const effectiveRent = adjustedGrossRent * (1 - vRate / 100);
+            const netRentBeforeTax = effectiveRent - mCosts;
+            const netRentAfterTax = netRentBeforeTax * (1 - iTax / 100);
 
             const cashFlowDiff = netRentAfterTax - mortgagePayment;
 
@@ -350,7 +382,8 @@ export default function RentalIncomeCalculator() {
         return { data, breakEvenMonth, breakEvenData };
     }, [
         simulationDate,
-        loanAmount,
+        propertyPrice, // dependency updated
+        downPayment,
         loanTerm,
         interestRate,
         amortizationSystem,
@@ -450,7 +483,7 @@ export default function RentalIncomeCalculator() {
                                         type="number"
                                         className="pl-9"
                                         value={propertyPrice}
-                                        onChange={e => setPropertyPrice(Number(e.target.value))}
+                                        onChange={e => setPropertyPrice(e.target.value === '' ? '' : Number(e.target.value))}
                                         onBlur={() => trackModification('propertyPrice')}
                                     />
                                 </div>
@@ -465,7 +498,7 @@ export default function RentalIncomeCalculator() {
                                         className="pl-9"
                                         value={downPayment}
                                         onChange={e => {
-                                            setDownPayment(Number(e.target.value));
+                                            setDownPayment(e.target.value === '' ? '' : Number(e.target.value));
                                             setDownPaymentWarning(null);
                                         }}
                                         onBlur={() => {
@@ -499,7 +532,7 @@ export default function RentalIncomeCalculator() {
                                         step="0.1"
                                         className="mt-1"
                                         value={interestRate}
-                                        onChange={e => setInterestRate(Number(e.target.value))}
+                                        onChange={e => setInterestRate(e.target.value === '' ? '' : Number(e.target.value))}
                                         onBlur={() => trackModification('interestRate')}
                                     />
                                 </div>
@@ -509,7 +542,7 @@ export default function RentalIncomeCalculator() {
                                         type="number"
                                         className="mt-1"
                                         value={loanTerm}
-                                        onChange={e => setLoanTerm(Number(e.target.value))}
+                                        onChange={e => setLoanTerm(e.target.value === '' ? '' : Number(e.target.value))}
                                         onBlur={() => trackModification('loanTerm')}
                                     />
                                 </div>
@@ -555,8 +588,11 @@ export default function RentalIncomeCalculator() {
                                     <Input
                                         type="number"
                                         className="pl-9"
-                                        value={Math.round(monthlyInsuranceFees)}
-                                        onChange={e => handleInsuranceChange(Number(e.target.value))}
+                                        value={Number(Math.round(monthlyInsuranceFees))}
+                                        onChange={e => {
+                                            trackModification('insurance');
+                                            setManualInsuranceFees(e.target.value === '' ? 0 : Number(e.target.value));
+                                        }}
                                         onBlur={() => trackModification('insurance')}
                                     />
                                 </div>
@@ -586,7 +622,7 @@ export default function RentalIncomeCalculator() {
                                         type="number"
                                         className="pl-9"
                                         value={initialRent}
-                                        onChange={e => setInitialRent(Number(e.target.value))}
+                                        onChange={e => setInitialRent(e.target.value === '' ? '' : Number(e.target.value))}
                                         onBlur={() => trackModification('initialRent')}
                                     />
                                 </div>
@@ -600,7 +636,7 @@ export default function RentalIncomeCalculator() {
                                         step="0.5"
                                         className="mt-1"
                                         value={rentReadjustment}
-                                        onChange={e => setRentReadjustment(Number(e.target.value))}
+                                        onChange={e => setRentReadjustment(e.target.value === '' ? '' : Number(e.target.value))}
                                         onBlur={() => trackModification('rentReadjustment')}
                                     />
                                 </div>
@@ -611,7 +647,7 @@ export default function RentalIncomeCalculator() {
                                         step="1"
                                         className="mt-1"
                                         value={vacancyRate}
-                                        onChange={e => setVacancyRate(Number(e.target.value))}
+                                        onChange={e => setVacancyRate(e.target.value === '' ? '' : Number(e.target.value))}
                                         onBlur={() => trackModification('vacancyRate')}
                                     />
                                 </div>
@@ -626,7 +662,7 @@ export default function RentalIncomeCalculator() {
                                             type="number"
                                             className="pl-6"
                                             value={monthlyCosts}
-                                            onChange={e => setMonthlyCosts(Number(e.target.value))}
+                                            onChange={e => setMonthlyCosts(e.target.value === '' ? '' : Number(e.target.value))}
                                             onBlur={() => trackModification('monthlyCosts')}
                                         />
                                     </div>
@@ -637,7 +673,7 @@ export default function RentalIncomeCalculator() {
                                         type="number"
                                         className="mt-1"
                                         value={incomeTax}
-                                        onChange={e => setIncomeTax(Number(e.target.value))}
+                                        onChange={e => setIncomeTax(e.target.value === '' ? '' : Number(e.target.value))}
                                         onBlur={() => trackModification('incomeTax')}
                                     />
                                 </div>
@@ -774,7 +810,7 @@ export default function RentalIncomeCalculator() {
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e5e5" />
                                         <XAxis
                                             dataKey="month"
-                                            ticks={Array.from({ length: Math.floor(loanTerm / 60) }, (_, i) => (i + 1) * 60)}
+                                            ticks={Array.from({ length: Math.floor(Number(loanTerm) / 60) }, (_, i) => (i + 1) * 60)}
                                             tickFormatter={(val) => `${val / 12}a`}
                                             tickMargin={10}
                                         />

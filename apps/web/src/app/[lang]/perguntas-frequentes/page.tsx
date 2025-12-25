@@ -11,7 +11,8 @@ export const metadata: Metadata = {
     description: 'Tudo o que você precisa saber sobre a Kitnets.com — rápido, claro e sem complicação.',
 };
 
-export default function FaqPage({ params: { lang } }: { params: { lang: string } }) {
+export default async function FaqPage({ params }: { params: Promise<{ lang: string }> }) {
+    const { lang } = await params;
     // Generate JSON-LD for SEO
     const jsonLd = {
         '@context': 'https://schema.org',

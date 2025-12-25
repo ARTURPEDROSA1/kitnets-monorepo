@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { calculateMortgageWithComparisons, MortgageInputs, System, ExtraPayment, AmortizationEffect } from '@/lib/mortgage';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { Trash2, Plus, Settings, TrendingDown, Maximize2, Minimize2, FileSpreadsheet, FileText, Lock, User, Mail, CheckCircle2 } from 'lucide-react';
@@ -53,13 +53,17 @@ const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
-const MoneyInput = ({ value, onChange, className, ...props }: { value: number, onChange: (value: number) => void, className?: string } & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) => {
+const MoneyInput = ({ value, onChange, className, ...props }: { value: number | string, onChange: (value: number | string) => void, className?: string } & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) => {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const rawValue = e.target.value.replace(/\D/g, '');
-        onChange(Number(rawValue));
+        if (rawValue === '') {
+            onChange('');
+        } else {
+            onChange(Number(rawValue));
+        }
     };
 
-    const formattedValue = new Intl.NumberFormat('pt-BR').format(value);
+    const formattedValue = value === '' ? '' : new Intl.NumberFormat('pt-BR').format(Number(value));
 
     return (
         <Input
@@ -106,10 +110,10 @@ function LeadCaptureModal({ isOpen, onCapture }: { isOpen: boolean; onCapture: (
                         <div className="p-2 bg-primary/10 rounded-full">
                             <Lock className="w-5 h-5 text-primary" />
                         </div>
-                        <h3 className="text-xl font-bold">Ver Resultado Completo</h3>
+                        <h3 className="text-xl font-bold">Desbloquear Análise Completa</h3>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                        Para visualizar a tabela detalhada e os gráficos, precisamos confirmar que você não é um robô.
+                        Identificamos que você está personalizando sua simulação. Para continuar explorando os resultados detalhados, precisamos confirmar que você não é um robô.
                     </p>
                 </div>
 
@@ -146,7 +150,7 @@ function LeadCaptureModal({ isOpen, onCapture }: { isOpen: boolean; onCapture: (
 
                     <div className="pt-2">
                         <Button type="submit" className="w-full h-12 text-lg">
-                            {loading ? "Confirmando..." : "Ver Resultado"}
+                            {loading ? "Confirmando..." : "Confirmar e Continuar"}
                         </Button>
                     </div>
 
@@ -164,43 +168,65 @@ function LeadCaptureModal({ isOpen, onCapture }: { isOpen: boolean; onCapture: (
 
 export function MortgageCalculator() {
     // State
-    const [propertyValue, setPropertyValue] = useState(500000);
-    const [downPayment, setDownPayment] = useState(100000);
+    const [propertyValue, setPropertyValue] = useState<number | string>(500000);
+    const [downPayment, setDownPayment] = useState<number | string>(100000);
     const [system, setSystem] = useState<System>('SAC');
-    const [termMonths, setTermMonths] = useState(360);
-    const [annualInterestRate, setAnnualInterestRate] = useState(9.99);
-    const [mipRate, setMipRate] = useState(0.000445); // 0.0445%
-    const [dfiRate, setDfiRate] = useState(0.0001); // 0.01%
+    const [termMonths, setTermMonths] = useState<number | string>(360);
+    const [annualInterestRate, setAnnualInterestRate] = useState<number | string>(9.99);
+    const [mipRate, setMipRate] = useState<number | string>(0.000445); // 0.0445%
+    const [dfiRate, setDfiRate] = useState<number | string>(0.0001); // 0.01%
     const [isTableExpanded, setIsTableExpanded] = useState(false);
 
     // Extra Payments
     const [extraPayments, setExtraPayments] = useState<ExtraPayment[]>([]);
 
     // UI State for Adding Extra Payment
-    const [newExtraMonth, setNewExtraMonth] = useState(12);
-    const [newExtraAmount, setNewExtraAmount] = useState(10000);
+    const [newExtraMonth, setNewExtraMonth] = useState<number | string>(12);
+    const [newExtraAmount, setNewExtraAmount] = useState<number | string>(10000);
     const [newExtraEffect, setNewExtraEffect] = useState<AmortizationEffect>('reduce_term');
     const [newExtraSource, setNewExtraSource] = useState('Poupanca');
 
     // UI State for FGTS Plan
-    const [fgtsSimulationAmount, setFgtsSimulationAmount] = useState(8000);
+    const [fgtsSimulationAmount, setFgtsSimulationAmount] = useState<number | string>(8000);
 
     // Lead Capture State
+    // Lead Capture State
+    const [modifiedFields, setModifiedFields] = useState<Set<string>>(new Set());
     const [isLeadCaptured, setIsLeadCaptured] = useState(false);
-    const [showLeadModal, setShowLeadModal] = useState(false);
+
+    useEffect(() => {
+        const hasCookie = document.cookie.split('; ').some(row => row.trim().startsWith('kitnets_user_identified='));
+        if (hasCookie) {
+            setIsLeadCaptured(true);
+        }
+    }, []);
+
+    const trackModification = (fieldId: string) => {
+        if (isLeadCaptured) return;
+        if (!modifiedFields.has(fieldId)) {
+            setModifiedFields(prev => {
+                const newSet = new Set(prev);
+                newSet.add(fieldId);
+                return newSet;
+            });
+        }
+    };
+
+    // Show modal only after 3 modifications
+    const showLeadModal = !isLeadCaptured && modifiedFields.size >= 3;
 
     // Derived Input
-    const financedAmount = propertyValue - downPayment;
+    const financedAmount = Number(propertyValue) - Number(downPayment);
 
     // Computations
     const inputs: MortgageInputs = useMemo(() => ({
-        propertyValue,
-        downPayment,
+        propertyValue: Number(propertyValue),
+        downPayment: Number(downPayment),
         system,
-        termMonths,
-        annualInterestRate,
-        mipRate,
-        dfiRate,
+        termMonths: Number(termMonths),
+        annualInterestRate: Number(annualInterestRate),
+        mipRate: Number(mipRate),
+        dfiRate: Number(dfiRate),
         extraPayments
     }), [propertyValue, downPayment, system, termMonths, annualInterestRate, mipRate, dfiRate, extraPayments]);
 
@@ -209,8 +235,8 @@ export function MortgageCalculator() {
     // Handlers
     const addExtraPayment = () => {
         setExtraPayments([...extraPayments, {
-            month: newExtraMonth,
-            amount: newExtraAmount,
+            month: Number(newExtraMonth),
+            amount: Number(newExtraAmount),
             effect: newExtraEffect,
             source: newExtraSource
         }].sort((a, b) => a.month - b.month));
@@ -224,11 +250,11 @@ export function MortgageCalculator() {
 
     const addFgtsPlan = () => {
         const newEvts = [...extraPayments];
-        for (let m = 24; m < termMonths; m += 24) {
+        for (let m = 24; m < Number(termMonths); m += 24) {
             if (!newEvts.find(e => e.month === m && e.source === 'FGTS')) {
                 newEvts.push({
                     month: m,
-                    amount: fgtsSimulationAmount,
+                    amount: Number(fgtsSimulationAmount),
                     effect: 'reduce_term',
                     source: 'FGTS'
                 });
@@ -274,7 +300,6 @@ export function MortgageCalculator() {
                 isOpen={showLeadModal}
                 onCapture={() => {
                     setIsLeadCaptured(true);
-                    setShowLeadModal(false);
                 }}
             />
             {/* Left Column: Inputs */}
@@ -291,8 +316,9 @@ export function MortgageCalculator() {
                             value={propertyValue}
                             onChange={setPropertyValue}
                             className="mt-1"
+                            onBlur={() => trackModification('propertyValue')}
                         />
-                        <p className="text-xs text-muted-foreground mt-1">{formatCurrency(propertyValue)}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{formatCurrency(Number(propertyValue))}</p>
                     </div>
 
                     <div>
@@ -301,8 +327,9 @@ export function MortgageCalculator() {
                             value={downPayment}
                             onChange={setDownPayment}
                             className="mt-1"
+                            onBlur={() => trackModification('downPayment')}
                         />
-                        <p className="text-xs text-muted-foreground mt-1">{formatCurrency(downPayment)}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{formatCurrency(Number(downPayment))}</p>
                     </div>
 
                     <div className="p-3 bg-muted rounded-md">
@@ -319,6 +346,7 @@ export function MortgageCalculator() {
                                 className="w-full mt-1 flex h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
                                 value={system}
                                 onChange={(e) => setSystem(e.target.value as System)}
+                                onBlur={() => trackModification('system')}
                             >
                                 <option value="SAC">SAC</option>
                                 <option value="PRICE">PRICE</option>
@@ -329,8 +357,9 @@ export function MortgageCalculator() {
                             <Input
                                 type="number"
                                 value={termMonths}
-                                onChange={e => setTermMonths(Number(e.target.value))}
+                                onChange={e => setTermMonths(e.target.value === '' ? '' : Number(e.target.value))}
                                 className="mt-1"
+                                onBlur={() => trackModification('termMonths')}
                             />
                         </div>
                     </div>
@@ -341,11 +370,12 @@ export function MortgageCalculator() {
                             type="number"
                             step="0.01"
                             value={annualInterestRate}
-                            onChange={e => setAnnualInterestRate(Number(e.target.value))}
+                            onChange={e => setAnnualInterestRate(e.target.value === '' ? '' : Number(e.target.value))}
                             className="mt-1"
+                            onBlur={() => trackModification('annualInterestRate')}
                         />
                         <p className="text-xs text-muted-foreground mt-1">
-                            Mensal equivalente: {((Math.pow(1 + annualInterestRate / 100, 1 / 12) - 1) * 100).toFixed(4)}%
+                            Mensal equivalente: {((Math.pow(1 + Number(annualInterestRate) / 100, 1 / 12) - 1) * 100).toFixed(4)}%
                         </p>
                     </div>
 
@@ -360,8 +390,9 @@ export function MortgageCalculator() {
                                     type="number"
                                     step="0.000001"
                                     value={mipRate}
-                                    onChange={e => setMipRate(Number(e.target.value))}
+                                    onChange={e => setMipRate(e.target.value === '' ? '' : Number(e.target.value))}
                                     className="mt-1"
+                                    onBlur={() => trackModification('mipRate')}
                                 />
                             </div>
                             <div>
@@ -370,8 +401,9 @@ export function MortgageCalculator() {
                                     type="number"
                                     step="0.000001"
                                     value={dfiRate}
-                                    onChange={e => setDfiRate(Number(e.target.value))}
+                                    onChange={e => setDfiRate(e.target.value === '' ? '' : Number(e.target.value))}
                                     className="mt-1"
+                                    onBlur={() => trackModification('dfiRate')}
                                 />
                             </div>
                         </div>
@@ -388,7 +420,7 @@ export function MortgageCalculator() {
                         <div className="grid grid-cols-2 gap-2">
                             <div>
                                 <Label>Mês</Label>
-                                <Input type="number" value={newExtraMonth} onChange={e => setNewExtraMonth(Number(e.target.value))} />
+                                <Input type="number" value={newExtraMonth} onChange={e => setNewExtraMonth(e.target.value === '' ? '' : Number(e.target.value))} />
                             </div>
                             <div>
                                 <Label>Valor</Label>
@@ -470,22 +502,7 @@ export function MortgageCalculator() {
             {/* Right Column: Results & Charts */}
             <div className="lg:col-span-8 space-y-6 relative">
 
-                {!isLeadCaptured && (
-                    <div className="absolute inset-0 z-10 bg-background/80 backdrop-blur-[2px] flex flex-col items-center justify-start pt-32 text-center rounded-xl border border-border">
-                        <div className="p-4 bg-background rounded-full border shadow-sm mb-6">
-                            <Lock className="w-12 h-12 text-primary" />
-                        </div>
-                        <h3 className="text-3xl font-bold mb-3 text-foreground">Desbloquear Simulação</h3>
-                        <p className="text-muted-foreground mb-8 max-w-md text-lg leading-relaxed">
-                            Visualize o cronograma detalhado de amortização, gráficos de saldo devedor e descubra quanto você vai economizar de verdade.
-                        </p>
-                        <Button onClick={() => setShowLeadModal(true)} className="text-lg px-10 h-14 shadow-xl hover:scale-105 transition-transform">
-                            Ver Resultado Completo
-                        </Button>
-                    </div>
-                )}
-
-                <div className={!isLeadCaptured ? "opacity-30 pointer-events-none select-none filter blur-sm transition-all duration-500" : "transition-all duration-500"}>
+                <div className="transition-all duration-500">
 
                     {/* Summary Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

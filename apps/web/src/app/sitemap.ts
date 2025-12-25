@@ -15,6 +15,7 @@ const staticRoutes = [
     'calculadoras/renda-aluguel',
     'comprar',
     'disclosure',
+    'forgot-password',
     'lancamentos',
     'links-uteis',
     'login',

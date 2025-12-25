@@ -748,6 +748,10 @@
             "Próximo Restaurante"
         ]
     },
+    "rentalIncomeCalculatorPage": {
+        "title": "A renda do aluguel paga o financiamento? - Kitnets.com",
+        "description": "Descubra em quantos anos a renda do aluguel passa a pagar o financiamento imobiliário. Simule SAC ou PRICE, considere juros, seguros, impostos, vacância e reajuste anual."
+    },
     "mortgageCalculatorPage": {
         "title": "Simulador de Amortização de Financiamento Imobiliário (SAC e PRICE)",
         "subtitle": "O poder da amortização: descubra o que os bancos não explicam sobre juros, prazo e economia.",
