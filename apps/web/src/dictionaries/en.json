@@ -554,4 +554,86 @@
             "deleteError": "Error deleting account. Try again."
         }
     }
+},
+"interestRateConverterPage": {
+    "title": "Monthly and Annual Interest Rate Converter",
+    "metaDescription": "Convert monthly interest rates to annual and annual to monthly using compound interest. Free and accurate tool.",
+    "intro": "Convert monthly interest rates to annual rates and annual rates to monthly rates automatically and accurately using compound interest — the same method used by banks and financial institutions. This converter is ideal for comparing mortgages, investments, rents, loans, and any contract using interest rates over different periods. Simply enter the rate in one field to instantly see the equivalent rate for the other period, without manual calculations or incorrect approximations.",
+    "monthlyRate": "Monthly Interest Rate (%)",
+    "annualRate": "Annual Interest Rate (%)",
+    "conversionNote": "Automatic conversion",
+    "supportingText": "Unlike simplified conversions that merely multiply or divide the rate by 12, this tool considers the real effect of compound capitalization, ensuring correct and reliable results. For example, a 1% monthly rate is not equivalent to 12% per year, but rather 12.6825% per year. If you are analyzing a mortgage, rent adjustment, investment return, or any financial simulation, this converter helps standardize rates and make more informed decisions.",
+    "educationalNote": "Note: Conversions use compound interest. A monthly rate of 1% is not equivalent to 12% per year.",
+    "example1": "1.00% monthly → 12.6825% annual",
+    "example2": "0.50% monthly → 6.1678% annual",
+    "faq": {
+        "title": "Interest Conversion FAQ",
+        "items": [
+            {
+                "question": "How to convert monthly interest to annual?",
+                "answer": "The compound interest formula is used, raising the monthly rate to the 12th power to get the effective annual rate: i_a = (1 + i_m)^12 - 1."
+            },
+            {
+                "question": "Does this converter use simple interest?",
+                "answer": "No. All conversions use compound interest, reflecting real financial market practices."
+            }
+        ]
+    }
+},
+"leadCapture": {
+    "title": "Unlock all features",
+    "description": "Get exclusive financial and real estate market tips. We promise no spam. You can unsubscribe at any time.",
+    "namePlaceholder": "Your name",
+    "emailPlaceholder": "Your email",
+    "submit": "Continue using",
+    "privacyNote": "By continuing, you agree to our terms and privacy policy."
+},
+"compoundInterestCalculator": {
+    "meta": {
+        "title": "Compound Interest Simulator with Monthly or Annual Contributions",
+        "description": "Simulate investments with compound interest, monthly or annual contributions and visualize your wealth growth over time. Free and accurate tool."
+    },
+    "title": "Compound Interest Simulator",
+    "subtitle": "Project your wealth growth with the power of compound interest.",
+    "inputs": {
+        "initialCapital": "Initial Capital",
+        "recurringContribution": "Periodic Contribution",
+        "interestRate": "Interest Rate",
+        "period": "Period",
+        "frequency": {
+            "monthly": "Monthly",
+            "annual": "Annual"
+        },
+        "rateType": {
+            "monthly": "% per month",
+            "annual": "% per year"
+        },
+        "periodUnit": {
+            "months": "Months",
+            "years": "Years"
+        }
+    },
+    "results": {
+        "totalInvested": "Total Invested",
+        "totalInterest": "Total Interest",
+        "finalAmount": "Final Total Amount",
+        "equivalentRate": "Equivalent {frequency}"
+    },
+    "chart": {
+        "totalAmount": "Accumulated Amount",
+        "invested": "Total Invested",
+        "interest": "Interest"
+    },
+    "table": {
+        "period": "Month",
+        "interest": "Interest",
+        "accumulatedInterest": "Acc. Interest",
+        "invested": "Invested",
+        "total": "Total"
+    },
+    "actions": {
+        "exportCsv": "Export CSV",
+        "exportPdf": "Export PDF"
+    }
+}
 }

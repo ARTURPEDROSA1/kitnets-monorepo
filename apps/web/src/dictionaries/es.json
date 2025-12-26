@@ -554,4 +554,38 @@
             "deleteError": "Error al eliminar cuenta. Intente de nuevo."
         }
     }
+},
+"interestRateConverterPage": {
+    "title": "Conversor de Tasa de Interés Mensual y Anual",
+    "metaDescription": "Convierta tasas de interés mensuales a anuales y anuales a mensuales utilizando interés compuesto. Herramienta gratuita y precisa.",
+    "intro": "Convierta tasas de interés mensuales a tasas anuales y tasas anuales a mensuales de forma automática y precisa, utilizando interés compuesto — el mismo método adoptado por bancos e instituciones financieras. Este conversor es ideal para comparar hipotecas, inversiones, alquileres, préstamos y cualquier contrato que utilice tasas de interés en diferentes períodos. Simplemente ingrese la tasa en uno de los campos para ver instantáneamente la tasa equivalente en el otro período, sin cálculos manuales o aproximaciones incorrectas.",
+    "monthlyRate": "Tasa de interés mensual (%)",
+    "annualRate": "Tasa de interés anual (%)",
+    "conversionNote": "Conversión automática",
+    "supportingText": "A diferencia de conversiones simplificadas que solo multiplican o dividen la tasa por 12, esta herramienta considera el efecto real de la capitalización compuesta, garantizando resultados correctos y confiables. Por ejemplo, una tasa del 1% mensual no equivale al 12% anual, sino al 12,6825% anual. Si está analizando una hipoteca, ajuste de alquiler, retorno de inversión o cualquier simulación financiera, este conversor ayuda a estandarizar tasas y tomar decisiones más conscientes.",
+    "educationalNote": "Nota: Las conversiones utilizan interés compuesto. Una tasa mensual del 1% no equivale al 12% anual.",
+    "example1": "1,00% mensual → 12,6825% anual",
+    "example2": "0,50% mensual → 6,1678% anual",
+    "faq": {
+        "title": "Preguntas Frecuentes sobre Conversión de Intereses",
+        "items": [
+            {
+                "question": "¿Cómo convertir interés mensual a anual?",
+                "answer": "Se utiliza la fórmula de interés compuesto, elevando la tasa mensual a la 12ª potencia para obtener la tasa anual efectiva: i_a = (1 + i_m)^12 - 1."
+            },
+            {
+                "question": "¿Este conversor usa interés simple?",
+                "answer": "No. Todas las conversiones utilizan interés compuesto, reflejando la práctica real del mercado financiero."
+            }
+        ]
+    }
+},
+"leadCapture": {
+    "title": "Desbloquea todas las funcionalidades",
+    "description": "Recibe consejos exclusivos del mercado financiero e inmobiliario. Prometemos no enviar spam. Puedes darte de baja en cualquier momento.",
+    "namePlaceholder": "Tu nombre",
+    "emailPlaceholder": "Tu correo electrónico",
+    "submit": "Continuar usando",
+    "privacyNote": "Al continuar, aceptas nuestros términos y política de privacidad."
+}
 }
