@@ -12,6 +12,7 @@
         "residents": "Moradores",
         "owners": "Proprietarios",
         "developers": "Construtoras",
+        "financialIndependence": "Independência Financeira",
         "back": "Voltar"
     },
     "filters": {
@@ -1033,6 +1034,223 @@
         "actions": {
             "exportCsv": "Exportar CSV",
             "exportPdf": "Exportar PDF"
+        }
+    },
+    "financialIndependenceCalculator": {
+        "title": "Calculadora de Independência Financeira",
+        "subtitle": "Simule sua liberdade financeira com inflação e impostos reais.",
+        "inputs": {
+            "section1": "Fase 1: Construção de Patrimônio",
+            "section2": "Fase 2: Independência Financeira (Usufruto)",
+            "initialCapital": "Capital Inicial (Hoje)",
+            "monthlyContribution": "Aporte Mensal (Valor Real)",
+            "years": "Período de Acumulação (Anos)",
+            "nominalReturn": "Rentabilidade Nominal Anual Estimada (%)",
+            "inflation": "Inflação Anual Estimada (IPCA %)",
+            "toggle": {
+                "real": "Valores Reais (IPCA ajustado)",
+                "nominal": "Valores Nominais"
+            },
+            "taxRate": "Imposto de Renda sobre Ganho de Capital",
+            "withdrawalYears": "Período de Usufruto (Anos)",
+            "withdrawalRealReturn": "Rentabilidade Real Mensal na Aposentadoria (%)",
+            "tax15": "15% (Imposto antes da reforma tributária de 2025)",
+            "tax175": "17.5% (Imposto após a reforma tributária de 2025)"
+        },
+        "educationalContent": {
+            "intro": {
+                "title": "Calculadora de Independência Financeira com Inflação e Impostos Reais",
+                "text1": "Planejar a independência financeira exige mais do que fazer contas otimistas. Exige entender poder de compra, inflação, impostos e, principalmente, onde o patrimônio está alocado.",
+                "text2": "Esta calculadora foi criada para responder uma pergunta fundamental:",
+                "quote": "“Quanto patrimônio eu preciso construir para viver de renda real, sem ilusões monetárias?”",
+                "text3": "Aqui, todos os resultados podem ser visualizados em valores nominais ou valores reais (ajustados pela inflação), permitindo uma análise honesta e realista do futuro financeiro."
+            },
+            "whatItDoes": {
+                "title": "O que esta calculadora faz",
+                "phase1": {
+                    "title": "🔹 Fase 1 – Construção de Patrimônio",
+                    "inputTitle": "Você informa:",
+                    "inputs": [
+                        "Capital inicial",
+                        "Aportes mensais",
+                        "Prazo de acumulação",
+                        "Rentabilidade esperada",
+                        "Inflação estimada (IPCA)",
+                        "Imposto sobre ganho de capital"
+                    ],
+                    "outputTitle": "O sistema calcula:",
+                    "outputs": [
+                        "Patrimônio total acumulado",
+                        "Total aportado (principal)",
+                        "Ganhos reais de capital",
+                        "Evolução patrimonial ao longo do tempo"
+                    ],
+                    "note": "Tudo isso pode ser analisado com ou sem ajuste pela inflação."
+                },
+                "phase2": {
+                    "title": "🔹 Fase 2 – Independência Financeira (Usufruto)",
+                    "intro": "Aqui entram os dois cenários clássicos do FIRE:",
+                    "scenarioA": {
+                        "title": "🅰️ Cenário A – Renda Finita (Esgotamento)",
+                        "description": "Você consome o patrimônio ao longo de um período definido (ex: 30 anos).",
+                        "items": [
+                            "Renda mensal bruta",
+                            "Impostos pagos",
+                            "Renda líquida real",
+                            "Capital reduzindo até zero"
+                        ]
+                    },
+                    "scenarioB": {
+                        "title": "🅱️ Cenário B – Renda Perpétua (Preservação)",
+                        "description": "Você vive apenas dos rendimentos reais, preservando o capital.",
+                        "items": [
+                            "Renda mensal sustentável",
+                            "Capital constante em termos reais",
+                            "Proteção de longo prazo",
+                            "Base sólida para herança e legado"
+                        ]
+                    }
+                }
+            },
+            "nominalVsReal": {
+                "title": "Nominal vs Real: por que isso muda tudo",
+                "text": "A maioria das simulações financeiras ignora a inflação. Esta não.",
+                "point1": "💡 Valores nominais mostram números maiores, mas enganam.",
+                "point2": "💡 Valores reais mostram o verdadeiro poder de compra.",
+                "listTitle": "Esta calculadora deixa claro:",
+                "items": [
+                    "Quanto do crescimento é real",
+                    "Quanto é apenas inflação",
+                    "Quanto sobra depois de impostos"
+                ],
+                "footer": "Sem marketing financeiro. Sem promessas vazias."
+            },
+            "marketRole": {
+                "title": "FIRE com Realismo: o papel do mercado imobiliário",
+                "text": "O movimento FIRE (Financial Independence, Retire Early) ganhou força com investimentos financeiros, mas os investidores mais experientes sabem de uma verdade simples: Dinheiro pode ser impresso. Imóveis não.",
+                "whyRealEstate": {
+                    "title": "Por que imóveis — especialmente kitnets e studios — são um refúgio seguro?",
+                    "items": [
+                        "🧱 O governo não pode “imprimir” terrenos, tijolos ou concreto",
+                        "📈 O valor dos imóveis tende a se ajustar à inflação no longo prazo",
+                        "💰 Pequenos imóveis frequentemente oferecem yield em torno de 1% ao mês",
+                        "🏠 Demanda estrutural por moradia compacta em grandes cidades",
+                        "🔁 Renda recorrente + valorização patrimonial"
+                    ]
+                },
+                "comparison": {
+                    "fixedIncome": {
+                        "title": "Enquanto a renda fixa sofre com:",
+                        "items": [
+                            "Inflação",
+                            "Mudanças regulatórias",
+                            "Regras tributárias instáveis"
+                        ]
+                    },
+                    "realEstate": {
+                        "text": "O imóvel continua lá. Físico. Tangível. Alugável."
+                    }
+                }
+            },
+            "wealthParking": {
+                "title": "Onde os grandes investidores realmente estacionam riqueza",
+                "text": "Muitos milionários e bilionários: Criaram fortuna em negócios, Cresceram no mercado financeiro, Inovaram em tecnologia. Mas preservam riqueza no mercado imobiliário.",
+                "why": {
+                    "title": "Por quê?",
+                    "items": [
+                        "Protegem contra ciclos políticos",
+                        "Protegem contra desvalorização monetária",
+                        "Protegem contra decisões arbitrárias de governos",
+                        "Geram renda previsível",
+                        "Atravessam gerações"
+                    ]
+                }
+            },
+            "kitnets": {
+                "title": "Kitnets e studios: eficiência, liquidez e resiliência",
+                "text": "Imóveis compactos se destacam porque:",
+                "items": [
+                    "Têm maior liquidez",
+                    "Menor ticket de entrada",
+                    "Melhor relação aluguel/preço",
+                    "Maior diversificação com o mesmo capital",
+                    "Mais resistência em crises"
+                ],
+                "footer": "Eles não são apenas um investimento. São infraestrutura básica da sociedade urbana moderna."
+            },
+            "generationalWealth": {
+                "title": "Construindo riqueza geracional",
+                "text": "Independência financeira não é apenas “parar de trabalhar”. É: Escolha, Segurança, Tempo, Legado.",
+                "propertyRole": {
+                    "title": "Um imóvel bem localizado:",
+                    "items": [
+                        "Sustenta uma família",
+                        "Gera renda por décadas",
+                        "Pode ser herdado",
+                        "Pode ser refinanciado",
+                        "Pode ser vendido",
+                        "Pode ser adaptado"
+                    ]
+                },
+                "conclusion": "📌 É riqueza que atravessa gerações."
+            },
+            "mindset": {
+                "title": "Use a calculadora com essa mentalidade",
+                "text": "Esta calculadora não existe para vender ilusões financeiras. Ela existe para mostrar, com clareza:",
+                "items": [
+                    "O que é crescimento real",
+                    "O impacto da inflação",
+                    "O peso dos impostos",
+                    "A diferença entre renda temporária e perpétua",
+                    "Como o patrimônio se comporta no tempo"
+                ],
+                "finalQuestion": "Estou construindo riqueza de verdade ou apenas números na tela?"
+            }
+        },
+        "results": {
+            "accumulationSummary": "Resumo da Acumulação",
+            "totalAccumulated": "Patrimônio Total Acumulado (Real)",
+            "totalContributed": "Total Aportado (Principal)",
+            "unrealizedGains": "Ganhos de Capital (Para Tributação)",
+            "wealthBuilding": "Construção de Patrimônio",
+            "scenarioA": "Cenário A: Renda Finita (Esgotamento)",
+            "scenarioAPeriod": "Renda por {years} anos até zerar o capital",
+            "scenarioB": "Cenário B: Renda Perpétua (Preservação)",
+            "scenarioBDesc": "Vive apenas dos rendimentos reais, mantendo o principal.",
+            "grossIncome": "Renda Bruta Mensal",
+            "taxPaid": "Imposto de Renda Mensal",
+            "netIncome": "Renda Líquida Mensal (Real)",
+            "purchasingPower": "Poder de Compra Preservado",
+            "nominalWarning": "Valores nominais não consideram perda de poder de compra."
+        },
+        "charts": {
+            "accumulationTitle": "Evolução Patrimonial",
+            "withdrawalTitle": "Fase de Usufruto",
+            "totalCapital": "Patrimônio Total",
+            "principal": "Aportes (Principal)",
+            "balance": "Saldo Restante",
+            "netIncome": "Renda Líquida"
+        },
+        "tables": {
+            "year": "Ano",
+            "initialCapital": "Capital Inicial",
+            "contributions": "Aportes",
+            "yield": "Rendimentos",
+            "finalCapital": "Capital Acumulado",
+            "grossIncome": "Renda Bruta",
+            "tax": "Imposto",
+            "netIncome": "Renda Líquida"
+        },
+        "disclaimer": {
+            "title": "Nota Educativa",
+            "text": "Esta calculadora permite visualizar valores nominais e valores reais. Valores reais representam o poder de compra de hoje, já descontada a inflação."
+        },
+        "tooltips": {
+            "inflation": "Essa calculadora ajusta todos os valores pela inflação. O resultado é dinheiro de hoje.",
+            "tax": "O imposto incide apenas sobre a parcela de ganho de capital em cada retirada."
+        },
+        "validation": {
+            "inflationError": "A inflação não pode ser maior que o retorno nominal."
         }
     }
 }
