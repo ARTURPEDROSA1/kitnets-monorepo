@@ -66,21 +66,24 @@ export function IndexHeatmap({ data }: Props) {
     }
 
     return (
-        <div className="w-full overflow-x-auto">
+        <div className="w-full overflow-x-auto relative">
             <table className="w-full text-sm text-center border-collapse">
                 <thead>
                     <tr>
-                        <th className="p-3 text-left font-medium text-muted-foreground border-b min-w-[60px]">Ano</th>
+                        <th className="p-3 text-left font-medium text-muted-foreground border-b min-w-[60px] sticky left-0 bg-card z-30">Ano</th>
+                        <th className="p-3 font-bold text-muted-foreground border-b min-w-[70px] sticky left-[60px] bg-card z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Acum.</th>
                         {months.map(m => (
                             <th key={m.num} className="p-2 font-medium text-muted-foreground border-b min-w-[50px]">{m.label}</th>
                         ))}
-                        <th className="p-3 font-bold text-muted-foreground border-b min-w-[70px]">Acum.</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y text-slate-700 dark:text-slate-300">
                     {processedData.years.map(year => (
                         <tr key={year} className="hover:bg-muted/30 transition-colors">
-                            <td className="p-3 text-left font-semibold">{year}</td>
+                            <td className="p-3 text-left font-semibold sticky left-0 bg-card z-30">{year}</td>
+                            <td className={`p-3 font-bold text-sm sticky left-[60px] bg-card z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] ${processedData.yearAccumulated[year] < 0 ? 'text-red-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                {formatValue(processedData.yearAccumulated[year])}
+                            </td>
                             {months.map(m => {
                                 const val = processedData.map[year]?.[m.num];
                                 return (
@@ -98,9 +101,6 @@ export function IndexHeatmap({ data }: Props) {
                                     </td>
                                 );
                             })}
-                            <td className={`p-3 font-bold text-sm ${processedData.yearAccumulated[year] < 0 ? 'text-red-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                                {formatValue(processedData.yearAccumulated[year])}
-                            </td>
                         </tr>
                     ))}
                 </tbody>
