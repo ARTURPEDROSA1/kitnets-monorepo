@@ -12,6 +12,7 @@
         "residents": "Residentes",
         "owners": "Propietarios",
         "developers": "Constructoras",
+        "financialIndependence": "Independencia Financiera",
         "back": "Volver"
     },
     "filters": {
@@ -553,39 +554,334 @@
             "saveError": "Error al guardar",
             "deleteError": "Error al eliminar cuenta. Intente de nuevo."
         }
-    }
-},
-"interestRateConverterPage": {
-    "title": "Conversor de Tasa de Interés Mensual y Anual",
-    "metaDescription": "Convierta tasas de interés mensuales a anuales y anuales a mensuales utilizando interés compuesto. Herramienta gratuita y precisa.",
-    "intro": "Convierta tasas de interés mensuales a tasas anuales y tasas anuales a mensuales de forma automática y precisa, utilizando interés compuesto — el mismo método adoptado por bancos e instituciones financieras. Este conversor es ideal para comparar hipotecas, inversiones, alquileres, préstamos y cualquier contrato que utilice tasas de interés en diferentes períodos. Simplemente ingrese la tasa en uno de los campos para ver instantáneamente la tasa equivalente en el otro período, sin cálculos manuales o aproximaciones incorrectas.",
-    "monthlyRate": "Tasa de interés mensual (%)",
-    "annualRate": "Tasa de interés anual (%)",
-    "conversionNote": "Conversión automática",
-    "supportingText": "A diferencia de conversiones simplificadas que solo multiplican o dividen la tasa por 12, esta herramienta considera el efecto real de la capitalización compuesta, garantizando resultados correctos y confiables. Por ejemplo, una tasa del 1% mensual no equivale al 12% anual, sino al 12,6825% anual. Si está analizando una hipoteca, ajuste de alquiler, retorno de inversión o cualquier simulación financiera, este conversor ayuda a estandarizar tasas y tomar decisiones más conscientes.",
-    "educationalNote": "Nota: Las conversiones utilizan interés compuesto. Una tasa mensual del 1% no equivale al 12% anual.",
-    "example1": "1,00% mensual → 12,6825% anual",
-    "example2": "0,50% mensual → 6,1678% anual",
-    "faq": {
-        "title": "Preguntas Frecuentes sobre Conversión de Intereses",
-        "items": [
-            {
-                "question": "¿Cómo convertir interés mensual a anual?",
-                "answer": "Se utiliza la fórmula de interés compuesto, elevando la tasa mensual a la 12ª potencia para obtener la tasa anual efectiva: i_a = (1 + i_m)^12 - 1."
+    },
+    "interestRateConverterPage": {
+        "title": "Conversor de Tasa de Interés Mensual y Anual",
+        "metaDescription": "Convierta tasas de interés mensuales a anuales y anuales a mensuales utilizando interés compuesto. Herramienta gratuita y precisa.",
+        "intro": "Convierta tasas de interés mensuales a tasas anuales y tasas anuales a mensuales de forma automática y precisa, utilizando interés compuesto — el mismo método adoptado por bancos e instituciones financieras. Este conversor es ideal para comparar hipotecas, inversiones, alquileres, préstamos y cualquier contrato que utilice tasas de interés en diferentes períodos. Simplemente ingrese la tasa en uno de los campos para ver instantáneamente la tasa equivalente en el otro período, sin cálculos manuales o aproximaciones incorrectas.",
+        "monthlyRate": "Tasa de interés mensual (%)",
+        "annualRate": "Tasa de interés anual (%)",
+        "conversionNote": "Conversión automática",
+        "supportingText": "A diferencia de conversiones simplificadas que solo multiplican o dividen la tasa por 12, esta herramienta considera el efecto real de la capitalización compuesta, garantizando resultados correctos y confiables. Por ejemplo, una tasa del 1% mensual no equivale al 12% anual, sino al 12,6825% anual. Si está analizando una hipoteca, ajuste de alquiler, retorno de inversión o cualquier simulación financiera, este conversor ayuda a estandarizar tasas y tomar decisiones más conscientes.",
+        "educationalNote": "Nota: Las conversiones utilizan interés compuesto. Una tasa mensual del 1% no equivale al 12% anual.",
+        "example1": "1,00% mensual → 12,6825% anual",
+        "example2": "0,50% mensual → 6,1678% anual",
+        "faq": {
+            "title": "Preguntas Frecuentes sobre Conversión de Intereses",
+            "items": [
+                {
+                    "question": "¿Cómo convertir interés mensual a anual?",
+                    "answer": "Se utiliza la fórmula de interés compuesto, elevando la tasa mensual a la 12ª potencia para obtener la tasa anual efectiva: i_a = (1 + i_m)^12 - 1."
+                },
+                {
+                    "question": "¿Este conversor usa interés simple?",
+                    "answer": "No. Todas las conversiones utilizan interés compuesto, reflejando la práctica real del mercado financiero."
+                }
+            ]
+        }
+    },
+    "leadCapture": {
+        "title": "Desbloquea todas las funcionalidades",
+        "description": "Recibe consejos exclusivos del mercado financiero e inmobiliario. Prometemos no enviar spam. Puedes darte de baja en cualquier momento.",
+        "namePlaceholder": "Tu nombre",
+        "emailPlaceholder": "Tu correo electrónico",
+        "submit": "Continuar usando",
+        "privacyNote": "Al continuar, aceptas nuestros términos y política de privacidad."
+    },
+    "compoundInterestCalculator": {
+        "meta": {
+            "title": "Simulador de Interés Compuesto con Aportes Mensuales o Anuales",
+            "description": "Simule inversiones con interés compuesto, aportes mensuales o anuales y visualice el crecimiento de su patrimonio a lo largo del tiempo. Herramienta gratuita y precisa."
+        },
+        "title": "Simulador de Interés Compuesto",
+        "subtitle": "Proyecte el crecimiento de su patrimonio con el poder del interés compuesto.",
+        "seoText": {
+            "title": "Simulador de Interés Compuesto con Aportes Mensuales o Anuales",
+            "intro": "El Simulador de Interés Compuesto de Kitnets.com es una herramienta completa para quien desea entender, planificar y maximizar el crecimiento del patrimonio a lo largo del tiempo.",
+            "howToUse": {
+                "title": "Con este simulador, puede informar:",
+                "items": [
+                    "Valor inicial invertido",
+                    "Aportes periódicos mensuales o anuales",
+                    "Tasa de interés mensual o anual",
+                    "Período de inversión"
+                ]
             },
-            {
-                "question": "¿Este conversor usa interés simple?",
-                "answer": "No. Todas las conversiones utilizan interés compuesto, reflejando la práctica real del mercado financiero."
+            "whatItShows": {
+                "title": "La calculadora muestra instantáneamente:",
+                "items": [
+                    "Total invertido",
+                    "Total ganado en intereses",
+                    "Valor final acumulado"
+                ]
+            },
+            "features": "Además, puede ver todo visualmente en un gráfico evolutivo.",
+            "idealFor": {
+                "title": "Ideal para:",
+                "items": [
+                    "Planificación financiera",
+                    "Simulación de inversiones",
+                    "Educación financiera"
+                ]
+            },
+            "export": "Puede exportar los resultados en CSV o PDF.",
+            "conclusion": "Descubra cuánto puede crecer su dinero."
+        },
+        "inputs": {
+            "initialCapital": "Valor inicial",
+            "recurringContribution": "Aporte periódico",
+            "interestRate": "Tasa de interés",
+            "period": "Período",
+            "frequency": {
+                "monthly": "Mensual",
+                "annual": "Anual"
+            },
+            "rateType": {
+                "monthly": "% al mes",
+                "annual": "% al año"
+            },
+            "periodUnit": {
+                "months": "Meses",
+                "years": "Años"
             }
-        ]
+        },
+        "results": {
+            "totalInvested": "Total Invertido",
+            "totalInterest": "Total en Intereses",
+            "finalAmount": "Valor Total Final",
+            "equivalentRate": "Equivalente {frequency}"
+        },
+        "chart": {
+            "totalAmount": "Valor Acumulado",
+            "invested": "Total Invertido",
+            "interest": "Intereses"
+        },
+        "table": {
+            "period": "Mes",
+            "interest": "Interés",
+            "accumulatedInterest": "Interés Acum.",
+            "invested": "Invertido",
+            "total": "Total"
+        },
+        "actions": {
+            "exportCsv": "Exportar CSV",
+            "exportPdf": "Exportar PDF"
+        }
+    },
+    "financialIndependenceCalculator": {
+        "title": "Calculadora de Independencia Financiera",
+        "subtitle": "Simule su libertad financiera con inflación e impuestos reales.",
+        "inputs": {
+            "section1": "Fase 1: Construcción de Patrimonio",
+            "section2": "Fase 2: Independencia Financiera (Disfrute)",
+            "initialCapital": "Capital Inicial (Hoy)",
+            "monthlyContribution": "Aporte Mensal (Valor Real)",
+            "years": "Período de Acumulación (Años)",
+            "nominalReturn": "Rentabilidad Nominal Anual Estimada (%)",
+            "inflation": "Inflación Anual Estimada (%)",
+            "toggle": {
+                "real": "Valores Reales (Ajustado por Inflación)",
+                "nominal": "Valores Nominales"
+            },
+            "taxRate": "Impuesto sobre Ganancia de Capital",
+            "withdrawalYears": "Período de Disfrute (Años)",
+            "withdrawalRealReturn": "Rentabilidad Real Mensal en el Retiro (%)",
+            "tax15": "15% (Impuesto antes reforma fiscal 2025)",
+            "tax175": "17.5% (Impuesto después reforma fiscal 2025)"
+        },
+        "educationalContent": {
+            "intro": {
+                "title": "Calculadora de Independencia Financiera con Inflación e Impuestos Reales",
+                "text1": "Planificar la independencia financiera exige más que hacer cuentas optimistas. Exige entender el poder adquisitivo, la inflación, los impuestos y, sobre todo, dónde está asignado el patrimonio.",
+                "text2": "Esta calculadora fue creada para responder una pregunta fundamental:",
+                "quote": "“¿Cuánto patrimonio necesito construir para vivir de ingresos reales, sin ilusiones monetarias?”",
+                "text3": "Aquí, todos los resultados pueden visualizarse en valores nominales o valores reales (ajustados por inflación), permitiendo un análisis honesto y realista del futuro financiero."
+            },
+            "whatItDoes": {
+                "title": "Lo que hace esta calculadora",
+                "phase1": {
+                    "title": "🔹 Fase 1 – Construcción de Patrimonio",
+                    "inputTitle": "Usted ingresa:",
+                    "inputs": [
+                        "Capital inicial",
+                        "Aportes mensuales",
+                        "Plazo de acumulación",
+                        "Rentabilidad esperada",
+                        "Inflación estimada",
+                        "Impuesto sobre ganancia de capital"
+                    ],
+                    "outputTitle": "El sistema calcula:",
+                    "outputs": [
+                        "Patrimonio total acumulado",
+                        "Total aportado (principal)",
+                        "Ganancias reales de capital",
+                        "Evolución patrimonial a lo largo del tiempo"
+                    ],
+                    "note": "Todo esto puede analizarse con o sin ajuste por inflación."
+                },
+                "phase2": {
+                    "title": "🔹 Fase 2 – Independencia Financiera (Disfrute)",
+                    "intro": "Aquí entran los dos escenarios clásicos del FIRE:",
+                    "scenarioA": {
+                        "title": "🅰️ Escenario A – Renta Finita (Agotamiento)",
+                        "description": "Usted consume el patrimonio a lo largo de un período definido (ej: 30 años).",
+                        "items": [
+                            "Renta mensual bruta",
+                            "Impuestos pagados",
+                            "Renta neta real",
+                            "Capital reduciéndose hasta cero"
+                        ]
+                    },
+                    "scenarioB": {
+                        "title": "🅱️ Escenario B – Renta Perpetua (Preservación)",
+                        "description": "Usted vive solo de los rendimientos reales, preservando el capital.",
+                        "items": [
+                            "Renta mensual sostenible",
+                            "Capital constante en términos reales",
+                            "Protección a largo plazo",
+                            "Base sólida para herencia y legado"
+                        ]
+                    }
+                }
+            },
+            "nominalVsReal": {
+                "title": "Nominal vs Real: por qué esto cambia todo",
+                "text": "La mayoría de las simulaciones financieras ignoran la inflación. Esta no.",
+                "point1": "💡 Valores nominales muestran números mayores, pero engañan.",
+                "point2": "💡 Valores reales muestran el verdadero poder adquisitivo.",
+                "listTitle": "Esta calculadora deja claro:",
+                "items": [
+                    "Cuánto del crecimiento es real",
+                    "Cuánto es solo inflación",
+                    "Cuánto queda después de impuestos"
+                ],
+                "footer": "Sin marketing financiero. Sin promesas vacías."
+            },
+            "marketRole": {
+                "title": "FIRE con Realismo: el papel del mercado inmobiliario",
+                "text": "El movimiento FIRE (Financial Independence, Retire Early) ganó fuerza con inversiones financieras, pero los inversores más experimentados saben una verdad simple: El dinero puede imprimirse. Los inmuebles no.",
+                "whyRealEstate": {
+                    "title": "¿Por qué los inmuebles — especialmente kitnets y studios — son un refugio seguro?",
+                    "items": [
+                        "🧱 El gobierno no puede “imprimir” terrenos, ladrillos o concreto",
+                        "📈 El valor de los inmuebles tiende a ajustarse a la inflación a largo plazo",
+                        "💰 Pequeños inmuebles frecuentemente ofrecen rentabilidad en torno al 1% mensual",
+                        "🏠 Demanda estructural por vivienda compacta en grandes ciudades",
+                        "🔁 Renta recurrente + valorización patrimonial"
+                    ]
+                },
+                "comparison": {
+                    "fixedIncome": {
+                        "title": "Mientras la renta fija sufre con:",
+                        "items": [
+                            "Inflación",
+                            "Cambios regulatorios",
+                            "Reglas tributarias inestables"
+                        ]
+                    },
+                    "realEstate": {
+                        "text": "El inmueble continúa allí. Físico. Tangible. Alquilable."
+                    }
+                }
+            },
+            "wealthParking": {
+                "title": "Donde los grandes inversores realmente estacionan riqueza",
+                "text": "Muchos millonarios y multimillonarios construyeron fortuna en negocios, crecieron en el mercado financiero o innovaron en tecnología. Pero preservan riqueza en el mercado inmobiliario.",
+                "why": {
+                    "title": "¿Por qué?",
+                    "items": [
+                        "Protegen contra ciclos políticos",
+                        "Protegen contra devaluación monetaria",
+                        "Protegen contra decisiones arbitrarias de gobiernos",
+                        "Generan renta predecible",
+                        "Atraviesan generaciones"
+                    ]
+                }
+            },
+            "kitnets": {
+                "title": "Kitnets y studios: eficiencia, liquidez e resiliencia",
+                "text": "Los inmuebles compactos destacan porque:",
+                "items": [
+                    "Tienen mayor liquidez",
+                    "Menor ticket de entrada",
+                    "Mejor relación alquiler/precio",
+                    "Mayor diversificación con el mismo capital",
+                    "Más resistencia en crisis"
+                ],
+                "footer": "No son solo una inversión. Son infraestructura básica de la sociedad urbana moderna."
+            },
+            "generationalWealth": {
+                "title": "Construyendo riqueza generacional",
+                "text": "La independencia financiera no es solo “dejar de trabajar”. Es Elección, Seguridad, Tiempo, Legado.",
+                "propertyRole": {
+                    "title": "Un inmueble bien ubicado:",
+                    "items": [
+                        "Sustenta una familia",
+                        "Genera renta por décadas",
+                        "Puede ser heredado",
+                        "Puede ser refinanciado",
+                        "Puede ser vendido o adaptado"
+                    ]
+                },
+                "conclusion": "📌 Es riqueza que atravessa generaciones."
+            },
+            "mindset": {
+                "title": "Use la calculadora con esta mentalidad",
+                "text": "Esta calculadora no existe para vender ilusiones financieras. Existe para mostrar, con claridad:",
+                "items": [
+                    "Qué es crecimiento real",
+                    "El impacto de la inflación",
+                    "El peso de los impuestos",
+                    "La diferencia entre renta temporal y perpetua",
+                    "Cómo el patrimonio se comporta en el tiempo"
+                ],
+                "finalQuestion": "¿Estoy construyendo riqueza de verdad o solo números en la pantalla?"
+            }
+        },
+        "results": {
+            "accumulationSummary": "Resumen de Acumulación",
+            "totalAccumulated": "Patrimonio Total Acumulado (Real)",
+            "totalContributed": "Total Aportado (Principal)",
+            "unrealizedGains": "Ganancias de Capital (Para Tributación)",
+            "wealthBuilding": "Construcción de Patrimonio",
+            "scenarioA": "Escenario A: Renta Finita (Agotamiento)",
+            "scenarioAPeriod": "Renta por {years} años hasta agotar el capital",
+            "scenarioB": "Escenario B: Renta Perpetua (Preservación)",
+            "scenarioBDesc": "Vive solo de los rendimientos reales, preservando el principal.",
+            "grossIncome": "Renta Bruta Mensual",
+            "taxPaid": "Impuesto de Renta Mensual",
+            "netIncome": "Renta Neta Mensual (Real)",
+            "purchasingPower": "Poder Adquisitivo Preservado",
+            "nominalWarning": "Valores nominales no consideran pérdida de poder adquisitivo."
+        },
+        "charts": {
+            "accumulationTitle": "Evolución Patrimonial",
+            "withdrawalTitle": "Fase de Disfrute",
+            "totalCapital": "Patrimonio Total",
+            "principal": "Aportes (Principal)",
+            "balance": "Saldo Restante",
+            "netIncome": "Renta Neta"
+        },
+        "tables": {
+            "year": "Año",
+            "initialCapital": "Capital Inicial",
+            "contributions": "Aportes",
+            "yield": "Rendimientos",
+            "finalCapital": "Capital Final",
+            "grossIncome": "Renta Bruta",
+            "tax": "Impuesto",
+            "netIncome": "Renta Neta"
+        },
+        "disclaimer": {
+            "title": "Nota Educativa",
+            "text": "Esta calculadora permite ver valores nominales y reales. Los valores reales representan el poder de compra de hoy, ajustado por inflación."
+        },
+        "tooltips": {
+            "inflation": "Esta calculadora ajusta todos los valores por inflación.",
+            "tax": "El impuesto se aplica solo sobre la ganancia de capital."
+        },
+        "validation": {
+            "inflationError": "La inflación no puede ser mayor que el retorno nominal."
+        }
     }
-},
-"leadCapture": {
-    "title": "Desbloquea todas las funcionalidades",
-    "description": "Recibe consejos exclusivos del mercado financiero e inmobiliario. Prometemos no enviar spam. Puedes darte de baja en cualquier momento.",
-    "namePlaceholder": "Tu nombre",
-    "emailPlaceholder": "Tu correo electrónico",
-    "submit": "Continuar usando",
-    "privacyNote": "Al continuar, aceptas nuestros términos y política de privacidad."
-}
 }

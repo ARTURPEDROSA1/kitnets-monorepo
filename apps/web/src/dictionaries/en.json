@@ -7,16 +7,6 @@
         "calculators": "Calculators",
         "usefulLinks": "Useful Links",
         "faq": "FAQ",
-        "brokers": "Brokers",
-        "agencies": "Real Estate Agencies",
-        "residents": "Residents",
-        "owners": "Owners",
-        "developers": "Developers",
-        "back": "Back"
-    },
-    "filters": {
-        "title": "Filter results",
-        "location": "Location",
         "propertyType": "Property Type",
         "selectPlaceholder": "None selected",
         "kitnet": "Kitnet",
@@ -553,87 +543,302 @@
             "saveError": "Failed to save",
             "deleteError": "Error deleting account. Try again."
         }
-    }
-},
-"interestRateConverterPage": {
-    "title": "Monthly and Annual Interest Rate Converter",
-    "metaDescription": "Convert monthly interest rates to annual and annual to monthly using compound interest. Free and accurate tool.",
-    "intro": "Convert monthly interest rates to annual rates and annual rates to monthly rates automatically and accurately using compound interest — the same method used by banks and financial institutions. This converter is ideal for comparing mortgages, investments, rents, loans, and any contract using interest rates over different periods. Simply enter the rate in one field to instantly see the equivalent rate for the other period, without manual calculations or incorrect approximations.",
-    "monthlyRate": "Monthly Interest Rate (%)",
-    "annualRate": "Annual Interest Rate (%)",
-    "conversionNote": "Automatic conversion",
-    "supportingText": "Unlike simplified conversions that merely multiply or divide the rate by 12, this tool considers the real effect of compound capitalization, ensuring correct and reliable results. For example, a 1% monthly rate is not equivalent to 12% per year, but rather 12.6825% per year. If you are analyzing a mortgage, rent adjustment, investment return, or any financial simulation, this converter helps standardize rates and make more informed decisions.",
-    "educationalNote": "Note: Conversions use compound interest. A monthly rate of 1% is not equivalent to 12% per year.",
-    "example1": "1.00% monthly → 12.6825% annual",
-    "example2": "0.50% monthly → 6.1678% annual",
-    "faq": {
-        "title": "Interest Conversion FAQ",
-        "items": [
-            {
-                "question": "How to convert monthly interest to annual?",
-                "answer": "The compound interest formula is used, raising the monthly rate to the 12th power to get the effective annual rate: i_a = (1 + i_m)^12 - 1."
-            },
-            {
-                "question": "Does this converter use simple interest?",
-                "answer": "No. All conversions use compound interest, reflecting real financial market practices."
-            }
-        ]
-    }
-},
-"leadCapture": {
-    "title": "Unlock all features",
-    "description": "Get exclusive financial and real estate market tips. We promise no spam. You can unsubscribe at any time.",
-    "namePlaceholder": "Your name",
-    "emailPlaceholder": "Your email",
-    "submit": "Continue using",
-    "privacyNote": "By continuing, you agree to our terms and privacy policy."
-},
-"compoundInterestCalculator": {
-    "meta": {
-        "title": "Compound Interest Simulator with Monthly or Annual Contributions",
-        "description": "Simulate investments with compound interest, monthly or annual contributions and visualize your wealth growth over time. Free and accurate tool."
     },
-    "title": "Compound Interest Simulator",
-    "subtitle": "Project your wealth growth with the power of compound interest.",
-    "inputs": {
-        "initialCapital": "Initial Capital",
-        "recurringContribution": "Periodic Contribution",
-        "interestRate": "Interest Rate",
-        "period": "Period",
-        "frequency": {
-            "monthly": "Monthly",
-            "annual": "Annual"
-        },
-        "rateType": {
-            "monthly": "% per month",
-            "annual": "% per year"
-        },
-        "periodUnit": {
-            "months": "Months",
-            "years": "Years"
+    "interestRateConverterPage": {
+        "title": "Monthly and Annual Interest Rate Converter",
+        "metaDescription": "Convert monthly interest rates to annual and annual to monthly using compound interest. Free and accurate tool.",
+        "intro": "Convert monthly interest rates to annual rates and annual rates to monthly rates automatically and accurately using compound interest — the same method used by banks and financial institutions. This converter is ideal for comparing mortgages, investments, rents, loans, and any contract using interest rates over different periods. Simply enter the rate in one field to instantly see the equivalent rate for the other period, without manual calculations or incorrect approximations.",
+        "monthlyRate": "Monthly Interest Rate (%)",
+        "annualRate": "Annual Interest Rate (%)",
+        "conversionNote": "Automatic conversion",
+        "supportingText": "Unlike simplified conversions that merely multiply or divide the rate by 12, this tool considers the real effect of compound capitalization, ensuring correct and reliable results. For example, a 1% monthly rate is not equivalent to 12% per year, but rather 12.6825% per year. If you are analyzing a mortgage, rent adjustment, investment return, or any financial simulation, this converter helps standardize rates and make more informed decisions.",
+        "educationalNote": "Note: Conversions use compound interest. A monthly rate of 1% is not equivalent to 12% per year.",
+        "example1": "1.00% monthly → 12.6825% annual",
+        "example2": "0.50% monthly → 6.1678% annual",
+        "faq": {
+            "title": "Interest Conversion FAQ",
+            "items": [
+                {
+                    "question": "How to convert monthly interest to annual?",
+                    "answer": "The compound interest formula is used, raising the monthly rate to the 12th power to get the effective annual rate: i_a = (1 + i_m)^12 - 1."
+                },
+                {
+                    "question": "Does this converter use simple interest?",
+                    "answer": "No. All conversions use compound interest, reflecting real financial market practices."
+                }
+            ]
         }
     },
-    "results": {
-        "totalInvested": "Total Invested",
-        "totalInterest": "Total Interest",
-        "finalAmount": "Final Total Amount",
-        "equivalentRate": "Equivalent {frequency}"
+    "leadCapture": {
+        "title": "Unlock all features",
+        "description": "Get exclusive financial and real estate market tips. We promise no spam. You can unsubscribe at any time.",
+        "namePlaceholder": "Your name",
+        "emailPlaceholder": "Your email",
+        "submit": "Continue using",
+        "privacyNote": "By continuing, you agree to our terms and privacy policy."
     },
-    "chart": {
-        "totalAmount": "Accumulated Amount",
-        "invested": "Total Invested",
-        "interest": "Interest"
+    "compoundInterestCalculator": {
+        "meta": {
+            "title": "Compound Interest Simulator with Monthly or Annual Contributions",
+            "description": "Simulate investments with compound interest, monthly or annual contributions and visualize your wealth growth over time. Free and accurate tool."
+        },
+        "title": "Compound Interest Simulator",
+        "subtitle": "Project your wealth growth with the power of compound interest.",
+        "inputs": {
+            "initialCapital": "Initial Capital",
+            "recurringContribution": "Periodic Contribution",
+            "interestRate": "Interest Rate",
+            "period": "Period",
+            "frequency": {
+                "monthly": "Monthly",
+                "annual": "Annual"
+            },
+            "rateType": {
+                "monthly": "% per month",
+                "annual": "% per year"
+            },
+            "periodUnit": {
+                "months": "Months",
+                "years": "Years"
+            }
+        },
+        "results": {
+            "totalInvested": "Total Invested",
+            "totalInterest": "Total Interest",
+            "finalAmount": "Final Total Amount",
+            "equivalentRate": "Equivalent {frequency}"
+        },
+        "chart": {
+            "totalAmount": "Accumulated Amount",
+            "invested": "Total Invested",
+            "interest": "Interest"
+        },
+        "table": {
+            "period": "Month",
+            "interest": "Interest",
+            "accumulatedInterest": "Acc. Interest",
+            "invested": "Invested",
+            "total": "Total"
+        },
+        "actions": {
+            "exportCsv": "Export CSV",
+            "exportPdf": "Export PDF"
+        }
     },
-    "table": {
-        "period": "Month",
-        "interest": "Interest",
-        "accumulatedInterest": "Acc. Interest",
-        "invested": "Invested",
-        "total": "Total"
-    },
-    "actions": {
-        "exportCsv": "Export CSV",
-        "exportPdf": "Export PDF"
+    "financialIndependenceCalculator": {
+        "title": "Financial Independence Calculator",
+        "subtitle": "Simulate your financial freedom with real inflation and taxes.",
+        "inputs": {
+            "section1": "Phase 1: Wealth Building",
+            "section2": "Phase 2: Financial Independence (Withdrawal)",
+            "initialCapital": "Initial Capital (Today)",
+            "monthlyContribution": "Monthly Contribution (Real Value)",
+            "years": "Accumulation Period (Years)",
+            "nominalReturn": "Estimated Nominal Annual Return (%)",
+            "inflation": "Estimated Annual Inflation (CPI %)",
+            "toggle": {
+                "real": "Real Values (Inflation Adjusted)",
+                "nominal": "Nominal Values"
+            },
+            "taxRate": "Capital Gains Tax",
+            "withdrawalYears": "Withdrawal Period (Years)",
+            "withdrawalRealReturn": "Real Monthly Return in Retirement (%)",
+            "tax15": "15% (Tax before 2025 tax refom)",
+            "tax175": "17.5% (Tax after 2025 tax reform)"
+        },
+        "educationalContent": {
+            "intro": {
+                "title": "Financial Independence Calculator with Inflation and Real Taxes",
+                "text1": "Planning financial independence requires more than optimistic math. It requires understanding purchasing power, inflation, taxes, and most importantly, where wealth is allocated.",
+                "text2": "This calculator was created to answer a fundamental question:",
+                "quote": "“How much wealth do I need to build to live on real income, without monetary illusions?”",
+                "text3": "Here, all results can be viewed in nominal values or real values (adjusted for inflation), allowing for an honest and realistic analysis of your financial future."
+            },
+            "whatItDoes": {
+                "title": "What this calculator does",
+                "phase1": {
+                    "title": "🔹 Phase 1 – Wealth Building",
+                    "inputTitle": "You enter:",
+                    "inputs": [
+                        "Initial capital",
+                        "Monthly contributions",
+                        "Accumulation period",
+                        "Expected return",
+                        "Estimated inflation (CPI)",
+                        "Capital gains tax"
+                    ],
+                    "outputTitle": "The system calculates:",
+                    "outputs": [
+                        "Total accumulated wealth",
+                        "Total contributed (principal)",
+                        "Real capital gains",
+                        "Wealth evolution over time"
+                    ],
+                    "note": "All of this can be analyzed with or without inflation adjustment."
+                },
+                "phase2": {
+                    "title": "🔹 Phase 2 – Financial Independence (Withdrawal)",
+                    "intro": "Here come the two classic FIRE scenarios:",
+                    "scenarioA": {
+                        "title": "🅰️ Scenario A – Finite Income (Depletion)",
+                        "description": "You consume the wealth over a defined period (e.g., 30 years).",
+                        "items": [
+                            "Gross monthly income",
+                            "Taxes paid",
+                            "Real net income",
+                            "Capital reducing to zero"
+                        ]
+                    },
+                    "scenarioB": {
+                        "title": "🅱️ Scenario B – Perpetual Income (Preservation)",
+                        "description": "You live only on real earnings, preserving the capital.",
+                        "items": [
+                            "Sustainable monthly income",
+                            "Constant capital in real terms",
+                            "Long-term protection",
+                            "Solid base for inheritance and legacy"
+                        ]
+                    }
+                }
+            },
+            "nominalVsReal": {
+                "title": "Nominal vs Real: why this changes everything",
+                "text": "Most financial simulations ignore inflation. This one doesn't.",
+                "point1": "💡 Nominal values show larger numbers, but they deceive.",
+                "point2": "💡 Real values show true purchasing power.",
+                "listTitle": "This calculator makes it clear:",
+                "items": [
+                    "How much growth is real",
+                    "How much is just inflation",
+                    "How much is left after taxes"
+                ],
+                "footer": "No financial marketing. No empty promises."
+            },
+            "marketRole": {
+                "title": "FIRE with Realism: the role of the real estate market",
+                "text": "The FIRE (Financial Independence, Retire Early) movement gained traction with financial investments, but experienced investors know a simple truth: Money can be printed. Real estate cannot.",
+                "whyRealEstate": {
+                    "title": "Why real estate — especially kitnets and studios — is a safe haven?",
+                    "items": [
+                        "🧱 Only land, bricks or concrete cannot be “printed”",
+                        "📈 Property values tend to adjust to inflation in the long term",
+                        "💰 Small properties often offer yields around 1% per month",
+                        "🏠 Structural demand for compact housing in big cities",
+                        "🔁 Recurring income + asset appreciation"
+                    ]
+                },
+                "comparison": {
+                    "fixedIncome": {
+                        "title": "While fixed income suffers from:",
+                        "items": [
+                            "Inflation",
+                            "Regulatory changes",
+                            "Unstable tax rules"
+                        ]
+                    },
+                    "realEstate": {
+                        "text": "The property remains there. Physical. Tangible. Rentable."
+                    }
+                }
+            },
+            "wealthParking": {
+                "title": "Where big investors really park wealth",
+                "text": "Many millionaires and billionaires built fortunes in business, grew in the financial market, or innovated in technology. But they preserve wealth in real estate.",
+                "why": {
+                    "title": "Why?",
+                    "items": [
+                        "Protect against political cycles",
+                        "Protect against currency devaluation",
+                        "Protect against arbitrary government decisions",
+                        "Generate predictable income",
+                        "Cross generations"
+                    ]
+                }
+            },
+            "kitnets": {
+                "title": "Kitnets and studios: efficiency, liquidity, and resilience",
+                "text": "Compact properties stand out because:",
+                "items": [
+                    "They have higher liquidity",
+                    "Lower entry ticket",
+                    "Better rent/price ratio",
+                    "Greater diversification with the same capital",
+                    "More resistance in crises"
+                ],
+                "footer": "They are not just an investment. They are basic infrastructure of modern urban society."
+            },
+            "generationalWealth": {
+                "title": "Building generational wealth",
+                "text": "Financial independence is not just “stopping work”. It is Choice, Security, Time, Legacy.",
+                "propertyRole": {
+                    "title": "A well-located property:",
+                    "items": [
+                        "Sustains a family",
+                        "Generates income for decades",
+                        "Can be inherited",
+                        "Can be refinanced",
+                        "Can be sold or adapted"
+                    ]
+                },
+                "conclusion": "📌 It is wealth that crosses generations."
+            },
+            "mindset": {
+                "title": "Use the calculator with this mindset",
+                "text": "This calculator does not exist to sell financial illusions. It exists to show, clearly:",
+                "items": [
+                    "What is real growth",
+                    "The impact of inflation",
+                    "The weight of taxes",
+                    "The difference between temporary and perpetual income",
+                    "How wealth behaves over time"
+                ],
+                "finalQuestion": "Am I building real wealth or just numbers on a screen?"
+            }
+        },
+        "results": {
+            "accumulationSummary": "Accumulation Summary",
+            "totalAccumulated": "Total Accumulated Wealth (Real)",
+            "totalContributed": "Total Contributed (Principal)",
+            "unrealizedGains": "Capital Gains (Taxable)",
+            "wealthBuilding": "Wealth Building",
+            "scenarioA": "Scenario A: Finite Income (Depletion)",
+            "scenarioAPeriod": "Income for {years} years until capital depletion",
+            "scenarioB": "Scenario B: Perpetual Income (Preservation)",
+            "scenarioBDesc": "Live only on real returns, preserving the principal.",
+            "grossIncome": "Gross Monthly Income",
+            "taxPaid": "Monthly Income Tax",
+            "netIncome": "Net Monthly Income (Real)",
+            "purchasingPower": "Purchasing Power Preserved",
+            "nominalWarning": "Nominal values do not account for loss of purchasing power."
+        },
+        "charts": {
+            "accumulationTitle": "Wealth Evolution",
+            "withdrawalTitle": "Withdrawal Phase",
+            "totalCapital": "Total Wealth",
+            "principal": "Contributions (Principal)",
+            "balance": "Remaining Balance",
+            "netIncome": "Net Income"
+        },
+        "tables": {
+            "year": "Year",
+            "initialCapital": "Initial Capital",
+            "contributions": "Contributions",
+            "yield": "Yield",
+            "finalCapital": "Final Capital",
+            "grossIncome": "Gross Income",
+            "tax": "Tax",
+            "netIncome": "Net Income"
+        },
+        "disclaimer": {
+            "title": "Educational Note",
+            "text": "This calculator allows you to view nominal and real values. Real values represent today's purchasing power, adjusted for inflation."
+        },
+        "tooltips": {
+            "inflation": "This calculator adjusts all values for inflation. The result is in today's money.",
+            "tax": "Tax applies only to the capital gains portion of each withdrawal."
+        },
+        "validation": {
+            "inflationError": "Inflation cannot be higher than nominal return."
+        }
     }
-}
 }

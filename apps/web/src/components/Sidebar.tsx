@@ -609,6 +609,15 @@ export function Sidebar({ lang }: { lang: string }) {
                                         <span className="ms-3 text-sm">Juros Compostos</span>
                                     </Link>
                                 </li>
+                                <li>
+                                    <Link
+                                        href={lang === 'pt' ? '/calculadora-independencia-financeira' : `/${lang}/calculadora-independencia-financeira`}
+                                        className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                    >
+                                        <Sun className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                        <span className="ms-3 text-sm">{dict.menu.financialIndependence}</span>
+                                    </Link>
+                                </li>
                             </ul>
                         </div>
                     ) : sidebarView === 'indices-menu' ? (

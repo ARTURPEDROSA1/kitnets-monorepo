@@ -12,5 +12,5 @@ export type Locale = keyof typeof dictionaries;
 export type Dictionary = typeof pt;
 
 export const getDictionary = (lang: string): Dictionary => {
-    return dictionaries[lang as Locale] ?? dictionaries.pt;
+    return (dictionaries[lang as Locale] ?? dictionaries.pt) as Dictionary;
 };
