@@ -163,8 +163,15 @@ function LeadCaptureModal({ isOpen, onCapture }: { isOpen: boolean; onCapture: (
 
 export default function RentAdjustmentCalculator() {
     // --- State ---
-    const [startDate, setStartDate] = useState<string>("2023-01-01");
-    const [currentRent, setCurrentRent] = useState<number | string>(1500);
+    const [startDate, setStartDate] = useState<string>(() => {
+        const d = new Date();
+        d.setFullYear(d.getFullYear() - 1);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    });
+    const [currentRent, setCurrentRent] = useState<number>(1000);
     const [method, setMethod] = useState<"index" | "fixed">("index");
     const [selectedIndex, setSelectedIndex] = useState<string>("IPCA");
     const [fixedPercent, setFixedPercent] = useState<number | string>(5);
@@ -282,14 +289,22 @@ export default function RentAdjustmentCalculator() {
                 const rentValue = Number(currentRent);
                 const pct = Number(fixedPercent);
                 const accumulatedRate = pct / 100;
+
+                // Fixed method logic - simplified for single step, could be expanded if needed
+                // For now, consistent with existing behavior but structured for potential future expansion
                 const finalRent = rentValue * (1 + accumulatedRate);
 
                 finalResult = {
-                    finalRent,
-                    increaseAmount: finalRent - rentValue,
-                    accumulatedPercent: pct,
-                    monthlyData: [],
-                    history: []
+                    totalFinalRent: finalRent,
+                    history: [{
+                        year: new Date().getFullYear(),
+                        date: new Date().toLocaleDateString("pt-BR"),
+                        oldRent: rentValue,
+                        newRent: finalRent,
+                        increase: finalRent - rentValue,
+                        percent: pct
+                    }],
+                    monthlyData: []
                 };
             } else {
                 // Fetch real data
@@ -300,37 +315,29 @@ export default function RentAdjustmentCalculator() {
                 const today = new Date();
                 let currentCalculationRent = Number(currentRent);
 
-                // Identify simulation periods
-                // Period 1: Adjust at Start + 1 year. Index window: Start -> Start + 11 months?
-                // Standard: Adjustment happens on anniversary. Index collection is usually 12 months prior.
-                // Example: Contract Jan 2023. Adj Jan 2024. Index: Jan 2023 - Dec 2023.
-
                 const checkDate = new Date(start);
                 checkDate.setFullYear(checkDate.getFullYear() + 1); // First adjustment
 
                 const adjustments: any[] = [];
-                let lastMonthlyData: any[] = [];
-                let lastAccumulated = 0;
+                const allMonthlyData: any[] = []; // Accumulate all monthly points here
 
-                // Loop through anniversaries until we reach a forecast limit (e.g., Today + 1 year)
-                // We want to calculate 2024, 2025, 2026 (Forecast)
+                // Loop through anniversaries until we reach a forecast limit
+                // Allow forecast up to 1 year ahead of Today
                 const limitDate = new Date(today);
-                limitDate.setFullYear(limitDate.getFullYear() + 1); // Look ahead max 1 year from today for forecast result
+                limitDate.setFullYear(limitDate.getFullYear() + 1);
 
-                while (checkDate <= limitDate) {
-                    // Define the 12-month window for this adjustment
-                    // Window ends 1 month before adjustment (or includes it? standard is previous 12 months)
-                    // If Adj is Jan 2024 -> Window Jan 2023 to Dec 2023.
+                // Limit max loop to minimize infinite loop risk (e.g. 10 years)
+                let loopCount = 0;
+
+                while (checkDate <= limitDate && loopCount < 10) {
+                    loopCount++;
 
                     const windowStart = new Date(checkDate);
                     windowStart.setFullYear(windowStart.getFullYear() - 1);
-                    // Start of window is exactly 12 months before adjustment date
 
-                    // Filter indices
-                    const windowData = [];
                     let accRate = 1;
 
-                    // Generate expected months
+                    // Generate expected months for this year's window
                     for (let i = 0; i < 12; i++) {
                         const targetMonthDate = new Date(windowStart);
                         targetMonthDate.setMonth(windowStart.getMonth() + i);
@@ -345,18 +352,22 @@ export default function RentAdjustmentCalculator() {
                         if (found) {
                             val = found.value_percent;
                         } else {
-                            // Forecast logic: if missing, use last known value from fetchedData
-                            // This covers "allow forecast next 2 months" by repeating last available
+                            // Forecast logic: use last known value
                             const lastKnown = fetchedData[fetchedData.length - 1];
                             val = lastKnown ? lastKnown.value_percent : 0.5; // fallback
                         }
 
                         accRate *= (1 + (val / 100));
 
-                        windowData.push({
-                            month: targetMonthDate.toLocaleDateString("pt-BR", { month: 'short' }),
-                            fullDate: targetMonthDate.toLocaleDateString("pt-BR", { month: 'long', year: 'numeric' }),
+                        // Unique Key Generation (important for chart if months repeat but distinct periods)
+                        // We use Full Date as visual X-Axis label or tooltip header
+
+                        allMonthlyData.push({
+                            // Format: "mm/yy" for chart X-Axis
+                            month: `${(targetMonthDate.getMonth() + 1).toString().padStart(2, '0')}/${targetMonthDate.getFullYear().toString().slice(-2)}`,
+                            fullDate: targetMonthDate.toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit', year: 'numeric' }),
                             value: val,
+                            // Accumulated since start of THIS period (standard display)
                             accumulated: (accRate - 1) * 100
                         });
                     }
@@ -365,31 +376,29 @@ export default function RentAdjustmentCalculator() {
                     const increase = currentCalculationRent * (accRate - 1);
                     const newRent = currentCalculationRent * accRate;
 
+                    // Determine if this is a forecast (future) or past/present
+                    const isForecast = checkDate > today;
+
                     adjustments.push({
                         date: checkDate.toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit', year: 'numeric' }),
                         year: checkDate.getFullYear(),
                         oldRent: currentCalculationRent,
                         newRent: newRent,
                         increase,
-                        percent: accumulatedPercent
+                        percent: accumulatedPercent,
+                        isForecast
                     });
 
-                    currentCalculationRent = newRent;
-                    lastMonthlyData = windowData;
-                    lastAccumulated = accumulatedPercent;
+                    currentCalculationRent = newRent; // Base for next year
 
                     // Move to next year
                     checkDate.setFullYear(checkDate.getFullYear() + 1);
                 }
 
-                // Result is the LAST calculated adjustment (Forecast)
-                // But we display the chain if needed. Currently we assume the "Main Result" is the target forecast.
                 finalResult = {
-                    finalRent: currentCalculationRent,
-                    increaseAmount: adjustments.length > 0 ? adjustments[adjustments.length - 1].increase : 0,
-                    accumulatedPercent: lastAccumulated,
-                    monthlyData: lastMonthlyData,
-                    history: adjustments
+                    totalFinalRent: currentCalculationRent,
+                    history: adjustments,
+                    monthlyData: allMonthlyData
                 };
             }
 
@@ -415,6 +424,12 @@ export default function RentAdjustmentCalculator() {
             return;
         }
         performCalculation();
+    };
+
+    const handleRentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const rawValue = e.target.value.replace(/\D/g, ''); // Remove non-numeric
+        const value = rawValue ? parseInt(rawValue, 10) / 100 : 0;
+        setCurrentRent(value);
     };
 
     return (
@@ -497,11 +512,11 @@ export default function RentAdjustmentCalculator() {
                             <div className="relative">
                                 <span className="absolute left-3 top-2.5 text-muted-foreground">R$</span>
                                 <Input
-                                    type="number"
-                                    placeholder="1.500,00"
+                                    type="text"
+                                    inputMode="numeric"
                                     className="pl-9 text-lg font-medium"
-                                    value={currentRent}
-                                    onChange={(e) => setCurrentRent(e.target.value)}
+                                    value={currentRent.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    onChange={handleRentChange}
                                 />
                             </div>
                         </div>
@@ -617,41 +632,59 @@ export default function RentAdjustmentCalculator() {
                         /* Results Display */
                         <div className="animate-in slide-in-from-bottom-4 duration-700 space-y-6">
 
-                            {/* Top Cards Grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                {/* Result Card 1 */}
-                                <div className="bg-primary/5 border border-primary/20 rounded-xl p-5 relative overflow-hidden">
-                                    <div className="absolute top-0 right-0 p-3 opacity-10">
-                                        <TrendingUp className="w-12 h-12 text-primary" />
+                            {/* Result Lists */}
+                            <div className="space-y-8">
+                                {calculationResult.history.map((item: any, index: number) => (
+                                    <div key={index} className="space-y-4">
+                                        <div className="flex items-center gap-2">
+                                            <div className={`p-1.5 rounded-full ${item.isForecast ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'}`}>
+                                                {item.isForecast ? <TrendingUp className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+                                            </div>
+                                            <h3 className="font-semibold text-lg">
+                                                Reajuste {item.year}
+                                                <span className="text-sm font-normal text-muted-foreground ml-2">
+                                                    ({item.date}) {item.isForecast && "- Previsão"}
+                                                </span>
+                                            </h3>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            {/* Result Card 1 */}
+                                            <div className="bg-primary/5 border border-primary/20 rounded-xl p-5 relative overflow-hidden">
+                                                <div className="absolute top-0 right-0 p-3 opacity-10">
+                                                    <TrendingUp className="w-12 h-12 text-primary" />
+                                                </div>
+                                                <p className="text-sm text-muted-foreground font-medium mb-1">Novo Aluguel</p>
+                                                <h3 className="text-2xl font-bold text-primary">
+                                                    {formatCurrency(item.newRent)}
+                                                </h3>
+                                                <p className="text-xs text-muted-foreground mt-2">Valor atualizado</p>
+                                            </div>
+
+                                            {/* Result Card 2 */}
+                                            <div className="bg-card border rounded-xl p-5">
+                                                <p className="text-sm text-muted-foreground font-medium mb-1">Aumento</p>
+                                                <h3 className="text-2xl font-bold text-foreground">
+                                                    +{formatCurrency(item.increase)}
+                                                </h3>
+                                                <p className="text-xs text-muted-foreground mt-2">Diferença mensal</p>
+                                            </div>
+
+                                            {/* Result Card 3 */}
+                                            <div className="bg-card border rounded-xl p-5">
+                                                <p className="text-sm text-muted-foreground font-medium mb-1">
+                                                    {method === 'fixed' ? 'Reajuste Fixo' : `Acumulado (${selectedIndex})`}
+                                                </p>
+                                                <h3 className="text-2xl font-bold text-foreground">
+                                                    {formatPercent(item.percent)}
+                                                </h3>
+                                                <p className="text-xs text-muted-foreground mt-2">
+                                                    {method === 'index' ? 'Neste período' : 'Taxa aplicada'}
+                                                </p>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <p className="text-sm text-muted-foreground font-medium mb-1">Novo Aluguel</p>
-                                    <h3 className="text-2xl font-bold text-primary">
-                                        {formatCurrency(calculationResult.finalRent)}
-                                    </h3>
-                                    <p className="text-xs text-muted-foreground mt-2">Valor atualizado</p>
-                                </div>
-
-                                {/* Result Card 2 */}
-                                <div className="bg-card border rounded-xl p-5">
-                                    <p className="text-sm text-muted-foreground font-medium mb-1">Aumento</p>
-                                    <h3 className="text-2xl font-bold text-foreground">
-                                        +{formatCurrency(calculationResult.increaseAmount)}
-                                    </h3>
-                                    <p className="text-xs text-muted-foreground mt-2">Diferença mensal</p>
-                                </div>
-
-                                {/* Result Card 3 */}
-                                <div className="bg-card border rounded-xl p-5">
-                                    <p className="text-sm text-muted-foreground font-medium mb-1">
-                                        {method === 'fixed' ? 'Reajuste Fixo' : `Acumulado (${selectedIndex})`}
-                                    </p>
-                                    <h3 className="text-2xl font-bold text-foreground">
-                                        {formatPercent(calculationResult.accumulatedPercent)}
-                                    </h3>
-                                    <p className="text-xs text-muted-foreground mt-2">
-                                        {method === 'index' ? 'Últimos 12 meses' : 'Taxa aplicada'}
-                                    </p>
-                                </div>
+                                ))}
                             </div>
 
                             {/* Chart / Table Section */}
@@ -664,7 +697,7 @@ export default function RentAdjustmentCalculator() {
                                                 Evolução do Índice ({selectedIndex})
                                             </h3>
                                             <p className="text-sm text-muted-foreground">
-                                                Comportamento mensal do índice nos últimos 12 meses.
+                                                Comportamento mensal do índice no período analisado.
                                             </p>
                                         </div>
 
@@ -779,13 +812,13 @@ export default function RentAdjustmentCalculator() {
                             )}
 
                             {/* Warning High Adjustment */}
-                            {calculationResult.accumulatedPercent > 20 && (
+                            {calculationResult.history.some((h: any) => h.percent > 20) && (
                                 <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/20 p-4 rounded-xl flex gap-3 text-amber-800 dark:text-amber-400">
                                     <AlertTriangle className="w-5 h-5 shrink-0 mt-1" />
                                     <div>
                                         <h4 className="font-semibold text-sm">Atenção: Reajuste Elevado</h4>
                                         <p className="text-sm mt-1 opacity-90">
-                                            O reajuste calculado está acima de 20%. Valores muito altos podem ser questionados judicialmente. Considere negociar um percentual intermediário.
+                                            Um ou mais reajustes calcularam acima de 20%. Valores muito altos podem ser questionados judicialmente. Considere negociar um percentual intermediário.
                                         </p>
                                     </div>
                                 </div>

@@ -39,18 +39,47 @@ export async function getIndexMetadata(code: string): Promise<IndexMetadata | nu
 
 export async function getIndexValues(indexId: string, limit = 36): Promise<IndexValue[]> {
     const supabase = createStaticClient();
+    // Fetch extra months to calculate 12-month accumulated for the oldest requested records
+    const fetchLimit = limit + 12;
+
     const { data, error } = await supabase
         .from("economic_index_values")
         .select("*")
         .eq("index_id", indexId)
         .order("reference_date", { ascending: false })
-        .limit(limit);
+        .limit(fetchLimit);
 
     if (error) {
         console.error(`Error fetching index values for ${indexId}:`, error);
         return [];
     }
-    return data;
+
+    // Calculate accumulated 12m on the fly
+    const enrichedData = data.map((item, index, arr) => {
+        // We need current month + 11 previous months (total 12)
+        // Since array is sorted DESC, we look ahead.
+        if (index + 12 > arr.length) {
+            // Not enough data for 12m accumulation
+            return item;
+        }
+
+        const window = arr.slice(index, index + 12);
+
+        // Accumulate: (1 + m1) * (1 + m2) ... - 1
+        const accumulatedDecimal = window.reduce((acc, curr) => {
+            return acc * (1 + (curr.value_percent / 100));
+        }, 1);
+
+        const accumulated12m = (accumulatedDecimal - 1) * 100;
+
+        return {
+            ...item,
+            accumulated_12m: parseFloat(accumulated12m.toFixed(2))
+        };
+    });
+
+    // Return only the requested amount
+    return enrichedData.slice(0, limit);
 }
 
 export async function getAllIndexes(): Promise<IndexMetadata[]> {
