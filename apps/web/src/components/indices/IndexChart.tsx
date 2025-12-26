@@ -28,7 +28,7 @@ export function IndexChart({ data, indexCode }: IndexChartProps) {
         }));
 
     return (
-        <div className="h-[350px] w-full mt-6">
+        <div className="h-[250px] md:h-[350px] w-full mt-4 md:mt-6">
             <ResponsiveContainer width="100%" height="100%">
                 <LineChart
                     data={chartData}

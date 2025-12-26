@@ -51,7 +51,7 @@ export default async function PanoramaPage({ params }: { params: Promise<{ lang:
     };
 
     return (
-        <div className="container mx-auto py-10 px-4 max-w-6xl">
+        <div className="container mx-auto py-6 md:py-10 px-4 max-w-6xl">
             <h1 className="text-3xl font-bold mb-2">Panorama Econômico</h1>
             <p className="text-muted-foreground mb-8 text-lg">
                 Resumo dos principais indicadores econômicos e suas variações nos últimos 12 meses.
@@ -74,7 +74,7 @@ export default async function PanoramaPage({ params }: { params: Promise<{ lang:
 
                     return (
                         <div key={meta.id} className="rounded-xl border bg-card text-card-foreground shadow-sm hover:shadow-md transition-shadow">
-                            <div className="p-6">
+                            <div className="p-5 md:p-6">
                                 <div className="flex justify-between items-start mb-4">
                                     <div>
                                         <div className="flex items-center gap-2 mb-1">
