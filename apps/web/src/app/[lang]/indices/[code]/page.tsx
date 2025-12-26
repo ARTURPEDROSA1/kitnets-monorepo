@@ -3,6 +3,7 @@ import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getIndexMetadata, getIndexValues, getAllIndexes } from '@/lib/indexes';
 import { IndexChart } from '@/components/indices/IndexChart';
+import { IndexHeatmap } from '@/components/indices/IndexHeatmap';
 import Link from 'next/link';
 import { Button } from '@kitnets/ui'; // Button exists now
 import { ArrowLeft } from 'lucide-react';
@@ -18,8 +19,8 @@ interface Props {
 }
 
 export async function generateStaticParams() {
-    const indexes = await getAllIndexes();
-    return indexes.map((idx) => ({
+    const indices = await getAllIndexes();
+    return indices.map((idx) => ({
         code: idx.code.toLowerCase(),
     }));
 }
@@ -57,8 +58,8 @@ export default async function IndexPage({ params }: Props) {
         notFound();
     }
 
-    // Fetch last 36 months (3 years)
-    const history = await getIndexValues(metadata.id, 36);
+    // Fetch last 60 months (5 years) to populate heatmap with decent history
+    const history = await getIndexValues(metadata.id, 60);
     const latest = history[0];
 
     // Schema.org Structured Data
@@ -151,10 +152,23 @@ export default async function IndexPage({ params }: Props) {
                     <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
                         <div className="flex flex-col space-y-1.5 p-6">
                             <h3 className="text-2xl font-semibold leading-none tracking-tight">Histórico de Variação (%)</h3>
-                            <p className="text-sm text-muted-foreground">Visualização gráfica da evolução do índice nos últimos 3 anos.</p>
+                            <p className="text-sm text-muted-foreground">Visualização gráfica da evolução do índice nos últimos 5 anos.</p>
                         </div>
                         <div className="p-6 pt-0">
                             <IndexChart data={history} indexCode={code} />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Heatmap Section */}
+                <div className="md:col-span-3">
+                    <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
+                        <div className="flex flex-col space-y-1.5 p-6">
+                            <h3 className="text-2xl font-semibold leading-none tracking-tight">Mapa de Calor Mensal</h3>
+                            <p className="text-sm text-muted-foreground">Comportamento mensal e acumulado anual.</p>
+                        </div>
+                        <div className="p-6 pt-0">
+                            <IndexHeatmap data={history} />
                         </div>
                     </div>
                 </div>
@@ -174,7 +188,6 @@ export default async function IndexPage({ params }: Props) {
                                             <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 w-[200px]">Mês/Ano</th>
                                             <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0">Índice no Mês (%)</th>
                                             <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0">Acumulado 12m (%)</th>
-                                            <th className="h-12 px-4 align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 text-right">Fonte</th>
                                         </tr>
                                     </thead>
                                     <tbody className="[&_tr:last-child]:border-0">
@@ -188,13 +201,6 @@ export default async function IndexPage({ params }: Props) {
                                                 </td>
                                                 <td className="p-4 align-middle [&:has([role=checkbox])]:pr-0">
                                                     {row.accumulated_12m ? `${row.accumulated_12m}%` : '-'}
-                                                </td>
-                                                <td className="p-4 align-middle [&:has([role=checkbox])]:pr-0 text-right text-xs text-muted-foreground">
-                                                    {row.source_url ? (
-                                                        <a href={`https://${row.source_url}`} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                                                            Ver Fonte
-                                                        </a>
-                                                    ) : '-'}
                                                 </td>
                                             </tr>
                                         ))}

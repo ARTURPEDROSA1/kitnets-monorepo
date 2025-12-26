@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@kitnets/ui";
 import { SignOutButton, useAuth } from "@clerk/nextjs";
-import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Search, Bell, ChevronDown, Rocket, HardHat, Briefcase, Building2, User, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard } from "lucide-react";
+import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Search, Bell, ChevronDown, Rocket, HardHat, Briefcase, Building2, User, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart } from "lucide-react";
 import { useTheme } from "next-themes";
 import Image from "next/image";
 import { getDictionary } from "../dictionaries";
@@ -23,7 +23,7 @@ export function Sidebar({ lang }: { lang: string }) {
     const router = useRouter();
     const { setTheme, theme } = useTheme();
     const { isSignedIn } = useAuth();
-    const [sidebarView, setSidebarView] = React.useState<'main' | 'rent-filters' | 'buy-filters' | 'launches-filters' | 'calculators-menu'>('main');
+    const [sidebarView, setSidebarView] = React.useState<'main' | 'rent-filters' | 'buy-filters' | 'launches-filters' | 'calculators-menu' | 'indices-menu'>('main');
     const [expandedSections, setExpandedSections] = React.useState<Record<string, boolean>>({});
     const [isMobileOpen, setIsMobileOpen] = React.useState(false);
 
@@ -86,6 +86,10 @@ export function Sidebar({ lang }: { lang: string }) {
 
     const toggleCalculatorsMenu = () => {
         setSidebarView('calculators-menu');
+    };
+
+    const toggleIndicesMenu = () => {
+        setSidebarView('indices-menu');
     };
 
     const backToMain = () => {
@@ -194,6 +198,16 @@ export function Sidebar({ lang }: { lang: string }) {
                                         </button>
                                     </li>
                                 )}
+
+                                <li>
+                                    <button
+                                        onClick={toggleIndicesMenu}
+                                        className="w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group text-left"
+                                    >
+                                        <LineChart className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                        <span className="ms-3">Indicadores</span>
+                                    </button>
+                                </li>
 
                                 {FLAGS.SHOW_USEFUL_LINKS && (
                                     <li>
@@ -577,6 +591,37 @@ export function Sidebar({ lang }: { lang: string }) {
                                         <span className="ms-3 text-sm">Simulador de Amortização</span>
                                     </Link>
                                 </li>
+                            </ul>
+                        </div>
+                    ) : sidebarView === 'indices-menu' ? (
+                        <div className="space-y-4">
+                            <button onClick={backToMain} className="flex items-center text-sm text-muted-foreground hover:text-foreground mb-4">
+                                <span className="mr-1">←</span> {dict.menu.back}
+                            </button>
+
+                            <h2 className="text-lg font-semibold text-foreground">Indicadores</h2>
+
+                            <ul className="space-y-2 font-medium">
+                                <li>
+                                    <Link
+                                        href={lang === 'pt' ? '/indices/panorama' : `/${lang}/indices/panorama`}
+                                        className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                    >
+                                        <LayoutDashboard className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                        <span className="ms-3 text-sm">Panorama Econômico</span>
+                                    </Link>
+                                </li>
+                                {['IPCA', 'IGPM', 'INPC', 'IVAR', 'FipeZAP', 'SELIC', 'CDI'].map((code) => (
+                                    <li key={code}>
+                                        <Link
+                                            href={lang === 'pt' ? `/indices/${code.toLowerCase()}` : `/${lang}/indices/${code.toLowerCase()}`}
+                                            className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                        >
+                                            <TrendingUp className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                            <span className="ms-3 text-sm">{code === 'IGPM' ? 'IGP-M' : code}</span>
+                                        </Link>
+                                    </li>
+                                ))}
                             </ul>
                         </div>
                     ) : null}
