@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@kitnets/ui";
 import { SignOutButton, useAuth } from "@clerk/nextjs";
-import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Search, Bell, ChevronDown, Rocket, HardHat, Briefcase, Building2, User, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart } from "lucide-react";
+import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Search, Bell, ChevronDown, Rocket, HardHat, Briefcase, Building2, User, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart, ArrowLeftRight } from "lucide-react";
 import { useTheme } from "next-themes";
 import Image from "next/image";
 import { getDictionary } from "../dictionaries";
@@ -589,6 +589,24 @@ export function Sidebar({ lang }: { lang: string }) {
                                     >
                                         <PiggyBank className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                         <span className="ms-3 text-sm">Simulador de Amortização</span>
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link
+                                        href={lang === 'pt' ? '/calculadoras/conversor-juros-mensal-anual' : `/${lang}/calculadoras/conversor-juros-mensal-anual`}
+                                        className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                    >
+                                        <ArrowLeftRight className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                        <span className="ms-3 text-sm">Conversor de Juros Mensal e Anual</span>
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link
+                                        href={lang === 'pt' ? '/calculadora-juros-compostos' : `/${lang}/calculadora-juros-compostos`}
+                                        className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                    >
+                                        <TrendingUp className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                        <span className="ms-3 text-sm">Juros Compostos</span>
                                     </Link>
                                 </li>
                             </ul>

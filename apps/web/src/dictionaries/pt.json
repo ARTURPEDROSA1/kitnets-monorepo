@@ -920,5 +920,119 @@
             "saveError": "Falha ao salvar",
             "deleteError": "Erro ao excluir conta. Tente novamente."
         }
+    },
+    "interestRateConverterPage": {
+        "title": "Conversor de Taxa de Juros Mensal e Anual",
+        "metaDescription": "Converta taxas de juros mensais em anuais e anuais em mensais usando juros compostos. Ferramenta gratuita e precisa.",
+        "intro": "Converta taxas de juros mensais em taxas anuais e taxas anuais em mensais de forma automática e precisa, utilizando juros compostos — o mesmo método adotado por bancos e instituições financeiras. Este conversor é ideal para comparar financiamentos, investimentos, aluguéis, empréstimos e qualquer contrato que utilize taxas de juros em períodos diferentes. Basta digitar a taxa em um dos campos para visualizar instantaneamente a taxa equivalente no outro período, sem cálculos manuais ou aproximações incorretas.",
+        "monthlyRate": "Taxa de juros mensal (%)",
+        "annualRate": "Taxa de juros anual (%)",
+        "conversionNote": "Conversão automática",
+        "supportingText": "Diferente de conversões simplificadas que apenas multiplicam ou dividem a taxa por 12, esta ferramenta considera o efeito real da capitalização composta, garantindo resultados corretos e confiáveis. Por exemplo, uma taxa de 1% ao mês não equivale a 12% ao ano, mas sim a 12,6825% ao ano. Se você está analisando um financiamento imobiliário, reajuste de aluguel, retorno de investimento ou qualquer simulação financeira, este conversor ajuda a padronizar taxas e tomar decisões mais conscientes.",
+        "educationalNote": "Nota: As conversões utilizam juros compostos. Uma taxa mensal de 1% não equivale a 12% ao ano.",
+        "example1": "1,00% ao mês → 12,6825% ao ano",
+        "example2": "0,50% ao mês → 6,1678% ao ano",
+        "faq": {
+            "title": "Perguntas Frequentes sobre Conversão de Juros",
+            "items": [
+                {
+                    "question": "Como converter juros mensal em anual?",
+                    "answer": "Utiliza-se a fórmula de juros compostos, elevando a taxa mensal à 12ª potência para obter a taxa anual efetiva: 𝑖ₐ = (1 + 𝑖ₘ)¹² - 1."
+                },
+                {
+                    "question": "Este conversor usa juros simples?",
+                    "answer": "Não. Todas as conversões utilizam juros compostos, refletindo a prática real do mercado financeiro."
+                }
+            ]
+        }
+    },
+    "leadCapture": {
+        "title": "Aproveite todas as funcionalidades",
+        "description": "Receba dicas exclusivas do mercado de Kitnets e do mercado imobiliário em geral. Prometemos não enviar spam. Você pode cancelar a inscrição a qualquer momento.",
+        "namePlaceholder": "Seu nome",
+        "emailPlaceholder": "Seu e-mail",
+        "submit": "Continuar usando",
+        "privacyNote": "Ao continuar, você concorda com nossos termos e política de privacidade."
+    },
+    "compoundInterestCalculator": {
+        "meta": {
+            "title": "Simulador de Juros Compostos com Aportes Mensais ou Anuais",
+            "description": "Simule investimentos com juros compostos, aportes mensais ou anuais e visualize o crescimento do seu patrimônio ao longo do tempo. Ferramenta gratuita e precisa."
+        },
+        "title": "Simulador de Juros Compostos",
+        "subtitle": "Projete o crescimento do seu patrimônio com o poder dos juros sobre juros.",
+        "seoText": {
+            "title": "Simulador de Juros Compostos com Aportes Mensais ou Anuais",
+            "intro": "O Simulador de Juros Compostos do Kitnets.com é uma ferramenta completa para quem deseja entender, planejar e maximizar o crescimento do patrimônio ao longo do tempo. Com poucos dados, você consegue visualizar de forma clara como os juros sobre juros atuam no longo prazo — seja em investimentos, reservas financeiras ou planejamento de objetivos futuros.",
+            "howToUse": {
+                "title": "Com este simulador, você pode informar:",
+                "items": [
+                    "Valor inicial investido",
+                    "Aportes periódicos mensais ou anuais",
+                    "Taxa de juros mensal ou anual, com conversão automática",
+                    "Período de investimento em meses ou anos"
+                ]
+            },
+            "whatItShows": {
+                "title": "A calculadora mostra instantaneamente:",
+                "items": [
+                    "Total investido ao longo do período",
+                    "Total ganho em juros",
+                    "Valor final acumulado, já considerando juros compostos"
+                ]
+            },
+            "features": "Além disso, você acompanha tudo visualmente em um gráfico evolutivo, comparando o dinheiro efetivamente investido com o crescimento do valor acumulado ao longo do tempo. Para quem deseja ir além, a tabela detalhada mês a mês permite entender exatamente quando os juros passam a trabalhar mais do que os aportes.",
+            "idealFor": {
+                "title": "Este simulador é ideal para:",
+                "items": [
+                    "Planejamento financeiro de longo prazo",
+                    "Simulação de investimentos em renda fixa, fundos ou qualquer aplicação com juros compostos",
+                    "Educação financeira e tomada de decisão consciente",
+                    "Comparar cenários com diferentes taxas, prazos e valores de aporte"
+                ]
+            },
+            "export": "Você ainda pode exportar os resultados em CSV ou PDF, facilitando análises mais profundas, apresentações ou planejamento pessoal.",
+            "conclusion": "Se você quer descobrir quanto seu dinheiro pode crescer no tempo e entender por que os juros compostos são considerados uma das forças mais poderosas das finanças, este simulador foi feito para você. Simule agora e veja como pequenas decisões hoje podem gerar grandes resultados no futuro."
+        },
+        "inputs": {
+            "initialCapital": "Valor inicial",
+            "recurringContribution": "Aporte periódico",
+            "interestRate": "Taxa de juros",
+            "period": "Período",
+            "frequency": {
+                "monthly": "Mensal",
+                "annual": "Anual"
+            },
+            "rateType": {
+                "monthly": "% ao mês",
+                "annual": "% ao ano"
+            },
+            "periodUnit": {
+                "months": "Meses",
+                "years": "Anos"
+            }
+        },
+        "results": {
+            "totalInvested": "Total Investido",
+            "totalInterest": "Total em Juros",
+            "finalAmount": "Valor Total Final",
+            "equivalentRate": "Equivalente {frequency}"
+        },
+        "chart": {
+            "totalAmount": "Valor Acumulado",
+            "invested": "Total Invested",
+            "interest": "Juros"
+        },
+        "table": {
+            "period": "Mês",
+            "interest": "Juros",
+            "accumulatedInterest": "Juros Acum.",
+            "invested": "Investido",
+            "total": "Total"
+        },
+        "actions": {
+            "exportCsv": "Exportar CSV",
+            "exportPdf": "Exportar PDF"
+        }
     }
 }

@@ -123,3 +123,43 @@ body {
     scrollbar-width: none;
   }
 }
+
+@media print {
+
+  aside,
+  nav,
+  header,
+  .fixed.top-0,
+  button,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Re-enable printing for specific buttons if needed, but usually we hide actions */
+
+  body {
+    background: white;
+    color: black;
+    padding: 0;
+    margin: 0;
+    overflow: visible !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  /* Ensure the main content is visible and takes full width */
+  main,
+  div[class*="container"] {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  /* Improve chart printing contrast if necessary */
+  .recharts-wrapper {
+    margin: 0 auto;
+  }
+}

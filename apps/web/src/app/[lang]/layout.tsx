@@ -1,4 +1,5 @@
 
+import type { Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { getDictionary } from "../../dictionaries";
 import "../globals.css";
@@ -17,6 +18,15 @@ const geistMono = Geist_Mono({
     subsets: ["latin"],
 });
 
+export const viewport: Viewport = {
+    themeColor: [
+        { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+        { media: '(prefers-color-scheme: dark)', color: '#000000' },
+    ],
+    width: 'device-width',
+    initialScale: 1,
+};
+
 export async function generateMetadata({ params }: { params: Promise<{ lang: string }> }) {
     const { lang } = await params;
     const dict = getDictionary(lang);
@@ -29,6 +39,14 @@ export async function generateMetadata({ params }: { params: Promise<{ lang: str
             template: `%s | Kitnets.com`,
         },
         description: dict.home.subtitle,
+        keywords: [
+            "kitnets", "aluguel", "moradia", "imóveis", "calculadoras", "financiamento",
+            "investimento", "IPCA", "IGPM", "INPC", "real estate", "rent", "Brazil"
+        ],
+        authors: [{ name: "Kitnets.com Team", url: baseUrl }],
+        creator: "Kitnets.com",
+        publisher: "Kitnets.com",
+        category: "Real Estate",
         openGraph: {
             type: 'website',
             locale: lang,
@@ -36,6 +54,14 @@ export async function generateMetadata({ params }: { params: Promise<{ lang: str
             title: 'Kitnets.com',
             description: dict.home.subtitle,
             siteName: 'Kitnets.com',
+            images: [
+                {
+                    url: `${baseUrl}/icon.png`,
+                    width: 512,
+                    height: 512,
+                    alt: 'Kitnets.com Logo',
+                },
+            ],
         },
         robots: {
             index: true,
@@ -64,6 +90,29 @@ export default async function RootLayout({
     params: Promise<{ lang: string }>;
 }) {
     const { lang } = await params;
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://kitnets.com';
+
+    const jsonLd = {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "WebSite",
+                "name": "Kitnets.com",
+                "url": baseUrl,
+                "potentialAction": {
+                    "@type": "SearchAction",
+                    "target": `${baseUrl}/search?q={search_term_string}`,
+                    "query-input": "required name=search_term_string"
+                }
+            },
+            {
+                "@type": "Organization",
+                "name": "Kitnets.com",
+                "url": baseUrl,
+                "logo": `${baseUrl}/icon.png`
+            }
+        ]
+    };
     return (
         <ClerkProvider>
             <html lang={lang} suppressHydrationWarning>
@@ -84,6 +133,10 @@ export default async function RootLayout({
                             <Footer lang={lang} />
                         </div>
                     </ThemeProvider>
+                    <script
+                        type="application/ld+json"
+                        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+                    />
                 </body>
             </html>
         </ClerkProvider>
