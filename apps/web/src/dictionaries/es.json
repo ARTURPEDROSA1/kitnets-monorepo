@@ -62,7 +62,7 @@
     },
     "home": {
         "welcome": "Bienvenido a Kitnets.com",
-        "subtitle": "Encuentra tu kitnet ideal.",
+        "subtitle": "La plataforma de IA para la gestión de kitnets y studios. Automatización, datos e inteligencia para quienes viven, invierten, alquilan y construyen.",
         "cta": "Comenzar"
     },
     "onboarding": {
@@ -122,93 +122,94 @@
         }
     },
     "homeContent": {
-        "mainTitle": "Kitnets.com — La plataforma completa para kitnets, estudios y propiedades compactas",
+        "mainTitle": "Kitnets.com es la primera plataforma en Brasil creada para transformar la forma en que se gestionan, analizan y negocian kitnets, studios e inmuebles compactos.",
         "mainIntro": [
-            "Kitnets.com es la primera plataforma en Brasil creada exclusivamente para kitnets, estudios y propiedades compactas, combinando la búsqueda inteligente de propiedades, la gestión profesional de alquileres y datos de mercado en tiempo real.",
-            "Aquí, los residentes, propietarios, corredores, inmobiliarias y constructoras operan en el mismo ecosistema, con información organizada, procesos digitales e inteligencia para tomar mejores decisiones."
+            "Más que un portal de anuncios, somos una infraestructura digital basada en datos e inteligencia artificial para todo el ecosistema inmobiliario compacto.",
+            "Aquí, residentes, propietarios, corredores, inmobiliarias y constructoras operan en el mismo entorno, con procesos automatizados, información estructurada y decisiones orientadas por datos."
         ],
         "sections": [
             {
-                "title": "Encuentre su kitnet ideal con más precisión",
-                "description": "Si está buscando un kitnet para alquilar o comprar, Kitnets.com ofrece:",
+                "title": "Encuentra tu kitnet con inteligencia",
+                "description": "Para quienes buscan vivir o invertir, Kitnets.com ofrece una experiencia objetiva y precisa:",
                 "items": [
-                    "Anuncios centrados en propiedades compactas",
-                    "Filtros inteligentes por ciudad, barrio y precio",
-                    "Alertas automáticas cuando hay nuevas propiedades disponibles",
-                    "Menos anuncios irrelevantes, más oportunidades reales"
+                    "Anuncios exclusivos de kitnets, studios e inmuebles compactos",
+                    "Filtros inteligentes por ciudad, barrio, precio y perfil",
+                    "Alertas automáticas basadas en tu interés",
+                    "Menos ruido. Más relevancia. Más eficiencia."
                 ],
-                "footer": "Usted no pierde tiempo. Usted encuentra lo que busca."
+                "footer": "No navegas en miles de anuncios genéricos. Encuentras el inmueble correcto, en el momento correcto."
             },
             {
-                "title": "Una nueva forma de anunciar propiedades",
-                "description": "Para corredores, inmobiliarias y propietarios, Kitnets.com es más que un portal de anuncios. Es una plataforma profesional para:",
+                "title": "Anunciar no es publicar. Es operar.",
+                "description": "En Kitnets.com, anunciar es solo el comienzo. La plataforma fue creada para operar inmuebles de forma profesional, con automatización y control. Para propietarios, corredores e inmobiliarias:",
                 "items": [
-                    "Anunciar propiedades a un público altamente cualificado",
-                    "Gestionar contratos, alquileres y ajustes",
-                    "Centralizar la comunicación con los residentes",
-                    "Eliminar hojas de cálculo, controles manuales y datos dispersos"
+                    "Anuncios con público altamente cualificado",
+                    "Gestión centralizada de contratos, alquileres y reajustes",
+                    "Comunicación organizada con residentes",
+                    "Historial completo de valores, documentos y eventos",
+                    "Fin de las hojas de cálculo, controles paralelos e improvisación"
                 ],
-                "footer": "Todo en un solo sistema."
+                "footer": "Todo en un único sistema, orientado a datos."
             },
             {
-                "title": "Gestión inmobiliaria como nunca existió en Brasil",
-                "description": "Kitnets.com funciona como un SaaS inmobiliario completo, ofreciendo:",
+                "title": "Gestión inmobiliaria orientada por datos",
+                "description": "Kitnets.com funciona como un SaaS inmobiliario con inteligencia integrada, ofreciendo:",
                 "items": [
-                    "Paneles claros y en tiempo real",
+                    "Dashboards claros y actualizados en tiempo real",
                     "Informes automáticos",
                     "Métricas de rendimiento y rentabilidad",
-                    "KPIs inéditos en el mercado brasileño",
-                    "Historial organizado de propiedades, contratos y valores"
+                    "KPIs inéditos para inmuebles compactos",
+                    "Historial completo de inmuebles, contratos y reajustes"
                 ],
-                "footer": "Aquí, las propiedades dejan de ser una “caja negra” y pasan a ser activos monitoreados con datos."
+                "footer": "Aquí, los inmuebles dejan de ser una “caja negra” y pasan a ser activos monitoreados, analizados y comparables."
             },
             {
                 "title": "Inteligencia de mercado para decidir mejor",
-                "description": "Kitnets.com utiliza datos reales del mercado para generar insights como:",
+                "description": "La plataforma transforma datos reales en insights accionables:",
                 "items": [
                     "Rangos de precios por barrio y ciudad",
                     "Tendencias de alquiler y demanda",
-                    "Comparativos regionales",
-                    "Apoyo en la decisión de nuevas inversiones"
+                    "Comparativas regionales",
+                    "Apoyo en la decisión para nuevas inversiones"
                 ],
-                "footer": "Ideal para quien quiere invertir, expandir o cambiar de ciudad con más seguridad."
+                "footer": "Ideal para quienes invierten, expanden portafolio o cambian de ciudad con más seguridad."
             },
             {
-                "title": "Una plataforma para todos los involucrados",
-                "description": "En Kitnets.com:",
+                "title": "Un ecosistema conectado",
+                "description": "Kitnets.com conecta a todos los involucrados:",
                 "items": [
-                    "Los residentes reciben alertas, siguen el mercado y abren solicitudes de mantenimiento",
-                    "Los propietarios siguen el rendimiento, los contratos y la rentabilidad",
-                    "Los corredores e inmobiliarias escalan su operación con menos costos",
-                    "Las constructoras validan la demanda y encuentran a los inversores adecuados"
+                    "Residentes reciben alertas, siguen el mercado y abren solicitudes",
+                    "Propietarios monitorean contratos, rentabilidad y rendimiento",
+                    "Corredores e inmobiliarias escalan operaciones con menos costo y más control",
+                    "Constructoras validan demanda y encuentran inversores"
                 ],
-                "footer": "Todos conectados, con datos consistentes y procesos claros."
+                "footer": "Todos operando sobre la misma base de datos, con procesos claros y rastreables."
             },
             {
                 "title": "Creado para la era de la Inteligencia Artificial",
-                "description": "Kitnets.com fue diseñado desde el principio para la era de la IA, con:",
+                "description": "Kitnets.com fue arquitectado desde el inicio para la era de la IA:",
                 "items": [
-                    "Datos estructurados",
-                    "Automatización de procesos",
-                    "Base para agentes inteligentes e informes avanzados",
-                    "Preparación para el futuro del mercado inmobiliario"
+                    "Datos estructurados y estandarizados",
+                    "Automatización de procesos operativos",
+                    "Base para agentes inteligentes, informes avanzados y análisis predictivos",
+                    "Infraestructura lista para el futuro del mercado inmobiliario"
                 ],
-                "footer": "No es solo un sitio de propiedades. Es una infraestructura digital para el mercado de propiedades compactas."
+                "footer": "No es solo un sitio de inmuebles. Es la plataforma de inteligencia para el mercado de inmuebles compactos."
             },
             {
-                "title": "Kitnets.com es para usted si:",
+                "title": "Kitnets.com es para ti si:",
                 "items": [
-                    "Busca un kitnet o estudio",
-                    "Quiere anunciar propiedades con más eficiencia",
-                    "Desea gestionar alquileres de forma profesional",
-                    "Busca datos reales para invertir mejor",
-                    "Quiere salir de las hojas de cálculo y la improvisación"
+                    "Buscas una kitnet o studio con eficiencia",
+                    "Quieres anunciar y operar inmuebles de forma profesional",
+                    "Deseas salir de las hojas de cálculo y del control manual",
+                    "Buscas datos reales para invertir mejor",
+                    "Quieres gestión, automatización e inteligencia en un solo lugar"
                 ]
             }
         ],
         "finalCta": {
             "title": "Encuentra. Anuncia. Gestiona. Decide con datos.",
-            "subtitle": "Kitnets.com es el nuevo estándar para el mercado de kitnets y propiedades compactas en Brasil."
+            "subtitle": "Kitnets.com — el nuevo estándar para la gestión de kitnets y studios en Brasil."
         }
     },
     "rentPage": {
