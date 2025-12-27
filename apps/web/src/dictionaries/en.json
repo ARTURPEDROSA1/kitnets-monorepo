@@ -840,5 +840,59 @@
         "validation": {
             "inflationError": "Inflation cannot be higher than nominal return."
         }
+    },
+    "indices": {
+        "ipca": {
+            "title": "IPCA – Broad National Consumer Price Index | Complete History and Analysis",
+            "description": "The IPCA (Broad National Consumer Price Index) is Brazil's main official inflation indicator, calculated and released monthly by IBGE. It measures the price variation of goods and services consumed by Brazilian families and is widely used as a reference for monetary policy, contract adjustments, rents, salaries, benefits, investments, and long-term economic analysis.",
+            "pageDescription": "On this page of Kitnets.com, you can follow the complete history of IPCA from January 1995 to the current date, with reliable, organized, and easy-to-analyze data.",
+            "sections": [
+                {
+                    "title": "What you find on this page",
+                    "items": [
+                        {
+                            "title": "Monthly IPCA variation",
+                            "text": "Track how much inflation has varied each month over the years."
+                        },
+                        {
+                            "title": "IPCA accumulated in 12 months",
+                            "text": "Essential indicator for rent adjustments, contracts, and value corrections."
+                        },
+                        {
+                            "title": "Interactive historical chart",
+                            "text": "Visualize the evolution of Brazilian inflation over time and identify economic cycles, periods of high inflation, and slowdowns."
+                        },
+                        {
+                            "title": "Monthly heatmap",
+                            "text": "Visual analysis showing IPCA behavior month by month, facilitating comparison between years and identification of seasonal patterns."
+                        },
+                        {
+                            "title": "Detailed historical data table",
+                            "text": "Month-by-month values, with monthly index and 12-month accumulated, ideal for studies, simulations, and financial analysis."
+                        },
+                        {
+                            "title": "Custom period filter",
+                            "text": "Consult any date range between 01/01/1995 and the most recent month available, allowing for complete historical analyses or focus on specific periods."
+                        }
+                    ]
+                },
+                {
+                    "title": "Why is IPCA important for the real estate market?",
+                    "text": "IPCA is one of the main indices used as a basis for rent adjustments, especially in contracts seeking to preserve purchasing power over time. For owners, investors, and tenants, following IPCA helps to:",
+                    "list": [
+                        "Understand the loss or preservation of purchasing power",
+                        "Evaluate if an adjustment is fair and aligned with inflation",
+                        "Compare IPCA with other indices like IGP-M, INPC, and IVAR",
+                        "Make more informed decisions about real estate investments"
+                    ]
+                },
+                {
+                    "title": "Official source and reliable data",
+                    "text": "All data presented on this page is sourced from IBGE, ensuring credibility, precision, and constant updates."
+                }
+            ],
+            "closing": "Kitnets.com offers clear and accessible tools for anyone wanting to understand the real economy, protect their assets from inflation, and make better decisions in the Brazilian real estate market.",
+            "cta": "Follow the IPCA, compare periods, analyze trends, and use inflation to your advantage."
+        }
     }
 }
