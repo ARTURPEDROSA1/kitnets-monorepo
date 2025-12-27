@@ -21,6 +21,7 @@ const staticRoutes = [
     'indices/panorama',
     'lancamentos',
     'links-uteis',
+    'lista-vip',
     'login',
     'login/construtora',
     'login/corretor',
