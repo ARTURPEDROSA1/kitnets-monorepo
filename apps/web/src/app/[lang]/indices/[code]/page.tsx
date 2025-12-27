@@ -1,9 +1,11 @@
 
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { getIndexMetadata, getIndexValues, getAllIndexes } from '@/lib/indexes';
+import { getIndexMetadata, getIndexValuesByDateRange, getAllIndexes } from '@/lib/indexes';
+import { getDictionary } from '../../../../dictionaries';
 import { IndexChart } from '@/components/indices/IndexChart';
 import { IndexHeatmap } from '@/components/indices/IndexHeatmap';
+import { IndexDateFilter } from '@/components/indices/IndexDateFilter';
 import Link from 'next/link';
 
 import { ArrowLeft } from 'lucide-react';
@@ -13,6 +15,7 @@ interface Props {
         lang: string;
         code: string;
     }>;
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 // Revalidate every hour
@@ -35,9 +38,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         };
     }
 
+    const dict = getDictionary(lang as "pt" | "en" | "es");
+    const indexContent = (dict as any).indices?.[code.toLowerCase()];
+
+    const title = indexContent?.title || `Índice ${metadata.code} - Histórico, Tabela e Gráfico 2025 | Kitnets`;
+    const description = indexContent?.description || `Acompanhe a variação do ${metadata.code} (${metadata.name}). Tabela histórica completa dos últimos meses, gráfico de evolução e acumulado de 12 meses.`;
+
     return {
-        title: `Índice ${metadata.code} - Histórico, Tabela e Gráfico 2025 | Kitnets`,
-        description: `Acompanhe a variação do ${metadata.code} (${metadata.name}). Tabela histórica completa dos últimos meses, gráfico de evolução e acumulado de 12 meses.`,
+        title,
+        description,
         keywords: [metadata.code, metadata.name, 'índice econômico', 'inflação', 'reajuste aluguel', 'brasil', 'economia', 'histórico', 'tabela', 'gráfico'],
         authors: [{ name: 'Kitnets.com' }],
         applicationName: 'Kitnets',
@@ -50,8 +59,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
             },
         },
         openGraph: {
-            title: `Índice ${metadata.code} - Histórico e Gráfico`,
-            description: `Tabela completa e atualizada do índice ${metadata.code} (${metadata.name}).`,
+            title,
+            description,
             type: 'article',
             siteName: 'Kitnets',
             locale: lang,
@@ -59,23 +68,30 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         },
         twitter: {
             card: 'summary_large_image',
-            title: `Índice ${metadata.code} - Histórico e Gráfico`,
-            description: `Acompanhe a variação do ${metadata.code}. Dados atualizados mensalmente.`,
+            title,
+            description,
         }
     };
 }
 
-export default async function IndexPage({ params }: Props) {
+export default async function IndexPage({ params, searchParams }: Props) {
     const { code: codeParam, lang } = await params;
+    const { startDate, endDate } = await searchParams;
     const code = codeParam.toUpperCase();
+
+    const dict = getDictionary(lang as "pt" | "en" | "es");
+    const indexContent = (dict as any).indices?.[code.toLowerCase()];
 
     const metadata = await getIndexMetadata(code);
     if (!metadata) {
         notFound();
     }
 
-    // Fetch last 60 months (5 years) to populate heatmap with decent history
-    const history = await getIndexValues(metadata.id, 60);
+    const startDateStr = typeof startDate === 'string' ? startDate : undefined;
+    const endDateStr = typeof endDate === 'string' ? endDate : undefined;
+
+    // Fetch history based on date range or default to recent
+    const history = await getIndexValuesByDateRange(metadata.id, startDateStr, endDateStr);
     const latest = history[0];
 
     // Schema.org Structured Data - Dataset
@@ -130,24 +146,25 @@ export default async function IndexPage({ params }: Props) {
                 </div>
             </Link>
 
-            <div className="grid gap-3 md:grid-cols-3 md:gap-6">
-                {/* Header Section */}
-                <div className="md:col-span-3 space-y-2 md:space-y-4">
-                    <div className="flex flex-wrap items-center gap-2 md:gap-3">
-                        <h1 className="text-2xl md:text-4xl font-bold tracking-tight">{metadata.code}</h1>
-                        <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${metadata.is_official ? 'border-transparent bg-primary text-primary-foreground hover:bg-primary/80' : 'border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}>
-                            {metadata.is_official ? 'Oficial' : 'Projeção'}
-                        </span>
-                        <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 text-foreground border-border">
-                            {metadata.category}
-                        </span>
-                    </div>
-                    <h2 className="text-xl text-muted-foreground">{metadata.name}</h2>
-                    <p className="max-w-3xl text-muted-foreground/80">
-                        Acompanhe a evolução do {metadata.code}, atualizado mensalmente.
-                        Fonte: <strong>{metadata.source}</strong>.
-                    </p>
+            {/* Header Section */}
+            <div className="space-y-4 mb-6 md:mb-8">
+                <div className="flex flex-wrap items-center gap-2 md:gap-3">
+                    <h1 className="text-2xl md:text-4xl font-bold tracking-tight">{metadata.code}</h1>
+                    <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${metadata.is_official ? 'border-transparent bg-primary text-primary-foreground hover:bg-primary/80' : 'border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}>
+                        {metadata.is_official ? 'Oficial' : 'Projeção'}
+                    </span>
+                    <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 text-foreground border-border">
+                        {metadata.category}
+                    </span>
                 </div>
+                <h2 className="text-xl text-muted-foreground">{metadata.name}</h2>
+                <p className="max-w-3xl text-muted-foreground/80">
+                    Acompanhe a evolução do {metadata.code}, atualizado mensalmente.
+                    Fonte: <strong>{metadata.source}</strong>.
+                </p>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-3 md:gap-6">
 
                 {/* Key Metrics Cards */}
                 <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-6">
@@ -194,12 +211,17 @@ export default async function IndexPage({ params }: Props) {
                     </div>
                 </div>
 
+                {/* Date Filter */}
+                <div className="md:col-span-3 min-w-0">
+                    <IndexDateFilter key={`${startDateStr || 'start'}-${endDateStr || 'end'}`} />
+                </div>
+
                 {/* Chart Section */}
                 <div className="md:col-span-3 min-w-0">
                     <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
                         <div className="flex flex-col space-y-1.5 p-3 md:p-6">
                             <h3 className="text-lg md:text-2xl font-semibold leading-none tracking-tight">Histórico de Variação (%)</h3>
-                            <p className="text-xs md:text-sm text-muted-foreground">Visualização gráfica da evolução do índice nos últimos 5 anos.</p>
+                            <p className="text-xs md:text-sm text-muted-foreground">Visualização gráfica da evolução do índice no período selecionado.</p>
                         </div>
                         <div className="p-3 md:p-6 pt-0">
                             <IndexChart data={history} indexCode={code} />
@@ -259,6 +281,66 @@ export default async function IndexPage({ params }: Props) {
                 </div>
             </div>
 
+            {/* Index Specific Content (SEO) */}
+            {
+                indexContent && (
+                    <article className="mt-12 md:mt-20 pt-8 border-t border-border space-y-8 md:space-y-12 max-w-4xl">
+                        <div className="space-y-4">
+                            <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">{indexContent.title}</h2>
+                            <p className="text-base md:text-lg text-muted-foreground leading-relaxed">
+                                {indexContent.description}
+                            </p>
+                            {indexContent.pageDescription && (
+                                <p className="text-base md:text-lg text-muted-foreground leading-relaxed">
+                                    {indexContent.pageDescription}
+                                </p>
+                            )}
+                        </div>
+
+                        {indexContent.sections && indexContent.sections.map((section: any, idx: number) => (
+                            <section key={idx} className="space-y-4 md:space-y-6">
+                                <h3 className="text-xl md:text-2xl font-semibold text-foreground">{section.title}</h3>
+
+                                {section.text && (
+                                    <p className="text-muted-foreground leading-relaxed">{section.text}</p>
+                                )}
+
+                                {section.items && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {section.items.map((item: any, itemIdx: number) => (
+                                            <div key={itemIdx} className="bg-card border rounded-lg p-4">
+                                                <h4 className="font-semibold text-foreground mb-1">{item.title}</h4>
+                                                <p className="text-sm text-muted-foreground">{item.text}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {section.list && (
+                                    <ul className="space-y-2">
+                                        {section.list.map((listItem: string, listIdx: number) => (
+                                            <li key={listIdx} className="flex items-start gap-2 text-muted-foreground">
+                                                <span className="mt-2 h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
+                                                <span>{listItem}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </section>
+                        ))}
+
+                        <div className="bg-muted/50 rounded-xl p-6 md:p-8 space-y-4">
+                            <p className="text-lg font-medium text-foreground">
+                                {indexContent.closing}
+                            </p>
+                            <p className="text-muted-foreground italic">
+                                {indexContent.cta}
+                            </p>
+                        </div>
+                    </article>
+                )
+            }
+
             <script
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -267,6 +349,6 @@ export default async function IndexPage({ params }: Props) {
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
             />
-        </div>
+        </div >
     );
 }

@@ -883,5 +883,59 @@
         "validation": {
             "inflationError": "La inflación no puede ser mayor que el retorno nominal."
         }
+    },
+    "indices": {
+        "ipca": {
+            "title": "IPCA – Índice Nacional de Precios al Consumidor Amplio | Historial Completo y Análisis",
+            "description": "El IPCA (Índice Nacional de Precios al Consumidor Amplio) es el principal indicador oficial de inflación de Brasil, calculado y divulgado mensualmente por el IBGE. Mide la variación de los precios de bienes y servicios consumidos por las familias brasileñas y es ampliamente utilizado como referencia para política monetaria, reajustes de contratos, alquileres, salarios, beneficios, inversiones y análisis económicos a largo plazo.",
+            "pageDescription": "En esta página de Kitnets.com, puede seguir el historial completo del IPCA desde enero de 1995 hasta la fecha actual, con datos confiables, organizados y fáciles de analizar.",
+            "sections": [
+                {
+                    "title": "Lo que encuentra en esta página",
+                    "items": [
+                        {
+                            "title": "Variación mensual del IPCA",
+                            "text": "Siga cuánto varió la inflación en cada mes a lo largo de los años."
+                        },
+                        {
+                            "title": "IPCA acumulado en 12 meses",
+                            "text": "Indicador esencial para reajustes de alquiler, contratos y corrección de valores."
+                        },
+                        {
+                            "title": "Gráfico histórico interactivo",
+                            "text": "Visualice la evolución de la inflación brasileña a lo largo del tiempo e identifique ciclos económicos, períodos de alza y de desaceleración."
+                        },
+                        {
+                            "title": "Mapa de calor mensual",
+                            "text": "Análisis visual que muestra el comportamiento del IPCA mes a mes, facilitando la comparación entre años y la identificación de patrones estacionales."
+                        },
+                        {
+                            "title": "Tabla de datos históricos detallada",
+                            "text": "Valores mes a mes, con índice mensual y acumulado en 12 meses, ideal para estudios, simulaciones y análisis financieros."
+                        },
+                        {
+                            "title": "Filtro por período personalizado",
+                            "text": "Consulte cualquier intervalo de fechas entre 01/01/1995 y el mes más reciente disponible, permitiendo análisis históricos completos o enfocados en períodos específicos."
+                        }
+                    ]
+                },
+                {
+                    "title": "¿Por qué el IPCA es importante para el mercado inmobiliario?",
+                    "text": "El IPCA es uno de los principales índices utilizados como base para reajuste de alquileres, especialmente en contratos que buscan preservar el poder adquisitivo a lo largo del tiempo. Para propietarios, inversores e inquilinos, seguir el IPCA ayuda a:",
+                    "list": [
+                        "Entender la pérdida o preservación del poder adquisitivo",
+                        "Evaluar si un reajuste es justo y alineado con la inflación",
+                        "Comparar el IPCA con otros índices como IGP-M, INPC e IVAR",
+                        "Tomar decisiones más informadas sobre inversiones inmobiliarias"
+                    ]
+                },
+                {
+                    "title": "Fuente oficial y datos confiables",
+                    "text": "Todos los datos presentados en esta página tienen como fuente el IBGE, garantizando credibilidad, precisión y actualización constante."
+                }
+            ],
+            "closing": "Kitnets.com ofrece herramientas claras y accesibles para quien desea entender la economía real, proteger su patrimonio de la inflación y tomar mejores decisiones en el mercado inmobiliario brasileño.",
+            "cta": "Siga el IPCA, compare períodos, analice tendencias y use la inflación a su favor."
+        }
     }
 }

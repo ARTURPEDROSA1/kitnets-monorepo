@@ -40,13 +40,20 @@ export function IndexHeatmap({ data }: Props) {
     }, [data]);
 
     const getColors = (value: number) => {
-        // Simple color scale for monthly variation
-        if (value >= 1.0) return 'bg-emerald-600 text-white';
-        if (value >= 0.5) return 'bg-emerald-500 text-white';
-        if (value > 0) return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-300';
-        if (value === 0) return 'bg-muted text-muted-foreground';
-        if (value > -0.5) return 'bg-red-100 text-red-900 dark:bg-red-900/40 dark:text-red-300';
-        return 'bg-red-500 text-white';
+        // Option A — Diverging (Professional, neutral)
+        // Strong deflation: emerald-500 (< -0.5%)
+        // Mild deflation: emerald-200 (-0.1% to -0.5%)
+        // Near zero: gray-100 / muted (-0.1% to +0.1%)
+        // Moderate inflation: amber-200 (0.1% to 0.5%)
+        // High inflation: red-400 (> 0.5%)
+
+        if (value < -0.5) return 'bg-emerald-500 text-white';
+        if (value < -0.1) return 'bg-emerald-200 text-emerald-900 dark:bg-emerald-900/60 dark:text-emerald-300';
+        if (value >= -0.1 && value <= 0.1) return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
+        if (value > 0.5) return 'bg-red-400 text-white dark:bg-red-600';
+        if (value > 0.1) return 'bg-amber-200 text-amber-900 dark:bg-amber-900/60 dark:text-amber-300';
+
+        return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'; // Fallback for edge cases
     };
 
     const formatValue = (val: number | undefined) => {

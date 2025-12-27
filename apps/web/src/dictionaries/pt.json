@@ -1252,5 +1252,59 @@
         "validation": {
             "inflationError": "A inflação não pode ser maior que o retorno nominal."
         }
+    },
+    "indices": {
+        "ipca": {
+            "title": "IPCA – Índice Nacional de Preços ao Consumidor Amplo | Histórico Completo e Análise",
+            "description": "O IPCA (Índice Nacional de Preços ao Consumidor Amplo) é o principal indicador oficial de inflação do Brasil, calculado e divulgado mensalmente pelo IBGE. Ele mede a variação dos preços de bens e serviços consumidos pelas famílias brasileiras e é amplamente utilizado como referência para política monetária, reajustes de contratos, aluguéis, salários, benefícios, investimentos e análises econômicas de longo prazo.",
+            "pageDescription": "Nesta página do Kitnets.com, você pode acompanhar o histórico completo do IPCA desde janeiro de 1995 até a data atual, com dados confiáveis, organizados e fáceis de analisar.",
+            "sections": [
+                {
+                    "title": "O que você encontra nesta página",
+                    "items": [
+                        {
+                            "title": "Variação mensal do IPCA",
+                            "text": "Acompanhe quanto a inflação variou em cada mês ao longo dos anos."
+                        },
+                        {
+                            "title": "IPCA acumulado em 12 meses",
+                            "text": "Indicador essencial para reajustes de aluguel, contratos e correção de valores."
+                        },
+                        {
+                            "title": "Gráfico histórico interativo",
+                            "text": "Visualize a evolução da inflação brasileira ao longo do tempo e identifique ciclos econômicos, períodos de alta e de desaceleração."
+                        },
+                        {
+                            "title": "Mapa de calor mensal",
+                            "text": "Análise visual que mostra o comportamento do IPCA mês a mês, facilitando a comparação entre anos e a identificação de padrões sazonais."
+                        },
+                        {
+                            "title": "Tabela de dados históricos detalhada",
+                            "text": "Valores mês a mês, com índice mensal e acumulado em 12 meses, ideal para estudos, simulações e análises financeiras."
+                        },
+                        {
+                            "title": "Filtro por período personalizado",
+                            "text": "Consulte qualquer intervalo de datas entre 01/01/1995 e o mês mais recente disponível, permitindo análises históricas completas ou focadas em períodos específicos."
+                        }
+                    ]
+                },
+                {
+                    "title": "Por que o IPCA é importante para o mercado imobiliário?",
+                    "text": "O IPCA é um dos principais índices utilizados como base para reajuste de aluguéis, especialmente em contratos que buscam preservar o poder de compra ao longo do tempo. Para proprietários, investidores e inquilinos, acompanhar o IPCA ajuda a:",
+                    "list": [
+                        "Entender a perda ou preservação do poder de compra",
+                        "Avaliar se um reajuste é justo e alinhado à inflação",
+                        "Comparar o IPCA com outros índices como IGP-M, INPC e IVAR",
+                        "Tomar decisões mais informadas sobre investimentos imobiliários"
+                    ]
+                },
+                {
+                    "title": "Fonte oficial e dados confiáveis",
+                    "text": "Todos os dados apresentados nesta página têm como fonte o IBGE, garantindo credibilidade, precisão e atualização constante."
+                }
+            ],
+            "closing": "Kitnets.com oferece ferramentas claras e acessíveis para quem deseja entender a economia real, proteger seu patrimônio da inflação e tomar decisões melhores no mercado imobiliário brasileiro.",
+            "cta": "Acompanhe o IPCA, compare períodos, analise tendências e use a inflação a seu favor."
+        }
     }
 }

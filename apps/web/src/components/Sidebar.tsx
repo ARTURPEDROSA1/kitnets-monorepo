@@ -86,10 +86,14 @@ export function Sidebar({ lang }: { lang: string }) {
 
     const toggleCalculatorsMenu = () => {
         setSidebarView('calculators-menu');
+        const path = lang === 'pt' ? '/calculadoras/renda-aluguel' : `/${lang}/calculadoras/renda-aluguel`;
+        router.push(path);
     };
 
     const toggleIndicesMenu = () => {
         setSidebarView('indices-menu');
+        const path = lang === 'pt' ? '/indices/panorama' : `/${lang}/indices/panorama`;
+        router.push(path);
     };
 
     const backToMain = () => {
