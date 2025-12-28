@@ -50,14 +50,14 @@ export function WaitlistProvider({ children }: { children: ReactNode }) {
     const nextStep = () => {
         if (currentStep < WAITLIST_STEPS.length - 1) {
             setCurrentStep((prev) => prev + 1);
-            window.scrollTo(0, 0);
+            if (typeof window !== 'undefined') window.scrollTo(0, 0);
         }
     };
 
     const prevStep = () => {
         if (currentStep > 0) {
             setCurrentStep((prev) => prev - 1);
-            window.scrollTo(0, 0);
+            if (typeof window !== 'undefined') window.scrollTo(0, 0);
         }
     };
 
@@ -65,7 +65,7 @@ export function WaitlistProvider({ children }: { children: ReactNode }) {
         const index = WAITLIST_STEPS.indexOf(stepId);
         if (index !== -1) {
             setCurrentStep(index);
-            window.scrollTo(0, 0);
+            if (typeof window !== 'undefined') window.scrollTo(0, 0);
         }
     };
 
