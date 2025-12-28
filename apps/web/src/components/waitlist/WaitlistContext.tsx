@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
 import { WaitlistData, WaitlistStepId, WAITLIST_STEPS } from "./types";
 
 interface WaitlistState {
@@ -29,7 +30,17 @@ const initialData: WaitlistData = {
 };
 
 export function WaitlistProvider({ children }: { children: ReactNode }) {
-    const [currentStep, setCurrentStep] = useState(0);
+    const searchParams = useSearchParams();
+    const initialStepParam = searchParams.get("step");
+
+    const getInitialStep = () => {
+        if (initialStepParam && WAITLIST_STEPS.includes(initialStepParam as WaitlistStepId)) {
+            return WAITLIST_STEPS.indexOf(initialStepParam as WaitlistStepId);
+        }
+        return 1;
+    };
+
+    const [currentStep, setCurrentStep] = useState(getInitialStep);
     const [data, setData] = useState<WaitlistData>(initialData);
 
     const updateData = (newData: Partial<WaitlistData>) => {

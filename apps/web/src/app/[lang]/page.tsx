@@ -47,9 +47,9 @@ export default async function Home({ params }: { params: Promise<{ lang: "en" | 
 
                 {FLAGS.SHOW_HOME_CTA && (
                     <div className="mt-10 animate-in fade-in zoom-in duration-1000 delay-300">
-                        <Link href={lang === 'pt' ? '/onboarding' : `/${lang}/onboarding`}>
-                            <Button size="lg" className="h-14 rounded-full px-10 text-xl font-semibold shadow-lg shadow-primary/25 transition-transform hover:scale-105 hover:shadow-xl">
-                                {dict.home.cta}
+                        <Link href={lang === 'pt' ? '/lista-vip' : `/${lang}/lista-vip`}>
+                            <Button size="lg" className="h-14 rounded-full px-10 text-xl font-semibold shadow-xl shadow-emerald-500/20 hover:shadow-emerald-500/40 transition-transform hover:scale-105 bg-emerald-600 hover:bg-emerald-700 text-white border-0">
+                                {dict.homeContent.finalCta.buttonLabel}
                             </Button>
                         </Link>
                     </div>
@@ -116,23 +116,65 @@ export default async function Home({ params }: { params: Promise<{ lang: "en" | 
                     </div>
 
                     {/* Final CTA */}
-                    <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-b from-muted/50 to-background border border-border p-12 md:p-24 text-center space-y-10 shadow-2xl">
+                    <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-b from-muted/50 to-background border border-border p-8 md:p-16 lg:p-24 text-center space-y-12 shadow-2xl">
                         <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))]" />
 
-                        <div className="relative z-10 space-y-6">
-                            <h2 className="text-3xl md:text-5xl font-extrabold text-foreground tracking-tight">
+                        <div className="relative z-10 space-y-10 max-w-4xl mx-auto">
+                            <h2 className="text-3xl md:text-5xl font-extrabold text-foreground tracking-tight leading-tight">
                                 {dict.homeContent.finalCta.title}
                             </h2>
-                            <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto font-light">
-                                {dict.homeContent.finalCta.subtitle}
-                            </p>
+
+                            <div className="space-y-6 text-lg md:text-xl text-muted-foreground leading-relaxed">
+                                <p className="font-medium text-primary text-xl md:text-2xl">
+                                    {dict.homeContent.finalCta.status}
+                                </p>
+                                <p>
+                                    {dict.homeContent.finalCta.description}
+                                </p>
+                            </div>
+
+                            <div className="bg-card/40 backdrop-blur-sm rounded-2xl p-8 border border-border/50 text-left space-y-6">
+                                <p className="text-xl font-bold text-foreground">
+                                    {dict.homeContent.finalCta.listTitle}
+                                </p>
+                                <ul className="space-y-4">
+                                    {dict.homeContent.finalCta.benefits.map((benefit: string, i: number) => (
+                                        <li key={i} className="flex items-start gap-3">
+                                            <div className="mt-1 h-5 w-5 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 text-primary">
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                                                    <polyline points="20 6 9 17 4 12" />
+                                                </svg>
+                                            </div>
+                                            <span className="text-foreground/90 text-lg">{benefit}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+
+                            <div className="space-y-6">
+                                <p className="text-lg md:text-xl text-muted-foreground leading-relaxed">
+                                    {dict.homeContent.finalCta.closing}
+                                </p>
+                                <h3 className="text-2xl md:text-3xl font-bold text-foreground">
+                                    {dict.homeContent.finalCta.callToAction}
+                                </h3>
+                            </div>
+
                             {FLAGS.SHOW_HOME_CTA && (
-                                <div className="pt-8">
-                                    <Link href={lang === 'pt' ? '/onboarding' : `/${lang}/onboarding`}>
-                                        <Button size="lg" className="h-16 px-12 text-xl rounded-full shadow-xl shadow-primary/20 hover:shadow-primary/40 hover:scale-105 transition-all">
-                                            {dict.home.cta}
-                                        </Button>
-                                    </Link>
+                                <div className="pt-4 space-y-6">
+                                    <div className="flex flex-col items-center gap-3">
+                                        <p className="text-base text-muted-foreground font-medium">
+                                            {dict.homeContent.finalCta.subText1}
+                                        </p>
+                                        <Link href={lang === 'pt' ? '/lista-vip' : `/${lang}/lista-vip`}>
+                                            <Button size="lg" className="h-14 px-10 text-lg rounded-full shadow-xl shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:scale-105 transition-all bg-emerald-600 hover:bg-emerald-700 text-white border-0">
+                                                {dict.homeContent.finalCta.buttonLabel}
+                                            </Button>
+                                        </Link>
+                                        <p className="text-sm text-balance text-muted-foreground max-w-lg mx-auto">
+                                            {dict.homeContent.finalCta.subText2}
+                                        </p>
+                                    </div>
                                 </div>
                             )}
                         </div>

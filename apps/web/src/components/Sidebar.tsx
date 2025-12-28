@@ -124,6 +124,7 @@ export function Sidebar({ lang }: { lang: string }) {
                             alt="Kitnets Logo"
                             fill
                             className="object-contain"
+                            sizes="32px"
                         />
                     </div>
                     <span className="text-lg font-bold text-foreground">
@@ -157,6 +158,7 @@ export function Sidebar({ lang }: { lang: string }) {
                                     width={32}
                                     height={32}
                                     className="h-8 w-8 me-3"
+                                    sizes="32px"
                                 />
                                 <span className="whitespace-nowrap text-xl font-semibold text-foreground leading-none">
                                     Kitnets.com

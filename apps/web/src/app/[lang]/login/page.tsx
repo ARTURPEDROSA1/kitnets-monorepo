@@ -3,7 +3,28 @@ import { Button } from "@kitnets/ui";
 import { getDictionary } from "../../../dictionaries";
 import LoginForm from "./LoginForm";
 
+
+import { Metadata } from "next";
+
+export async function generateMetadata({ params }: { params: Promise<{ lang: "en" | "pt" | "es" }> }): Promise<Metadata> {
+    const { lang } = await params;
+    const dict = getDictionary(lang);
+
+    return {
+        title: `${dict.residentLogin.title} | Kitnets.com`,
+        description: dict.residentLogin.subtitle,
+        alternates: {
+            canonical: `/${lang}/login`,
+        },
+        robots: {
+            index: true,
+            follow: true,
+        }
+    };
+}
+
 export default async function LoginPage({ params }: { params: Promise<{ lang: "en" | "pt" | "es" }> }) {
+
     const { lang } = await params;
     const dict = getDictionary(lang);
 

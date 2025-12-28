@@ -8,6 +8,7 @@ import { IndexDateFilter } from '@/components/indices/IndexDateFilter';
 import { IndexHistoryTable } from '@/components/indices/IndexHistoryTable';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import { Button } from "@/components/ui/button";
 
 interface Props {
     params: Promise<{
@@ -46,7 +47,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     return {
         title,
         description,
-        keywords: [metadata.code, metadata.name, 'índice econômico', 'inflação', 'reajuste aluguel', 'brasil', 'economia', 'histórico', 'tabela', 'gráfico'],
+        keywords: indexContent?.keywords || [metadata.code, metadata.name, 'índice econômico', 'inflação', 'reajuste aluguel', 'brasil', 'economia', 'histórico', 'tabela', 'gráfico'],
         authors: [{ name: 'Kitnets.com' }],
         applicationName: 'Kitnets',
         alternates: {
@@ -157,7 +158,21 @@ export default async function IndexPage({ params, searchParams }: Props) {
                         {metadata.is_official ? 'Oficial' : 'Projeção'}
                     </span>
                     <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 text-foreground border-border">
-                        {metadata.category}
+                        {(() => {
+                            const translations: Record<string, Record<string, string>> = {
+                                'rent': {
+                                    'pt': 'Aluguel',
+                                    'en': 'Rent',
+                                    'es': 'Alquiler'
+                                },
+                                'inflation': {
+                                    'pt': 'Inflação',
+                                    'en': 'Inflation',
+                                    'es': 'Inflación'
+                                }
+                            };
+                            return translations[metadata.category]?.[lang] || metadata.category;
+                        })()}
                     </span>
                 </div>
                 <h2 className="text-xl text-muted-foreground">{metadata.name}</h2>
@@ -245,6 +260,10 @@ export default async function IndexPage({ params, searchParams }: Props) {
                                     if (code === 'IGPM') {
                                         const date = new Date(nextRefYear, nextRefMonth - 1, 29);
                                         return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+                                    }
+
+                                    if (code === 'IVAR') {
+                                        return '07 de jan';
                                     }
 
                                     // Default (IPCA, etc) - Release happens month after Ref
@@ -385,6 +404,26 @@ export default async function IndexPage({ params, searchParams }: Props) {
                     </article>
                 )
             }
+
+            {/* Authority CTA */}
+            <div className="mt-20 w-full text-center space-y-8 bg-muted/30 p-8 md:p-12 rounded-[2.5rem] border relative overflow-hidden">
+                <div className="absolute inset-0 bg-grid-black/5 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.5))]" />
+                <div className="relative z-10 space-y-6 max-w-2xl mx-auto">
+                    <h3 className="text-3xl md:text-3xl font-bold tracking-tight whitespace-pre-line text-foreground">
+                        {(dict as any).indicesCta?.title}
+                    </h3>
+                    <p className="text-lg text-muted-foreground leading-relaxed whitespace-pre-line">
+                        {(dict as any).indicesCta?.description}
+                    </p>
+                    <div className="pt-4 flex flex-col items-center gap-3">
+                        <Link href={`/${lang}/lista-vip?step=landing`}>
+                            <Button size="lg" className="h-14 px-8 text-lg rounded-full font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xl shadow-emerald-500/20 hover:scale-105 transition-all border-0">
+                                {(dict as any).indicesCta?.button}
+                            </Button>
+                        </Link>
+                    </div>
+                </div>
+            </div>
 
             <script
                 type="application/ld+json"

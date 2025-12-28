@@ -5,6 +5,8 @@ import { FaqSection } from './components/FaqSection';
 import { AskForm } from './components/AskForm';
 import { ContactForm } from './components/ContactForm';
 import { faqData } from './faq-data';
+import { getDictionary } from '../../../dictionaries';
+import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
     title: 'Perguntas Frequentes - Kitnets.com',
@@ -13,6 +15,7 @@ export const metadata: Metadata = {
 
 export default async function FaqPage({ params }: { params: Promise<{ lang: string }> }) {
     const { lang } = await params;
+    const dict = getDictionary(lang);
     // Generate JSON-LD for SEO
     const jsonLd = {
         '@context': 'https://schema.org',
@@ -63,19 +66,26 @@ export default async function FaqPage({ params }: { params: Promise<{ lang: stri
                 </div>
 
                 {/* Final CTA */}
-                <div className="mt-20 text-center py-10 px-6 bg-muted/40 rounded-2xl w-full">
-                    <h2 className="text-2xl font-bold text-foreground mb-2">
-                        Pronto para usar a Kitnets.com?
-                    </h2>
-                    <p className="text-muted-foreground mb-6">
-                        Crie sua conta e comece agora.
-                    </p>
-                    <Link
-                        href={`/${lang}`}
-                        className="inline-flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-full text-white bg-emerald-600 hover:bg-emerald-700 md:text-lg transition-transform hover:scale-105 shadow-lg shadow-emerald-600/20"
-                    >
-                        Começar agora
-                    </Link>
+                <div className="mt-20 w-full text-center space-y-8 bg-muted/30 p-8 md:p-12 rounded-[2.5rem] border relative overflow-hidden">
+                    <div className="absolute inset-0 bg-grid-black/5 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.5))]" />
+                    <div className="relative z-10 space-y-6 max-w-2xl mx-auto">
+                        <h3 className="text-3xl md:text-3xl font-bold tracking-tight whitespace-pre-line text-foreground">
+                            {(dict as any).calculatorCtaStandard?.title}
+                        </h3>
+                        <p className="text-lg text-muted-foreground leading-relaxed whitespace-pre-line">
+                            {(dict as any).calculatorCtaStandard?.description}
+                        </p>
+                        <div className="pt-4 flex flex-col items-center gap-3">
+                            <Link href={`/${lang}/lista-vip?step=landing`}>
+                                <Button size="lg" className="h-14 px-8 text-lg rounded-full font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xl shadow-emerald-500/20 hover:scale-105 transition-all border-0">
+                                    {(dict as any).calculatorCtaStandard?.button}
+                                </Button>
+                            </Link>
+                            <p className="text-xs md:text-sm text-muted-foreground font-medium opacity-80">
+                                {(dict as any).calculatorCtaStandard?.microcopy}
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

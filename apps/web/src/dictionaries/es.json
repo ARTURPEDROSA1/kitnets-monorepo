@@ -208,8 +208,22 @@
             }
         ],
         "finalCta": {
-            "title": "Encuentra. Anuncia. Gestiona. Decide con datos.",
-            "subtitle": "Kitnets.com — el nuevo estándar para la gestión de kitnets y studios en Brasil."
+            "title": "Lleve la gestión de sus inmuebles al siguiente nivel",
+            "status": "El SaaS de gestión inteligente de Kitnets.com está en fase de lanzamiento.",
+            "description": "Estamos abriendo una lista de espera exclusiva para propietarios, holdings inmobiliarios, inversores e inmobiliarias que desean operar kitnets y studios con automatización, datos e inteligencia artificial desde el primer día.",
+            "listTitle": "Al unirse a la lista de espera, obtendrá:",
+            "benefits": [
+                "Acceso anticipado a la plataforma de gestión",
+                "Participación en el grupo de usuarios fundadores",
+                "Prioridad en la activación de funciones de IA",
+                "Condiciones comerciales diferenciadas en el lanzamiento",
+                "Influencia directa en el roadmap del producto"
+            ],
+            "closing": "Si administra uno o decenas de inmuebles, esta plataforma fue creada para reemplazar hojas de cálculo, reducir la fricción operativa y elevar el nivel de su gestión.",
+            "callToAction": "Empiece ahora. Sea uno de los primeros.",
+            "subText1": "Únase a la lista de espera del SaaS de Kitnets.com",
+            "subText2": "Y participe en la construcción de la nueva infraestructura digital para kitnets y studios en Brasil.",
+            "buttonLabel": "Unirse a la lista de espera"
         }
     },
     "rentPage": {
@@ -937,6 +951,432 @@
             ],
             "closing": "Kitnets.com ofrece herramientas claras y accesibles para quien desea entender la economía real, proteger su patrimonio de la inflación y tomar mejores decisiones en el mercado inmobiliario brasileño.",
             "cta": "Siga el IPCA, compare períodos, analice tendencias y use la inflación a su favor."
+        },
+        "ivar": {
+            "title": "IVAR – Índice de Variación de Alquileres Residenciales | Historial y Gráfico",
+            "description": "El IVAR (Índice de Variación de Alquileres Residenciales) es un indicador económico oficial creado para medir con precisión la variación de los precios de los alquileres residenciales en Brasil.",
+            "pageDescription": "Siga el IVAR actualizado, con serie histórica completa desde el inicio del índice, en 2019, además de gráficos, mapa de calor mensual y tabla detallada mes a mes.",
+            "keywords": [
+                "IVAR hoy",
+                "IVAR alquiler",
+                "índice de alquiler residencial",
+                "reajuste de alquiler",
+                "IVAR Brasil"
+            ],
+            "sections": [],
+            "closing": "Todo en un solo lugar.",
+            "cta": "Siga el IVAR actualizado."
         }
+    },
+    "calculatorCta": {
+        "title": "Simular es el primer paso.\nGestionar con datos es el siguiente.",
+        "description": "Kitnets.com transforma cálculos en gestión profesional de alquileres con Inteligencia Artificial.",
+        "text": "La mayoría de las simulaciones financieras ignoran la inflación. Esta no.",
+        "point1": "💡 Valores nominales muestran números mayores, pero engañan.",
+        "point2": "💡 Valores reales muestran el verdadero poder adquisitivo.",
+        "listTitle": "Esta calculadora deja claro:",
+        "items": [
+            "Cuánto del crecimiento es real",
+            "Cuánto es solo inflación",
+            "Cuánto queda después de impuestos"
+        ],
+        "footer": "Sin marketing financiero. Sin promesas vacías."
+    },
+    "marketRole": {
+        "title": "FIRE con Realismo: el papel del mercado inmobiliario",
+        "text": "El movimiento FIRE (Financial Independence, Retire Early) ganó fuerza con inversiones financieras, pero los inversores más experimentados saben una verdad simple: El dinero puede imprimirse. Los inmuebles no.",
+        "whyRealEstate": {
+            "title": "¿Por qué los inmuebles — especialmente kitnets y studios — son un refugio seguro?",
+            "items": [
+                "🧱 El gobierno no puede “imprimir” terrenos, ladrillos o concreto",
+                "📈 El valor de los inmuebles tiende a ajustarse a la inflación a largo plazo",
+                "💰 Pequeños inmuebles frecuentemente ofrecen rentabilidad en torno al 1% mensual",
+                "🏠 Demanda estructural por vivienda compacta en grandes ciudades",
+                "🔁 Renta recurrente + valorización patrimonial"
+            ]
+        },
+        "comparison": {
+            "fixedIncome": {
+                "title": "Mientras la renta fija sufre con:",
+                "items": [
+                    "Inflación",
+                    "Cambios regulatorios",
+                    "Reglas tributarias inestables"
+                ]
+            },
+            "realEstate": {
+                "text": "El inmueble continúa allí. Físico. Tangible. Alquilable."
+            }
+        }
+    },
+    "wealthParking": {
+        "title": "Donde los grandes inversores realmente estacionan riqueza",
+        "text": "Muchos millonarios y multimillonarios construyeron fortuna en negocios, crecieron en el mercado financiero o innovaron en tecnología. Pero preservan riqueza en el mercado inmobiliario.",
+        "why": {
+            "title": "¿Por qué?",
+            "items": [
+                "Protegen contra ciclos políticos",
+                "Protegen contra devaluación monetaria",
+                "Protegen contra decisiones arbitrarias de gobiernos",
+                "Generan renta predecible",
+                "Atraviesan generaciones"
+            ]
+        }
+    },
+    "kitnets": {
+        "title": "Kitnets y studios: eficiencia, liquidez e resiliencia",
+        "text": "Los inmuebles compactos destacan porque:",
+        "items": [
+            "Tienen mayor liquidez",
+            "Menor ticket de entrada",
+            "Mejor relación alquiler/precio",
+            "Mayor diversificación con el mismo capital",
+            "Más resistencia en crisis"
+        ],
+        "footer": "No son solo una inversión. Son infraestructura básica de la sociedad urbana moderna."
+    },
+    "generationalWealth": {
+        "title": "Construyendo riqueza generacional",
+        "text": "La independencia financiera no es solo “dejar de trabajar”. Es Elección, Seguridad, Tiempo, Legado.",
+        "propertyRole": {
+            "title": "Un inmueble bien ubicado:",
+            "items": [
+                "Sustenta una familia",
+                "Genera renta por décadas",
+                "Puede ser heredado",
+                "Puede ser refinanciado",
+                "Puede ser vendido o adaptado"
+            ]
+        },
+        "conclusion": "📌 Es riqueza que atravessa generaciones."
+    },
+    "mindset": {
+        "title": "Use la calculadora con esta mentalidad",
+        "text": "Esta calculadora no existe para vender ilusiones financieras. Existe para mostrar, con claridad:",
+        "items": [
+            "Qué es crecimiento real",
+            "El impacto de la inflación",
+            "El peso de los impuestos",
+            "La diferencia entre renta temporal y perpetua",
+            "Cómo el patrimonio se comporta en el tiempo"
+        ],
+        "finalQuestion": "¿Estoy construyendo riqueza de verdad o solo números en la pantalla?"
+    },
+    "results": {
+        "accumulationSummary": "Resumen de Acumulación",
+        "totalAccumulated": "Patrimonio Total Acumulado (Real)",
+        "totalContributed": "Total Aportado (Principal)",
+        "unrealizedGains": "Ganancias de Capital (Para Tributación)",
+        "wealthBuilding": "Construcción de Patrimonio",
+        "scenarioA": "Escenario A: Renta Finita (Agotamiento)",
+        "scenarioAPeriod": "Renta por {years} años hasta agotar el capital",
+        "scenarioB": "Escenario B: Renta Perpetua (Preservación)",
+        "scenarioBDesc": "Vive solo de los rendimientos reales, preservando el principal.",
+        "grossIncome": "Renta Bruta Mensual",
+        "taxPaid": "Impuesto de Renta Mensual",
+        "netIncome": "Renta Neta Mensual (Real)",
+        "purchasingPower": "Poder Adquisitivo Preservado",
+        "nominalWarning": "Valores nominales no consideran pérdida de poder adquisitivo."
+    },
+    "charts": {
+        "accumulationTitle": "Evolución Patrimonial",
+        "withdrawalTitle": "Fase de Disfrute",
+        "totalCapital": "Patrimonio Total",
+        "principal": "Aportes (Principal)",
+        "balance": "Saldo Restante",
+        "netIncome": "Renta Neta"
+    },
+    "tables": {
+        "year": "Año",
+        "initialCapital": "Capital Inicial",
+        "contributions": "Aportes",
+        "yield": "Rendimientos",
+        "finalCapital": "Capital Final",
+        "grossIncome": "Renta Bruta",
+        "tax": "Impuesto",
+        "netIncome": "Renta Neta"
+    },
+    "disclaimer": {
+        "title": "Nota Educativa",
+        "text": "Esta calculadora permite ver valores nominales y reales. Los valores reales representan el poder de compra de hoy, ajustado por inflación."
+    },
+    "tooltips": {
+        "inflation": "Esta calculadora ajusta todos los valores por inflación.",
+        "tax": "El impuesto se aplica solo sobre la ganancia de capital."
+    },
+    "validation": {
+        "inflationError": "La inflación no puede ser mayor que el retorno nominal."
     }
+},
+"indices": {
+    "ipca": {
+        "title": "IPCA – Índice Nacional de Precios al Consumidor Amplio | Historial Completo y Análisis",
+        "description": "El IPCA (Índice Nacional de Precios al Consumidor Amplio) es el principal indicador oficial de inflación de Brasil, calculado y divulgado mensualmente por el IBGE. Mide la variación de los precios de bienes y servicios consumidos por las familias brasileñas y es ampliamente utilizado como referencia para política monetaria, reajustes de contratos, alquileres, salarios, beneficios, inversiones y análisis económicos a largo plazo.",
+        "pageDescription": "En esta página de Kitnets.com, puede seguir el historial completo del IPCA desde enero de 1995 hasta la fecha actual, con datos confiables, organizados y fáciles de analizar.",
+        "sections": [
+            {
+                "title": "Lo que encuentra en esta página",
+                "items": [
+                    {
+                        "title": "Variación mensual del IPCA",
+                        "text": "Siga cuánto varió la inflación en cada mes a lo largo de los años."
+                    },
+                    {
+                        "title": "IPCA acumulado en 12 meses",
+                        "text": "Indicador esencial para reajustes de alquiler, contratos y corrección de valores."
+                    },
+                    {
+                        "title": "Gráfico histórico interactivo",
+                        "text": "Visualice la evolución de la inflación brasileña a lo largo del tiempo e identifique ciclos económicos, períodos de alza y de desaceleración."
+                    },
+                    {
+                        "title": "Mapa de calor mensual",
+                        "text": "Análisis visual que muestra el comportamiento del IPCA mes a mes, facilitando la comparación entre años y la identificación de patrones estacionales."
+                    },
+                    {
+                        "title": "Tabla de datos históricos detallada",
+                        "text": "Valores mes a mes, con índice mensual y acumulado en 12 meses, ideal para estudios, simulaciones y análisis financieros."
+                    },
+                    {
+                        "title": "Filtro por período personalizado",
+                        "text": "Consulte cualquier intervalo de fechas entre 01/01/1995 y el mes más reciente disponible, permitiendo análisis históricos completos o enfocados en períodos específicos."
+                    }
+                ]
+            },
+            {
+                "title": "¿Por qué el IPCA es importante para el mercado inmobiliario?",
+                "text": "El IPCA es uno de los principales índices utilizados como base para reajuste de alquileres, especialmente en contratos que buscan preservar el poder adquisitivo a lo largo del tiempo. Para propietarios, inversores e inquilinos, seguir el IPCA ayuda a:",
+                "list": [
+                    "Entender la pérdida o preservación del poder adquisitivo",
+                    "Evaluar si un reajuste es justo y alineado con la inflación",
+                    "Comparar el IPCA con otros índices como IGP-M, INPC e IVAR",
+                    "Tomar decisiones más informadas sobre inversiones inmobiliarias"
+                ]
+            },
+            {
+                "title": "Fuente oficial y datos confiables",
+                "text": "Todos los datos presentados en esta página tienen como fuente el IBGE, garantizando credibilidad, precisión y actualización constante."
+            }
+        ],
+        "closing": "Kitnets.com ofrece herramientas claras y accesibles para quien desea entender la economía real, proteger su patrimonio de la inflación y tomar mejores decisiones en el mercado inmobiliario brasileño.",
+        "cta": "Siga el IPCA, compare períodos, analice tendencias y use la inflación a su favor."
+    }
+},
+"calculatorCta": {
+    "title": "Simular es el primer paso.\nGestionar con datos es el siguiente.",
+    "description": "Kitnets.com transforma cálculos en gestión profesional de alquileres con Inteligencia Artificial.",
+    "button": "Conocer la plataforma"
+},
+```
+        "point1": "💡 Valores nominales muestran números mayores, pero engañan.",
+"point2": "💡 Valores reales muestran el verdadero poder adquisitivo.",
+"listTitle": "Esta calculadora deja claro:",
+"items": [
+    "Cuánto del crecimiento es real",
+    "Cuánto es solo inflación",
+    "Cuánto queda después de impuestos"
+],
+"footer": "Sin marketing financiero. Sin promesas vacías."
+},
+"marketRole": {
+"title": "FIRE con Realismo: el papel del mercado inmobiliario",
+"text": "El movimiento FIRE (Financial Independence, Retire Early) ganó fuerza con inversiones financieras, pero los inversores más experimentados saben una verdad simple: El dinero puede imprimirse. Los inmuebles no.",
+"whyRealEstate": {
+    "title": "¿Por qué los inmuebles — especialmente kitnets y studios — son un refugio seguro?",
+    "items": [
+        "🧱 El gobierno no puede “imprimir” terrenos, ladrillos o concreto",
+        "📈 El valor de los inmuebles tiende a ajustarse a la inflación a largo plazo",
+        "💰 Pequeños inmuebles frecuentemente ofrecen rentabilidad en torno al 1% mensual",
+        "🏠 Demanda estructural por vivienda compacta en grandes ciudades",
+        "🔁 Renta recurrente + valorización patrimonial"
+    ]
+},
+"comparison": {
+    "fixedIncome": {
+        "title": "Mientras la renta fija sufre con:",
+        "items": [
+            "Inflación",
+            "Cambios regulatorios",
+            "Reglas tributarias inestables"
+        ]
+    },
+    "realEstate": {
+        "text": "El inmueble continúa allí. Físico. Tangible. Alquilable."
+    }
+}
+},
+"wealthParking": {
+"title": "Donde los grandes inversores realmente estacionan riqueza",
+"text": "Muchos millonarios y multimillonarios construyeron fortuna en negocios, crecieron en el mercado financiero o innovaron en tecnología. Pero preservan riqueza en el mercado inmobiliario.",
+"why": {
+    "title": "¿Por qué?",
+    "items": [
+        "Protegen contra ciclos políticos",
+        "Protegen contra devaluación monetaria",
+        "Protegen contra decisiones arbitrarias de gobiernos",
+        "Generan renta predecible",
+        "Atraviesan generaciones"
+    ]
+}
+},
+"kitnets": {
+"title": "Kitnets y studios: eficiencia, liquidez e resiliencia",
+"text": "Los inmuebles compactos destacan porque:",
+"items": [
+    "Tienen mayor liquidez",
+    "Menor ticket de entrada",
+    "Mejor relación alquiler/precio",
+    "Mayor diversificación con el mismo capital",
+    "Más resistencia en crisis"
+],
+"footer": "No son solo una inversión. Son infraestructura básica de la sociedad urbana moderna."
+},
+"generationalWealth": {
+"title": "Construyendo riqueza generacional",
+"text": "La independencia financiera no es solo “dejar de trabajar”. Es Elección, Seguridad, Tiempo, Legado.",
+"propertyRole": {
+    "title": "Un inmueble bien ubicado:",
+    "items": [
+        "Sustenta una familia",
+        "Genera renta por décadas",
+        "Puede ser heredado",
+        "Puede ser refinanciado",
+        "Puede ser vendido o adaptado"
+    ]
+},
+"conclusion": "📌 Es riqueza que atravessa generaciones."
+},
+"mindset": {
+"title": "Use la calculadora con esta mentalidad",
+"text": "Esta calculadora no existe para vender ilusiones financieras. Existe para mostrar, con claridad:",
+"items": [
+    "Qué es crecimiento real",
+    "El impacto de la inflación",
+    "El peso de los impuestos",
+    "La diferencia entre renta temporal y perpetua",
+    "Cómo el patrimonio se comporta en el tiempo"
+],
+"finalQuestion": "¿Estoy construyendo riqueza de verdad o solo números en la pantalla?"
+},
+"results": {
+"accumulationSummary": "Resumen de Acumulación",
+"totalAccumulated": "Patrimonio Total Acumulado (Real)",
+"totalContributed": "Total Aportado (Principal)",
+"unrealizedGains": "Ganancias de Capital (Para Tributación)",
+"wealthBuilding": "Construcción de Patrimonio",
+"scenarioA": "Escenario A: Renta Finita (Agotamiento)",
+"scenarioAPeriod": "Renta por {years} años hasta agotar el capital",
+"scenarioB": "Escenario B: Renta Perpetua (Preservación)",
+"scenarioBDesc": "Vive solo de los rendimientos reales, preservando el principal.",
+"grossIncome": "Renta Bruta Mensual",
+"taxPaid": "Impuesto de Renta Mensual",
+"netIncome": "Renta Neta Mensual (Real)",
+"purchasingPower": "Poder Adquisitivo Preservado",
+"nominalWarning": "Valores nominales no consideran pérdida de poder adquisitivo."
+},
+"charts": {
+"accumulationTitle": "Evolución Patrimonial",
+"withdrawalTitle": "Fase de Disfrute",
+"totalCapital": "Patrimonio Total",
+"principal": "Aportes (Principal)",
+"balance": "Saldo Restante",
+"netIncome": "Renta Neta"
+},
+"tables": {
+"year": "Año",
+"initialCapital": "Capital Inicial",
+"contributions": "Aportes",
+"yield": "Rendimientos",
+"finalCapital": "Capital Final",
+"grossIncome": "Renta Bruta",
+"tax": "Impuesto",
+"netIncome": "Renta Neta"
+},
+"disclaimer": {
+"title": "Nota Educativa",
+"text": "Esta calculadora permite ver valores nominales y reales. Los valores reales representan el poder de compra de hoy, ajustado por inflación."
+},
+"tooltips": {
+"inflation": "Esta calculadora ajusta todos los valores por inflación.",
+"tax": "El impuesto se aplica solo sobre la ganancia de capital."
+},
+"validation": {
+"inflationError": "La inflación no puede ser mayor que el retorno nominal."
+}
+},
+"indices": {
+"ipca": {
+"title": "IPCA – Índice Nacional de Precios al Consumidor Amplio | Historial Completo y Análisis",
+"description": "El IPCA (Índice Nacional de Precios al Consumidor Amplio) es el principal indicador oficial de inflación de Brasil, calculado y divulgado mensualmente por el IBGE. Mide la variación de los precios de bienes y servicios consumidos por las familias brasileñas y es ampliamente utilizado como referencia para política monetaria, reajustes de contratos, alquileres, salarios, beneficios, inversiones y análisis económicos a largo plazo.",
+"pageDescription": "En esta página de Kitnets.com, puede seguir el historial completo del IPCA desde enero de 1995 hasta la fecha actual, con datos confiables, organizados y fáciles de analizar.",
+"sections": [
+    {
+        "title": "Lo que encuentra en esta página",
+        "items": [
+            {
+                "title": "Variación mensual del IPCA",
+                "text": "Siga cuánto varió la inflación en cada mes a lo largo de los años."
+            },
+            {
+                "title": "IPCA acumulado en 12 meses",
+                "text": "Indicador esencial para reajustes de alquiler, contratos y corrección de valores."
+            },
+            {
+                "title": "Gráfico histórico interactivo",
+                "text": "Visualice la evolución de la inflación brasileña a lo largo del tiempo e identifique ciclos económicos, períodos de alza y de desaceleración."
+            },
+            {
+                "title": "Mapa de calor mensual",
+                "text": "Análisis visual que muestra el comportamiento del IPCA mes a mes, facilitando la comparación entre años y la identificación de patrones estacionales."
+            },
+            {
+                "title": "Tabla de datos históricos detallada",
+                "text": "Valores mes a mes, con índice mensual y acumulado en 12 meses, ideal para estudios, simulaciones y análisis financieros."
+            },
+            {
+                "title": "Filtro por período personalizado",
+                "text": "Consulte cualquier intervalo de fechas entre 01/01/1995 y el mes más reciente disponible, permitiendo análisis históricos completos o enfocados en períodos específicos."
+            }
+        ]
+    },
+    {
+        "title": "¿Por qué el IPCA es importante para el mercado inmobiliario?",
+        "text": "El IPCA es uno de los principales índices utilizados como base para reajuste de alquileres, especialmente en contratos que buscan preservar el poder adquisitivo a lo largo del tiempo. Para propietarios, inversores e inquilinos, seguir el IPCA ayuda a:",
+        "list": [
+            "Entender la pérdida o preservación del poder adquisitivo",
+            "Evaluar si un reajuste es justo y alineado con la inflación",
+            "Comparar el IPCA con otros índices como IGP-M, INPC e IVAR",
+            "Tomar decisiones más informadas sobre inversiones inmobiliarias"
+        ]
+    },
+    {
+        "title": "Fuente oficial y datos confiables",
+        "text": "Todos los datos presentados en esta página tienen como fuente el IBGE, garantizando credibilidad, precisión y actualización constante."
+    }
+],
+"closing": "Kitnets.com ofrece herramientas claras y accesibles para quien desea entender la economía real, proteger su patrimonio de la inflación y tomar mejores decisiones en el mercado inmobiliario brasileño.",
+"cta": "Siga el IPCA, compare períodos, analice tendencias y use la inflación a su favor."
+}
+},
+"calculatorCta": {
+"title": "Simular es el primer paso.\nGestionar con datos es el siguiente.",
+"description": "Kitnets.com transforma cálculos en gestión profesional de alquileres con Inteligencia Artificial.",
+"button": "Conocer la plataforma"
+},
+"calculatorCtaShort": {
+"title": "¿Quiere ir más allá de los cálculos?",
+"description": "Conozca la plataforma de gestión de alquileres con Inteligencia Artificial de Kitnets.com.",
+"button": "Solicitar acceso anticipado"
+},
+"calculatorCtaStandard": {
+"title": "Transforme datos en gestión profesional de alquileres",
+"description": "Kitnets.com es una plataforma de gestión de alquileres con Inteligencia Artificial, creada para quienes desean dejar las hojas de cálculo, automatizar procesos y tomar decisiones con datos reales.\n\nSi es propietario, inversor, holding o inmobiliaria, esta plataforma fue creada para operar sus inmuebles de forma profesional.",
+"button": "Unirse a la lista de espera",
+"microcopy": "Acceso anticipado • Plataforma profesional • CPF o CNPJ para validación"
+},
+"indicesCta": {
+"title": "Ya entiende los índices.\nAhora es el momento de usar datos para gestionar sus alquileres con inteligencia.",
+"description": "Kitnets.com está construyendo la plataforma que conecta índices, contratos y gestión en un único sistema.",
+"button": "Unirse a la lista de espera"
+}
 }
