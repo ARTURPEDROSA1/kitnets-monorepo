@@ -1,8 +1,9 @@
-
 import { MortgageCalculator } from "@/components/calculators/MortgageCalculator";
 import { CalculatorSuggestion } from "@/components/calculators/CalculatorSuggestion";
 import { getDictionary } from "../../../dictionaries";
 import { Metadata } from "next";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 export async function generateMetadata({ params }: { params: Promise<{ lang: string }> }): Promise<Metadata> {
     const { lang } = await params;
@@ -155,6 +156,23 @@ export default async function MortgageCalculatorPage({ params }: { params: Promi
                 {/* Feedback Section */}
                 <div className="mt-16 max-w-4xl mx-auto">
                     <CalculatorSuggestion />
+                </div>
+
+                {/* Short CTA */}
+                <div className="mt-16 text-center space-y-6 bg-muted/30 p-8 rounded-2xl border border-muted">
+                    <h3 className="text-2xl font-bold tracking-tight text-foreground">
+                        {(dict as any).calculatorCtaShort?.title}
+                    </h3>
+                    <p className="text-lg text-muted-foreground leading-relaxed">
+                        {(dict as any).calculatorCtaShort?.description}
+                    </p>
+                    <div className="pt-2">
+                        <Link href={`/${lang}/lista-vip?step=landing`}>
+                            <Button size="lg" className="h-12 px-8 text-base font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xl shadow-emerald-500/20 hover:scale-105 transition-all border-0">
+                                {(dict as any).calculatorCtaShort?.button}
+                            </Button>
+                        </Link>
+                    </div>
                 </div>
 
             </div>

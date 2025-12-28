@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { getDictionary } from "@/dictionaries";
 import { saveLead } from "@/app/actions/capture-lead";
 import { saveCalculatorSuggestion } from "@/app/actions/save-calculator-suggestion";
 import {
@@ -264,6 +267,11 @@ function LeadCaptureModal({ isOpen, onCapture }: { isOpen: boolean; onCapture: (
 }
 
 export default function RentalIncomeCalculator() {
+    const params = useParams();
+    const lang = (params?.lang as string) || "pt";
+    // cast to any to avoid type check issues if dictionary types aren't perfectly up to date with the new key immediately
+    const dict = getDictionary(lang) as any;
+
     const [simulationDate] = useState(() => new Date());
 
     // View State
@@ -1112,6 +1120,25 @@ export default function RentalIncomeCalculator() {
 
                     </div>
 
+                </div>
+            </div>
+
+            <div className="mt-16 text-center space-y-8 bg-muted/30 p-8 md:p-12 rounded-[2.5rem] border relative overflow-hidden">
+                <div className="absolute inset-0 bg-grid-black/5 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.5))]" />
+                <div className="relative z-10 space-y-6 max-w-2xl mx-auto">
+                    <h2 className="text-3xl md:text-4xl font-bold tracking-tight whitespace-pre-line text-foreground">
+                        {dict.calculatorCta?.title}
+                    </h2>
+                    <p className="text-lg md:text-xl text-muted-foreground leading-relaxed">
+                        {dict.calculatorCta?.description}
+                    </p>
+                    <div className="pt-2">
+                        <Link href={`/${lang}/lista-vip?step=landing`}>
+                            <Button size="lg" className="h-14 px-8 text-lg rounded-full font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xl shadow-emerald-500/20 hover:scale-105 transition-all border-0">
+                                {dict.calculatorCta?.button}
+                            </Button>
+                        </Link>
+                    </div>
                 </div>
             </div>
 

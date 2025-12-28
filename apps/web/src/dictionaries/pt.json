@@ -208,8 +208,22 @@
             }
         ],
         "finalCta": {
-            "title": "Encontre. Anuncie. Gerencie. Decida com dados.",
-            "subtitle": "Kitnets.com — o novo padrão para gestão de kitnets e studios no Brasil."
+            "title": "Leve a gestão dos seus imóveis para o próximo nível",
+            "status": "O SaaS de gestão inteligente do Kitnets.com está em fase de lançamento.",
+            "description": "Estamos abrindo uma lista de espera exclusiva para proprietários (PF), holdings imobiliárias, investidores e imobiliárias que desejam operar kitnets e studios com automação, dados e inteligência artificial desde o primeiro dia.",
+            "listTitle": "Ao entrar na waitlist, você terá:",
+            "benefits": [
+                "Acesso antecipado à plataforma de gestão",
+                "Participação no grupo de usuários fundadores",
+                "Prioridade na ativação de recursos de IA",
+                "Condições comerciais diferenciadas no lançamento",
+                "Influência direta no roadmap do produto"
+            ],
+            "closing": "Se você administra um ou dezenas de imóveis, esta plataforma foi criada para substituir planilhas, reduzir fricção operacional e elevar o nível da sua gestão.",
+            "callToAction": "Comece agora. Seja um dos primeiros.",
+            "subText1": "Entre na lista de espera do SaaS do Kitnets.com",
+            "subText2": "E participe da construção da nova infraestrutura digital para kitnets e studios no Brasil.",
+            "buttonLabel": "Entrar na lista de espera"
         }
     },
     "rentPage": {
@@ -1479,6 +1493,118 @@
                 }
             ],
             "cta": "Acesse agora o INPC histórico completo, com gráficos, tabela e mapa de calor."
+        },
+        "ivar": {
+            "title": "IVAR – Índice de Variação de Aluguéis Residenciais | Histórico e Gráfico",
+            "description": "O IVAR (Índice de Variação de Aluguéis Residenciais) é um indicador econômico oficial criado para medir, de forma precisa, a variação dos preços dos aluguéis residenciais no Brasil. Divulgado pela FGV.",
+            "pageDescription": "Nesta página, você acompanha o IVAR atualizado, com série histórica completa desde o início do índice, em 2019, além de gráficos, mapa de calor mensal e tabela detalhada mês a mês.",
+            "keywords": [
+                "IVAR hoje",
+                "IVAR aluguel",
+                "índice de aluguel residencial",
+                "reajuste de aluguel",
+                "IVAR FGV",
+                "inflação do aluguel",
+                "IVAR histórico",
+                "IVAR x IGP-M",
+                "IVAR x IPCA",
+                "índice de aluguel Brasil"
+            ],
+            "sections": [
+                {
+                    "title": "O que é o IVAR?",
+                    "text": "O IVAR (Índice de Variação de Aluguéis Residenciais) é um indicador econômico oficial criado para medir, de forma precisa, a variação dos preços dos aluguéis residenciais no Brasil. Calculado e divulgado mensalmente pela FGV (Fundação Getulio Vargas), o IVAR acompanha exclusivamente o comportamento do mercado de locação, tornando-se uma referência cada vez mais relevante para proprietários, inquilinos, investidores imobiliários, imobiliárias e analistas econômicos."
+                },
+                {
+                    "title": "Para que serve o IVAR?",
+                    "text": "O IVAR foi criado com um objetivo claro: medir a inflação específica dos aluguéis residenciais, algo que índices tradicionais não conseguem capturar com precisão. Diferentemente de outros indicadores, o IVAR reflete dados reais de contratos de locação, considerando variações efetivamente praticadas no mercado.",
+                    "list": [
+                        "Analisar a evolução real dos preços de aluguel",
+                        "Acompanhar tendências do mercado imobiliário residencial",
+                        "Apoiar negociações entre locadores e inquilinos",
+                        "Comparar o comportamento dos aluguéis com outros índices econômicos",
+                        "Servir como referência técnica em estudos, contratos e análises de investimento"
+                    ]
+                },
+                {
+                    "title": "IVAR e reajuste de aluguel: qual a importância?",
+                    "text": "Historicamente, muitos contratos de aluguel no Brasil utilizam o IGP-M como índice de reajuste. No entanto, ao longo dos anos, ficou evidente que o IGP-M pode apresentar volatilidade elevada, muitas vezes desconectada da realidade do mercado imobiliário residencial.",
+                    "items": [
+                        {
+                            "title": "Alternativa Alinhada",
+                            "text": "O IVAR surge como uma alternativa mais alinhada ao setor, pois mede exclusivamente aluguéis residenciais e não sofre influência direta de commodities ou câmbio."
+                        },
+                        {
+                            "title": "Capacidade de Pagamento",
+                            "text": "Representa melhor a capacidade de pagamento dos inquilinos e reflete com mais fidelidade o equilíbrio entre oferta e demanda de imóveis."
+                        }
+                    ]
+                },
+                {
+                    "title": "IVAR x IPCA x IGP-M: qual a diferença?",
+                    "items": [
+                        {
+                            "title": "📌 IVAR – Aluguéis Residenciais",
+                            "text": "Foco exclusivo em aluguéis de imóveis residenciais. Baseado em dados reais de contratos. Menor distorção em relação ao mercado de locação."
+                        },
+                        {
+                            "title": "📌 IPCA – Inflação ao Consumidor",
+                            "text": "Mede a inflação geral da economia. Calculado pelo IBGE. Reflete o custo de vida das famílias. Não é específico para aluguéis."
+                        },
+                        {
+                            "title": "📌 IGP-M – Inflação do Mercado",
+                            "text": "Calculado pela FGV. Influenciado fortemente por atacado, commodities e câmbio. Pode apresentar oscilações bruscas."
+                        }
+                    ],
+                    "list": [
+                        "IPCA → custo de vida",
+                        "IGP-M → inflação ampla, volátil",
+                        "IVAR → inflação real dos aluguéis residenciais"
+                    ]
+                },
+                {
+                    "title": "Série histórica do IVAR desde 2019",
+                    "text": "O IVAR está disponível desde 2019, permitindo uma análise detalhada do comportamento dos aluguéis ao longo do tempo. A série histórica é fundamental para investidores e proprietários que desejam tomar decisões baseadas em dados.",
+                    "list": [
+                        "Visualizar o histórico mensal de variação",
+                        "Analisar o acumulado em 12 meses",
+                        "Comparar diferentes períodos econômicos",
+                        "Identificar ciclos de alta e desaceleração dos aluguéis"
+                    ]
+                },
+                {
+                    "title": "Acompanhe o IVAR atualizado",
+                    "text": "Aqui no Kitnets.com, você acompanha IVAR mensal atualizado, acumulado no ano e em 12 meses, gráficos interativos, mapa de calor mensal e tabela histórica detalhada.",
+                    "list": [
+                        "Dados claros e confiáveis",
+                        "Fáceis de interpretar",
+                        "Tudo em um só lugar"
+                    ]
+                }
+            ],
+            "closing": "Tudo em um só lugar, com dados claros, confiáveis e fáceis de interpretar.",
+            "cta": "Acompanhe a variação do IVAR e tome melhores decisões no mercado imobiliário."
         }
+    },
+    "calculatorCta": {
+        "title": "Simular é o primeiro passo.\nGerir com dados é o próximo.",
+        "description": "O Kitnets.com transforma cálculos em gestão profissional de aluguéis com Inteligência Artificial.",
+        "button": "Conhecer a plataforma"
+    },
+    "calculatorCtaShort": {
+        "title": "Quer ir além dos cálculos?",
+        "description": "Conheça a plataforma de gestão de aluguéis com Inteligência Artificial do Kitnets.com.",
+        "button": "Solicitar acesso antecipado"
+    },
+    "calculatorCtaStandard": {
+        "title": "Transforme dados em gestão profissional de aluguéis",
+        "description": "O Kitnets.com é uma plataforma de gestão de aluguéis com Inteligência Artificial, criada para quem quer sair das planilhas, automatizar processos e tomar decisões com dados reais.\n\nSe você é proprietário, investidor, holding ou imobiliária, esta plataforma foi feita para operar seus imóveis de forma profissional.",
+        "button": "Entrar na lista de espera",
+        "microcopy": "Acesso antecipado • Plataforma profissional • CPF ou CNPJ para validação"
+    },
+    "indicesCta": {
+        "title": "Você já entende os índices.\nAgora é hora de usar dados para gerir seus aluguéis com inteligência.",
+        "description": "O Kitnets.com está construindo a plataforma que conecta índices, contratos e gestão em um único sistema.",
+        "button": "Entrar na lista de espera"
     }
 }

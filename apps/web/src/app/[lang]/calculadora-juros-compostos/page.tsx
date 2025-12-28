@@ -3,6 +3,8 @@ import { CompoundInterestCalculator } from "@/components/calculators/CompoundInt
 import { CalculatorSuggestion } from "@/components/calculators/CalculatorSuggestion";
 import { getDictionary } from "../../../dictionaries";
 import { Metadata } from "next";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 export async function generateMetadata({ params }: { params: Promise<{ lang: string }> }): Promise<Metadata> {
     const { lang } = await params;
@@ -145,6 +147,29 @@ export default async function CompoundInterestCalculatorPage({ params }: { param
                 {/* Feedback Section */}
                 <div className="mt-16 max-w-4xl mx-auto">
                     <CalculatorSuggestion />
+                </div>
+
+                {/* CTA Standard */}
+                <div className="mt-16 text-center space-y-8 bg-muted/30 p-8 md:p-12 rounded-[2.5rem] border relative overflow-hidden">
+                    <div className="absolute inset-0 bg-grid-black/5 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.5))]" />
+                    <div className="relative z-10 space-y-6 max-w-2xl mx-auto">
+                        <h3 className="text-3xl md:text-3xl font-bold tracking-tight whitespace-pre-line text-foreground">
+                            {(dict as any).calculatorCtaStandard?.title}
+                        </h3>
+                        <p className="text-lg text-muted-foreground leading-relaxed whitespace-pre-line">
+                            {(dict as any).calculatorCtaStandard?.description}
+                        </p>
+                        <div className="pt-4 flex flex-col items-center gap-3">
+                            <Link href={`/${lang}/lista-vip?step=landing`}>
+                                <Button size="lg" className="h-14 px-8 text-lg rounded-full font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xl shadow-emerald-500/20 hover:scale-105 transition-all border-0">
+                                    {(dict as any).calculatorCtaStandard?.button}
+                                </Button>
+                            </Link>
+                            <p className="text-xs md:text-sm text-muted-foreground font-medium opacity-80">
+                                {(dict as any).calculatorCtaStandard?.microcopy}
+                            </p>
+                        </div>
+                    </div>
                 </div>
 
             </div>

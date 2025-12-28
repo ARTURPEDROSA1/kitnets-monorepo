@@ -23,7 +23,7 @@ export default async function Page({ params }: { params: Promise<{ lang: "pt" | 
 
     return (
         <div className="container mx-auto py-12 px-4">
-            <InterestRateConverter dict={dict} />
+            <InterestRateConverter dict={dict} lang={lang} />
         </div>
     );
 }

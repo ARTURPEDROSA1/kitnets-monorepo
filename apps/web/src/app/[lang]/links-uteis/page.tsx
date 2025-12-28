@@ -10,13 +10,17 @@ import {
 import Link from "next/link";
 import { Metadata } from "next";
 import { SuggestLinkForm } from "./components/SuggestLinkForm";
+import { getDictionary } from "../../../dictionaries";
+import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
     title: "Links Úteis | Kitnets.com",
     description: "Links oficiais e confiáveis para financiamento imobiliário, seguros e legislação.",
 };
 
-export default function UsefulLinksPage() {
+export default async function UsefulLinksPage({ params }: { params: Promise<{ lang: string }> }) {
+    const { lang } = await params;
+    const dict = getDictionary(lang);
     return (
         <div className="flex flex-col items-center">
             {/* Header */}
@@ -216,6 +220,29 @@ export default function UsefulLinksPage() {
                         O Kitnets.com não representa instituições financeiras, seguradoras ou órgãos públicos.
                         Os links acima são fornecidos apenas para fins informativos. Sempre confirme condições, taxas e cláusulas diretamente com as instituições oficiais ou com um profissional especializado (advogado, corretor ou contador).
                     </p>
+                </div>
+
+                {/* CTA Standard */}
+                <div className="mt-16 text-center space-y-8 bg-muted/30 p-8 md:p-12 rounded-[2.5rem] border relative overflow-hidden">
+                    <div className="absolute inset-0 bg-grid-black/5 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.5))]" />
+                    <div className="relative z-10 space-y-6 max-w-2xl mx-auto">
+                        <h3 className="text-3xl md:text-3xl font-bold tracking-tight whitespace-pre-line text-foreground">
+                            {(dict as any).calculatorCtaStandard?.title}
+                        </h3>
+                        <p className="text-lg text-muted-foreground leading-relaxed whitespace-pre-line">
+                            {(dict as any).calculatorCtaStandard?.description}
+                        </p>
+                        <div className="pt-4 flex flex-col items-center gap-3">
+                            <Link href={`/${lang}/lista-vip?step=landing`}>
+                                <Button size="lg" className="h-14 px-8 text-lg rounded-full font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xl shadow-emerald-500/20 hover:scale-105 transition-all border-0">
+                                    {(dict as any).calculatorCtaStandard?.button}
+                                </Button>
+                            </Link>
+                            <p className="text-xs md:text-sm text-muted-foreground font-medium opacity-80">
+                                {(dict as any).calculatorCtaStandard?.microcopy}
+                            </p>
+                        </div>
+                    </div>
                 </div>
 
             </div>

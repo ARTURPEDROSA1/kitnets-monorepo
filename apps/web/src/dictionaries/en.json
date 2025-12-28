@@ -197,8 +197,22 @@
             }
         ],
         "finalCta": {
-            "title": "Find. Advertise. Manage. Decide with data.",
-            "subtitle": "Kitnets.com — the new standard for kitnet and studio management in Brazil."
+            "title": "Take your property management to the next level",
+            "status": "Kitnets.com intelligent management SaaS is launching soon.",
+            "description": "We are opening an exclusive waitlist for owners, real estate holdings, investors, and agencies who want to operate kitnets and studios with automation, data, and artificial intelligence from day one.",
+            "listTitle": "By joining the waitlist, you get:",
+            "benefits": [
+                "Early access to the management platform",
+                "Participation in the founding users group",
+                "Priority in activating AI features",
+                "Special commercial conditions at launch",
+                "Direct influence on the product roadmap"
+            ],
+            "closing": "Whether you manage one or dozens of properties, this platform was created to replace spreadsheets, reduce operational friction, and elevate your management level.",
+            "callToAction": "Start now. Be one of the first.",
+            "subText1": "Join the Kitnets.com SaaS waitlist",
+            "subText2": "And participate in building the new digital infrastructure for kitnets and studios in Brazil.",
+            "buttonLabel": "Join the waitlist"
         }
     },
     "rentPage": {
@@ -894,6 +908,42 @@
             ],
             "closing": "Kitnets.com offers clear and accessible tools for anyone wanting to understand the real economy, protect their assets from inflation, and make better decisions in the Brazilian real estate market.",
             "cta": "Follow the IPCA, compare periods, analyze trends, and use inflation to your advantage."
+        },
+        "ivar": {
+            "title": "IVAR – Residential Rent Variation Index | History and Chart",
+            "description": "The IVAR (Residential Rent Variation Index) is an official economic measure of residential rent price variations in Brazil, calculated by FGV.",
+            "pageDescription": "Track updated IVAR with complete historical series since 2019, charts, monthly heatmap, and detailed tables.",
+            "keywords": [
+                "IVAR today",
+                "IVAR rent",
+                "residential rent index",
+                "rent adjustment",
+                "IVAR Brazil"
+            ],
+            "sections": [],
+            "closing": "All in one place.",
+            "cta": "Track IVAR updates on Kitnets.com."
         }
+    },
+    "calculatorCta": {
+        "title": "Simulating is the first step.\nManaging with data is the next.",
+        "description": "Kitnets.com transforms calculations into professional rental management with Artificial Intelligence.",
+        "button": "Explore the platform"
+    },
+    "calculatorCtaShort": {
+        "title": "Want to go beyond calculations?",
+        "description": "Discover Kitnets.com's AI-powered rental management platform.",
+        "button": "Request early access"
+    },
+    "calculatorCtaStandard": {
+        "title": "Transform data into professional rental management",
+        "description": "Kitnets.com is an AI-powered rental management platform designed for those who want to move beyond spreadsheets, automate processes, and make decisions with real data.\n\nWhether you are an owner, investor, holding company, or real estate agency, this platform was built to professionally operate your properties.",
+        "button": "Join the waitlist",
+        "microcopy": "Early access • Professional platform • CPF or CNPJ for validation"
+    },
+    "indicesCta": {
+        "title": "You already understand the indexes.\nNow it's time to use data to manage your rentals intelligently.",
+        "description": "Kitnets.com is building the platform that connects indexes, contracts, and management into a single system.",
+        "button": "Join the waitlist"
     }
 }
