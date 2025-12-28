@@ -47,22 +47,32 @@ export function Step2Identity() {
     const { state, updateData, nextStep } = useWaitlist();
     const { profile } = state.data;
     const isPF = profile === 'pf';
+    const isImobiliaria = profile === 'imobiliaria';
 
-    const [value, setValue] = useState(isPF ? (state.data.identity.cpf || "") : (state.data.identity.cnpj || ""));
+    const [value, setValue] = useState(
+        isPF ? (state.data.identity.cpf || "") :
+            isImobiliaria ? (state.data.identity.creci || "") :
+                (state.data.identity.cnpj || "")
+    );
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const raw = e.target.value;
-        const formatted = isPF ? formatCPF(raw) : formatCNPJ(raw);
-        setValue(formatted);
+        let formatted = raw;
 
         if (isPF) {
+            formatted = formatCPF(raw);
             updateData({ identity: { ...state.data.identity, cpf: formatted } });
+        } else if (isImobiliaria) {
+            formatted = raw.toUpperCase(); // Basic formatting for CRECI
+            updateData({ identity: { ...state.data.identity, creci: formatted } });
         } else {
+            formatted = formatCNPJ(raw);
             updateData({ identity: { ...state.data.identity, cnpj: formatted } });
         }
 
+        setValue(formatted);
         if (error) setError("");
     };
 
@@ -130,9 +140,9 @@ export function Step2Identity() {
     };
 
     const handleBlur = async () => {
-        if (!isPF && validateCNPJ(value)) {
-            // Only fetch if it's a new valid CNPJ or we don't have the name yet
-            // Check against current stored to avoid re-fetching identical
+        // Only fetch if it's a valid CNPJ (PJ profile)
+        // For Imobiliaria (CRECI) and PF (CPF), we don't fetch currently.
+        if (!isPF && !isImobiliaria && validateCNPJ(value)) {
             const cleanInput = cleanDigits(value);
             const cleanStored = cleanDigits(state.data.identity.cnpj || "");
 
@@ -142,17 +152,21 @@ export function Step2Identity() {
         }
     };
 
-    const isValid = isPF ? validateCPF(value) : validateCNPJ(value);
+    const isValid = isPF
+        ? validateCPF(value)
+        : isImobiliaria
+            ? value.length >= 4 // Basic CRECI length check
+            : validateCNPJ(value);
 
     return (
         <StepLayout
-            title={isPF ? "Informe seu CPF" : "Informe seu CNPJ"}
-            subtitle={isPF ? undefined : "O CNPJ permite ativar recursos profissionais, relatórios e planos empresariais."}
+            title={isPF ? "Informe seu CPF" : isImobiliaria ? "Informe seu CRECI" : "Informe seu CNPJ"}
+            subtitle={isPF ? undefined : isImobiliaria ? "O CRECI valida sua certificação profissional." : "O CNPJ permite ativar recursos profissionais, relatórios e planos empresariais."}
         >
             <div className="space-y-6">
                 <div className="space-y-2">
                     <label className="text-sm font-medium text-muted-foreground ml-1">
-                        {isPF ? "CPF (apenas números)" : "CNPJ (apenas números)"}
+                        {isPF ? "CPF (apenas números)" : isImobiliaria ? "CRECI" : "CNPJ (apenas números)"}
                     </label>
                     <div className="relative">
                         <Input
@@ -160,9 +174,9 @@ export function Step2Identity() {
                             onChange={handleChange}
                             onBlur={handleBlur}
                             className={`h-14 text-lg bg-card/50 dark:bg-zinc-900/50 border-input dark:border-white/10 text-foreground dark:text-white placeholder:text-muted-foreground focus-visible:ring-emerald-500/50 ${error ? "border-destructive/50" : ""}`}
-                            placeholder={isPF ? "000.000.000-00" : "00.000.000/0001-00"}
-                            maxLength={isPF ? 14 : 18}
-                            inputMode="numeric"
+                            placeholder={isPF ? "000.000.000-00" : isImobiliaria ? "Ex: 12345-J" : "00.000.000/0001-00"}
+                            maxLength={isPF ? 14 : isImobiliaria ? 10 : 18}
+                            inputMode={isImobiliaria ? "text" : "numeric"}
                         />
                         {isLoading && (
                             <div className="absolute right-4 top-4">
@@ -173,7 +187,7 @@ export function Step2Identity() {
                     </div>
                     {error && <p className="text-sm text-destructive ml-1">{error}</p>}
 
-                    {!isPF && state.data.identity.businessName && (
+                    {!isPF && !isImobiliaria && state.data.identity.businessName && (
                         <div className="mt-2 p-3 bg-muted/50 dark:bg-zinc-900/30 border border-border dark:border-white/5 rounded-lg text-sm space-y-1 animate-in fade-in slide-in-from-top-2">
                             <p className="font-medium text-foreground dark:text-zinc-200">{state.data.identity.businessName}</p>
                             {state.data.identity.tradeName && (
@@ -189,7 +203,9 @@ export function Step2Identity() {
                     <p>
                         {isPF
                             ? "Utilizamos o CPF exclusivamente para validação do perfil, prevenção de fraudes e futura formalização de contratos. Seus dados são protegidos conforme a LGPD."
-                            : "Validamos seu CNPJ para garantir que o ambiente seja exclusivo para profissionais."}
+                            : isImobiliaria
+                                ? "Seu CRECI será verificado para garantir acesso às ferramentas exclusivas de corretagem."
+                                : "Validamos seu CNPJ para garantir que o ambiente seja exclusivo para profissionais."}
                     </p>
                 </div>
             </div>

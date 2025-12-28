@@ -1,4 +1,3 @@
-
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getIndexMetadata, getIndexValuesByDateRange, getAllIndexes } from '@/lib/indexes';
@@ -6,8 +5,8 @@ import { getDictionary } from '../../../../dictionaries';
 import { IndexChart } from '@/components/indices/IndexChart';
 import { IndexHeatmap } from '@/components/indices/IndexHeatmap';
 import { IndexDateFilter } from '@/components/indices/IndexDateFilter';
+import { IndexHistoryTable } from '@/components/indices/IndexHistoryTable';
 import Link from 'next/link';
-
 import { ArrowLeft } from 'lucide-react';
 
 interface Props {
@@ -79,6 +78,10 @@ export default async function IndexPage({ params, searchParams }: Props) {
     const { startDate, endDate } = await searchParams;
     const code = codeParam.toUpperCase();
 
+    // Default dates logic applied to all indexes
+    const defaultStartDate = '2021-01-01';
+    const defaultEndDate = new Date().toISOString().split('T')[0];
+
     const dict = getDictionary(lang as "pt" | "en" | "es");
     const indexContent = (dict as any).indices?.[code.toLowerCase()];
 
@@ -87,8 +90,8 @@ export default async function IndexPage({ params, searchParams }: Props) {
         notFound();
     }
 
-    const startDateStr = typeof startDate === 'string' ? startDate : undefined;
-    const endDateStr = typeof endDate === 'string' ? endDate : undefined;
+    const startDateStr = typeof startDate === 'string' ? startDate : defaultStartDate;
+    const endDateStr = typeof endDate === 'string' ? endDate : defaultEndDate;
 
     // Fetch history based on date range or default to recent
     const history = await getIndexValuesByDateRange(metadata.id, startDateStr, endDateStr);
@@ -167,45 +170,108 @@ export default async function IndexPage({ params, searchParams }: Props) {
             <div className="grid gap-3 md:grid-cols-3 md:gap-6">
 
                 {/* Key Metrics Cards */}
-                <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-6">
+                <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+                    {/* Card 1: Variação Mensal */}
                     <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
                         <div className="flex flex-col space-y-1 p-3 md:p-6 pb-1 md:pb-2">
-                            <h3 className="text-sm font-medium text-muted-foreground whitespace-nowrap">Variação Mensal</h3>
+                            <h3 className="text-sm font-medium text-muted-foreground whitespace-nowrap">{code} hoje:</h3>
                         </div>
                         <div className="p-3 md:p-6 pt-0">
-                            <div className="text-2xl md:text-3xl font-bold">
+                            <div className="text-2xl md:text-3xl font-bold text-primary">
                                 {latest ? `${latest.value_percent}%` : '--'}
                             </div>
                             <p className="text-xs text-muted-foreground mt-1">
-                                Ref: {latest ? `${latest.month}/${latest.year}` : '--'}
+                                Referente a {latest ? `${latest.month.toString().padStart(2, '0')}/${latest.year}` : '--'}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+                                Atualizado em {latest ? new Date(latest.reference_date).toLocaleDateString('pt-BR') : '--'}
                             </p>
                         </div>
                     </div>
 
+                    {/* Card 2: Acumulado 12m */}
                     <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
                         <div className="flex flex-col space-y-1 p-3 md:p-6 pb-1 md:pb-2">
-                            <h3 className="text-sm font-medium text-muted-foreground whitespace-nowrap">Acumulado 12m</h3>
+                            <h3 className="text-sm font-medium text-muted-foreground whitespace-nowrap">{code} acumulado em 12 meses:</h3>
                         </div>
                         <div className="p-3 md:p-6 pt-0">
-                            <div className="text-2xl md:text-3xl font-bold">
+                            <div className="text-2xl md:text-3xl font-bold text-primary">
                                 {latest?.accumulated_12m ? `${latest.accumulated_12m}%` : '--'}
                             </div>
                             <p className="text-xs text-muted-foreground mt-1">
                                 Últimos 12 meses
                             </p>
+                            <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+                                Atualizado em {latest ? new Date(latest.reference_date).toLocaleDateString('pt-BR') : '--'}
+                            </p>
                         </div>
                     </div>
 
+                    {/* Card 3: Acumulado Ano (YTD) */}
                     <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
                         <div className="flex flex-col space-y-1 p-3 md:p-6 pb-1 md:pb-2">
-                            <h3 className="text-sm font-medium text-muted-foreground">Frequência</h3>
+                            <h3 className="text-sm font-medium text-muted-foreground whitespace-nowrap">{code} acumulado em {latest?.year}:</h3>
                         </div>
                         <div className="p-3 md:p-6 pt-0">
-                            <div className="text-2xl md:text-3xl font-bold capitalize">
-                                {metadata.frequency === 'monthly' ? 'Mensal' : metadata.frequency}
+                            <div className="text-2xl md:text-3xl font-bold text-primary">
+                                {latest?.accumulated_year ? `${latest.accumulated_year}%` : '--'}
                             </div>
                             <p className="text-xs text-muted-foreground mt-1">
-                                Atualização
+                                Até {latest ? `${latest.month.toString().padStart(2, '0')}/${latest.year}` : '--'}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+                                Atualizado em {latest ? new Date(latest.reference_date).toLocaleDateString('pt-BR') : '--'}
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Card 4: Next Release Date */}
+                    <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
+                        <div className="flex flex-col space-y-1 p-3 md:p-6 pb-1 md:pb-2">
+                            <h3 className="text-sm font-medium text-muted-foreground whitespace-nowrap">Data da próxima divulgação:</h3>
+                        </div>
+                        <div className="p-3 md:p-6 pt-0">
+                            <div className="text-2xl md:text-3xl font-bold text-primary">
+                                {(() => {
+                                    if (!latest) return '--';
+                                    // Determine next reference month
+                                    let nextRefMonth = latest.month + 1;
+                                    let nextRefYear = latest.year;
+                                    if (nextRefMonth > 12) {
+                                        nextRefMonth = 1;
+                                        nextRefYear++;
+                                    }
+
+                                    if (code === 'IGPM') {
+                                        const date = new Date(nextRefYear, nextRefMonth - 1, 29);
+                                        return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+                                    }
+
+                                    // Default (IPCA, etc) - Release happens month after Ref
+                                    let releaseMonth = nextRefMonth + 1;
+                                    let releaseYear = nextRefYear;
+                                    if (releaseMonth > 12) {
+                                        releaseMonth = 1;
+                                        releaseYear++;
+                                    }
+
+                                    // Format 09/MMM
+                                    const date = new Date(releaseYear, releaseMonth - 1, 9);
+                                    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+                                })()}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">
+                                Referente a {(() => {
+                                    if (!latest) return '--';
+                                    let nextRefMonth = latest.month + 1;
+                                    let nextRefYear = latest.year;
+                                    if (nextRefMonth > 12) {
+                                        nextRefMonth = 1;
+                                        nextRefYear++;
+                                    }
+                                    const date = new Date(nextRefYear, nextRefMonth - 1, 1);
+                                    return date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+                                })()}
                             </p>
                         </div>
                     </div>
@@ -213,7 +279,11 @@ export default async function IndexPage({ params, searchParams }: Props) {
 
                 {/* Date Filter */}
                 <div className="md:col-span-3 min-w-0">
-                    <IndexDateFilter key={`${startDateStr || 'start'}-${endDateStr || 'end'}`} />
+                    <IndexDateFilter
+                        key={`${startDateStr || 'start'}-${endDateStr || 'end'}`}
+                        defaultStartDate={defaultStartDate}
+                        defaultEndDate={defaultEndDate}
+                    />
                 </div>
 
                 {/* Chart Section */}
@@ -250,32 +320,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
                             <p className="text-xs md:text-sm text-muted-foreground">Valores detalhados mês a mês.</p>
                         </div>
                         <div className="p-3 md:p-6 pt-0">
-                            <div className="w-full overflow-auto">
-                                <table className="w-full caption-bottom text-sm">
-                                    <thead className="[&_tr]:border-b">
-                                        <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
-                                            <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 min-w-[100px]">Mês/Ano</th>
-                                            <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0">Índice no Mês (%)</th>
-                                            <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0">Acumulado 12m (%)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="[&_tr:last-child]:border-0">
-                                        {history.map((row) => (
-                                            <tr key={row.id} className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
-                                                <td className="p-4 align-middle [&:has([role=checkbox])]:pr-0 font-medium">
-                                                    {row.month.toString().padStart(2, '0')}/{row.year}
-                                                </td>
-                                                <td className={`p-4 align-middle [&:has([role=checkbox])]:pr-0 ${row.value_percent < 0 ? 'text-red-500' : 'text-green-600'}`}>
-                                                    {row.value_percent > 0 ? '+' : ''}{row.value_percent}%
-                                                </td>
-                                                <td className="p-4 align-middle [&:has([role=checkbox])]:pr-0">
-                                                    {row.accumulated_12m ? `${row.accumulated_12m}%` : '-'}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                            <IndexHistoryTable data={history} />
                         </div>
                     </div>
                 </div>

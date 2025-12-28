@@ -10,6 +10,7 @@ export interface WaitlistData {
         businessName?: string; // Razão Social
         tradeName?: string; // Nome Fantasia
         partners?: string[]; // Sócios
+        creci?: string; // CRECI
     };
     portfolioSize: PortfolioSize | null;
     location: {
@@ -25,10 +26,12 @@ export interface WaitlistData {
         name: string;
         email: string;
         whatsapp: string;
+        ddi?: string;
     };
 }
 
 export type WaitlistStepId =
+    | 'landing'
     | 'profile'
     | 'identity'
     | 'portfolio'
@@ -37,6 +40,7 @@ export type WaitlistStepId =
     | 'success';
 
 export const WAITLIST_STEPS: WaitlistStepId[] = [
+    'landing',
     'profile',
     'identity',
     'portfolio',

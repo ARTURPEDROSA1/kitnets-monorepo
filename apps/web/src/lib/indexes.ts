@@ -18,6 +18,7 @@ export type IndexValue = {
     reference_date: string;
     value_percent: number;
     accumulated_12m: number | null;
+    accumulated_year: number | null;
     is_projection: boolean;
     source_url: string | null;
 };
@@ -54,27 +55,57 @@ export async function getIndexValues(indexId: string, limit = 36): Promise<Index
         return [];
     }
 
-    // Calculate accumulated 12m on the fly
+    // Process data to add accumulated fields
     const enrichedData = data.map((item, index, arr) => {
-        // We need current month + 11 previous months (total 12)
-        // Since array is sorted DESC, we look ahead.
-        if (index + 12 > arr.length) {
-            // Not enough data for 12m accumulation
-            return item;
+        // --- Accumulated 12m Calculation ---
+        let accumulated12m: number | null = null;
+        if (index + 12 <= arr.length) {
+            const window12m = arr.slice(index, index + 12);
+            const accDecimal12m = window12m.reduce((acc, curr) => {
+                return acc * (1 + (curr.value_percent / 100));
+            }, 1);
+            accumulated12m = parseFloat(((accDecimal12m - 1) * 100).toFixed(2));
         }
 
-        const window = arr.slice(index, index + 12);
+        // --- Accumulated Year (YTD) Calculation ---
+        // Sum from Jan of the item's year up to the item's month
+        // Since list is DESC, we look ahead for same year until we hit Jan or end of same year data
+        const currentYear = item.year;
+        let accumulatedYear: number | null = null;
 
-        // Accumulate: (1 + m1) * (1 + m2) ... - 1
-        const accumulatedDecimal = window.reduce((acc, curr) => {
-            return acc * (1 + (curr.value_percent / 100));
-        }, 1);
+        // Find all records belonging to the same year that are "older or equal" to current item
+        // In a DESC list, these are items at current index and subsequent indices that match year
+        const yearRecords = [];
+        for (let i = index; i < arr.length; i++) {
+            if (arr[i].year === currentYear) {
+                yearRecords.push(arr[i]);
+                // If we hit January, we have the full set for YTD up to this month
+                if (arr[i].month === 1) break;
+            } else {
+                // Entered a different year, stop
+                break;
+            }
+        }
 
-        const accumulated12m = (accumulatedDecimal - 1) * 100;
+        // Only calculate if we found records
+        if (yearRecords.length > 0) {
+            // Check if we actually reached January or if it's the oldest available data for that year ???
+            // For strict YTD, ideally we want to know we have data back to Jan. 
+            // But if data starts in Feb, YTD is just Feb...Current. 
+            // Let's assume we sum whatever we found for that year up to the current month.
+            // Reverse because reduce (1+m1)... works typically in time order, but multiplication is commutative so order doesn't matter for simple compound.
+            // product(1+r)
+
+            const accDecimalYear = yearRecords.reduce((acc, curr) => {
+                return acc * (1 + (curr.value_percent / 100));
+            }, 1);
+            accumulatedYear = parseFloat(((accDecimalYear - 1) * 100).toFixed(2));
+        }
 
         return {
             ...item,
-            accumulated_12m: parseFloat(accumulated12m.toFixed(2))
+            accumulated_12m: accumulated12m,
+            accumulated_year: accumulatedYear
         };
     });
 
@@ -94,11 +125,29 @@ export async function getIndexValuesByDateRange(indexId: string, startDate?: str
         .order("reference_date", { ascending: false });
 
     // Apply date filters if provided
+    // IMPORTANT: To calculate YTD and 12m correctly, we need extra data BEFORE the startDate.
+    // 12m needs 1 year back.
+    // YTD needs back to January of the year of the startDate.
+
+    let fetchStartDate: string | undefined;
+
     if (startDate) {
-        // We need 12 months prior for accumulated calculation
-        const priorDate = new Date(startDate);
-        priorDate.setMonth(priorDate.getMonth() - 12);
-        const priorDateStr = priorDate.toISOString().split('T')[0];
+        const start = new Date(startDate);
+        // Go back 12 months for 12m calc
+        const priorMsg = new Date(start);
+        priorMsg.setMonth(start.getMonth() - 12);
+
+        // Also ensure we cover Jan of the start year for YTD
+        // If priorMsg is later than Jan 1 of start year, we're fine (Jan 1 is covered). 
+        // If priorMsg is earlier, that's also fine (we have even more data).
+        // Actually, if startDate is e.g. Feb 2024, Jan 1st 2024 is < Feb 2024.
+        // 12 months prior to Feb 2024 is Feb 2023. This covers Jan 2024. 
+        // So fetching 12 months prior is usually enough for YTD unless startDate is very old and we only fetched 12 months? 
+        // No, we fetch GTE priorDate.
+
+        const priorDateStr = priorMsg.toISOString().split('T')[0];
+        fetchStartDate = priorDateStr;
+
         query = query.gte("reference_date", priorDateStr);
     }
 
@@ -106,7 +155,7 @@ export async function getIndexValuesByDateRange(indexId: string, startDate?: str
         query = query.lte("reference_date", endDate);
     }
 
-    // Default limit if no dates (fallback to standard behavior, though usually dates will be provided)
+    // Default limit if no dates (fallback)
     if (!startDate && !endDate) {
         query = query.limit(72); // 60 + 12 buffer
     }
@@ -118,31 +167,47 @@ export async function getIndexValuesByDateRange(indexId: string, startDate?: str
         return [];
     }
 
-    // Calculate accumulated 12m on the fly
+    // Calculate accumulated values
     const enrichedData = data.map((item, index, arr) => {
-        // We need current month + 11 previous months (total 12)
-        // Since array is sorted DESC, we look ahead.
-        if (index + 12 > arr.length) {
-            // Not enough data for 12m accumulation
-            return item;
+        // --- Accumulated 12m ---
+        let accumulated12m: number | null = null;
+        if (index + 12 <= arr.length) {
+            const window = arr.slice(index, index + 12);
+            const accumulatedDecimal = window.reduce((acc, curr) => {
+                return acc * (1 + (curr.value_percent / 100));
+            }, 1);
+            accumulated12m = parseFloat(((accumulatedDecimal - 1) * 100).toFixed(2));
         }
 
-        const window = arr.slice(index, index + 12);
+        // --- Accumulated Year (YTD) ---
+        const currentYear = item.year;
+        let accumulatedYear: number | null = null;
 
-        // Accumulate: (1 + m1) * (1 + m2) ... - 1
-        const accumulatedDecimal = window.reduce((acc, curr) => {
-            return acc * (1 + (curr.value_percent / 100));
-        }, 1);
+        const yearRecords = [];
+        for (let i = index; i < arr.length; i++) {
+            if (arr[i].year === currentYear) {
+                yearRecords.push(arr[i]);
+                if (arr[i].month === 1) break;
+            } else {
+                break;
+            }
+        }
 
-        const accumulated12m = (accumulatedDecimal - 1) * 100;
+        if (yearRecords.length > 0) {
+            const accDecimalYear = yearRecords.reduce((acc, curr) => {
+                return acc * (1 + (curr.value_percent / 100));
+            }, 1);
+            accumulatedYear = parseFloat(((accDecimalYear - 1) * 100).toFixed(2));
+        }
 
         return {
             ...item,
-            accumulated_12m: parseFloat(accumulated12m.toFixed(2))
+            accumulated_12m: accumulated12m,
+            accumulated_year: accumulatedYear
         };
     });
 
-    // Filter out the buffer months if we fetched extra for accumulation
+    // Filter out the buffer months if we fetched extra
     if (startDate) {
         return enrichedData.filter(item => item.reference_date >= startDate);
     }

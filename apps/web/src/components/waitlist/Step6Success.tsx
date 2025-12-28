@@ -20,29 +20,24 @@ export function Step6Success() {
                 Seu perfil foi registrado na lista de espera do SaaS Kitnets.com.
             </p>
 
-            <div className="bg-card/50 dark:bg-zinc-900/50 border border-border dark:border-white/10 rounded-2xl p-6 max-w-md w-full mb-10 text-left">
-                <p className="text-foreground dark:text-zinc-300 font-medium mb-4">Seu CPF/CNPJ será utilizado apenas para:</p>
-                <ul className="space-y-3">
-                    <li className="flex gap-3 text-muted-foreground dark:text-zinc-400">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-2 shrink-0" />
-                        Validação do perfil
-                    </li>
-                    <li className="flex gap-3 text-muted-foreground dark:text-zinc-400">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-2 shrink-0" />
-                        Ativação de recursos profissionais
-                    </li>
-                    <li className="flex gap-3 text-muted-foreground dark:text-zinc-400">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-2 shrink-0" />
-                        Conformidade legal e contratual
-                    </li>
-                </ul>
+            <div className="bg-card/50 dark:bg-zinc-900/50 border border-border dark:border-white/10 rounded-2xl p-6 max-w-md w-full mb-10 text-center">
+                <p className="text-foreground dark:text-zinc-200 font-medium mb-2">Enquanto isso, que tal simular seus retornos?</p>
+                <p className="text-muted-foreground dark:text-zinc-400 text-sm mb-6">
+                    Acesse nossas calculadoras gratuitas para projetar a rentabilidade dos seus investimentos imobiliários.
+                </p>
+
+                <Button asChild className="w-full h-12 text-base font-medium bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/20">
+                    <Link href="/calculadoras/renda-aluguel">
+                        Acessar Calculadora de Aluguel
+                    </Link>
+                </Button>
             </div>
 
             <p className="text-muted-foreground text-sm mb-8">
                 Você será avisado(a) assim que o acesso antecipado estiver disponível.
             </p>
 
-            <Button asChild variant="outline" className="h-12 border-input hover:bg-accent hover:text-accent-foreground text-muted-foreground">
+            <Button asChild variant="ghost" className="h-12 text-muted-foreground hover:text-foreground">
                 <Link href="/">
                     Voltar para o site
                 </Link>

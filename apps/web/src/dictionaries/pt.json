@@ -1306,6 +1306,179 @@
             ],
             "closing": "Kitnets.com oferece ferramentas claras e acessíveis para quem deseja entender a economia real, proteger seu patrimônio da inflação e tomar decisões melhores no mercado imobiliário brasileiro.",
             "cta": "Acompanhe o IPCA, compare períodos, analise tendências e use a inflação a seu favor."
+        },
+        "igpm": {
+            "title": "IGP-M Hoje: Histórico Completo, Gráficos e Reajuste de Aluguel",
+            "description": "O IGP-M (Índice Geral de Preços – Mercado) é um dos indicadores econômicos mais importantes do Brasil, amplamente utilizado para o reajuste de contratos de aluguel, mensalidades escolares, energia elétrica e diversos serviços.",
+            "pageDescription": "Na Kitnets.com, você acompanha o IGP-M atualizado mensalmente, com dados históricos completos desde 01/01/1995 até hoje, gráficos interativos, mapa de calor mensal e tabelas detalhadas para análise precisa e confiável.",
+            "sections": [
+                {
+                    "title": "O que é o IGP-M?",
+                    "text": "O IGP-M é um índice de inflação calculado mensalmente pela Fundação Getulio Vargas (FGV). Ele mede a variação de preços em diferentes etapas da economia, desde a produção até o consumo final, o que explica sua alta sensibilidade a câmbio, commodities e choques econômicos globais. Por essa abrangência, o índice ficou conhecido como “inflação do aluguel”, sendo referência em milhões de contratos no Brasil."
+                },
+                {
+                    "title": "Como o IGP-M é calculado?",
+                    "text": "O cálculo do IGP-M é baseado em uma média ponderada de três subíndices, cada um representando um estágio distinto da economia:",
+                    "items": [
+                        {
+                            "title": "📦 IPA – Índice de Preços ao Produtor Amplo (60%)",
+                            "text": "Monitora preços no atacado, com forte influência de commodities agrícolas, industriais e variações cambiais."
+                        },
+                        {
+                            "title": "🛒 IPC – Índice de Preços ao Consumidor (30%)",
+                            "text": "Acompanha a variação de preços de bens e serviços consumidos pelas famílias."
+                        },
+                        {
+                            "title": "🏗️ INCC – Índice Nacional de Custo da Construção (10%)",
+                            "text": "Reflete os custos de materiais, mão de obra e serviços da construção civil."
+                        },
+                        {
+                            "title": "📅 Período de coleta",
+                            "text": "Do dia 21 do mês anterior ao dia 20 do mês de referência, permitindo capturar variações recentes de preços com maior rapidez."
+                        }
+                    ]
+                },
+                {
+                    "title": "IGP-M Hoje: acompanhe em tempo real",
+                    "text": "Na página do IGP-M da Kitnets.com, você encontra:",
+                    "list": [
+                        "✅ IGP-M do mês atual",
+                        "✅ IGP-M acumulado em 12 meses",
+                        "✅ IGP-M acumulado no ano",
+                        "✅ Data oficial da próxima divulgação",
+                        "✅ Filtros por período personalizado",
+                        "✅ Histórico completo desde 1995"
+                    ],
+                    "items": [
+                        {
+                            "title": "Visualização Intuitiva",
+                            "text": "Tudo isso em um único lugar, com dados claros e visualização intuitiva."
+                        }
+                    ]
+                },
+                {
+                    "title": "Histórico do IGP-M desde 1995",
+                    "text": "A Kitnets.com disponibiliza uma das séries históricas mais completas do IGP-M, ideal para análise de contratos antigos, simulações de reajuste de aluguel, estudos econômicos e acadêmicos, e decisões de investimento imobiliário. Você pode explorar a evolução do índice ao longo de décadas e identificar ciclos de alta, estabilidade e deflação."
+                },
+                {
+                    "title": "Gráfico de evolução do IGP-M",
+                    "text": "O gráfico interativo permite visualizar variação mensal do índice, períodos de inflação elevada, fases de deflação e o impacto de crises econômicas e ciclos globais. Essa visualização facilita a compreensão do comportamento do índice ao longo do tempo."
+                },
+                {
+                    "title": "Mapa de calor mensal do IGP-M",
+                    "text": "O mapa de calor apresenta o comportamento do IGP-M mês a mês, ano a ano, com cores intuitivas que ajudam a identificar rapidamente meses de alta inflação, períodos de deflação, padrões sazonais e volatilidade do índice. É uma ferramenta poderosa para quem analisa reajustes contratuais e tendências históricas."
+                },
+                {
+                    "title": "IGP-M e reajuste de aluguel",
+                    "text": "O IGP-M é amplamente usado em contratos de locação no Brasil. Seu impacto é direto: inflação alta leva a reajustes mais agressivos, enquanto deflação pode levar a reajustes reduzidos ou até negativos. Por isso, acompanhar o índice é essencial para proprietários, inquilinos, imobiliárias e investidores que desejam negociar contratos de forma justa e informada."
+                },
+                {
+                    "title": "IGP-M ou IPCA: qual é melhor?",
+                    "text": "Nos últimos anos, muitos contratos passaram a substituir o IGP-M pelo IPCA devido à alta volatilidade do IGP-M, especialmente em períodos de choque cambial e commodities. Na Kitnets.com, você pode comparar facilmente diferentes índices e entender qual faz mais sentido para cada tipo de contrato."
+                },
+                {
+                    "title": "Por que acompanhar o IGP-M na Kitnets.com?",
+                    "list": [
+                        "✔ Histórico completo desde 1995",
+                        "✔ Dados atualizados mensalmente",
+                        "✔ Gráficos claros e interativos",
+                        "✔ Mapa de calor exclusivo",
+                        "✔ Tabela detalhada mês a mês",
+                        "✔ Ferramenta ideal para aluguel e investimentos",
+                        "✔ Foco em mercado imobiliário brasileiro"
+                    ]
+                }
+            ],
+            "closing": "O IGP-M continua sendo um dos índices mais relevantes da economia brasileira, especialmente para o mercado imobiliário. Entender sua composição, acompanhar sua evolução e analisar seus impactos é fundamental para evitar surpresas em contratos e investimentos.",
+            "cta": "Na Kitnets.com, você encontra todas as informações do IGP-M em um só lugar, com transparência, profundidade histórica e ferramentas visuais que facilitam a tomada de decisão."
+        },
+        "inpc": {
+            "title": "Série Histórica do INPC desde 1995 (IBGE)",
+            "description": "A Série Histórica do INPC apresenta a evolução completa do Índice Nacional de Preços ao Consumidor, calculado mensalmente pelo IBGE, desde janeiro de 1995 até a data mais recente disponível.",
+            "pageDescription": "Na Kitnets.com, você acompanha o INPC histórico mês a mês, com dados oficiais, gráficos interativos, tabela detalhada e mapa de calor mensal — tudo em um único lugar, de forma clara e confiável.",
+            "sections": [
+                {
+                    "title": "O que é o INPC?",
+                    "text": "O INPC (Índice Nacional de Preços ao Consumidor) mede a variação dos preços de bens e serviços consumidos por famílias com renda mensal entre 1 e 5 salários mínimos. Por refletir o custo de vida da população de menor renda, o INPC é amplamente utilizado para:",
+                    "list": [
+                        "Reajuste de salários e acordos coletivos",
+                        "Correção de benefícios previdenciários",
+                        "Atualização de contratos trabalhistas",
+                        "Estudos econômicos e análises de inflação"
+                    ]
+                },
+                {
+                    "title": "Série Histórica do INPC: dados desde 1995",
+                    "text": "A série histórica do INPC é especialmente relevante porque começa em 1995, após a implementação do Plano Real, permitindo análises consistentes da inflação brasileira ao longo de diferentes ciclos econômicos. Na Kitnets.com, a série histórica do INPC inclui:",
+                    "list": [
+                        "INPC mês a mês desde 1995",
+                        "Variação mensal (%)",
+                        "INPC acumulado no ano",
+                        "INPC acumulado em 12 meses",
+                        "Gráfico histórico interativo",
+                        "Mapa de calor mensal por ano",
+                        "Tabela completa com dados detalhados"
+                    ],
+                    "items": [
+                        {
+                            "title": "Dados Oficiais",
+                            "text": "Todos os dados são baseados em fontes oficiais do IBGE e atualizados mensalmente."
+                        }
+                    ]
+                },
+                {
+                    "title": "Para que serve a série histórica do INPC?",
+                    "text": "A análise do INPC histórico é fundamental para:",
+                    "list": [
+                        "Avaliar a perda ou ganho do poder de compra ao longo do tempo",
+                        "Comparar diferentes períodos econômicos",
+                        "Negociar reajustes salariais de forma mais justa",
+                        "Planejar finanças pessoais e familiares",
+                        "Realizar estudos acadêmicos e econômicos"
+                    ],
+                    "items": [
+                        {
+                            "title": "Contexto e Decisão",
+                            "text": "Diferente do “INPC hoje”, a série histórica permite contexto, comparação e decisões mais informadas."
+                        }
+                    ]
+                },
+                {
+                    "title": "INPC x IPCA: qual a diferença?",
+                    "text": "Embora ambos sejam calculados pelo IBGE, os índices têm objetivos distintos. Por isso, o INPC tende a refletir de forma mais direta o impacto da inflação no orçamento das famílias de menor renda.",
+                    "items": [
+                        {
+                            "title": "INPC",
+                            "text": "Famílias com renda de 1 a 5 salários mínimos, foco em salários e benefícios."
+                        },
+                        {
+                            "title": "IPCA",
+                            "text": "Famílias com renda de 1 a 40 salários mínimos, usado como meta oficial de inflação."
+                        }
+                    ]
+                },
+                {
+                    "title": "INPC histórico e custo de vida no Brasil",
+                    "text": "O INPC histórico é um importante termômetro do custo de vida real no Brasil. Sua variação ao longo dos anos revela:",
+                    "list": [
+                        "Pressão dos alimentos no orçamento",
+                        "Impacto do transporte e da habitação",
+                        "Momentos de alta e baixa inflação",
+                        "Efeitos de crises econômicas no dia a dia das famílias"
+                    ],
+                    "items": [
+                        {
+                            "title": "Impacto Real",
+                            "text": "Acompanhar essa série ajuda a entender como a inflação afeta diretamente o consumo básico da população."
+                        }
+                    ]
+                },
+                {
+                    "title": "Consulte a Série Histórica do INPC na Kitnets.com",
+                    "text": "Se você procura dados completos, confiáveis e fáceis de analisar, a Kitnets.com oferece uma das visualizações mais completas da série histórica do INPC desde 1995."
+                }
+            ],
+            "cta": "Acesse agora o INPC histórico completo, com gráficos, tabela e mapa de calor."
         }
     }
 }

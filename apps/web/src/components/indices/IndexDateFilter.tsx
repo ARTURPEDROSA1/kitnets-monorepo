@@ -8,15 +8,22 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
-export function IndexDateFilter() {
+export interface IndexDateFilterProps {
+    defaultStartDate?: string;
+    defaultEndDate?: string;
+}
+
+export function IndexDateFilter({ defaultStartDate, defaultEndDate }: IndexDateFilterProps) {
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
 
     // Get initial values from URL or defaults
-    const initialStartDate = searchParams.get("startDate") || "";
-    const initialEndDate = searchParams.get("endDate") || "";
+    const urlStartDate = searchParams.get("startDate");
+    const urlEndDate = searchParams.get("endDate");
 
+    const initialStartDate = urlStartDate !== null ? urlStartDate : (defaultStartDate || "");
+    const initialEndDate = urlEndDate !== null ? urlEndDate : (defaultEndDate || "");
 
     const [startDate, setStartDate] = useState(initialStartDate);
     const [endDate, setEndDate] = useState(initialEndDate);

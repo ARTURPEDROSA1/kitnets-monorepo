@@ -23,6 +23,7 @@ export async function submitWaitlist(data: WaitlistData): Promise<WaitlistResult
         profile_type: profile,
         cpf: identity.cpf || null,
         cnpj: identity.cnpj || null,
+        creci: identity.creci || null,
         business_name: identity.businessName || null,
         trade_name: identity.tradeName || null,
         portfolio_size: portfolioSize,
@@ -36,7 +37,7 @@ export async function submitWaitlist(data: WaitlistData): Promise<WaitlistResult
         partners_json: identity.partners ? JSON.stringify(identity.partners) : null,
         name: contact.name,
         email: contact.email,
-        whatsapp: contact.whatsapp,
+        whatsapp: contact.whatsapp ? `${contact.ddi || '+55'}${contact.whatsapp.replace(/\D/g, '')}` : null,
         status: 'pending'
     };
 

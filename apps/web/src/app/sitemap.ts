@@ -36,6 +36,9 @@ const staticRoutes = [
     'signup/imobiliaria',
     'signup/proprietario',
     'termos-de-uso',
+    'calculadora-independencia-financeira',
+    'new-listing',
+    'waitlist',
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

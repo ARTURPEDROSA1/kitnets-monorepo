@@ -4,7 +4,7 @@ import React from "react";
 import { useWaitlist } from "./WaitlistContext";
 import { StepLayout } from "./StepLayout";
 import { SelectCard } from "./SelectCard";
-import { User, Building, Handshake } from "lucide-react"; // Using similar icons
+import { UserRound, Building2, Store } from "lucide-react"; // Updated icons
 import { LegalProfile } from "./types";
 import { Button } from "@kitnets/ui";
 
@@ -16,19 +16,19 @@ export function Step1Profile() {
             value: "pf",
             label: "Pessoa Física (PF)",
             desc: "Proprietário(a) de imóveis",
-            icon: <User className="w-6 h-6" />,
+            icon: <UserRound className="w-6 h-6" />,
         },
         {
             value: "pj",
             label: "Pessoa Jurídica (PJ)",
             desc: "Holding, empresa ou investidor",
-            icon: <Building className="w-6 h-6" />
+            icon: <Building2 className="w-6 h-6" />
         },
         {
             value: "imobiliaria",
             label: "Imobiliária / Corretor",
             desc: "Administração para terceiros",
-            icon: <Handshake className="w-6 h-6" />
+            icon: <Store className="w-6 h-6" />
         },
     ];
 
