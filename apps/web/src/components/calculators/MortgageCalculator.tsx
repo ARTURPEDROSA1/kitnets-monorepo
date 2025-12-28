@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { calculateMortgageWithComparisons, MortgageInputs, System, ExtraPayment, AmortizationEffect } from '@/lib/mortgage';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
-import { Trash2, Plus, Settings, TrendingDown, Maximize2, Minimize2, FileSpreadsheet, FileText, Lock, User, Mail, CheckCircle2 } from 'lucide-react';
+import { Trash2, Plus, Settings, TrendingDown, Maximize2, Minimize2, FileSpreadsheet, FileText, Lock, User, Mail, CheckCircle2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { saveLead } from "@/app/actions/capture-lead";
 
 // UI Helpers using Semantic Colors
@@ -54,25 +54,38 @@ const formatCurrency = (value: number) => {
 };
 
 const MoneyInput = ({ value, onChange, className, ...props }: { value: number | string, onChange: (value: number | string) => void, className?: string } & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) => {
+    const displayValue = useMemo(() => {
+        if (value === "" || value === undefined || value === null) return "";
+        const num = Number(value);
+        if (isNaN(num)) return "";
+        return num.toLocaleString("pt-BR", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        });
+    }, [value]);
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const rawValue = e.target.value.replace(/\D/g, '');
-        if (rawValue === '') {
-            onChange('');
-        } else {
-            onChange(Number(rawValue));
+        const raw = e.target.value.replace(/\D/g, "");
+        if (raw === "") {
+            onChange("");
+            return;
         }
+        const val = Number(raw) / 100;
+        onChange(val);
     };
 
-    const formattedValue = value === '' ? '' : new Intl.NumberFormat('pt-BR').format(Number(value));
-
     return (
-        <Input
-            type="text"
-            value={formattedValue}
-            onChange={handleChange}
-            className={className}
-            {...props}
-        />
+        <div className={`relative w-full ${className || ''}`}>
+            <span className="absolute left-3 top-0 h-full flex items-center text-muted-foreground pointer-events-none">R$</span>
+            <Input
+                type="text"
+                inputMode="numeric"
+                value={displayValue}
+                onChange={handleChange}
+                className="pl-9"
+                {...props}
+            />
+        </div>
     );
 };
 
@@ -176,6 +189,8 @@ export function MortgageCalculator() {
     const [mipRate, setMipRate] = useState<number | string>(0.000445); // 0.0445%
     const [dfiRate, setDfiRate] = useState<number | string>(0.0001); // 0.01%
     const [isTableExpanded, setIsTableExpanded] = useState(false);
+    const [downPaymentWarning, setDownPaymentWarning] = useState<string | null>(null);
+    const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
 
     // Extra Payments
     const [extraPayments, setExtraPayments] = useState<ExtraPayment[]>([]);
@@ -232,6 +247,46 @@ export function MortgageCalculator() {
 
     const result = useMemo(() => calculateMortgageWithComparisons(inputs), [inputs]);
 
+    const sortedSchedule = useMemo(() => {
+        if (!sortConfig) return result.schedule;
+        return [...result.schedule].sort((a: any, b: any) => {
+            let aValue = a[sortConfig.key];
+            let bValue = b[sortConfig.key];
+
+            // Handle special case for 'insurance' which is a sum of mip + dfi
+            if (sortConfig.key === 'insurance') {
+                aValue = a.mip + a.dfi;
+                bValue = b.mip + b.dfi;
+            }
+
+            if (aValue < bValue) {
+                return sortConfig.direction === 'asc' ? -1 : 1;
+            }
+            if (aValue > bValue) {
+                return sortConfig.direction === 'asc' ? 1 : -1;
+            }
+            return 0;
+        });
+    }, [result.schedule, sortConfig]);
+
+    const requestSort = (key: string) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const getSortIcon = (key: string) => {
+        if (!sortConfig || sortConfig.key !== key) {
+            return <ArrowUpDown className="ml-2 h-3 w-3 text-muted-foreground" />;
+        }
+        if (sortConfig.direction === 'asc') {
+            return <ArrowUp className="ml-2 h-3 w-3 text-primary" />;
+        }
+        return <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
+    };
+
     // Handlers
     const addExtraPayment = () => {
         setExtraPayments([...extraPayments, {
@@ -261,6 +316,16 @@ export function MortgageCalculator() {
             }
         }
         setExtraPayments(newEvts.sort((a, b) => a.month - b.month));
+    };
+
+    const handleDownPaymentBlur = () => {
+        const minDownPayment = Number(propertyValue) * 0.20;
+        if (Number(downPayment) < minDownPayment) {
+            setDownPayment(minDownPayment);
+            setDownPaymentWarning(`Entrada ajustada para 20% do valor do imóvel (${formatCurrency(minDownPayment)})`);
+        } else {
+            setDownPaymentWarning(null);
+        }
     };
 
     const exportToCSV = () => {
@@ -318,18 +383,26 @@ export function MortgageCalculator() {
                             className="mt-1"
                             onBlur={() => trackModification('propertyValue')}
                         />
-                        <p className="text-xs text-muted-foreground mt-1">{formatCurrency(Number(propertyValue))}</p>
+
                     </div>
 
                     <div>
-                        <Label>Entrada (Down Payment)</Label>
+                        <Label>Entrada</Label>
                         <MoneyInput
                             value={downPayment}
-                            onChange={setDownPayment}
+                            onChange={(val) => {
+                                setDownPayment(val);
+                                setDownPaymentWarning(null);
+                            }}
                             className="mt-1"
-                            onBlur={() => trackModification('downPayment')}
+                            onBlur={() => {
+                                trackModification('downPayment');
+                                handleDownPaymentBlur();
+                            }}
                         />
-                        <p className="text-xs text-muted-foreground mt-1">{formatCurrency(Number(downPayment))}</p>
+                        {downPaymentWarning && (
+                            <p className="text-xs text-amber-600 mt-1 font-medium">{downPaymentWarning}</p>
+                        )}
                     </div>
 
                     <div className="p-3 bg-muted rounded-md">
@@ -617,17 +690,52 @@ export function MortgageCalculator() {
                             <table className="w-full text-sm text-left text-foreground">
                                 <thead className="text-xs text-muted-foreground uppercase bg-muted sticky top-0 z-10">
                                     <tr>
-                                        <th className="px-4 py-3">Mês</th>
-                                        <th className="px-4 py-3 text-right">Parcela</th>
-                                        <th className="px-4 py-3 text-right">Amort.</th>
-                                        <th className="px-4 py-3 text-right">Juros</th>
-                                        <th className="px-4 py-3 text-right">Seguros</th>
-                                        <th className="px-4 py-3 text-right font-bold">Extra</th>
-                                        <th className="px-4 py-3 text-right">Saldo</th>
+                                        <th className="px-4 py-3 cursor-pointer hover:text-foreground transition-colors text-center" onClick={() => requestSort('month')}>
+                                            <div className="flex items-center justify-center">
+                                                Mês
+                                                {getSortIcon('month')}
+                                            </div>
+                                        </th>
+                                        <th className="px-4 py-3 cursor-pointer hover:text-foreground transition-colors text-right" onClick={() => requestSort('payment')}>
+                                            <div className="flex items-center justify-end">
+                                                Parcela
+                                                {getSortIcon('payment')}
+                                            </div>
+                                        </th>
+                                        <th className="px-4 py-3 cursor-pointer hover:text-foreground transition-colors text-right" onClick={() => requestSort('amortization')}>
+                                            <div className="flex items-center justify-end">
+                                                Amort.
+                                                {getSortIcon('amortization')}
+                                            </div>
+                                        </th>
+                                        <th className="px-4 py-3 cursor-pointer hover:text-foreground transition-colors text-right" onClick={() => requestSort('interest')}>
+                                            <div className="flex items-center justify-end">
+                                                Juros
+                                                {getSortIcon('interest')}
+                                            </div>
+                                        </th>
+                                        <th className="px-4 py-3 cursor-pointer hover:text-foreground transition-colors text-right" onClick={() => requestSort('insurance')}>
+                                            <div className="flex items-center justify-end">
+                                                Seguros
+                                                {getSortIcon('insurance')}
+                                            </div>
+                                        </th>
+                                        <th className="px-4 py-3 cursor-pointer hover:text-foreground transition-colors text-right font-bold" onClick={() => requestSort('extraAmortization')}>
+                                            <div className="flex items-center justify-end">
+                                                Extra
+                                                {getSortIcon('extraAmortization')}
+                                            </div>
+                                        </th>
+                                        <th className="px-4 py-3 cursor-pointer hover:text-foreground transition-colors text-right" onClick={() => requestSort('balance')}>
+                                            <div className="flex items-center justify-end">
+                                                Saldo
+                                                {getSortIcon('balance')}
+                                            </div>
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {result.schedule.map((row) => (
+                                    {sortedSchedule.map((row) => (
                                         <tr key={row.month} className="border-b border-border hover:bg-muted/50">
                                             <td className="px-4 py-3 text-center text-muted-foreground">{row.month}</td>
                                             <td className="px-4 py-3 text-right font-medium">{formatCurrency(row.payment)}</td>

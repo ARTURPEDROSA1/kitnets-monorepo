@@ -29,9 +29,23 @@ export function Sidebar({ lang }: { lang: string }) {
 
     const dict = getDictionary(lang);
 
-    // Close mobile sidebar on route change
+    // Detect active section and update sidebar view
     React.useEffect(() => {
-        setIsMobileOpen(false);
+        setIsMobileOpen(false); // Close mobile sidebar on route change
+
+        if (pathname.includes('calculadora')) {
+            setSidebarView('calculators-menu');
+        } else if (pathname.includes('/indices/')) {
+            setSidebarView('indices-menu');
+        } else if (pathname.includes('/alugar')) {
+            setSidebarView('rent-filters');
+        } else if (pathname.includes('/comprar')) {
+            setSidebarView('buy-filters');
+        } else if (pathname.includes('/lancamentos')) {
+            setSidebarView('launches-filters');
+        } else {
+            setSidebarView('main');
+        }
     }, [pathname]);
 
     const toggleSection = (section: string) => {

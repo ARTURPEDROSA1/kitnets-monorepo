@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Calculator, Coins, TrendingUp, AlertTriangle, Info, Printer } from "lucide-react";
+import { Calculator, Coins, TrendingUp, AlertTriangle, Info, Printer, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -37,6 +37,42 @@ import { Lock } from "lucide-react";
 
 import { Dictionary } from "@/dictionaries";
 
+const MoneyInput = ({ value, onChange, className, ...props }: { value: number | string, onChange: (value: number | string) => void, className?: string } & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) => {
+    const displayValue = React.useMemo(() => {
+        if (value === "" || value === undefined || value === null) return "";
+        const num = Number(value);
+        if (isNaN(num)) return "";
+        return num.toLocaleString("pt-BR", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        });
+    }, [value]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const raw = e.target.value.replace(/\D/g, "");
+        if (raw === "") {
+            onChange("");
+            return;
+        }
+        const val = Number(raw) / 100;
+        onChange(val);
+    };
+
+    return (
+        <div className={`relative w-full ${className || ''}`}>
+            <span className="absolute left-3 top-0 h-full flex items-center text-muted-foreground pointer-events-none">R$</span>
+            <Input
+                type="text"
+                inputMode="numeric"
+                value={displayValue}
+                onChange={handleChange}
+                className="pl-9"
+                {...props}
+            />
+        </div>
+    );
+};
+
 export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictionary; lang: string }) {
     const t = dict.financialIndependenceCalculator?.inputs;
     const r = dict.financialIndependenceCalculator?.results;
@@ -65,7 +101,10 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
     const [withdrawalRealReturnAnnual, setWithdrawalRealReturnAnnual] = React.useState<string>("4");
 
     // Toggle
+    // Toggle
     const [isRealMode, setIsRealMode] = React.useState<boolean>(true);
+    const [sortConfig, setSortConfig] = React.useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
+    const [sortWithdrawalConfig, setSortWithdrawalConfig] = React.useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
 
     // Lead Capture State
     const [usageCount, setUsageCount] = React.useState(0);
@@ -171,7 +210,7 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
     const wdMonths = withdrawalYearsVal * 12;
 
     // Accumulation Arrays
-    const accumulationData = [];
+    const accumulationData: { month: number; year: number; balance: number; principal: number; interest: number }[] = [];
     let currentBalance = initialCapitalVal;
     let currentPrincipal = initialCapitalVal;
 
@@ -218,7 +257,7 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
     const finiteWithdrawalNet = finiteWithdrawalGross - finiteTax;
 
     // Scenario A Data Generation
-    const withdrawalDataA = [];
+    const withdrawalDataA: { year: number; balance: number }[] = [];
     let balanceA = totalAccumulated;
     for (let i = 0; i <= wdMonths; i += 12) {
         if (i === 0) {
@@ -246,7 +285,7 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
     const perpetualWithdrawalNet = perpetualWithdrawalGross - perpetualTax;
 
     // Scenario B Data Generation
-    const withdrawalDataB = [];
+    const withdrawalDataB: { year: number; balance: number }[] = [];
     let balanceB = totalAccumulated;
     const inflationMonthly = Math.pow(1 + inflationVal / 100, 1 / 12) - 1;
 
@@ -281,6 +320,91 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
     };
 
     const isInflationError = inflationVal >= nominalReturnVal;
+
+    const sortedAccumulationData = React.useMemo(() => {
+        if (!sortConfig) return accumulationData;
+        return [...accumulationData].sort((a: any, b: any) => {
+            if (a[sortConfig.key] < b[sortConfig.key]) {
+                return sortConfig.direction === 'asc' ? -1 : 1;
+            }
+            if (a[sortConfig.key] > b[sortConfig.key]) {
+                return sortConfig.direction === 'asc' ? 1 : -1;
+            }
+            return 0;
+        });
+    }, [accumulationData, sortConfig]);
+
+    const requestSort = (key: string) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const getSortIcon = (key: string) => {
+        if (!sortConfig || sortConfig.key !== key) {
+            return <ArrowUpDown className="ml-2 h-3 w-3 text-muted-foreground" />;
+        }
+        if (sortConfig.direction === 'asc') {
+            return <ArrowUp className="ml-2 h-3 w-3 text-primary" />;
+        }
+        return <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
+    };
+
+    const combinedWithdrawalData = React.useMemo(() => {
+        const netMultiplier = 1 - (gainRatio * (taxRateVal / 100));
+
+        return withdrawalDataA.map((item, index) => {
+            const balanceB = withdrawalDataB[index]?.balance || 0;
+            // Income A is constant annuity as long as we have balance (simplified)
+            // Or strictly, if previous balance was > 0.
+            // For display, if balance is 0, we assume income stopped.
+            const incomeA = item.balance > 0 ? finiteWithdrawalNet : 0;
+
+            // Income B derives from the balance base of that year
+            const incomeB = balanceB * withdrawalMonthlyRate * netMultiplier;
+
+            return {
+                year: item.year,
+                balanceA: item.balance,
+                balanceB: balanceB,
+                incomeA,
+                incomeB
+            };
+        });
+    }, [withdrawalDataA, withdrawalDataB, finiteWithdrawalNet, withdrawalMonthlyRate, gainRatio, taxRateVal]);
+
+    const sortedWithdrawalData = React.useMemo(() => {
+        if (!sortWithdrawalConfig) return combinedWithdrawalData;
+        return [...combinedWithdrawalData].sort((a: any, b: any) => {
+            if (a[sortWithdrawalConfig.key] < b[sortWithdrawalConfig.key]) {
+                return sortWithdrawalConfig.direction === 'asc' ? -1 : 1;
+            }
+            if (a[sortWithdrawalConfig.key] > b[sortWithdrawalConfig.key]) {
+                return sortWithdrawalConfig.direction === 'asc' ? 1 : -1;
+            }
+            return 0;
+        });
+    }, [combinedWithdrawalData, sortWithdrawalConfig]);
+
+    const requestWithdrawalSort = (key: string) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortWithdrawalConfig && sortWithdrawalConfig.key === key && sortWithdrawalConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortWithdrawalConfig({ key, direction });
+    };
+
+    const getWithdrawalSortIcon = (key: string) => {
+        if (!sortWithdrawalConfig || sortWithdrawalConfig.key !== key) {
+            return <ArrowUpDown className="ml-2 h-3 w-3 text-muted-foreground" />;
+        }
+        if (sortWithdrawalConfig.direction === 'asc') {
+            return <ArrowUp className="ml-2 h-3 w-3 text-primary" />;
+        }
+        return <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
+    };
 
     return (
         <div className="space-y-12">
@@ -362,18 +486,16 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
                         <div className="space-y-4">
                             <div className="space-y-2">
                                 <Label>{t?.initialCapital}</Label>
-                                <Input
-                                    type="number"
+                                <MoneyInput
                                     value={initialCapital}
-                                    onChange={(e) => { if (checkCap()) setInitialCapital(e.target.value); }}
+                                    onChange={(val) => { if (checkCap()) setInitialCapital(val.toString()); }}
                                 />
                             </div>
                             <div className="space-y-2">
                                 <Label>{t?.monthlyContribution}</Label>
-                                <Input
-                                    type="number"
+                                <MoneyInput
                                     value={monthlyContribution}
-                                    onChange={(e) => { if (checkCap()) setMonthlyContribution(e.target.value); }}
+                                    onChange={(val) => { if (checkCap()) setMonthlyContribution(val.toString()); }}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -627,21 +749,108 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
                     <table className="w-full text-sm text-left">
                         <thead className="bg-muted text-muted-foreground font-medium sticky top-0">
                             <tr>
-                                <th className="px-6 py-3">{tableLabels?.year}</th>
-                                <th className="px-6 py-3">{tableLabels?.initialCapital}</th>
-                                <th className="px-6 py-3">{tableLabels?.contributions}</th>
-                                <th className="px-6 py-3">{tableLabels?.yield}</th>
-                                <th className="px-6 py-3">{tableLabels?.finalCapital}</th>
+                                <th className="px-6 py-3 cursor-pointer hover:text-foreground transition-colors" onClick={() => requestSort('year')}>
+                                    <div className="flex items-center">
+                                        {tableLabels?.year}
+                                        {getSortIcon('year')}
+                                    </div>
+                                </th>
+                                <th className="px-6 py-3 cursor-pointer hover:text-foreground transition-colors" onClick={() => requestSort('principal')}>
+                                    <div className="flex items-center">
+                                        {tableLabels?.initialCapital}
+                                        {getSortIcon('principal')}
+                                    </div>
+                                </th>
+                                <th className="px-6 py-3 cursor-pointer hover:text-foreground transition-colors" onClick={() => requestSort('contributions')}>
+                                    <div className="flex items-center">
+                                        {tableLabels?.contributions}
+                                        {getSortIcon('contributions')}
+                                    </div>
+                                </th>
+                                <th className="px-6 py-3 cursor-pointer hover:text-foreground transition-colors" onClick={() => requestSort('interest')}>
+                                    <div className="flex items-center">
+                                        {tableLabels?.yield}
+                                        {getSortIcon('interest')}
+                                    </div>
+                                </th>
+                                <th className="px-6 py-3 cursor-pointer hover:text-foreground transition-colors" onClick={() => requestSort('balance')}>
+                                    <div className="flex items-center">
+                                        {tableLabels?.finalCapital}
+                                        {getSortIcon('balance')}
+                                    </div>
+                                </th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
-                            {accumulationData.map((row) => (
+                            {sortedAccumulationData.map((row) => (
                                 <tr key={row.year} className="hover:bg-muted/50">
                                     <td className="px-6 py-3">{row.year}</td>
                                     <td className="px-6 py-3">{formatCurrency(row.principal - (row.year * 12 * monthlyContributionVal))}</td>
                                     <td className="px-6 py-3">{formatCurrency(row.year * 12 * monthlyContributionVal)}</td>
                                     <td className="px-6 py-3 text-green-600">{formatCurrency(row.interest)}</td>
                                     <td className="px-6 py-3 font-medium">{formatCurrency(row.balance)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* Withdrawal Table */}
+            <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden mt-8">
+                <div className="p-6 border-b border-border flex justify-between items-center">
+                    <h3 className="text-lg font-semibold">{t?.section2} - {isRealMode ? "Valores Reais (IPCA Ajustado)" : "Valores Nominais"}</h3>
+                    <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => window.print()}>
+                            <Printer className="h-4 w-4 mr-2" />
+                            PDF
+                        </Button>
+                    </div>
+                </div>
+                <div className="overflow-x-auto max-h-[400px]">
+                    <table className="w-full text-sm text-left">
+                        <thead className="bg-muted text-muted-foreground font-medium sticky top-0">
+                            <tr>
+                                <th className="px-6 py-3 cursor-pointer hover:text-foreground transition-colors" onClick={() => requestWithdrawalSort('year')}>
+                                    <div className="flex items-center">
+                                        {tableLabels?.year}
+                                        {getWithdrawalSortIcon('year')}
+                                    </div>
+                                </th>
+                                <th className="px-6 py-3 cursor-pointer hover:text-foreground transition-colors text-right" onClick={() => requestWithdrawalSort('incomeA')}>
+                                    <div className="flex items-center justify-end">
+                                        Renda Mensal (A)
+                                        {getWithdrawalSortIcon('incomeA')}
+                                    </div>
+                                </th>
+                                <th className="px-6 py-3 cursor-pointer hover:text-foreground transition-colors text-right" onClick={() => requestWithdrawalSort('balanceA')}>
+                                    <div className="flex items-center justify-end">
+                                        Saldo (A)
+                                        {getWithdrawalSortIcon('balanceA')}
+                                    </div>
+                                </th>
+                                <th className="px-6 py-3 cursor-pointer hover:text-foreground transition-colors text-right" onClick={() => requestWithdrawalSort('incomeB')}>
+                                    <div className="flex items-center justify-end">
+                                        Renda Mensal (B)
+                                        {getWithdrawalSortIcon('incomeB')}
+                                    </div>
+                                </th>
+                                <th className="px-6 py-3 cursor-pointer hover:text-foreground transition-colors text-right" onClick={() => requestWithdrawalSort('balanceB')}>
+                                    <div className="flex items-center justify-end">
+                                        Saldo (B)
+                                        {getWithdrawalSortIcon('balanceB')}
+                                    </div>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                            {sortedWithdrawalData.map((row) => (
+                                <tr key={row.year} className="hover:bg-muted/50">
+                                    <td className="px-6 py-3">{row.year}</td>
+                                    <td className="px-6 py-3 font-medium text-right text-orange-600 dark:text-orange-500">{formatCurrency(row.incomeA)}</td>
+                                    <td className="px-6 py-3 font-medium text-right text-muted-foreground">{formatCurrency(row.balanceA)}</td>
+                                    <td className="px-6 py-3 font-medium text-right text-green-600 dark:text-green-500">{formatCurrency(row.incomeB)}</td>
+                                    <td className="px-6 py-3 font-medium text-right text-muted-foreground">{formatCurrency(row.balanceB)}</td>
                                 </tr>
                             ))}
                         </tbody>

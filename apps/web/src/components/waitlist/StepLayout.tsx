@@ -24,7 +24,7 @@ interface StepLayoutProps {
 }
 
 export function StepLayout({ title, subtitle, children, showBack = true }: StepLayoutProps) {
-    const { progress, prevStep, state } = useWaitlist();
+    const { prevStep, state } = useWaitlist();
 
     const handleBack = () => {
         if (state.currentStep > 0) {
@@ -32,13 +32,17 @@ export function StepLayout({ title, subtitle, children, showBack = true }: StepL
         }
     };
 
+    const totalDisplaySteps = WAITLIST_STEPS.length - 2; // Exclude landing and success
+    const currentDisplayStep = state.currentStep;
+    const effectiveProgress = (currentDisplayStep / totalDisplaySteps) * 100;
+
     return (
         <div className="min-h-screen flex flex-col bg-background text-foreground selection:bg-emerald-500/30">
             {/* Top Bar */}
             <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
                 <div className="max-w-xl mx-auto px-4 py-4">
                     <div className="flex items-center justify-between mb-2">
-                        {showBack && state.currentStep > 0 ? (
+                        {showBack && state.currentStep > 1 ? (
                             <button
                                 onClick={handleBack}
                                 className="p-2 -ml-2 rounded-full hover:bg-accent hover:text-accent-foreground transition-colors text-muted-foreground"
@@ -48,12 +52,12 @@ export function StepLayout({ title, subtitle, children, showBack = true }: StepL
                         ) : <div className="w-9" />}
 
                         <span className="text-xs font-semibold text-muted-foreground tracking-wider uppercase">
-                            Passo {state.currentStep + 1} de {WAITLIST_STEPS.length}
+                            Passo {currentDisplayStep} de {totalDisplaySteps}
                         </span>
 
                         <div className="w-9" />
                     </div>
-                    <ProgressBar progress={progress} />
+                    <ProgressBar progress={effectiveProgress} />
                 </div>
             </div>
 

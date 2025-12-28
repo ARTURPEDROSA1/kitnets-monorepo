@@ -39,6 +39,49 @@ const formatMonthYear = (monthIndex: number) => {
 
 // --- Components ---
 
+// Helper Component for Currency Input
+function CurrencyInput({
+    value,
+    onChange,
+    className,
+    ...props
+}: {
+    value: number | string;
+    onChange: (val: number | string) => void;
+    className?: string;
+} & Omit<React.ComponentProps<typeof Input>, "onChange" | "value">) {
+    const displayValue = useMemo(() => {
+        if (value === "" || value === undefined || value === null) return "";
+        const num = Number(value);
+        if (isNaN(num)) return "";
+        return num.toLocaleString("pt-BR", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        });
+    }, [value]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const raw = e.target.value.replace(/\D/g, "");
+        if (raw === "") {
+            onChange("");
+            return;
+        }
+        const val = Number(raw) / 100;
+        onChange(val);
+    };
+
+    return (
+        <Input
+            {...props}
+            type="text"
+            inputMode="numeric"
+            className={className}
+            value={displayValue}
+            onChange={handleChange}
+        />
+    );
+}
+
 function SuggestionForm() {
     const [suggestion, setSuggestion] = useState("");
     const [email, setEmail] = useState("");
@@ -479,11 +522,10 @@ export default function RentalIncomeCalculator() {
                                 <Label>Valor do Imóvel</Label>
                                 <div className="relative mt-1">
                                     <span className="absolute left-3 top-2.5 text-muted-foreground">R$</span>
-                                    <Input
-                                        type="number"
+                                    <CurrencyInput
                                         className="pl-9"
                                         value={propertyPrice}
-                                        onChange={e => setPropertyPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                                        onChange={val => setPropertyPrice(val)}
                                         onBlur={() => trackModification('propertyPrice')}
                                     />
                                 </div>
@@ -493,12 +535,11 @@ export default function RentalIncomeCalculator() {
                                 <Label>Entrada</Label>
                                 <div className="relative mt-1">
                                     <span className="absolute left-3 top-2.5 text-muted-foreground">R$</span>
-                                    <Input
-                                        type="number"
+                                    <CurrencyInput
                                         className="pl-9"
                                         value={downPayment}
-                                        onChange={e => {
-                                            setDownPayment(e.target.value === '' ? '' : Number(e.target.value));
+                                        onChange={val => {
+                                            setDownPayment(val);
                                             setDownPaymentWarning(null);
                                         }}
                                         onBlur={() => {
@@ -618,11 +659,10 @@ export default function RentalIncomeCalculator() {
                                 <Label>Aluguel Bruto Inicial</Label>
                                 <div className="relative mt-1">
                                     <span className="absolute left-3 top-2.5 text-muted-foreground">R$</span>
-                                    <Input
-                                        type="number"
+                                    <CurrencyInput
                                         className="pl-9"
                                         value={initialRent}
-                                        onChange={e => setInitialRent(e.target.value === '' ? '' : Number(e.target.value))}
+                                        onChange={val => setInitialRent(val)}
                                         onBlur={() => trackModification('initialRent')}
                                     />
                                 </div>
@@ -657,10 +697,10 @@ export default function RentalIncomeCalculator() {
                                 <div>
                                     <Label>Custos Mensais</Label>
                                     <div className="relative mt-1">
-                                        <span className="absolute left-2 top-2.5 text-muted-foreground text-xs">R$</span>
+                                        <span className="absolute left-3 top-2.5 text-muted-foreground">R$</span>
                                         <Input
                                             type="number"
-                                            className="pl-6"
+                                            className="pl-9"
                                             value={monthlyCosts}
                                             onChange={e => setMonthlyCosts(e.target.value === '' ? '' : Number(e.target.value))}
                                             onBlur={() => trackModification('monthlyCosts')}

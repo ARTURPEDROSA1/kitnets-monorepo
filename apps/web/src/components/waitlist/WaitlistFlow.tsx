@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useWaitlist } from "./WaitlistContext";
+import { Step0Landing } from "./Step0Landing";
 import { Step1Profile } from "./Step1Profile";
 import { Step2Identity } from "./Step2Identity";
 import { Step3Portfolio } from "./Step3Portfolio";
@@ -13,6 +14,8 @@ export function WaitlistFlow() {
     const { stepId } = useWaitlist();
 
     switch (stepId) {
+        case "landing":
+            return <Step0Landing />;
         case "profile":
             return <Step1Profile />;
         case "identity":

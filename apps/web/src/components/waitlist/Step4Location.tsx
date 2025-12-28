@@ -123,7 +123,6 @@ export function Step4Location() {
                             <Input
                                 value={state.data.location.number || ""}
                                 onChange={(e) => updateData({ location: { ...state.data.location, number: e.target.value } })}
-                                placeholder="123"
                                 className="h-14 text-lg text-center bg-card/50 dark:bg-zinc-900/50 border-input dark:border-white/10 text-foreground dark:text-white placeholder:text-muted-foreground focus-visible:ring-emerald-500/50"
                                 inputMode="numeric"
                             />
@@ -133,7 +132,6 @@ export function Step4Location() {
                             <Input
                                 value={state.data.location.complement || ""}
                                 onChange={(e) => updateData({ location: { ...state.data.location, complement: e.target.value } })}
-                                placeholder="Apto 101"
                                 className="h-14 text-lg bg-card/50 dark:bg-zinc-900/50 border-input dark:border-white/10 text-foreground dark:text-white placeholder:text-muted-foreground focus-visible:ring-emerald-500/50"
                             />
                         </div>
