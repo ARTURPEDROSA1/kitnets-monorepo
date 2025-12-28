@@ -923,6 +923,139 @@
             "sections": [],
             "closing": "All in one place.",
             "cta": "Track IVAR updates on Kitnets.com."
+        },
+        "igpm": {
+            "title": "IGP-M Today: Complete History, Charts, and Rent Adjustment",
+            "description": "The IGP-M (General Market Price Index) is one of Brazil's most important economic indicators, widely used for adjusting rent contracts, school tuitions, energy bills, and various services.",
+            "pageDescription": "On Kitnets.com, track IGP-M updated monthly, with complete historical data since 01/01/1995, interactive charts, monthly heatmap, and detailed tables for accurate and reliable analysis.",
+            "sections": [
+                {
+                    "title": "What is IGP-M?",
+                    "text": "The IGP-M is an inflation index calculated monthly by Fundação Getulio Vargas (FGV). It measures price variation at different economic stages, from production to final consumption, which explains its high sensitivity to exchange rates, commodities, and global economic shocks. Due to this scope, the index became known as 'rent inflation', being the reference for millions of contracts in Brazil."
+                },
+                {
+                    "title": "How is IGP-M calculated?",
+                    "text": "The calculation of IGP-M is based on a weighted average of three sub-indices, each representing a distinct stage of the economy:",
+                    "items": [
+                        {
+                            "title": "📦 IPA – Broad Producer Price Index (60%)",
+                            "text": "Monitors wholesale prices, with strong influence from agricultural commodities, industrial goods, and exchange rate variations."
+                        },
+                        {
+                            "title": "🛒 IPC – Consumer Price Index (30%)",
+                            "text": "Tracks price variation of goods and services consumed by families."
+                        },
+                        {
+                            "title": "🏗️ INCC – National Construction Cost Index (10%)",
+                            "text": "Reflects costs of materials, labor, and services in civil construction."
+                        },
+                        {
+                            "title": "📅 Collection period",
+                            "text": "From the 21st of the previous month to the 20th of the reference month, allowing for faster capture of recent price variations."
+                        }
+                    ]
+                },
+                {
+                    "title": "IGP-M Today: track in real time",
+                    "text": "On Kitnets.com's IGP-M page, you find:",
+                    "list": [
+                        "✅ Current month's IGP-M",
+                        "✅ IGP-M accumulated in 12 months",
+                        "✅ IGP-M accumulated in the year",
+                        "✅ Official date of next release",
+                        "✅ Custom period filters",
+                        "✅ Complete history since 1995"
+                    ],
+                    "items": [
+                        {
+                            "title": "Intuitive Visualization",
+                            "text": "All this in one place, with clear data and intuitive visualization."
+                        }
+                    ]
+                },
+                {
+                    "title": "IGP-M History since 1995",
+                    "text": "Kitnets.com provides one of the most complete historical IGP-M series, ideal for analyzing old contracts, simulating rent adjustments, economic and academic studies, and real estate investment decisions. You can explore the index evolution over decades and identify cycles of rise, stability, and deflation."
+                },
+                {
+                    "title": "IGP-M Evolution Chart",
+                    "text": "The interactive chart allows you to visualize monthly index variation, periods of high inflation, deflation phases, and the impact of economic crises and global cycles. This visualization facilitates understanding the index behavior over time."
+                },
+                {
+                    "title": "IGP-M Monthly Heatmap",
+                    "text": "The heatmap presents IGP-M behavior month by month, year by year, with intuitive colors helping to quickly identify high inflation months, deflation periods, seasonal patterns, and index volatility. It is a powerful tool for analyzing contract adjustments and historical trends."
+                },
+                {
+                    "title": "IGP-M and Rent Adjustment",
+                    "text": "IGP-M is widely used in rental contracts in Brazil. Its impact is direct: high inflation leads to more aggressive adjustments, while deflation can lead to reduced or even negative adjustments. Therefore, tracking the index is essential for owners, tenants, real estate agencies, and investors who want to negotiate contracts fairly and informed."
+                },
+                {
+                    "title": "IGP-M or IPCA: which is better?",
+                    "text": "In recent years, many contracts have switched from IGP-M to IPCA due to IGP-M's high volatility, especially during periods of exchange rate and commodity shocks. On Kitnets.com, you can easily compare different indices and understand which makes more sense for each type of contract."
+                },
+                {
+                    "title": "Why track IGP-M on Kitnets.com?",
+                    "list": [
+                        "✔ Complete history since 1995",
+                        "✔ Monthly updated data",
+                        "✔ Clear and interactive charts",
+                        "✔ Exclusive heatmap",
+                        "✔ Detailed month-by-month table",
+                        "✔ Ideal tool for renting and investing",
+                        "✔ Focus on Brazilian real estate market"
+                    ]
+                }
+            ],
+            "closing": "IGP-M remains one of the most relevant indices in the Brazilian economy, especially for the real estate market. Understanding its composition, following its evolution, and analyzing its impacts is fundamental to avoid surprises in contracts and investments.",
+            "cta": "On Kitnets.com, you find all IGP-M information in one place, with transparency, historical depth, and visual tools that facilitate decision making."
+        },
+        "inpc": {
+            "title": "INPC Historical Series since 1995 (IBGE)",
+            "description": "The INPC Historical Series presents the complete evolution of the National Consumer Price Index, calculated monthly by IBGE, from January 1995 to the most recent available date.",
+            "pageDescription": "On Kitnets.com, track historical INPC month by month, with official data, interactive charts, detailed table, and monthly heatmap — all in one place, clear and reliable.",
+            "sections": [
+                {
+                    "title": "What is INPC?",
+                    "text": "The INPC (National Consumer Price Index) measures price variation of goods and services consumed by families with monthly income between 1 and 5 minimum wages. Reflecting the cost of living for the lower-income population, INPC is widely used for:",
+                    "list": [
+                        "Salary adjustments and collective agreements",
+                        "Social security benefit corrections",
+                        "Labor contract updates",
+                        "Economic studies and inflation analysis"
+                    ]
+                },
+                {
+                    "title": "INPC Historical Series: data since 1995",
+                    "text": "The INPC historical series is especially relevant because it starts in 1995, after the implementation of the Real Plan, allowing for consistent analysis of Brazilian inflation across different economic cycles. On Kitnets.com, the INPC historical series includes:",
+                    "list": [
+                        "INPC month by month since 1995",
+                        "Monthly variation (%)",
+                        "INPC accumulated in the year",
+                        "INPC accumulated in 12 months",
+                        "Interactive historical chart",
+                        "Monthly heatmap by year",
+                        "Complete table with detailed data"
+                    ],
+                    "items": [
+                        {
+                            "title": "Official Data",
+                            "text": "All data is based on official IBGE sources and updated monthly."
+                        }
+                    ]
+                },
+                {
+                    "title": "What is the INPC historical series for?",
+                    "text": "Analyzing historical INPC is fundamental for:",
+                    "list": [
+                        "Evaluating loss or gain of purchasing power over time",
+                        "Comparing different economic periods",
+                        "Negotiating salary adjustments fairly",
+                        "Planning personal and family finances"
+                    ]
+                }
+            ],
+            "closing": "Kitnets.com organizes and simplifies access to INPC data, transforming complex numbers into useful information for your day-to-day.",
+            "cta": "Explore the complete INPC historical series and make decisions based on real data."
         }
     },
     "calculatorCta": {

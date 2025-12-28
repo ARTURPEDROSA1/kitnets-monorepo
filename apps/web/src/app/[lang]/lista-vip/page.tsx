@@ -1,6 +1,7 @@
 
 import { WaitlistProvider } from "@/components/waitlist/WaitlistContext";
 import { WaitlistFlow } from "@/components/waitlist/WaitlistFlow";
+import React from "react";
 
 const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://kitnets.com';
 
@@ -58,9 +59,11 @@ export default async function WaitlistPage() {
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
             />
-            <WaitlistProvider>
-                <WaitlistFlow />
-            </WaitlistProvider>
+            <React.Suspense fallback={<div>Loading...</div>}>
+                <WaitlistProvider>
+                    <WaitlistFlow />
+                </WaitlistProvider>
+            </React.Suspense>
         </>
     );
 }
