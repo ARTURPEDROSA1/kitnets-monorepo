@@ -104,8 +104,8 @@ export async function getIndexValues(indexId: string, limit = 36): Promise<Index
 
         return {
             ...item,
-            accumulated_12m: item.accumulated_12m ?? accumulated12m,
-            accumulated_year: item.accumulated_year ?? accumulatedYear
+            accumulated_12m: accumulated12m ?? item.accumulated_12m,
+            accumulated_year: accumulatedYear ?? item.accumulated_year
         };
     });
 
@@ -201,8 +201,8 @@ export async function getIndexValuesByDateRange(indexId: string, startDate?: str
 
         return {
             ...item,
-            accumulated_12m: item.accumulated_12m ?? accumulated12m,
-            accumulated_year: item.accumulated_year ?? accumulatedYear
+            accumulated_12m: accumulated12m ?? item.accumulated_12m,
+            accumulated_year: accumulatedYear ?? item.accumulated_year
         };
     });
 
