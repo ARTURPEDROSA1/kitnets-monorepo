@@ -198,9 +198,6 @@ export default async function IndexPage({ params, searchParams }: Props) {
                             <p className="text-xs text-muted-foreground mt-1">
                                 Referente a {latest ? `${latest.month.toString().padStart(2, '0')}/${latest.year}` : '--'}
                             </p>
-                            <p className="text-[10px] text-muted-foreground/60 mt-0.5">
-                                Atualizado em {latest ? new Date(latest.reference_date).toLocaleDateString('pt-BR') : '--'}
-                            </p>
                         </div>
                     </div>
 
@@ -216,9 +213,6 @@ export default async function IndexPage({ params, searchParams }: Props) {
                             <p className="text-xs text-muted-foreground mt-1">
                                 Últimos 12 meses
                             </p>
-                            <p className="text-[10px] text-muted-foreground/60 mt-0.5">
-                                Atualizado em {latest ? new Date(latest.reference_date).toLocaleDateString('pt-BR') : '--'}
-                            </p>
                         </div>
                     </div>
 
@@ -233,9 +227,6 @@ export default async function IndexPage({ params, searchParams }: Props) {
                             </div>
                             <p className="text-xs text-muted-foreground mt-1">
                                 Até {latest ? `${latest.month.toString().padStart(2, '0')}/${latest.year}` : '--'}
-                            </p>
-                            <p className="text-[10px] text-muted-foreground/60 mt-0.5">
-                                Atualizado em {latest ? new Date(latest.reference_date).toLocaleDateString('pt-BR') : '--'}
                             </p>
                         </div>
                     </div>
