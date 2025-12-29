@@ -1190,5 +1190,84 @@
         "title": "Ya entiende los índices.\nAhora es el momento de usar datos para gestionar sus alquileres con inteligencia.",
         "description": "Kitnets.com está construyendo la plataforma que conecta índices, contratos y gestión en un único sistema.",
         "button": "Unirse a la lista de espera"
+    },
+    "panoramaPage": {
+        "title": "Panorama Econômico do Brasil: inflação, aluguel e juros em um só lugar",
+        "description": "O Panorama Econômico do Kitnets.com reúne, em uma única página, os principais indicadores econômicos do Brasil, organizados de forma clara e visual para facilitar a análise de inflação, aluguéis, juros e investimentos.",
+        "intro": "Aqui você acompanha a variação mensal e o acumulado dos últimos 12 meses dos índices oficiais mais utilizados no país, com gráficos intuitivos que permitem identificar tendências, ciclos econômicos e mudanças relevantes no cenário macroeconômico.",
+        "sections": [
+            {
+                "title": "Indicadores de Inflação",
+                "text": "A inflação impacta diretamente o custo de vida, contratos, reajustes e o poder de compra. No Panorama Econômico, você encontra:",
+                "items": [
+                    {
+                        "term": "IPCA",
+                        "def": "Índice Nacional de Preços ao Consumidor, o principal indicador oficial de inflação do Brasil, utilizado pelo Banco Central."
+                    },
+                    {
+                        "term": "INPC",
+                        "def": "Índice Nacional de Preços ao Consumidor, focado em famílias de renda mais baixa e amplamente usado em reajustes salariais."
+                    },
+                    {
+                        "term": "IGP-M",
+                        "def": "Índice Geral de Preços do Mercado, tradicionalmente conhecido como “inflação do aluguel”, muito presente em contratos imobiliários."
+                    }
+                ],
+                "conclusion": "Cada índice apresenta sua variação no mês mais recente e o acumulado em 12 meses, permitindo comparar rapidamente o comportamento da inflação sob diferentes metodologias."
+            },
+            {
+                "title": "Indicadores de Aluguel e Mercado Imobiliário",
+                "text": "Para quem investe, administra ou aluga imóveis, entender a dinâmica dos aluguéis é fundamental. O Panorama Econômico inclui:",
+                "items": [
+                    {
+                        "term": "FipeZAP",
+                        "def": "Indicador de preços de imóveis e aluguéis nas principais cidades brasileiras."
+                    },
+                    {
+                        "term": "IVAR",
+                        "def": "Índice de Variação de Aluguéis Residenciais, focado exclusivamente na evolução dos valores de locação."
+                    }
+                ],
+                "conclusion": "Esses indicadores ajudam proprietários, inquilinos e investidores a avaliar se os reajustes de aluguel estão acima ou abaixo da inflação e como o mercado imobiliário está se comportando ao longo do tempo."
+            },
+            {
+                "title": "Juros e Investimentos",
+                "text": "As taxas de juros influenciam diretamente financiamentos, rendimentos e decisões de investimento. No Panorama Econômico do Kitnets.com, você acompanha:",
+                "items": [
+                    {
+                        "term": "Selic",
+                        "def": "A taxa básica de juros da economia brasileira."
+                    },
+                    {
+                        "term": "CDI",
+                        "def": "Referência para a maior parte dos investimentos em renda fixa no Brasil."
+                    }
+                ],
+                "conclusion": "Com a visualização do acumulado em 12 meses, fica mais fácil comparar o desempenho da renda fixa frente à inflação e aos reajustes de aluguel."
+            },
+            {
+                "title": "Detalhamento completo de cada indicador",
+                "text": "Ao clicar na seta (➝) localizada no canto superior direito de cada cartão, você acessa a página detalhada do índice selecionado.\n\nNessa página, é possível consultar informações completas como:",
+                "list": [
+                    "Série histórica completa do indicador",
+                    "Filtros por período (mensal, anual e acumulado)",
+                    "Gráficos interativos com evolução ao longo do tempo",
+                    "Variações mensais, anuais e acumuladas",
+                    "Descrição oficial do índice, metodologia de cálculo e fonte dos dados"
+                ],
+                "conclusion": "Esse recurso permite sair de uma visão resumida do panorama econômico para uma análise aprofundada, ideal para quem precisa tomar decisões financeiras, acompanhar reajustes de aluguel, analisar inflação ou comparar indicadores ao longo dos anos.\n\nBasta clicar na seta do indicador desejado e explorar todos os detalhes disponíveis no Kitnets.com."
+            },
+            {
+                "title": "Por que acompanhar o Panorama Econômico?",
+                "list": [
+                    "Visão rápida e consolidada dos principais índices do Brasil",
+                    "Gráficos claros com histórico recente e tendências",
+                    "Comparação entre inflação, aluguéis e juros em um único painel",
+                    "Informação essencial para decisões financeiras, imobiliárias e de investimento"
+                ],
+                "conclusion": "O Panorama Econômico do Kitnets.com é a ferramenta ideal para quem busca dados confiáveis, atualizados e fáceis de entender, seja para reajustar um contrato de aluguel, analisar investimentos ou acompanhar a economia brasileira de forma inteligente."
+            }
+        ],
+        "finalCta": "Explore os indicadores, aprofunde sua análise e tome decisões melhores com base em dados reais."
     }
 }

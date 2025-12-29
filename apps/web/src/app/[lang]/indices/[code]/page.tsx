@@ -170,9 +170,17 @@ export default async function IndexPage({ params, searchParams }: Props) {
                                     'pt': 'Mercado',
                                     'en': 'Market',
                                     'es': 'Mercado'
+                                },
+                                'inflation': {
+                                    'pt': 'Inflação',
+                                    'en': 'Inflation',
+                                    'es': 'Inflación'
                                 }
                             };
-                            return translations[metadata.category]?.[lang] || metadata.category;
+
+                            const category = code === 'IGPM' ? 'inflation' : metadata.category;
+
+                            return translations[category]?.[lang] || category;
                         })()}
                     </span>
                 </div>
@@ -240,8 +248,32 @@ export default async function IndexPage({ params, searchParams }: Props) {
                         <div className="p-3 md:p-6 pt-0">
                             <div className="text-2xl md:text-3xl font-bold text-primary">
                                 {(() => {
-                                    if (code === 'CDI' || code === 'SELIC') {
+                                    if (code === 'CDI') {
                                         return '1º dia útil/mês';
+                                    }
+
+                                    if (code === 'SELIC') {
+                                        const copomDates2026 = [
+                                            new Date(2026, 0, 28), // Jan 28
+                                            new Date(2026, 2, 18), // Mar 18
+                                            new Date(2026, 3, 29), // Apr 29
+                                            new Date(2026, 5, 17), // Jun 17
+                                            new Date(2026, 7, 5),  // Aug 5
+                                            new Date(2026, 8, 16), // Sep 16
+                                            new Date(2026, 10, 4), // Nov 4
+                                            new Date(2026, 11, 9), // Dec 9
+                                        ];
+
+                                        const now = new Date();
+                                        now.setHours(0, 0, 0, 0);
+
+                                        const nextMeeting = copomDates2026.find(d => d >= now);
+
+                                        if (nextMeeting) {
+                                            const locale = lang === 'pt' ? 'pt-BR' : lang === 'en' ? 'en-US' : 'es-ES';
+                                            return nextMeeting.toLocaleDateString(locale, { day: '2-digit', month: 'short' });
+                                        }
+                                        return 'A definir';
                                     }
 
                                     if (!latest) return '--';
