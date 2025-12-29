@@ -37,7 +37,7 @@ export function WaitlistProvider({ children }: { children: ReactNode }) {
         if (initialStepParam && WAITLIST_STEPS.includes(initialStepParam as WaitlistStepId)) {
             return WAITLIST_STEPS.indexOf(initialStepParam as WaitlistStepId);
         }
-        return 1;
+        return 0;
     };
 
     const [currentStep, setCurrentStep] = useState(getInitialStep);

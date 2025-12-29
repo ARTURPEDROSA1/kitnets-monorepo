@@ -83,6 +83,7 @@ export default async function RootLayout({
 }) {
     const { lang } = await params;
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://kitnets.com';
+    const dict = getDictionary(lang);
 
     const jsonLd = {
         "@context": "https://schema.org",
@@ -117,7 +118,7 @@ export default async function RootLayout({
                         enableSystem
                         disableTransitionOnChange
                     >
-                        <Sidebar lang={lang} />
+                        <Sidebar lang={lang} dict={dict} />
                         <div className="sm:ml-64 flex min-h-screen flex-col pt-16 sm:pt-0">
                             <div className="flex-1 p-4">
                                 {children}

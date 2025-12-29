@@ -1327,6 +1327,10 @@
             "pageDescription": "Na Kitnets.com, você acompanha o IGP-M atualizado mensalmente, com dados históricos completos desde 01/01/1995 até hoje, gráficos interativos, mapa de calor mensal e tabelas detalhadas para análise precisa e confiável.",
             "sections": [
                 {
+                    "title": "Análise: Dezembro de 2025",
+                    "text": "O Índice Geral de Preços – Mercado (IGP-M) caiu 0,01% em dezembro, invertendo a taxa registrada em novembro, quando subira 0,27%. Com esse resultado, o índice encerra o ano de 2025 com queda acumulada de 1,05%."
+                },
+                {
                     "title": "O que é o IGP-M?",
                     "text": "O IGP-M é um índice de inflação calculado mensalmente pela Fundação Getulio Vargas (FGV). Ele mede a variação de preços em diferentes etapas da economia, desde a produção até o consumo final, o que explica sua alta sensibilidade a câmbio, commodities e choques econômicos globais. Por essa abrangência, o índice ficou conhecido como “inflação do aluguel”, sendo referência em milhões de contratos no Brasil."
                 },
