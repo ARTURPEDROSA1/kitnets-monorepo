@@ -9,11 +9,33 @@
 
  ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
    Creating an optimized production build ...
- ✓ Compiled successfully in 9.4s
+ ✓ Compiled successfully in 13.4s
    Running TypeScript ...
    Collecting page data using 7 workers ...
-   Generating static pages using 7 workers (0/118) ...
-   Generating static pages using 7 workers (29/118) 
+   Generating static pages using 7 workers (0/137) ...
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+   Generating static pages using 7 workers (34/137) 
+   Generating static pages using 7 workers (68/137) 
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+   Generating static pages using 7 workers (102/137) 
 The width(-1) and height(-1) of chart should be greater than 0,
        please check the style of container, or the props width(100%) and height(100%),
        or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
@@ -74,7 +96,6 @@ The width(-1) and height(-1) of chart should be greater than 0,
        please check the style of container, or the props width(100%) and height(100%),
        or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
        height and width.
-   Generating static pages using 7 workers (58/118) 
 The width(-1) and height(-1) of chart should be greater than 0,
        please check the style of container, or the props width(100%) and height(100%),
        or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
@@ -103,7 +124,6 @@ The width(-1) and height(-1) of chart should be greater than 0,
        please check the style of container, or the props width(100%) and height(100%),
        or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
        height and width.
-   Generating static pages using 7 workers (88/118) 
 The width(-1) and height(-1) of chart should be greater than 0,
        please check the style of container, or the props width(100%) and height(100%),
        or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
@@ -124,7 +144,23 @@ The width(-1) and height(-1) of chart should be greater than 0,
        please check the style of container, or the props width(100%) and height(100%),
        or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
        height and width.
- ✓ Generating static pages using 7 workers (118/118) in 3.0s
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+ ✓ Generating static pages using 7 workers (137/137) in 4.4s
    Finalizing page optimization ...
 
 Route (app)                                                    Revalidate  Expire
@@ -149,10 +185,22 @@ Route (app)                                                    Revalidate  Expir
 │ ├ /en/calculadora-amortizacao-financiamento-imobiliario
 │ ├ /pt/calculadora-amortizacao-financiamento-imobiliario
 │ └ /es/calculadora-amortizacao-financiamento-imobiliario
+├ ● /[lang]/calculadora-independencia-financeira
+│ ├ /en/calculadora-independencia-financeira
+│ ├ /pt/calculadora-independencia-financeira
+│ └ /es/calculadora-independencia-financeira
+├ ● /[lang]/calculadora-juros-compostos
+│ ├ /en/calculadora-juros-compostos
+│ ├ /pt/calculadora-juros-compostos
+│ └ /es/calculadora-juros-compostos
 ├ ● /[lang]/calculadora-reajuste-aluguel
 │ ├ /en/calculadora-reajuste-aluguel
 │ ├ /pt/calculadora-reajuste-aluguel
 │ └ /es/calculadora-reajuste-aluguel
+├ ● /[lang]/calculadoras/conversor-juros-mensal-anual
+│ ├ /en/calculadoras/conversor-juros-mensal-anual
+│ ├ /pt/calculadoras/conversor-juros-mensal-anual
+│ └ /es/calculadoras/conversor-juros-mensal-anual
 ├ ● /[lang]/calculadoras/renda-aluguel
 │ ├ /en/calculadoras/renda-aluguel
 │ ├ /pt/calculadoras/renda-aluguel
@@ -172,11 +220,11 @@ Route (app)                                                    Revalidate  Expir
 │ ├ /pt/forgot-password
 │ └ /es/forgot-password
 ├ ○ /[lang]/icon.png
-├ ● /[lang]/indices/[code]                                             1h      1y
-│ ├ /en/indices/cdi                                                    1h      1y
-│ ├ /en/indices/fipezap                                                1h      1y
-│ ├ /en/indices/igpm                                                   1h      1y
-│ └ [+18 more paths]
+├ ƒ /[lang]/indices/[code]
+├ ● /[lang]/indices/panorama                                           1h      1y
+│ ├ /en/indices/panorama                                               1h      1y
+│ ├ /pt/indices/panorama                                               1h      1y
+│ └ /es/indices/panorama                                               1h      1y
 ├ ● /[lang]/lancamentos
 │ ├ /en/lancamentos
 │ ├ /pt/lancamentos
@@ -185,6 +233,10 @@ Route (app)                                                    Revalidate  Expir
 │ ├ /en/links-uteis
 │ ├ /pt/links-uteis
 │ └ /es/links-uteis
+├ ● /[lang]/lista-vip
+│ ├ /en/lista-vip
+│ ├ /pt/lista-vip
+│ └ /es/lista-vip
 ├ ● /[lang]/login
 │ ├ /en/login
 │ ├ /pt/login
@@ -253,9 +305,15 @@ Route (app)                                                    Revalidate  Expir
 │ ├ /en/termos-de-uso
 │ ├ /pt/termos-de-uso
 │ └ /es/termos-de-uso
+├ ● /[lang]/waitlist
+│ ├ /en/waitlist
+│ ├ /pt/waitlist
+│ └ /es/waitlist
+├ ƒ /api/cron/update-igpm
 ├ ƒ /api/enrichment/cpf
 ├ ƒ /api/gateways/claim
 ├ ƒ /api/ownership/analyze
+├ ○ /manifest.webmanifest
 ├ ○ /robots.txt
 └ ○ /sitemap.xml
 

@@ -1099,6 +1099,75 @@
             ],
             "closing": "Kitnets.com organiza y simplifica el acceso a los datos del INPC, transformando números complejos en información útil para su día a día.",
             "cta": "Explore la serie histórica completa del INPC y tome decisiones basadas en datos reales."
+        },
+        "selic": {
+            "title": "Tasa Selic: Historial Completo desde 1995 y Decisiones del Copom",
+            "description": "La Tasa Selic es el principal instrumento de política monetaria de Brasil e influye directamente en las tasas de interés, la inflación, el crédito, las inversiones y el crecimiento económico. Todas las tasas de interés del país — desde la financiación inmobiliaria hasta las inversiones en renta fija — tienen a la Selic como referencia central.",
+            "pageDescription": "En esta página de Kitnets.com, puede seguir la serie histórica completa de la Tasa Selic desde enero de 1995, punto de partida del Plan Real, con datos actualizados, gráficos interactivos, mapas de calor mensuales y tablas detalladas para análisis a corto, mediano y largo plazo.",
+            "sections": [
+                {
+                    "title": "¿Qué es la Tasa Selic?",
+                    "text": "La Selic es la tasa básica de interés de la economía brasileña, definida por el Banco Central de Brasil. Representa la tasa promedio de financiamiento a un día respaldada por bonos públicos federales, negociados en el Sistema Especial de Liquidación y Custodia (Selic).",
+                    "footer": "En la práctica, la Selic sirve para:",
+                    "list": [
+                        "Controlar la inflación",
+                        "Regular el costo del crédito",
+                        "Influir en el consumo y las inversiones",
+                        "Definir el atractivo de la renta fija frente a otros activos"
+                    ]
+                },
+                {
+                    "title": "Serie Histórica de la Selic desde el Plan Real (1995)",
+                    "text": "Kitnets.com ofrece la serie histórica de la Selic desde enero de 1995, permitiendo analizar:",
+                    "list": [
+                        "El comportamiento de las tasas de interés a lo largo de diferentes gobiernos",
+                        "Ciclos de combate a la inflación y estímulo económico",
+                        "Períodos de tasas de interés estructuralmente altas y bajas",
+                        "El impacto de la Selic en inversiones, bienes raíces y renta fija"
+                    ],
+                    "footer": "Este largo historial es esencial para entender cómo la política monetaria ha moldeado la economía brasileña en las últimas décadas."
+                },
+                {
+                    "title": "Decisiones del Copom: Cómo se define la Selic",
+                    "text": "La Tasa Selic es definida por el Comité de Política Monetaria (Copom), órgano del Banco Central responsable de establecer la tasa básica de interés en cada ciclo de reuniones. El Copom se reúne ocho veces al año y, al final de cada reunión, divulga la nueva meta de la Selic, además de un comunicado explicando la racionalidad de la decisión."
+                },
+                {
+                    "title": "Calendario de Reuniones del Copom – 2026",
+                    "text": "Según el Banco Central, el calendario oficial de reuniones del Copom en 2026 es el siguiente:",
+                    "list": [
+                        "27 y 28 de enero",
+                        "17 y 18 de marzo",
+                        "28 y 29 de abril",
+                        "16 y 17 de junio",
+                        "4 y 5 de agosto",
+                        "15 y 16 de septiembre",
+                        "3 y 4 de noviembre",
+                        "8 y 9 de diciembre"
+                    ],
+                    "footer": "📌 Las actas del Copom se publicarán a las 8:00 AM del martes siguiente a cada reunión, brindando un análisis más detallado del escenario económico, inflación, actividad económica y riesgos considerados por el comité."
+                },
+                {
+                    "title": "Cómo interpretar los datos de la Selic en Kitnets.com",
+                    "text": "En esta página encontrará:",
+                    "list": [
+                        "Selic actual",
+                        "Selic acumulada en el año",
+                        "Gráfico histórico de variación de la tasa",
+                        "Mapa de calor mensual, facilitando la identificación de períodos de tasas altas o bajas",
+                        "Tabla histórica completa, con datos mes a mes desde 1995"
+                    ],
+                    "footer": "Estas visualizaciones ayudan a inversores, propietarios de inmuebles y analistas a entender el impacto de la Selic en financiamientos, rendimientos y decisiones a largo plazo."
+                },
+                {
+                    "title": "Selic, CDI y Mercado Inmobiliario",
+                    "text": "La Selic influye directamente en el CDI, los financiamientos inmobiliarios, los títulos públicos (Tesouro Selic) y el costo del crédito para familias y empresas. En períodos de Selic elevada, la renta fija tiende a competir fuertemente con las inversiones inmobiliarias; en ciclos de baja, el crédito inmobiliario se vuelve más accesible y el mercado de inmuebles gana tracción. Por eso, seguir la Selic es fundamental para la planificación financiera, el análisis de inversiones y las decisiones en el mercado inmobiliario."
+                },
+                {
+                    "title": "¿Por qué seguir la Selic en Kitnets.com?",
+                    "text": "Kitnets.com centraliza datos económicos relevantes con profundidad histórica, claridad visual y enfoque práctico. La serie histórica de la Selic desde el Plan Real, combinada con gráficos, filtros y tablas detalladas, permite un análisis completo del pasado, presente y posibles escenarios futuros."
+                }
+            ],
+            "cta": "📊 Explore la serie histórica de la Selic, siga las decisiones del Copom y utilice estos datos para tomar decisiones financieras e inmobiliarias más inteligentes."
         }
     },
     "calculatorCta": {
