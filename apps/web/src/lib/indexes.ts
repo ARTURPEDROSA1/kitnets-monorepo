@@ -104,8 +104,8 @@ export async function getIndexValues(indexId: string, limit = 36): Promise<Index
 
         return {
             ...item,
-            accumulated_12m: accumulated12m,
-            accumulated_year: accumulatedYear
+            accumulated_12m: item.accumulated_12m ?? accumulated12m,
+            accumulated_year: item.accumulated_year ?? accumulatedYear
         };
     });
 
@@ -129,7 +129,7 @@ export async function getIndexValuesByDateRange(indexId: string, startDate?: str
     // 12m needs 1 year back.
     // YTD needs back to January of the year of the startDate.
 
-    let fetchStartDate: string | undefined;
+
 
     if (startDate) {
         const start = new Date(startDate);
@@ -146,7 +146,6 @@ export async function getIndexValuesByDateRange(indexId: string, startDate?: str
         // No, we fetch GTE priorDate.
 
         const priorDateStr = priorMsg.toISOString().split('T')[0];
-        fetchStartDate = priorDateStr;
 
         query = query.gte("reference_date", priorDateStr);
     }
@@ -202,8 +201,8 @@ export async function getIndexValuesByDateRange(indexId: string, startDate?: str
 
         return {
             ...item,
-            accumulated_12m: accumulated12m,
-            accumulated_year: accumulatedYear
+            accumulated_12m: item.accumulated_12m ?? accumulated12m,
+            accumulated_year: item.accumulated_year ?? accumulatedYear
         };
     });
 
