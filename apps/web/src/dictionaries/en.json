@@ -1056,6 +1056,75 @@
             ],
             "closing": "Kitnets.com organizes and simplifies access to INPC data, transforming complex numbers into useful information for your day-to-day.",
             "cta": "Explore the complete INPC historical series and make decisions based on real data."
+        },
+        "selic": {
+            "title": "Selic Rate: Complete History Since 1995 and Copom Decisions",
+            "description": "The Selic Rate is Brazil's main monetary policy instrument and directly influences interest rates, inflation, credit, investments, and economic growth. All interest rates in the country — from real estate financing to fixed income investments — have the Selic as their central reference.",
+            "pageDescription": "On this Kitnets.com page, you can follow the complete historical series of the Selic Rate since January 1995, the starting point of the Real Plan, with up-to-date data, interactive charts, monthly heatmaps, and detailed tables for short, medium, and long-term analysis.",
+            "sections": [
+                {
+                    "title": "What is the Selic Rate?",
+                    "text": "The Selic is the basic interest rate of the Brazilian economy, defined by the Central Bank of Brazil. It represents the average rate of one-day financing backed by federal government bonds, traded in the Special System for Settlement and Custody (Selic).",
+                    "footer": "In practice, the Selic serves to:",
+                    "list": [
+                        "Control inflation",
+                        "Regulate the cost of credit",
+                        "Influence consumption and investments",
+                        "Define the attractiveness of fixed income versus other assets"
+                    ]
+                },
+                {
+                    "title": "Selic Historical Series Since the Real Plan (1995)",
+                    "text": "Kitnets.com provides the Selic historical series since January 1995, allowing analysis of:",
+                    "list": [
+                        "Interest rate behavior across different governments",
+                        "Cycles of inflation fighting and economic stimulus",
+                        "Periods of structurally high and low interest rates",
+                        "The impact of Selic on investments, real estate, and fixed income"
+                    ],
+                    "footer": "This long history is essential to understand how monetary policy has shaped the Brazilian economy in recent decades."
+                },
+                {
+                    "title": "Copom Decisions: How Selic is Defined",
+                    "text": "The Selic Rate is defined by the Monetary Policy Committee (Copom), a Central Bank body responsible for establishing the basic interest rate at each cycle of meetings. Copom meets eight times a year and, at the end of each meeting, announces the new Selic target, along with a statement explaining the rationale for the decision."
+                },
+                {
+                    "title": "Copom Meeting Calendar – 2026",
+                    "text": "According to the Central Bank, the official calendar for Copom meetings in 2026 is as follows:",
+                    "list": [
+                        "January 27 and 28",
+                        "March 17 and 18",
+                        "April 28 and 29",
+                        "June 16 and 17",
+                        "August 4 and 5",
+                        "September 15 and 16",
+                        "November 3 and 4",
+                        "December 8 and 9"
+                    ],
+                    "footer": "📌 The Copom minutes are published at 8:00 AM on the Tuesday following each meeting, providing a more detailed analysis of the economic scenario, inflation, economic activity, and risks considered by the committee."
+                },
+                {
+                    "title": "How to Interpret Selic Data on Kitnets.com",
+                    "text": "On this page you will find:",
+                    "list": [
+                        "Current Selic",
+                        "Selic accumulated in the year",
+                        "Historical chart of rate variation",
+                        "Monthly heatmap, facilitating identification of high or low interest rate periods",
+                        "Complete historical table, with month-by-month data since 1995"
+                    ],
+                    "footer": "These visualizations help investors, property owners, and analysts understand the impact of Selic on financing, yields, and long-term decisions."
+                },
+                {
+                    "title": "Selic, CDI, and Real Estate Market",
+                    "text": "The Selic directly influences the CDI, real estate financing, government bonds (Tesouro Selic), and the cost of credit for families and companies. In periods of high Selic, fixed income tends to compete strongly with real estate investments; in cycles of decline, real estate credit becomes more accessible and the property market gains traction. Therefore, following the Selic is fundamental for financial planning, investment analysis, and real estate market decisions."
+                },
+                {
+                    "title": "Why Follow Selic on Kitnets.com?",
+                    "text": "Kitnets.com centralizes relevant economic data with historical depth, visual clarity, and practical focus. The Selic historical series since the Real Plan, combined with charts, filters, and detailed tables, allows for a complete analysis of the past, present, and possible future scenarios."
+                }
+            ],
+            "cta": "📊 Explore the Selic historical series, follow Copom decisions, and use this data to make smarter financial and real estate decisions."
         }
     },
     "calculatorCta": {

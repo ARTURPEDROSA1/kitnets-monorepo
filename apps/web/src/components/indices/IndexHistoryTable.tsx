@@ -58,10 +58,19 @@ export function IndexHistoryTable({ data }: IndexHistoryTableProps) {
     const renderHeaderCell = (label: string, columnKey: keyof IndexValue, className?: string) => (
         <th
             className={cn(
-                "h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 cursor-pointer hover:bg-muted/50 transition-colors select-none group",
+                "h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 cursor-pointer hover:bg-muted/50 transition-colors select-none group focus:outline-none focus:bg-muted/50",
                 className
             )}
             onClick={() => toggleSort(columnKey)}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    toggleSort(columnKey);
+                }
+            }}
+            tabIndex={0}
+            role="button"
+            aria-label={`Ordenar por ${label}`}
         >
             <div className="flex items-center">
                 {label}
@@ -73,6 +82,7 @@ export function IndexHistoryTable({ data }: IndexHistoryTableProps) {
     return (
         <div className="w-full overflow-auto">
             <table className="w-full caption-bottom text-sm">
+                <caption className="sr-only">Tabela de Histórico de Índices Econômicos</caption>
                 <thead className="[&_tr]:border-b">
                     <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
                         {renderHeaderCell("Mês/Ano", "reference_date", "min-w-[100px]")}

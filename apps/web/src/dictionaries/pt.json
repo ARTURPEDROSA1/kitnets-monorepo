@@ -1588,6 +1588,129 @@
             ],
             "closing": "Tudo em um só lugar, com dados claros, confiáveis e fáceis de interpretar.",
             "cta": "Acompanhe a variação do IVAR e tome melhores decisões no mercado imobiliário."
+        },
+        "cdi": {
+            "title": "CDI (Certificado de Depósito Interbancário): histórico, rentabilidade e impacto nos investimentos",
+            "description": "O CDI (Certificado de Depósito Interbancário) é um dos principais indicadores financeiros do Brasil e serve como referência fundamental para a rentabilidade de investimentos de renda fixa, como CDBs, LCIs, LCAs, fundos DI e diversos produtos bancários.",
+            "pageDescription": "Nesta página do Kitnets.com, você pode acompanhar a série histórica completa do CDI desde 1995, com dados atualizados, visualizações gráficas, mapa de calor mensal e tabelas detalhadas para análise mês a mês, anual e acumulada.",
+            "sections": [
+                {
+                    "title": "O que é o CDI e por que ele é tão importante?",
+                    "text": "O CDI representa a taxa média dos empréstimos de curtíssimo prazo realizados entre bancos, normalmente com vencimento de um dia. Essas operações são essenciais para o equilíbrio de caixa do sistema financeiro e refletem, na prática, o custo do dinheiro no mercado interbancário. Por sua proximidade operacional, o CDI acompanha de perto a taxa Selic, definida pelo Banco Central, tornando-se o principal benchmark da renda fixa no Brasil. Na prática, quando um investimento promete pagar “100% do CDI”, significa que ele tende a render muito próximo à taxa básica de juros da economia."
+                },
+                {
+                    "title": "Série histórica do CDI desde 1995",
+                    "text": "O Kitnets.com oferece a série histórica do CDI desde 1995 até os dias atuais, permitindo:",
+                    "list": [
+                        "Análise da evolução do CDI ao longo de diferentes ciclos econômicos",
+                        "Comparação entre períodos de juros altos e juros baixos",
+                        "Avaliação da rentabilidade real frente à inflação",
+                        "Estudos de longo prazo para planejamento financeiro e investimentos"
+                    ],
+                    "footer": "Com esse histórico extenso, é possível entender como o CDI se comportou em cenários como estabilização monetária, crises econômicas, ciclos de aperto e afrouxamento monetário."
+                },
+                {
+                    "title": "Como interpretar os dados do CDI nesta página",
+                    "text": "Nesta página você encontra:",
+                    "list": [
+                        "CDI do mês atual",
+                        "CDI acumulado em 12 meses",
+                        "CDI acumulado no ano",
+                        "Gráfico histórico de variação (%)",
+                        "Mapa de calor mensal, facilitando a identificação de períodos de maior ou menor rentabilidade",
+                        "Tabela completa com dados históricos, ideal para análises financeiras e comparações"
+                    ],
+                    "footer": "Todos os dados têm como fonte a B3, garantindo confiabilidade e precisão das informações."
+                },
+                {
+                    "title": "CDI e investimentos: como usar esse índice na prática",
+                    "text": "O CDI é amplamente utilizado para:",
+                    "list": [
+                        "Avaliar se um investimento está rendendo bem (ex.: 90%, 100% ou 120% do CDI)",
+                        "Comparar renda fixa com outras alternativas, como imóveis ou inflação",
+                        "Projetar retornos de longo prazo em aplicações conservadoras",
+                        "Servir como base para contratos financeiros e produtos bancários"
+                    ],
+                    "footer": "Investidores mais experientes também utilizam o CDI para comparar a atratividade da renda fixa frente a ativos reais, como imóveis, especialmente em períodos de juros elevados."
+                },
+                {
+                    "title": "Por que acompanhar o CDI no Kitnets.com?",
+                    "text": "O Kitnets.com vai além de mostrar números. A plataforma foi criada para transformar dados econômicos em inteligência prática, ajudando investidores, proprietários e profissionais do mercado imobiliário a tomarem decisões mais informadas.",
+                    "list": [
+                        "Com a série histórica do CDI desde 1995, visualizações claras e filtros avançados, você consegue analisar o passado, entender o presente e planejar melhor o futuro financeiro."
+                    ]
+                }
+            ],
+            "cta": "📌 Explore os dados, filtre períodos, compare cenários e utilize o CDI como base para decisões financeiras mais inteligentes."
+        },
+        "selic": {
+            "title": "Taxa Selic: histórico completo desde 1995 e decisões do Copom",
+            "description": "A Taxa Selic é o principal instrumento de política monetária do Brasil e influencia diretamente juros, inflação, crédito, investimentos e crescimento econômico. Todas as taxas de juros do país — desde financiamentos imobiliários até aplicações em renda fixa — têm a Selic como referência central.",
+            "pageDescription": "Nesta página do Kitnets.com, você acompanha a série histórica completa da Taxa Selic desde janeiro de 1995, marco inicial do Plano Real, com dados atualizados, gráficos interativos, mapa de calor mensal e tabelas detalhadas para análises de curto, médio e longo prazo.",
+            "sections": [
+                {
+                    "title": "O que é a Taxa Selic?",
+                    "text": "A Selic é a taxa básica de juros da economia brasileira, definida pelo Banco Central do Brasil. Ela representa a taxa média dos financiamentos de um dia lastreados em títulos públicos federais, negociados no Sistema Especial de Liquidação e Custódia (Selic).",
+                    "footer": "Na prática, a Selic serve para:",
+                    "list": [
+                        "Controlar a inflação",
+                        "Regular o custo do crédito",
+                        "Influenciar o consumo e os investimentos",
+                        "Definir a atratividade da renda fixa frente a outros ativos"
+                    ]
+                },
+                {
+                    "title": "Série histórica da Selic desde o Plano Real (1995)",
+                    "text": "O Kitnets.com disponibiliza a série histórica da Selic desde janeiro de 1995, permitindo analisar:",
+                    "list": [
+                        "O comportamento dos juros ao longo de diferentes governos",
+                        "Ciclos de combate à inflação e estímulo econômico",
+                        "Períodos de juros estruturalmente altos e baixos",
+                        "O impacto da Selic sobre investimentos, imóveis e renda fixa"
+                    ],
+                    "footer": "Esse histórico longo é essencial para entender como a política monetária moldou a economia brasileira nas últimas décadas."
+                },
+                {
+                    "title": "Decisões do Copom: como a Selic é definida",
+                    "text": "A Taxa Selic é definida pelo Comitê de Política Monetária (Copom), órgão do Banco Central responsável por estabelecer a taxa básica de juros a cada ciclo de reuniões. O Copom se reúne oito vezes por ano e, ao final de cada reunião, divulga a nova meta da Selic, além de um comunicado explicando o racional da decisão."
+                },
+                {
+                    "title": "Calendário das reuniões do Copom – 2026",
+                    "text": "De acordo com o Banco Central, o calendário oficial de reuniões do Copom em 2026 é o seguinte:",
+                    "list": [
+                        "27 e 28 de janeiro",
+                        "17 e 18 de março",
+                        "28 e 29 de abril",
+                        "16 e 17 de junho",
+                        "4 e 5 de agosto",
+                        "15 e 16 de setembro",
+                        "3 e 4 de novembro",
+                        "8 e 9 de dezembro"
+                    ],
+                    "footer": "📌 As atas do Copom serão publicadas às 8h da terça-feira seguinte a cada reunião, trazendo uma análise mais detalhada do cenário econômico, inflação, atividade econômica e riscos considerados pelo comitê."
+                },
+                {
+                    "title": "Como interpretar os dados da Selic no Kitnets.com",
+                    "text": "Nesta página você encontra:",
+                    "list": [
+                        "Selic atual",
+                        "Selic acumulada no ano",
+                        "Gráfico histórico de variação da taxa",
+                        "Mapa de calor mensal, facilitando a identificação de períodos de juros altos ou baixos",
+                        "Tabela histórica completa, com dados mês a mês desde 1995"
+                    ],
+                    "footer": "Essas visualizações ajudam investidores, proprietários de imóveis e analistas a entender o impacto da Selic em financiamentos, rendimentos e decisões de longo prazo."
+                },
+                {
+                    "title": "Selic, CDI e mercado imobiliário",
+                    "text": "A Selic influencia diretamente o CDI, os financiamentos imobiliários, os títulos públicos (Tesouro Selic) e o custo do crédito para famílias e empresas. Em períodos de Selic elevada, a renda fixa tende a competir fortemente com investimentos imobiliários; em ciclos de queda, o crédito imobiliário se torna mais acessível e o mercado de imóveis ganha tração. Por isso, acompanhar a Selic é fundamental para planejamento financeiro, análise de investimentos e decisões no mercado imobiliário."
+                },
+                {
+                    "title": "Por que acompanhar a Selic no Kitnets.com?",
+                    "text": "O Kitnets.com centraliza dados econômicos relevantes com profundidade histórica, clareza visual e foco prático. A série histórica da Selic desde o Plano Real, combinada com gráficos, filtros e tabelas detalhadas, permite uma análise completa do passado, presente e possíveis cenários futuros."
+                }
+            ],
+            "cta": "📊 Explore a série histórica da Selic, acompanhe as decisões do Copom e utilize esses dados para tomar decisões financeiras e imobiliárias mais inteligentes."
         }
     },
     "calculatorCta": {

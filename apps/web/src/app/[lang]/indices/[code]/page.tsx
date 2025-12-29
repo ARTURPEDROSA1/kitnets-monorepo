@@ -113,6 +113,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
         },
         temporalCoverage: history.length > 0 ? `${history[history.length - 1].year}-${history[history.length - 1].month}/${history[0].year}-${history[0].month}` : '2023-2025',
         variableMeasured: 'Percentage Change',
+        dateModified: latest ? new Date(latest.year, latest.month - 1, 1).toISOString() : new Date().toISOString(),
     };
 
     // Schema.org Structured Data - Breadcrumbs
@@ -165,10 +166,10 @@ export default async function IndexPage({ params, searchParams }: Props) {
                                     'en': 'Rent',
                                     'es': 'Alquiler'
                                 },
-                                'inflation': {
-                                    'pt': 'Inflação',
-                                    'en': 'Inflation',
-                                    'es': 'Inflación'
+                                'market': {
+                                    'pt': 'Mercado',
+                                    'en': 'Market',
+                                    'es': 'Mercado'
                                 }
                             };
                             return translations[metadata.category]?.[lang] || metadata.category;
@@ -239,6 +240,10 @@ export default async function IndexPage({ params, searchParams }: Props) {
                         <div className="p-3 md:p-6 pt-0">
                             <div className="text-2xl md:text-3xl font-bold text-primary">
                                 {(() => {
+                                    if (code === 'CDI' || code === 'SELIC') {
+                                        return '1º dia útil/mês';
+                                    }
+
                                     if (!latest) return '--';
                                     // Determine next reference month (default: latest + 1)
                                     let nextRefMonth = latest.month + 1;
@@ -302,19 +307,21 @@ export default async function IndexPage({ params, searchParams }: Props) {
                                     return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
                                 })()}
                             </div>
-                            <p className="text-xs text-muted-foreground mt-1">
-                                Referente a {(() => {
-                                    if (!latest) return '--';
-                                    let nextRefMonth = latest.month + 1;
-                                    let nextRefYear = latest.year;
-                                    if (nextRefMonth > 12) {
-                                        nextRefMonth = 1;
-                                        nextRefYear++;
-                                    }
-                                    const date = new Date(nextRefYear, nextRefMonth - 1, 1);
-                                    return date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-                                })()}
-                            </p>
+                            {code !== 'CDI' && code !== 'SELIC' && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    Referente a {(() => {
+                                        if (!latest) return '--';
+                                        let nextRefMonth = latest.month + 1;
+                                        let nextRefYear = latest.year;
+                                        if (nextRefMonth > 12) {
+                                            nextRefMonth = 1;
+                                            nextRefYear++;
+                                        }
+                                        const date = new Date(nextRefYear, nextRefMonth - 1, 1);
+                                        return date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+                                    })()}
+                                </p>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -358,7 +365,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
                 <div className="md:col-span-3 min-w-0">
                     <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
                         <div className="flex flex-col space-y-1.5 p-3 md:p-6">
-                            <h3 className="text-lg md:text-2xl font-semibold leading-none tracking-tight">Tabela de Dados Históricos</h3>
+                            <h3 className="text-lg md:text-2xl font-semibold leading-none tracking-tight">Série Histórica</h3>
                             <p className="text-xs md:text-sm text-muted-foreground">Valores detalhados mês a mês.</p>
                         </div>
                         <div className="p-3 md:p-6 pt-0">
@@ -461,6 +468,12 @@ export default async function IndexPage({ params, searchParams }: Props) {
                                             </li>
                                         ))}
                                     </ul>
+                                )}
+
+                                {section.footer && (
+                                    <p className="text-muted-foreground leading-relaxed mt-4">
+                                        {section.footer}
+                                    </p>
                                 )}
                             </section>
                         ))}
