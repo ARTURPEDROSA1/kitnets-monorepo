@@ -8,6 +8,7 @@ import { SignOutButton, useAuth } from "@clerk/nextjs";
 import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Search, Bell, ChevronDown, Rocket, HardHat, Briefcase, Building2, User, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart, ArrowLeftRight } from "lucide-react";
 import { useTheme } from "next-themes";
 import Image from "next/image";
+import { Dictionary } from "../dictionaries";
 import { FLAGS } from "../lib/flags";
 
 const languages = [
@@ -16,7 +17,7 @@ const languages = [
     { code: "es", label: "Español" },
 ];
 
-export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
+export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
     const pathname = usePathname();
     const router = useRouter();
     const { setTheme, theme } = useTheme();
@@ -508,7 +509,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                     </button>
                                     {expandedSections['features'] && (
                                         <div className="space-y-2 animate-in slide-in-from-top-1 fade-in duration-200">
-                                            {dict.lists.features.map((item) => (
+                                            {dict.lists.features.map((item: string) => (
                                                 <label key={item} className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer hover:text-foreground">
                                                     <input type="checkbox" className="rounded border-input text-primary focus:ring-primary" />
                                                     {item}
@@ -529,7 +530,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                     </button>
                                     {expandedSections['amenities'] && (
                                         <div className="space-y-2 animate-in slide-in-from-top-1 fade-in duration-200">
-                                            {dict.lists.amenities.map((item) => (
+                                            {dict.lists.amenities.map((item: string) => (
                                                 <label key={item} className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer hover:text-foreground">
                                                     <input type="checkbox" className="rounded border-input text-primary focus:ring-primary" />
                                                     {item}
@@ -550,7 +551,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                     </button>
                                     {expandedSections['locationOpts'] && (
                                         <div className="space-y-2 animate-in slide-in-from-top-1 fade-in duration-200">
-                                            {dict.lists.locationOptions.map((item) => (
+                                            {dict.lists.locationOptions.map((item: string) => (
                                                 <label key={item} className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer hover:text-foreground">
                                                     <input type="checkbox" className="rounded border-input text-primary focus:ring-primary" />
                                                     {item}
