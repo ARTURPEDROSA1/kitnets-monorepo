@@ -249,7 +249,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
                             <div className="text-2xl md:text-3xl font-bold text-primary">
                                 {(() => {
                                     if (!latest) return '--';
-                                    // Determine next reference month
+                                    // Determine next reference month (default: latest + 1)
                                     let nextRefMonth = latest.month + 1;
                                     let nextRefYear = latest.year;
                                     if (nextRefMonth > 12) {
@@ -258,7 +258,36 @@ export default async function IndexPage({ params, searchParams }: Props) {
                                     }
 
                                     if (code === 'IGPM') {
-                                        const date = new Date(nextRefYear, nextRefMonth - 1, 29);
+                                        // Calendar for 2026
+                                        const releaseDates_2026: Record<number, number> = {
+                                            1: 29, // Jan
+                                            2: 26, // Feb
+                                            3: 30, // Mar
+                                            4: 29, // Apr
+                                        };
+
+                                        // Helper to get release day for a given month/year
+                                        const getDay = (m: number, y: number) =>
+                                            (y === 2026 && releaseDates_2026[m]) ? releaseDates_2026[m] : 29;
+
+                                        let day = getDay(nextRefMonth, nextRefYear);
+                                        let date = new Date(nextRefYear, nextRefMonth - 1, day);
+
+                                        // Check if this calculated date is today or in the past
+                                        const now = new Date();
+                                        now.setHours(0, 0, 0, 0);
+
+                                        if (date <= now) {
+                                            // Advance to NEXT month
+                                            nextRefMonth++;
+                                            if (nextRefMonth > 12) {
+                                                nextRefMonth = 1;
+                                                nextRefYear++;
+                                            }
+                                            day = getDay(nextRefMonth, nextRefYear);
+                                            date = new Date(nextRefYear, nextRefMonth - 1, day);
+                                        }
+
                                         return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
                                     }
 
@@ -266,7 +295,10 @@ export default async function IndexPage({ params, searchParams }: Props) {
                                         return '07 de jan';
                                     }
 
-                                    // Default (IPCA, etc) - Release happens month after Ref
+                                    // Default (IPCA, etc) - Release happens month AFTER Next Ref Month (2 months after latest data month?)
+                                    // Logic in original code: nextRef = latest+1. Release = nextRef+1.
+                                    // Example: Latest = Nov. Next Ref = Dec. Release for Dec = Jan.
+                                    // So releaseMonth = nextRefMonth + 1.
                                     let releaseMonth = nextRefMonth + 1;
                                     let releaseYear = nextRefYear;
                                     if (releaseMonth > 12) {
@@ -274,7 +306,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
                                         releaseYear++;
                                     }
 
-                                    // Format 09/MMM
+                                    // Format 09/MMM (IPCA usually around 9th-11th)
                                     const date = new Date(releaseYear, releaseMonth - 1, 9);
                                     return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
                                 })()}
@@ -343,6 +375,55 @@ export default async function IndexPage({ params, searchParams }: Props) {
                         </div>
                     </div>
                 </div>
+
+                {/* IGPM Calendar Specific Section */}
+                {code === 'IGPM' && (
+                    <div className="md:col-span-3 min-w-0">
+                        <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
+                            <div className="flex flex-col space-y-1.5 p-3 md:p-6">
+                                <h3 className="text-lg md:text-2xl font-semibold leading-none tracking-tight">Calendário de divulgação IGP-M 2026</h3>
+                            </div>
+                            <div className="p-3 md:p-6 pt-0 overflow-x-auto">
+                                <table className="w-full text-left">
+                                    <thead className="text-muted-foreground bg-muted/50 text-xs uppercase">
+                                        <tr className="border-b">
+                                            <th className="p-4 font-medium min-w-[120px]">Prev. divulgação</th>
+                                            <th className="p-4 font-medium min-w-[200px]">Pesquisa</th>
+                                            <th className="p-4 font-medium min-w-[150px]">Referência</th>
+                                            <th className="p-4 font-medium">Horário</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y">
+                                        <tr className="hover:bg-muted/50 transition-colors">
+                                            <td className="p-4 font-medium">29/01/2026</td>
+                                            <td className="p-4 text-muted-foreground">IGP-M e os componentes: IPA-M e IPC-M</td>
+                                            <td className="p-4 text-muted-foreground">Janeiro/2026</td>
+                                            <td className="p-4 text-muted-foreground">8h</td>
+                                        </tr>
+                                        <tr className="hover:bg-muted/50 transition-colors">
+                                            <td className="p-4 font-medium">26/02/2026</td>
+                                            <td className="p-4 text-muted-foreground">IGP-M e os componentes: IPA-M e IPC-M</td>
+                                            <td className="p-4 text-muted-foreground">Fevereiro/2026</td>
+                                            <td className="p-4 text-muted-foreground">8h</td>
+                                        </tr>
+                                        <tr className="hover:bg-muted/50 transition-colors">
+                                            <td className="p-4 font-medium">30/03/2026</td>
+                                            <td className="p-4 text-muted-foreground">IGP-M e os componentes: IPA-M e IPC-M</td>
+                                            <td className="p-4 text-muted-foreground">Março/2026</td>
+                                            <td className="p-4 text-muted-foreground">8h</td>
+                                        </tr>
+                                        <tr className="hover:bg-muted/50 transition-colors">
+                                            <td className="p-4 font-medium">29/04/2026</td>
+                                            <td className="p-4 text-muted-foreground">IGP-M e os componentes: IPA-M e IPC-M</td>
+                                            <td className="p-4 text-muted-foreground">Abril/2026</td>
+                                            <td className="p-4 text-muted-foreground">8h</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Index Specific Content (SEO) */}

@@ -17,6 +17,7 @@ BEGIN
 (v_igmp_id, 2025, 9, '2025-09-01', 0.42, 'https://brasilindicadores.com.br/igpm/'),
 (v_igmp_id, 2025, 10, '2025-10-01', -0.36, 'https://brasilindicadores.com.br/igpm/'),
 (v_igmp_id, 2025, 11, '2025-11-01', 0.27, 'https://brasilindicadores.com.br/igpm/'),
+(v_igmp_id, 2025, 12, '2025-12-01', -0.01, 'https://brasilindicadores.com.br/igpm/'),
 (v_igmp_id, 2024, 1, '2024-01-01', 0.07, 'https://brasilindicadores.com.br/igpm/'),
 (v_igmp_id, 2024, 2, '2024-02-01', -0.52, 'https://brasilindicadores.com.br/igpm/'),
 (v_igmp_id, 2024, 3, '2024-03-01', -0.47, 'https://brasilindicadores.com.br/igpm/'),

@@ -8,8 +8,6 @@ import { SignOutButton, useAuth } from "@clerk/nextjs";
 import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Search, Bell, ChevronDown, Rocket, HardHat, Briefcase, Building2, User, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart, ArrowLeftRight } from "lucide-react";
 import { useTheme } from "next-themes";
 import Image from "next/image";
-import { getDictionary } from "../dictionaries";
-
 import { FLAGS } from "../lib/flags";
 
 const languages = [
@@ -18,7 +16,7 @@ const languages = [
     { code: "es", label: "Español" },
 ];
 
-export function Sidebar({ lang }: { lang: string }) {
+export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
     const pathname = usePathname();
     const router = useRouter();
     const { setTheme, theme } = useTheme();
@@ -27,7 +25,7 @@ export function Sidebar({ lang }: { lang: string }) {
     const [expandedSections, setExpandedSections] = React.useState<Record<string, boolean>>({});
     const [isMobileOpen, setIsMobileOpen] = React.useState(false);
 
-    const dict = getDictionary(lang);
+    // Dictionary is now passed as prop
 
     // Detect active section and update sidebar view
     React.useEffect(() => {
