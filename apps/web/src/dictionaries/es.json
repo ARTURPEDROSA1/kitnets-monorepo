@@ -406,6 +406,31 @@
             "description": "Descubra en cuántos años la renta del alquiler pasa a pagar la hipoteca inmobiliaria. Simule SAC o PRICE, considere intereses, seguros, impuestos, vacancia y reajuste anual."
         }
     },
+    "rentAdjustmentCalculatorPage": {
+        "title": "Calculadora de Reajuste de Alquiler (IGP-M, IPCA, IVAR)",
+        "menuTitle": "Reajuste de Alquiler",
+        "description": "Calcule el reajuste del alquiler online y gratis. Simule con índices oficiales (IGP-M, IPCA, INPC, IVAR) o valor fijo.",
+        "seo": {
+            "title": "Calculadora de Reajuste de Alquiler (IGP-M, IPCA, IVAR) - Kitnets.com",
+            "description": "Calcule el reajuste de alquiler online y gratis. Simule con los índices oficiales (IGP-M, IPCA, INPC, IVAR) o valor fijo."
+        },
+        "inputs": {
+            "currentRent": "Valor Actual del Alquiler (R$)",
+            "adjustmentDate": "Mes del Reajuste (Inicio del nuevo ciclo)",
+            "indexLabel": "Índice de Reajuste",
+            "indexPlaceholder": "Seleccione el índice (ej. IGP-M)",
+            "calculate": "Calcular Reajuste"
+        },
+        "results": {
+            "newRent": "Nuevo Valor de Alquiler",
+            "adjustmentParams": "Parámetros del Reajuste",
+            "indexUsed": "Índice",
+            "accumulated": "Acumulado",
+            "originalRent": "Alquiler Original",
+            "adjustmentValue": "Valor del Reajuste",
+            "copy": "Copiar Resultado"
+        }
+    },
     "mortgageCalculatorPage": {
         "title": "Simulador de Amortización de Hipoteca (SAC y PRICE)",
         "subtitle": "El poder de la amortización: descubra lo que los bancos no explican sobre intereses, plazos y ahorro.",

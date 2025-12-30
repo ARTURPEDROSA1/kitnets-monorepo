@@ -391,6 +391,31 @@
             "Near Restaurant"
         ]
     },
+    "rentAdjustmentCalculatorPage": {
+        "title": "Rent Adjustment Calculator (IGP-M, IPCA, IVAR)",
+        "menuTitle": "Rent Adjustment",
+        "description": "Calculate rent adjustments online for free. Simulate with official indices (IGP-M, IPCA, INPC, IVAR) or fixed value.",
+        "seo": {
+            "title": "Rent Adjustment Calculator (IGP-M, IPCA, IVAR) - Kitnets.com",
+            "description": "Calculate rent adjustments online for free. Simulate with official indices (IGP-M, IPCA, INPC, IVAR) or fixed value."
+        },
+        "inputs": {
+            "currentRent": "Current Rent Amount (R$)",
+            "adjustmentDate": "Adjustment Month (Start of new cycle)",
+            "indexLabel": "Adjustment Index",
+            "indexPlaceholder": "Select index (e.g. IGP-M)",
+            "calculate": "Calculate Adjustment"
+        },
+        "results": {
+            "newRent": "New Rent Amount",
+            "adjustmentParams": "Adjustment Parameters",
+            "indexUsed": "Index",
+            "accumulated": "Accumulated",
+            "originalRent": "Original Rent",
+            "adjustmentValue": "Adjustment Value",
+            "copy": "Copy Result"
+        }
+    },
     "rentalIncomeCalculatorPage": {
         "seo": {
             "title": "Does rental income cover the mortgage? - Kitnets.com",
