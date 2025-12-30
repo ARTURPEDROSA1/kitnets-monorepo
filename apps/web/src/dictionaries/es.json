@@ -1412,6 +1412,55 @@
             "description": "Calcule multa e intereses por mora en alquiler con pro-rata diario. Soporta varios recibos/meses atrasados y detalla el total por cuota."
         }
     },
+    "proRataRentCalculatorPage": {
+        "title": "Calculadora de Alquiler Proporcional (Pro-Rata)",
+        "menuTitle": "Alquiler Proporcional",
+        "description": "Calcule el valor proporcional del alquiler para períodos incompletos (inicio o fin de contrato).",
+        "inputs": {
+            "contractDetails": "Datos del Contrato",
+            "monthlyRent": "Alquiler Mensual (R$)",
+            "startDate": "Fecha Inicio (Pro-Rata)",
+            "endDate": "Fecha Fin (Pro-Rata)",
+            "advancedOptions": "Opciones Avanzadas",
+            "calculationMethod": "Método de Cálculo",
+            "commercialMonth": "Mes Comercial (30 días)",
+            "realDays": "Días Reales (28-31 días)",
+            "includeStartDate": "Incluir Fecha Inicio",
+            "includeEndDate": "Incluir Fecha Fin",
+            "commercialMonthTooltip": "Estándar en la mayoría de los contratos: considera todos los meses como de 30 días.",
+            "realDaysTooltip": "Considera el número exacto de días del mes.",
+            "calculate": "Calcular Alquiler Proporcional"
+        },
+        "validation": {
+            "endDateBeforeStart": "La fecha final debe ser igual o posterior a la fecha inicial.",
+            "differentMonth": "Este cálculo considera solo un mes. Para períodos mayores, use el valor completo o repita el cálculo.",
+            "rentZero": "El valor del alquiler debe ser mayor que cero."
+        },
+        "results": {
+            "title": "Resultado del Cálculo",
+            "payTitle": "Alquiler Proporcional a Pagar",
+            "breakdownTitle": "Desglose",
+            "dailyValue": "Valor diario",
+            "daysCharged": "Días cobrados",
+            "methodUsed": "Método utilizado",
+            "period": "Período cubierto",
+            "copy": "Copiar",
+            "recalculate": "Recalcular"
+        },
+        "pageContent": {
+            "intro": "El cálculo de alquiler proporcional (pro-rata) es común al inicio o cierre de contratos de alquiler. Garantiza que el inquilino pague solo por los días efectivamente ocupados.",
+            "sections": [
+                {
+                    "title": "¿Para qué sirve esta calculadora?",
+                    "text": "La Calculadora de Alquiler Proporcional determina el valor exacto a pagar cuando la ocupación no cubre el mes completo."
+                }
+            ]
+        },
+        "seo": {
+            "title": "Calculadora de Alquiler Proporcional (Pro-Rata) | Kitnets.com",
+            "description": "Calcule el alquiler proporcional online. Simple, rápido y gratuito."
+        }
+    },
     "calculatorsOverview": {
         "title": "Calculadoras Financieras, de Alquiler e Inmobiliarias",
         "subtitle": "Simuladores gratuitos para alquiler, financiamiento, reajustes, intereses, inflación y planificación financiera — hechos para propietarios, inquilinos e inversores inmobiliarios.",
@@ -1439,6 +1488,10 @@
                 "rentAdjustment": {
                     "title": "Reajuste de Alquiler",
                     "description": "Actualice el valor del alquiler usando índices como IGP-M, IPCA o IVAR."
+                },
+                "proRataRent": {
+                    "title": "Alquiler Proporcional",
+                    "description": "Calcule el valor del alquiler para períodos incompletos."
                 },
                 "lateFee": {
                     "title": "Multa por Atraso",

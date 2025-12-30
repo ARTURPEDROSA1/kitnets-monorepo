@@ -1371,6 +1371,55 @@
             "description": "Calculate late rent fines and interest with daily pro-rata. Supports multiple overdue slips/months and details the total per installment."
         }
     },
+    "proRataRentCalculatorPage": {
+        "title": "Pro-Rata Rent Calculator",
+        "menuTitle": "Pro-Rata Rent",
+        "description": "Calculate proportional rent for incomplete periods (start or end of contract).",
+        "inputs": {
+            "contractDetails": "Contract Details",
+            "monthlyRent": "Monthly Rent (R$)",
+            "startDate": "Start Date (Pro-Rata)",
+            "endDate": "End Date (Pro-Rata)",
+            "advancedOptions": "Advanced Options",
+            "calculationMethod": "Calculation Method",
+            "commercialMonth": "Commercial Month (30 days)",
+            "realDays": "Real Days (28-31 days)",
+            "includeStartDate": "Include Start Date",
+            "includeEndDate": "Include End Date",
+            "commercialMonthTooltip": "Standard in most contracts: considers all months as having 30 days.",
+            "realDaysTooltip": "Considers exact number of days in the month.",
+            "calculate": "Calculate Pro-Rata Rent"
+        },
+        "validation": {
+            "endDateBeforeStart": "End date must be on or after start date.",
+            "differentMonth": "This calculation considers only one month. For longer periods, use full value or repeat calculation.",
+            "rentZero": "Rent value must be greater than zero."
+        },
+        "results": {
+            "title": "Calculation Result",
+            "payTitle": "Pro-Rata Rent to Pay",
+            "breakdownTitle": "Breakdown",
+            "dailyValue": "Daily Value",
+            "daysCharged": "Days Charged",
+            "methodUsed": "Method Used",
+            "period": "Period Covered",
+            "copy": "Copy",
+            "recalculate": "Recalculate"
+        },
+        "pageContent": {
+            "intro": "The pro-rata rent calculation is common at the start or end of rental contracts. It ensures tenants pay only for days effectively occupied.",
+            "sections": [
+                {
+                    "title": "What is this calculator for?",
+                    "text": "The Pro-Rata Rent Calculator determines the exact amount to pay when occupation does not cover a full month."
+                }
+            ]
+        },
+        "seo": {
+            "title": "Pro-Rata Rent Calculator | Kitnets.com",
+            "description": "Calculate pro-rata rent for start or end of contract online. Simple, fast, and free."
+        }
+    },
     "calculatorsOverview": {
         "title": "Financial, Rent, and Real Estate Calculators",
         "subtitle": "Free simulators for rent, financing, adjustments, interest, inflation, and financial planning — made for landlords, tenants, and real estate investors.",
@@ -1398,6 +1447,10 @@
                 "rentAdjustment": {
                     "title": "Rent Adjustment",
                     "description": "Update rent value using indices like IGP-M, IPCA, or IVAR."
+                },
+                "proRataRent": {
+                    "title": "Pro-Rata Rent",
+                    "description": "Calculate rent for incomplete periods (start/end of contract)."
                 },
                 "lateFee": {
                     "title": "Late Payment Fine",

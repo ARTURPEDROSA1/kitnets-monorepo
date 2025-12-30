@@ -1588,6 +1588,112 @@
             "closing": "Tudo em um só lugar, com dados claros, confiáveis e fáceis de interpretar.",
             "cta": "Acompanhe a variação do IVAR e tome melhores decisões no mercado imobiliário."
         },
+        "fipezap": {
+            "title": "Índice FipeZAP: Histórico Completo de Preços de Imóveis no Brasil desde 2008",
+            "description": "O Índice FipeZAP é o principal indicador de preços de imóveis residenciais e comerciais do Brasil, sendo também o primeiro índice imobiliário de abrangência nacional. Criado em 2008, ele acompanha de forma contínua e padronizada a evolução dos preços de venda, locação e rentabilidade (yield imobiliário).",
+            "pageDescription": "Nesta página do Kitnets.com, você encontra o histórico completo do FipeZAP desde o início do índice, com filtros avançados, gráficos interativos, mapa de calor de sazonalidade e tabela detalhada mês a mês — tudo em um único lugar.",
+            "keywords": [
+                "Índice FipeZAP",
+                "FipeZAP histórico",
+                "preço de imóveis Brasil",
+                "FipeZAP venda",
+                "FipeZAP locação",
+                "yield imobiliário",
+                "mercado imobiliário",
+                "preço m2",
+                "imóveis comerciais",
+                "imóveis residenciais"
+            ],
+            "sections": [
+                {
+                    "title": "O que é o Índice FipeZAP?",
+                    "text": "O Índice FipeZAP é calculado pela Fundação Instituto de Pesquisas Econômicas (FIPE) com base em milhões de anúncios reais de imóveis veiculados nos portais do Grupo OLX, como Zap Imóveis, Viva Real e OLX. Os dados refletem o comportamento do mercado imobiliário brasileiro de forma dinâmica, capturando tendências de curto, médio e longo prazo."
+                },
+                {
+                    "title": "Abrangência do FipeZAP",
+                    "items": [
+                        {
+                            "title": "🏠 Venda e Locação Residencial",
+                            "text": "Apartamentos prontos. Até 56 cidades brasileiras, incluindo 22 capitais. Segmentação por número de dormitórios. Indicadores de variação mensal, acumulado em 12 meses e acumulado no ano."
+                        },
+                        {
+                            "title": "🏢 Venda e Locação Comercial",
+                            "text": "Salas e conjuntos comerciais de até 200 m². Dados consolidados para 10 cidades selecionadas. Ideal para análise de retorno e precificação de imóveis corporativos."
+                        }
+                    ]
+                },
+                {
+                    "title": "Série Histórica Completa desde 2008",
+                    "text": "Diferente de muitos sites que mostram apenas dados recentes, aqui você pode:",
+                    "list": [
+                        "Analisar o FipeZAP desde o início do índice (2008)",
+                        "Comparar ciclos imobiliários completos",
+                        "Avaliar períodos de alta, queda e estabilidade",
+                        "Entender o impacto de crises econômicas, juros e inflação no mercado imobiliário"
+                    ],
+                    "footer": "A série histórica detalhada permite exportação em CSV, facilitando estudos, relatórios, análises acadêmicas e decisões de investimento mais precisas."
+                },
+                {
+                    "title": "Indicadores Disponíveis nesta Página",
+                    "text": "Nesta página do FipeZAP você encontra:",
+                    "list": [
+                        "Variação mensal dos preços de imóveis",
+                        "Acumulado em 12 meses",
+                        "Acumulado no ano",
+                        "Yield imobiliário (rentabilidade do aluguel)",
+                        "Gráficos de evolução histórica",
+                        "Mapa de calor (sazonalidade mensal)",
+                        "Tabela completa mês a mês, com paginação e exportação"
+                    ]
+                },
+                {
+                    "title": "Filtros Disponíveis",
+                    "list": [
+                        "Período",
+                        "Tipo (venda ou locação)",
+                        "Número de dormitórios"
+                    ]
+                },
+                {
+                    "title": "Mapa de Calor: Entenda a Sazonalidade do Mercado Imobiliário",
+                    "text": "O mapa de calor do FipeZAP revela padrões claros de sazonalidade: Meses historicamente mais fortes para reajustes, períodos de desaceleração ou retração e comparação visual rápida entre anos. Esse recurso é especialmente útil para:",
+                    "list": [
+                        "Proprietários definirem o melhor momento para reajuste de aluguel",
+                        "Investidores identificarem ciclos favoráveis de entrada",
+                        "Inquilinos negociarem contratos com mais informação"
+                    ]
+                },
+                {
+                    "title": "Calendário Oficial de Divulgação do FipeZAP",
+                    "text": "Nesta página você também encontra o calendário atualizado de divulgação do FipeZAP, com as datas previstas para Índice de Venda e Índice de Locação. Isso permite acompanhar o mercado em tempo real, sabendo exatamente quando novos dados serão publicados."
+                },
+                {
+                    "title": "Para quem o Índice FipeZAP é essencial?",
+                    "list": [
+                        "Proprietários que querem reajustar aluguel com base no mercado",
+                        "Inquilinos que desejam negociar contratos de forma justa",
+                        "Investidores em imóveis residenciais e comerciais",
+                        "Corretores e imobiliárias",
+                        "Incorporadoras e construtoras",
+                        "Analistas econômicos e estudantes"
+                    ]
+                },
+                {
+                    "title": "Por que acompanhar o FipeZAP no Kitnets.com?",
+                    "list": [
+                        "✅ Série histórica completa desde 2008",
+                        "✅ Interface clara e moderna",
+                        "✅ Filtros avançados e gráficos interativos",
+                        "✅ Exportação de dados",
+                        "✅ Comparação com outros índices econômicos",
+                        "✅ Conteúdo atualizado mensalmente"
+                    ],
+                    "footer": "Se você quer entender como os preços de imóveis realmente evoluem no Brasil, esta é a fonte certa."
+                }
+            ],
+            "closing": "O Índice FipeZAP no Kitnets.com é a forma mais completa, transparente e acessível de acompanhar o mercado imobiliário brasileiro.",
+            "cta": "🔎 Explore os dados, analise tendências e tome decisões imobiliárias com base em informação real."
+        },
         "cdi": {
             "title": "CDI (Certificado de Depósito Interbancário): histórico, rentabilidade e impacto nos investimentos",
             "description": "O CDI (Certificado de Depósito Interbancário) é um dos principais indicadores financeiros do Brasil e serve como referência fundamental para a rentabilidade de investimentos de renda fixa, como CDBs, LCIs, LCAs, fundos DI e diversos produtos bancários.",
@@ -2092,6 +2198,115 @@
             "finalText": "Se você lida com aluguel atrasado — seja como locatário, locador ou imobiliária — esta é a forma mais prática de saber exatamente quanto é devido, sem surpresas."
         }
     },
+    "proRataRentCalculatorPage": {
+        "title": "Calculadora de Aluguel Proporcional (Pro-Rata)",
+        "menuTitle": "Aluguel Proporcional",
+        "description": "Calcule o valor proporcional do aluguel para períodos incompletos (início ou fim de contrato).",
+        "inputs": {
+            "contractDetails": "Dados do Contrato",
+            "monthlyRent": "Valor do Aluguel Mensal (R$)",
+            "startDate": "Data Inicial (Pro-Rata)",
+            "endDate": "Data Final (Pro-Rata)",
+            "advancedOptions": "Opções Avançadas",
+            "calculationMethod": "Método de Cálculo",
+            "commercialMonth": "Mês Comercial (30 dias)",
+            "realDays": "Dias Reais do Mês (28-31 dias)",
+            "includeStartDate": "Incluir Data Inicial",
+            "includeEndDate": "Incluir Data Final",
+            "commercialMonthTooltip": "Padrão na maioria dos contratos: considera todos os meses como tendo 30 dias.",
+            "realDaysTooltip": "Considera o número exato de dias do mês (ex: Fevereiro = 28/29 dias).",
+            "calculate": "Calcular Aluguel Proporcional"
+        },
+        "validation": {
+            "endDateBeforeStart": "A data final deve ser igual ou posterior à data inicial.",
+            "differentMonth": "Este cálculo considera apenas um mês. Para períodos maiores, utilize o valor cheio ou repita o cálculo.",
+            "rentZero": "O valor do aluguel deve ser maior que zero."
+        },
+        "results": {
+            "title": "Resultado do Cálculo",
+            "payTitle": "Aluguel Proporcional a Pagar",
+            "breakdownTitle": "Detalhamento",
+            "dailyValue": "Valor diário",
+            "daysCharged": "Dias cobrados",
+            "methodUsed": "Método utilizado",
+            "period": "Período coberto",
+            "copy": "Copiar",
+            "recalculate": "Recalcular"
+        },
+        "pageContent": {
+            "intro": "A Calculadora de Aluguel Proporcional permite calcular com precisão o valor do aluguel devido quando o contrato não cobre um mês completo, situação muito comum no início, encerramento ou rescisão antecipada da locação.\n\nCom poucos dados — valor do aluguel, data inicial e data final — você descobre exatamente quanto deve ser pago, evitando erros, discussões e cobranças indevidas.",
+            "sections": [
+                {
+                    "title": "📅 Quando o aluguel proporcional é utilizado?",
+                    "text": "O cálculo pro-rata de aluguel é aplicado principalmente em situações como:",
+                    "list": [
+                        "Entrada do inquilino após o início do mês",
+                        "Saída do imóvel antes do fim do mês",
+                        "Rescisão antecipada do contrato",
+                        "Ajustes contratuais com vigência parcial",
+                        "Transição entre contratos ou inquilinos"
+                    ],
+                    "conclusion": "Nesses casos, o valor do aluguel deve ser calculado proporcionalmente aos dias efetivamente ocupados."
+                },
+                {
+                    "title": "🧮 Como funciona o cálculo de aluguel proporcional?",
+                    "text": "O cálculo segue uma lógica simples e amplamente utilizada em contratos de locação:",
+                    "list": [
+                        "Determina-se o valor diário do aluguel (Pelo mês comercial de 30 dias ou dias reais do mês)",
+                        "Calcula-se o número de dias ocupados no período",
+                        "Multiplica-se: Valor diário × número de dias"
+                    ],
+                    "conclusion": "O resultado é o aluguel proporcional exato a ser pago."
+                },
+                {
+                    "title": "✅ Por que usar a Calculadora de Aluguel Proporcional da Kitnets.com?",
+                    "list": [
+                        "Cálculo instantâneo e preciso",
+                        "Compatível com práticas contratuais brasileiras",
+                        "Evita erros manuais e interpretações equivocadas",
+                        "Ideal para inquilinos, proprietários e imobiliárias",
+                        "Totalmente online e gratuita"
+                    ],
+                    "conclusion": "A calculadora mostra não apenas o valor final, mas também o valor diário do aluguel, a quantidade de dias considerados, o método de cálculo utilizado e o período exato da cobrança."
+                },
+                {
+                    "title": "⚖️ Aluguel proporcional é obrigatório por lei?",
+                    "text": "A Lei do Inquilinato (Lei nº 8.245/91) não define uma fórmula única, mas o cálculo proporcional é amplamente aceito no mercado imobiliário e geralmente previsto em contrato.\n\nPor isso, é fundamental que o cálculo respeite o método acordado em contrato e seja transparente para ambas as partes."
+                },
+                {
+                    "title": "📌 Exemplo prático de aluguel proporcional",
+                    "text": "Aluguel mensal: R$ 1.500,00\nEntrada no imóvel: dia 10\nSaída ou fechamento do período: dia 25\nMétodo: mês comercial (30 dias)\n\nValor diário: R$ 50,00\nDias cobrados: 16\nAluguel proporcional: R$ 800,00"
+                },
+                {
+                    "title": "🔗 Ferramentas relacionadas",
+                    "text": "Se você está lidando com contratos de locação, também pode ser útil:",
+                    "links": [
+                        {
+                            "text": "Calculadora de reajuste de aluguel",
+                            "url": "/calculadora-reajuste-aluguel"
+                        },
+                        {
+                            "text": "Calculadora de multa por rescisão antecipada",
+                            "url": "/calculadoras/multa-rescisao-contrato-aluguel"
+                        },
+                        {
+                            "text": "Calculadora de multa por atraso no aluguel",
+                            "url": "/calculadoras/multa-atraso-aluguel"
+                        }
+                    ],
+                    "conclusion": "Todas disponíveis gratuitamente na Kitnets.com."
+                },
+                {
+                    "title": "🧾 Observação importante",
+                    "text": "Esta calculadora tem caráter informativo e educativo. Sempre verifique as cláusulas do contrato de locação e, em caso de dúvida, consulte um profissional especializado."
+                }
+            ]
+        },
+        "seo": {
+            "title": "Calculadora de Aluguel Proporcional (Pro-Rata) Online | Kitnets.com",
+            "description": "Calcule o aluguel proporcional de forma simples e precisa. Ideal para início ou fim de contrato de locação. Ferramenta gratuita da Kitnets.com."
+        }
+    },
     "calculatorsOverview": {
         "title": "Calculadoras Financeiras, de Aluguel e viabilidade de investimentos",
         "subtitle": "Simuladores gratuitos para aluguel, financiamento, reajustes, juros, inflação e planejamento financeiro — feitos para locadores, inquilinos e investidores imobiliários.",
@@ -2119,6 +2334,10 @@
                 "rentAdjustment": {
                     "title": "Reajuste de Aluguel",
                     "description": "Atualize o valor do aluguel usando índices como IGP-M, IPCA ou IVAR."
+                },
+                "proRataRent": {
+                    "title": "Aluguel Proporcional",
+                    "description": "Calcule o valor do aluguel para períodos incompletos (início/fim de contrato)."
                 },
                 "lateFee": {
                     "title": "Multa por Atraso",

@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import { getAllIndexes, getIndexValues, IndexMetadata, IndexValue } from '@/lib/indexes';
+import { getFipeZapData, FipeZapDataPoint } from '@/lib/fipezap';
 import { MiniIndexChart } from '@/components/indices/MiniIndexChart';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
@@ -9,8 +10,8 @@ import { Button } from "@/components/ui/button";
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
-    title: 'Panorama Econômico do Brasil: inflação, aluguel e juros em um só lugar',
-    description: 'O Panorama Econômico do Kitnets.com reúne, em uma única página, os principais indicadores econômicos do Brasil, organizados de forma clara e visual para facilitar a análise de inflação, aluguéis, juros e investimentos.',
+    title: 'Panorama Econômico do Brasil: inflação, imoveis e juros em um só lugar',
+    description: 'O Panorama Econômico do Kitnets.com reúne, em uma única página, os principais indicadores econômicos do Brasil, organizados de forma clara e visual para facilitar a análise de inflação, imoveis, juros e investimentos.',
 };
 
 interface IndexData {
@@ -37,6 +38,50 @@ export default async function PanoramaPage({ params }: { params: Promise<{ lang:
         })
     );
 
+    // Fetch FipeZap Data (Dynamic)
+    const now = new Date();
+    const endDate = now.toISOString().split('T')[0];
+    const startDateDate = new Date();
+    startDateDate.setMonth(now.getMonth() - 13); // Go back ~13 months to ensure full chart context
+    const startDate = startDateDate.toISOString().split('T')[0];
+
+    const fipeData = await getFipeZapData(startDate, endDate, 'todos');
+
+    // Helper to map FipeZap to IndexData
+    const mapFipeToData = (series: FipeZapDataPoint[], code: string, name: string): IndexData => {
+        // Map to IndexValue
+        const history: IndexValue[] = series.map(p => ({
+            id: `fipe-${code}-${p.date}`,
+            year: p.year,
+            month: p.month,
+            reference_date: p.date,
+            value_percent: p.value_percent,
+            accumulated_12m: p.accumulated_12m,
+            accumulated_year: p.accumulated_year,
+            is_projection: false,
+            source_url: null
+        })).sort((a, b) => new Date(b.reference_date).getTime() - new Date(a.reference_date).getTime()); // Descending for 'latest' access
+
+        return {
+            meta: {
+                id: `fipe-${code}`,
+                code: code,
+                name: name,
+                source: 'FIPE',
+                frequency: 'Mensal',
+                category: 'imoveis',
+                is_official: true
+            },
+            history: history, // Send all fetched history, chart component handles display count usually
+            latest: history[0]
+        };
+    };
+
+    const fipeLocacao = mapFipeToData(fipeData.locacao, 'FIPEZAP Locação', 'Índice FipeZAP de Locação Residencial');
+    const fipeVenda = mapFipeToData(fipeData.venda, 'FIPEZAP Venda', 'Índice FipeZAP de Venda Residencial');
+    const fipeYield = mapFipeToData(fipeData.yield, 'FIPEZAP Yield', 'Índice FipeZAP de Yield (Rentabilidade)');
+
+
     // Define categories and grouping logic
     const categories: Record<string, IndexData[]> = {
         inflation: [],
@@ -48,19 +93,19 @@ export default async function PanoramaPage({ params }: { params: Promise<{ lang:
     const categoryTitles: Record<string, Record<string, string>> = {
         pt: {
             inflation: 'Inflação',
-            rent: 'Aluguel',
+            rent: 'Imóveis',
             interest: 'Juros e Investimentos',
             other: 'Outros'
         },
         en: {
             inflation: 'Inflation',
-            rent: 'Rent',
+            rent: 'Real Estate',
             interest: 'Interest Rates',
             other: 'Others'
         },
         es: {
             inflation: 'Inflación',
-            rent: 'Alquiler',
+            rent: 'Inmuebles',
             interest: 'Intereses',
             other: 'Otros'
         }
@@ -72,14 +117,21 @@ export default async function PanoramaPage({ params }: { params: Promise<{ lang:
 
         if (['IPCA', 'INPC', 'IGPM', 'IGP'].includes(code)) {
             categories.inflation.push(data);
-        } else if (['IVAR', 'FIPEZAP'].includes(code)) {
+        } else if (['IVAR'].includes(code)) {
             categories.rent.push(data);
+        } else if (['FIPEZAP'].includes(code)) {
+            // Skip generic FipeZap from DB in favor of our manual ones
         } else if (['SELIC', 'CDI', 'TR', 'POUPANCA'].includes(code)) {
             categories.interest.push(data);
         } else {
             categories.other.push(data);
         }
     });
+
+    // Inject manual FipeZap
+    categories.rent.push(fipeLocacao);
+    categories.rent.push(fipeVenda);
+    categories.rent.push(fipeYield);
 
     const currentTitles = categoryTitles[lang as string] || categoryTitles['pt'];
 
@@ -89,7 +141,7 @@ export default async function PanoramaPage({ params }: { params: Promise<{ lang:
         '@type': 'DataCatalog',
         name: 'Panorama Econômico Kitnets',
         description: 'Visão geral dos principais indicadores econômicos do Brasil (IPCA, IGP-M, SELIC, etc).',
-        dataset: indexesData.map(({ meta }) => ({
+        dataset: [...indexesData, fipeLocacao, fipeVenda, fipeYield].map(({ meta }) => ({
             '@type': 'Dataset',
             name: `${meta.code} - ${meta.name}`,
             description: `Dados históricos e variações do índice ${meta.code}.`
@@ -123,7 +175,7 @@ export default async function PanoramaPage({ params }: { params: Promise<{ lang:
                                     // const ChartIcon = trend.icon;
 
                                     const displayValue = latest ? `${latest.value_percent.toFixed(2)}%` : '-';
-                                    const displayAccumulated = latest?.accumulated_12m ? `${latest.accumulated_12m}%` : '-';
+                                    const displayAccumulated = latest?.accumulated_12m != null ? `${latest.accumulated_12m.toFixed(2)}%` : '-';
 
                                     // Heatmap-aligned color logic
                                     const getChartColor = (val: number) => {
@@ -135,6 +187,20 @@ export default async function PanoramaPage({ params }: { params: Promise<{ lang:
 
                                     const chartColor = getChartColor(current);
 
+                                    // Determine link: Special case for FipeZap sub-types -> go to main FipeZap page
+                                    let href = lang === 'pt' ? `/indices/${meta.code.toLowerCase()}` : `/${lang}/indices/${meta.code.toLowerCase()}`;
+                                    if (meta.code.includes('FIPEZAP')) {
+                                        // Normalize to fipezap base link with params maybe? Or just base page. 
+                                        // Existing page /indices/fipezap handles params.
+                                        // Let's just link to /indices/fipezap. User can use filter there.
+                                        href = lang === 'pt' ? `/indices/fipezap` : `/${lang}/indices/fipezap`;
+
+                                        // Optional: Add params to pre-select type? 
+                                        if (meta.code.includes('Venda')) href += '?type=venda';
+                                        if (meta.code.includes('Yield')) href += '?type=yield';
+                                        // Locacao is default
+                                    }
+
                                     return (
                                         <div key={meta.id} className="rounded-xl border bg-card text-card-foreground shadow-sm hover:shadow-md transition-shadow">
                                             <div className="p-5 md:p-6">
@@ -142,6 +208,7 @@ export default async function PanoramaPage({ params }: { params: Promise<{ lang:
                                                     <div>
                                                         <div className="flex items-center gap-2 mb-1">
                                                             <h2 className="text-xl font-bold">{meta.code}</h2>
+
                                                             {meta.is_official && (
                                                                 <span className="text-[10px] uppercase px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-semibold">
                                                                     Oficial
@@ -152,7 +219,7 @@ export default async function PanoramaPage({ params }: { params: Promise<{ lang:
                                                             {meta.name}
                                                         </p>
                                                     </div>
-                                                    <Link href={lang === 'pt' ? `/indices/${meta.code.toLowerCase()}` : `/${lang}/indices/${meta.code.toLowerCase()}`} className="text-muted-foreground hover:text-primary transition-colors">
+                                                    <Link href={href} className="text-muted-foreground hover:text-primary transition-colors">
                                                         <ArrowRight className="h-5 w-5" />
                                                     </Link>
                                                 </div>
