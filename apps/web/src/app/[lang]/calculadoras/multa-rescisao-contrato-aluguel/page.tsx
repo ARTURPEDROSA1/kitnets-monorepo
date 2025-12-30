@@ -93,6 +93,7 @@ interface CalculationResult {
     methodologyText: string;
     daysRemaining: number;
     monthsUsed: number;
+    daysUsed: number;
     totalDays: number;
     dailyFine: number;
     rentDueForNotice: number; // For conditional logic (default 0)
@@ -233,6 +234,7 @@ export default function RentFineCalculator() {
             methodologyText,
             daysRemaining,
             monthsUsed,
+            daysUsed,
             totalDays: totalContractDays,
             dailyFine,
             rentDueForNotice,
