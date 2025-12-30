@@ -1,0 +1,34 @@
+
+> web@0.1.0 build
+> next build
+
+   ▲ Next.js 16.0.10 (Turbopack)
+   - Environments: .env.local
+   - Experiments (use with caution):
+     · optimizePackageImports
+     · serverActions
+
+ ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 11.1s
+   Running TypeScript ...
+Failed to compile.
+
+./src/app/[lang]/calculadoras/multa-rescisao-contrato-aluguel/page.tsx:469:82
+Type error: Property 'daysUsed' does not exist on type 'CalculationResult'.
+
+[0m [90m 467 |[39m                                         [33m<[39m[33mdiv[39m className[33m=[39m[32m"p-3 bg-muted/20 rounded"[39m[33m>[39m
+ [90m 468 |[39m                                             [33m<[39m[33mdiv[39m className[33m=[39m[32m"text-muted-foreground text-xs"[39m[33m>[39m{t[33m.[39mresults[33m?[39m[33m.[39mdaysUsed}[33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+[31m[1m>[22m[39m[90m 469 |[39m                                             [33m<[39m[33mdiv[39m className[33m=[39m[32m"font-medium"[39m[33m>[39m{result[33m.[39mdaysUsed} dias[33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m     |[39m                                                                                  [31m[1m^[22m[39m
+ [90m 470 |[39m                                         [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 471 |[39m                                         [33m<[39m[33mdiv[39m className[33m=[39m[32m"p-3 bg-muted/20 rounded"[39m[33m>[39m
+ [90m 472 |[39m                                             [33m<[39m[33mdiv[39m className[33m=[39m[32m"text-muted-foreground text-xs"[39m[33m>[39m{t[33m.[39mresults[33m?[39m[33m.[39mdaysRemaining}[33m<[39m[33m/[39m[33mdiv[39m[33m>[39m[0m
+Next.js build worker exited with code: 1 and signal: null
+npm error Lifecycle script `build` failed with error:
+npm error code 1
+npm error path C:\Users\Administrator\Documents\Kitnets\apps\web
+npm error workspace web@0.1.0
+npm error location C:\Users\Administrator\Documents\Kitnets\apps\web
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c next build

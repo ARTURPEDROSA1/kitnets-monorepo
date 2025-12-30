@@ -1368,5 +1368,84 @@
             "title": "Rent Late Fine & Interest Calculator (Pro-rata) - Kitnets.com",
             "description": "Calculate late rent fines and interest with daily pro-rata. Supports multiple overdue slips/months and details the total per installment."
         }
+    },
+    "calculatorsOverview": {
+        "title": "Financial, Rent, and Real Estate Calculators",
+        "subtitle": "Free simulators for rent, financing, adjustments, interest, inflation, and financial planning — made for landlords, tenants, and real estate investors.",
+        "microCta": "Use now — no sign-up",
+        "secondaryCta": "Create account to save simulations",
+        "searchPlaceholder": "Search calculator...",
+        "mostUsed": "Most Used",
+        "categories": {
+            "all": "All",
+            "rent": "Rent",
+            "finance": "Financing",
+            "indices": "Indices",
+            "interest": "Interest",
+            "planning": "Planning"
+        },
+        "conversion": {
+            "title": "Want to save your simulations and contracts?",
+            "text": "Soon, Kitnets.com will allow you to track adjustments, contracts, and properties in one place.",
+            "cta": "Join the waitlist"
+        },
+        "cards": {
+            "ctaPrimary": "Calculate now",
+            "ctaSecondary": "Understand how it works",
+            "items": {
+                "rentAdjustment": {
+                    "title": "Rent Adjustment",
+                    "description": "Update rent value using indices like IGP-M, IPCA, or IVAR."
+                },
+                "lateFee": {
+                    "title": "Late Payment Fine",
+                    "description": "Calculate fines and interest for late rent payments."
+                },
+                "terminationFee": {
+                    "title": "Termination Fee",
+                    "description": "Calculate proportional fine for early property vacation."
+                },
+                "rentalIncome": {
+                    "title": "Rental Income",
+                    "description": "Find out if rental income covers your mortgage payments."
+                },
+                "amortization": {
+                    "title": "Mortgage Amortization",
+                    "description": "Simulate interest and term reduction by amortizing your mortgage."
+                },
+                "monthlyAnnualInterest": {
+                    "title": "Monthly/Annual Interest",
+                    "description": "Convert monthly interest rates to annual and vice-versa."
+                },
+                "compoundInterest": {
+                    "title": "Compound Interest",
+                    "description": "Simulate your wealth growth with the power of compound interest."
+                },
+                "financialIndependence": {
+                    "title": "Financial Independence",
+                    "description": "Plan your financial freedom considering inflation and taxes."
+                },
+                "ipca": {
+                    "title": "IPCA (Official Inflation)",
+                    "description": "Check Brazil's official inflation index."
+                },
+                "igpm": {
+                    "title": "IGP-M (Rent)",
+                    "description": "Track the index most used in rental contracts."
+                },
+                "cdi": {
+                    "title": "CDI (Fixed Income)",
+                    "description": "Track the rate that benchmarks fixed income investments."
+                },
+                "selic": {
+                    "title": "Selic Rate",
+                    "description": "Check the basic interest rate of the Brazilian economy."
+                },
+                "inpc": {
+                    "title": "INPC",
+                    "description": "Check the national consumer price index."
+                }
+            }
+        }
     }
 }
