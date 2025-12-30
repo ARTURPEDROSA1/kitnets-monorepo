@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { TrendingUp, AlertCircle, FileText, Coins, PiggyBank, ArrowLeftRight, Sun, Percent, Search, ArrowRight } from 'lucide-react';
+import { TrendingUp, AlertCircle, FileText, Coins, PiggyBank, ArrowLeftRight, Sun, Percent, Search, ArrowRight, Calculator } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,6 +43,13 @@ const CALCULATORS: CalculatorItem[] = [
         route: (lang) => `/${lang}/calculadoras/multa-rescisao-contrato-aluguel`,
         categories: ['rent'],
         dictKey: 'terminationFee'
+    },
+    {
+        id: 'proRataRent',
+        icon: Calculator,
+        route: (lang) => `/${lang}/calculadoras/aluguel-proporcional`,
+        categories: ['rent'],
+        dictKey: 'proRataRent'
     },
     {
         id: 'rentalIncome',

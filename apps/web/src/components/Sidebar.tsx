@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Button } from "@kitnets/ui";
 import { SignOutButton, useAuth } from "@clerk/nextjs";
 import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Search, Bell, ChevronDown, Rocket, HardHat, Briefcase, Building2, User, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart, ArrowLeftRight, FileText, AlertCircle } from "lucide-react";
@@ -20,7 +20,6 @@ const languages = [
 
 export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
     const pathname = usePathname();
-    const router = useRouter();
     const { setTheme, theme } = useTheme();
     const { isSignedIn } = useAuth();
     const [sidebarView, setSidebarView] = React.useState<'main' | 'rent-filters' | 'buy-filters' | 'launches-filters' | 'calculators-menu' | 'indices-menu'>('main');
@@ -80,35 +79,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
         window.location.href = path;
     };
 
-    const toggleRentFilters = () => {
-        setSidebarView('rent-filters');
-        const path = lang === 'pt' ? '/alugar' : `/${lang}/alugar`;
-        router.push(path);
-    };
 
-    const toggleBuyFilters = () => {
-        setSidebarView('buy-filters');
-        const path = lang === 'pt' ? '/comprar' : `/${lang}/comprar`;
-        router.push(path);
-    };
-
-    const toggleLaunchesFilters = () => {
-        setSidebarView('launches-filters');
-        const path = lang === 'pt' ? '/lancamentos' : `/${lang}/lancamentos`;
-        router.push(path);
-    };
-
-    const toggleCalculatorsMenu = () => {
-        setSidebarView('calculators-menu');
-        const path = lang === 'pt' ? '/calculadoras' : `/${lang}/calculadoras`;
-        router.push(path);
-    };
-
-    const toggleIndicesMenu = () => {
-        setSidebarView('indices-menu');
-        const path = lang === 'pt' ? '/indices/panorama' : `/${lang}/indices/panorama`;
-        router.push(path);
-    };
 
     const backToMain = () => {
         setSidebarView('main');
@@ -178,55 +149,64 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                             </Link>
                                         </li>
                                         <li>
-                                            <button
-                                                onClick={toggleRentFilters}
+                                            <Link
+                                                href={lang === 'pt' ? '/alugar' : `/${lang}/alugar`}
+                                                onClick={() => setSidebarView('rent-filters')}
                                                 className="w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group text-left"
                                             >
                                                 <Key className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                 <span className="ms-3">{dict.menu.rent}</span>
-                                            </button>
+                                            </Link>
                                         </li>
                                         <li>
-                                            <button
-                                                onClick={toggleBuyFilters}
+                                            <Link
+                                                href={lang === 'pt' ? '/comprar' : `/${lang}/comprar`}
+                                                onClick={() => setSidebarView('buy-filters')}
                                                 className="w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group text-left"
                                             >
                                                 <Home className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                 <span className="ms-3">{dict.menu.buy}</span>
-                                            </button>
+                                            </Link>
                                         </li>
                                         <li>
-                                            <button
-                                                onClick={toggleLaunchesFilters}
+                                            <Link
+                                                href={lang === 'pt' ? '/lancamentos' : `/${lang}/lancamentos`}
+                                                onClick={() => setSidebarView('launches-filters')}
                                                 className="w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group text-left"
                                             >
                                                 <Rocket className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                 <span className="ms-3">{dict.menu.launches}</span>
-                                            </button>
+                                            </Link>
                                         </li>
                                     </>
                                 )}
 
                                 {FLAGS.SHOW_CALCULATORS && (
                                     <li>
-                                        <button
-                                            onClick={toggleCalculatorsMenu}
-                                            className="w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group text-left"
-                                        >
-                                            <Calculator className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                            <span className="ms-3">{dict.menu.calculators}</span>
-                                        </button>
+                                        <li>
+                                            <Link
+                                                href={lang === 'pt' ? '/calculadoras' : `/${lang}/calculadoras`}
+                                                onClick={() => setSidebarView('calculators-menu')}
+                                                className="w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group text-left"
+                                            >
+                                                <Calculator className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                <span className="ms-3">{dict.menu.calculators}</span>
+                                            </Link>
+                                        </li>
                                     </li>
                                 )}
 
                                 <li>
-                                    <button
-                                        onClick={toggleIndicesMenu}
-                                        className="w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group text-left"
-                                    >
-                                        <LineChart className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                        <span className="ms-3">Indicadores</span>
-                                    </button>
+                                    <li>
+                                        <Link
+                                            href={lang === 'pt' ? '/indices/panorama' : `/${lang}/indices/panorama`}
+                                            onClick={() => setSidebarView('indices-menu')}
+                                            className="w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group text-left"
+                                        >
+                                            <LineChart className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                            <span className="ms-3">Indicadores</span>
+                                        </Link>
+                                    </li>
                                 </li>
 
                                 {FLAGS.SHOW_USEFUL_LINKS && (
@@ -651,6 +631,15 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                             >
                                                 <FileText className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                 <span className="ms-3 text-sm">{dict.rentFineCalculatorPage?.menuTitle || "Calculadora Rescisão"}</span>
+                                            </Link>
+                                        </li>
+                                        <li>
+                                            <Link
+                                                href={lang === 'pt' ? '/calculadoras/aluguel-proporcional' : `/${lang}/calculadoras/aluguel-proporcional`}
+                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                            >
+                                                <Calculator className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                <span className="ms-3 text-sm">{dict.proRataRentCalculatorPage?.menuTitle || "Aluguel Proporcional"}</span>
                                             </Link>
                                         </li>
                                     </ul>
