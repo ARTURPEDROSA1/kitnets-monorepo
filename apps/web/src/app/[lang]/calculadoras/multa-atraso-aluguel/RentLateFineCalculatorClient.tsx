@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { getDictionary } from "@/dictionaries";
 import {
@@ -11,7 +11,9 @@ import {
     Download,
     AlertCircle,
     Calculator,
-    HelpCircle
+    HelpCircle,
+    Check,
+    Calendar as CalendarIcon
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,6 +44,12 @@ import {
 
 import CalculatorCta from "@/components/calculators/CalculatorCta";
 import CalculatorContent from "@/components/calculators/CalculatorContent";
+import dynamic from "next/dynamic";
+
+const LeadCaptureModal = dynamic(() => import("@/components/calculators/LeadCaptureModal"), {
+    ssr: false,
+    loading: () => null,
+});
 
 // --- Helper Components ---
 
@@ -82,11 +90,108 @@ function CurrencyInput({
             {...props}
             type="text"
             inputMode="numeric"
-            className={className}
+            className={`${className} text-base md:text-sm`} // Prevent iOS zoom
             value={displayValue}
             onChange={handleChange}
             placeholder={placeholder}
         />
+    );
+}
+
+function BrazilianDateInput({
+    value,
+    onChange,
+    className,
+    ...props
+}: {
+    value: string;
+    onChange: (val: string) => void;
+    className?: string;
+} & Omit<React.ComponentProps<typeof Input>, "onChange" | "value">) {
+    const [text, setText] = useState("");
+    const [lastValue, setLastValue] = useState(value);
+
+    // Sync prop to text during render (derived state pattern)
+    if (value !== lastValue) {
+        setLastValue(value);
+        if (value) {
+            const [y, m, d] = value.split("-");
+            if (y && m && d) {
+                setText(`${d}/${m}/${y}`);
+            } else {
+                setText("");
+            }
+        } else {
+            setText("");
+        }
+    }
+
+    const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        let val = e.target.value.replace(/\D/g, "");
+        if (val.length > 8) val = val.slice(0, 8);
+
+        let formatted = val;
+        if (val.length >= 3) {
+            formatted = `${val.slice(0, 2)}/${val.slice(2)}`;
+        }
+        if (val.length >= 5) {
+            formatted = `${val.slice(0, 2)}/${val.slice(2, 4)}/${val.slice(4)}`;
+        }
+        setText(formatted);
+
+        // Emit change if valid full date or empty
+        if (val.length === 8) {
+            const d = val.slice(0, 2);
+            const m = val.slice(2, 4);
+            const y = val.slice(4);
+            // Basic validation (optional but good)
+            const numD = parseInt(d);
+            const numM = parseInt(m);
+            if (numD > 0 && numD <= 31 && numM > 0 && numM <= 12) {
+                onChange(`${y}-${m}-${d}`);
+            }
+        } else if (val.length === 0) {
+            onChange("");
+        }
+    };
+
+    const dateInputRef = useRef<HTMLInputElement>(null);
+    const triggerPicker = () => {
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (dateInputRef.current as any)?.showPicker();
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    return (
+        <div className="relative">
+            <Input
+                {...props}
+                type="text"
+                inputMode="numeric"
+                value={text}
+                onChange={handleTextChange}
+                className={`${className} text-base md:text-sm`} // Prevent iOS zoom
+                placeholder="dd/mm/aaaa"
+                maxLength={10}
+            />
+            <div
+                className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-muted-foreground hover:text-foreground p-1"
+                onClick={triggerPicker}
+            >
+                <CalendarIcon className="w-4 h-4" />
+            </div>
+            <input
+                type="date"
+                ref={dateInputRef}
+                className="invisible absolute bottom-0 right-0 w-0 h-0"
+                onChange={(e) => onChange(e.target.value)}
+                value={value || ""}
+                tabIndex={-1}
+            />
+        </div>
     );
 }
 
@@ -153,6 +258,44 @@ export default function RentLateFineCalculatorClient() {
         { id: "1", value: 1000, dueDate: "" }
     ]);
 
+    const [isCopied, setIsCopied] = useState(false);
+
+    // --- Lead Capture State ---
+    const [interactionCount, setInteractionCount] = useState(0);
+    const [showLeadModal, setShowLeadModal] = useState(false);
+    const [leadCaptured, setLeadCaptured] = useState(false);
+
+    // Check cookie on mount
+    useEffect(() => {
+        const match = document.cookie.match(new RegExp('(^| )kitnets_lead_captured=([^;]+)'));
+        if (match) {
+            setLeadCaptured(true);
+        }
+    }, []);
+
+    const trackInteraction = () => {
+        if (leadCaptured) return;
+
+        const newCount = interactionCount + 1;
+        setInteractionCount(newCount);
+
+        // Prompt on the 4th interaction (index 3 if 0-based, count 4 if 1-based)
+        // User request: "on 4th show a pop up"
+        if (newCount === 4) {
+            setShowLeadModal(true);
+        }
+    };
+
+    // Wrap state setters for interactions
+    const handleSetCalcType = (v: "today" | "specific") => { trackInteraction(); setCalcType(v); };
+    const handleSetSpecificDate = (v: string) => { trackInteraction(); setSpecificDate(v); };
+    const handleSetGracePeriod = (v: string | number) => { trackInteraction(); setGracePeriod(v); };
+    const handleSetFinePercent = (v: string | number) => { trackInteraction(); setFinePercent(v); };
+    const handleSetFineDelay = (v: boolean) => { trackInteraction(); setApplyFineOnlyIfDelayed(v); };
+    const handleSetInterestMode = (v: "monthly" | "daily") => { trackInteraction(); setInterestMode(v); };
+    const handleSetInterestRate = (v: string | number) => { trackInteraction(); setInterestRate(v); };
+
+
     // Results
     // --- Results (Derived via useMemo below) ---
 
@@ -161,14 +304,17 @@ export default function RentLateFineCalculatorClient() {
 
     // Add new installment
     const addInstallment = () => {
+        trackInteraction();
+        const initialValue = installments.length > 0 ? installments[0].value : "";
         setInstallments([
             ...installments,
-            { id: Math.random().toString(36).substr(2, 9), value: "", dueDate: "" }
+            { id: Math.random().toString(36).substr(2, 9), value: initialValue, dueDate: "" }
         ]);
     };
 
     // Remove installment
     const removeInstallment = (id: string) => {
+        trackInteraction();
         if (installments.length > 1) {
             setInstallments(installments.filter(i => i.id !== id));
         }
@@ -176,6 +322,13 @@ export default function RentLateFineCalculatorClient() {
 
     // Update installment
     const updateInstallment = (id: string, field: keyof Installment, value: string | number) => {
+        if (field === 'value' || field === 'dueDate' || field === 'paymentDate') {
+            // We can debate if typing '1' then '0' is 2 interactions. 
+            // To avoid spam, we might want to debounce or rely on the fact that `LeadCaptureModal` handles the popup logic.
+            // But simpler is to key off major actions. 
+            // Ideally we'd wrap 'onChange' and check distinct changes.
+            trackInteraction();
+        }
         setInstallments(installments?.map(i => i.id === id ? { ...i, [field]: value } : i));
     };
 
@@ -291,7 +444,8 @@ export default function RentLateFineCalculatorClient() {
             `Venc: ${formatDate(r.dueDate)} | Valor: ${formatCurrency(r.value)} | Atraso: ${r.delayDays}d | Total: ${formatCurrency(r.totalRef)}`
         ).join('\n') + `\n\nTOTAL: ${formatCurrency(summary.totalUpdated)}`;
         navigator.clipboard.writeText(text);
-        // Toast?
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2000);
     };
 
     const handlePrint = () => {
@@ -351,7 +505,7 @@ export default function RentLateFineCalculatorClient() {
                             {/* Calculation Date */}
                             <div className="space-y-2">
                                 <Label>{t.inputs?.calculationDate}</Label>
-                                <RadioGroup value={calcType} onValueChange={(v: "today" | "specific") => setCalcType(v)} className="flex gap-4">
+                                <RadioGroup value={calcType} onValueChange={handleSetCalcType} className="flex gap-4">
                                     <div className="flex items-center space-x-2">
                                         <RadioGroupItem value="today" id="r-today" />
                                         <Label htmlFor="r-today">{t.inputs?.calculationDateOptionToday}</Label>
@@ -362,10 +516,9 @@ export default function RentLateFineCalculatorClient() {
                                     </div>
                                 </RadioGroup>
                                 {calcType === 'specific' && (
-                                    <Input
-                                        type="date"
+                                    <BrazilianDateInput
                                         value={specificDate}
-                                        onChange={e => setSpecificDate(e.target.value)}
+                                        onChange={handleSetSpecificDate}
                                         className="mt-2"
                                     />
                                 )}
@@ -379,7 +532,7 @@ export default function RentLateFineCalculatorClient() {
                                 <Input
                                     type="number"
                                     value={gracePeriod}
-                                    onChange={e => setGracePeriod(e.target.value)}
+                                    onChange={e => handleSetGracePeriod(e.target.value)}
                                     className="mt-1.5"
                                 />
                             </div>
@@ -405,9 +558,9 @@ export default function RentLateFineCalculatorClient() {
                                     <div className="relative">
                                         <Input
                                             type="number"
-                                            className="pr-8"
+                                            className="pr-8 text-base md:text-sm"
                                             value={finePercent}
-                                            onChange={e => setFinePercent(e.target.value)}
+                                            onChange={e => handleSetFinePercent(e.target.value)}
                                         />
                                         <span className="absolute right-3 top-2.5 text-xs text-muted-foreground">%</span>
                                     </div>
@@ -416,7 +569,7 @@ export default function RentLateFineCalculatorClient() {
                                     <Checkbox
                                         id="c-fine-delay"
                                         checked={applyFineOnlyIfDelayed}
-                                        onCheckedChange={(c) => setApplyFineOnlyIfDelayed(c as boolean)}
+                                        onCheckedChange={(c) => handleSetFineDelay(c as boolean)}
                                     />
                                     <Label htmlFor="c-fine-delay" className="text-xs font-normal leading-tight">
                                         {t.inputs?.applyFineOnlyIfDelayed}
@@ -429,7 +582,7 @@ export default function RentLateFineCalculatorClient() {
                             {/* Interest */}
                             <div className="space-y-3">
                                 <Label className="font-semibold">{t.inputs?.interestRules}</Label>
-                                <RadioGroup value={interestMode} onValueChange={(v: "monthly" | "daily") => setInterestMode(v)} className="grid grid-cols-2 gap-2">
+                                <RadioGroup value={interestMode} onValueChange={handleSetInterestMode} className="grid grid-cols-2 gap-2">
                                     <div className="flex items-center space-x-2 border rounded p-2 hover:bg-muted/50 transition cursor-pointer">
                                         <RadioGroupItem value="monthly" id="i-monthly" />
                                         <div className="grid gap-0.5">
@@ -454,7 +607,8 @@ export default function RentLateFineCalculatorClient() {
                                         type="number"
                                         step={0.01}
                                         value={interestRate}
-                                        onChange={e => setInterestRate(e.target.value)}
+                                        onChange={e => handleSetInterestRate(e.target.value)}
+                                        className="text-base md:text-sm"
                                     />
                                     <TooltipProvider>
                                         <Tooltip>
@@ -481,7 +635,7 @@ export default function RentLateFineCalculatorClient() {
                         <Card>
                             <CardContent className="p-4 flex flex-col justify-between h-full">
                                 <div className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{t.results?.totalPrincipal}</div>
-                                <div className="text-xl md:text-2xl font-bold mt-1 max-w-full truncate" title={formatCurrency(summary.totalPrincipal)}>
+                                <div className="text-lg md:text-2xl font-bold mt-1 max-w-full truncate" title={formatCurrency(summary.totalPrincipal)}>
                                     {formatCurrency(summary.totalPrincipal)}
                                 </div>
                             </CardContent>
@@ -489,7 +643,7 @@ export default function RentLateFineCalculatorClient() {
                         <Card className="bg-primary text-primary-foreground shadow-lg shadow-primary/20 relative overflow-hidden">
                             <CardContent className="p-4 flex flex-col justify-between h-full relative z-10">
                                 <div className="text-xs text-primary-foreground/80 font-medium uppercase tracking-wider">{t.results?.totalUpdated}</div>
-                                <div className="text-2xl md:text-3xl font-bold mt-1 tracking-tight max-w-full truncate">
+                                <div className="text-xl md:text-3xl font-bold mt-1 tracking-tight max-w-full truncate">
                                     {formatCurrency(summary.totalUpdated)}
                                 </div>
                             </CardContent>
@@ -560,19 +714,17 @@ export default function RentLateFineCalculatorClient() {
                                                             </div>
                                                         </TableCell>
                                                         <TableCell>
-                                                            <Input
-                                                                type="date"
+                                                            <BrazilianDateInput
                                                                 className="h-9"
                                                                 value={inst.dueDate}
-                                                                onChange={e => updateInstallment(inst.id, 'dueDate', e.target.value)}
+                                                                onChange={(v) => updateInstallment(inst.id, 'dueDate', v)}
                                                             />
                                                         </TableCell>
                                                         <TableCell className="hidden md:table-cell">
-                                                            <Input
-                                                                type="date"
+                                                            <BrazilianDateInput
                                                                 className="h-9 text-muted-foreground"
                                                                 value={inst.paymentDate || ""}
-                                                                onChange={e => updateInstallment(inst.id, 'paymentDate', e.target.value)}
+                                                                onChange={(v) => updateInstallment(inst.id, 'paymentDate', v)}
                                                             />
                                                         </TableCell>
                                                         <TableCell className="text-right">
@@ -601,8 +753,8 @@ export default function RentLateFineCalculatorClient() {
                             <div className="flex items-center justify-between">
                                 <h3 className="text-lg font-semibold">{t.results?.detailedTableTitle}</h3>
                                 <div className="flex gap-2 print:hidden">
-                                    <Button variant="outline" size="sm" onClick={copyToClipboard} title={t.results?.actions?.copySummary}>
-                                        <Copy className="w-4 h-4" />
+                                    <Button variant="outline" size="sm" onClick={copyToClipboard} title={t.results?.actions?.copySummary} className="transition-all duration-200">
+                                        {isCopied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
                                     </Button>
                                     <Button variant="outline" size="sm" onClick={downloadCSV} title={t.results?.actions?.exportCsv}>
                                         <Download className="w-4 h-4" />
@@ -664,6 +816,19 @@ export default function RentLateFineCalculatorClient() {
             <div className="max-w-4xl text-xs text-muted-foreground mx-auto text-center leading-relaxed print:text-[10px]">
                 <p>{t.results?.footerDisclaimer}</p>
             </div>
+
+            <LeadCaptureModal
+                open={showLeadModal}
+                onOpenChange={(open) => {
+                    setShowLeadModal(open);
+                    if (!open) {
+                        // Check if it was because of success (cookie set)
+                        const match = document.cookie.match(new RegExp('(^| )kitnets_lead_captured=([^;]+)'));
+                        if (match) setLeadCaptured(true);
+                    }
+                }}
+                calculatorType="multa-atraso-aluguel"
+            />
 
         </div >
     );
