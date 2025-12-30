@@ -16,22 +16,22 @@ export default function CalculatorCta({ dict, lang }: CalculatorCtaProps) {
     if (!dict) return null;
 
     return (
-        <div className="w-full max-w-4xl mx-auto my-12 p-8 md:p-12 text-center space-y-6">
-            <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-50 whitespace-pre-line leading-tight">
-                {dict.title}
-            </h2>
-            <p className="text-slate-600 dark:text-slate-400 max-w-2xl mx-auto leading-relaxed text-base md:text-lg">
-                {dict.description}
-            </p>
-            <div className="pt-4">
-                <Link href={`/${lang}/lista-vip?step=landing`}>
-                    <Button
-                        size="lg"
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-8 py-6 h-auto text-lg rounded-full shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300"
-                    >
-                        {dict.button}
-                    </Button>
-                </Link>
+        <div className="mt-16 text-center space-y-8 bg-muted/30 p-8 md:p-12 rounded-[2.5rem] border relative overflow-hidden w-full max-w-4xl mx-auto">
+            <div className="absolute inset-0 bg-grid-black/5 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.5))]" />
+            <div className="relative z-10 space-y-6 max-w-2xl mx-auto">
+                <h2 className="text-3xl md:text-4xl font-bold tracking-tight whitespace-pre-line text-foreground">
+                    {dict.title}
+                </h2>
+                <p className="text-lg md:text-xl text-muted-foreground leading-relaxed">
+                    {dict.description}
+                </p>
+                <div className="pt-2">
+                    <Link href={`/${lang}/lista-vip?step=landing`}>
+                        <Button size="lg" className="h-14 px-8 text-lg rounded-full font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xl shadow-emerald-500/20 hover:scale-105 transition-all border-0">
+                            {dict.button}
+                        </Button>
+                    </Link>
+                </div>
             </div>
         </div>
     );
