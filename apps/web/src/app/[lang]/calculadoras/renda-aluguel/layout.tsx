@@ -7,8 +7,8 @@ export async function generateMetadata({ params }: { params: Promise<{ lang: str
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://kitnets.com';
 
     return {
-        title: dict.rentalIncomeCalculatorPage.title,
-        description: dict.rentalIncomeCalculatorPage.description,
+        title: dict.rentalIncomeCalculatorPage.seo.title,
+        description: dict.rentalIncomeCalculatorPage.seo.description,
         alternates: {
             canonical: `${baseUrl}/${lang}/calculadoras/renda-aluguel`,
             languages: {
@@ -33,8 +33,8 @@ export default async function Layout({
     const jsonLd = {
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
-        "name": dict.rentalIncomeCalculatorPage.title,
-        "description": dict.rentalIncomeCalculatorPage.description,
+        "name": dict.rentalIncomeCalculatorPage.seo.title,
+        "description": dict.rentalIncomeCalculatorPage.seo.description,
         "applicationCategory": "FinanceApplication",
         "operatingSystem": "Web",
         "offers": {
