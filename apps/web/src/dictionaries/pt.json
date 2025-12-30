@@ -13,7 +13,10 @@
         "owners": "Proprietarios",
         "developers": "Construtoras",
         "financialIndependence": "Independência Financeira",
-        "back": "Voltar"
+        "back": "Voltar",
+        "finance": "Financeiro",
+        "rentCategory": "Aluguel",
+        "investment": "Investimento"
     },
     "filters": {
         "title": "Filtrar resultados",
@@ -1812,5 +1815,273 @@
             }
         ],
         "finalCta": "Explore os indicadores, aprofunde sua análise e tome decisões melhores com base em dados reais."
+    },
+    "rentFineCalculatorPage": {
+        "title": "Calculadora de Multa por Rescisão de Contrato de Aluguel",
+        "menuTitle": "Calculadora Rescisão de Aluguel",
+        "description": "Calcule com precisão a multa proporcional por rescisão antecipada de contrato de aluguel, conforme a Lei do Inquilinato.",
+        "inputs": {
+            "contractData": "Dados do Contrato",
+            "rentValue": "Valor do aluguel mensal (R$)",
+            "startDate": "Data de início do contrato",
+            "duration": "Duração total do contrato (meses)",
+            "keyReturnDate": "Data de entrega das chaves",
+            "fineClause": "Cláusula de Multa",
+            "fineScope": "Aplicação da Multa",
+            "fineScopeTotal": "Todo o contrato",
+            "fineScope12Months": "Apenas sobre 12 meses (multa com isenção)",
+            "fineType": "Tipo de cálculo",
+            "fineTypeMonths": "Meses de aluguel",
+            "fineTypeFixed": "Valor fixo",
+            "finePathLabel": "Como a multa é definida no contrato?",
+            "finePathFixed": "Multa fixa (integral, sem proporcionalidade)",
+            "finePathProportional": "Multa proporcional ao prazo restante (Lei do Inquilinato)",
+            "finePathConditional": "Multa condicional (período + aviso prévio)",
+            "finePathUnknown": "Não sei / Simular cenários",
+            "minPeriod": "Período de permanência mínima (meses)",
+            "noticeRequired": "Aviso prévio exigido (dias)",
+            "noticeGivenDays": "Dias de aviso cumpridos",
+            "scenarioTitle": "Cenários Possíveis",
+            "scenarioFixed": "Cenário A: Multa Integral",
+            "scenarioProportional": "Cenário B: Multa Proporcional",
+            "scenarioConditional": "Cenário C: Condicional (Ex: 12 meses)",
+            "noticeRentDue": "Aluguel ref. Aviso (Devido)",
+            "legalBase": "Base Legal",
+            "legalBaseProportional": "Art. 4º Lei 8.245/91 + Art. 571 V CC",
+            "warningNotice": "Atenção: Multa aplicada por falta de aviso prévio integral.",
+            "warningFixed": "Atenção: Este cálculo desconsidera a proporcionalidade legal.",
+            "conditionalExemption": "Isenção (Prazo + Aviso cumpridos)",
+            "conditionalApplied": "Multa aplicada (Antes do prazo ou s/ aviso)",
+            "fineMonths": "Quantidade de meses de multa",
+            "fineFixedValue": "Valor fixo da multa (R$)",
+            "calculate": "Calcular multa de rescisão"
+        },
+        "results": {
+            "mainTitle": "Valor da Multa a Pagar",
+            "subtitle": "Multa proporcional calculada com base no tempo restante do contrato.",
+            "detailsTitle": "Tabela Detalhada",
+            "monthsUsed": "Meses utilizados",
+            "daysUsed": "Dias utilizados",
+            "monthsRemaining": "Meses restantes",
+            "daysRemaining": "Dias restantes",
+            "rentValue": "Valor do aluguel mensal",
+            "totalFine": "Multa contratual integral",
+            "fineFormula": "Fórmula da multa",
+            "dailyFine": "Multa por dia de contrato",
+            "dailyFormula": "Fórmula diária",
+            "proportionalFine": "Multa proporcional",
+            "finalFormula": "Fórmula final",
+            "methodologyTitle": "Como esse valor foi calculado",
+            "methodologyText": "A multa contratual total é de <strong>{totalFine}</strong>.<br/>Considerando um contrato de {durationMonths} meses ({totalDays} dias), o valor diário da multa é de <strong>{dailyFine}</strong>.<br/>Como restavam {daysRemaining} dias para o término do contrato na data da entrega das chaves, a multa proporcional é de <strong>{proportionalFine}</strong>."
+        },
+        "alerts": {
+            "contractEnded": "Contrato já encerrado",
+            "contractEndedDesc": "A data de entrega é posterior ao fim do contrato, portanto a multa é R$ 0,00.",
+            "invalidDates": "Datas inválidas",
+            "invalidDatesDesc": "A data de entrega não pode ser anterior ao início do contrato.",
+            "highFine": "Atenção: Multa alta",
+            "highFineDesc": "A multa configurada é superior a 3 aluguéis. Verifique se isso está correto, pois pode ser considerado abusivo."
+        },
+        "legal": {
+            "title": "Aviso Legal",
+            "text": "Esta calculadora tem caráter informativo. O valor final da multa deve sempre respeitar o contrato assinado e pode variar conforme decisões judiciais ou acordos entre as partes."
+        },
+        "seo": {
+            "title": "Calculadora de Multa por Rescisão de Contrato de Aluguel - Kitnets.com",
+            "description": "Calcule a multa proporcional por rescisão de contrato de aluguel (Lei do Inquilinato). Ferramenta gratuita para inquilinos e proprietários."
+        },
+        "pageContent": {
+            "intro": "A Calculadora de Multa por Rescisão de Contrato de Aluguel do Kitnets.com permite calcular, de forma clara e precisa, o valor da multa aplicada na rescisão antecipada de contratos de locação residencial ou comercial, conforme a Lei do Inquilinato (Lei nº 8.245/91) e as cláusulas previstas no contrato.\n\nCom poucos dados, você descobre quanto realmente deve pagar, evitando erros comuns, cobranças indevidas e interpretações equivocadas do contrato.",
+            "sections": [
+                {
+                    "title": "O que esta calculadora faz",
+                    "text": "Esta ferramenta foi desenvolvida para atender diferentes tipos de cláusulas contratuais, refletindo a realidade dos contratos de aluguel no Brasil. Ela calcula automaticamente:",
+                    "list": [
+                        "✅ Multa fixa (integral), quando o contrato não prevê proporcionalidade",
+                        "✅ Multa proporcional ao tempo restante do contrato, conforme a Lei do Inquilinato",
+                        "✅ Multa condicional, considerando período mínimo de permanência e exigência de aviso prévio",
+                        "✅ Simulação de cenários, ideal para quem não tem certeza sobre a regra aplicada no contrato"
+                    ],
+                    "conclusion": "Tudo isso com transparência total, exibindo os valores intermediários, datas, prazos e a lógica utilizada no cálculo."
+                },
+                {
+                    "title": "Como o cálculo da multa é feito",
+                    "text": "A calculadora utiliza informações como:",
+                    "list": [
+                        "Valor do aluguel mensal",
+                        "Duração total do contrato (em meses)",
+                        "Data de início do contrato",
+                        "Data de entrega das chaves",
+                        "Tipo de multa definido no contrato (meses de aluguel ou valor fixo)",
+                        "Existência de cláusula de proporcionalidade",
+                        "Período mínimo de permanência",
+                        "Aviso prévio exigido e dias efetivamente cumpridos"
+                    ],
+                    "conclusion": "Com base nesses dados, o sistema identifica automaticamente qual regra contratual se aplica e apresenta o valor correto da multa de rescisão."
+                },
+                {
+                    "title": "Resultados completos e detalhados",
+                    "text": "Além do valor final da multa, você visualiza:",
+                    "list": [
+                        "Meses e dias já utilizados no contrato",
+                        "Meses e dias restantes",
+                        "Valor da multa integral prevista em contrato",
+                        "Valor diário da multa (quando aplicável)",
+                        "Multa proporcional na data da rescisão",
+                        "Indicação clara do motivo da cobrança ou da isenção da multa"
+                    ],
+                    "conclusion": "Isso garante total entendimento do cálculo, tanto para locatários quanto para proprietários, imobiliárias e corretores."
+                },
+                {
+                    "title": "Quando usar esta calculadora",
+                    "text": "Esta calculadora é ideal para:",
+                    "list": [
+                        "Locatários que desejam encerrar o contrato antes do prazo",
+                        "Proprietários que querem conferir se a multa cobrada está correta",
+                        "Imobiliárias e corretores que precisam explicar a multa ao cliente",
+                        "Quem quer simular diferentes cenários antes de tomar uma decisão"
+                    ]
+                },
+                {
+                    "title": "Importante",
+                    "text": "Esta calculadora tem caráter informativo e educativo. O valor final da multa sempre deve respeitar o contrato assinado entre as partes e pode variar conforme negociação ou entendimento judicial."
+                }
+            ],
+            "cta": {
+                "title": "Use agora",
+                "text": "Preencha os dados do contrato e descubra, em segundos, qual é a multa correta na rescisão do seu contrato de aluguel, com base na lei e nas cláusulas contratuais."
+            }
+        }
+    },
+    "rentLateFineCalculatorPage": {
+        "title": "Calculadora de Multa de Atraso no Pagamento de Aluguel",
+        "menuTitle": "Multa por Atraso",
+        "description": "Calcule multas e juros de mora acumulados em aluguéis atrasados, com opções de cálculo pró-rata e taxas personalizadas.",
+        "inputs": {
+            "generalData": "Dados Gerais",
+            "calculationDate": "Calcular até",
+            "calculationDateOptionToday": "Hoje",
+            "calculationDateOptionSpecific": "Data específica",
+            "gracePeriod": "Carência para cobrança (dias)",
+            "fineRules": "Regra de Multa",
+            "finePercent": "Multa (%)",
+            "applyFineOnlyIfDelayed": "Aplicar multa apenas se houver atraso (respeitando carência)",
+            "interestRules": "Regra de Juros",
+            "interestMonthly": "Mensal (Pró-rata)",
+            "interestDaily": "Diário",
+            "interestMonthlyLabel": "% a.m.",
+            "interestDailyLabel": "% a.d.",
+            "interestMonthlyTooltip": "Cálculo diário aproximado: % a.m. / 30 × dias de atraso.",
+            "interestDailyTooltip": "Use quando o contrato define juros diários (ex.: 0,10% ao dia).",
+            "presetsTitle": "Perfis Rápidos",
+            "presetStandard": "Padrão contrato: 10% + 1% a.m.",
+            "presetBoleto": "Boleto: 10% + 0,10% a.d.",
+            "presetGrace": "Cobrar após 1 dia"
+        },
+        "installments": {
+            "title": "Parcelas em Atraso",
+            "addInstallment": "Adicionar parcela",
+            "clearAll": "Limpar tudo",
+            "tableHeaderValue": "Valor (R$)",
+            "tableHeaderDueDate": "Vencimento",
+            "tableHeaderPayDate": "Data Pagto (Opcional)",
+            "tableHeaderActions": "Ações",
+            "importCsv": "Importar várias",
+            "remove": "Remover",
+            "duplicate": "Duplicar"
+        },
+        "results": {
+            "cardsTitle": "Resultados Consolidados",
+            "totalPrincipal": "Total Principal",
+            "totalFine": "Total Multa",
+            "totalInterest": "Total Juros",
+            "totalUpdated": "Total Atualizado",
+            "detailedTableTitle": "Detalhamento por Parcela",
+            "colDueDate": "Vencimento",
+            "colValue": "Valor",
+            "colDelayDays": "Dias Atraso",
+            "colFine": "Multa",
+            "colInterest": "Juros",
+            "colTotal": "Total",
+            "actions": {
+                "copySummary": "Copiar Resumo",
+                "print": "Imprimir",
+                "exportCsv": "Baixar CSV"
+            },
+            "footerDisclaimer": "Esta calculadora é uma estimativa baseada nos parâmetros informados e em práticas contratuais comuns (multa e juros). Contratos podem prever regras específicas e a cobrança efetiva pode variar. Para casos de disputa, consulte sua imobiliária/advogado."
+        },
+        "seo": {
+            "title": "Calculadora de Multa e Juros por Atraso no Aluguel (Pró-rata) - Kitnets.com",
+            "description": "Calcule multa e juros de mora por atraso no aluguel com pró-rata por dia. Suporta vários boletos/meses em atraso e detalha o total por parcela."
+        },
+        "pageContent": {
+            "intro": "A Calculadora de Multa de Atraso no Pagamento de Aluguel do Kitnets.com permite calcular de forma rápida, transparente e precisa multas e juros de mora aplicáveis a aluguéis pagos em atraso, exatamente como previsto nos contratos de locação mais utilizados no Brasil. Com poucos dados, você descobre quanto realmente deve pagar ou cobrar, considerando pró-rata por dia, diferentes regras de juros e várias parcelas em atraso ao mesmo tempo — algo essencial em casos de inadimplência recorrente.",
+            "sections": [
+                {
+                    "title": "Para que serve a calculadora de multa por atraso no aluguel?",
+                    "text": "Esta ferramenta é ideal para:",
+                    "list": [
+                        "Locatários que querem saber o valor correto do aluguel atrasado antes de pagar",
+                        "Locadores que precisam calcular multas e juros de forma justa e documentada",
+                        "Imobiliárias que fazem cobranças administrativas ou extrajudiciais",
+                        "Advogados e administradores de imóveis que precisam de valores claros e auditáveis"
+                    ],
+                    "conclusion": "Ela elimina dúvidas comuns como: A multa é aplicada uma única vez ou por mês? O juro é de 1% ao mês ou 0,10% ao dia? Como funciona o cálculo pró-rata? O que acontece quando há mais de um aluguel vencido?"
+                },
+                {
+                    "title": "Como funciona o cálculo da multa e dos juros de aluguel atrasado?",
+                    "text": "A calculadora segue as cláusulas mais comuns encontradas em contratos de locação residencial e comercial, como:",
+                    "list": [
+                        "Multa contratual (geralmente 10% sobre o valor do aluguel)",
+                        "Juros de mora: 1% ao mês (com cálculo pró-rata por dia), ou Percentual diário (ex.: 0,10% ao dia)",
+                        "Carência para cobrança, quando prevista em contrato (ex.: cobrar após 1 dia corrido do vencimento)"
+                    ]
+                },
+                {
+                    "title": "Cálculo pró-rata por dia",
+                    "text": "Se o contrato estabelece juros mensais, a calculadora converte automaticamente para um valor diário proporcional, garantindo um cálculo justo, especialmente em atrasos curtos."
+                },
+                {
+                    "title": "Suporte a múltiplos aluguéis em atraso",
+                    "text": "Diferente de calculadoras simples, esta ferramenta permite informar várias parcelas vencidas, cada uma com: Valor do aluguel, Data de vencimento, Data de pagamento (opcional). Isso é essencial quando o atraso envolve 2, 3 ou mais meses, pois cada parcela tem um número diferente de dias em atraso e, portanto, um valor atualizado distinto. A calculadora soma tudo automaticamente e apresenta: Total principal, Total de multa, Total de juros, Total atualizado a pagar ou cobrar."
+                },
+                {
+                    "title": "Resultados claros e detalhados",
+                    "text": "Após inserir os dados, você visualiza:",
+                    "list": [
+                        "O valor atualizado parcela por parcela",
+                        "O total consolidado da dívida",
+                        "Quantos dias cada aluguel ficou em atraso",
+                        "Quanto da dívida corresponde a multa e quanto a juros"
+                    ],
+                    "conclusion": "Essas informações facilitam: Negociação amigável, Cobrança administrativa, Conferência de boletos bancários, Organização financeira pessoal ou profissional."
+                },
+                {
+                    "title": "Exemplos de uso prático",
+                    "list": [
+                        "“Atrasei o aluguel em 15 dias, quanto devo pagar?”",
+                        "“Tenho 3 meses de aluguel vencidos, cada um com valor diferente.”",
+                        "“O contrato cobra 10% de multa e 1% ao mês. Está certo esse valor?”",
+                        "“O boleto fala em 0,10% ao dia. Quanto isso dá na prática?”"
+                    ],
+                    "conclusion": "A calculadora resolve todos esses cenários em segundos."
+                },
+                {
+                    "title": "Importante: transparência e responsabilidade",
+                    "text": "Esta calculadora utiliza regras contratuais padrão, mas cada contrato pode conter cláusulas específicas. Os valores calculados são estimativas financeiras, úteis para conferência, negociação e planejamento. Para disputas judiciais ou cobranças formais, recomenda-se sempre a análise do contrato e, se necessário, a orientação de um profissional jurídico."
+                },
+                {
+                    "title": "Por que usar a Calculadora de Multa de Atraso do Kitnets.com?",
+                    "list": [
+                        "✅ Cálculo pró-rata correto",
+                        "✅ Suporte a múltiplos aluguéis em atraso",
+                        "✅ Regras flexíveis de multa e juros",
+                        "✅ Interface simples e rápida",
+                        "✅ Total transparência nos valores"
+                    ]
+                }
+            ],
+            "finalText": "Se você lida com aluguel atrasado — seja como locatário, locador ou imobiliária — esta é a forma mais prática de saber exatamente quanto é devido, sem surpresas."
+        }
     }
 }

@@ -39,6 +39,8 @@ const staticRoutes = [
     'calculadora-independencia-financeira',
     'new-listing',
     'waitlist',
+    'calculadoras/multa-atraso-aluguel',
+    'calculadoras/multa-rescisao-contrato-aluguel',
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

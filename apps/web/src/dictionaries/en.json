@@ -47,7 +47,12 @@
         "furnished": "Furnished",
         "balcony": "Balcony",
         "petFriendly": "Pet Friendly",
-        "nearMetro": "Near Metro"
+        "nearMetro": "Near Metro",
+        "financialIndependence": "Financial Independence",
+        "back": "Back",
+        "finance": "Finance",
+        "rentCategory": "Rent",
+        "investment": "Investment"
     },
     "home": {
         "welcome": "Welcome to Kitnets.com",
@@ -1226,5 +1231,142 @@
             }
         ],
         "finalCta": "Explore os indicadores, aprofunde sua análise e tome decisões melhores com base em dados reais."
+    },
+    "rentFineCalculatorPage": {
+        "title": "Rental Contract Termination Fine Calculator",
+        "menuTitle": "Rental Termination Calculator",
+        "description": "Accurately calculate the proportional fine for early rental contract termination, in accordance with the Tenancy Law.",
+        "inputs": {
+            "contractData": "Contract Data",
+            "rentValue": "Monthly Rent Value (R$)",
+            "startDate": "Contract Start Date",
+            "duration": "Total Contract Duration (months)",
+            "keyReturnDate": "Key Return Date",
+            "fineClause": "Fine Clause",
+            "fineScope": "Fine Applicability",
+            "fineScopeTotal": "Entire contract",
+            "fineScope12Months": "First 12 months only",
+            "fineType": "Calculation Type",
+            "fineTypeMonths": "Months of Rent",
+            "fineTypeFixed": "Fixed Value",
+            "finePathLabel": "How is the fine defined in the contract?",
+            "finePathFixed": "Fixed Fine (Integral, no proportionality)",
+            "finePathProportional": "Proportional Fine (Tenancy Law)",
+            "finePathConditional": "Conditional Fine (Period + Notice)",
+            "finePathUnknown": "I don't know / Simulate Scenarios",
+            "minPeriod": "Minimum Stay Period (months)",
+            "noticeRequired": "Required Notice Period (days)",
+            "noticeGivenDays": "Days of Notice Given",
+            "scenarioTitle": "Possible Scenarios",
+            "scenarioFixed": "Scenario A: Full Fine",
+            "scenarioProportional": "Scenario B: Proportional Fine",
+            "scenarioConditional": "Scenario C: Conditional (Ex: 12 months)",
+            "noticeRentDue": "Rent due for Notice Period",
+            "legalBase": "Legal Basis",
+            "legalBaseProportional": "Art. 4 Law 8.245/91",
+            "warningNotice": "Attention: Fine applied due to lack of full notice.",
+            "warningFixed": "Attention: This calculation ignores legal proportionality.",
+            "conditionalExemption": "Exemption applied (Period + Notice met)",
+            "conditionalApplied": "Fine applied (Before period or no notice)",
+            "fineMonths": "Quantity of Fine Months",
+            "fineFixedValue": "Fixed Fine Value (R$)",
+            "calculate": "Calculate Termination Fine"
+        },
+        "results": {
+            "mainTitle": "Fine Amount to Pay",
+            "subtitle": "Proportional fine calculated based on the remaining contract time.",
+            "detailsTitle": "Detailed Table",
+            "monthsUsed": "Months Used",
+            "daysUsed": "Days Used",
+            "monthsRemaining": "Months Remaining",
+            "daysRemaining": "Days Remaining",
+            "rentValue": "Monthly Rent Value",
+            "totalFine": "Full Contractual Fine",
+            "fineFormula": "Fine Formula",
+            "dailyFine": "Fine per Contract Day",
+            "dailyFormula": "Daily Formula",
+            "proportionalFine": "Proportional Fine",
+            "finalFormula": "Final Formula",
+            "methodologyTitle": "How this value was calculated",
+            "methodologyText": "The total contractual fine is <strong>{totalFine}</strong>.<br/>Considering a {durationMonths}-month contract ({totalDays} days), the daily fine value is <strong>{dailyFine}</strong>.<br/>Since {daysRemaining} days remained until the end of the contract on the key return date, the proportional fine is <strong>{proportionalFine}</strong>."
+        },
+        "alerts": {
+            "contractEnded": "Contract Already Ended",
+            "contractEndedDesc": "The return date is after the contract end, so the fine is R$ 0.00.",
+            "invalidDates": "Invalid Dates",
+            "invalidDatesDesc": "The return date cannot be before the contract start.",
+            "highFine": "Attention: High Fine",
+            "highFineDesc": "The configured fine exceeds 3 rents. Verify if this is correct, as it may be considered abusive."
+        },
+        "legal": {
+            "title": "Legal Notice",
+            "text": "This calculator is for informational purposes. The final fine value must always respect the signed contract and may vary according to judicial decisions or agreements between the parties."
+        },
+        "seo": {
+            "title": "Rental Contract Termination Fine Calculator - Kitnets.com",
+            "description": "Calculate the proportional fine for rental contract termination. Free tool for tenants and landlords."
+        }
+    },
+    "rentLateFineCalculatorPage": {
+        "title": "Rent Late Payment Fine Calculator",
+        "menuTitle": "Late Rent Fine",
+        "description": "Calculate accumulated fines and interest on late rent payments, with pro-rata calculation options and custom rates.",
+        "inputs": {
+            "generalData": "General Data",
+            "calculationDate": "Calculate until",
+            "calculationDateOptionToday": "Today",
+            "calculationDateOptionSpecific": "Specific Date",
+            "gracePeriod": "Grace Period (days)",
+            "fineRules": "Fine Rules",
+            "finePercent": "Fine (%)",
+            "applyFineOnlyIfDelayed": "Apply fine only if delayed (respecting grace period)",
+            "interestRules": "Interest Rules",
+            "interestMonthly": "Monthly (Pro-rata)",
+            "interestDaily": "Daily",
+            "interestMonthlyLabel": "% p.m.",
+            "interestDailyLabel": "% p.d.",
+            "interestMonthlyTooltip": "Approximate daily calculation: % p.m. / 30 × days delayed.",
+            "interestDailyTooltip": "Use when the contract defines daily interest (e.g., 0.10% per day).",
+            "presetsTitle": "Quick Profiles",
+            "presetStandard": "Contract Standard: 10% + 1% p.m.",
+            "presetBoleto": "Boleto: 10% + 0.10% p.d.",
+            "presetGrace": "Charge after 1 day"
+        },
+        "installments": {
+            "title": "Overdue Installments",
+            "addInstallment": "Add Installment",
+            "clearAll": "Clear All",
+            "tableHeaderValue": "Value ($)",
+            "tableHeaderDueDate": "Due Date",
+            "tableHeaderPayDate": "Date Paid (Optional)",
+            "tableHeaderActions": "Actions",
+            "importCsv": "Import Multiple",
+            "remove": "Remove",
+            "duplicate": "Duplicate"
+        },
+        "results": {
+            "cardsTitle": "Consolidated Results",
+            "totalPrincipal": "Total Principal",
+            "totalFine": "Total Fine",
+            "totalInterest": "Total Interest",
+            "totalUpdated": "Total Updated",
+            "detailedTableTitle": "Details per Installment",
+            "colDueDate": "Due Date",
+            "colValue": "Value",
+            "colDelayDays": "Delay Days",
+            "colFine": "Fine",
+            "colInterest": "Interest",
+            "colTotal": "Total",
+            "actions": {
+                "copySummary": "Copy Summary",
+                "print": "Print",
+                "exportCsv": "Download CSV"
+            },
+            "footerDisclaimer": "This calculator is an estimate based on the parameters provided and common contractual practices (fine and interest). Contracts may provide for specific rules and the actual collection may vary. For dispute cases, consult your real estate agency/lawyer."
+        },
+        "seo": {
+            "title": "Rent Late Fine & Interest Calculator (Pro-rata) - Kitnets.com",
+            "description": "Calculate late rent fines and interest with daily pro-rata. Supports multiple overdue slips/months and details the total per installment."
+        }
     }
 }
