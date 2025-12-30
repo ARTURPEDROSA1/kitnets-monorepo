@@ -13,7 +13,10 @@
         "owners": "Propietarios",
         "developers": "Constructoras",
         "financialIndependence": "Independencia Financiera",
-        "back": "Volver"
+        "back": "Volver",
+        "finance": "Finanzas",
+        "rentCategory": "Alquiler",
+        "investment": "Inversión"
     },
     "filters": {
         "title": "Filtrar resultados",
@@ -1269,5 +1272,142 @@
             }
         ],
         "finalCta": "Explore os indicadores, aprofunde sua análise e tome decisões melhores com base em dados reais."
+    },
+    "rentFineCalculatorPage": {
+        "title": "Calculadora de Multa por Rescisión de Contrato de Alquiler",
+        "menuTitle": "Calculadora Rescisión Alquiler",
+        "description": "Calcule con precisión la multa proporcional por rescisión anticipada del contrato de alquiler.",
+        "inputs": {
+            "contractData": "Datos del Contrato",
+            "rentValue": "Valor del Alquiler Mensual (R$)",
+            "startDate": "Fecha de Inicio del Contrato",
+            "duration": "Duración Total del Contrato (meses)",
+            "keyReturnDate": "Fecha de Entrega de Llaves",
+            "fineClause": "Cláusula de Multa",
+            "fineScope": "Aplicabilidad de la Multa",
+            "fineScopeTotal": "Todo el contrato",
+            "fineScope12Months": "Solo primeros 12 meses",
+            "fineType": "Tipo de Cálculo",
+            "fineTypeMonths": "Meses de Alquiler",
+            "fineTypeFixed": "Valor Fijo",
+            "finePathLabel": "¿Cómo se define la multa en el contrato?",
+            "finePathFixed": "Multa Fija (Integral, sin proporcionalidad)",
+            "finePathProportional": "Multa Proporcional al plazo restante (Ley de Alquileres)",
+            "finePathConditional": "Multa Condicional (Período + Aviso previo)",
+            "finePathUnknown": "No sé / Simular Escenarios",
+            "minPeriod": "Período Mínimo de Permanencia (meses)",
+            "noticeRequired": "Aviso previo exigido (días)",
+            "noticeGivenDays": "Días de aviso cumplidos",
+            "scenarioTitle": "Escenarios Posibles",
+            "scenarioFixed": "Escenario A: Multa Integral",
+            "scenarioProportional": "Escenario B: Multa Proporcional",
+            "scenarioConditional": "Escenario C: Condicional (Ej: 12 meses)",
+            "noticeRentDue": "Alquiler ref. Aviso (Debido)",
+            "legalBase": "Base Legal",
+            "legalBaseProportional": "Art. 4 Ley 8.245 (Brasil)",
+            "warningNotice": "Atención: Multa aplicada por falta de aviso previo integral.",
+            "warningFixed": "Atención: Este cálculo ignora la proporcionalidad legal.",
+            "conditionalExemption": "Exención aplicada (Plazo + Aviso cumplidos)",
+            "conditionalApplied": "Multa aplicada (Antes del plazo o sin aviso)",
+            "fineMonths": "Cantidad de Meses de Multa",
+            "fineFixedValue": "Valor Fijo de la Multa (R$)",
+            "calculate": "Calcular Multa de Rescisión"
+        },
+        "results": {
+            "mainTitle": "Valor de la Multa a Pagar",
+            "subtitle": "Multa proporcional calculada en base al tiempo restante del contrato.",
+            "detailsTitle": "Tabla Detallada",
+            "monthsUsed": "Meses Utilizados",
+            "daysUsed": "Días Utilizados",
+            "monthsRemaining": "Meses Restantes",
+            "daysRemaining": "Días Restantes",
+            "rentValue": "Valor del Alquiler Mensual",
+            "totalFine": "Multa Contractual Integral",
+            "fineFormula": "Fórmula de la Multa",
+            "dailyFine": "Multa por Día de Contrato",
+            "dailyFormula": "Fórmula Diaria",
+            "proportionalFine": "Multa Proporcional",
+            "finalFormula": "Fórmula Final",
+            "methodologyTitle": "Cómo se calculó este valor",
+            "methodologyText": "La multa contractual total es de <strong>{totalFine}</strong>.<br/>Considerando un contrato de {durationMonths} meses ({totalDays} días), el valor diario de la multa es de <strong>{dailyFine}</strong>.<br/>Como restaban {daysRemaining} días para el término del contrato en la fecha de entrega de llaves, la multa proporcional es de <strong>{proportionalFine}</strong>."
+        },
+        "alerts": {
+            "contractEnded": "Contrato Ya Finalizado",
+            "contractEndedDesc": "La fecha de entrega es posterior al fin del contrato, por lo tanto la multa es R$ 0,00.",
+            "invalidDates": "Fechas Inválidas",
+            "invalidDatesDesc": "La fecha de entrega no puede ser anterior al inicio del contrato.",
+            "highFine": "Atención: Multa Alta",
+            "highFineDesc": "La multa configurada es superior a 3 alquileres. Verifique si es correcto, ya que puede considerarse abusivo."
+        },
+        "legal": {
+            "title": "Aviso Legal",
+            "text": "Esta calculadora tiene carácter informativo. El valor final de la multa siempre debe respetar el contrato firmado y puede variar según decisiones judiciales o acuerdos entre las partes."
+        },
+        "seo": {
+            "title": "Calculadora de Multa por Rescisión de Contrato de Alquiler - Kitnets.com",
+            "description": "Calcule la multa proporcional por rescisión de contrato de alquiler. Herramienta gratuita para inquilinos y propietarios."
+        }
+    },
+    "rentLateFineCalculatorPage": {
+        "title": "Calculadora de Multa por Atraso en Alquiler",
+        "menuTitle": "Multa por Atraso",
+        "description": "Calcule multas e intereses acumulados en alquileres atrasados, con opciones de cálculo pro-rata y tasas personalizadas.",
+        "inputs": {
+            "generalData": "Datos Generales",
+            "calculationDate": "Calcular hasta",
+            "calculationDateOptionToday": "Hoy",
+            "calculationDateOptionSpecific": "Fecha específica",
+            "gracePeriod": "Carencia para cobro (días)",
+            "fineRules": "Regla de Multa",
+            "finePercent": "Multa (%)",
+            "applyFineOnlyIfDelayed": "Aplicar multa solo si hay atraso (respetando carencia)",
+            "interestRules": "Regla de Intereses",
+            "interestMonthly": "Mensual (Pro-rata)",
+            "interestDaily": "Diario",
+            "interestMonthlyLabel": "% p.m.",
+            "interestDailyLabel": "% p.d.",
+            "interestMonthlyTooltip": "Cálculo diario aproximado: % p.m. / 30 × días de atraso.",
+            "interestDailyTooltip": "Use cuando el contrato define intereses diarios (ej: 0,10% por día).",
+            "presetsTitle": "Perfiles Rápidos",
+            "presetStandard": "Estándar Contrato: 10% + 1% p.m.",
+            "presetBoleto": "Boleto: 10% + 0,10% p.d.",
+            "presetGrace": "Cobrar tras 1 día"
+        },
+        "installments": {
+            "title": "Cuotas Atrasadas",
+            "addInstallment": "Agregar cuota",
+            "clearAll": "Limpiar todo",
+            "tableHeaderValue": "Valor ($)",
+            "tableHeaderDueDate": "Vencimiento",
+            "tableHeaderPayDate": "Fecha Pago (Opcional)",
+            "tableHeaderActions": "Acciones",
+            "importCsv": "Importar varias",
+            "remove": "Eliminar",
+            "duplicate": "Duplicar"
+        },
+        "results": {
+            "cardsTitle": "Resultados Consolidados",
+            "totalPrincipal": "Total Principal",
+            "totalFine": "Total Multa",
+            "totalInterest": "Total Intereses",
+            "totalUpdated": "Total Actualizado",
+            "detailedTableTitle": "Detalle por Cuota",
+            "colDueDate": "Vencimiento",
+            "colValue": "Valor",
+            "colDelayDays": "Días Atraso",
+            "colFine": "Multa",
+            "colInterest": "Intereses",
+            "colTotal": "Total",
+            "actions": {
+                "copySummary": "Copiar Resumen",
+                "print": "Imprimir",
+                "exportCsv": "Descargar CSV"
+            },
+            "footerDisclaimer": "Esta calculadora es una estimación basada en los parámetros informados y en prácticas contractuales comunes. Los contratos pueden prever reglas específicas y el cobro efectivo puede variar. Para disputas, consulte agencia/abogado."
+        },
+        "seo": {
+            "title": "Calculadora de Multa e Intereses por Atraso en Alquiler - Kitnets.com",
+            "description": "Calcule multa e intereses por mora en alquiler con pro-rata diario. Soporta varios recibos/meses atrasados y detalla el total por cuota."
+        }
     }
 }

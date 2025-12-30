@@ -16,6 +16,7 @@ BEGIN
 (v_index_id, 2025, 8, '2025-08-01', 1.16, 'https://www.bcb.gov.br/controleinflacao/historicotaxasjuros'),
 (v_index_id, 2025, 9, '2025-09-01', 1.22, 'https://www.bcb.gov.br/controleinflacao/historicotaxasjuros'),
 (v_index_id, 2025, 10, '2025-10-01', 1.28, 'https://www.bcb.gov.br/controleinflacao/historicotaxasjuros'),
+(v_index_id, 2025, 12, '2025-12-01', 1.1715, 'https://www.bcb.gov.br/controleinflacao/historicotaxasjuros'),
 (v_index_id, 2025, 11, '2025-11-01', 1.0, 'https://www.bcb.gov.br/controleinflacao/historicotaxasjuros'),
 (v_index_id, 2024, 1, '2024-01-01', 0.97, 'https://www.bcb.gov.br/controleinflacao/historicotaxasjuros'),
 (v_index_id, 2024, 2, '2024-02-01', 0.8, 'https://www.bcb.gov.br/controleinflacao/historicotaxasjuros'),

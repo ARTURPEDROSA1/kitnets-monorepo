@@ -41,7 +41,8 @@ export async function generateMetadata({ params }: { params: Promise<{ lang: str
         description: dict.home.subtitle,
         keywords: [
             "kitnets", "aluguel", "moradia", "imóveis", "calculadoras", "financiamento",
-            "investimento", "IPCA", "IGPM", "INPC", "real estate", "rent", "Brazil"
+            "investimento", "IPCA", "IGPM", "INPC", "real estate", "rent", "Brazil",
+            "multa aluguel", "rescisão contrato", "aluguel atrasado", "rental fine", "lease termination"
         ],
         authors: [{ name: "Kitnets.com Team", url: baseUrl }],
         creator: "Kitnets.com",

@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  reactStrictMode: true,
   compress: true,
   poweredByHeader: false,
   images: {
@@ -16,6 +17,7 @@ const nextConfig: NextConfig = {
     ],
   },
   experimental: {
+    optimizePackageImports: ['lucide-react', 'recharts', 'date-fns', '@kitnets/ui'],
     serverActions: {
       bodySizeLimit: '10mb',
     },

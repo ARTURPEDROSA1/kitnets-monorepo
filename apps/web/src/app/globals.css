@@ -111,6 +111,11 @@
   html {
     scroll-behavior: smooth;
   }
+
+  button,
+  a {
+    touch-action: manipulation;
+  }
 }
 
 body {
