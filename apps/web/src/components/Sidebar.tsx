@@ -100,7 +100,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
 
     const toggleCalculatorsMenu = () => {
         setSidebarView('calculators-menu');
-        const path = lang === 'pt' ? '/calculadoras/renda-aluguel' : `/${lang}/calculadoras/renda-aluguel`;
+        const path = lang === 'pt' ? '/calculadoras' : `/${lang}/calculadoras`;
         router.push(path);
     };
 

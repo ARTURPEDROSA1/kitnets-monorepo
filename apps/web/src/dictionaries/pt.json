@@ -767,10 +767,6 @@
             "Próximo Restaurante"
         ]
     },
-    "rentalIncomeCalculatorPage": {
-        "title": "A renda do aluguel paga o financiamento? - Kitnets.com",
-        "description": "Descubra em quantos anos a renda do aluguel passa a pagar o financiamento imobiliário. Simule SAC ou PRICE, considere juros, seguros, impostos, vacância e reajuste anual."
-    },
     "mortgageCalculatorPage": {
         "title": "Simulador de Amortização de Financiamento Imobiliário (SAC e PRICE)",
         "subtitle": "O poder da amortização: descubra o que os bancos não explicam sobre juros, prazo e economia.",
@@ -1953,6 +1949,18 @@
             }
         }
     },
+    "rentAdjustmentCalculatorPage": {
+        "seo": {
+            "title": "Calculadora de Reajuste de Aluguel (IGP-M, IPCA, IVAR) - Kitnets.com",
+            "description": "Calcule o reajuste de aluguel online e gratuito. Simule com os índices oficiais (IGP-M, IPCA, INPC, IVAR) ou valor fixo."
+        }
+    },
+    "rentalIncomeCalculatorPage": {
+        "seo": {
+            "title": "Calculadora: A Renda do Aluguel Paga o Financiamento? - Kitnets.com",
+            "description": "Descubra em quanto tempo o aluguel cobre a parcela do financiamento. Simule cenários com SAC, PRICE, vacância e impostos."
+        }
+    },
     "rentLateFineCalculatorPage": {
         "title": "Calculadora de Multa de Atraso no Pagamento de Aluguel",
         "menuTitle": "Multa por Atraso",
@@ -2082,6 +2090,85 @@
                 }
             ],
             "finalText": "Se você lida com aluguel atrasado — seja como locatário, locador ou imobiliária — esta é a forma mais prática de saber exatamente quanto é devido, sem surpresas."
+        }
+    },
+    "calculatorsOverview": {
+        "title": "Calculadoras Financeiras, de Aluguel e viabilidade de investimentos",
+        "subtitle": "Simuladores gratuitos para aluguel, financiamento, reajustes, juros, inflação e planejamento financeiro — feitos para locadores, inquilinos e investidores imobiliários.",
+        "microCta": "Usar agora — sem cadastro",
+        "secondaryCta": "Criar conta para salvar simulações",
+        "searchPlaceholder": "Buscar calculadora...",
+        "mostUsed": "Mais Utilizadas",
+        "categories": {
+            "all": "Todas",
+            "rent": "Aluguel",
+            "finance": "Financiamento",
+            "indices": "Índices",
+            "interest": "Juros",
+            "planning": "Planejamento"
+        },
+        "conversion": {
+            "title": "Quer salvar suas simulações e contratos?",
+            "text": "Em breve, o Kitnets.com permitirá acompanhar reajustes, contratos e imóveis em um só lugar.",
+            "cta": "Entrar na lista de espera"
+        },
+        "cards": {
+            "ctaPrimary": "Calcular agora",
+            "ctaSecondary": "Entenda como funciona",
+            "items": {
+                "rentAdjustment": {
+                    "title": "Reajuste de Aluguel",
+                    "description": "Atualize o valor do aluguel usando índices como IGP-M, IPCA ou IVAR."
+                },
+                "lateFee": {
+                    "title": "Multa por Atraso",
+                    "description": "Calcule multas e juros por atraso no pagamento do aluguel."
+                },
+                "terminationFee": {
+                    "title": "Multa Rescisão de Contrato",
+                    "description": "Calcule a multa proporcional para desocupação antecipada do imóvel."
+                },
+                "rentalIncome": {
+                    "title": "Renda do Aluguel",
+                    "description": "Descubra se a renda do aluguel paga as parcelas do seu financiamento."
+                },
+                "amortization": {
+                    "title": "Amortização Financiamento",
+                    "description": "Simule a redução de juros e prazo amortizando seu financiamento imobiliario."
+                },
+                "monthlyAnnualInterest": {
+                    "title": "Conv. Juros Mensal/Anual",
+                    "description": "Converta taxas de juros mensais para anuais e vice-versa."
+                },
+                "compoundInterest": {
+                    "title": "Juros Compostos",
+                    "description": "Simule o crescimento do seu patrimônio com o poder dos juros compostos."
+                },
+                "financialIndependence": {
+                    "title": "Independência Financeira",
+                    "description": "Planeje sua liberdade financeira considerando inflação e impostos."
+                },
+                "ipca": {
+                    "title": "IPCA (Inflação Oficial)",
+                    "description": "Consulte o índice oficial de inflação do Brasil."
+                },
+                "igpm": {
+                    "title": "IGP-M (Aluguel)",
+                    "description": "Acompanhe o índice mais usado em contratos de aluguel."
+                },
+                "cdi": {
+                    "title": "CDI (Renda Fixa)",
+                    "description": "Acompanhe a taxa que baliza os investimentos de renda fixa."
+                },
+                "selic": {
+                    "title": "Taxa Selic",
+                    "description": "Consulte a taxa básica de juros da economia brasileira."
+                },
+                "inpc": {
+                    "title": "INPC",
+                    "description": "Consulte o índice nacional de preços ao consumidor."
+                }
+            }
         }
     }
 }

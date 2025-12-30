@@ -39,7 +39,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Badge } from "@/components/ui/badge";
+
 import CalculatorCta from "@/components/calculators/CalculatorCta";
 import CalculatorContent from "@/components/calculators/CalculatorContent";
 
@@ -179,21 +179,7 @@ export default function RentLateFineCalculatorClient() {
         setInstallments(installments?.map(i => i.id === id ? { ...i, [field]: value } : i));
     };
 
-    // Apply Presets
-    const applyPreset = (type: 'standard' | 'boleto' | 'grace') => {
-        if (type === 'standard') {
-            setFinePercent(10);
-            setInterestMode('monthly');
-            setInterestRate(1);
-        } else if (type === 'boleto') {
-            setFinePercent(10);
-            setInterestMode('daily');
-            setInterestRate(0.10);
-        } else if (type === 'grace') {
-            setGracePeriod(1);
-            setApplyFineOnlyIfDelayed(true);
-        }
-    };
+
 
     const { results, summary } = useMemo(() => {
         const baseDate = calcType === 'today' ? new Date() : (specificDate ? new Date(specificDate + 'T12:00:00') : new Date());
@@ -481,15 +467,7 @@ export default function RentLateFineCalculatorClient() {
                                 </div>
                             </div>
 
-                            {/* Presets */}
-                            <div className="pt-2">
-                                <Label className="text-xs font-semibold uppercase text-muted-foreground mb-2 block">{t.inputs?.presetsTitle}</Label>
-                                <div className="flex flex-wrap gap-2">
-                                    <Badge variant="secondary" className="cursor-pointer hover:bg-primary/20" onClick={() => applyPreset('standard')}>Default</Badge>
-                                    <Badge variant="secondary" className="cursor-pointer hover:bg-primary/20" onClick={() => applyPreset('boleto')}>Boleto</Badge>
-                                    <Badge variant="secondary" className="cursor-pointer hover:bg-primary/20" onClick={() => applyPreset('grace')}>+1 Dia</Badge>
-                                </div>
-                            </div>
+
 
                         </CardContent>
                     </Card>
@@ -502,7 +480,7 @@ export default function RentLateFineCalculatorClient() {
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                         <Card className="bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800">
                             <CardContent className="p-4 flex flex-col justify-between h-full">
-                                <div className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{t.results?.totalPrincipal}</div>
+                                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wider">{t.results?.totalPrincipal}</div>
                                 <div className="text-xl md:text-2xl font-bold mt-1 max-w-full truncate" title={formatCurrency(summary.totalPrincipal)}>
                                     {formatCurrency(summary.totalPrincipal)}
                                 </div>
@@ -510,7 +488,7 @@ export default function RentLateFineCalculatorClient() {
                         </Card>
                         <Card className="bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800">
                             <CardContent className="p-4 flex flex-col justify-between h-full">
-                                <div className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{t.results?.totalFine}</div>
+                                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wider">{t.results?.totalFine}</div>
                                 <div className="text-xl md:text-2xl font-bold mt-1 text-amber-600 dark:text-amber-500 max-w-full truncate">
                                     {formatCurrency(summary.totalFine)}
                                 </div>
@@ -518,7 +496,7 @@ export default function RentLateFineCalculatorClient() {
                         </Card>
                         <Card className="bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800">
                             <CardContent className="p-4 flex flex-col justify-between h-full">
-                                <div className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{t.results?.totalInterest}</div>
+                                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wider">{t.results?.totalInterest}</div>
                                 <div className="text-xl md:text-2xl font-bold mt-1 text-red-600 dark:text-red-500 max-w-full truncate">
                                     {formatCurrency(summary.totalInterest)}
                                 </div>
@@ -550,67 +528,69 @@ export default function RentLateFineCalculatorClient() {
                         </CardHeader>
                         <CardContent className="flex-1">
                             <div className="rounded-md border overflow-hidden">
-                                <Table>
-                                    <TableHeader className="bg-muted/50">
-                                        <TableRow>
-                                            <TableHead className="w-[180px]">{t.installments?.tableHeaderValue}</TableHead>
-                                            <TableHead className="min-w-[150px]">{t.installments?.tableHeaderDueDate}</TableHead>
-                                            <TableHead className="hidden md:table-cell">{t.installments?.tableHeaderPayDate}</TableHead>
-                                            <TableHead className="text-right w-[100px]">{t.installments?.tableHeaderActions}</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {installments.length === 0 ? (
+                                <div className="overflow-x-auto">
+                                    <Table>
+                                        <TableHeader className="bg-muted/50">
                                             <TableRow>
-                                                <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                                                    Nenhuma parcela adicionada.
-                                                </TableCell>
+                                                <TableHead className="min-w-[170px]">{t.installments?.tableHeaderValue}</TableHead>
+                                                <TableHead className="min-w-[150px]">{t.installments?.tableHeaderDueDate}</TableHead>
+                                                <TableHead className="hidden md:table-cell">{t.installments?.tableHeaderPayDate}</TableHead>
+                                                <TableHead className="text-right min-w-[80px]">{t.installments?.tableHeaderActions}</TableHead>
                                             </TableRow>
-                                        ) : (
-                                            installments.map((inst) => (
-                                                <TableRow key={inst.id} className="animate-in slide-in-from-left-2 duration-300">
-                                                    <TableCell>
-                                                        <div className="relative">
-                                                            <span className="absolute left-3 top-2.5 text-muted-foreground text-xs">R$</span>
-                                                            <CurrencyInput
-                                                                className="pl-8 h-9 text-base"
-                                                                value={inst.value}
-                                                                onChange={(v) => updateInstallment(inst.id, 'value', v)}
-                                                                placeholder="0,00"
-                                                            />
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Input
-                                                            type="date"
-                                                            className="h-9"
-                                                            value={inst.dueDate}
-                                                            onChange={e => updateInstallment(inst.id, 'dueDate', e.target.value)}
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell className="hidden md:table-cell">
-                                                        <Input
-                                                            type="date"
-                                                            className="h-9 text-muted-foreground"
-                                                            value={inst.paymentDate || ""}
-                                                            onChange={e => updateInstallment(inst.id, 'paymentDate', e.target.value)}
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                                            onClick={() => removeInstallment(inst.id)}
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </Button>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {installments.length === 0 ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                                                        Nenhuma parcela adicionada.
                                                     </TableCell>
                                                 </TableRow>
-                                            ))
-                                        )}
-                                    </TableBody>
-                                </Table>
+                                            ) : (
+                                                installments.map((inst) => (
+                                                    <TableRow key={inst.id} className="animate-in slide-in-from-left-2 duration-300">
+                                                        <TableCell>
+                                                            <div className="relative">
+                                                                <span className="absolute left-3 top-2.5 text-muted-foreground text-xs">R$</span>
+                                                                <CurrencyInput
+                                                                    className="pl-8 h-9 text-base"
+                                                                    value={inst.value}
+                                                                    onChange={(v) => updateInstallment(inst.id, 'value', v)}
+                                                                    placeholder="0,00"
+                                                                />
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Input
+                                                                type="date"
+                                                                className="h-9"
+                                                                value={inst.dueDate}
+                                                                onChange={e => updateInstallment(inst.id, 'dueDate', e.target.value)}
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell className="hidden md:table-cell">
+                                                            <Input
+                                                                type="date"
+                                                                className="h-9 text-muted-foreground"
+                                                                value={inst.paymentDate || ""}
+                                                                onChange={e => updateInstallment(inst.id, 'paymentDate', e.target.value)}
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell className="text-right">
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                                                onClick={() => removeInstallment(inst.id)}
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </Button>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
@@ -685,6 +665,6 @@ export default function RentLateFineCalculatorClient() {
                 <p>{t.results?.footerDisclaimer}</p>
             </div>
 
-        </div>
+        </div >
     );
 }

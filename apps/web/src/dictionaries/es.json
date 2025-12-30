@@ -1409,5 +1409,84 @@
             "title": "Calculadora de Multa e Intereses por Atraso en Alquiler - Kitnets.com",
             "description": "Calcule multa e intereses por mora en alquiler con pro-rata diario. Soporta varios recibos/meses atrasados y detalla el total por cuota."
         }
+    },
+    "calculatorsOverview": {
+        "title": "Calculadoras Financieras, de Alquiler e Inmobiliarias",
+        "subtitle": "Simuladores gratuitos para alquiler, financiamiento, reajustes, intereses, inflación y planificación financiera — hechos para propietarios, inquilinos e inversores inmobiliarios.",
+        "microCta": "Usar ahora — sin registro",
+        "secondaryCta": "Crear cuenta para guardar simulaciones",
+        "searchPlaceholder": "Buscar calculadora...",
+        "mostUsed": "Más Utilizadas",
+        "categories": {
+            "all": "Todas",
+            "rent": "Alquiler",
+            "finance": "Financiamiento",
+            "indices": "Índices",
+            "interest": "Interés",
+            "planning": "Planificación"
+        },
+        "conversion": {
+            "title": "¿Quiere guardar sus simulaciones y contratos?",
+            "text": "Pronto, Kitnets.com permitirá seguir reajustes, contratos e inmuebles en un solo lugar.",
+            "cta": "Unirse a la lista de espera"
+        },
+        "cards": {
+            "ctaPrimary": "Calcular ahora",
+            "ctaSecondary": "Entienda cómo funciona",
+            "items": {
+                "rentAdjustment": {
+                    "title": "Reajuste de Alquiler",
+                    "description": "Actualice el valor del alquiler usando índices como IGP-M, IPCA o IVAR."
+                },
+                "lateFee": {
+                    "title": "Multa por Atraso",
+                    "description": "Calcule multas e intereses por pago atrasado del alquiler."
+                },
+                "terminationFee": {
+                    "title": "Multa Rescisión Contrato",
+                    "description": "Calcule la multa proporcional por desocupación anticipada."
+                },
+                "rentalIncome": {
+                    "title": "Renta de Alquiler",
+                    "description": "Descubra si la renta del alquiler paga las cuotas de su financiamiento."
+                },
+                "amortization": {
+                    "title": "Amortización Hipoteca",
+                    "description": "Simule la reducción de intereses y plazo amortizando su hipoteca."
+                },
+                "monthlyAnnualInterest": {
+                    "title": "Conv. Interés Mensual/Anual",
+                    "description": "Convierta tasas de interés mensuales a anuales y viceversa."
+                },
+                "compoundInterest": {
+                    "title": "Interés Compuesto",
+                    "description": "Simule el crecimiento de su patrimonio con el poder del interés compuesto."
+                },
+                "financialIndependence": {
+                    "title": "Independencia Financiera",
+                    "description": "Planifique su libertad financiera considerando inflación e impuestos."
+                },
+                "ipca": {
+                    "title": "IPCA (Inflación Oficial)",
+                    "description": "Consulta el índice oficial de inflación de Brasil."
+                },
+                "igpm": {
+                    "title": "IGP-M (Alquiler)",
+                    "description": "Sigue el índice más utilizado en contratos de alquiler."
+                },
+                "cdi": {
+                    "title": "CDI (Renta Fija)",
+                    "description": "Sigue la tasa que referencia las inversiones de renta fija."
+                },
+                "selic": {
+                    "title": "Tasa Selic",
+                    "description": "Consulta la tasa básica de interés de la economía brasileña."
+                },
+                "inpc": {
+                    "title": "INPC",
+                    "description": "Consulta el índice nacional de precios al consumidor."
+                }
+            }
+        }
     }
 }

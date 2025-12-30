@@ -24,6 +24,8 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import CalculatorCta from "@/components/calculators/CalculatorCta";
+import CalculatorContent from "@/components/calculators/CalculatorContent";
 
 // --- Helper Components ---
 
@@ -364,7 +366,7 @@ export default function RentFineCalculator() {
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="flex gap-4">
-                                <div className="flex-1">
+                                <div className="flex-1 flex flex-col justify-between">
                                     <Label>{t.inputs?.fineType}</Label>
                                     <Select value={fineType} onValueChange={(v: FineType) => setFineType(v)}>
                                         <SelectTrigger className="mt-1.5 w-full"><SelectValue /></SelectTrigger>
@@ -374,7 +376,7 @@ export default function RentFineCalculator() {
                                         </SelectContent>
                                     </Select>
                                 </div>
-                                <div className="flex-1">
+                                <div className="flex-1 flex flex-col justify-between">
                                     {fineType === 'months' ? (
                                         <>
                                             <Label>{t.inputs?.fineMonths}</Label>
@@ -399,7 +401,7 @@ export default function RentFineCalculator() {
                                         <AlertTriangle className="w-4 h-4" />
                                         {t.inputs?.finePathConditional}
                                     </div>
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div>
                                             <Label>{t.inputs?.minPeriod}</Label>
                                             <Input type="number" className="mt-1.5" value={minPeriodMonths} onChange={e => setMinPeriodMonths(e.target.value)} />
@@ -561,63 +563,10 @@ export default function RentFineCalculator() {
                 </div>
             </div>
             {/* Content Section */}
-            {t.pageContent && (
-                <div className="mt-16 mb-12 space-y-16">
-                    <Separator />
-
-                    {/* Intro */}
-                    <div className="max-w-3xl space-y-6">
-                        <h2 className="text-3xl font-bold tracking-tight text-foreground">Sobre a Calculadora</h2>
-                        <div className="text-lg text-muted-foreground whitespace-pre-line leading-relaxed">
-                            {t.pageContent.intro}
-                        </div>
-                    </div>
-
-                    {/* Image CTA */}
-                    <div className="rounded-2xl overflow-hidden shadow-2xl border bg-card max-w-4xl mx-auto transform hover:scale-[1.01] transition-transform duration-500">
-                        <img
-                            src="/images/cta-rescisao-aluguel.png"
-                            alt="Kitnets.com - Gestão Inteligente"
-                            className="w-full h-auto"
-                        />
-                    </div>
-
-                    {/* Sections Grid */}
-                    <div className="grid gap-x-12 gap-y-12 md:grid-cols-2">
-                        {t.pageContent.sections?.map((section: any, idx: number) => (
-                            <div key={idx} className="space-y-4">
-                                <h3 className="text-xl font-bold flex items-center gap-2 text-foreground">
-                                    {section.title}
-                                </h3>
-                                {section.text && <p className="text-muted-foreground leading-relaxed">{section.text}</p>}
-                                {section.list && (
-                                    <ul className="space-y-3 mt-4">
-                                        {section.list.map((item: string, i: number) => (
-                                            <li key={i} className="flex gap-3 text-muted-foreground">
-                                                <div className="mt-2 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-                                                <span className="flex-1">{item}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )}
-                                {section.conclusion && (
-                                    <p className="text-base font-medium text-primary pt-2 border-t border-border/50 mt-4 inline-block">
-                                        {section.conclusion}
-                                    </p>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* Final CTA Text */}
-                    {t.pageContent.cta && (
-                        <div className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-3xl p-8 md:p-12 text-center space-y-6 border border-primary/10 max-w-3xl mx-auto">
-                            <h3 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight">{t.pageContent.cta.title}</h3>
-                            <p className="text-lg text-muted-foreground leading-relaxed">{t.pageContent.cta.text}</p>
-                        </div>
-                    )}
-                </div>
-            )}
+            <div className="print:hidden space-y-12 mt-16">
+                <CalculatorContent content={t.pageContent} />
+                <CalculatorCta dict={dict.calculatorCta} lang={lang} />
+            </div>
 
             <hr className="my-8 border-border" />
 

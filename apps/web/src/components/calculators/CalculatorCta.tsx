@@ -16,7 +16,7 @@ export default function CalculatorCta({ dict, lang }: CalculatorCtaProps) {
     if (!dict) return null;
 
     return (
-        <div className="w-full max-w-4xl mx-auto my-12 p-8 md:p-12 border rounded-[2rem] bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-center space-y-6">
+        <div className="w-full max-w-4xl mx-auto my-12 p-8 md:p-12 text-center space-y-6">
             <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-50 whitespace-pre-line leading-tight">
                 {dict.title}
             </h2>

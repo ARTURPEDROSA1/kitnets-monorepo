@@ -18,7 +18,7 @@ export default function CalculatorContent({ content }: { content: Content }) {
 
     return (
         <div className="max-w-4xl mx-auto space-y-12 py-12 text-slate-700 dark:text-slate-300 leading-relaxed animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
-            <p className="text-lg md:text-xl leading-relaxed text-slate-800 dark:text-slate-200">
+            <p className="text-lg md:text-xl leading-relaxed text-slate-800 dark:text-slate-50">
                 {content.intro}
             </p>
 
