@@ -477,28 +477,12 @@ export default function RentLateFineCalculatorClient() {
                 <div className="xl:col-span-8 space-y-6">
 
                     {/* KPI Cards */}
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                        <Card className="bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+                    <div className="grid grid-cols-2 gap-4">
+                        <Card>
                             <CardContent className="p-4 flex flex-col justify-between h-full">
-                                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wider">{t.results?.totalPrincipal}</div>
+                                <div className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{t.results?.totalPrincipal}</div>
                                 <div className="text-xl md:text-2xl font-bold mt-1 max-w-full truncate" title={formatCurrency(summary.totalPrincipal)}>
                                     {formatCurrency(summary.totalPrincipal)}
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card className="bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800">
-                            <CardContent className="p-4 flex flex-col justify-between h-full">
-                                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wider">{t.results?.totalFine}</div>
-                                <div className="text-xl md:text-2xl font-bold mt-1 text-amber-600 dark:text-amber-500 max-w-full truncate">
-                                    {formatCurrency(summary.totalFine)}
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card className="bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800">
-                            <CardContent className="p-4 flex flex-col justify-between h-full">
-                                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wider">{t.results?.totalInterest}</div>
-                                <div className="text-xl md:text-2xl font-bold mt-1 text-red-600 dark:text-red-500 max-w-full truncate">
-                                    {formatCurrency(summary.totalInterest)}
                                 </div>
                             </CardContent>
                         </Card>
@@ -507,6 +491,22 @@ export default function RentLateFineCalculatorClient() {
                                 <div className="text-xs text-primary-foreground/80 font-medium uppercase tracking-wider">{t.results?.totalUpdated}</div>
                                 <div className="text-2xl md:text-3xl font-bold mt-1 tracking-tight max-w-full truncate">
                                     {formatCurrency(summary.totalUpdated)}
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardContent className="p-4 flex flex-col justify-between h-full">
+                                <div className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{t.results?.totalFine}</div>
+                                <div className="text-xl md:text-2xl font-bold mt-1 text-amber-600 dark:text-amber-500 max-w-full truncate">
+                                    {formatCurrency(summary.totalFine)}
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardContent className="p-4 flex flex-col justify-between h-full">
+                                <div className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{t.results?.totalInterest}</div>
+                                <div className="text-xl md:text-2xl font-bold mt-1 text-red-600 dark:text-red-500 max-w-full truncate">
+                                    {formatCurrency(summary.totalInterest)}
                                 </div>
                             </CardContent>
                         </Card>
