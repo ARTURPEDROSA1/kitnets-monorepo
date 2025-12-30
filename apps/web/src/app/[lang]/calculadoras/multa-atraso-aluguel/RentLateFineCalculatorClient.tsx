@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useParams } from "next/navigation";
 import { getDictionary } from "@/dictionaries";
 import {
@@ -260,40 +260,48 @@ export default function RentLateFineCalculatorClient() {
 
     const [isCopied, setIsCopied] = useState(false);
 
+
     // --- Lead Capture State ---
-    const [interactionCount, setInteractionCount] = useState(0);
+    const interactedFeatures = useRef<Set<string>>(new Set());
     const [showLeadModal, setShowLeadModal] = useState(false);
-    const [leadCaptured, setLeadCaptured] = useState(false);
+    const isLeadCapturedRef = useRef(false);
 
-    // Check cookie on mount
-    useEffect(() => {
-        const match = document.cookie.match(new RegExp('(^| )kitnets_lead_captured=([^;]+)'));
-        if (match) {
-            setLeadCaptured(true);
+    const checkLeadCaptured = () => {
+        if (isLeadCapturedRef.current) return true;
+        if (typeof document !== 'undefined') {
+            const match = document.cookie.match(new RegExp('(^| )kitnets_lead_captured=([^;]+)'));
+            if (match) {
+                isLeadCapturedRef.current = true;
+                return true;
+            }
         }
-    }, []);
+        return false;
+    };
 
-    const trackInteraction = () => {
-        if (leadCaptured) return;
+    const trackInteraction = (featureId: string) => {
+        if (checkLeadCaptured()) return;
 
-        const newCount = interactionCount + 1;
-        setInteractionCount(newCount);
+        // If already tracked, ignore
+        if (interactedFeatures.current.has(featureId)) return;
 
-        // Prompt on the 4th interaction (index 3 if 0-based, count 4 if 1-based)
-        // User request: "on 4th show a pop up"
-        if (newCount === 4) {
+        interactedFeatures.current.add(featureId);
+        const newCount = interactedFeatures.current.size;
+        console.log(`Tracking interaction: ${featureId}. Unique count: ${newCount}`); // Debug
+
+        // Prompt on the 3rd distinct parameter change (User Request: "changes 3 parameters")
+        if (newCount === 3) {
             setShowLeadModal(true);
         }
     };
 
     // Wrap state setters for interactions
-    const handleSetCalcType = (v: "today" | "specific") => { trackInteraction(); setCalcType(v); };
-    const handleSetSpecificDate = (v: string) => { trackInteraction(); setSpecificDate(v); };
-    const handleSetGracePeriod = (v: string | number) => { trackInteraction(); setGracePeriod(v); };
-    const handleSetFinePercent = (v: string | number) => { trackInteraction(); setFinePercent(v); };
-    const handleSetFineDelay = (v: boolean) => { trackInteraction(); setApplyFineOnlyIfDelayed(v); };
-    const handleSetInterestMode = (v: "monthly" | "daily") => { trackInteraction(); setInterestMode(v); };
-    const handleSetInterestRate = (v: string | number) => { trackInteraction(); setInterestRate(v); };
+    const handleSetCalcType = (v: "today" | "specific") => { trackInteraction('calc_type'); setCalcType(v); };
+    const handleSetSpecificDate = (v: string) => { trackInteraction('specific_date'); setSpecificDate(v); };
+    const handleSetGracePeriod = (v: string | number) => { trackInteraction('grace_period'); setGracePeriod(v); };
+    const handleSetFinePercent = (v: string | number) => { trackInteraction('fine_percent'); setFinePercent(v); };
+    const handleSetFineDelay = (v: boolean) => { trackInteraction('fine_delay_mode'); setApplyFineOnlyIfDelayed(v); };
+    const handleSetInterestMode = (v: "monthly" | "daily") => { trackInteraction('interest_mode'); setInterestMode(v); };
+    const handleSetInterestRate = (v: string | number) => { trackInteraction('interest_rate'); setInterestRate(v); };
 
 
     // Results
@@ -304,17 +312,17 @@ export default function RentLateFineCalculatorClient() {
 
     // Add new installment
     const addInstallment = () => {
-        trackInteraction();
+        trackInteraction('add_installment');
         const initialValue = installments.length > 0 ? installments[0].value : "";
         setInstallments([
             ...installments,
-            { id: Math.random().toString(36).substr(2, 9), value: initialValue, dueDate: "" }
+            { id: crypto.randomUUID(), value: initialValue, dueDate: "" }
         ]);
     };
 
     // Remove installment
     const removeInstallment = (id: string) => {
-        trackInteraction();
+        trackInteraction('remove_installment');
         if (installments.length > 1) {
             setInstallments(installments.filter(i => i.id !== id));
         }
@@ -323,11 +331,7 @@ export default function RentLateFineCalculatorClient() {
     // Update installment
     const updateInstallment = (id: string, field: keyof Installment, value: string | number) => {
         if (field === 'value' || field === 'dueDate' || field === 'paymentDate') {
-            // We can debate if typing '1' then '0' is 2 interactions. 
-            // To avoid spam, we might want to debounce or rely on the fact that `LeadCaptureModal` handles the popup logic.
-            // But simpler is to key off major actions. 
-            // Ideally we'd wrap 'onChange' and check distinct changes.
-            trackInteraction();
+            trackInteraction(`update_installment_${field}`);
         }
         setInstallments(installments?.map(i => i.id === id ? { ...i, [field]: value } : i));
     };
@@ -823,8 +827,7 @@ export default function RentLateFineCalculatorClient() {
                     setShowLeadModal(open);
                     if (!open) {
                         // Check if it was because of success (cookie set)
-                        const match = document.cookie.match(new RegExp('(^| )kitnets_lead_captured=([^;]+)'));
-                        if (match) setLeadCaptured(true);
+                        checkLeadCaptured();
                     }
                 }}
                 calculatorType="multa-atraso-aluguel"
