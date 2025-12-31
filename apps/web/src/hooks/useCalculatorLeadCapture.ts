@@ -70,12 +70,6 @@ export function useCalculatorLeadCapture({ isSimpleCalculator = false }: UseCalc
     const checkAdvancedTrigger = useCallback(() => {
         if (hasVerifiedCookie()) return;
 
-        const dismissedAt = sessionStorage.getItem('kitnets_lead_dismissed_at');
-        if (dismissedAt) {
-            const diff = Date.now() - parseInt(dismissedAt);
-            if (diff < 30 * 60 * 1000) return;
-        }
-
         // Always trigger if called, assuming the caller knows it is an advanced interaction
         triggerModal('advanced', 'calculator_advanced_gate');
     }, [triggerModal]);
@@ -84,17 +78,12 @@ export function useCalculatorLeadCapture({ isSimpleCalculator = false }: UseCalc
         if (hasVerifiedCookie()) return false;
 
         // Export is HARD GATE. Always show if no cookie.
-        // If already triggered/open, we return true (blocked)
-        if (hasTriggeredRef.current) {
-            if (!isModalOpen) {
-                // If triggered but closed (dismissed), we might re-trigger or respect dismissal?
-                // Spec: "If dismissed -> block gated action." (So we return true)
-                // "Do not re-show for 30 minutes".
-                // So we return true (block) but don't show modal?
-                return true;
-            }
-            return true;
+        if (hasTriggeredRef.current && isModalOpen) {
+            return true; // Already open, block action
         }
+
+        // Reset triggered ref if we need to re-show (handled by handleClose resetting it, but to be safe)
+        if (!isModalOpen) hasTriggeredRef.current = false;
 
         triggerModal('export', 'calculator_export_gate', type);
         return true; // Blocked
@@ -122,18 +111,9 @@ export function useCalculatorLeadCapture({ isSimpleCalculator = false }: UseCalc
 
     const handleClose = (open: boolean) => {
         if (!open) {
-            // Dismissed or Closed after success?
-            // We rely on isModalOpen being controlled.
-            // If the parent sets open=false, it means closed.
             setIsModalOpen(false);
-
-            // If validation wasn't successful (we don't know here, but generally if closed without reload/cookie), treat as dismiss?
-            // Actually, if success, the cookie is set.
-            if (!hasVerifiedCookie()) {
-                sessionStorage.setItem('kitnets_lead_dismissed_at', Date.now().toString());
-            } else {
-                // Success
-            }
+            // Allow re-triggering immediately
+            hasTriggeredRef.current = false;
         } else {
             setIsModalOpen(true);
         }

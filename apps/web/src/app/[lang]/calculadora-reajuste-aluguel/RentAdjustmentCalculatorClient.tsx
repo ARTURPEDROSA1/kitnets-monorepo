@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
+import { useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { getDictionary } from "@/dictionaries";
 import {
@@ -23,9 +23,6 @@ import {
     CheckCircle2,
     ArrowRight,
     BarChart3,
-    Lock,
-    User,
-    Mail,
     Table,
     ArrowUpDown,
     ArrowUp,
@@ -36,8 +33,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+
 import { CalculatorSuggestion } from "@/components/calculators/CalculatorSuggestion";
-import { saveLead } from "@/app/actions/capture-lead";
+import LeadCaptureModal from "@/components/calculators/LeadCaptureModal";
+import { useCalculatorLeadCapture } from "@/hooks/useCalculatorLeadCapture";
 
 import { getEconomicData } from "@/app/actions/get-economic-data";
 import { IndexValue } from "@/lib/indexes";
@@ -68,101 +67,7 @@ const formatPercent = (value: number) => {
 };
 
 
-function LeadCaptureModal({ isOpen, onCapture }: { isOpen: boolean; onCapture: () => void }) {
-    const [name, setName] = useState("");
-    const [email, setEmail] = useState("");
-    const [loading, setLoading] = useState(false);
 
-    if (!isOpen) return null;
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setLoading(true);
-
-        try {
-            // Save lead to Supabase
-            await saveLead({
-                name,
-                email,
-                source: "rent-adjustment-calculator"
-            });
-
-            // Proceed regardless of backend success/fail to not block user
-            // (In a stricter system, checking result.success might be desired)
-            onCapture();
-        } catch (error) {
-            console.error("Lead capture error:", error);
-            onCapture(); // Fail open
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-            <div className="bg-background rounded-xl shadow-2xl w-full max-w-md overflow-hidden border animate-in zoom-in-95 duration-300">
-                <div className="bg-muted/30 p-6 border-b">
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2 bg-primary/10 rounded-full">
-                            <Lock className="w-5 h-5 text-primary" />
-                        </div>
-                        <h3 className="text-xl font-bold">Ver Resultado Completo</h3>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                        Para visualizar o cálculo detalhado do reajuste e o gráfico de evolução, precisamos confirmar que você não é um robô.
-                    </p>
-                </div>
-
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="name">Seu Nome</Label>
-                        <div className="relative">
-                            <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                id="name"
-                                placeholder="Como podemos te chamar?"
-                                className="pl-9"
-                                required
-                                autoComplete="name"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="email">Seu Melhor E-mail</Label>
-                        <div className="relative">
-                            <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                id="email"
-                                type="email"
-                                placeholder="exemplo@email.com"
-                                className="pl-9"
-                                required
-                                autoComplete="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                            />
-                        </div>
-                    </div>
-
-                    <div className="pt-2">
-                        <Button type="submit" className="w-full" size="lg" disabled={loading}>
-                            {loading ? "Confirmando..." : "Ver Resultado"}
-                        </Button>
-                    </div>
-
-                    <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg mt-4">
-                        <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
-                        <p>
-                            Fique tranquilo! Você será adicionado à nossa newsletter para receber dicas de investimento, mas pode cancelar a inscrição a qualquer momento. Zero spam.
-                        </p>
-                    </div>
-                </form>
-            </div>
-        </div>
-    );
-}
 
 export default function RentAdjustmentCalculatorClient() {
     const params = useParams();
@@ -190,15 +95,17 @@ export default function RentAdjustmentCalculatorClient() {
     const [isAnimating, setIsAnimating] = useState(false);
 
     // Lead Capture State
-    const [isLeadCaptured, setIsLeadCaptured] = useState(false);
-    const [showLeadModal, setShowLeadModal] = useState(false);
-
-    useEffect(() => {
-        const hasCookie = document.cookie.split('; ').some(row => row.trim().startsWith('kitnets_user_identified='));
-        if (hasCookie) {
-            setIsLeadCaptured(true);
-        }
-    }, []);
+    // Lead Capture Hook
+    const {
+        isModalOpen,
+        setIsModalOpen,
+        leadMetadata,
+        trackInteraction,
+        checkAdvancedTrigger,
+        hasVerifiedCookie
+    } = useCalculatorLeadCapture({
+        calculatorType: "calculadora-reajuste-aluguel"
+    });
 
     // View State
     const [viewMode, setViewMode] = useState<"chart" | "table">("chart");
@@ -450,8 +357,9 @@ export default function RentAdjustmentCalculatorClient() {
     };
 
     const handleCalculate = () => {
-        if (!isLeadCaptured) {
-            setShowLeadModal(true);
+        trackInteraction();
+        if (!hasVerifiedCookie) {
+            checkAdvancedTrigger();
             return;
         }
         performCalculation();
@@ -466,12 +374,10 @@ export default function RentAdjustmentCalculatorClient() {
     return (
         <div className="container mx-auto p-4 md:p-8 max-w-5xl space-y-8 animate-in fade-in duration-500">
             <LeadCaptureModal
-                isOpen={showLeadModal}
-                onCapture={() => {
-                    setIsLeadCaptured(true);
-                    setShowLeadModal(false);
-                    performCalculation();
-                }}
+                open={isModalOpen}
+                onOpenChange={setIsModalOpen}
+                calculatorType="calculadora-reajuste-aluguel"
+                leadMetadata={leadMetadata}
             />
 
             {/* Header / SEO Area */}

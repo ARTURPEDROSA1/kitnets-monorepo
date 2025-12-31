@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { getDictionary } from "@/dictionaries";
@@ -31,6 +31,108 @@ const formatCurrency = (value: number) => {
         currency: "BRL",
     }).format(value);
 };
+
+function BrazilianDateInput({
+    value,
+    onChange,
+    className,
+    ...props
+}: {
+    value: string;
+    onChange: (val: string) => void;
+    className?: string;
+} & Omit<React.ComponentProps<typeof Input>, "onChange" | "value">) {
+    const [text, setText] = useState("");
+    const [lastValue, setLastValue] = useState(value);
+
+    // Sync prop to text during render (derived state pattern)
+    if (value !== lastValue) {
+        setLastValue(value);
+        if (value) {
+            const [y, m, d] = value.split("-");
+            if (y && m && d) {
+                setText(`${d}/${m}/${y}`);
+            } else {
+                setText("");
+            }
+        } else {
+            setText("");
+        }
+    }
+
+    const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        let val = e.target.value.replace(/\D/g, "");
+        if (val.length > 8) val = val.slice(0, 8);
+
+        let formatted = val;
+        if (val.length >= 3) {
+            formatted = `${val.slice(0, 2)}/${val.slice(2)}`;
+        }
+        if (val.length >= 5) {
+            formatted = `${val.slice(0, 2)}/${val.slice(2, 4)}/${val.slice(4)}`;
+        }
+        setText(formatted);
+
+        // Emit change if valid full date or empty
+        if (val.length === 8) {
+            const d = val.slice(0, 2);
+            const m = val.slice(2, 4);
+            const y = val.slice(4);
+            // Basic validation (optional but good)
+            const numD = parseInt(d);
+            const numM = parseInt(m);
+            if (numD > 0 && numD <= 31 && numM > 0 && numM <= 12) {
+                onChange(`${y}-${m}-${d}`);
+            }
+        } else if (val.length === 0) {
+            onChange("");
+        }
+    };
+
+    const dateInputRef = useRef<HTMLInputElement>(null);
+    const triggerPicker = () => {
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (dateInputRef.current as any)?.showPicker();
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    return (
+        <div className="relative">
+            <Input
+                {...props}
+                type="text"
+                inputMode="numeric"
+                value={text}
+                onChange={handleTextChange}
+                onClick={triggerPicker}
+                className={`${className} text-base md:text-sm pr-10`}
+                placeholder="dd/mm/aaaa"
+                maxLength={10}
+            />
+            <div
+                className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-muted-foreground hover:text-foreground p-1"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    triggerPicker();
+                }}
+            >
+                <Calendar className="w-4 h-4" />
+            </div>
+            <input
+                type="date"
+                ref={dateInputRef}
+                className="opacity-0 absolute bottom-0 right-0 w-0 h-0 overflow-hidden pointer-events-none"
+                onChange={(e) => onChange(e.target.value)}
+                value={value || ""}
+                tabIndex={-1}
+                aria-hidden="true"
+            />
+        </div>
+    );
+}
 
 export default function ProRataRentCalculatorClient() {
     const params = useParams();
@@ -245,20 +347,18 @@ export default function ProRataRentCalculatorClient() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="start">{tInputs.startDate}</Label>
-                                    <Input
+                                    <BrazilianDateInput
                                         id="start"
-                                        type="date"
                                         value={startDate}
-                                        onChange={(e) => { handleInteraction(); setStartDate(e.target.value); }}
+                                        onChange={(v) => { handleInteraction(); setStartDate(v); }}
                                     />
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="end">{tInputs.endDate}</Label>
-                                    <Input
+                                    <BrazilianDateInput
                                         id="end"
-                                        type="date"
                                         value={endDate}
-                                        onChange={(e) => { handleInteraction(); setEndDate(e.target.value); }}
+                                        onChange={(v) => { handleInteraction(); setEndDate(v); }}
                                     />
                                 </div>
                             </div>

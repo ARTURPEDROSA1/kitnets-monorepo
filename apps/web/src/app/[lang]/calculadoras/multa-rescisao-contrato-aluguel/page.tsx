@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams } from "next/navigation";
 import { getDictionary } from "@/dictionaries";
 import {
@@ -151,9 +151,14 @@ export default function RentFineCalculator() {
         calculatorType: "multa-rescisao-contrato-aluguel"
     });
 
+    const interactionCountRef = useRef(0);
+
     const handleInteraction = () => {
         trackInteraction();
-        checkAdvancedTrigger(); // Gate on interaction
+        interactionCountRef.current += 1;
+        if (interactionCountRef.current > 5) {
+            checkAdvancedTrigger();
+        }
     };
 
     const calculateScenario = (path: FinePath): CalculationResult | null => {
