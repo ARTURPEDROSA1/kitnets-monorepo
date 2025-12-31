@@ -13,6 +13,8 @@ const staticRoutes = [
     'calculadora-amortizacao-financiamento-imobiliario',
     'calculadora-juros-compostos',
     'calculadora-reajuste-aluguel',
+    'calculadoras',
+    'calculadoras/aluguel-proporcional',
     'calculadoras/conversor-juros-mensal-anual',
     'calculadoras/renda-aluguel',
     'comprar',

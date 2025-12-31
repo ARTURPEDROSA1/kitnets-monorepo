@@ -11,8 +11,10 @@ import {
     ArrowRight,
     AlertTriangle,
     Info,
-    Copy
+    Copy,
 } from "lucide-react";
+import LeadCaptureModal from "@/components/calculators/LeadCaptureModal";
+import { useCalculatorLeadCapture } from "@/hooks/useCalculatorLeadCapture";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -61,6 +63,22 @@ export default function ProRataRentCalculatorClient() {
     const [includeEndDate, setIncludeEndDate] = useState<boolean>(true);
 
     const [showBreakdown, setShowBreakdown] = useState(false);
+
+    // --- Lead Capture Hook ---
+    const {
+        isModalOpen,
+        setIsModalOpen,
+        leadMetadata,
+        trackInteraction,
+        checkExportTrigger
+    } = useCalculatorLeadCapture({
+        calculatorType: "aluguel-proporcional",
+        isSimpleCalculator: true
+    });
+
+    const handleInteraction = () => {
+        trackInteraction();
+    };
 
     // --- Derived Values & Validation ---
 
@@ -161,6 +179,7 @@ export default function ProRataRentCalculatorClient() {
     }, [isValid, numericRent, startD, endD, calculationMethod, includeStartDate, includeEndDate]);
 
     const handleCopy = () => {
+        if (checkExportTrigger('copy')) return;
         if (!calculationResult) return;
         const text = `Cálculo de Aluguel Proporcional\nPeríodo: ${calculationResult.period}\nDias cobrados: ${calculationResult.chargeableDays}\nValor: ${formatCurrency(calculationResult.proRataValue)}`;
         navigator.clipboard.writeText(text);
@@ -217,7 +236,7 @@ export default function ProRataRentCalculatorClient() {
                                         placeholder="0,00"
                                         className="pl-9 text-lg font-medium"
                                         value={rentValue}
-                                        onChange={(e) => setRentValue(e.target.value)}
+                                        onChange={(e) => { handleInteraction(); setRentValue(e.target.value); }}
                                     />
                                 </div>
                             </div>
@@ -230,7 +249,7 @@ export default function ProRataRentCalculatorClient() {
                                         id="start"
                                         type="date"
                                         value={startDate}
-                                        onChange={(e) => setStartDate(e.target.value)}
+                                        onChange={(e) => { handleInteraction(); setStartDate(e.target.value); }}
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -239,7 +258,7 @@ export default function ProRataRentCalculatorClient() {
                                         id="end"
                                         type="date"
                                         value={endDate}
-                                        onChange={(e) => setEndDate(e.target.value)}
+                                        onChange={(e) => { handleInteraction(); setEndDate(e.target.value); }}
                                     />
                                 </div>
                             </div>
@@ -252,7 +271,7 @@ export default function ProRataRentCalculatorClient() {
 
                                 <RadioGroup
                                     value={calculationMethod}
-                                    onValueChange={(v) => setCalculationMethod(v as "commercial" | "real")}
+                                    onValueChange={(v) => { handleInteraction(); setCalculationMethod(v as "commercial" | "real"); }}
                                     className="mb-6 space-y-2"
                                 >
                                     <div className="flex items-center space-x-2">
@@ -286,7 +305,7 @@ export default function ProRataRentCalculatorClient() {
                                         <Checkbox
                                             id="incStart"
                                             checked={includeStartDate}
-                                            onCheckedChange={(c) => setIncludeStartDate(c as boolean)}
+                                            onCheckedChange={(c) => { handleInteraction(); setIncludeStartDate(c as boolean); }}
                                         />
                                         <Label htmlFor="incStart" className="text-sm font-normal cursor-pointer">{tInputs.includeStartDate}</Label>
                                     </div>
@@ -294,7 +313,7 @@ export default function ProRataRentCalculatorClient() {
                                         <Checkbox
                                             id="incEnd"
                                             checked={includeEndDate}
-                                            onCheckedChange={(c) => setIncludeEndDate(c as boolean)}
+                                            onCheckedChange={(c) => { handleInteraction(); setIncludeEndDate(c as boolean); }}
                                         />
                                         <Label htmlFor="incEnd" className="text-sm font-normal cursor-pointer">{tInputs.includeEndDate}</Label>
                                     </div>
@@ -446,6 +465,13 @@ export default function ProRataRentCalculatorClient() {
                     </div>
                 </div>
             </div>
+
+            <LeadCaptureModal
+                open={isModalOpen}
+                onOpenChange={setIsModalOpen}
+                calculatorType="aluguel-proporcional"
+                leadMetadata={leadMetadata}
+            />
         </div>
     );
 }

@@ -16,3 +16,9 @@ create table if not exists public.minimum_wage_history (
 
 -- Index for date sorting
 create index if not exists idx_minimum_wage_date on public.minimum_wage_history (reference_date);
+
+-- RLS Policies
+alter table public.minimum_wage_history enable row level security;
+
+create policy "Public Read Access Minimum Wage" on public.minimum_wage_history
+  for select using (true);

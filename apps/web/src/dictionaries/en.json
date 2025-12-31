@@ -1446,16 +1446,16 @@
         }
     },
     "calculatorsOverview": {
-        "title": "Financial, Rent, and Real Estate Calculators",
+        "title": "Financial, Rent, and Investment Calculators",
         "subtitle": "Free simulators for rent, financing, adjustments, interest, inflation, and financial planning — made for landlords, tenants, and real estate investors.",
-        "microCta": "Use now — no sign-up",
+        "microCta": "Use now — no registration",
         "secondaryCta": "Create account to save simulations",
         "searchPlaceholder": "Search calculator...",
         "mostUsed": "Most Used",
         "categories": {
             "all": "All",
             "rent": "Rent",
-            "finance": "Financing",
+            "finance": "Finance",
             "indices": "Indices",
             "interest": "Interest",
             "planning": "Planning"
@@ -1475,27 +1475,27 @@
                 },
                 "proRataRent": {
                     "title": "Pro-Rata Rent",
-                    "description": "Calculate rent for incomplete periods (start/end of contract)."
+                    "description": "Calculate rent value for partial periods (start/end of contract)."
                 },
                 "lateFee": {
-                    "title": "Late Payment Fine",
-                    "description": "Calculate fines and interest for late rent payments."
+                    "title": "Late Fee",
+                    "description": "Calculate fines and interest for late rent payment."
                 },
                 "terminationFee": {
-                    "title": "Termination Fee",
-                    "description": "Calculate proportional fine for early property vacation."
+                    "title": "Contract Termination Fee",
+                    "description": "Calculate proportional fine for early property written notice."
                 },
                 "rentalIncome": {
                     "title": "Rental Income",
-                    "description": "Find out if rental income covers your mortgage payments."
+                    "description": "Find out if rental income covers your financing installments."
                 },
                 "amortization": {
-                    "title": "Mortgage Amortization",
-                    "description": "Simulate interest and term reduction by amortizing your mortgage."
+                    "title": "Financing Amortization",
+                    "description": "Simulate interest and term reduction by amortizing your real estate loan."
                 },
                 "monthlyAnnualInterest": {
-                    "title": "Monthly/Annual Interest",
-                    "description": "Convert monthly interest rates to annual and vice-versa."
+                    "title": "Monthly/Annual Interest Conversion",
+                    "description": "Convert monthly interest rates to annual and vice versa."
                 },
                 "compoundInterest": {
                     "title": "Compound Interest",
@@ -1525,6 +1525,62 @@
                     "title": "INPC",
                     "description": "Check the national consumer price index."
                 }
+            }
+        },
+        "seoContent": {
+            "intro": {
+                "title": "Financial, Rent, and Real Estate Investment Viability Calculators",
+                "text": "Kitnets.com gathers in one place the main financial, real estate, and estate planning calculators in the Brazilian market. Our calculator hub was created to help owners, investors, landlords, real estate agencies, and holdings make safer, faster, and data-driven decisions.\n\nHere you find practical tools for rent, real estate financing, interest, economic indices, investment viability, and financial planning, all developed with a focus on the reality of the Brazilian real estate market."
+            },
+            "updated": {
+                "title": "Calculators always updated with the market and legislation",
+                "text": "Unlike generic simulators, Kitnets.com calculators are constantly maintained and updated to reflect:",
+                "items": [
+                    "Current real estate market conditions",
+                    "The evolution of official indices like IGP-M, IPCA, IVAR, CDI, and Selic",
+                    "Best contractual practices and rules most used in rental contracts",
+                    "Changes in regulations, standards, and market interpretations"
+                ],
+                "conclusion": "This guarantees that the results presented are reliable, realistic, and applicable in practice, both for personal and professional use."
+            },
+            "ecosystem": {
+                "title": "A complete ecosystem of real estate and financial calculators",
+                "text": "In the Kitnets.com calculator hub you can:",
+                "items": [
+                    "Calculate rent adjustment by different indices",
+                    "Simulate proportional rent at the start or end of a contract",
+                    "Estimate fines for delay and contract termination",
+                    "Evaluate if rental income covers financing",
+                    "Simulate real estate financing amortization",
+                    "Convert monthly and annual interest",
+                    "Project growth with compound interest",
+                    "Plan your financial independence, considering inflation and taxes"
+                ],
+                "conclusion": "All this in a simple, fast, and accessible interface, including on mobile."
+            },
+            "innovation": {
+                "title": "Research, data, and continuous innovation",
+                "text": "Kitnets.com continuously invests in research and development (R&D) to ensure the platform evolves with the market. Our commitment is clear:",
+                "items": [
+                    "Launch at least one new calculator every month, always based on real demands from owners, investors, and real estate professionals."
+                ],
+                "conclusion": "This transforms Kitnets.com into a living hub, constantly expanding, following economic trends, regulatory changes, and new investment opportunities."
+            },
+            "targetAudience": {
+                "title": "Who is the Kitnets.com Calculator Hub for?",
+                "items": [
+                    "Owners of rental properties",
+                    "Real estate investors",
+                    "Those evaluating buying a property for income",
+                    "Real estate agencies and administrators",
+                    "Patrimonial holdings",
+                    "Individuals who want to make smarter financial decisions"
+                ],
+                "conclusion": "Whether for quick decisions or deeper analyses, Kitnets.com offers the right tools."
+            },
+            "cta": {
+                "title": "Make decisions with data, not guesswork",
+                "text": "Kitnets.com calculators were created for those who want to get out of improvised spreadsheets and start managing rent, financing, and investments professionally.\n\nExplore the hub, use the calculators, and follow the constant evolution of the platform.\nCorrect data today means better decisions tomorrow."
             }
         }
     }

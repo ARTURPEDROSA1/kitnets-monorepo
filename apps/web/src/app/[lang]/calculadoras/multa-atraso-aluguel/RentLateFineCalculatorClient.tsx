@@ -44,12 +44,8 @@ import {
 
 import CalculatorCta from "@/components/calculators/CalculatorCta";
 import CalculatorContent from "@/components/calculators/CalculatorContent";
-import dynamic from "next/dynamic";
-
-const LeadCaptureModal = dynamic(() => import("@/components/calculators/LeadCaptureModal"), {
-    ssr: false,
-    loading: () => null,
-});
+import LeadCaptureModal from "@/components/calculators/LeadCaptureModal";
+import { useCalculatorLeadCapture } from "@/hooks/useCalculatorLeadCapture";
 
 // --- Helper Components ---
 
@@ -173,23 +169,28 @@ function BrazilianDateInput({
                 inputMode="numeric"
                 value={text}
                 onChange={handleTextChange}
-                className={`${className} text-base md:text-sm`} // Prevent iOS zoom
+                onClick={triggerPicker}
+                className={`${className} text-base md:text-sm pr-3 md:pr-10`} // Prevent iOS zoom, space for icon only on desktop
                 placeholder="dd/mm/aaaa"
                 maxLength={10}
             />
             <div
-                className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-muted-foreground hover:text-foreground p-1"
-                onClick={triggerPicker}
+                className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-muted-foreground hover:text-foreground p-1 hidden md:block"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    triggerPicker();
+                }}
             >
                 <CalendarIcon className="w-4 h-4" />
             </div>
             <input
                 type="date"
                 ref={dateInputRef}
-                className="invisible absolute bottom-0 right-0 w-0 h-0"
+                className="opacity-0 absolute bottom-0 right-0 w-0 h-0 overflow-hidden pointer-events-none"
                 onChange={(e) => onChange(e.target.value)}
                 value={value || ""}
                 tabIndex={-1}
+                aria-hidden="true"
             />
         </div>
     );
@@ -261,47 +262,31 @@ export default function RentLateFineCalculatorClient() {
     const [isCopied, setIsCopied] = useState(false);
 
 
-    // --- Lead Capture State ---
-    const interactedFeatures = useRef<Set<string>>(new Set());
-    const [showLeadModal, setShowLeadModal] = useState(false);
-    const isLeadCapturedRef = useRef(false);
+    // --- Lead Capture Hook ---
+    const {
+        isModalOpen,
+        setIsModalOpen,
+        leadMetadata,
+        trackInteraction: hookTrackInteraction,
+        checkAdvancedTrigger,
+        checkExportTrigger
+    } = useCalculatorLeadCapture({
+        calculatorType: "multa-atraso-aluguel"
+    });
 
-    const checkLeadCaptured = () => {
-        if (isLeadCapturedRef.current) return true;
-        if (typeof document !== 'undefined') {
-            const match = document.cookie.match(new RegExp('(^| )kitnets_lead_captured=([^;]+)'));
-            if (match) {
-                isLeadCapturedRef.current = true;
-                return true;
-            }
-        }
-        return false;
-    };
-
-    const trackInteraction = (featureId: string) => {
-        if (checkLeadCaptured()) return;
-
-        // If already tracked, ignore
-        if (interactedFeatures.current.has(featureId)) return;
-
-        interactedFeatures.current.add(featureId);
-        const newCount = interactedFeatures.current.size;
-        console.log(`Tracking interaction: ${featureId}. Unique count: ${newCount}`); // Debug
-
-        // Prompt on the 3rd distinct parameter change (User Request: "changes 3 parameters")
-        if (newCount === 3) {
-            setShowLeadModal(true);
-        }
+    const handleInteraction = () => {
+        hookTrackInteraction();
+        checkAdvancedTrigger();
     };
 
     // Wrap state setters for interactions
-    const handleSetCalcType = (v: "today" | "specific") => { trackInteraction('calc_type'); setCalcType(v); };
-    const handleSetSpecificDate = (v: string) => { trackInteraction('specific_date'); setSpecificDate(v); };
-    const handleSetGracePeriod = (v: string | number) => { trackInteraction('grace_period'); setGracePeriod(v); };
-    const handleSetFinePercent = (v: string | number) => { trackInteraction('fine_percent'); setFinePercent(v); };
-    const handleSetFineDelay = (v: boolean) => { trackInteraction('fine_delay_mode'); setApplyFineOnlyIfDelayed(v); };
-    const handleSetInterestMode = (v: "monthly" | "daily") => { trackInteraction('interest_mode'); setInterestMode(v); };
-    const handleSetInterestRate = (v: string | number) => { trackInteraction('interest_rate'); setInterestRate(v); };
+    const handleSetCalcType = (v: "today" | "specific") => { handleInteraction(); setCalcType(v); };
+    const handleSetSpecificDate = (v: string) => { handleInteraction(); setSpecificDate(v); };
+    const handleSetGracePeriod = (v: string | number) => { handleInteraction(); setGracePeriod(v); };
+    const handleSetFinePercent = (v: string | number) => { handleInteraction(); setFinePercent(v); };
+    const handleSetFineDelay = (v: boolean) => { handleInteraction(); setApplyFineOnlyIfDelayed(v); };
+    const handleSetInterestMode = (v: "monthly" | "daily") => { handleInteraction(); setInterestMode(v); };
+    const handleSetInterestRate = (v: string | number) => { handleInteraction(); setInterestRate(v); };
 
 
     // Results
@@ -312,7 +297,7 @@ export default function RentLateFineCalculatorClient() {
 
     // Add new installment
     const addInstallment = () => {
-        trackInteraction('add_installment');
+        handleInteraction();
         const initialValue = installments.length > 0 ? installments[0].value : "";
         setInstallments([
             ...installments,
@@ -322,7 +307,7 @@ export default function RentLateFineCalculatorClient() {
 
     // Remove installment
     const removeInstallment = (id: string) => {
-        trackInteraction('remove_installment');
+        handleInteraction();
         if (installments.length > 1) {
             setInstallments(installments.filter(i => i.id !== id));
         }
@@ -331,7 +316,7 @@ export default function RentLateFineCalculatorClient() {
     // Update installment
     const updateInstallment = (id: string, field: keyof Installment, value: string | number) => {
         if (field === 'value' || field === 'dueDate' || field === 'paymentDate') {
-            trackInteraction(`update_installment_${field}`);
+            handleInteraction();
         }
         setInstallments(installments?.map(i => i.id === id ? { ...i, [field]: value } : i));
     };
@@ -444,6 +429,7 @@ export default function RentLateFineCalculatorClient() {
 
     // Export functions
     const copyToClipboard = () => {
+        if (checkExportTrigger('copy')) return;
         const text = results.map(r =>
             `Venc: ${formatDate(r.dueDate)} | Valor: ${formatCurrency(r.value)} | Atraso: ${r.delayDays}d | Total: ${formatCurrency(r.totalRef)}`
         ).join('\n') + `\n\nTOTAL: ${formatCurrency(summary.totalUpdated)}`;
@@ -453,10 +439,12 @@ export default function RentLateFineCalculatorClient() {
     };
 
     const handlePrint = () => {
+        if (checkExportTrigger('print')) return;
         window.print();
     };
 
     const downloadCSV = () => {
+        if (checkExportTrigger('csv')) return;
         const headers = ["Vencimento", "Valor Original", "Dias Atraso", "Multa", "Juros", "Total"];
         const rows = results.map(r => [
             r.dueDate,
@@ -822,15 +810,10 @@ export default function RentLateFineCalculatorClient() {
             </div>
 
             <LeadCaptureModal
-                open={showLeadModal}
-                onOpenChange={(open) => {
-                    setShowLeadModal(open);
-                    if (!open) {
-                        // Check if it was because of success (cookie set)
-                        checkLeadCaptured();
-                    }
-                }}
+                open={isModalOpen}
+                onOpenChange={setIsModalOpen}
                 calculatorType="multa-atraso-aluguel"
+                leadMetadata={leadMetadata}
             />
 
         </div >

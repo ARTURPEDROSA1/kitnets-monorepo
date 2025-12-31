@@ -228,6 +228,82 @@ export function CalculatorsOverview({ lang, dict }: { lang: string; dict: Dictio
                         {(dict as any).calculatorCtaStandard?.microcopy}
                     </p>
                 </div>
+
+                {/* SEO Content Section */}
+                <div className="mt-24 space-y-16 max-w-4xl mx-auto pb-20 text-left">
+                    {/* Intro */}
+                    <div className="space-y-6">
+                        <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">
+                            {(t as any).seoContent?.intro.title}
+                        </h2>
+                        <p className="text-lg text-muted-foreground leading-relaxed whitespace-pre-line">
+                            {(t as any).seoContent?.intro.text}
+                        </p>
+                    </div>
+
+                    {/* Updated */}
+                    <div className="space-y-6">
+                        <h3 className="text-2xl font-bold text-foreground">{(t as any).seoContent?.updated.title}</h3>
+                        <div className="text-lg text-muted-foreground space-y-4">
+                            <p>{(t as any).seoContent?.updated.text}</p>
+                            <ul className="space-y-3 pl-6 list-disc marker:text-primary">
+                                {(t as any).seoContent?.updated.items.map((item: string, i: number) => (
+                                    <li key={i}>{item}</li>
+                                ))}
+                            </ul>
+                            <p className="font-medium text-foreground">{(t as any).seoContent?.updated.conclusion}</p>
+                        </div>
+                    </div>
+
+                    {/* Ecosystem */}
+                    <div className="space-y-6">
+                        <h3 className="text-2xl font-bold text-foreground">{(t as any).seoContent?.ecosystem.title}</h3>
+                        <div className="text-lg text-muted-foreground space-y-4">
+                            <p>{(t as any).seoContent?.ecosystem.text}</p>
+                            <ul className="space-y-3 pl-6 list-disc marker:text-primary">
+                                {(t as any).seoContent?.ecosystem.items.map((item: string, i: number) => (
+                                    <li key={i}>{item}</li>
+                                ))}
+                            </ul>
+                            <p className="font-medium text-foreground">{(t as any).seoContent?.ecosystem.conclusion}</p>
+                        </div>
+                    </div>
+
+                    {/* Innovation */}
+                    <div className="space-y-6">
+                        <h3 className="text-2xl font-bold text-foreground">{(t as any).seoContent?.innovation.title}</h3>
+                        <div className="text-lg text-muted-foreground space-y-4">
+                            <p>{(t as any).seoContent?.innovation.text}</p>
+                            <ul className="space-y-3 pl-6 list-disc marker:text-primary">
+                                {(t as any).seoContent?.innovation.items.map((item: string, i: number) => (
+                                    <li key={i}>{item}</li>
+                                ))}
+                            </ul>
+                            <p className="font-medium text-foreground">{(t as any).seoContent?.innovation.conclusion}</p>
+                        </div>
+                    </div>
+
+                    {/* Target Audience */}
+                    <div className="space-y-6">
+                        <h3 className="text-2xl font-bold text-foreground">{(t as any).seoContent?.targetAudience.title}</h3>
+                        <div className="text-lg text-muted-foreground space-y-4">
+                            <ul className="space-y-3 pl-6 list-disc marker:text-primary">
+                                {(t as any).seoContent?.targetAudience.items.map((item: string, i: number) => (
+                                    <li key={i}>{item}</li>
+                                ))}
+                            </ul>
+                            <p className="font-medium text-foreground">{(t as any).seoContent?.targetAudience.conclusion}</p>
+                        </div>
+                    </div>
+
+                    {/* Final CTA */}
+                    <div className="bg-muted/30 rounded-3xl p-8 md:p-12 border border-border/50">
+                        <h3 className="text-2xl font-bold text-foreground mb-4">{(t as any).seoContent?.cta.title}</h3>
+                        <p className="text-lg text-muted-foreground whitespace-pre-line leading-relaxed">
+                            {(t as any).seoContent?.cta.text}
+                        </p>
+                    </div>
+                </div>
             </div>
         </div>
     );

@@ -18,13 +18,21 @@ import { saveCalculatorLead } from "@/app/actions/save-calculator-lead";
 interface LeadCaptureModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    calculatorType: string;
+    calculatorType: string; // Acts as 'source'
+    leadMetadata?: {
+        leadType: string;
+        triggerType: string; // advanced, export, time
+        interactionCount: number;
+        engagedSeconds: number;
+        exportType?: string; // pdf, csv, copy, print
+    };
 }
 
 export default function LeadCaptureModal({
     open,
     onOpenChange,
     calculatorType,
+    leadMetadata,
 }: LeadCaptureModalProps) {
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
@@ -61,10 +69,29 @@ export default function LeadCaptureModal({
             // Continue without location
         }
 
+        // Gather Context Data
+        const searchParams = new URLSearchParams(window.location.search);
+        const attributionData = {
+            referrer: document.referrer,
+            utm_source: searchParams.get("utm_source") || undefined,
+            utm_medium: searchParams.get("utm_medium") || undefined,
+            utm_campaign: searchParams.get("utm_campaign") || undefined,
+        };
+
         const res = await saveCalculatorLead({
             name,
             email,
-            calculatorType,
+            source: calculatorType,
+            lead_type: leadMetadata?.leadType || "generic_calculator_gate", // Fallback
+            page_url: window.location.href,
+            user_agent: navigator.userAgent,
+            attribution_data: attributionData,
+            metadata: {
+                trigger_type: leadMetadata?.triggerType,
+                interaction_count: leadMetadata?.interactionCount,
+                engaged_seconds: leadMetadata?.engagedSeconds,
+                export_type: leadMetadata?.exportType,
+            },
             location: locationData,
         });
 
@@ -78,19 +105,15 @@ export default function LeadCaptureModal({
     };
 
     return (
-        <Dialog open={open} onOpenChange={(val) => {
-            // Prevent closing by clicking outside if strictly forced? 
-            // The prompt doesn't say "forced", but implies interruption. 
-            // We'll allow closing but it might pop up again if logic dictates, 
-            // or we consider "closing" as "refusal" and reset counter?
-            // For now, let's allow standard dialog behavior.
-            onOpenChange(val);
-        }}>
-            <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()}>
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md backdrop-blur-sm" onInteractOutside={(e) => e.preventDefault()}>
                 <DialogHeader>
-                    <DialogTitle>Desbloqueie o potencial total</DialogTitle>
-                    <DialogDescription>
-                        Para continuar utilizando nossas calculadoras gratuitamente, precisamos apenas que você se identifique.
+                    <DialogTitle className="text-center">Desbloquear Análise Completa</DialogTitle>
+                    <DialogDescription className="text-center pt-2">
+                        Identificamos que você está personalizando sua simulação.
+                        <br />
+                        Para continuar explorando os resultados detalhados,
+                        precisamos confirmar que você não é um robô.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -116,26 +139,25 @@ export default function LeadCaptureModal({
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                         />
-                        <p className="text-[11px] text-muted-foreground">
-                            Prometemos zero spam. Você será notificado apenas quando lançarmos novas ferramentas úteis.
-                        </p>
-                    </div>
-
-                    <div className="pt-2">
-                        <p className="text-xs text-muted-foreground text-center">
-                            Precisamos do seu nome e e-mail apenas para confirmar que você é humano.
-                        </p>
                     </div>
 
                     {error && (
-                        <p className="text-sm text-red-500 font-medium">{error}</p>
+                        <p className="text-sm text-red-500 font-medium text-center">{error}</p>
                     )}
 
-                    <div className="pt-2 flex justify-end">
-                        <Button type="submit" disabled={isLoading} className="w-full sm:w-auto">
+                    <div className="pt-2">
+                        <Button type="submit" disabled={isLoading} className="w-full">
                             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Continuar usando
+                            Confirmar e Continuar
                         </Button>
+                    </div>
+
+                    <div className="pt-2 text-center">
+                        <p className="text-xs text-muted-foreground">
+                            Você será adicionado à nossa newsletter com dicas e novos simuladores.
+                            <br />
+                            Cancelamento a qualquer momento. Zero spam.
+                        </p>
                     </div>
                 </form>
             </DialogContent>

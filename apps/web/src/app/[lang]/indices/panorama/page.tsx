@@ -10,10 +10,25 @@ import { Button } from "@/components/ui/button";
 
 export const revalidate = 3600;
 
-export const metadata: Metadata = {
-    title: 'Panorama Econômico do Brasil: inflação, imoveis e juros em um só lugar',
-    description: 'O Panorama Econômico do Kitnets.com reúne, em uma única página, os principais indicadores econômicos do Brasil, organizados de forma clara e visual para facilitar a análise de inflação, imoveis, juros e investimentos.',
-};
+export async function generateMetadata({ params }: { params: Promise<{ lang: string }> }): Promise<Metadata> {
+    const { lang } = await params;
+    const dict = getDictionary(lang);
+    const t: any = (dict as any).panoramaPage || {};
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://kitnets.com';
+
+    return {
+        title: t.title || 'Panorama Econômico do Brasil: inflação, imoveis e juros em um só lugar',
+        description: t.description || 'O Panorama Econômico do Kitnets.com reúne, em uma única página, os principais indicadores econômicos do Brasil, organizados de forma clara e visual para facilitar a análise de inflação, imoveis, juros e investimentos.',
+        alternates: {
+            canonical: `${baseUrl}/${lang}/indices/panorama`,
+            languages: {
+                'pt': `${baseUrl}/pt/indices/panorama`,
+                'en': `${baseUrl}/en/indices/panorama`,
+                'es': `${baseUrl}/es/indices/panorama`,
+            },
+        },
+    };
+}
 
 interface IndexData {
     meta: IndexMetadata;

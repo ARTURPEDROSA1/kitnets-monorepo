@@ -14,7 +14,7 @@ export async function generateMetadata({ params }: { params: Promise<{ lang: str
             canonical: `https://kitnets.com/${lang}/calculadoras`,
             languages: {
                 'pt': 'https://kitnets.com/pt/calculadoras',
-                'en': 'https://kitnets.com/en/calculators',
+                'en': 'https://kitnets.com/en/calculadoras',
                 'es': 'https://kitnets.com/es/calculadoras',
             },
         },

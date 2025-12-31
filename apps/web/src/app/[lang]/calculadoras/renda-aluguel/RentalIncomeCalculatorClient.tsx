@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { getDictionary } from "@/dictionaries";
-import { saveLead } from "@/app/actions/capture-lead";
 import { saveCalculatorSuggestion } from "@/app/actions/save-calculator-suggestion";
+import LeadCaptureModal from "@/components/calculators/LeadCaptureModal";
+import { useCalculatorLeadCapture } from "@/hooks/useCalculatorLeadCapture";
 import {
     LineChart,
     Line,
@@ -16,7 +17,7 @@ import {
     ResponsiveContainer,
     ReferenceDot,
 } from "recharts";
-import { Calculator, Info, AlertTriangle, TrendingUp, ArrowUpDown, ArrowUp, ArrowDown, User, Mail, CheckCircle2, Lock, MessageSquarePlus } from "lucide-react";
+import { Calculator, Info, AlertTriangle, TrendingUp, ArrowUpDown, ArrowUp, ArrowDown, CheckCircle2, MessageSquarePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -173,95 +174,7 @@ function SuggestionForm() {
     );
 }
 
-function LeadCaptureModal({ isOpen, onCapture }: { isOpen: boolean; onCapture: () => void }) {
-    const [name, setName] = useState("");
-    const [email, setEmail] = useState("");
-    const [loading, setLoading] = useState(false);
 
-    if (!isOpen) return null;
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setLoading(true);
-
-        try {
-            await saveLead({
-                name,
-                email,
-                source: "rental-income-calculator"
-            });
-            onCapture();
-        } catch (error) {
-            console.error("Lead capture error:", error);
-            onCapture();
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-            <div className="bg-background rounded-xl shadow-2xl w-full max-w-md overflow-hidden border animate-in zoom-in-95 duration-300">
-                <div className="bg-muted/30 p-6 border-b">
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2 bg-primary/10 rounded-full">
-                            <Lock className="w-5 h-5 text-primary" />
-                        </div>
-                        <h3 className="text-xl font-bold">Desbloquear Análise Completa</h3>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                        Identificamos que você está personalizando sua simulação. Para continuar explorando os resultados detalhados, precisamos confirmar que você não é um robô.
-                    </p>
-                </div>
-
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="name">Seu Nome</Label>
-                        <div className="relative">
-                            <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                id="name"
-                                placeholder="Como podemos te chamar?"
-                                className="pl-9"
-                                required
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="email">Seu Melhor E-mail</Label>
-                        <div className="relative">
-                            <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                id="email"
-                                type="email"
-                                placeholder="exemplo@email.com"
-                                className="pl-9"
-                                required
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                            />
-                        </div>
-                    </div>
-
-                    <div className="pt-2">
-                        <Button type="submit" className="w-full" size="lg" disabled={loading}>
-                            {loading ? "Confirmando..." : "Confirmar e Continuar"}
-                        </Button>
-                    </div>
-
-                    <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg mt-4">
-                        <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
-                        <p>
-                            Fique tranquilo! Você será adicionado à nossa newsletter para receber dicas de investimento, mas pode cancelar a inscrição a qualquer momento. Zero spam.
-                        </p>
-                    </div>
-                </form>
-            </div>
-        </div>
-    );
-}
 
 export default function RentalIncomeCalculatorClient() {
     const params = useParams();
@@ -275,29 +188,21 @@ export default function RentalIncomeCalculatorClient() {
     const [viewMode, setViewMode] = useState<"chart" | "table">("chart");
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
-    // Lead Capture State
-    const [modifiedFields, setModifiedFields] = useState<Set<string>>(new Set());
-    const [isLeadCaptured, setIsLeadCaptured] = useState(false);
+    // Lead Capture Hook
+    const {
+        isModalOpen,
+        setIsModalOpen,
+        leadMetadata,
+        trackInteraction,
+        checkAdvancedTrigger
+    } = useCalculatorLeadCapture({
+        calculatorType: "rental-income-calculator"
+    });
 
-    useEffect(() => {
-        const hasCookie = document.cookie.split('; ').some(row => row.trim().startsWith('kitnets_user_identified='));
-        if (hasCookie) {
-            setIsLeadCaptured(true);
-        }
-    }, []);
-
-    const trackModification = (fieldId: string) => {
-        if (isLeadCaptured) return;
-        if (!modifiedFields.has(fieldId)) {
-            setModifiedFields(prev => {
-                const newSet = new Set(prev);
-                newSet.add(fieldId);
-                return newSet;
-            });
-        }
+    const handleInteraction = () => {
+        trackInteraction();
+        checkAdvancedTrigger();
     };
-
-    const showLeadModal = !isLeadCaptured && modifiedFields.size >= 3;
 
     // --- State: Mortgage ---
     const [propertyPrice, setPropertyPrice] = useState<number | string>(500000); // 500k
@@ -490,7 +395,12 @@ export default function RentalIncomeCalculatorClient() {
 
     return (
         <div className="container mx-auto p-6 max-w-7xl animate-in fade-in space-y-8">
-            <LeadCaptureModal isOpen={showLeadModal} onCapture={() => setIsLeadCaptured(true)} />
+            <LeadCaptureModal
+                open={isModalOpen}
+                onOpenChange={setIsModalOpen}
+                calculatorType="rental-income-calculator"
+                leadMetadata={leadMetadata}
+            />
 
             <div className="space-y-4 max-w-4xl">
                 <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">
@@ -529,7 +439,7 @@ export default function RentalIncomeCalculatorClient() {
                                         className="pl-9"
                                         value={propertyPrice}
                                         onChange={val => setPropertyPrice(val)}
-                                        onBlur={() => trackModification('propertyPrice')}
+                                        onBlur={handleInteraction}
                                     />
                                 </div>
                             </div>
@@ -546,7 +456,7 @@ export default function RentalIncomeCalculatorClient() {
                                             setDownPaymentWarning(null);
                                         }}
                                         onBlur={() => {
-                                            trackModification('downPayment');
+                                            handleInteraction();
                                             handleDownPaymentBlur();
                                         }}
                                     />
@@ -577,7 +487,7 @@ export default function RentalIncomeCalculatorClient() {
                                         className="mt-1"
                                         value={interestRate}
                                         onChange={e => setInterestRate(e.target.value === '' ? '' : Number(e.target.value))}
-                                        onBlur={() => trackModification('interestRate')}
+                                        onBlur={handleInteraction}
                                     />
                                 </div>
                                 <div>
@@ -587,7 +497,7 @@ export default function RentalIncomeCalculatorClient() {
                                         className="mt-1"
                                         value={loanTerm}
                                         onChange={e => setLoanTerm(e.target.value === '' ? '' : Number(e.target.value))}
-                                        onBlur={() => trackModification('loanTerm')}
+                                        onBlur={handleInteraction}
                                     />
                                 </div>
                             </div>
@@ -600,7 +510,7 @@ export default function RentalIncomeCalculatorClient() {
                                         variant={amortizationSystem === "SAC" ? "default" : "outline"}
                                         className="flex-1"
                                         onClick={() => {
-                                            trackModification('amortizationSystem');
+                                            handleInteraction();
                                             setAmortizationSystem("SAC");
                                         }}
                                     >
@@ -611,7 +521,7 @@ export default function RentalIncomeCalculatorClient() {
                                         variant={amortizationSystem === "PRICE" ? "default" : "outline"}
                                         className="flex-1"
                                         onClick={() => {
-                                            trackModification('amortizationSystem');
+                                            handleInteraction();
                                             setAmortizationSystem("PRICE");
                                         }}
                                     >
@@ -634,10 +544,10 @@ export default function RentalIncomeCalculatorClient() {
                                         className="pl-9"
                                         value={Number(Math.round(monthlyInsuranceFees))}
                                         onChange={e => {
-                                            trackModification('insurance');
+                                            handleInteraction();
                                             setManualInsuranceFees(e.target.value === '' ? 0 : Number(e.target.value));
                                         }}
-                                        onBlur={() => trackModification('insurance')}
+                                        onBlur={handleInteraction}
                                     />
                                 </div>
                                 {!isInsuranceManual && (
@@ -666,7 +576,7 @@ export default function RentalIncomeCalculatorClient() {
                                         className="pl-9"
                                         value={initialRent}
                                         onChange={val => setInitialRent(val)}
-                                        onBlur={() => trackModification('initialRent')}
+                                        onBlur={handleInteraction}
                                     />
                                 </div>
                             </div>
@@ -680,7 +590,7 @@ export default function RentalIncomeCalculatorClient() {
                                         className="mt-1"
                                         value={rentReadjustment}
                                         onChange={e => setRentReadjustment(e.target.value === '' ? '' : Number(e.target.value))}
-                                        onBlur={() => trackModification('rentReadjustment')}
+                                        onBlur={handleInteraction}
                                     />
                                 </div>
                                 <div>
@@ -691,7 +601,7 @@ export default function RentalIncomeCalculatorClient() {
                                         className="mt-1"
                                         value={vacancyRate}
                                         onChange={e => setVacancyRate(e.target.value === '' ? '' : Number(e.target.value))}
-                                        onBlur={() => trackModification('vacancyRate')}
+                                        onBlur={handleInteraction}
                                     />
                                 </div>
                             </div>
@@ -706,7 +616,7 @@ export default function RentalIncomeCalculatorClient() {
                                             className="pl-9"
                                             value={monthlyCosts}
                                             onChange={e => setMonthlyCosts(e.target.value === '' ? '' : Number(e.target.value))}
-                                            onBlur={() => trackModification('monthlyCosts')}
+                                            onBlur={handleInteraction}
                                         />
                                     </div>
                                 </div>
@@ -717,7 +627,7 @@ export default function RentalIncomeCalculatorClient() {
                                         className="mt-1"
                                         value={incomeTax}
                                         onChange={e => setIncomeTax(e.target.value === '' ? '' : Number(e.target.value))}
-                                        onBlur={() => trackModification('incomeTax')}
+                                        onBlur={handleInteraction}
                                     />
                                 </div>
                             </div>

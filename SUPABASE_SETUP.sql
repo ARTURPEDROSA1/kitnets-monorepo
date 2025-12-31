@@ -106,7 +106,7 @@ VALUES
 ON CONFLICT (code) DO NOTHING;
 
 -- Example View: Latest Values for Dashboard
-CREATE OR REPLACE VIEW public.vw_latest_indices AS
+CREATE OR REPLACE VIEW public.vw_latest_indices WITH (security_invoker = true) AS
 SELECT DISTINCT ON (i.id)
     i.code,
     i.name,

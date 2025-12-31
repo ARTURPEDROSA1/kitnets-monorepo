@@ -1487,8 +1487,8 @@
         }
     },
     "calculatorsOverview": {
-        "title": "Calculadoras Financieras, de Alquiler e Inmobiliarias",
-        "subtitle": "Simuladores gratuitos para alquiler, financiamiento, reajustes, intereses, inflación y planificación financiera — hechos para propietarios, inquilinos e inversores inmobiliarios.",
+        "title": "Calculadoras Financieras, de Alquiler y Viabilidad de Inversiones",
+        "subtitle": "Simuladores gratuitos para alquiler, financiación, reajustes, intereses, inflación y planificación financiera — hechos para propietarios, inquilinos e inversores inmobiliarios.",
         "microCta": "Usar ahora — sin registro",
         "secondaryCta": "Crear cuenta para guardar simulaciones",
         "searchPlaceholder": "Buscar calculadora...",
@@ -1496,55 +1496,55 @@
         "categories": {
             "all": "Todas",
             "rent": "Alquiler",
-            "finance": "Financiamiento",
+            "finance": "Financiación",
             "indices": "Índices",
             "interest": "Interés",
             "planning": "Planificación"
         },
         "conversion": {
-            "title": "¿Quiere guardar sus simulaciones y contratos?",
+            "title": "¿Quieres guardar tus simulaciones y contratos?",
             "text": "Pronto, Kitnets.com permitirá seguir reajustes, contratos e inmuebles en un solo lugar.",
-            "cta": "Unirse a la lista de espera"
+            "cta": "Entrar en la lista de espera"
         },
         "cards": {
             "ctaPrimary": "Calcular ahora",
-            "ctaSecondary": "Entienda cómo funciona",
+            "ctaSecondary": "Entiende cómo funciona",
             "items": {
                 "rentAdjustment": {
                     "title": "Reajuste de Alquiler",
-                    "description": "Actualice el valor del alquiler usando índices como IGP-M, IPCA o IVAR."
+                    "description": "Actualiza el valor del alquiler usando índices como IGP-M, IPCA o IVAR."
                 },
                 "proRataRent": {
                     "title": "Alquiler Proporcional",
-                    "description": "Calcule el valor del alquiler para períodos incompletos."
+                    "description": "Calcula el valor del alquiler para períodos incompletos (inicio/fin de contrato)."
                 },
                 "lateFee": {
                     "title": "Multa por Atraso",
-                    "description": "Calcule multas e intereses por pago atrasado del alquiler."
+                    "description": "Calcula multas e intereses por atraso en el pago del alquiler."
                 },
                 "terminationFee": {
-                    "title": "Multa Rescisión Contrato",
-                    "description": "Calcule la multa proporcional por desocupación anticipada."
+                    "title": "Multa Rescisión de Contrato",
+                    "description": "Calcula la multa proporcional por desocupación anticipada del inmueble."
                 },
                 "rentalIncome": {
                     "title": "Renta de Alquiler",
-                    "description": "Descubra si la renta del alquiler paga las cuotas de su financiamiento."
+                    "description": "Descubre si la renta del alquiler paga las cuotas de tu financiación."
                 },
                 "amortization": {
-                    "title": "Amortización Hipoteca",
-                    "description": "Simule la reducción de intereses y plazo amortizando su hipoteca."
+                    "title": "Amortización Financiación",
+                    "description": "Simula la reducción de intereses y plazo amortizando tu préstamo inmobiliario."
                 },
                 "monthlyAnnualInterest": {
                     "title": "Conv. Interés Mensual/Anual",
-                    "description": "Convierta tasas de interés mensuales a anuales y viceversa."
+                    "description": "Convierte tasas de interés mensuales a anuales y viceversa."
                 },
                 "compoundInterest": {
                     "title": "Interés Compuesto",
-                    "description": "Simule el crecimiento de su patrimonio con el poder del interés compuesto."
+                    "description": "Simula el crecimiento de tu patrimonio con el poder del interés compuesto."
                 },
                 "financialIndependence": {
                     "title": "Independencia Financiera",
-                    "description": "Planifique su libertad financiera considerando inflación e impuestos."
+                    "description": "Planea tu libertad financiera considerando inflación e impuestos."
                 },
                 "ipca": {
                     "title": "IPCA (Inflación Oficial)",
@@ -1552,7 +1552,7 @@
                 },
                 "igpm": {
                     "title": "IGP-M (Alquiler)",
-                    "description": "Sigue el índice más utilizado en contratos de alquiler."
+                    "description": "Sigue el índice más usado en contratos de alquiler."
                 },
                 "cdi": {
                     "title": "CDI (Renta Fija)",
@@ -1566,6 +1566,62 @@
                     "title": "INPC",
                     "description": "Consulta el índice nacional de precios al consumidor."
                 }
+            }
+        },
+        "seoContent": {
+            "intro": {
+                "title": "Calculadoras Financieras, de Alquiler y Viabilidad de Inversiones Inmobiliarias",
+                "text": "Kitnets.com reúne en un solo lugar las principales calculadoras financieras, inmobiliarias y de planificación patrimonial del mercado brasileño. Nuestro hub de calculadoras fue creado para ayudar a propietarios, inversores, arrendadores, inmobiliarias y holdings a tomar decisiones más seguras, rápidas y fundamentadas en datos reales.\n\nAquí encuentras herramientas prácticas para alquiler, financiación inmobiliaria, intereses, índices económicos, viabilidad de inversiones y planificación financiera, todas desarrolladas con foco en la realidad del mercado inmobiliario brasileño."
+            },
+            "updated": {
+                "title": "Calculadoras siempre actualizadas con el mercado y la legislación",
+                "text": "A diferencia de simuladores genéricos, las calculadoras de Kitnets.com se mantienen y actualizan constantemente para reflejar:",
+                "items": [
+                    "Las condiciones actuales del mercado inmobiliario",
+                    "La evolución de los índices oficiales como IGP-M, IPCA, IVAR, CDI y Selic",
+                    "Las buenas prácticas contractuales y reglas más utilizadas en contratos de alquiler",
+                    "Cambios en regulaciones, normas e interpretaciones del mercado"
+                ],
+                "conclusion": "Esto garantiza que los resultados presentados sean confiables, realistas y aplicables en la práctica, tanto para uso personal como profesional."
+            },
+            "ecosystem": {
+                "title": "Un ecosistema completo de calculadoras inmobiliarias y financieras",
+                "text": "En el hub de calculadoras de Kitnets.com puedes:",
+                "items": [
+                    "Calcular reajuste de alquiler por diferentes índices",
+                    "Simular alquiler proporcional en inicio o fin de contrato",
+                    "Estimar multas por atraso y rescisión contractual",
+                    "Evaluar si la renta del alquiler cubre la financiación",
+                    "Simular amortizaciones de financiación inmobiliaria",
+                    "Convertir intereses mensuales y anuales",
+                    "Proyectar crecimiento con interés compuesto",
+                    "Planear tu independencia financiera, considerando inflación e impuestos"
+                ],
+                "conclusion": "Todo esto en una interfaz simple, rápida y accesible, incluso en el celular."
+            },
+            "innovation": {
+                "title": "Investigación, datos e innovación continua",
+                "text": "Kitnets.com invierte continuamente en investigación y desarrollo (R&D) para garantizar que la plataforma evolucione junto con el mercado. Nuestro compromiso es claro:",
+                "items": [
+                    "Lanzar al menos una nueva calculadora todos los meses, siempre basada en demandas reales de propietarios, inversores y profesionales del sector inmobiliario."
+                ],
+                "conclusion": "Esto transforma a Kitnets.com en un hub vivo, en constante expansão, acompañando tendencias económicas, cambios regulatorios y nuevas oportunidades de inversión."
+            },
+            "targetAudience": {
+                "title": "¿Para quién es el Hub de Calculadoras de Kitnets.com?",
+                "items": [
+                    "Propietarios de inmuebles para alquiler",
+                    "Inversores inmobiliarios",
+                    "Quien está evaluando comprar un inmueble para renta",
+                    "Inmobiliarias y administradoras",
+                    "Holdings patrimoniales",
+                    "Personas físicas que quieren tomar decisiones financieras más inteligentes"
+                ],
+                "conclusion": "Ya sea para tomar decisiones rápidas o para análisis más profundos, Kitnets.com ofrece las herramientas correctas."
+            },
+            "cta": {
+                "title": "Toma decisiones con datos, no con suposiciones",
+                "text": "Las calculadoras de Kitnets.com fueron creadas para quien quiere salir de las planillas improvisadas y pasar a gestionar alquiler, financiación e inversiones de forma profesional.\n\nExplora el hub, utiliza las calculadoras y sigue la evolución constante de la plataforma.\nDatos correctos hoy significan mejores decisiones mañana."
             }
         }
     }

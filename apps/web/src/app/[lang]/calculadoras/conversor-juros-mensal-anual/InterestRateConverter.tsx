@@ -4,24 +4,17 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { Input } from "../../../../components/ui/input";
 import { Label } from "../../../../components/ui/label";
-import { ArrowUpDown, Info, Lock } from "lucide-react";
+import { ArrowUpDown, Info } from "lucide-react";
 import { Dictionary } from "../../../../dictionaries";
-import { useUser } from "@clerk/nextjs";
 import {
     Accordion,
     AccordionContent,
     AccordionItem,
     AccordionTrigger,
 } from "../../../../components/ui/accordion";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "../../../../components/ui/dialog";
 import { Button } from "../../../../components/ui/button";
+import LeadCaptureModal from "@/components/calculators/LeadCaptureModal";
+import { useCalculatorLeadCapture } from "@/hooks/useCalculatorLeadCapture";
 
 type InterestRateConverterProps = {
     dict: Dictionary;
@@ -30,8 +23,6 @@ type InterestRateConverterProps = {
 
 export function InterestRateConverter({ dict, lang }: InterestRateConverterProps) {
     const t = dict.interestRateConverterPage;
-    const tCapture = dict.leadCapture;
-    const { user } = useUser();
 
     // States for inputs (string to allow formatting)
     const [monthlyStr, setMonthlyStr] = useState("1,0000");
@@ -41,24 +32,19 @@ export function InterestRateConverter({ dict, lang }: InterestRateConverterProps
     const [lastEdited, setLastEdited] = useState<"monthly" | "annual">("monthly");
 
     // Usage tracking
-    const [usageCount, setUsageCount] = useState(0);
-    const [showCapture, setShowCapture] = useState(false);
-    const [hasCaptured, setHasCaptured] = useState(false);
-
-    // Capture Form State
-    const [name, setName] = useState("");
-    const [email, setEmail] = useState("");
-
-    // Debounce timer
+    const localUsageCount = useRef(0);
     const debounceTimer = useRef<NodeJS.Timeout | null>(null);
 
-    // Initial check for captured cookie
-    useEffect(() => {
-        const capturedCookie = document.cookie.split('; ').find(row => row.startsWith('lead_captured='));
-        if (capturedCookie) {
-            setHasCaptured(true);
-        }
-    }, []);
+    // Lead Capture Hook
+    const {
+        isModalOpen,
+        setIsModalOpen,
+        leadMetadata,
+        trackInteraction,
+        checkAdvancedTrigger
+    } = useCalculatorLeadCapture({
+        calculatorType: "conversor-juros-mensal-anual"
+    });
 
     // Helper to parse localized string to number
     const parseNumber = (val: string): number | null => {
@@ -79,13 +65,7 @@ export function InterestRateConverter({ dict, lang }: InterestRateConverterProps
         });
     };
 
-    // Pre-fill user data
-    useEffect(() => {
-        if (user) {
-            if (user.fullName) setName(user.fullName);
-            if (user.primaryEmailAddress?.emailAddress) setEmail(user.primaryEmailAddress.emailAddress);
-        }
-    }, [user]);
+
 
     // Calculation logic
     const calculateAnnual = (monthly: number): number => {
@@ -107,12 +87,7 @@ export function InterestRateConverter({ dict, lang }: InterestRateConverterProps
     useEffect(() => {
         if (debounceTimer.current) clearTimeout(debounceTimer.current);
 
-        // "play with converter 2 times on the 3rd time ask"
-        // Interactions 1 and 2 are free. 3rd triggers capture.
-        if (!hasCaptured && usageCount >= 2) {
-            setShowCapture(true);
-            return;
-        }
+
 
         debounceTimer.current = setTimeout(() => {
             if (lastEdited === "monthly") {
@@ -123,9 +98,11 @@ export function InterestRateConverter({ dict, lang }: InterestRateConverterProps
 
                     if (newAnnualStr !== annualStr) {
                         setAnnualStr(newAnnualStr);
-                        // increment usage only if actual change happened (user typed something new)
-                        // and not just initial render or loop
-                        if (!hasCaptured) setUsageCount(prev => prev + 1);
+                        localUsageCount.current += 1;
+                        trackInteraction();
+                        if (localUsageCount.current > 2) {
+                            checkAdvancedTrigger();
+                        }
                     }
                 } else if (monthlyStr === "") {
                     setAnnualStr("");
@@ -138,8 +115,11 @@ export function InterestRateConverter({ dict, lang }: InterestRateConverterProps
 
                     if (newMonthlyStr !== monthlyStr) {
                         setMonthlyStr(newMonthlyStr);
-                        // increment usage only if actual change happened
-                        if (!hasCaptured) setUsageCount(prev => prev + 1);
+                        localUsageCount.current += 1;
+                        trackInteraction();
+                        if (localUsageCount.current > 2) {
+                            checkAdvancedTrigger();
+                        }
                     }
                 } else if (annualStr === "") {
                     setMonthlyStr("");
@@ -150,15 +130,10 @@ export function InterestRateConverter({ dict, lang }: InterestRateConverterProps
         return () => {
             if (debounceTimer.current) clearTimeout(debounceTimer.current);
         };
-    }, [monthlyStr, annualStr, lastEdited, hasCaptured]); // Removed usageCount from dependency to avoid loop
+    }, [monthlyStr, annualStr, lastEdited, trackInteraction, checkAdvancedTrigger]);
 
     // Handlers
     const handleMonthlyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!hasCaptured && usageCount >= 2) {
-            setShowCapture(true);
-            return;
-        }
-
         const val = e.target.value;
         if (!/^[0-9.,]*$/.test(val)) return;
 
@@ -167,11 +142,6 @@ export function InterestRateConverter({ dict, lang }: InterestRateConverterProps
     };
 
     const handleAnnualChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!hasCaptured && usageCount >= 2) {
-            setShowCapture(true);
-            return;
-        }
-
         const val = e.target.value;
         if (!/^[0-9.,]*$/.test(val)) return;
 
@@ -179,65 +149,17 @@ export function InterestRateConverter({ dict, lang }: InterestRateConverterProps
         setAnnualStr(val);
     };
 
-    const handleCaptureSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        // Set cookie
-        // Expires in 1 year
-        const date = new Date();
-        date.setTime(date.getTime() + (365 * 24 * 60 * 60 * 1000));
-        document.cookie = `lead_captured=true; expires=${date.toUTCString()}; path=/`;
 
-        setHasCaptured(true);
-        setShowCapture(false);
-        setUsageCount(0); // Reset count so they can continue
-
-        // Use the input they were trying to type? 
-        // For now just letting them continue is enough.
-    };
 
     return (
         <div className="w-full max-w-2xl mx-auto space-y-12">
 
-            <Dialog open={showCapture} onOpenChange={setShowCapture}>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>{tCapture.title}</DialogTitle>
-                        <DialogDescription>
-                            {tCapture.description}
-                        </DialogDescription>
-                    </DialogHeader>
-                    <form onSubmit={handleCaptureSubmit} className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="lead-name" className="sr-only">Name</Label>
-                            <Input
-                                id="lead-name"
-                                placeholder={tCapture.namePlaceholder}
-                                required
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="lead-email" className="sr-only">Email</Label>
-                            <Input
-                                id="lead-email"
-                                type="email"
-                                placeholder={tCapture.emailPlaceholder}
-                                required
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                            />
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Lock className="h-3 w-3" />
-                            <span>{tCapture.privacyNote}</span>
-                        </div>
-                        <DialogFooter>
-                            <Button type="submit" className="w-full">{tCapture.submit}</Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
+            <LeadCaptureModal
+                open={isModalOpen}
+                onOpenChange={setIsModalOpen}
+                calculatorType="conversor-juros-mensal-anual"
+                leadMetadata={leadMetadata}
+            />
 
             <div className="text-center space-y-6">
                 <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">{t.title}</h1>
