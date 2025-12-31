@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/utils/supabase/server";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 
 export interface SaveIndexLeadResponse {
     success: boolean;
@@ -48,6 +48,26 @@ export async function saveIndexLead(data: IndexLeadData): Promise<SaveIndexLeadR
         // We will try to upsert.
 
 
+        const headerStore = await headers();
+        const ipCountry = headerStore.get('x-vercel-ip-country') || headerStore.get('cf-ipcountry');
+        const ipCity = headerStore.get('x-vercel-ip-city');
+        const ipRegion = headerStore.get('x-vercel-ip-region');
+        const ipLat = headerStore.get('x-vercel-ip-latitude');
+        const ipLong = headerStore.get('x-vercel-ip-longitude');
+
+        // Construct Location Object (merging client data + server headers)
+        const locationField: any = {
+            ...location_data,
+            country: location_data?.country || ipCountry,
+            city: location_data?.city || ipCity,
+            state: location_data?.state || ipRegion, // Region often maps to state
+            location_source: location_data?.location_source || (ipCountry ? 'ip_header' : 'unknown')
+        };
+
+        if (ipLat && ipLong && !locationField.latitude) {
+            locationField.latitude = parseFloat(ipLat);
+            locationField.longitude = parseFloat(ipLong);
+        }
 
         const { data: existingUsers } = await supabase
             .from("leads")
@@ -63,16 +83,12 @@ export async function saveIndexLead(data: IndexLeadData): Promise<SaveIndexLeadR
             // Update
             const updatePayload: any = {
                 last_seen_at: timestamp,
-                page_url, // Update page url to latest? Spec implies tracking context.
-                user_agent
+                page_url,
+                user_agent,
+                location: locationField // Update location with latest info
             };
             if (!existingUser.source) {
                 updatePayload.source = source;
-            }
-            // Add location/attribution to specific columns or a JSONB column if exists?
-            // Spec 4.1 lists specific columns. I will assumes they exist.
-            if (location_data) {
-                Object.assign(updatePayload, location_data);
             }
             if (attribution_data) {
                 Object.assign(updatePayload, attribution_data);
@@ -93,8 +109,8 @@ export async function saveIndexLead(data: IndexLeadData): Promise<SaveIndexLeadR
                 user_agent,
                 consent_newsletter: true,
                 first_seen_at: timestamp,
-                lead_type: 'index_filter_gate', // Fixed value as per spec
-                ...location_data,
+                lead_type: 'index_filter_gate',
+                location: locationField, // Insert as JSONB object
                 ...attribution_data
             };
 

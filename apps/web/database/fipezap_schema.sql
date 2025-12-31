@@ -54,9 +54,11 @@ create index if not exists idx_fipezap_main_filter
     reference_date
   );
 
--- 3. Row Level Security (Optional but recommended)
--- alter table fipezap_series enable row level security;
--- create policy "public read" on fipezap_series for select using (true);
+-- 3. Row Level Security
+alter table public.fipezap_series enable row level security;
+
+create policy "Public Read Access FipeZap" on public.fipezap_series
+  for select using (true);
 
 /*
 Usage Examples:

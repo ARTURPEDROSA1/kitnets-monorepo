@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { Download, Printer, ArrowUpDown } from "lucide-react";
+import Image from "next/image";
 import {
     XAxis,
     YAxis,
@@ -152,11 +153,11 @@ export function CompoundInterestCalculator({ dict, lang }: CompoundInterestCalcu
         if (!sortConfig) return results.data;
 
         return [...results.data].sort((a, b) => {
-            // @ts-ignore - dynamic sorting
+            // @ts-expect-error - dynamic sorting
             if (a[sortConfig.key] < b[sortConfig.key]) {
                 return sortConfig.direction === "asc" ? -1 : 1;
             }
-            // @ts-ignore - dynamic sorting
+            // @ts-expect-error - dynamic sorting
             if (a[sortConfig.key] > b[sortConfig.key]) {
                 return sortConfig.direction === "asc" ? 1 : -1;
             }
@@ -226,8 +227,7 @@ export function CompoundInterestCalculator({ dict, lang }: CompoundInterestCalcu
             {/* Print Header */}
             <div className="hidden print:block mb-8 border-b pb-4">
                 <div className="flex items-center gap-3 mb-2">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/kitnets-logo.png" alt="Kitnets Logo" className="h-8 w-auto" />
+                    <Image src="/kitnets-logo.png" alt="Kitnets Logo" width={32} height={32} className="h-8 w-auto" />
                     <span className="text-xl font-bold text-zinc-900">Kitnets.com</span>
                 </div>
                 <p className="text-sm text-zinc-500">Source: kitnets.com - {t.meta.title}</p>

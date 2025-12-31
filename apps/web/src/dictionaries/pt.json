@@ -2420,6 +2420,62 @@
                     "description": "Consulte o índice nacional de preços ao consumidor."
                 }
             }
+        },
+        "seoContent": {
+            "intro": {
+                "title": "Calculadoras Financeiras, de Aluguel e Viabilidade de Investimentos Imobiliários",
+                "text": "O Kitnets.com reúne em um único lugar as principais calculadoras financeiras, imobiliárias e de planejamento patrimonial do mercado brasileiro. Nosso hub de calculadoras foi criado para ajudar proprietários, investidores, locadores, imobiliárias e holdings a tomarem decisões mais seguras, rápidas e fundamentadas em dados reais.\n\nAqui você encontra ferramentas práticas para aluguel, financiamento imobiliário, juros, índices econômicos, viabilidade de investimentos e planejamento financeiro, todas desenvolvidas com foco na realidade do mercado imobiliário brasileiro."
+            },
+            "updated": {
+                "title": "Calculadoras sempre atualizadas com o mercado e a legislação",
+                "text": "Diferente de simuladores genéricos, as calculadoras do Kitnets.com são constantemente mantidas e atualizadas para refletir:",
+                "items": [
+                    "As condições atuais do mercado imobiliário",
+                    "A evolução dos índices oficiais como IGP-M, IPCA, IVAR, CDI e Selic",
+                    "As boas práticas contratuais e regras mais utilizadas em contratos de aluguel",
+                    "Mudanças em regulamentações, normas e interpretações do mercado"
+                ],
+                "conclusion": "Isso garante que os resultados apresentados sejam confiáveis, realistas e aplicáveis na prática, tanto para uso pessoal quanto profissional."
+            },
+            "ecosystem": {
+                "title": "Um ecossistema completo de calculadoras imobiliárias e financeiras",
+                "text": "No hub de calculadoras do Kitnets.com você pode:",
+                "items": [
+                    "Calcular reajuste de aluguel por diferentes índices",
+                    "Simular aluguel proporcional em início ou fim de contrato",
+                    "Estimar multas por atraso e rescisão contratual",
+                    "Avaliar se a renda do aluguel cobre o financiamento",
+                    "Simular amortizações de financiamento imobiliário",
+                    "Converter juros mensais e anuais",
+                    "Projetar crescimento com juros compostos",
+                    "Planejar sua independência financeira, considerando inflação e impostos"
+                ],
+                "conclusion": "Tudo isso em uma interface simples, rápida e acessível, inclusive no celular."
+            },
+            "innovation": {
+                "title": "Pesquisa, dados e inovação contínua",
+                "text": "O Kitnets.com investe continuamente em pesquisa e desenvolvimento (R&D) para garantir que a plataforma evolua junto com o mercado. Nosso compromisso é claro:",
+                "items": [
+                    "Lançar pelo menos uma nova calculadora todos os meses, sempre baseada em demandas reais de proprietários, investidores e profissionais do setor imobiliário."
+                ],
+                "conclusion": "Isso transforma o Kitnets.com em um hub vivo, em constante expansão, acompanhando tendências econômicas, mudanças regulatórias e novas oportunidades de investimento."
+            },
+            "targetAudience": {
+                "title": "Para quem é o Hub de Calculadoras do Kitnets.com?",
+                "items": [
+                    "Proprietários de imóveis para locação",
+                    "Investidores imobiliários",
+                    "Quem está avaliando comprar um imóvel para renda",
+                    "Imobiliárias e administradoras",
+                    "Holdings patrimoniais",
+                    "Pessoas físicas que querem tomar decisões financeiras mais inteligentes"
+                ],
+                "conclusion": "Seja para tomar decisões rápidas ou para análises mais profundas, o Kitnets.com oferece as ferramentas certas."
+            },
+            "cta": {
+                "title": "Tome decisões com dados, não com achismos",
+                "text": "As calculadoras do Kitnets.com foram criadas para quem quer sair das planilhas improvisadas e passar a gerenciar aluguel, financiamento e investimentos de forma profissional.\n\nExplore o hub, utilize as calculadoras e acompanhe a evolução constante da plataforma.\nDados corretos hoje significam decisões melhores amanhã."
+            }
         }
     }
 }

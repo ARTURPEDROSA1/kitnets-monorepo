@@ -26,6 +26,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import CalculatorCta from "@/components/calculators/CalculatorCta";
 import CalculatorContent from "@/components/calculators/CalculatorContent";
+import LeadCaptureModal from "@/components/calculators/LeadCaptureModal";
+import { useCalculatorLeadCapture } from "@/hooks/useCalculatorLeadCapture";
 
 // --- Helper Components ---
 
@@ -137,6 +139,22 @@ export default function RentFineCalculator() {
     const [scenarios, setScenarios] = useState<Record<string, CalculationResult> | null>(null);
 
     // --- Logic ---
+
+    // --- Lead Capture Hook ---
+    const {
+        isModalOpen,
+        setIsModalOpen,
+        leadMetadata,
+        trackInteraction,
+        checkAdvancedTrigger
+    } = useCalculatorLeadCapture({
+        calculatorType: "multa-rescisao-contrato-aluguel"
+    });
+
+    const handleInteraction = () => {
+        trackInteraction();
+        checkAdvancedTrigger(); // Gate on interaction
+    };
 
     const calculateScenario = (path: FinePath): CalculationResult | null => {
         const start = new Date(startDate);
@@ -296,7 +314,7 @@ export default function RentFineCalculator() {
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <RadioGroup value={finePath} onValueChange={(v: FinePath) => setFinePath(v)} className="space-y-3">
+                            <RadioGroup value={finePath} onValueChange={(v: FinePath) => { handleInteraction(); setFinePath(v); }} className="space-y-3">
                                 <div className="flex items-center space-x-2">
                                     <RadioGroupItem value="fixed" id="r-fixed" />
                                     <Label htmlFor="r-fixed" className="font-normal cursor-pointer">{t.inputs?.finePathFixed}</Label>
@@ -331,13 +349,13 @@ export default function RentFineCalculator() {
                                 <Label>{t.inputs?.rentValue}</Label>
                                 <div className="relative mt-1.5">
                                     <span className="absolute left-3 top-2.5 text-muted-foreground">R$</span>
-                                    <CurrencyInput className="pl-9" value={rentValue} onChange={setRentValue} />
+                                    <CurrencyInput className="pl-9" value={rentValue} onChange={(v) => { handleInteraction(); setRentValue(v); }} />
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <Label>{t.inputs?.duration}</Label>
-                                    <Input type="number" className="mt-1.5" value={durationMonths} onChange={e => setDurationMonths(e.target.value)} />
+                                    <Input type="number" className="mt-1.5" value={durationMonths} onChange={e => { handleInteraction(); setDurationMonths(e.target.value); }} />
                                 </div>
                                 <div className="flex items-end pb-2 text-sm text-muted-foreground">
                                     {(Number(durationMonths) / 12).toFixed(1)} anos
@@ -346,11 +364,11 @@ export default function RentFineCalculator() {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <Label>{t.inputs?.startDate}</Label>
-                                    <Input type="date" className="mt-1.5" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                                    <Input type="date" className="mt-1.5" value={startDate} onChange={e => { handleInteraction(); setStartDate(e.target.value); }} />
                                 </div>
                                 <div>
                                     <Label>{t.inputs?.keyReturnDate}</Label>
-                                    <Input type="date" className="mt-1.5 border-primary/30" value={keyReturnDate} onChange={e => setKeyReturnDate(e.target.value)} />
+                                    <Input type="date" className="mt-1.5 border-primary/30" value={keyReturnDate} onChange={e => { handleInteraction(); setKeyReturnDate(e.target.value); }} />
                                 </div>
                             </div>
                         </CardContent>
@@ -368,7 +386,7 @@ export default function RentFineCalculator() {
                             <div className="flex gap-4">
                                 <div className="flex-1 flex flex-col justify-between">
                                     <Label>{t.inputs?.fineType}</Label>
-                                    <Select value={fineType} onValueChange={(v: FineType) => setFineType(v)}>
+                                    <Select value={fineType} onValueChange={(v: FineType) => { handleInteraction(); setFineType(v); }}>
                                         <SelectTrigger className="mt-1.5 w-full"><SelectValue /></SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="months">{t.inputs?.fineTypeMonths}</SelectItem>
@@ -380,14 +398,14 @@ export default function RentFineCalculator() {
                                     {fineType === 'months' ? (
                                         <>
                                             <Label>{t.inputs?.fineMonths}</Label>
-                                            <Input type="number" step="0.5" className="mt-1.5" value={fineMonths} onChange={e => setFineMonths(e.target.value)} />
+                                            <Input type="number" step="0.5" className="mt-1.5" value={fineMonths} onChange={e => { handleInteraction(); setFineMonths(e.target.value); }} />
                                         </>
                                     ) : (
                                         <>
                                             <Label>{t.inputs?.fineFixedValue}</Label>
                                             <div className="relative mt-1.5">
                                                 <span className="absolute left-3 top-2.5 text-muted-foreground">R$</span>
-                                                <CurrencyInput className="pl-9" value={fineFixedValue} onChange={setFineFixedValue} />
+                                                <CurrencyInput className="pl-9" value={fineFixedValue} onChange={(v) => { handleInteraction(); setFineFixedValue(v); }} />
                                             </div>
                                         </>
                                     )}
@@ -404,16 +422,16 @@ export default function RentFineCalculator() {
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div>
                                             <Label>{t.inputs?.minPeriod}</Label>
-                                            <Input type="number" className="mt-1.5" value={minPeriodMonths} onChange={e => setMinPeriodMonths(e.target.value)} />
+                                            <Input type="number" className="mt-1.5" value={minPeriodMonths} onChange={e => { handleInteraction(); setMinPeriodMonths(e.target.value); }} />
                                         </div>
                                         <div>
                                             <Label>{t.inputs?.noticeRequired}</Label>
-                                            <Input type="number" className="mt-1.5" value={noticeRequiredDays} onChange={e => setNoticeRequiredDays(e.target.value)} />
+                                            <Input type="number" className="mt-1.5" value={noticeRequiredDays} onChange={e => { handleInteraction(); setNoticeRequiredDays(e.target.value); }} />
                                         </div>
                                     </div>
                                     <div>
                                         <Label className="text-primary font-semibold">{t.inputs?.noticeGivenDays}</Label>
-                                        <Input type="number" className="mt-1.5 border-primary/50 bg-primary/5" value={noticeGivenDays} onChange={e => setNoticeGivenDays(e.target.value)} />
+                                        <Input type="number" className="mt-1.5 border-primary/50 bg-primary/5" value={noticeGivenDays} onChange={e => { handleInteraction(); setNoticeGivenDays(e.target.value); }} />
                                     </div>
                                 </div>
                             )}
@@ -574,6 +592,13 @@ export default function RentFineCalculator() {
             <div className="max-w-4xl text-xs text-muted-foreground mx-auto text-center leading-relaxed">
                 <p>{t?.legal?.text || "Aviso Legal: Calculadora informativa."}</p>
             </div>
+
+            <LeadCaptureModal
+                open={isModalOpen}
+                onOpenChange={setIsModalOpen}
+                calculatorType="multa-rescisao-contrato-aluguel"
+                leadMetadata={leadMetadata}
+            />
         </div>
     );
 }
