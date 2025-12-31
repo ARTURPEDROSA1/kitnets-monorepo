@@ -13,6 +13,8 @@ import {
     Area,
     AreaChart
 } from "recharts";
+import { useCalculatorLeadCapture } from "@/hooks/useCalculatorLeadCapture";
+import LeadCaptureModal from "@/components/calculators/LeadCaptureModal";
 
 interface Dictionary {
     compoundInterestCalculator: {
@@ -72,6 +74,15 @@ interface CompoundInterestCalculatorProps {
 
 export function CompoundInterestCalculator({ dict, lang }: CompoundInterestCalculatorProps) {
     const t = dict.compoundInterestCalculator;
+
+    // --- Lead Capture ---
+    const {
+        isModalOpen,
+        setIsModalOpen,
+        checkExportTrigger,
+        trackInteraction,
+        leadMetadata
+    } = useCalculatorLeadCapture({ isSimpleCalculator: false });
 
     // --- State ---
     const [initialCapital, setInitialCapital] = useState<number | string>(1000);
@@ -194,6 +205,7 @@ export function CompoundInterestCalculator({ dict, lang }: CompoundInterestCalcu
         e: React.ChangeEvent<HTMLInputElement>,
         setter: (value: number | string) => void
     ) => {
+        trackInteraction();
         const rawValue = e.target.value.replace(/\D/g, "");
         if (rawValue === "") {
             setter("");
@@ -204,6 +216,8 @@ export function CompoundInterestCalculator({ dict, lang }: CompoundInterestCalcu
     };
 
     const downloadCSV = () => {
+        if (checkExportTrigger('csv')) return;
+
         const headers = [t.table.period, t.table.invested, t.table.interest, t.table.total];
         const csvContent = [
             headers.join(","),
@@ -222,8 +236,20 @@ export function CompoundInterestCalculator({ dict, lang }: CompoundInterestCalcu
         document.body.removeChild(link);
     };
 
+    const handlePrint = () => {
+        if (checkExportTrigger('print')) return;
+        window.print();
+    };
+
     return (
         <div className="space-y-8">
+            <LeadCaptureModal
+                open={isModalOpen}
+                onOpenChange={setIsModalOpen}
+                calculatorType="calculadora-juros-compostos"
+                leadMetadata={leadMetadata}
+            />
+
             {/* Print Header */}
             <div className="hidden print:block mb-8 border-b pb-4">
                 <div className="flex items-center gap-3 mb-2">
@@ -271,7 +297,10 @@ export function CompoundInterestCalculator({ dict, lang }: CompoundInterestCalcu
                         </div>
                         <select
                             value={contributionFrequency}
-                            onChange={(e) => setContributionFrequency(e.target.value as "monthly" | "annual")}
+                            onChange={(e) => {
+                                trackInteraction();
+                                setContributionFrequency(e.target.value as "monthly" | "annual");
+                            }}
                             className="w-28 px-2 py-2 rounded-lg border border-input bg-background text-foreground focus:ring-2 focus:ring-ring outline-none text-sm"
                         >
                             <option value="monthly">{t.inputs.frequency.monthly}</option>
@@ -291,12 +320,18 @@ export function CompoundInterestCalculator({ dict, lang }: CompoundInterestCalcu
                             min="0.01"
                             step="0.01"
                             value={interestRate}
-                            onChange={(e) => setInterestRate(e.target.value === "" ? "" : Number(e.target.value))}
+                            onChange={(e) => {
+                                trackInteraction();
+                                setInterestRate(e.target.value === "" ? "" : Number(e.target.value));
+                            }}
                             className="w-full px-4 py-2 rounded-lg border border-input bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent outline-none transition-all"
                         />
                         <select
                             value={rateType}
-                            onChange={(e) => setRateType(e.target.value as "monthly" | "annual")}
+                            onChange={(e) => {
+                                trackInteraction();
+                                setRateType(e.target.value as "monthly" | "annual");
+                            }}
                             className="w-32 px-2 py-2 rounded-lg border border-input bg-background text-foreground focus:ring-2 focus:ring-ring outline-none text-sm"
                         >
                             <option value="monthly">{t.inputs.rateType.monthly}</option>
@@ -322,12 +357,18 @@ export function CompoundInterestCalculator({ dict, lang }: CompoundInterestCalcu
                             type="number"
                             min="1"
                             value={period}
-                            onChange={(e) => setPeriod(e.target.value === "" ? "" : Number(e.target.value))}
+                            onChange={(e) => {
+                                trackInteraction();
+                                setPeriod(e.target.value === "" ? "" : Number(e.target.value));
+                            }}
                             className="w-full px-4 py-2 rounded-lg border border-input bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent outline-none transition-all"
                         />
                         <select
                             value={periodUnit}
-                            onChange={(e) => setPeriodUnit(e.target.value as "months" | "years")}
+                            onChange={(e) => {
+                                trackInteraction();
+                                setPeriodUnit(e.target.value as "months" | "years");
+                            }}
                             className="w-28 px-2 py-2 rounded-lg border border-input bg-background text-foreground focus:ring-2 focus:ring-ring outline-none text-sm"
                         >
                             <option value="months">{t.inputs.periodUnit.months}</option>
@@ -437,7 +478,7 @@ export function CompoundInterestCalculator({ dict, lang }: CompoundInterestCalcu
                             {t.actions.exportCsv}
                         </button>
                         <button
-                            onClick={() => window.print()}
+                            onClick={handlePrint}
                             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-600 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-300 rounded-lg transition-colors"
                         >
                             <Printer className="w-4 h-4" />
