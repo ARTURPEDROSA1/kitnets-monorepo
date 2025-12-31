@@ -117,3 +117,28 @@ SELECT DISTINCT ON (i.id)
 FROM public.economic_indexes i
 JOIN public.economic_index_values v ON v.index_id = i.id
 ORDER BY i.id, v.year DESC, v.month DESC;
+
+-- 4. Leads (Consolidated)
+CREATE TABLE IF NOT EXISTS public.leads (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    source TEXT NOT NULL, -- e.g. "multa-atraso-aluguel", "waitlist", etc.
+    location JSONB DEFAULT '{}'::jsonb, -- Stores { city, country, lat, long, etc. }
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+COMMENT ON TABLE public.leads IS 'Consolidated leads from all sources (calculators, waitlists, etc).';
+
+ALTER TABLE public.leads ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Public Insert Leads" ON public.leads
+    FOR INSERT WITH CHECK (true);
+
+-- Ensure location column exists if table already existed without it
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'leads' AND column_name = 'location') THEN
+        ALTER TABLE public.leads ADD COLUMN location JSONB DEFAULT '{}'::jsonb;
+    END IF;
+END $$;

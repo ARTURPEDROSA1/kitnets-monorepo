@@ -11,6 +11,8 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { FipeZapDashboardWrapper } from '@/components/indices/FipeZap/FipeZapDashboardWrapper';
+import { MinimumWageDashboardWrapper } from '@/components/indices/MinimumWage/MinimumWageDashboardWrapper';
+import { getMinimumWageData, MinimumWageData } from '@/lib/minimum-wage';
 
 interface Props {
     params: Promise<{
@@ -18,6 +20,24 @@ interface Props {
         code: string;
     }>;
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}
+
+interface IndexSection {
+    title: string;
+    text?: string;
+    items?: { title: string; text?: string }[];
+    list?: string[];
+    footer?: string;
+}
+
+interface IndexContent {
+    title: string;
+    description: string;
+    pageDescription?: string;
+    keywords?: string[];
+    closing?: string;
+    cta?: string;
+    sections?: IndexSection[];
 }
 
 // Revalidate every hour
@@ -42,7 +62,9 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
     }
 
     const dict = getDictionary(lang as "pt" | "en" | "es");
-    const indexContent = (dict as any).indices?.[code.toLowerCase()];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const indices = (dict as any).indices || {};
+    const indexContent = indices[code.toLowerCase()] as IndexContent | undefined;
 
     let title = indexContent?.title || `Índice ${metadata.code} - Histórico, Tabela e Gráfico 2025 | Kitnets`;
     let description = indexContent?.description || `Acompanhe a variação do ${metadata.code} (${metadata.name}). Tabela histórica completa dos últimos meses, gráfico de evolução e acumulado de 12 meses.`;
@@ -99,7 +121,9 @@ export default async function IndexPage({ params, searchParams }: Props) {
     const defaultEndDate = new Date().toISOString().split('T')[0];
 
     const dict = getDictionary(lang as "pt" | "en" | "es");
-    const indexContent = (dict as any).indices?.[code.toLowerCase()];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const indices = (dict as any).indices || {};
+    const indexContent = indices[code.toLowerCase()] as IndexContent | undefined;
 
     const metadata = await getIndexMetadata(code);
     if (!metadata) {
@@ -112,6 +136,31 @@ export default async function IndexPage({ params, searchParams }: Props) {
     // Fetch history based on date range or default to recent
     const history = await getIndexValuesByDateRange(metadata.id, startDateStr, endDateStr);
     const latest = history[0];
+
+    // Prepare Minimum Wage Data
+    let minWageData: MinimumWageData[] = [];
+    let minWageLatest: MinimumWageData | null = null;
+    let minWageNext: MinimumWageData | null = null;
+
+    if (code === 'REAJUSTE-SALARIO-MINIMO') {
+        const allMw = await getMinimumWageData(); // Sorted DESC
+
+        // Filter for dashboard table/charts
+        minWageData = allMw.filter(d => d.reference_date >= startDateStr && d.reference_date <= endDateStr);
+
+        const today = new Date().toISOString().split('T')[0];
+        minWageLatest = allMw.find(d => !d.is_projection && d.reference_date <= today) || null;
+
+        // Find next adjustment (closest future date)
+        // Data is DESC: [FutureFar, FutureNear, Present, Past]
+        // Filter > Present => [FutureFar, FutureNear]
+        // We want FutureNear (Last item of the future array)
+        const currentRefDate = minWageLatest?.reference_date || today;
+        const future = allMw.filter(d => d.reference_date > currentRefDate);
+        if (future.length > 0) {
+            minWageNext = future[future.length - 1];
+        }
+    }
 
     // Schema.org Structured Data - Dataset
     const jsonLd = {
@@ -157,6 +206,14 @@ export default async function IndexPage({ params, searchParams }: Props) {
         ],
     };
 
+    interface IndicesCta {
+        title: string;
+        description: string;
+        button: string;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ctaContent = (dict as any).indicesCta as IndicesCta | undefined;
+
     return (
         <div className="container mx-auto py-4 md:py-10 px-4 max-w-5xl">
             <Link href={`/${lang}`} passHref>
@@ -169,7 +226,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
             {/* Header Section */}
             <div className="space-y-4 mb-6 md:mb-8">
                 <div className="flex flex-wrap items-center gap-2 md:gap-3">
-                    <h1 className="text-2xl md:text-4xl font-bold tracking-tight">{metadata.code}</h1>
+                    <h1 className="text-2xl md:text-4xl font-bold tracking-tight">{code === 'REAJUSTE-SALARIO-MINIMO' ? metadata.code.replace(/-/g, ' ') : metadata.code}</h1>
                     <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${metadata.is_official ? 'border-transparent bg-primary text-primary-foreground hover:bg-primary/80' : 'border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}>
                         {metadata.is_official ? 'Oficial' : 'Projeção'}
                     </span>
@@ -185,9 +242,11 @@ export default async function IndexPage({ params, searchParams }: Props) {
                         })()}
                     </span>
                 </div>
-                <h2 className="text-xl text-muted-foreground">{metadata.name}</h2>
+                {code !== 'REAJUSTE-SALARIO-MINIMO' && (
+                    <h2 className="text-xl text-muted-foreground">{metadata.name}</h2>
+                )}
                 <p className="max-w-3xl text-muted-foreground/80">
-                    Acompanhe a evolução do {metadata.code}, atualizado mensalmente.
+                    Acompanhe a evolução do {code === 'REAJUSTE-SALARIO-MINIMO' ? metadata.code.replace(/-/g, ' ') : metadata.code}, atualizado mensalmente.
                     Fonte: <strong>{metadata.source}</strong>.
                 </p>
             </div>
@@ -205,8 +264,20 @@ export default async function IndexPage({ params, searchParams }: Props) {
                 </div>
             )}
 
-            {/* Standard Index Layout for non-FIPEZAP */}
-            {code !== 'FIPEZAP' && (
+            {code === 'REAJUSTE-SALARIO-MINIMO' && (
+                <div className="md:col-span-3 min-w-0">
+                    <MinimumWageDashboardWrapper
+                        data={minWageData}
+                        latest={minWageLatest}
+                        startDate={startDateStr}
+                        endDate={endDateStr}
+                        nextAdjustment={minWageNext}
+                    />
+                </div>
+            )}
+
+            {/* Standard Index Layout for non-custom indexes */}
+            {code !== 'FIPEZAP' && code !== 'REAJUSTE-SALARIO-MINIMO' && (
                 <div className="grid gap-3 md:grid-cols-3 md:gap-6">
                     {/* Key Metrics Cards */}
                     <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
@@ -474,7 +545,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
                         )}
                     </div>
 
-                    {indexContent.sections && indexContent.sections.map((section: any, idx: number) => (
+                    {indexContent.sections && indexContent.sections.map((section: IndexSection, idx: number) => (
                         <section key={idx} className="space-y-4 md:space-y-6">
                             <h3 className="text-xl md:text-2xl font-semibold text-foreground">{section.title}</h3>
 
@@ -484,7 +555,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
 
                             {section.items && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {section.items.map((item: any, itemIdx: number) => (
+                                    {section.items.map((item, itemIdx: number) => (
                                         <div key={itemIdx} className="bg-card border rounded-lg p-4">
                                             <h4 className="font-semibold text-foreground mb-1">{item.title}</h4>
                                             <p className="text-sm text-muted-foreground">{item.text}</p>
@@ -528,15 +599,15 @@ export default async function IndexPage({ params, searchParams }: Props) {
                 <div className="absolute inset-0 bg-grid-black/5 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.5))]" />
                 <div className="relative z-10 space-y-6 max-w-2xl mx-auto">
                     <h3 className="text-3xl md:text-3xl font-bold tracking-tight whitespace-pre-line text-foreground">
-                        {(dict as any).indicesCta?.title}
+                        {ctaContent?.title}
                     </h3>
                     <p className="text-lg text-muted-foreground leading-relaxed whitespace-pre-line">
-                        {(dict as any).indicesCta?.description}
+                        {ctaContent?.description}
                     </p>
                     <div className="pt-4 flex flex-col items-center gap-3">
                         <Link href={`/${lang}/lista-vip?step=landing`}>
                             <Button size="lg" className="h-14 px-8 text-lg rounded-full font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xl shadow-emerald-500/20 hover:scale-105 transition-all border-0">
-                                {(dict as any).indicesCta?.button}
+                                {ctaContent?.button}
                             </Button>
                         </Link>
                     </div>

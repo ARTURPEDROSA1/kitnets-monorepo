@@ -68,6 +68,12 @@ export async function generateMetadata({ params }: { params: Promise<{ lang: str
             index: true,
             follow: true,
         },
+        twitter: {
+            card: 'summary',
+            title: 'Kitnets.com',
+            description: dict.home.subtitle,
+            images: [`${baseUrl}/icon.png`],
+        },
     };
 }
 

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@kitnets/ui";
 import { SignOutButton, useAuth } from "@clerk/nextjs";
 import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Search, Bell, ChevronDown, Rocket, HardHat, Briefcase, Building2, User, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart, ArrowLeftRight, FileText, AlertCircle } from "lucide-react";
@@ -51,6 +51,8 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
         setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
     };
 
+    const router = useRouter();
+
     const handleLanguageChange = (newLang: string) => {
         // Replace current lang in path with new lang
         const segments = pathname.split("/");
@@ -64,10 +66,6 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
         } else {
             // We are at root /, or /some-page
             // If switching to a non-default lang, prepend it.
-            // But wait, our middleware rewrites / to /pt internally, so valid langs might be stripped?
-            // Actually, pathname from usePathname in Next.js app dir usually includes the lang param if it is dynamic.
-            // EXCEPT when middleware rewrites it away? No, usePathname returns what the browser sees.
-            // browser sees /. 
             path = `/${newLang}${pathname === '/' ? '' : pathname}`;
         }
 
@@ -76,7 +74,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
             path = path.replace('/pt', '') || '/';
         }
 
-        window.location.href = path;
+        router.push(path);
     };
 
 
@@ -691,14 +689,14 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                         <span className="ms-3 text-sm">Panorama Econômico</span>
                                     </Link>
                                 </li>
-                                {['IPCA', 'IGPM', 'INPC', 'IVAR', 'FipeZAP', 'SELIC', 'CDI'].map((code) => (
+                                {['CDI', 'FipeZAP', 'IGPM', 'INPC', 'IPCA', 'IVAR', 'REAJUSTE-SALARIO-MINIMO', 'SELIC'].map((code) => (
                                     <li key={code}>
                                         <Link
                                             href={lang === 'pt' ? `/indices/${code.toLowerCase()}` : `/${lang}/indices/${code.toLowerCase()}`}
                                             className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
                                         >
                                             <TrendingUp className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                            <span className="ms-3 text-sm">{code === 'IGPM' ? 'IGP-M' : code}</span>
+                                            <span className="ms-3 text-sm">{code === 'IGPM' ? 'IGP-M' : code === 'REAJUSTE-SALARIO-MINIMO' ? 'Salário Mínimo' : code}</span>
                                         </Link>
                                     </li>
                                 ))}

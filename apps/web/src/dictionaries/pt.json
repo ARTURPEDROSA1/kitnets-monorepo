@@ -1694,6 +1694,38 @@
             "closing": "O Índice FipeZAP no Kitnets.com é a forma mais completa, transparente e acessível de acompanhar o mercado imobiliário brasileiro.",
             "cta": "🔎 Explore os dados, analise tendências e tome decisões imobiliárias com base em informação real."
         },
+        "reajuste-salario-minimo": {
+            "title": "Reajuste do Salário Mínimo (Brasil)",
+            "description": "Tabela histórica e completa do Salário Mínimo no Brasil desde 1994. Consulte valores vigentes, percentuais de reajuste e legislação oficial.",
+            "pageDescription": "O Índice de Reajuste do Salário Mínimo tem como objetivo consolidar, em formato estruturado e histórico, todas as variações do salário mínimo no Brasil desde julho de 1994, marco inicial do Plano Real. O Kitnets.com disponibiliza este índice de forma transparente, histórica e auditável.",
+            "keywords": [
+                "reajuste salário mínimo",
+                "reajuste aluguel salário mínimo",
+                "salário mínimo histórico Brasil",
+                "salário mínimo como índice de aluguel"
+            ],
+            "sections": [
+                {
+                    "title": "Visão Geral",
+                    "text": "O salário mínimo serve como referência base para remuneração no Brasil, mas também é amplamente utilizado como indexador informal em contratos de longo prazo, especialmente aluguéis em cidades menores."
+                },
+                {
+                    "title": "Objetivos do Índice",
+                    "list": [
+                        "Preservar a memória histórica dos reajustes do salário mínimo no Brasil.",
+                        "Permitir o cálculo de reajustes de aluguel baseados no salário mínimo.",
+                        "Atender usuários de cidades pequenas e zonas rurais, onde este indexador é prática comum.",
+                        "Oferecer comparação direta com outros índices (IPCA, IGP-M, INPC, IVAR)."
+                    ]
+                },
+                {
+                    "title": "Lógica de Cálculo",
+                    "text": "O cálculo do reajuste considera a variação percentual entre o valor antigo e o novo valor vigente. Nossa tabela consolida esses dados oficialmente publicados no DOU (Diário Oficial da União). Formula: Reajuste (%) = (Salário Atual / Salário Anterior - 1) × 100."
+                }
+            ],
+            "closing": "Mantenha-se informado sobre as variações do salário mínimo para planejar seus contratos e finanças.",
+            "cta": "O Kitnets.com é a sua fonte confiável para históricos econômicos."
+        },
         "cdi": {
             "title": "CDI (Certificado de Depósito Interbancário): histórico, rentabilidade e impacto nos investimentos",
             "description": "O CDI (Certificado de Depósito Interbancário) é um dos principais indicadores financeiros do Brasil e serve como referência fundamental para a rentabilidade de investimentos de renda fixa, como CDBs, LCIs, LCAs, fundos DI e diversos produtos bancários.",

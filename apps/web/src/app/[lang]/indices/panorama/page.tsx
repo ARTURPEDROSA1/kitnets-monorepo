@@ -1,6 +1,7 @@
 import { Metadata } from 'next';
 import { getAllIndexes, getIndexValues, IndexMetadata, IndexValue } from '@/lib/indexes';
 import { getFipeZapData, FipeZapDataPoint } from '@/lib/fipezap';
+import { getMinimumWageData, MinimumWageData } from '@/lib/minimum-wage';
 import { MiniIndexChart } from '@/components/indices/MiniIndexChart';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
@@ -45,7 +46,10 @@ export default async function PanoramaPage({ params }: { params: Promise<{ lang:
     startDateDate.setMonth(now.getMonth() - 13); // Go back ~13 months to ensure full chart context
     const startDate = startDateDate.toISOString().split('T')[0];
 
-    const fipeData = await getFipeZapData(startDate, endDate, 'todos');
+    const [fipeData, minWageData] = await Promise.all([
+        getFipeZapData(startDate, endDate, 'todos'),
+        getMinimumWageData() // Fetch all history including future confirmed
+    ]);
 
     // Helper to map FipeZap to IndexData
     const mapFipeToData = (series: FipeZapDataPoint[], code: string, name: string): IndexData => {
@@ -80,6 +84,34 @@ export default async function PanoramaPage({ params }: { params: Promise<{ lang:
     const fipeLocacao = mapFipeToData(fipeData.locacao, 'FIPEZAP Locação', 'Índice FipeZAP de Locação Residencial');
     const fipeVenda = mapFipeToData(fipeData.venda, 'FIPEZAP Venda', 'Índice FipeZAP de Venda Residencial');
     const fipeYield = mapFipeToData(fipeData.yield, 'FIPEZAP Yield', 'Índice FipeZAP de Yield (Rentabilidade)');
+
+
+    // Prepare Minimum Wage Data
+    const minWageHistory: IndexValue[] = minWageData.map((mw: MinimumWageData) => ({
+        id: `mw-${mw.id}`,
+        year: mw.year,
+        month: mw.month,
+        reference_date: mw.reference_date,
+        value_percent: mw.amount_brl, // Use BRL amount for the chart to show growth
+        accumulated_12m: mw.variation_percent ?? 0, // Store % change here
+        accumulated_year: mw.variation_percent ?? 0,
+        is_projection: mw.is_projection,
+        source_url: null
+    })).sort((a, b) => new Date(b.reference_date).getTime() - new Date(a.reference_date).getTime());
+
+    const minWageIndexData: IndexData = {
+        meta: {
+            id: 'reajuste-salario-minimo',
+            code: 'REAJUSTE SALARIO MINIMO',
+            name: '',
+            source: 'Governo Federal',
+            frequency: 'Anual',
+            category: 'other',
+            is_official: true
+        },
+        history: minWageHistory.slice(0, 12), // Pass last 12 records
+        latest: minWageHistory[0]
+    };
 
 
     // Define categories and grouping logic
@@ -123,6 +155,8 @@ export default async function PanoramaPage({ params }: { params: Promise<{ lang:
             // Skip generic FipeZap from DB in favor of our manual ones
         } else if (['SELIC', 'CDI', 'TR', 'POUPANCA'].includes(code)) {
             categories.interest.push(data);
+        } else if (['REAJUSTESALARIOMINIMO', 'SALARIOMINIMO'].includes(code)) {
+            // Skip empty generic fetch for MW, we inject manual below
         } else {
             categories.other.push(data);
         }
@@ -133,6 +167,9 @@ export default async function PanoramaPage({ params }: { params: Promise<{ lang:
     categories.rent.push(fipeVenda);
     categories.rent.push(fipeYield);
 
+    // Inject manual Minimum Wage
+    categories.other.push(minWageIndexData);
+
     const currentTitles = categoryTitles[lang as string] || categoryTitles['pt'];
 
     // Schema.org Structured Data
@@ -141,7 +178,7 @@ export default async function PanoramaPage({ params }: { params: Promise<{ lang:
         '@type': 'DataCatalog',
         name: 'Panorama Econômico Kitnets',
         description: 'Visão geral dos principais indicadores econômicos do Brasil (IPCA, IGP-M, SELIC, etc).',
-        dataset: [...indexesData, fipeLocacao, fipeVenda, fipeYield].map(({ meta }) => ({
+        dataset: [...indexesData, fipeLocacao, fipeVenda, fipeYield, minWageIndexData].map(({ meta }) => ({
             '@type': 'Dataset',
             name: `${meta.code} - ${meta.name}`,
             description: `Dados históricos e variações do índice ${meta.code}.`
@@ -174,21 +211,30 @@ export default async function PanoramaPage({ params }: { params: Promise<{ lang:
                                     // const trend = getTrend(current, previous);
                                     // const ChartIcon = trend.icon;
 
-                                    const displayValue = latest ? `${latest.value_percent.toFixed(2)}%` : '-';
-                                    const displayAccumulated = latest?.accumulated_12m != null ? `${latest.accumulated_12m.toFixed(2)}%` : '-';
+                                    const isMinWage = meta.id === 'reajuste-salario-minimo';
 
-                                    // Heatmap-aligned color logic
-                                    const getChartColor = (val: number) => {
-                                        if (val > 0.5) return '#ef4444'; // Red (High Inflation/Value)
-                                        if (val > 0.1) return '#f59e0b'; // Amber (Moderate)
-                                        if (val >= -0.1) return '#6b7280'; // Gray (Neutral)
-                                        return '#10b981'; // Emerald (Low/Negative)
-                                    };
+                                    let displayValue = latest ? `${latest.value_percent.toFixed(2)}%` : '-';
+                                    let displayAccumulated = latest?.accumulated_12m != null ? `${latest.accumulated_12m.toFixed(2)}%` : '-';
+                                    let chartColor = '#10b981'; // Default emerald
 
-                                    const chartColor = getChartColor(current);
+                                    if (isMinWage) {
+                                        // Minimum Wage Special Display
+                                        displayValue = latest ? latest.value_percent.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-';
+                                        displayAccumulated = latest?.accumulated_12m != null ? `${latest.accumulated_12m.toFixed(2)}%` : '-';
+                                        chartColor = '#10b981'; // Always green for salary growth
+                                    } else {
+                                        // Standard Logic
+                                        const getChartColor = (val: number) => {
+                                            if (val > 0.5) return '#ef4444'; // Red (High Inflation/Value)
+                                            if (val > 0.1) return '#f59e0b'; // Amber (Moderate)
+                                            if (val >= -0.1) return '#6b7280'; // Gray (Neutral)
+                                            return '#10b981'; // Emerald (Low/Negative)
+                                        };
+                                        chartColor = getChartColor(current);
+                                    }
 
                                     // Determine link: Special case for FipeZap sub-types -> go to main FipeZap page
-                                    let href = lang === 'pt' ? `/indices/${meta.code.toLowerCase()}` : `/${lang}/indices/${meta.code.toLowerCase()}`;
+                                    let href = lang === 'pt' ? `/indices/${meta.code.toLowerCase().replace(/\s+/g, '-')}` : `/${lang}/indices/${meta.code.toLowerCase().replace(/\s+/g, '-')}`;
                                     if (meta.code.includes('FIPEZAP')) {
                                         // Normalize to fipezap base link with params maybe? Or just base page. 
                                         // Existing page /indices/fipezap handles params.
@@ -215,9 +261,11 @@ export default async function PanoramaPage({ params }: { params: Promise<{ lang:
                                                                 </span>
                                                             )}
                                                         </div>
-                                                        <p className="text-sm text-muted-foreground line-clamp-1" title={meta.name}>
-                                                            {meta.name}
-                                                        </p>
+                                                        {meta.name && (
+                                                            <p className="text-sm text-muted-foreground line-clamp-1" title={meta.name}>
+                                                                {meta.name}
+                                                            </p>
+                                                        )}
                                                     </div>
                                                     <Link href={href} className="text-muted-foreground hover:text-primary transition-colors">
                                                         <ArrowRight className="h-5 w-5" />
@@ -232,16 +280,15 @@ export default async function PanoramaPage({ params }: { params: Promise<{ lang:
                                                 <div className="grid grid-cols-2 gap-4 pt-4 border-t">
                                                     <div>
                                                         <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">
-                                                            No Mês ({latest?.month.toString().padStart(2, '0')}/{latest?.year})
+                                                            {isMinWage ? 'Valor Atual' : `No Mês (${latest?.month.toString().padStart(2, '0')}/${latest?.year})`}
                                                         </p>
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-2xl font-bold">{displayValue}</span>
-                                                            {/* <ChartIcon className={`h-4 w-4 ${trend.color}`} /> */}
+                                                            <span className={`font-bold ${isMinWage ? 'text-xl' : 'text-2xl'}`}>{displayValue}</span>
                                                         </div>
                                                     </div>
                                                     <div className="text-right">
                                                         <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">
-                                                            Acumulado 12m
+                                                            {isMinWage ? 'Reajuste' : 'Acumulado 12m'}
                                                         </p>
                                                         <span className="text-2xl font-bold text-primary">
                                                             {displayAccumulated}

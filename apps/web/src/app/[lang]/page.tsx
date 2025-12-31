@@ -11,7 +11,13 @@ export async function generateMetadata({ params }: { params: Promise<{ lang: "en
         title: dict.home.welcome + " — " + dict.home.subtitle.split('.')[0], // "Bem-vindo ao Kitnets.com — A plataforma de IA para gestão de kitnets e studios"
         description: dict.home.subtitle,
         alternates: {
-            canonical: `https://kitnets.com/${lang}`,
+            canonical: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://kitnets.com'}/${lang}`,
+            languages: {
+                'pt': `${process.env.NEXT_PUBLIC_BASE_URL || 'https://kitnets.com'}/pt`,
+                'en': `${process.env.NEXT_PUBLIC_BASE_URL || 'https://kitnets.com'}/en`,
+                'es': `${process.env.NEXT_PUBLIC_BASE_URL || 'https://kitnets.com'}/es`,
+                'x-default': `${process.env.NEXT_PUBLIC_BASE_URL || 'https://kitnets.com'}/pt`,
+            },
         }
     };
 }

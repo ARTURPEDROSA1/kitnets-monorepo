@@ -24,11 +24,11 @@ export async function saveCalculatorLead(data: {
 
     try {
         const { error } = await supabase
-            .from("calculator_leads")
+            .from("leads")
             .insert({
                 name,
                 email,
-                calculator_type: calculatorType,
+                source: calculatorType,
                 location: location || {},
             });
 
