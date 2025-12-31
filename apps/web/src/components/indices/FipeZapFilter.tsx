@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Filter } from "lucide-react";
+import { LeadCaptureModal } from "./LeadCaptureModal";
 
 export interface FipeZapFilterProps {
     defaultType?: string;
@@ -39,6 +40,8 @@ export function FipeZapFilter({
     // Check if dirty state (different from URL) for "Apply" button visualization? 
     // Spec says "When user clicks Apply". 
 
+    const [showModal, setShowModal] = useState(false);
+
     const createQueryString = useCallback(
         (t: string, b: string, s: string, e: string) => {
             const params = new URLSearchParams(searchParams.toString());
@@ -63,9 +66,18 @@ export function FipeZapFilter({
         [searchParams]
     );
 
-    const handleApply = () => {
+    const applyFilter = () => {
         const queryString = createQueryString(type, bedrooms, startDate, endDate);
         router.push(`${pathname}?${queryString}`, { scroll: false });
+    };
+
+    const handleFilterClick = () => {
+        const isVerified = getCookie("kitnets_lead_verified");
+        if (isVerified) {
+            applyFilter();
+        } else {
+            setShowModal(true);
+        }
     };
 
     const handleClear = () => {
@@ -144,7 +156,7 @@ export function FipeZapFilter({
                 </div>
 
                 <div className="flex items-center gap-2 pt-2 border-t mt-1">
-                    <Button onClick={handleApply} className="flex-1 md:flex-none md:w-32 bg-primary">
+                    <Button onClick={handleFilterClick} className="flex-1 md:flex-none md:w-32 bg-primary">
                         <Filter className="mr-2 h-4 w-4" />
                         Aplicar
                     </Button>
@@ -153,6 +165,23 @@ export function FipeZapFilter({
                     </Button>
                 </div>
             </div>
+
+            <LeadCaptureModal
+                isOpen={showModal}
+                onClose={(success) => {
+                    setShowModal(false);
+                    if (success) {
+                        applyFilter();
+                    }
+                }}
+            />
         </div>
     );
+}
+
+function getCookie(name: string): string | undefined {
+    if (typeof document === "undefined") return undefined;
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop()?.split(';').shift();
 }
