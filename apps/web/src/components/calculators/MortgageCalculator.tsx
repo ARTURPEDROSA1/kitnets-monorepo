@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { calculateMortgageWithComparisons, MortgageInputs, System, ExtraPayment, AmortizationEffect } from '@/lib/mortgage';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
-import { Trash2, Plus, Settings, TrendingDown, Maximize2, Minimize2, FileSpreadsheet, FileText, Lock, User, Mail, CheckCircle2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
-import { saveLead } from "@/app/actions/capture-lead";
+import { Trash2, Plus, Settings, TrendingDown, Maximize2, Minimize2, FileSpreadsheet, FileText, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { useCalculatorLeadCapture } from "@/hooks/useCalculatorLeadCapture";
+import LeadCaptureModal from "@/components/calculators/LeadCaptureModal";
 
 // UI Helpers using Semantic Colors
 const Card = ({ children, className = "" }: { children: React.ReactNode, className?: string }) => (
@@ -89,95 +90,7 @@ const MoneyInput = ({ value, onChange, className, ...props }: { value: number | 
     );
 };
 
-function LeadCaptureModal({ isOpen, onCapture }: { isOpen: boolean; onCapture: () => void }) {
-    const [name, setName] = useState("");
-    const [email, setEmail] = useState("");
-    const [loading, setLoading] = useState(false);
 
-    if (!isOpen) return null;
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setLoading(true);
-
-        try {
-            await saveLead({
-                name,
-                email,
-                source: "mortgage-amortization-calculator"
-            });
-            onCapture();
-        } catch (error) {
-            console.error("Lead capture error:", error);
-            onCapture();
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-            <div className="bg-background rounded-xl shadow-2xl w-full max-w-md overflow-hidden border animate-in zoom-in-95 duration-300">
-                <div className="bg-muted/30 p-6 border-b">
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2 bg-primary/10 rounded-full">
-                            <Lock className="w-5 h-5 text-primary" />
-                        </div>
-                        <h3 className="text-xl font-bold">Desbloquear Análise Completa</h3>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                        Identificamos que você está personalizando sua simulação. Para continuar explorando os resultados detalhados, precisamos confirmar que você não é um robô.
-                    </p>
-                </div>
-
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                    <div className="space-y-2">
-                        <Label>Seu Nome</Label>
-                        <div className="relative">
-                            <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                placeholder="Como podemos te chamar?"
-                                className="pl-9"
-                                required
-                                autoComplete="name"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                    <div className="space-y-2">
-                        <Label>Seu Melhor E-mail</Label>
-                        <div className="relative">
-                            <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                type="email"
-                                placeholder="exemplo@email.com"
-                                className="pl-9"
-                                required
-                                autoComplete="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                            />
-                        </div>
-                    </div>
-
-                    <div className="pt-2">
-                        <Button type="submit" className="w-full h-12 text-lg">
-                            {loading ? "Confirmando..." : "Confirmar e Continuar"}
-                        </Button>
-                    </div>
-
-                    <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg mt-4">
-                        <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
-                        <p>
-                            Fique tranquilo! Você será adicionado à nossa newsletter para receber dicas de investimento. Cancelamento a qualquer momento.
-                        </p>
-                    </div>
-                </form>
-            </div>
-        </div>
-    );
-}
 
 export function MortgageCalculator() {
     // State
@@ -204,31 +117,29 @@ export function MortgageCalculator() {
     // UI State for FGTS Plan
     const [fgtsSimulationAmount, setFgtsSimulationAmount] = useState<number | string>(8000);
 
-    // Lead Capture State
-    // Lead Capture State
-    const [modifiedFields, setModifiedFields] = useState<Set<string>>(new Set());
-    const [isLeadCaptured, setIsLeadCaptured] = useState(false);
+    // Lead Capture Hook
+    const {
+        isModalOpen,
+        setIsModalOpen,
+        leadMetadata,
+        trackInteraction,
+        checkAdvancedTrigger,
+        checkExportTrigger
+    } = useCalculatorLeadCapture({
+        calculatorType: "calculadora-amortizacao-financiamento-imobiliario",
+        isSimpleCalculator: false
+    });
 
-    useEffect(() => {
-        const hasCookie = document.cookie.split('; ').some(row => row.trim().startsWith('kitnets_user_identified='));
-        if (hasCookie) {
-            setIsLeadCaptured(true);
-        }
-    }, []);
+    const interactionCountRef = React.useRef(0);
 
-    const trackModification = (fieldId: string) => {
-        if (isLeadCaptured) return;
-        if (!modifiedFields.has(fieldId)) {
-            setModifiedFields(prev => {
-                const newSet = new Set(prev);
-                newSet.add(fieldId);
-                return newSet;
-            });
+    const handleInteraction = () => {
+        trackInteraction();
+        interactionCountRef.current += 1;
+        // Trigger lead capture after 5 interactions
+        if (interactionCountRef.current > 5) {
+            checkAdvancedTrigger();
         }
     };
-
-    // Show modal only after 3 modifications
-    const showLeadModal = !isLeadCaptured && modifiedFields.size >= 3;
 
     // Derived Input
     const financedAmount = Number(propertyValue) - Number(downPayment);
@@ -329,6 +240,7 @@ export function MortgageCalculator() {
     };
 
     const exportToCSV = () => {
+        if (checkExportTrigger('csv')) return;
         const headers = ["Mês", "Parcela", "Amortização", "Juros", "Seguros", "Amort. Extra", "Saldo Devedor"];
         const rows = result.schedule.map(row => [
             row.month,
@@ -356,16 +268,17 @@ export function MortgageCalculator() {
     };
 
     const handlePrint = () => {
+        if (checkExportTrigger('print')) return;
         window.print();
     };
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             <LeadCaptureModal
-                isOpen={showLeadModal}
-                onCapture={() => {
-                    setIsLeadCaptured(true);
-                }}
+                open={isModalOpen}
+                onOpenChange={setIsModalOpen}
+                calculatorType="calculadora-amortizacao-financiamento-imobiliario"
+                leadMetadata={leadMetadata}
             />
             {/* Left Column: Inputs */}
             <div className="lg:col-span-4 space-y-6">
@@ -381,7 +294,7 @@ export function MortgageCalculator() {
                             value={propertyValue}
                             onChange={setPropertyValue}
                             className="mt-1"
-                            onBlur={() => trackModification('propertyValue')}
+                            onBlur={() => handleInteraction()}
                         />
 
                     </div>
@@ -396,7 +309,7 @@ export function MortgageCalculator() {
                             }}
                             className="mt-1"
                             onBlur={() => {
-                                trackModification('downPayment');
+                                handleInteraction();
                                 handleDownPaymentBlur();
                             }}
                         />
@@ -419,7 +332,7 @@ export function MortgageCalculator() {
                                 className="w-full mt-1 flex h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
                                 value={system}
                                 onChange={(e) => setSystem(e.target.value as System)}
-                                onBlur={() => trackModification('system')}
+                                onBlur={() => handleInteraction()}
                             >
                                 <option value="SAC">SAC</option>
                                 <option value="PRICE">PRICE</option>
@@ -432,7 +345,7 @@ export function MortgageCalculator() {
                                 value={termMonths}
                                 onChange={e => setTermMonths(e.target.value === '' ? '' : Number(e.target.value))}
                                 className="mt-1"
-                                onBlur={() => trackModification('termMonths')}
+                                onBlur={() => handleInteraction()}
                             />
                         </div>
                     </div>
@@ -445,7 +358,7 @@ export function MortgageCalculator() {
                             value={annualInterestRate}
                             onChange={e => setAnnualInterestRate(e.target.value === '' ? '' : Number(e.target.value))}
                             className="mt-1"
-                            onBlur={() => trackModification('annualInterestRate')}
+                            onBlur={() => handleInteraction()}
                         />
                         <p className="text-xs text-muted-foreground mt-1">
                             Mensal equivalente: {((Math.pow(1 + Number(annualInterestRate) / 100, 1 / 12) - 1) * 100).toFixed(4)}%
@@ -465,7 +378,7 @@ export function MortgageCalculator() {
                                     value={mipRate}
                                     onChange={e => setMipRate(e.target.value === '' ? '' : Number(e.target.value))}
                                     className="mt-1"
-                                    onBlur={() => trackModification('mipRate')}
+                                    onBlur={() => handleInteraction()}
                                 />
                             </div>
                             <div>
@@ -476,7 +389,7 @@ export function MortgageCalculator() {
                                     value={dfiRate}
                                     onChange={e => setDfiRate(e.target.value === '' ? '' : Number(e.target.value))}
                                     className="mt-1"
-                                    onBlur={() => trackModification('dfiRate')}
+                                    onBlur={() => handleInteraction()}
                                 />
                             </div>
                         </div>

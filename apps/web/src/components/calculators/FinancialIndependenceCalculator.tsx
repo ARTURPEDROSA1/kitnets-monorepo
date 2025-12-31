@@ -24,16 +24,9 @@ import {
     YAxis
 } from "recharts";
 import { Button } from "@/components/ui/button";
-import { useUser } from "@clerk/nextjs";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog";
 import { Lock } from "lucide-react";
+import { useCalculatorLeadCapture } from "@/hooks/useCalculatorLeadCapture";
+import LeadCaptureModal from "@/components/calculators/LeadCaptureModal";
 
 import { Dictionary } from "@/dictionaries";
 
@@ -84,7 +77,30 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
     const edu = dict.financialIndependenceCalculator?.educationalContent;
     const tCapture = dict.leadCapture;
 
-    const { user } = useUser();
+
+
+    // Lead Capture Hook
+    const {
+        isModalOpen,
+        setIsModalOpen,
+        leadMetadata,
+        trackInteraction,
+        checkAdvancedTrigger
+    } = useCalculatorLeadCapture({
+        calculatorType: "calculadora-independencia-financeira",
+        isSimpleCalculator: false
+    });
+
+    const interactionCountRef = React.useRef(0);
+
+    const handleInteraction = () => {
+        trackInteraction();
+        interactionCountRef.current += 1;
+        // Trigger lead capture after 5 interactions
+        if (interactionCountRef.current > 5) {
+            checkAdvancedTrigger();
+        }
+    };
 
 
     // State
@@ -101,80 +117,9 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
     const [withdrawalRealReturnAnnual, setWithdrawalRealReturnAnnual] = React.useState<string>("4");
 
     // Toggle
-    // Toggle
     const [isRealMode, setIsRealMode] = React.useState<boolean>(true);
     const [sortConfig, setSortConfig] = React.useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
     const [sortWithdrawalConfig, setSortWithdrawalConfig] = React.useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
-
-    // Lead Capture State
-    const [usageCount, setUsageCount] = React.useState(0);
-    const [showCapture, setShowCapture] = React.useState(false);
-    const [hasCaptured, setHasCaptured] = React.useState(false);
-    const [name, setName] = React.useState("");
-    const [email, setEmail] = React.useState("");
-
-    const debounceTimer = React.useRef<NodeJS.Timeout | null>(null);
-    const isFirstRender = React.useRef(true);
-
-    // Check cookie
-    React.useEffect(() => {
-        const capturedCookie = document.cookie.split('; ').find(row => row.startsWith('lead_captured='));
-        if (capturedCookie) {
-            setHasCaptured(true);
-        }
-    }, []);
-
-    // Prefill user
-    React.useEffect(() => {
-        if (user) {
-            if (user.fullName) setName(user.fullName);
-            if (user.primaryEmailAddress?.emailAddress) setEmail(user.primaryEmailAddress.emailAddress);
-        }
-    }, [user]);
-
-    // Usage Tracking
-    React.useEffect(() => {
-        if (isFirstRender.current) {
-            isFirstRender.current = false;
-            return;
-        }
-
-        if (debounceTimer.current) clearTimeout(debounceTimer.current);
-
-        // If not captured, and user is interacting, increment count debounced
-        // We trigger this effect when inputs change (dependencies).
-        // But we only increment if not captured.
-        // Also if usageCount >= 2, we theoretically shouldn't have reached here if we blocked input, 
-        // but if they manage to edit, we don't need to increment further to avoid loops.
-
-        if (!hasCaptured) {
-            debounceTimer.current = setTimeout(() => {
-                setUsageCount(prev => prev + 1);
-            }, 500);
-        }
-
-        return () => {
-            if (debounceTimer.current) clearTimeout(debounceTimer.current);
-        };
-    }, [initialCapital, monthlyContribution, years, nominalReturn, inflation, taxRate, withdrawalYears, withdrawalRealReturnAnnual, hasCaptured]);
-
-    const checkCap = () => {
-        if (!hasCaptured && usageCount >= 2) {
-            setShowCapture(true);
-            return false;
-        }
-        return true;
-    };
-
-    const handleCaptureSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        const date = new Date();
-        date.setTime(date.getTime() + (365 * 24 * 60 * 60 * 1000));
-        document.cookie = `lead_captured=true; expires=${date.toUTCString()}; path=/`;
-        setHasCaptured(true);
-        setShowCapture(false);
-        setUsageCount(0); // Reset
-    };
 
     // Parsed values
     const initialCapitalVal = parseFloat(initialCapital) || 0;
@@ -409,46 +354,12 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
     return (
         <div className="space-y-12">
 
-            <Dialog open={showCapture} onOpenChange={setShowCapture}>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>{tCapture?.title || "Desbloqueie todas as funcionalidades"}</DialogTitle>
-                        <DialogDescription>
-                            {tCapture?.description || "Receba dicas exclusivas do mercado financeiro e imobiliário."}
-                        </DialogDescription>
-                    </DialogHeader>
-                    <form onSubmit={handleCaptureSubmit} className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="lead-name" className="sr-only">Name</Label>
-                            <Input
-                                id="lead-name"
-                                placeholder={tCapture?.namePlaceholder || "Seu nome"}
-                                required
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="lead-email" className="sr-only">Email</Label>
-                            <Input
-                                id="lead-email"
-                                type="email"
-                                placeholder={tCapture?.emailPlaceholder || "Seu email"}
-                                required
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                            />
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Lock className="h-3 w-3" />
-                            <span>{tCapture?.privacyNote || "Seus dados estão seguros."}</span>
-                        </div>
-                        <DialogFooter>
-                            <Button type="submit" className="w-full">{tCapture?.submit || "Continuar"}</Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
+            <LeadCaptureModal
+                open={isModalOpen}
+                onOpenChange={setIsModalOpen}
+                calculatorType="calculadora-independencia-financeira"
+                leadMetadata={leadMetadata}
+            />
 
             {/* Disclaimer / Global Toggle */}
             <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-muted/30 p-4 rounded-xl border border-border">
@@ -488,14 +399,14 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
                                 <Label>{t?.initialCapital}</Label>
                                 <MoneyInput
                                     value={initialCapital}
-                                    onChange={(val) => { if (checkCap()) setInitialCapital(val.toString()); }}
+                                    onChange={(val) => { handleInteraction(); setInitialCapital(val.toString()); }}
                                 />
                             </div>
                             <div className="space-y-2">
                                 <Label>{t?.monthlyContribution}</Label>
                                 <MoneyInput
                                     value={monthlyContribution}
-                                    onChange={(val) => { if (checkCap()) setMonthlyContribution(val.toString()); }}
+                                    onChange={(val) => { handleInteraction(); setMonthlyContribution(val.toString()); }}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -503,7 +414,7 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
                                 <Input
                                     type="number"
                                     value={years}
-                                    onChange={(e) => { if (checkCap()) setYears(e.target.value); }}
+                                    onChange={(e) => { handleInteraction(); setYears(e.target.value); }}
                                 />
                             </div>
                             <div className="grid grid-cols-2 gap-4 items-start">
@@ -512,7 +423,7 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
                                     <Input
                                         type="number"
                                         value={nominalReturn}
-                                        onChange={(e) => { if (checkCap()) setNominalReturn(e.target.value); }}
+                                        onChange={(e) => { handleInteraction(); setNominalReturn(e.target.value); }}
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -525,7 +436,7 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
                                     <Input
                                         type="number"
                                         value={inflation}
-                                        onChange={(e) => { if (checkCap()) setInflation(e.target.value); }}
+                                        onChange={(e) => { handleInteraction(); setInflation(e.target.value); }}
                                         className={isInflationError ? "border-red-500" : ""}
                                     />
                                 </div>
@@ -543,7 +454,7 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
                                         <Info className="h-3 w-3 text-muted-foreground" />
                                     </span>
                                 </Label>
-                                <Select value={taxRate} onValueChange={(val) => { if (checkCap()) setTaxRate(val); }}>
+                                <Select value={taxRate} onValueChange={(val) => { handleInteraction(); setTaxRate(val); }}>
                                     <SelectTrigger>
                                         <SelectValue />
                                     </SelectTrigger>
@@ -569,7 +480,7 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
                                     <Input
                                         type="number"
                                         value={withdrawalYears}
-                                        onChange={(e) => { if (checkCap()) setWithdrawalYears(e.target.value); }}
+                                        onChange={(e) => { handleInteraction(); setWithdrawalYears(e.target.value); }}
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -577,7 +488,7 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
                                     <Input
                                         type="number"
                                         value={withdrawalRealReturnAnnual}
-                                        onChange={(e) => { if (checkCap()) setWithdrawalRealReturnAnnual(e.target.value); }}
+                                        onChange={(val) => { handleInteraction(); setWithdrawalRealReturnAnnual(val.toString()); }}
                                         className="mt-auto"
                                     />
                                 </div>
