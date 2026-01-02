@@ -45,6 +45,10 @@ const staticRoutes = [
     'calculadoras/multa-rescisao-contrato-aluguel',
     'conteudos',
     'conteudos/impostos-e-legislacao',
+    'conteudos/salario-e-renda',
+    'conteudos/salario-e-renda/salario-minimo-2026',
+    'conteudos/impostos-e-legislacao/renda-fixa-reforma-imposto-de-renda',
+    'conteudos/impostos-e-legislacao/imposto-sobre-dividendos',
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

@@ -42,7 +42,7 @@ export default async function AuthorPage({ params }: { params: Promise<{ lang: s
                     <div className="flex flex-wrap gap-4 text-sm text-muted-foreground pt-2">
                         <div className="flex items-center gap-1.5">
                             <MapPin className="h-4 w-4" />
-                            <span>São Paulo, Brasil</span>
+                            <span>Belo Horizonte, Brasil</span>
                         </div>
                         <a href="https://kitnets.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-primary transition-colors">
                             <Globe className="h-4 w-4" />

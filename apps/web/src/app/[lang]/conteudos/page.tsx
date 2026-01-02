@@ -52,6 +52,25 @@ export default async function ContentsPage({ params }: { params: Promise<{ lang:
                                 'Everything about taxes, laws, and regulations for kitnets and compact properties.'}
                     </p>
                 </Link>
+
+                <Link
+                    href={`/${lang}/conteudos/salario-e-renda`}
+                    className="block group relative overflow-hidden rounded-xl border border-border bg-card p-6 shadow-sm transition-all hover:shadow-md hover:border-primary/50"
+                >
+                    <div className="flex items-center gap-4 mb-4">
+                        <div className="p-3 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                            <FileText className="h-6 w-6" />
+                        </div>
+                        <h2 className="text-xl font-semibold group-hover:text-primary transition-colors">
+                            {dict.menu.salariesAndIncome}
+                        </h2>
+                    </div>
+                    <p className="text-muted-foreground">
+                        {lang === 'pt' ? 'Notícias e análises sobre o salário mínimo, renda e indicadores econômicos.' :
+                            lang === 'es' ? 'Noticias y análisis sobre el salario mínimo, ingresos e indicadores económicos.' :
+                                'News and analysis on minimum wage, income, and economic indicators.'}
+                    </p>
+                </Link>
             </div>
         </div>
     );
