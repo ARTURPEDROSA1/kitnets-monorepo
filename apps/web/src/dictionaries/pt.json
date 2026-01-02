@@ -1015,6 +1015,7 @@
         "inputs": {
             "initialCapital": "Valor inicial",
             "recurringContribution": "Aporte periódico",
+            "annualIncreaseRate": "Aumento anual do aporte (%)",
             "interestRate": "Taxa de juros",
             "period": "Período",
             "frequency": {
@@ -1046,6 +1047,7 @@
             "interest": "Juros",
             "accumulatedInterest": "Juros Acum.",
             "invested": "Investido",
+            "contribution": "Aporte",
             "total": "Total"
         },
         "actions": {
@@ -1972,8 +1974,8 @@
             "fineTypeFixed": "Valor fixo",
             "finePathLabel": "Como a multa é definida no contrato?",
             "finePathFixed": "Multa fixa (integral, sem proporcionalidade)",
-            "finePathProportional": "Multa proporcional ao prazo restante (Lei do Inquilinato)",
-            "finePathConditional": "Multa condicional (período + aviso prévio)",
+            "finePathProportional": "Multa proporcional ao prazo restante",
+            "finePathConditional": "Multa condicional (Num. meses + aviso prévio)",
             "finePathUnknown": "Não sei / Simular cenários",
             "minPeriod": "Período de permanência mínima (meses)",
             "noticeRequired": "Aviso prévio exigido (dias)",
@@ -1984,11 +1986,6 @@
             "scenarioConditional": "Cenário C: Condicional (Ex: 12 meses)",
             "noticeRentDue": "Aluguel ref. Aviso (Devido)",
             "legalBase": "Base Legal",
-            "legalBaseProportional": "Art. 4º Lei 8.245/91 + Art. 571 V CC",
-            "warningNotice": "Atenção: Multa aplicada por falta de aviso prévio integral.",
-            "warningFixed": "Atenção: Este cálculo desconsidera a proporcionalidade legal.",
-            "conditionalExemption": "Isenção (Prazo + Aviso cumpridos)",
-            "conditionalApplied": "Multa aplicada (Antes do prazo ou s/ aviso)",
             "fineMonths": "Quantidade de meses de multa",
             "fineFixedValue": "Valor fixo da multa (R$)",
             "calculate": "Calcular multa de rescisão"
@@ -2008,6 +2005,16 @@
             "dailyFormula": "Fórmula diária",
             "proportionalFine": "Multa proporcional",
             "finalFormula": "Fórmula final",
+            "legalBaseProportional": "Art. 4º Lei 8.245/91 + Art. 571 CC",
+            "warningNotice": "Atenção: Multa aplicada por falta de aviso prévio integral.",
+            "warningFixed": "Atenção: Este cálculo desconsidera a proporcionalidade (Multa Cheia).",
+            "conditionalExemption": "Isenção (Prazo + Aviso cumpridos)",
+            "conditionalApplied": "Multa aplicada (Antes do prazo ou s/ aviso)",
+            "scenarioTitle": "Resultados da Simulação",
+            "scenarioFixed": "Cenário A: Multa Integral",
+            "scenarioProportional": "Cenário B: Multa Proporcional",
+            "scenarioConditional": "Cenário C: Condicional",
+            "marketPractice": "Prática de Mercado",
             "methodologyTitle": "Como esse valor foi calculado",
             "methodologyText": "A multa contratual total é de <strong>{totalFine}</strong>.<br/>Considerando um contrato de {durationMonths} meses ({totalDays} dias), o valor diário da multa é de <strong>{dailyFine}</strong>.<br/>Como restavam {daysRemaining} dias para o término do contrato na data da entrega das chaves, a multa proporcional é de <strong>{proportionalFine}</strong>."
         },
