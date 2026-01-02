@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useParams } from "next/navigation";
 import { getDictionary } from "@/dictionaries";
 import {
@@ -47,6 +47,7 @@ const INDEX_COLORS: Record<string, string> = {
     INPC: "#2563eb", // blue-600
     IVAR: "#9333ea", // purple-600
     FipeZap: "#db2777", // pink-600
+    "REAJUSTE-SALARIO-MINIMO": "#eab308", // yellow-600
 };
 
 // Helper: Format Currency
@@ -65,6 +66,110 @@ const formatPercent = (value: number) => {
         maximumFractionDigits: 2,
     }).format(value / 100);
 };
+
+
+
+function BrazilianDateInput({
+    value,
+    onChange,
+    className,
+    ...props
+}: {
+    value: string;
+    onChange: (val: string) => void;
+    className?: string;
+} & Omit<React.ComponentProps<typeof Input>, "onChange" | "value">) {
+    const [text, setText] = useState("");
+    const [lastValue, setLastValue] = useState(value);
+
+    // Sync prop to text during render (derived state pattern)
+    if (value !== lastValue) {
+        setLastValue(value);
+        if (value) {
+            const [y, m, d] = value.split("-");
+            if (y && m && d) {
+                setText(`${d}/${m}/${y}`);
+            } else {
+                setText("");
+            }
+        } else {
+            setText("");
+        }
+    }
+
+    const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        let val = e.target.value.replace(/\D/g, "");
+        if (val.length > 8) val = val.slice(0, 8);
+
+        let formatted = val;
+        if (val.length >= 3) {
+            formatted = `${val.slice(0, 2)}/${val.slice(2)}`;
+        }
+        if (val.length >= 5) {
+            formatted = `${val.slice(0, 2)}/${val.slice(2, 4)}/${val.slice(4)}`;
+        }
+        setText(formatted);
+
+        // Emit change if valid full date or empty
+        if (val.length === 8) {
+            const d = val.slice(0, 2);
+            const m = val.slice(2, 4);
+            const y = val.slice(4);
+            // Basic validation (optional but good)
+            const numD = parseInt(d);
+            const numM = parseInt(m);
+            if (numD > 0 && numD <= 31 && numM > 0 && numM <= 12) {
+                onChange(`${y}-${m}-${d}`);
+            }
+        } else if (val.length === 0) {
+            onChange("");
+        }
+    };
+
+    const dateInputRef = useRef<HTMLInputElement>(null);
+    const triggerPicker = () => {
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (dateInputRef.current as any)?.showPicker();
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    return (
+        <div className="relative">
+            <Input
+                {...props}
+                type="text"
+                inputMode="numeric"
+                value={text}
+                onChange={handleTextChange}
+                onClick={triggerPicker}
+                className={`${className} text-base md:text-sm pr-10`}
+                placeholder="dd/mm/aaaa"
+                maxLength={10}
+            />
+            <div
+                className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-muted-foreground hover:text-foreground p-1"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    triggerPicker();
+                }}
+            >
+                <Calendar className="w-4 h-4" />
+            </div>
+            <input
+                type="date"
+                ref={dateInputRef}
+                className="opacity-0 absolute bottom-0 right-0 w-0 h-0 overflow-hidden pointer-events-none"
+                onChange={(e) => onChange(e.target.value)}
+                value={value || ""}
+                tabIndex={-1}
+                aria-hidden="true"
+            />
+        </div>
+    );
+}
 
 
 
@@ -110,6 +215,7 @@ export default function RentAdjustmentCalculatorClient() {
     // View State
     const [viewMode, setViewMode] = useState<"chart" | "table">("chart");
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+    const [calculationCount, setCalculationCount] = useState(0);
 
     // --- Computed Values ---
 
@@ -290,9 +396,13 @@ export default function RentAdjustmentCalculatorClient() {
                         if (found) {
                             val = found.value_percent;
                         } else {
-                            // Forecast logic: use last known value
-                            const lastKnown = fetchedData[fetchedData.length - 1];
-                            val = lastKnown ? lastKnown.value_percent : 0.5; // fallback
+                            if (selectedIndex === "REAJUSTE-SALARIO-MINIMO") {
+                                val = 0;
+                            } else {
+                                // Forecast logic: use last known value
+                                const lastKnown = fetchedData[fetchedData.length - 1];
+                                val = lastKnown ? lastKnown.value_percent : 0.5; // fallback
+                            }
                         }
 
                         accRate *= (1 + (val / 100));
@@ -358,11 +468,13 @@ export default function RentAdjustmentCalculatorClient() {
 
     const handleCalculate = () => {
         trackInteraction();
-        if (!hasVerifiedCookie) {
+        // Allow 2 free calculations (0 and 1). On 3rd (2), trigger gate if no cookie.
+        if (calculationCount >= 2 && !hasVerifiedCookie) {
             checkAdvancedTrigger();
             return;
         }
         performCalculation();
+        setCalculationCount((prev) => prev + 1);
     };
 
     const handleRentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -378,6 +490,7 @@ export default function RentAdjustmentCalculatorClient() {
                 onOpenChange={setIsModalOpen}
                 calculatorType="calculadora-reajuste-aluguel"
                 leadMetadata={leadMetadata}
+                forceCapture={calculationCount >= 2 && !hasVerifiedCookie}
             />
 
             {/* Header / SEO Area */}
@@ -418,10 +531,9 @@ export default function RentAdjustmentCalculatorClient() {
                                 <Label className="text-sm font-medium mb-1.5 block">
                                     Início do Contrato (ou último reajuste)
                                 </Label>
-                                <Input
-                                    type="date"
+                                <BrazilianDateInput
                                     value={startDate}
-                                    onChange={(e) => setStartDate(e.target.value)}
+                                    onChange={setStartDate}
                                     min="2023-01-01"
                                     className="w-full"
                                 />
@@ -502,6 +614,7 @@ export default function RentAdjustmentCalculatorClient() {
                                                 <SelectItem value="INPC">INPC (Renda Familiar)</SelectItem>
                                                 <SelectItem value="IVAR">IVAR (Residencial FGV)</SelectItem>
                                                 <SelectItem value="FipeZap">FipeZap (Mercado)</SelectItem>
+                                                <SelectItem value="REAJUSTE-SALARIO-MINIMO">Salário Mínimo (Nacional)</SelectItem>
                                             </SelectContent>
                                         </Select>
                                         <p className="text-xs text-muted-foreground mt-2">
@@ -509,6 +622,7 @@ export default function RentAdjustmentCalculatorClient() {
                                             {selectedIndex === "IGPM" && "Historicamente utilizado, mas pode sofrer grandes oscilações cambiais."}
                                             {selectedIndex === "INPC" && "Mede a variação para famílias com renda de 1 a 5 salários mínimos."}
                                             {selectedIndex === "IVAR" && "Índice específico da FGV para variação de aluguéis residenciais."}
+                                            {selectedIndex === "REAJUSTE-SALARIO-MINIMO" && "Reajuste baseado na variação percentual do Salário Mínimo Nacional."}
                                         </p>
                                     </div>
 

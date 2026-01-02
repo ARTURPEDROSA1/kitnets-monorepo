@@ -49,6 +49,7 @@ const staticRoutes = [
     'conteudos/salario-e-renda/salario-minimo-2026',
     'conteudos/impostos-e-legislacao/renda-fixa-reforma-imposto-de-renda',
     'conteudos/impostos-e-legislacao/imposto-sobre-dividendos',
+    'autor/artur-pedrosa',
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

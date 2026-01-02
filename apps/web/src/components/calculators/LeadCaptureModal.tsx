@@ -26,6 +26,7 @@ interface LeadCaptureModalProps {
         engagedSeconds: number;
         exportType?: string; // pdf, csv, copy, print
     };
+    forceCapture?: boolean;
 }
 
 export default function LeadCaptureModal({
@@ -33,6 +34,7 @@ export default function LeadCaptureModal({
     onOpenChange,
     calculatorType,
     leadMetadata,
+    forceCapture = false,
 }: LeadCaptureModalProps) {
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
@@ -106,7 +108,17 @@ export default function LeadCaptureModal({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md backdrop-blur-sm" onInteractOutside={(e) => e.preventDefault()}>
+            <DialogContent
+                className={`sm:max-w-md backdrop-blur-sm ${forceCapture ? "[&>button]:hidden" : ""}`}
+                onInteractOutside={(e) => {
+                    e.preventDefault();
+                }}
+                onEscapeKeyDown={(e) => {
+                    if (forceCapture) {
+                        e.preventDefault();
+                    }
+                }}
+            >
                 <DialogHeader>
                     <DialogTitle className="text-center">Desbloquear Análise Completa</DialogTitle>
                     <DialogDescription className="text-center pt-2">

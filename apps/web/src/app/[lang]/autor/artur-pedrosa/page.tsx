@@ -1,5 +1,5 @@
 import { getDictionary } from '@/dictionaries';
-import { Calendar, MapPin, Globe, FileText } from 'lucide-react';
+import { Calendar, MapPin, FileText } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -8,6 +8,14 @@ export async function generateMetadata({ params }: { params: Promise<{ lang: str
     return {
         title: `Artur Pedrosa - Fundador da Kitnets.com | Kitnets.com`,
         description: "Perfil de Artur Pedrosa, fundador da Kitnets.com e especialista em mercado imobiliário e finanças pessoais.",
+        alternates: {
+            canonical: `https://kitnets.com/${lang}/autor/artur-pedrosa`,
+            languages: {
+                'pt': 'https://kitnets.com/pt/autor/artur-pedrosa',
+                'en': 'https://kitnets.com/en/autor/artur-pedrosa',
+                'es': 'https://kitnets.com/es/autor/artur-pedrosa',
+            },
+        },
     };
 }
 
@@ -45,7 +53,13 @@ export default async function AuthorPage({ params }: { params: Promise<{ lang: s
                             <span>Belo Horizonte, Brasil</span>
                         </div>
                         <a href="https://kitnets.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-primary transition-colors">
-                            <Globe className="h-4 w-4" />
+                            <Image
+                                src="/icon.png"
+                                alt="Kitnets Logo"
+                                width={16}
+                                height={16}
+                                className="object-contain"
+                            />
                             <span>kitnets.com</span>
                         </a>
                         {/* 
@@ -66,6 +80,7 @@ export default async function AuthorPage({ params }: { params: Promise<{ lang: s
 
                 <div className="grid gap-6">
                     {/* Manual list of articles for now */}
+                    {/* Recent Articles List */}
                     <Link
                         href={`/${lang}/conteudos/impostos-e-legislacao/imposto-sobre-dividendos`}
                         className="group block p-6 rounded-xl border border-border bg-card hover:shadow-md transition-all hover:border-primary/50"
@@ -81,6 +96,42 @@ export default async function AuthorPage({ params }: { params: Promise<{ lang: s
                         </h3>
                         <p className="text-muted-foreground line-clamp-2">
                             O PL 1087/2025 redesenha a tributação da renda. Entenda as novas regras para dividendos, isenção até R$ 5 mil e imposto mínimo para altas rendas.
+                        </p>
+                    </Link>
+
+                    <Link
+                        href={`/${lang}/conteudos/impostos-e-legislacao/renda-fixa-reforma-imposto-de-renda`}
+                        className="group block p-6 rounded-xl border border-border bg-card hover:shadow-md transition-all hover:border-primary/50"
+                    >
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-semibold uppercase tracking-wider text-primary">Impostos e Legislação</span>
+                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Calendar className="h-3 w-3" /> 01 Jan 2026
+                            </span>
+                        </div>
+                        <h3 className="text-xl font-bold mb-2 group-hover:text-primary transition-colors">
+                            Como fica a renda fixa (CDB, Tesouro Direto e fundos) com a reforma do Imposto de Renda
+                        </h3>
+                        <p className="text-muted-foreground line-clamp-2">
+                            A reforma do Imposto de Renda não altera a tributação do CDB, mas muda o contexto para contribuintes de alta renda. Entenda o impacto do imposto mínimo.
+                        </p>
+                    </Link>
+
+                    <Link
+                        href={`/${lang}/conteudos/salario-e-renda/salario-minimo-2026`}
+                        className="group block p-6 rounded-xl border border-border bg-card hover:shadow-md transition-all hover:border-primary/50"
+                    >
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-semibold uppercase tracking-wider text-primary">Salário e Renda</span>
+                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Calendar className="h-3 w-3" /> 01 Jan 2026
+                            </span>
+                        </div>
+                        <h3 className="text-xl font-bold mb-2 group-hover:text-primary transition-colors">
+                            Salário mínimo 2026 no Brasil: valor, reajuste e impactos na economia
+                        </h3>
+                        <p className="text-muted-foreground line-clamp-2">
+                            O salário mínimo de 2026 foi fixado em R$ 1.621. Confira o reajuste de 6,79%, o ganho real e os impactos na economia e benefícios sociais.
                         </p>
                     </Link>
                 </div>
