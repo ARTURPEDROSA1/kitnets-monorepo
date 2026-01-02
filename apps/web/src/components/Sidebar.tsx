@@ -735,6 +735,15 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                                 <span className="ms-3 text-sm">{dict.menu.taxesAndLegislation}</span>
                                             </Link>
                                         </li>
+                                        <li>
+                                            <Link
+                                                href={lang === 'pt' ? '/conteudos/salario-e-renda' : `/${lang}/conteudos/salario-e-renda`}
+                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                            >
+                                                <FileText className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                <span className="ms-3 text-sm">{dict.menu.salariesAndIncome}</span>
+                                            </Link>
+                                        </li>
                                     </ul>
                                 </div>
                             </div>

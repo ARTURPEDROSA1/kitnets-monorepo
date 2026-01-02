@@ -54,7 +54,8 @@
         "rentCategory": "Rent",
         "investment": "Investment",
         "contents": "Contents",
-        "taxesAndLegislation": "Taxes & Legislation"
+        "taxesAndLegislation": "Taxes & Legislation",
+        "salariesAndIncome": "Salaries & Income"
     },
     "home": {
         "welcome": "Welcome to Kitnets.com",

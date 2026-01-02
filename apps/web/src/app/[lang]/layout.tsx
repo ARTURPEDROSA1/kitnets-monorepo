@@ -30,7 +30,7 @@ export const viewport: Viewport = {
 export async function generateMetadata({ params }: { params: Promise<{ lang: string }> }) {
     const { lang } = await params;
     const dict = getDictionary(lang);
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://kitnets.com';
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : 'https://kitnets.com');
 
     return {
         metadataBase: new URL(baseUrl),
@@ -40,9 +40,9 @@ export async function generateMetadata({ params }: { params: Promise<{ lang: str
         },
         description: dict.home.subtitle,
         icons: {
-            icon: '/icon.png',
-            shortcut: '/icon.png',
-            apple: '/icon.png',
+            icon: '/favicon.ico',
+            shortcut: '/favicon.ico',
+            apple: '/apple-icon.png',
         },
         keywords: [
             "kitnets", "aluguel", "moradia", "imóveis", "calculadoras", "financiamento",
