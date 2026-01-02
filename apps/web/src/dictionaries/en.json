@@ -1265,6 +1265,8 @@
         "finalCta": "Explore os indicadores, aprofunde sua análise e tome decisões melhores com base em dados reais."
     },
     "rentFineCalculatorPage": {
+        "metaTitle": "Rent Termination Fine Calculator | Kitnets",
+        "metaDescription": "Calculate the fine for early termination of a rental contract according to the Tenancy Law. Simulate different scenarios.",
         "title": "Rental Contract Termination Fine Calculator",
         "menuTitle": "Rental Termination Calculator",
         "description": "Accurately calculate the proportional fine for early rental contract termination, in accordance with the Tenancy Law.",
