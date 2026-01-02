@@ -4,15 +4,7 @@ import Link from "next/link";
 import { useState, useMemo, useRef } from "react";
 import { useParams } from "next/navigation";
 import { getDictionary } from "@/dictionaries";
-import {
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    ResponsiveContainer,
-    AreaChart,
-    Area
-} from "recharts";
+import dynamic from "next/dynamic";
 import {
     Calculator,
     Calendar,
@@ -46,7 +38,7 @@ const INDEX_COLORS: Record<string, string> = {
     IGPM: "#ea580c", // orange-600
     INPC: "#2563eb", // blue-600
     IVAR: "#9333ea", // purple-600
-    FipeZap: "#db2777", // pink-600
+    "FIPEZAP-LOCACAO": "#db2777", // pink-600
     "REAJUSTE-SALARIO-MINIMO": "#eab308", // yellow-600
 };
 
@@ -144,7 +136,6 @@ function BrazilianDateInput({
                 inputMode="numeric"
                 value={text}
                 onChange={handleTextChange}
-                onClick={triggerPicker}
                 className={`${className} text-base md:text-sm pr-10`}
                 placeholder="dd/mm/aaaa"
                 maxLength={10}
@@ -214,6 +205,11 @@ export default function RentAdjustmentCalculatorClient() {
 
     // View State
     const [viewMode, setViewMode] = useState<"chart" | "table">("chart");
+
+    const RentAdjustmentChart = useMemo(() => dynamic(() => import('./RentAdjustmentChart'), {
+        ssr: false,
+        loading: () => <div className="h-[300px] w-full bg-muted/10 animate-pulse rounded-xl flex items-center justify-center text-muted-foreground">Carregando gráfico...</div>
+    }), []);
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
     const [calculationCount, setCalculationCount] = useState(0);
 
@@ -268,6 +264,7 @@ export default function RentAdjustmentCalculatorClient() {
         increase: number;
         percent: number;
         isForecast?: boolean;
+        dataUnavailable?: boolean;
     }
 
     interface MonthlyData {
@@ -370,7 +367,7 @@ export default function RentAdjustmentCalculatorClient() {
                 const limitDate = new Date(today);
                 limitDate.setFullYear(limitDate.getFullYear() + 1);
 
-                // Limit max loop to minimize infinite loop risk (e.g. 10 years)
+                // Limit max loop to minimize infinite loop risk
                 let loopCount = 0;
 
                 while (checkDate <= limitDate && loopCount < 10) {
@@ -379,7 +376,14 @@ export default function RentAdjustmentCalculatorClient() {
                     const windowStart = new Date(checkDate);
                     windowStart.setFullYear(windowStart.getFullYear() - 1);
 
-                    let accRate = 1;
+                    // For Salario Minimo, we want to include the adjustment month itself (e.g. Jan) 
+                    // because the hike usually happens exactly then.
+                    if (selectedIndex === "REAJUSTE-SALARIO-MINIMO") {
+                        windowStart.setMonth(windowStart.getMonth() + 1);
+                    }
+
+                    const periodValues: { val: number, isReal: boolean, date: Date }[] = [];
+                    let realDataCount = 0;
 
                     // Generate expected months for this year's window
                     for (let i = 0; i < 12; i++) {
@@ -392,52 +396,101 @@ export default function RentAdjustmentCalculatorClient() {
                         // Find value in fetchedData
                         const found = fetchedData.find((d: IndexValue) => d.year === y && d.month === m);
 
-                        let val = 0;
                         if (found) {
-                            val = found.value_percent;
+                            periodValues.push({ val: found.value_percent, isReal: true, date: targetMonthDate });
+                            realDataCount++;
                         } else {
-                            if (selectedIndex === "REAJUSTE-SALARIO-MINIMO") {
-                                val = 0;
-                            } else {
-                                // Forecast logic: use last known value
-                                const lastKnown = fetchedData[fetchedData.length - 1];
-                                val = lastKnown ? lastKnown.value_percent : 0.5; // fallback
-                            }
+                            // If not found, use 0 as placeholder (will be replaced or ignored)
+                            periodValues.push({ val: 0, isReal: false, date: targetMonthDate });
                         }
+                    }
 
-                        accRate *= (1 + (val / 100));
+                    let dataUnavailable = false;
+                    let periodAccRate = 1;
 
-                        // Unique Key Generation (important for chart if months repeat but distinct periods)
-                        // We use Full Date as visual X-Axis label or tooltip header
+                    // Logic: Only show forecast if we have at least threshold months of data
+                    // For Salario Minimo, we only need 1 month (usually Jan) to know the year's trend, or 0 if no increase.
+                    const realDataThreshold = selectedIndex === "REAJUSTE-SALARIO-MINIMO" ? 1 : 11;
 
-                        allMonthlyData.push({
-                            // Format: "mm/yy" for chart X-Axis
-                            month: `${(targetMonthDate.getMonth() + 1).toString().padStart(2, '0')}/${targetMonthDate.getFullYear().toString().slice(-2)}`,
-                            fullDate: targetMonthDate.toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit', year: 'numeric' }),
-                            value: val,
-                            // Accumulated since start of THIS period (standard display)
-                            accumulated: (accRate - 1) * 100
+                    if (realDataCount < realDataThreshold) {
+                        dataUnavailable = true;
+                    } else if (realDataCount >= realDataThreshold && realDataCount < 12) {
+                        // Forecast the missing month(s)
+                        // For regular indices: Average of real months
+                        // For Salario Minimo: Usually 0 for remaining months, but average check handles 0s if they are marked real.
+
+                        const sumReal = periodValues.reduce((acc, curr) => curr.isReal ? acc + curr.val : acc, 0);
+                        const avg = realDataCount > 0 ? sumReal / realDataCount : 0;
+
+                        // Apply forecast to non-real entries
+                        periodValues.forEach(p => {
+                            if (!p.isReal) {
+                                // For Salario Minimo, falling back to 0 is safer than average if Jan was huge? 
+                                // Actually, if Jan=6%, avg of 1 month is 6%. Applying 6% to Feb is WRONG for Salario Minimo.
+                                // Salario Minimo should default to 0 for future months.
+                                if (selectedIndex === "REAJUSTE-SALARIO-MINIMO") {
+                                    p.val = 0;
+                                } else {
+                                    p.val = avg;
+                                }
+                            }
+                        });
+                    }
+                    // If 12 months, we utilize the real data as is.
+
+                    // Calculate Accumulation & Chart Data
+                    if (!dataUnavailable) {
+                        periodValues.forEach(p => {
+                            periodAccRate *= (1 + (p.val / 100));
+
+                            // Only push to chart data if valid
+                            allMonthlyData.push({
+                                month: `${(p.date.getMonth() + 1).toString().padStart(2, '0')}/${p.date.getFullYear().toString().slice(-2)}`,
+                                fullDate: p.date.toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit', year: 'numeric' }),
+                                value: p.val,
+                                accumulated: (periodAccRate - 1) * 100
+                            });
                         });
                     }
 
-                    const accumulatedPercent = (accRate - 1) * 100;
-                    const increase = currentCalculationRent * (accRate - 1);
-                    const newRent = currentCalculationRent * accRate;
+                    const accumulatedPercent = (periodAccRate - 1) * 100;
+                    let increase = currentCalculationRent * (periodAccRate - 1);
+                    let newRent = currentCalculationRent * periodAccRate;
 
-                    // Determine if this is a forecast (future) or past/present
-                    const isForecast = checkDate > today;
+                    // If index is negative, readjustment is 0 (keep same rent)
+                    if (accumulatedPercent < 0) {
+                        increase = 0;
+                        newRent = currentCalculationRent;
+                    }
+
+                    // Determine status
+                    // If we have < 12 months real data, it is a forecast/estimate (unless unavailable)
+                    // For Salario Minimo, 1 month is enough to be "Official" (not forecast), so threshold is 1.
+                    const isForecastThreshold = selectedIndex === "REAJUSTE-SALARIO-MINIMO" ? 1 : 12;
+                    const isForecast = realDataCount < isForecastThreshold;
 
                     adjustments.push({
                         date: checkDate.toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit', year: 'numeric' }),
                         year: checkDate.getFullYear(),
                         oldRent: currentCalculationRent,
-                        newRent: newRent,
-                        increase,
-                        percent: accumulatedPercent,
-                        isForecast
+                        newRent: dataUnavailable ? 0 : newRent,
+                        increase: dataUnavailable ? 0 : increase,
+                        percent: dataUnavailable ? 0 : accumulatedPercent,
+                        isForecast,
+                        dataUnavailable
                     });
 
-                    currentCalculationRent = newRent; // Base for next year
+                    // Update rent base for next loop if data was available
+                    if (!dataUnavailable) {
+                        currentCalculationRent = newRent;
+                    }
+                    // If unavailable, we keep old rent base or could stop. 
+                    // Continuing allows seeing future "Unavailable" cards if desired, 
+                    // though usually one unavailable blocks the chain.
+
+                    // Break if unavailable to avoid cascading unavailable cards nicely? 
+                    // Or let it run to show all future years as unavailable.
+                    // Existing logic let it run.
 
                     // Move to next year
                     checkDate.setFullYear(checkDate.getFullYear() + 1);
@@ -613,7 +666,7 @@ export default function RentAdjustmentCalculatorClient() {
                                                 <SelectItem value="IGPM">IGP-M (Mais Volátil)</SelectItem>
                                                 <SelectItem value="INPC">INPC (Renda Familiar)</SelectItem>
                                                 <SelectItem value="IVAR">IVAR (Residencial FGV)</SelectItem>
-                                                <SelectItem value="FipeZap">FipeZap (Mercado)</SelectItem>
+                                                <SelectItem value="FIPEZAP-LOCACAO">FipeZap Locação (Mercado)</SelectItem>
                                                 <SelectItem value="REAJUSTE-SALARIO-MINIMO">Salário Mínimo (Nacional)</SelectItem>
                                             </SelectContent>
                                         </Select>
@@ -700,39 +753,51 @@ export default function RentAdjustmentCalculatorClient() {
                                         </div>
 
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            {/* Result Card 1 */}
-                                            <div className="bg-primary/5 border border-primary/20 rounded-xl p-5 relative overflow-hidden">
-                                                <div className="absolute top-0 right-0 p-3 opacity-10">
-                                                    <TrendingUp className="w-12 h-12 text-primary" />
+                                            {item.dataUnavailable ? (
+                                                <div className="col-span-1 md:col-span-3 bg-muted/40 border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center">
+                                                    <AlertTriangle className="w-10 h-10 text-muted-foreground mb-3 opacity-50" />
+                                                    <h4 className="font-semibold text-muted-foreground">Dados insuficientes para cálculo</h4>
+                                                    <p className="text-sm text-muted-foreground max-w-md mt-1">
+                                                        É necessário ter pelo menos 11 meses de índices oficiais divulgados para realizar a previsão do reajuste (Média dos últimos 11 meses).
+                                                    </p>
                                                 </div>
-                                                <p className="text-sm text-muted-foreground font-medium mb-1">Novo Aluguel</p>
-                                                <h3 className="text-2xl font-bold text-primary">
-                                                    {formatCurrency(item.newRent)}
-                                                </h3>
-                                                <p className="text-xs text-muted-foreground mt-2">Valor atualizado</p>
-                                            </div>
+                                            ) : (
+                                                <>
+                                                    {/* Result Card 1 */}
+                                                    <div className="bg-primary/5 border border-primary/20 rounded-xl p-5 relative overflow-hidden">
+                                                        <div className="absolute top-0 right-0 p-3 opacity-10">
+                                                            <TrendingUp className="w-12 h-12 text-primary" />
+                                                        </div>
+                                                        <p className="text-sm text-muted-foreground font-medium mb-1">Novo Aluguel</p>
+                                                        <h3 className="text-2xl font-bold text-primary">
+                                                            {formatCurrency(item.newRent)}
+                                                        </h3>
+                                                        <p className="text-xs text-muted-foreground mt-2">Valor atualizado</p>
+                                                    </div>
 
-                                            {/* Result Card 2 */}
-                                            <div className="bg-card border rounded-xl p-5">
-                                                <p className="text-sm text-muted-foreground font-medium mb-1">Aumento</p>
-                                                <h3 className="text-2xl font-bold text-foreground">
-                                                    +{formatCurrency(item.increase)}
-                                                </h3>
-                                                <p className="text-xs text-muted-foreground mt-2">Diferença mensal</p>
-                                            </div>
+                                                    {/* Result Card 2 */}
+                                                    <div className="bg-card border rounded-xl p-5">
+                                                        <p className="text-sm text-muted-foreground font-medium mb-1">Aumento</p>
+                                                        <h3 className="text-2xl font-bold text-foreground">
+                                                            +{formatCurrency(item.increase)}
+                                                        </h3>
+                                                        <p className="text-xs text-muted-foreground mt-2">Diferença mensal</p>
+                                                    </div>
 
-                                            {/* Result Card 3 */}
-                                            <div className="bg-card border rounded-xl p-5">
-                                                <p className="text-sm text-muted-foreground font-medium mb-1">
-                                                    {method === 'fixed' ? 'Reajuste Fixo' : `Acumulado (${selectedIndex})`}
-                                                </p>
-                                                <h3 className="text-2xl font-bold text-foreground">
-                                                    {formatPercent(item.percent)}
-                                                </h3>
-                                                <p className="text-xs text-muted-foreground mt-2">
-                                                    {method === 'index' ? 'Neste período' : 'Taxa aplicada'}
-                                                </p>
-                                            </div>
+                                                    {/* Result Card 3 */}
+                                                    <div className="bg-card border rounded-xl p-5">
+                                                        <p className="text-sm text-muted-foreground font-medium mb-1">
+                                                            {method === 'fixed' ? 'Reajuste Fixo' : `Acumulado (${selectedIndex})`}
+                                                        </p>
+                                                        <h3 className="text-2xl font-bold text-foreground">
+                                                            {formatPercent(item.percent)}
+                                                        </h3>
+                                                        <p className="text-xs text-muted-foreground mt-2">
+                                                            {method === 'index' ? 'Neste período' : 'Taxa aplicada'}
+                                                        </p>
+                                                    </div>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
                                 ))}
@@ -775,43 +840,10 @@ export default function RentAdjustmentCalculatorClient() {
                                     </div>
 
                                     {viewMode === "chart" ? (
-                                        <div className="h-[300px] w-full animate-in fade-in zoom-in-95 duration-300">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <AreaChart data={calculationResult.monthlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                                    <defs>
-                                                        <linearGradient id="colorIndex" x1="0" y1="0" x2="0" y2="1">
-                                                            <stop offset="5%" stopColor={INDEX_COLORS[selectedIndex] || INDEX_COLORS.IPCA} stopOpacity={0.2} />
-                                                            <stop offset="95%" stopColor={INDEX_COLORS[selectedIndex] || INDEX_COLORS.IPCA} stopOpacity={0} />
-                                                        </linearGradient>
-                                                    </defs>
-                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e5e5" />
-                                                    <XAxis
-                                                        dataKey="month"
-                                                        axisLine={false}
-                                                        tickLine={false}
-                                                        tick={{ fontSize: 12, fill: '#888' }}
-                                                        dy={10}
-                                                    />
-                                                    <YAxis
-                                                        axisLine={false}
-                                                        tickLine={false}
-                                                        tick={{ fontSize: 12, fill: '#888' }}
-                                                    />
-                                                    <Tooltip
-                                                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                                                        formatter={(val: number | string | undefined) => [`${Number(val || 0).toFixed(2)}%`, `Variação`]}
-                                                    />
-                                                    <Area
-                                                        type="monotone"
-                                                        dataKey="value"
-                                                        stroke={INDEX_COLORS[selectedIndex] || INDEX_COLORS.IPCA}
-                                                        fillOpacity={1}
-                                                        fill="url(#colorIndex)"
-                                                        strokeWidth={2}
-                                                    />
-                                                </AreaChart>
-                                            </ResponsiveContainer>
-                                        </div>
+                                        <RentAdjustmentChart
+                                            data={calculationResult.monthlyData}
+                                            color={INDEX_COLORS[selectedIndex] || INDEX_COLORS.IPCA}
+                                        />
                                     ) : (
                                         <div className="overflow-x-auto animate-in fade-in zoom-in-95 duration-300">
                                             <table className="w-full text-sm text-left">
@@ -929,6 +961,26 @@ export default function RentAdjustmentCalculatorClient() {
             <div className="mt-16">
                 <CalculatorSuggestion />
             </div>
+
+            {/* JSON-LD for SEO */}
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{
+                    __html: JSON.stringify({
+                        "@context": "https://schema.org",
+                        "@type": "SoftwareApplication",
+                        "name": "Calculadora de Reajuste de Aluguel",
+                        "applicationCategory": "FinanceApplication",
+                        "operatingSystem": "Any",
+                        "offers": {
+                            "@type": "Offer",
+                            "price": "0",
+                            "priceCurrency": "BRL"
+                        },
+                        "description": "Atualize o valor do aluguel de forma justa e correta. Utilize índices oficiais (IPCA, IGP-M, IVAR) ou taxas fixas."
+                    })
+                }}
+            />
 
         </div>
     );

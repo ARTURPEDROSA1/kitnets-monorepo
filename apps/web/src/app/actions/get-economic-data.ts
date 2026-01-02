@@ -6,6 +6,27 @@ import { IndexValue } from "@/lib/indexes";
 export async function getEconomicData(indexCode: string, startDate?: string) {
     const supabase = createStaticClient();
 
+    // Special handling for Minimum Wage
+    if (indexCode === "REAJUSTE-SALARIO-MINIMO") {
+        const { getMinimumWageData } = await import("@/lib/minimum-wage");
+        const wageData = await getMinimumWageData(startDate);
+
+        // Map to IndexValue and Sort Ascending
+        return wageData
+            .map(w => ({
+                id: w.id.toString(),
+                year: w.year,
+                month: w.month,
+                reference_date: w.reference_date,
+                value_percent: w.variation_percent ?? 0,
+                accumulated_12m: null,
+                accumulated_year: null,
+                is_projection: w.is_projection,
+                source_url: null
+            }))
+            .sort((a, b) => new Date(a.reference_date).getTime() - new Date(b.reference_date).getTime()) as IndexValue[];
+    }
+
     // 1. Get Index ID
     const { data: indexMeta } = await supabase
         .from("economic_indexes")
