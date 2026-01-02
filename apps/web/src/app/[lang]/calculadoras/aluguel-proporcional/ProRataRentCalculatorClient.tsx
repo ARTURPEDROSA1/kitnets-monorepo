@@ -107,7 +107,6 @@ function BrazilianDateInput({
                 inputMode="numeric"
                 value={text}
                 onChange={handleTextChange}
-                onClick={triggerPicker}
                 className={`${className} text-base md:text-sm pr-10`}
                 placeholder="dd/mm/aaaa"
                 maxLength={10}

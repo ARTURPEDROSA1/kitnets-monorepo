@@ -637,6 +637,7 @@
         "inputs": {
             "initialCapital": "Initial Capital",
             "recurringContribution": "Periodic Contribution",
+            "annualIncreaseRate": "Annual contribution increase (%)",
             "interestRate": "Interest Rate",
             "period": "Period",
             "frequency": {
@@ -668,6 +669,7 @@
             "interest": "Interest",
             "accumulatedInterest": "Acc. Interest",
             "invested": "Invested",
+            "contribution": "Contribution",
             "total": "Total"
         },
         "actions": {

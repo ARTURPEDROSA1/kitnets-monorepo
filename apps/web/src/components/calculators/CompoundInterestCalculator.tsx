@@ -27,6 +27,7 @@ interface Dictionary {
         inputs: {
             initialCapital: string;
             recurringContribution: string;
+            annualIncreaseRate: string;
             interestRate: string;
             period: string;
             frequency: {
@@ -58,6 +59,7 @@ interface Dictionary {
             interest: string;
             accumulatedInterest: string;
             invested: string;
+            contribution: string;
             total: string;
         };
         actions: {
@@ -106,6 +108,7 @@ export function CompoundInterestCalculator({ dict, lang }: CompoundInterestCalcu
     // --- State ---
     const [initialCapital, setInitialCapital] = useState<number | string>(1000);
     const [recurringContribution, setRecurringContribution] = useState<number | string>(350);
+    const [annualIncreaseRate, setAnnualIncreaseRate] = useState<number | string>(""); // Default empty or 0
     const [contributionFrequency, setContributionFrequency] = useState<"monthly" | "annual">("monthly");
     const [interestRate, setInterestRate] = useState<number | string>(1.00);
     const [rateType, setRateType] = useState<"monthly" | "annual">("monthly");
@@ -117,6 +120,7 @@ export function CompoundInterestCalculator({ dict, lang }: CompoundInterestCalcu
     const results = useMemo(() => {
         const valInitialCapital = Number(initialCapital) || 0;
         const valRecurringContribution = Number(recurringContribution) || 0;
+        const valAnnualIncreaseRate = Number(annualIncreaseRate) || 0;
         const valInterestRate = Number(interestRate) || 0;
         const valPeriod = Number(period) || 0;
 
@@ -137,6 +141,7 @@ export function CompoundInterestCalculator({ dict, lang }: CompoundInterestCalcu
             invested: valInitialCapital,
             interest: 0,
             total: valInitialCapital,
+            contribution: 0,
             interestEarnedMonth: 0
         });
 
@@ -147,10 +152,13 @@ export function CompoundInterestCalculator({ dict, lang }: CompoundInterestCalcu
 
             // Add contribution
             let contribution = 0;
+            const currentYearIndex = Math.floor((i - 1) / 12);
+            const contributionAmount = valRecurringContribution * Math.pow(1 + valAnnualIncreaseRate / 100, currentYearIndex);
+
             if (contributionFrequency === "monthly") {
-                contribution = valRecurringContribution;
+                contribution = contributionAmount;
             } else if (contributionFrequency === "annual" && i % 12 === 0) {
-                contribution = valRecurringContribution;
+                contribution = contributionAmount;
             }
 
             balance += contribution;
@@ -161,6 +169,7 @@ export function CompoundInterestCalculator({ dict, lang }: CompoundInterestCalcu
                 invested: totalInvested,
                 interest: totalInterest, // Cumulative interest
                 total: balance,
+                contribution: contribution,
                 interestEarnedMonth: interestEarned
             });
         }
@@ -176,7 +185,7 @@ export function CompoundInterestCalculator({ dict, lang }: CompoundInterestCalcu
                     : (Math.pow(1 + rateMonthly, 12) - 1) * 100
             }
         };
-    }, [initialCapital, recurringContribution, contributionFrequency, interestRate, rateType, period, periodUnit]);
+    }, [initialCapital, recurringContribution, annualIncreaseRate, contributionFrequency, interestRate, rateType, period, periodUnit]);
 
     // --- Sorting ---
     const sortedData = useMemo(() => {
@@ -238,11 +247,11 @@ export function CompoundInterestCalculator({ dict, lang }: CompoundInterestCalcu
     const downloadCSV = () => {
         if (checkExportTrigger('csv')) return;
 
-        const headers = [t.table.period, t.table.invested, t.table.interest, t.table.total];
+        const headers = [t.table.period, t.table.invested, t.table.contribution, t.table.interest, t.table.total];
         const csvContent = [
             headers.join(","),
             ...results.data.map(row =>
-                [row.month, row.invested.toFixed(2), row.interest.toFixed(2), row.total.toFixed(2)].join(",")
+                [row.month, row.invested.toFixed(2), row.contribution.toFixed(2), row.interest.toFixed(2), row.total.toFixed(2)].join(",")
             )
         ].join("\n");
 
@@ -326,6 +335,28 @@ export function CompoundInterestCalculator({ dict, lang }: CompoundInterestCalcu
                             <option value="monthly">{t.inputs.frequency.monthly}</option>
                             <option value="annual">{t.inputs.frequency.annual}</option>
                         </select>
+                    </div>
+                </div>
+
+                {/* Annual Increase Rate */}
+                <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground block">
+                        {t.inputs.annualIncreaseRate}
+                    </label>
+                    <div className="relative">
+                        <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={annualIncreaseRate}
+                            onChange={(e) => {
+                                handleInteraction('annualIncreaseRate');
+                                setAnnualIncreaseRate(e.target.value === "" ? "" : Number(e.target.value));
+                            }}
+                            className="w-full pl-3 pr-8 py-2 rounded-lg border border-input bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent outline-none transition-all"
+                            placeholder="0.00"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">%</span>
                     </div>
                 </div>
 
@@ -522,6 +553,12 @@ export function CompoundInterestCalculator({ dict, lang }: CompoundInterestCalcu
                                         <ArrowUpDown className="w-4 h-4" />
                                     </div>
                                 </th>
+                                <th className="px-6 py-4 cursor-pointer hover:text-foreground" onClick={() => handleSort('contribution')}>
+                                    <div className="flex items-center gap-2">
+                                        {t.table.contribution}
+                                        <ArrowUpDown className="w-4 h-4" />
+                                    </div>
+                                </th>
                                 <th className="px-6 py-4 cursor-pointer hover:text-foreground" onClick={() => handleSort('interest')}>
                                     <div className="flex items-center gap-2">
                                         {t.table.interest}
@@ -541,6 +578,7 @@ export function CompoundInterestCalculator({ dict, lang }: CompoundInterestCalcu
                                 <tr key={row.month} className="group hover:bg-muted/50 transition-colors">
                                     <td className="px-6 py-4 text-foreground sticky left-0 z-10 bg-card group-hover:bg-muted border-r border-border font-medium shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">{row.month}</td>
                                     <td className="px-6 py-4 text-muted-foreground">{formatCurrency(row.invested)}</td>
+                                    <td className="px-6 py-4 text-muted-foreground">{formatCurrency(row.contribution)}</td>
                                     <td className="px-6 py-4 text-green-600 dark:text-green-400">+{formatCurrency(row.interestEarnedMonth || 0)}</td>
                                     <td className="px-6 py-4 font-medium text-foreground">{formatCurrency(row.total)}</td>
                                 </tr>

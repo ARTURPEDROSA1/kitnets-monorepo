@@ -169,13 +169,12 @@ function BrazilianDateInput({
                 inputMode="numeric"
                 value={text}
                 onChange={handleTextChange}
-                onClick={triggerPicker}
-                className={`${className} text-base md:text-sm pr-3 md:pr-10`} // Prevent iOS zoom, space for icon only on desktop
+                className={`${className} text-base md:text-sm pr-10`} // Prevent iOS zoom, space for icon
                 placeholder="dd/mm/aaaa"
                 maxLength={10}
             />
             <div
-                className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-muted-foreground hover:text-foreground p-1 hidden md:block"
+                className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-muted-foreground hover:text-foreground p-1"
                 onClick={(e) => {
                     e.stopPropagation();
                     triggerPicker();
