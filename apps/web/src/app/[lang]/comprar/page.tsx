@@ -1,5 +1,5 @@
 import { BuyListings } from "@/components/BuyListings";
-import { getDictionary } from "../../../dictionaries";
+import { getDictionary } from "@/dictionaries";
 
 export async function generateMetadata({ params }: { params: Promise<{ lang: "en" | "pt" | "es" }> }) {
     const { lang } = await params;
@@ -7,6 +7,14 @@ export async function generateMetadata({ params }: { params: Promise<{ lang: "en
     return {
         title: dict.buyPage.title,
         description: dict.buyPage.subtitle,
+        alternates: {
+            canonical: `https://kitnets.com/${lang}/comprar`,
+            languages: {
+                'pt': 'https://kitnets.com/pt/comprar',
+                'en': 'https://kitnets.com/en/comprar',
+                'es': 'https://kitnets.com/es/comprar',
+            },
+        },
     };
 }
 
