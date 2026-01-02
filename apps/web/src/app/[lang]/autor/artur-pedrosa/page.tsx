@@ -1,5 +1,5 @@
 import { getDictionary } from '@/dictionaries';
-import { Calendar, MapPin, FileText } from 'lucide-react';
+import { Calendar, MapPin, FileText, Youtube } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -61,6 +61,10 @@ export default async function AuthorPage({ params }: { params: Promise<{ lang: s
                                 className="object-contain"
                             />
                             <span>kitnets.com</span>
+                        </a>
+                        <a href="https://www.youtube.com/@artur.pedrosa" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-primary transition-colors">
+                            <Youtube className="h-4 w-4" />
+                            <span>YouTube</span>
                         </a>
                         {/* 
                         <a href="#" className="flex items-center gap-1.5 hover:text-primary transition-colors">
