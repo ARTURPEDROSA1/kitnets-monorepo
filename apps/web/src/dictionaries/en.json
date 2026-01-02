@@ -52,7 +52,9 @@
         "back": "Back",
         "finance": "Finance",
         "rentCategory": "Rent",
-        "investment": "Investment"
+        "investment": "Investment",
+        "contents": "Contents",
+        "taxesAndLegislation": "Taxes & Legislation"
     },
     "home": {
         "welcome": "Welcome to Kitnets.com",

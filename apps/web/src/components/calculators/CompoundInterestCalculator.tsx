@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Download, Printer, ArrowUpDown } from "lucide-react";
 import Image from "next/image";
 import {
@@ -81,8 +81,27 @@ export function CompoundInterestCalculator({ dict, lang }: CompoundInterestCalcu
         setIsModalOpen,
         checkExportTrigger,
         trackInteraction,
-        leadMetadata
+        leadMetadata,
+        checkAdvancedTrigger
     } = useCalculatorLeadCapture({ isSimpleCalculator: false });
+
+    const interactionCountRef = useRef(0);
+    const lastInteractedFieldRef = useRef<string | null>(null);
+
+    const handleInteraction = (fieldId: string) => {
+        trackInteraction();
+
+        // Only increment counter if switching fields
+        if (lastInteractedFieldRef.current !== fieldId) {
+            interactionCountRef.current += 1;
+            lastInteractedFieldRef.current = fieldId;
+        }
+
+        // Trigger on 4th interaction (allow 3 free interactions)
+        if (interactionCountRef.current >= 4) {
+            checkAdvancedTrigger();
+        }
+    };
 
     // --- State ---
     const [initialCapital, setInitialCapital] = useState<number | string>(1000);
@@ -203,9 +222,10 @@ export function CompoundInterestCalculator({ dict, lang }: CompoundInterestCalcu
 
     const handleCurrencyChange = (
         e: React.ChangeEvent<HTMLInputElement>,
-        setter: (value: number | string) => void
+        setter: (value: number | string) => void,
+        fieldId: string
     ) => {
-        trackInteraction();
+        handleInteraction(fieldId);
         const rawValue = e.target.value.replace(/\D/g, "");
         if (rawValue === "") {
             setter("");
@@ -273,7 +293,7 @@ export function CompoundInterestCalculator({ dict, lang }: CompoundInterestCalcu
                             type="text"
                             inputMode="numeric"
                             value={formatCurrencyInput(initialCapital)}
-                            onChange={(e) => handleCurrencyChange(e, setInitialCapital)}
+                            onChange={(e) => handleCurrencyChange(e, setInitialCapital, 'initialCapital')}
                             className="w-full pl-10 pr-4 py-2 rounded-lg border border-input bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent outline-none transition-all"
                         />
                     </div>
@@ -291,14 +311,14 @@ export function CompoundInterestCalculator({ dict, lang }: CompoundInterestCalcu
                                 type="text"
                                 inputMode="numeric"
                                 value={formatCurrencyInput(recurringContribution)}
-                                onChange={(e) => handleCurrencyChange(e, setRecurringContribution)}
+                                onChange={(e) => handleCurrencyChange(e, setRecurringContribution, 'recurringContribution')}
                                 className="w-full pl-10 pr-4 py-2 rounded-lg border border-input bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent outline-none transition-all"
                             />
                         </div>
                         <select
                             value={contributionFrequency}
                             onChange={(e) => {
-                                trackInteraction();
+                                handleInteraction('frequency');
                                 setContributionFrequency(e.target.value as "monthly" | "annual");
                             }}
                             className="w-28 px-2 py-2 rounded-lg border border-input bg-background text-foreground focus:ring-2 focus:ring-ring outline-none text-sm"
@@ -321,7 +341,7 @@ export function CompoundInterestCalculator({ dict, lang }: CompoundInterestCalcu
                             step="0.01"
                             value={interestRate}
                             onChange={(e) => {
-                                trackInteraction();
+                                handleInteraction('interestRate');
                                 setInterestRate(e.target.value === "" ? "" : Number(e.target.value));
                             }}
                             className="w-full px-4 py-2 rounded-lg border border-input bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent outline-none transition-all"
@@ -329,7 +349,7 @@ export function CompoundInterestCalculator({ dict, lang }: CompoundInterestCalcu
                         <select
                             value={rateType}
                             onChange={(e) => {
-                                trackInteraction();
+                                handleInteraction('rateType');
                                 setRateType(e.target.value as "monthly" | "annual");
                             }}
                             className="w-32 px-2 py-2 rounded-lg border border-input bg-background text-foreground focus:ring-2 focus:ring-ring outline-none text-sm"
@@ -358,7 +378,7 @@ export function CompoundInterestCalculator({ dict, lang }: CompoundInterestCalcu
                             min="1"
                             value={period}
                             onChange={(e) => {
-                                trackInteraction();
+                                handleInteraction('period');
                                 setPeriod(e.target.value === "" ? "" : Number(e.target.value));
                             }}
                             className="w-full px-4 py-2 rounded-lg border border-input bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent outline-none transition-all"
@@ -366,7 +386,7 @@ export function CompoundInterestCalculator({ dict, lang }: CompoundInterestCalcu
                         <select
                             value={periodUnit}
                             onChange={(e) => {
-                                trackInteraction();
+                                handleInteraction('periodUnit');
                                 setPeriodUnit(e.target.value as "months" | "years");
                             }}
                             className="w-28 px-2 py-2 rounded-lg border border-input bg-background text-foreground focus:ring-2 focus:ring-ring outline-none text-sm"
@@ -488,9 +508,9 @@ export function CompoundInterestCalculator({ dict, lang }: CompoundInterestCalcu
                 </div>
                 <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
                     <table className="w-full text-sm text-left">
-                        <thead className="bg-zinc-50 dark:bg-zinc-800/50 text-muted-foreground uppercase font-medium sticky top-0 backdrop-blur-sm">
+                        <thead className="bg-zinc-50 dark:bg-zinc-800 text-muted-foreground uppercase font-medium sticky top-0 z-20 shadow-sm">
                             <tr>
-                                <th className="px-6 py-4 cursor-pointer hover:text-foreground" onClick={() => handleSort('month')}>
+                                <th className="px-6 py-4 cursor-pointer hover:text-foreground sticky left-0 z-30 bg-zinc-50 dark:bg-zinc-800 border-r border-border" onClick={() => handleSort('month')}>
                                     <div className="flex items-center gap-2">
                                         {t.table.period}
                                         <ArrowUpDown className="w-4 h-4" />
@@ -518,8 +538,8 @@ export function CompoundInterestCalculator({ dict, lang }: CompoundInterestCalcu
                         </thead>
                         <tbody className="divide-y divide-border">
                             {sortedData.map((row) => (
-                                <tr key={row.month} className="hover:bg-muted/50 transition-colors">
-                                    <td className="px-6 py-4 text-foreground">{row.month}</td>
+                                <tr key={row.month} className="group hover:bg-muted/50 transition-colors">
+                                    <td className="px-6 py-4 text-foreground sticky left-0 z-10 bg-card group-hover:bg-muted border-r border-border font-medium shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">{row.month}</td>
                                     <td className="px-6 py-4 text-muted-foreground">{formatCurrency(row.invested)}</td>
                                     <td className="px-6 py-4 text-green-600 dark:text-green-400">+{formatCurrency(row.interestEarnedMonth || 0)}</td>
                                     <td className="px-6 py-4 font-medium text-foreground">{formatCurrency(row.total)}</td>

@@ -16,7 +16,9 @@
         "back": "Volver",
         "finance": "Finanzas",
         "rentCategory": "Alquiler",
-        "investment": "Inversión"
+        "investment": "Inversión",
+        "contents": "Contenidos",
+        "taxesAndLegislation": "Impuestos y legislación"
     },
     "filters": {
         "title": "Filtrar resultados",

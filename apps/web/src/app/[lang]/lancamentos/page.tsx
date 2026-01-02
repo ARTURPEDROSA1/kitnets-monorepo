@@ -1,5 +1,5 @@
-import { LaunchesListings } from "../../../components/LaunchesListings";
-import { getDictionary } from "../../../dictionaries";
+import { LaunchesListings } from "@/components/LaunchesListings";
+import { getDictionary } from "@/dictionaries";
 
 export async function generateMetadata({ params }: { params: Promise<{ lang: "en" | "pt" | "es" }> }) {
     const { lang } = await params;
@@ -7,6 +7,14 @@ export async function generateMetadata({ params }: { params: Promise<{ lang: "en
     return {
         title: dict.launchesPage.title,
         description: dict.launchesPage.subtitle,
+        alternates: {
+            canonical: `https://kitnets.com/${lang}/lancamentos`,
+            languages: {
+                'pt': 'https://kitnets.com/pt/lancamentos',
+                'en': 'https://kitnets.com/en/lancamentos',
+                'es': 'https://kitnets.com/es/lancamentos',
+            },
+        },
     };
 }
 

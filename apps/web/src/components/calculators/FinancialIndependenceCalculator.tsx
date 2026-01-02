@@ -85,19 +85,27 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
         setIsModalOpen,
         leadMetadata,
         trackInteraction,
-        checkAdvancedTrigger
+        checkAdvancedTrigger,
+        checkExportTrigger
     } = useCalculatorLeadCapture({
         calculatorType: "calculadora-independencia-financeira",
         isSimpleCalculator: false
     });
 
     const interactionCountRef = React.useRef(0);
+    const lastInteractedFieldRef = React.useRef<string | null>(null);
 
-    const handleInteraction = () => {
+    const handleInteraction = (fieldId: string) => {
         trackInteraction();
-        interactionCountRef.current += 1;
-        // Trigger lead capture after 5 interactions
-        if (interactionCountRef.current > 5) {
+
+        // Only increment counter if switching fields
+        if (lastInteractedFieldRef.current !== fieldId) {
+            interactionCountRef.current += 1;
+            lastInteractedFieldRef.current = fieldId;
+        }
+
+        // Trigger on 4th interaction (allow 3 free)
+        if (interactionCountRef.current >= 4) {
             checkAdvancedTrigger();
         }
     };
@@ -109,7 +117,7 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
     const [years, setYears] = React.useState<string>("30");
     const [nominalReturn, setNominalReturn] = React.useState<string>("12");
     const [inflation, setInflation] = React.useState<string>("4");
-    const [taxRate, setTaxRate] = React.useState<string>("17.5");
+    // taxRate state removed, now derived from years
     const [withdrawalYears, setWithdrawalYears] = React.useState<string>("30");
 
     // For Phase 2 input, prompt implies reusing return/inflation or asking for specific withdrawal return?
@@ -127,7 +135,16 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
     const yearsVal = parseFloat(years) || 0;
     const nominalReturnVal = parseFloat(nominalReturn) || 0;
     const inflationVal = parseFloat(inflation) || 0;
-    const taxRateVal = parseFloat(taxRate) || 15;
+
+    // Derived Tax Rate (Regressive Table)
+    const calculatedTaxRate = React.useMemo(() => {
+        if (yearsVal <= 0.5) return 22.5; // Up to 180 days
+        if (yearsVal <= 1.0) return 20.0; // 181 to 360 days
+        if (yearsVal <= 2.0) return 17.5; // 361 to 720 days
+        return 15.0; // Above 720 days
+    }, [yearsVal]);
+
+    const taxRateVal = calculatedTaxRate;
     const withdrawalYearsVal = parseFloat(withdrawalYears) || 0;
     const withdrawalRealReturnAnnualVal = parseFloat(withdrawalRealReturnAnnual) || 0;
 
@@ -399,14 +416,14 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
                                 <Label>{t?.initialCapital}</Label>
                                 <MoneyInput
                                     value={initialCapital}
-                                    onChange={(val) => { handleInteraction(); setInitialCapital(val.toString()); }}
+                                    onChange={(val) => { handleInteraction('initialCapital'); setInitialCapital(val.toString()); }}
                                 />
                             </div>
                             <div className="space-y-2">
                                 <Label>{t?.monthlyContribution}</Label>
                                 <MoneyInput
                                     value={monthlyContribution}
-                                    onChange={(val) => { handleInteraction(); setMonthlyContribution(val.toString()); }}
+                                    onChange={(val) => { handleInteraction('monthlyContribution'); setMonthlyContribution(val.toString()); }}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -414,7 +431,7 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
                                 <Input
                                     type="number"
                                     value={years}
-                                    onChange={(e) => { handleInteraction(); setYears(e.target.value); }}
+                                    onChange={(e) => { handleInteraction('years'); setYears(e.target.value); }}
                                 />
                             </div>
                             <div className="grid grid-cols-2 gap-4 items-start">
@@ -423,7 +440,7 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
                                     <Input
                                         type="number"
                                         value={nominalReturn}
-                                        onChange={(e) => { handleInteraction(); setNominalReturn(e.target.value); }}
+                                        onChange={(e) => { handleInteraction('nominalReturn'); setNominalReturn(e.target.value); }}
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -436,7 +453,7 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
                                     <Input
                                         type="number"
                                         value={inflation}
-                                        onChange={(e) => { handleInteraction(); setInflation(e.target.value); }}
+                                        onChange={(e) => { handleInteraction('inflation'); setInflation(e.target.value); }}
                                         className={isInflationError ? "border-red-500" : ""}
                                     />
                                 </div>
@@ -449,20 +466,24 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
                             )}
                             <div className="space-y-2">
                                 <Label className="flex items-center gap-1">
-                                    {t?.taxRate}
+                                    {t?.taxRate || "IR sobre Ganho de Capital"}
                                     <span title={tooltips?.tax} className="cursor-help">
                                         <Info className="h-3 w-3 text-muted-foreground" />
                                     </span>
                                 </Label>
-                                <Select value={taxRate} onValueChange={(val) => { handleInteraction(); setTaxRate(val); }}>
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="15">{t?.tax15}</SelectItem>
-                                        <SelectItem value="17.5">{t?.tax175}</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                <div className="p-3 bg-muted/50 rounded-md border border-border text-sm font-medium flex justify-between items-center">
+                                    <span>Alíquota do período ({yearsVal} {yearsVal === 1 ? 'ano' : 'anos'}):</span>
+                                    <span className="font-bold text-primary">{calculatedTaxRate.toFixed(1).replace('.', ',')}%</span>
+                                </div>
+                                <div className="text-xs text-muted-foreground space-y-1 mt-2 bg-muted/30 p-3 rounded-md border border-border/50">
+                                    <p className="font-semibold mb-2">Tabela Regressiva de IR:</p>
+                                    <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                                        <span>22,5%</span> <span className="text-right text-muted-foreground">até 180 dias</span>
+                                        <span>20,0%</span> <span className="text-right text-muted-foreground">de 181 a 360 dias</span>
+                                        <span>17,5%</span> <span className="text-right text-muted-foreground">de 361 a 720 dias</span>
+                                        <span>15,0%</span> <span className="text-right text-muted-foreground">acima de 720 dias</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -480,7 +501,7 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
                                     <Input
                                         type="number"
                                         value={withdrawalYears}
-                                        onChange={(e) => { handleInteraction(); setWithdrawalYears(e.target.value); }}
+                                        onChange={(e) => { handleInteraction('withdrawalYears'); setWithdrawalYears(e.target.value); }}
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -488,7 +509,7 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
                                     <Input
                                         type="number"
                                         value={withdrawalRealReturnAnnual}
-                                        onChange={(val) => { handleInteraction(); setWithdrawalRealReturnAnnual(val.toString()); }}
+                                        onChange={(val) => { handleInteraction('withdrawalRealReturnAnnual'); setWithdrawalRealReturnAnnual(val.toString()); }}
                                         className="mt-auto"
                                     />
                                 </div>
@@ -524,7 +545,6 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
                             <div className="space-y-1">
                                 <p className="text-sm text-muted-foreground">{r?.unrealizedGains}</p>
                                 <p className="text-xl font-bold text-blue-600 dark:text-blue-500">{formatCurrency(unrealizedGains)}</p>
-                                <p className="text-xs text-muted-foreground">{(gainRatio * 100).toFixed(1)}% {t?.taxRate}</p>
                             </div>
                         </div>
                     </div>
@@ -633,7 +653,11 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
                                     labelFormatter={(val) => `${tableLabels?.year} ${val}`}
                                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                                 />
-                                <Legend />
+                                <Legend
+                                    wrapperStyle={{ paddingTop: '10px', width: '100%' }}
+                                    iconSize={8}
+                                    formatter={(value) => <span className="text-xs font-medium text-foreground mr-2">{value}</span>}
+                                />
                                 <Line type="monotone" dataKey="balance" name={`${chartLabels?.balance} (A)`} stroke="#f97316" strokeWidth={2} />
                                 <Line type="monotone" data={withdrawalDataB} dataKey="balance" name={`${chartLabels?.balance} (B)`} stroke="#22c55e" strokeWidth={2} />
                             </LineChart>
@@ -650,7 +674,7 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
                 <div className="p-6 border-b border-border flex justify-between items-center">
                     <h3 className="text-lg font-semibold">{tableLabels?.year} - {t?.section1}</h3>
                     <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => window.print()}>
+                        <Button variant="outline" size="sm" onClick={() => { if (!checkExportTrigger('print')) window.print(); }}>
                             <Printer className="h-4 w-4 mr-2" />
                             PDF
                         </Button>
@@ -658,9 +682,9 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
                 </div>
                 <div className="overflow-x-auto max-h-[400px]">
                     <table className="w-full text-sm text-left">
-                        <thead className="bg-muted text-muted-foreground font-medium sticky top-0">
+                        <thead className="bg-muted text-muted-foreground font-medium sticky top-0 z-20">
                             <tr>
-                                <th className="px-6 py-3 cursor-pointer hover:text-foreground transition-colors" onClick={() => requestSort('year')}>
+                                <th className="px-6 py-3 cursor-pointer hover:text-foreground transition-colors sticky left-0 z-20 bg-muted" onClick={() => requestSort('year')}>
                                     <div className="flex items-center">
                                         {tableLabels?.year}
                                         {getSortIcon('year')}
@@ -694,8 +718,8 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
                         </thead>
                         <tbody className="divide-y divide-border">
                             {sortedAccumulationData.map((row) => (
-                                <tr key={row.year} className="hover:bg-muted/50">
-                                    <td className="px-6 py-3">{row.year}</td>
+                                <tr key={row.year} className="hover:bg-muted/50 group">
+                                    <td className="px-6 py-3 sticky left-0 z-10 bg-card group-hover:bg-muted">{row.year}</td>
                                     <td className="px-6 py-3">{formatCurrency(row.principal - (row.year * 12 * monthlyContributionVal))}</td>
                                     <td className="px-6 py-3">{formatCurrency(row.year * 12 * monthlyContributionVal)}</td>
                                     <td className="px-6 py-3 text-green-600">{formatCurrency(row.interest)}</td>
@@ -712,7 +736,7 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
                 <div className="p-6 border-b border-border flex justify-between items-center">
                     <h3 className="text-lg font-semibold">{t?.section2} - {isRealMode ? "Valores Reais (IPCA Ajustado)" : "Valores Nominais"}</h3>
                     <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => window.print()}>
+                        <Button variant="outline" size="sm" onClick={() => { if (!checkExportTrigger('print')) window.print(); }}>
                             <Printer className="h-4 w-4 mr-2" />
                             PDF
                         </Button>
@@ -720,9 +744,9 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
                 </div>
                 <div className="overflow-x-auto max-h-[400px]">
                     <table className="w-full text-sm text-left">
-                        <thead className="bg-muted text-muted-foreground font-medium sticky top-0">
+                        <thead className="bg-muted text-muted-foreground font-medium sticky top-0 z-20">
                             <tr>
-                                <th className="px-6 py-3 cursor-pointer hover:text-foreground transition-colors" onClick={() => requestWithdrawalSort('year')}>
+                                <th className="px-6 py-3 cursor-pointer hover:text-foreground transition-colors sticky left-0 z-20 bg-muted" onClick={() => requestWithdrawalSort('year')}>
                                     <div className="flex items-center">
                                         {tableLabels?.year}
                                         {getWithdrawalSortIcon('year')}
@@ -756,8 +780,8 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
                         </thead>
                         <tbody className="divide-y divide-border">
                             {sortedWithdrawalData.map((row) => (
-                                <tr key={row.year} className="hover:bg-muted/50">
-                                    <td className="px-6 py-3">{row.year}</td>
+                                <tr key={row.year} className="hover:bg-muted/50 group">
+                                    <td className="px-6 py-3 sticky left-0 z-10 bg-card group-hover:bg-muted">{row.year}</td>
                                     <td className="px-6 py-3 font-medium text-right text-orange-600 dark:text-orange-500">{formatCurrency(row.incomeA)}</td>
                                     <td className="px-6 py-3 font-medium text-right text-muted-foreground">{formatCurrency(row.balanceA)}</td>
                                     <td className="px-6 py-3 font-medium text-right text-green-600 dark:text-green-500">{formatCurrency(row.incomeB)}</td>

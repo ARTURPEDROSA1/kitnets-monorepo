@@ -16,7 +16,9 @@
         "back": "Voltar",
         "finance": "Financeiro",
         "rentCategory": "Aluguel",
-        "investment": "Investimento"
+        "investment": "Investimento",
+        "contents": "Conteúdos",
+        "taxesAndLegislation": "Impostos e legislação"
     },
     "filters": {
         "title": "Filtrar resultados",
@@ -1223,9 +1225,9 @@
         },
         "results": {
             "accumulationSummary": "Resumo da Acumulação",
-            "totalAccumulated": "Patrimônio Total Acumulado (Real)",
+            "totalAccumulated": "Patrimônio Total Acumulado",
             "totalContributed": "Total Aportado (Principal)",
-            "unrealizedGains": "Ganhos de Capital (Para Tributação)",
+            "unrealizedGains": "Ganhos de Capital (Tributável)",
             "wealthBuilding": "Construção de Patrimônio",
             "scenarioA": "Cenário A: Renda Finita (Esgotamento)",
             "scenarioAPeriod": "Renda por {years} anos até zerar o capital",

@@ -43,6 +43,8 @@ const staticRoutes = [
     'waitlist',
     'calculadoras/multa-atraso-aluguel',
     'calculadoras/multa-rescisao-contrato-aluguel',
+    'conteudos',
+    'conteudos/impostos-e-legislacao',
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

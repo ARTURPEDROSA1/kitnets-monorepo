@@ -1,5 +1,5 @@
 import { RentListings } from "@/components/RentListings";
-import { getDictionary } from "../../../dictionaries";
+import { getDictionary } from "@/dictionaries";
 
 export async function generateMetadata({ params }: { params: Promise<{ lang: "en" | "pt" | "es" }> }) {
     const { lang } = await params;
@@ -7,6 +7,14 @@ export async function generateMetadata({ params }: { params: Promise<{ lang: "en
     return {
         title: dict.rentPage.title,
         description: dict.rentPage.subtitle,
+        alternates: {
+            canonical: `https://kitnets.com/${lang}/alugar`,
+            languages: {
+                'pt': 'https://kitnets.com/pt/alugar',
+                'en': 'https://kitnets.com/en/alugar',
+                'es': 'https://kitnets.com/es/alugar',
+            },
+        },
     };
 }
 

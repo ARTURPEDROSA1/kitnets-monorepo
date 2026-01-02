@@ -61,7 +61,7 @@ export default async function CalculatorOverviewPage({ params }: { params: Promi
                     "item": {
                         "@type": "SoftwareApplication",
                         "name": dict.rentAdjustmentCalculatorPage.seo.title,
-                        "url": `https://kitnets.com/${lang}/calculadoras/reajuste-aluguel`
+                        "url": `https://kitnets.com/${lang}/calculadora-reajuste-aluguel`
                     }
                 },
                 {
