@@ -39,6 +39,11 @@ export async function generateMetadata({ params }: { params: Promise<{ lang: str
             template: `%s | Kitnets.com`,
         },
         description: dict.home.subtitle,
+        icons: {
+            icon: '/icon.png',
+            shortcut: '/icon.png',
+            apple: '/icon.png',
+        },
         keywords: [
             "kitnets", "aluguel", "moradia", "imóveis", "calculadoras", "financiamento",
             "investimento", "IPCA", "IGPM", "INPC", "real estate", "rent", "Brazil",

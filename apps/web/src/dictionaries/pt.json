@@ -18,7 +18,8 @@
         "rentCategory": "Aluguel",
         "investment": "Investimento",
         "contents": "Conteúdos",
-        "taxesAndLegislation": "Impostos e legislação"
+        "taxesAndLegislation": "Impostos e legislação",
+        "salariesAndIncome": "Salário e Renda"
     },
     "filters": {
         "title": "Filtrar resultados",
