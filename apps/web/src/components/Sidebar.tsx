@@ -575,6 +575,24 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                             <h2 className="text-lg font-semibold text-foreground">{dict.menu.calculators}</h2>
 
                             <div className="space-y-6">
+                                {/* Impostos */}
+                                <div className="space-y-1">
+                                    <h3 className="px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                        {dict.menu.taxes}
+                                    </h3>
+                                    <ul className="space-y-1 font-medium">
+                                        <li>
+                                            <Link
+                                                href={lang === 'pt' ? '/calculadoras/aluguel-na-holding' : `/${lang}/calculadoras/aluguel-na-holding`}
+                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                            >
+                                                <Building2 className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                <span className="ms-3 text-sm">{dict.menu.rentalOnHolding}</span>
+                                            </Link>
+                                        </li>
+                                    </ul>
+                                </div>
+
                                 {/* Financeiro */}
                                 <div className="space-y-1">
                                     <h3 className="px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -682,6 +700,8 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                         </li>
                                     </ul>
                                 </div>
+
+
                             </div>
                         </div>
                     ) : sidebarView === 'indices-menu' ? (

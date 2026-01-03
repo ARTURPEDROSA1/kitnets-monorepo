@@ -50,6 +50,7 @@ const staticRoutes = [
     'conteudos/impostos-e-legislacao/renda-fixa-reforma-imposto-de-renda',
     'conteudos/impostos-e-legislacao/imposto-sobre-dividendos',
     'autor/artur-pedrosa',
+    'calculadoras/aluguel-na-holding',
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
