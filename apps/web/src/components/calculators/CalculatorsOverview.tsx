@@ -3,14 +3,14 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { TrendingUp, AlertCircle, FileText, Coins, PiggyBank, ArrowLeftRight, Sun, Percent, Search, ArrowRight, Calculator, Building2 } from 'lucide-react';
+import { TrendingUp, AlertCircle, FileText, Coins, PiggyBank, ArrowLeftRight, Sun, Percent, Search, ArrowRight, Calculator, Building2, User } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dictionary } from '@/dictionaries';
 import { cn } from '@/lib/utils';
 
-type CalculatorCategory = 'rent' | 'finance' | 'indices' | 'interest' | 'planning';
+type CalculatorCategory = 'rent' | 'finance' | 'indices' | 'interest' | 'planning' | 'taxes';
 
 interface CalculatorItem {
     id: string;
@@ -104,6 +104,14 @@ const CALCULATORS: CalculatorItem[] = [
         dictKey: 'irpf2026',
         mostUsed: true
     },
+    {
+        id: 'rentOnIndividual',
+        icon: User,
+        route: (lang) => `/${lang}/calculadoras/imposto-aluguel-pessoa-fisica`,
+        categories: ['finance', 'planning', 'taxes'],
+        dictKey: 'rentOnIndividual'
+    },
+
 ];
 
 export function CalculatorsOverview({ lang, dict }: { lang: string; dict: Dictionary }) {
@@ -135,6 +143,7 @@ export function CalculatorsOverview({ lang, dict }: { lang: string; dict: Dictio
         { id: 'indices', label: t.categories.indices },
         { id: 'interest', label: t.categories.interest },
         { id: 'planning', label: t.categories.planning },
+        { id: 'taxes', label: (t.categories as any).taxes },
     ];
 
     return (

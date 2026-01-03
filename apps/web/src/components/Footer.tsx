@@ -2,17 +2,15 @@
 
 import Link from "next/link";
 import { Instagram, Youtube, Facebook } from "lucide-react";
-import { getDictionary } from "../dictionaries";
+import { Dictionary } from "../dictionaries";
 
-export function Footer({ lang }: { lang?: string }) {
+export function Footer({ lang, dict }: { lang?: string; dict: Dictionary }) {
     const isDefaultLang = lang === "pt" || !lang;
     const legalHref = isDefaultLang ? "/aviso-legal" : `/${lang}/aviso-legal`;
     const termsHref = isDefaultLang ? "/termos-de-uso" : `/${lang}/termos-de-uso`;
     const privacyHref = isDefaultLang ? "/politica-de-privacidade" : `/${lang}/politica-de-privacidade`;
     const cookiesHref = isDefaultLang ? "/politica-de-cookies" : `/${lang}/politica-de-cookies`;
     const disclosureHref = isDefaultLang ? "/disclosure" : `/${lang}/disclosure`;
-
-    const dict = getDictionary(lang || "pt");
 
     return (
         <footer className="w-full border-t border-border bg-background py-6">

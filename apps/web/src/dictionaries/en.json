@@ -54,11 +54,59 @@
         "rentCategory": "Rent",
         "investment": "Investment",
         "contents": "Contents",
-        "taxesAndLegislation": "Taxes & Legislation",
-        "salariesAndIncome": "Salaries & Income",
+        "taxesAndLegislation": "Taxes and Legislation",
+        "salariesAndIncome": "Salaries and Income",
         "taxes": "Taxes",
         "rentalOnHolding": "Rental on Holding",
-        "irpf2026": "IRPF 2026 Calculator"
+        "irpf2026": "IRPF 2026 Calculator",
+        "rentOnIndividual": "Rental on Individual",
+        "highIncomeTax": "Minimum Tax High Income",
+        "minTaxPF": "Minimum Tax Individual"
+    },
+    "filters": {
+        "title": "Filters",
+        "location": "Location",
+        "searchPlaceholder": "Search city or neighborhood...",
+        "propertyType": "Property Type",
+        "selectPlaceholder": "None selected",
+        "kitnet": "Kitnet",
+        "studio": "Studio",
+        "luxuryStudio": "Luxury Studio",
+        "flat": "Flat",
+        "apartment": "Apartment",
+        "barracao": "Guest House",
+        "house": "House",
+        "penthouse": "Penthouse",
+        "duplex": "Duplex",
+        "pilotis": "Pilotis",
+        "townhouse": "Townhouse",
+        "bedrooms": "Bedrooms",
+        "price": "Price",
+        "min": "min",
+        "max": "max",
+        "area": "Area",
+        "parking": "Parking spaces",
+        "bathrooms": "Bathrooms",
+        "listingHas": "Listing has",
+        "virtualTour": "Virtual Tour",
+        "video": "Video",
+        "floorPlan": "Floor Plan",
+        "features": "Filter by features",
+        "amenities": "Amenities",
+        "locationOptions": "Location options",
+        "seeResults": "See results",
+        "createAlert": "Create alert",
+        "moreFilters": "More filters",
+        "areaUnit": "Area (m²)",
+        "useful": "Useful",
+        "total": "Total",
+        "from": "From",
+        "to": "to",
+        "furnished": "Furnished",
+        "balcony": "Balcony",
+        "petFriendly": "Pet Friendly",
+        "nearMetro": "Near Metro",
+        "clear": "Clear"
     },
     "home": {
         "welcome": "Welcome to Kitnets.com",
@@ -381,6 +429,146 @@
             "Near Bus Stop",
             "Near Restaurant"
         ]
+    },
+    "rentalTaxCalculatorPage": {
+        "title": "Rental Income Tax Calculator - Individual (IRPF + IBS + CBS)",
+        "subtitle": "Simulate your tax burden considering IRPF + IBS/CBS (Brazil Tax Reform)",
+        "inputs": {
+            "properties": "Number of Rental Properties",
+            "revenue": "Annual Gross Rental Revenue",
+            "taxYear": "Tax Year",
+            "referenceYear": "Reference Year (Previous)",
+            "otherIncome": "Other Taxable Income",
+            "dependents": "Dependents",
+            "deductions": "Deductible Expenses (Health, Education, etc)",
+            "calculate": "Calculate Taxes"
+        },
+        "results": {
+            "legalStatus": "Legal Status",
+            "smallLandlord": "Small Landlord (IRPF only)",
+            "largeLandlord": "Large Landlord (IRPF + CBS + IBS)",
+            "legalRef": "Legal Basis: Art. 251 (Law IBS/CBS)",
+            "irpfCard": "Personal Income Tax (IRPF)",
+            "irpfBase": "IRPF Base Calculation",
+            "irpfTax": "IRPF Tax Due",
+            "irpfEffective": "IRPF Effective Rate",
+            "cbsCard": "CBS (Federal)",
+            "ibsCard": "IBS (State/Municipal)",
+            "vatBase": "Calculation Base",
+            "vatRate": "Rate Applied",
+            "vatTax": "Tax Due",
+            "startYear": "Start Year",
+            "totalCard": "Total Tax Burden",
+            "totalTax": "Total to Pay",
+            "totalEffective": "Total Effective Rate"
+        },
+        "alerts": {
+            "classification": "Classification based on the previous year.",
+            "cumulative": "IBS and CBS do not replace IRPF; taxation is cumulative.",
+            "advice": "This simulation does not replace professional advice.",
+            "credits": "VAT credits not considered in this version."
+        },
+        "seo": {
+            "title": "Individual Rental Income Tax Calculator (IRPF, IBS & CBS)",
+            "description": "Calculate rental income tax for individuals in Brazil. See when IRPF, IBS, and CBS apply for small and large landlords."
+        },
+        "page": {
+            "intro": "The Rental Income Tax Calculator for Individuals by Kitnets.com allows you to simulate, clearly and with up-to-date data, how much tax a landlord really pays on rental income, considering traditional IRPF rules and the new requirements of the Tax Reform (IBS and CBS). \n\n With it, you understand: \n\n • When rental is taxed only by Income Tax \n • When the individual is classified as a Large Landlord \n • When cumulative incidence of IRPF + IBS + CBS occurs \n • What is the total tax burden and the real effective rate \n\n All based on current legislation, especially Art. 251 of the IBS/CBS Law.",
+            "whoNeeds": {
+                "title": "Who needs to use this calculator?",
+                "text": "This tool is ideal for:",
+                "list": [
+                    "Owners renting 1, 2, 3 or more properties",
+                    "Individuals with significant rental income",
+                    "Real estate investors wanting to understand the tax reform impact",
+                    "Those evaluating if staying as an individual still makes sense",
+                    "Those wishing to compare Individual vs Legal Entity/Holding in the future"
+                ],
+                "footer": "If you receive rent as an individual, this calculator is essential."
+            },
+            "landlordDistinction": {
+                "title": "Small Landlord vs Large Landlord: what is the difference?",
+                "intro": "The Tax Reform created an important attention point for individuals renting properties.",
+                "smallTitle": "🔹 Small Landlord (Individual)",
+                "smallText": "You continue to be taxed only by IRPF when you do not simultaneously exceed:",
+                "smallList": [
+                    "More than 3 rented properties",
+                    "R$ 240,000 per year in gross rental revenue"
+                ],
+                "smallFooter": "In this case, rent is treated as common taxable income, subject to the progressive Income Tax table.",
+                "largeTitle": "🔹 Large Landlord (Individual)",
+                "largeText": "You are classified as a Large Landlord when, at the same time:",
+                "largeList": [
+                    "You possess more than 3 rented properties",
+                    "Have annual rental revenue above R$ 240,000"
+                ],
+                "largeFooter": "In this scenario, cumulative taxation occurs, i.e.: \n • IRPF continues to be due \n • IBS and CBS start to apply on rental revenue \n • **No tax substitution** \n • **No regime option**",
+                "conclusion": "👉 The tax burden increases significantly, and that is exactly what this calculator demonstrates transparently."
+            },
+            "howItWorks": {
+                "title": "How does the calculator work?",
+                "text": "It considers:",
+                "list": [
+                    "Number of rented properties",
+                    "Annual gross rental revenue",
+                    "Other taxable income",
+                    "Dependents",
+                    "Deductible expenses",
+                    "Calculation year",
+                    "Classification rules based on the previous calendar year"
+                ],
+                "footer": "Based on this data, the system: \n • Determines your legal status \n • Calculates IRPF due \n • Calculates IBS + CBS, when applicable \n • Shows total tax burden \n • Presents real effective rate, without simplifications"
+            },
+            "substitution": {
+                "title": "Do IBS and CBS replace IRPF?",
+                "answer": "❌ No.",
+                "explanation": "This is one of the biggest points of confusion today.",
+                "highlight": "👉 IBS and CBS do not replace IRPF.",
+                "text": "When applicable, they are added to Income Tax, as they apply to the economic activity of renting, while IRPF continues to apply to the individual's income.",
+                "footer": "The calculator makes this explicit, with separate values and consolidated total."
+            },
+            "effectiveRate": {
+                "title": "Why can the effective rate seem so high?",
+                "text": "Because the individual classified as a Large Landlord starts paying:",
+                "list": [
+                    "IRPF on income",
+                    "IBS + CBS on rental revenue"
+                ],
+                "explanation": "Even with the 70% reduction in VAT rate for residential rental, the combined burden can easily exceed 30% of revenue, depending on the taxpayer's profile.",
+                "footer": "👉 This is the exact point where many investors start evaluating a Legal Entity or real estate holding."
+            },
+            "transparency": {
+                "title": "Transparent simulation, no unrealistic promises",
+                "list": [
+                    "✔️ Clear legal basis",
+                    "✔️ Correct rules (AND, not OR)",
+                    "✔️ Cumulative taxation correctly applied",
+                    "✔️ No \"magic optimizations\"",
+                    "✔️ No hiding taxes"
+                ],
+                "footer": "This calculator was built to inform and plan, not to mislead."
+            },
+            "important": {
+                "title": "Important to know",
+                "list": [
+                    "Classification as Large Landlord is based on the previous calendar year",
+                    "In some cases, IBS/CBS incidence may occur in the current year, according to law",
+                    "VAT credits are not considered in this version",
+                    "The result is a simulation, does not replace an accountant or tax lawyer"
+                ]
+            },
+            "planning": {
+                "title": "Tax planning begins with information",
+                "text": "Before deciding:",
+                "list": [
+                    "Continue as individual",
+                    "Open a Company",
+                    "Create a real estate holding"
+                ],
+                "footer": "👉 Understand first how much you really pay today."
+            },
+            "cta": "Use the Rental Income Tax Calculator - Individual by Kitnets.com and have total clarity on your tax burden in the post-Tax Reform scenario."
+        }
     },
     "rentAdjustmentCalculatorPage": {
         "title": "Rent Adjustment Calculator (IGP-M, IPCA, IVAR)",
@@ -1440,6 +1628,15 @@
             "description": "Calculate pro-rata rent for start or end of contract online. Simple, fast, and free."
         }
     },
+    "rentOnIndividualCalculatorPage": {
+        "seo": {
+            "title": "Rental Income Tax Calculator for Individuals - Kitnets.com",
+            "description": "Calculate how much tax you will pay on rental income as an individual."
+        },
+        "title": "Rental Income Tax Calculator (Individual)",
+        "description": "Simulate your taxes on rental income received as an individual.",
+        "menuTitle": "Rental on Individual"
+    },
     "calculatorsOverview": {
         "title": "Financial, Rent, and Investment Calculators",
         "subtitle": "Free simulators for rent, financing, adjustments, interest, inflation, and financial planning — made for landlords, tenants, and real estate investors.",
@@ -1453,7 +1650,8 @@
             "finance": "Finance",
             "indices": "Indices",
             "interest": "Interest",
-            "planning": "Planning"
+            "planning": "Planning",
+            "taxes": "Taxes"
         },
         "conversion": {
             "title": "Want to save your simulations and contracts?",
@@ -1527,6 +1725,14 @@
                 "irpf2026": {
                     "title": "IRPF 2026 Calculator",
                     "description": "Official simulation with deduction from Law 15.270/2025"
+                },
+                "rentOnIndividual": {
+                    "title": "Rental on Individual",
+                    "description": "Simulate your taxes on rental income received as an individual."
+                },
+                "minTaxPF": {
+                    "title": "Minimum Tax on Individuals",
+                    "description": "Calculate the Minimum Tax for High Incomes (IRPFM) and verify if you fall under the new rule."
                 }
             }
         },
@@ -1988,5 +2194,120 @@
         "totalTableTax": "Total Table Tax",
         "disclaimerTitle": "Legal Note",
         "disclaimerText": "This calculator strictly follows Law No. 15,270/2025 and guidelines published by the Federal Revenue. The result is for informational purposes."
+    },
+    "highIncomeTaxCalculatorPage": {
+        "title": "Minimum Tax Calculator for High Income (IRPFM)",
+        "subtitle": "Simulate taxation for annual incomes over R$ 600,000 under Law 15.270/2025",
+        "inputs": {
+            "grossIncomeTitle": "Annual Gross Income",
+            "salaries": "Salaries, Pro-Labore, Pensions",
+            "rent": "Rentals",
+            "business": "Rural Activity / Self-Employed",
+            "financial": "Financial Income (Taxed/Exempt)",
+            "dividends": "Dividends (Brazil)",
+            "other": "Other Income",
+            "exclusionsTitle": "Exclusions (Art. 16-A, §1º)",
+            "capitalGains": "Capital Gains (Except Stock Exchange)",
+            "rra": "RRA Taxed Exclusively at Source",
+            "inheritance": "Inheritance / Donation (Advance on Inheritance)",
+            "deductionsTitle": "Base Calculation Deductions (Art. 16-A, §3º)",
+            "savings": "Savings Account Income",
+            "accidentIndemnity": "Accident Indemnities (Excluding Lost Profits)",
+            "legalExemptions": "Legal Exemptions (Law 7.713/88 - Serious Illness/Elderly)",
+            "exemptFinancial": "Exempt Financial Income (Except Dividends)",
+            "offsetsTitle": "Offsets and Credits",
+            "irpfPaid": "IRPF Due in Annual Return",
+            "withheldIr": "Withheld IR (Already included in Base)",
+            "offshoreIr": "IR Paid Abroad (Law 14.754)",
+            "definitiveIr": "Definitive IR Already Paid",
+            "dividendsWithheld": "Anticipated IRPFM on Dividends",
+            "calculate": "Calculate"
+        },
+        "results": {
+            "netIncome": "Net Income for Test",
+            "thresholdStatus": "Status",
+            "aboveThreshold": "Subject to IRPFM",
+            "belowThreshold": "Exempt from IRPFM",
+            "effectiveRate": "IRPFM Effective Rate",
+            "grossTax": "Gross IRPFM",
+            "finalTax": "IRPFM Payable",
+            "redutor": "Applied Reducer",
+            "totalDeductions": "Total Deductions"
+        },
+        "tooltips": {
+            "redutor": "Mechanism ensuring Corporate Tax + Personal Tax does not exceed 34% (general) or financial rates.",
+            "dividendsAnticipation": "10% monthly withholding anticipation for dividends above R$ 50k."
+        },
+        "seo": {
+            "title": "IRPFM Calculator - High Income Minimum Tax (Law 15.270/2025)",
+            "description": "Simulate the Minimum Tax for High Income (IRPFM). Find out if you are subject to the high wealth tax and calculate the tax due under Law 15.270/2025."
+        },
+        "disclaimer": "Simulation based on Law 15.270/2025 (PL 1087/2025). Does not replace official declaration.",
+        "takeaway": "Even with exemptions, deductions, and exempt income, those earning above R$ 600,000 per year now have an effective minimum rate, ensuring real progressivity at the top income level.",
+        "article": {
+            "title": "Minimum Tax Calculator for High Income (IRPFM)",
+            "intro": "The Kitnets.com Minimum Tax Calculator for High Income (IRPFM) allows you to simulate, clearly and in detail, how much minimum tax an individual taxpayer may pay on income if their annual earnings exceed R$ 600,000, according to the rules introduced by Law No. 15,270/2025, valid from the calendar year 2026.",
+            "description": "This new taxation was created to ensure real progressivity at the top income level, even when a significant part of the earnings consists of dividends, exempt income, or exclusively taxed income.",
+            "whatIs": {
+                "title": "What is the Minimum Tax for High Income?",
+                "content": "The IRPFM (Minimum Individual Income Tax) establishes that taxpayers with high annual income must pay a minimum effective rate, calculated on the aggregate income received in the year, including:",
+                "list": [
+                    "Labor income",
+                    "Rentals",
+                    "Self-employed or rural activity",
+                    "Financial income",
+                    "Dividends received in Brazil",
+                    "Other taxable, exempt, or exclusive income"
+                ],
+                "note": "Even with exemptions, legal deductions, and traditionally untaxed income, those exceeding the R$ 600,000 annual limit enter the minimum tax regime."
+            },
+            "howItWorks": {
+                "title": "How does the IRPFM rate work?",
+                "content": "The minimum tax rate is progressive and linear:",
+                "list": [
+                    "Up to R$ 600k/year → exempt from IRPFM",
+                    "Between R$ 600k and R$ 1.2M → rate grows gradually from 0% to 10%",
+                    "Above R$ 1.2M → maximum rate of 10%"
+                ],
+                "note": "The calculator automatically shows the effective rate applied, according to the entered value."
+            },
+            "whatToSimulate": {
+                "title": "What you can simulate with this calculator",
+                "content": "With this tool, you can:",
+                "list": [
+                    "See if your income falls under the minimum tax",
+                    "Calculate the IRPFM tax base",
+                    "Correctly apply: Legal exclusions (capital gains, inheritance, RRA, etc.) and Permitted deductions (savings, indemnities, specific exemptions)",
+                    "Consider: IR already paid in annual return, Withheld IR, Tax paid abroad, Definitive IR already collected, and Anticipated IRPFM on dividends",
+                    "Visualize the final IRPFM payable or zero, transparently"
+                ]
+            },
+            "dividends": {
+                "title": "Dividend taxation: how does it enter the calculation?",
+                "content": "The law also provides for monthly anticipation of IRPFM when dividends paid by the same company to an individual exceed R$ 50,000 in the month, with 10% withholding at source. This withholding is not a definitive tax: it enters as a credit in the annual minimum tax calculation — and the calculator automatically considers this adjustment."
+            },
+            "redutor": {
+                "title": "IRPFM Reducer: protection against double taxation",
+                "content": "To prevent the sum of taxes paid by the company (IRPJ + CSLL) and the individual from exceeding certain limits, the law created the IRPFM reducer. In the calculator, this reducer can be entered simply, allowing simulation of scenarios where: The total tax burden was already high on the legal entity or The individual's minimum tax is partially reduced or even zeroed."
+            },
+            "whyUse": {
+                "title": "Why use the Kitnets.com Calculator?",
+                "list": [
+                    "Updated with Law 15.270/2025",
+                    "Explicit legal basis at each step of the calculation",
+                    "Clear interface, with summary of base and tax",
+                    "Ideal for financial and tax planning",
+                    "Integrates with the logic of other Kitnets.com tax calculators"
+                ]
+            },
+            "important": {
+                "title": "Important",
+                "content": "This simulation is for informational and educational purposes. It does not replace the official Income Tax declaration or the advice of an accountant or tax specialist."
+            },
+            "cta": {
+                "title": "Start now",
+                "content": "Fill in the fields above and find out, in a few seconds, if you are subject to the minimum tax for high income and what the impact on your IR might be."
+            }
+        }
     }
 }

@@ -18,16 +18,6 @@
         "rentCategory": "Aluguel",
         "investment": "Investimento",
         "contents": "Conteúdos",
-        "taxesAndLegislation": "Impostos e legislação",
-        "salariesAndIncome": "Salário e Renda",
-        "taxes": "Impostos",
-        "rentalOnHolding": "Aluguel na Holding",
-        "irpf2026": "Calculadora IRPF 2026"
-    },
-    "filters": {
-        "title": "Filtrar resultados",
-        "location": "Localização",
-        "propertyType": "Tipo do imóvel",
         "selectPlaceholder": "Nenhum selecionado",
         "kitnet": "Kitnet",
         "studio": "Studio",
@@ -67,7 +57,60 @@
         "furnished": "Mobiliado",
         "balcony": "Varanda",
         "petFriendly": "Pet Friendly",
-        "nearMetro": "Metrô prox."
+        "nearMetro": "Metrô prox.",
+        "taxesAndLegislation": "Impostos e Legislação",
+        "salariesAndIncome": "Salários e Renda",
+        "taxes": "Impostos",
+        "rentalOnHolding": "Aluguel na Holding",
+        "irpf2026": "Calculadora IRPF 2026",
+        "rentOnIndividual": "Aluguel na Pessoa Física",
+        "highIncomeTax": "Imposto Mínimo Altas Rendas",
+        "minTaxPF": "Imposto Mínimo PF"
+    },
+    "filters": {
+        "title": "Filtros",
+        "location": "Localização",
+        "searchPlaceholder": "Digite uma cidade ou bairro...",
+        "propertyType": "Tipo de Imóvel",
+        "selectPlaceholder": "Nenhum selecionado",
+        "kitnet": "Kitnet",
+        "studio": "Studio",
+        "luxuryStudio": "Studio Luxo",
+        "flat": "Flat",
+        "apartment": "Apartamento",
+        "barracao": "Barracão",
+        "house": "Casa",
+        "penthouse": "Cobertura",
+        "duplex": "Duplex",
+        "pilotis": "Pilotis",
+        "townhouse": "Sobrado",
+        "bedrooms": "Número de quartos",
+        "price": "Valor",
+        "min": "mínimo",
+        "max": "máximo",
+        "area": "Área",
+        "parking": "Número de vagas",
+        "bathrooms": "Número de banheiros",
+        "listingHas": "Anúncio possui",
+        "virtualTour": "Tour Virtual",
+        "video": "Vídeo",
+        "floorPlan": "Desenho da planta",
+        "features": "Filtrar por características",
+        "amenities": "Comodidade",
+        "locationOptions": "Opções de localização",
+        "seeResults": "Ver resultados",
+        "createAlert": "Criar alerta",
+        "moreFilters": "Mais filtros",
+        "areaUnit": "Área (m²)",
+        "useful": "Útil",
+        "total": "Total",
+        "from": "De",
+        "to": "até",
+        "furnished": "Mobiliado",
+        "balcony": "Varanda",
+        "petFriendly": "Pet Friendly",
+        "nearMetro": "Metrô prox.",
+        "clear": "Limpar"
     },
     "home": {
         "welcome": "Bem-vindo ao Kitnets.com",
@@ -1275,6 +1318,162 @@
             "inflationError": "A inflação não pode ser maior que o retorno nominal."
         }
     },
+    "rentAdjustmentCalculatorPage": {
+        "title": "Calculadora de Reajuste de Aluguel (IGP-M, IPCA, IVAR)",
+        "menuTitle": "Reajuste de Aluguel",
+        "description": "Calcule o reajuste do aluguel online e grátis. Simule com os índices oficiais (IGP-M, IPCA, INPC, IVAR) ou valor fixo.",
+        "seo": {
+            "title": "Calculadora de Reajuste de Aluguel (IGP-M, IPCA, IVAR) - Kitnets.com",
+            "description": "Calcule o reajuste do aluguel online e grátis. Simule com os índices oficiais (IGP-M, IPCA, INPC, IVAR) ou valor fixo."
+        },
+        "inputs": {
+            "currentRent": "Valor Atual do Aluguel (R$)",
+            "adjustmentDate": "Mês do Reajuste (Início do novo ciclo)",
+            "indexLabel": "Índice de Reajuste",
+            "indexPlaceholder": "Selecione o índice (ex: IGP-M)",
+            "calculate": "Calcular Reajuste"
+        },
+        "results": {
+            "newRent": "Novo Valor de Aluguel",
+            "adjustmentParams": "Parâmetros do Reajuste",
+            "indexUsed": "Índice",
+            "accumulated": "Acumulado",
+            "originalRent": "Aluguel Original",
+            "adjustmentValue": "Valor do Reajuste",
+            "copy": "Copiar Resultado"
+        }
+    },
+    "rentOnIndividualCalculatorPage": {
+        "seo": {
+            "title": "Calculadora de Imposto de Aluguel na PF - Kitnets.com",
+            "description": "Calcule quanto você pagará de imposto de aluguel como Pessoa Física."
+        },
+        "title": "Calculadora de Aluguel na Pessoa Física",
+        "description": "Simule seus impostos sobre aluguel recebido como pessoa física.",
+        "menuTitle": "Aluguel na PF"
+    },
+    "calculatorsOverview": {
+        "title": "Calculadoras Imobiliárias e Financeiras",
+        "subtitle": "Ferramentas inteligentes para otimizar seus investimentos e decisões no mercado imobiliário.",
+        "searchPlaceholder": "Buscar calculadora...",
+        "categories": {
+            "all": "Todas",
+            "rent": "Aluguel",
+            "finance": "Finanças",
+            "indices": "Índices",
+            "interest": "Juros",
+            "planning": "Planejamento",
+            "taxes": "Impostos"
+        },
+        "mostUsed": "Mais Usadas",
+        "cards": {
+            "ctaPrimary": "Calcular",
+            "items": {
+                "rentAdjustment": {
+                    "title": "Reajuste de Aluguel",
+                    "description": "Calcule o reajuste do aluguel com base em diversos índices (IGP-M, IPCA, IVAR, etc.) e simule diferentes cenários."
+                },
+                "lateFee": {
+                    "title": "Multa por Atraso de Aluguel",
+                    "description": "Calcule multas e juros por atraso no pagamento do aluguel, conforme a legislação vigente."
+                },
+                "terminationFee": {
+                    "title": "Multa por Rescisão de Contrato de Aluguel",
+                    "description": "Simule o valor da multa por rescisão antecipada de contrato de aluguel, considerando o tempo restante e o valor do aluguel."
+                },
+                "proRataRent": {
+                    "title": "Aluguel Proporcional",
+                    "description": "Calcule o valor proporcional do aluguel para períodos incompletos, ideal para início ou fim de contrato."
+                },
+                "holdingRental": {
+                    "title": "Aluguel na Holding",
+                    "description": "Compare a tributação do aluguel recebido por pessoa física (PF) e por uma holding imobiliária, e descubra a opção mais vantajosa."
+                },
+                "rentalIncome": {
+                    "title": "Renda do Aluguel paga o Imóvel?",
+                    "description": "Descubra em quantos anos a renda do aluguel quita o financiamento do imóvel, considerando juros, impostos e reajustes."
+                },
+                "amortization": {
+                    "title": "Simulador de Amortização",
+                    "description": "Compare os sistemas SAC e PRICE, simule amortizações com FGTS ou recursos próprios e veja a economia de juros e tempo."
+                },
+                "monthlyAnnualInterest": {
+                    "title": "Conversor de Juros Mensal e Anual",
+                    "description": "Converta taxas de juros mensais para anuais e vice-versa, considerando juros compostos para uma análise precisa."
+                },
+                "compoundInterest": {
+                    "title": "Juros Compostos",
+                    "description": "Simule o crescimento do seu patrimônio com juros compostos, aportes mensais ou anuais e visualize o poder da acumulação."
+                },
+                "financialIndependence": {
+                    "title": "Independência Financeira",
+                    "description": "Calcule quanto você precisa acumular para alcançar a independência financeira, considerando inflação e impostos reais."
+                },
+                "irpf2026": {
+                    "title": "IRPF 2026",
+                    "description": "Calcule o Imposto de Renda de Pessoa Física para o ano de 2026, com as novas regras e tabelas."
+                },
+                "rentOnIndividual": {
+                    "title": "Aluguel na PF",
+                    "description": "Simule seus impostos sobre aluguel recebido como pessoa física."
+                },
+                "minTaxPF": {
+                    "title": "Imposto Mínimo PF",
+                    "description": "Calcule o Imposto Mínimo para Altas Rendas (IRPFM) e verifique se você se enquadra na nova regra."
+                }
+            }
+        },
+        "seoContent": {
+            "intro": {
+                "title": "Calculadoras Imobiliárias e Financeiras: Suas Ferramentas para Decisões Inteligentes",
+                "text": "No dinâmico mercado imobiliário e financeiro, tomar decisões informadas é crucial. As calculadoras da Kitnets.com são projetadas para simplificar análises complexas, oferecendo clareza e precisão para proprietários, investidores, inquilinos e corretores."
+            },
+            "updated": {
+                "title": "Sempre Atualizadas e Confiáveis",
+                "text": "Nossas ferramentas são constantemente revisadas para refletir as últimas mudanças na legislação, índices econômicos e tendências de mercado. Isso garante que você sempre terá acesso a informações precisas para suas simulações e planejamentos. Incluímos:",
+                "items": [
+                    "Atualização de índices como IGP-M, IPCA, SELIC, CDI, IVAR e FipeZAP.",
+                    "Novas regras de tributação e impostos, como o IRPF 2026.",
+                    "Ajustes nas metodologias de cálculo para maior acurácia."
+                ],
+                "conclusion": "Com a Kitnets.com, você tem a certeza de que está usando ferramentas alinhadas com a realidade do mercado."
+            },
+            "ecosystem": {
+                "title": "Parte de um Ecossistema Completo",
+                "text": "As calculadoras são apenas uma parte da nossa plataforma. Elas se integram a um ecossistema maior, onde você pode gerenciar seus imóveis, acompanhar o mercado e tomar decisões estratégicas. Nossos usuários se beneficiam de:",
+                "items": [
+                    "Sincronização de dados entre calculadoras.",
+                    "Salvamento de simulações para consulta futura.",
+                    "Acesso a conteúdos educativos relacionados."
+                ],
+                "conclusion": "Tudo isso em um ambiente seguro e intuitivo."
+            },
+            "innovation": {
+                "title": "Pesquisa, dados e inovação contínua",
+                "text": "A Kitnets.com investe continuamente em pesquisa e desenvolvimento (P&D) para garantir que a plataforma evolua junto com o mercado. Nosso compromisso é claro:",
+                "items": [
+                    "Lançar pelo menos uma nova calculadora todos os meses, sempre com base em demandas reais de proprietários, investidores e profissionais do mercado imobiliário."
+                ],
+                "conclusion": "Isso transforma a Kitnets.com em um hub vivo, em constante expansão, acompanhando tendências econômicas, mudanças regulatórias e novas oportunidades de investimento."
+            },
+            "targetAudience": {
+                "title": "Para quem é o Hub de Calculadoras da Kitnets.com?",
+                "items": [
+                    "Proprietários de imóveis de aluguel",
+                    "Investidores imobiliários",
+                    "Quem está avaliando comprar imóvel para renda",
+                    "Imobiliárias e administradoras",
+                    "Holdings patrimoniais",
+                    "Pessoas físicas que querem tomar decisões financeiras mais inteligentes"
+                ],
+                "conclusion": "Seja para decisões rápidas ou para análises aprofundadas, a Kitnets.com oferece as ferramentas certas."
+            },
+            "cta": {
+                "title": "Tome decisões com dados, não com \"achismos\"",
+                "text": "As calculadoras da Kitnets.com foram criadas para quem quer sair das planilhas improvisadas e passar a gerir aluguel, financiamento e investimentos de forma profissional.\n\nExplore o hub, utilize as calculadoras e acompanhe a evolução constante da plataforma.\nDados corretos hoje significam melhores decisões amanhã."
+            }
+        }
+    },
     "indices": {
         "ipca": {
             "title": "IPCA – Índice Nacional de Preços ao Consumidor Amplo | Histórico Completo e Análise",
@@ -1958,6 +2157,78 @@
         ],
         "finalCta": "Explore os indicadores, aprofunde sua análise e tome decisões melhores com base em dados reais."
     },
+    "rentalIncomeCalculatorPage": {
+        "seo": {
+            "title": "A renda do aluguel paga o financiamento? - Kitnets.com",
+            "description": "Descubra em quantos anos o aluguel paga o imóvel financiado. Simule SAC ou PRICE, considere juros, seguros, impostos, vacância e reajuste anual."
+        }
+    },
+    "rentLateFineCalculatorPage": {
+        "seo": {
+            "title": "Calculadora de Multa por Atraso de Aluguel - Kitnets.com",
+            "description": "Calcule multas e juros por atraso de aluguel."
+        },
+        "title": "Calculadora de Multa por Atraso de Aluguel",
+        "menuTitle": "Multa por Atraso",
+        "description": "Calcule juros e multa por atraso no aluguel conforme a lei.",
+        "inputs": {
+            "generalData": "Dados Gerais",
+            "calculationDate": "Data do Cálculo",
+            "calculationDateOptionToday": "Hoje (Data atual)",
+            "calculationDateOptionSpecific": "Data Específica",
+            "gracePeriod": "Carência (dias)",
+            "fineRules": "Regras de Multa",
+            "finePercent": "Multa (%)",
+            "applyFineOnlyIfDelayed": "Aplicar multa apenas se houver atraso (após carência)",
+            "interestRules": "Regras de Juros",
+            "interestMonthly": "Juros Mensais",
+            "interestDaily": "Juros Diários",
+            "interestMonthlyLabel": "% a.m. (Pro-rata)",
+            "interestDailyLabel": "% a.d.",
+            "interestMonthlyTooltip": "Calculado proporcionalmente (pro rata) com base na taxa mensal.",
+            "interestDailyTooltip": "Use quando o contrato define juros diários (ex: 0,033% ao dia).",
+            "presetsTitle": "Perfis Rápidos",
+            "presetStandard": "Padrão Contrato: 10% + 1% a.m.",
+            "presetBoleto": "Boleto: 2% + 1% a.m.",
+            "presetGrace": "Cobrar após 1 dia"
+        },
+        "installments": {
+            "title": "Parcelas em Atraso",
+            "addInstallment": "Adicionar Parcela",
+            "clearAll": "Limpar Tudo",
+            "tableHeaderValue": "Valor (R$)",
+            "tableHeaderDueDate": "Vencimento",
+            "tableHeaderPayDate": "Data Pagamento (Opcional)",
+            "tableHeaderActions": "Ações",
+            "importCsv": "Importar Múltiplos",
+            "remove": "Remover",
+            "duplicate": "Duplicar"
+        },
+        "results": {
+            "cardsTitle": "Resultados Consolidados",
+            "totalPrincipal": "Valor Original",
+            "totalFine": "Total Multa",
+            "totalInterest": "Total Juros",
+            "totalUpdated": "Total Atualizado",
+            "detailedTableTitle": "Detalhamento por Parcela",
+            "colDueDate": "Vencimento",
+            "colValue": "Valor",
+            "colDelayDays": "Dias Atraso",
+            "colFine": "Multa",
+            "colInterest": "Juros",
+            "colTotal": "Total",
+            "actions": {
+                "copySummary": "Copiar Resumo",
+                "print": "Imprimir",
+                "exportCsv": "Baixar CSV"
+            },
+            "footerDisclaimer": "Esta calculadora é uma estimativa baseada nos parâmetros informados e práticas contratuais comuns (multa e juros). Contratos podem prever regras específicas e a cobrança real pode variar. Para casos de disputa, consulte sua imobiliária/advogado."
+        },
+        "pageContent": {
+            "intro": "Calcule juros e multas de aluguel de forma simples.",
+            "sections": []
+        }
+    },
     "rentFineCalculatorPage": {
         "metaTitle": "Calculadora de Multa Rescisória de Aluguel | Kitnets",
         "metaDescription": "Calcule o valor da multa por quebra de contrato de aluguel conforme a Lei do Inquilinato. Simule diferentes cenários e saiba quanto pagar.",
@@ -2097,407 +2368,9 @@
                 }
             ],
             "cta": {
-                "title": "Use agora",
-                "text": "Preencha os dados do contrato e descubra, em segundos, qual é a multa correta na rescisão do seu contrato de aluguel, com base na lei e nas cláusulas contratuais."
-            }
-        }
-    },
-    "rentAdjustmentCalculatorPage": {
-        "seo": {
-            "title": "Calculadora de Reajuste de Aluguel (IGP-M, IPCA, IVAR) - Kitnets.com",
-            "description": "Calcule o reajuste de aluguel online e gratuito. Simule com os índices oficiais (IGP-M, IPCA, INPC, IVAR) ou valor fixo."
-        }
-    },
-    "rentalIncomeCalculatorPage": {
-        "seo": {
-            "title": "Calculadora: A Renda do Aluguel Paga o Financiamento? - Kitnets.com",
-            "description": "Descubra em quanto tempo o aluguel cobre a parcela do financiamento. Simule cenários com SAC, PRICE, vacância e impostos."
-        }
-    },
-    "rentLateFineCalculatorPage": {
-        "title": "Calculadora de Multa de Atraso no Pagamento de Aluguel",
-        "menuTitle": "Multa por Atraso",
-        "description": "Calcule multas e juros de mora acumulados em aluguéis atrasados, com opções de cálculo pró-rata e taxas personalizadas.",
-        "inputs": {
-            "generalData": "Dados Gerais",
-            "calculationDate": "Calcular até",
-            "calculationDateOptionToday": "Hoje",
-            "calculationDateOptionSpecific": "Data específica",
-            "gracePeriod": "Carência para cobrança (dias)",
-            "fineRules": "Regra de Multa",
-            "finePercent": "Multa (%)",
-            "applyFineOnlyIfDelayed": "Aplicar multa apenas se houver atraso (respeitando carência)",
-            "interestRules": "Regra de Juros",
-            "interestMonthly": "Mensal (Pró-rata)",
-            "interestDaily": "Diário",
-            "interestMonthlyLabel": "% a.m.",
-            "interestDailyLabel": "% a.d.",
-            "interestMonthlyTooltip": "Cálculo diário aproximado: % a.m. / 30 × dias de atraso.",
-            "interestDailyTooltip": "Use quando o contrato define juros diários (ex.: 0,10% ao dia).",
-            "presetsTitle": "Perfis Rápidos",
-            "presetStandard": "Padrão contrato: 10% + 1% a.m.",
-            "presetBoleto": "Boleto: 10% + 0,10% a.d.",
-            "presetGrace": "Cobrar após 1 dia"
-        },
-        "installments": {
-            "title": "Parcelas em Atraso",
-            "addInstallment": "Adicionar parcela",
-            "clearAll": "Limpar tudo",
-            "tableHeaderValue": "Valor (R$)",
-            "tableHeaderDueDate": "Vencimento",
-            "tableHeaderPayDate": "Data Pagto (Opcional)",
-            "tableHeaderActions": "Ações",
-            "importCsv": "Importar várias",
-            "remove": "Remover",
-            "duplicate": "Duplicar"
-        },
-        "results": {
-            "cardsTitle": "Resultados Consolidados",
-            "totalPrincipal": "Total Principal",
-            "totalFine": "Total Multa",
-            "totalInterest": "Total Juros",
-            "totalUpdated": "Total Atualizado",
-            "detailedTableTitle": "Detalhamento por Parcela",
-            "colDueDate": "Vencimento",
-            "colValue": "Valor",
-            "colDelayDays": "Dias Atraso",
-            "colFine": "Multa",
-            "colInterest": "Juros",
-            "colTotal": "Total",
-            "actions": {
-                "copySummary": "Copiar Resumo",
-                "print": "Imprimir",
-                "exportCsv": "Baixar CSV"
-            },
-            "footerDisclaimer": "Esta calculadora é uma estimativa baseada nos parâmetros informados e em práticas contratuais comuns (multa e juros). Contratos podem prever regras específicas e a cobrança efetiva pode variar. Para casos de disputa, consulte sua imobiliária/advogado."
-        },
-        "seo": {
-            "title": "Calculadora de Multa e Juros por Atraso no Aluguel (Pró-rata) - Kitnets.com",
-            "description": "Calcule multa e juros de mora por atraso no aluguel com pró-rata por dia. Suporta vários boletos/meses em atraso e detalha o total por parcela."
-        },
-        "pageContent": {
-            "intro": "A Calculadora de Multa de Atraso no Pagamento de Aluguel do Kitnets.com permite calcular de forma rápida, transparente e precisa multas e juros de mora aplicáveis a aluguéis pagos em atraso, exatamente como previsto nos contratos de locação mais utilizados no Brasil. Com poucos dados, você descobre quanto realmente deve pagar ou cobrar, considerando pró-rata por dia, diferentes regras de juros e várias parcelas em atraso ao mesmo tempo — algo essencial em casos de inadimplência recorrente.",
-            "sections": [
-                {
-                    "title": "Para que serve a calculadora de multa por atraso no aluguel?",
-                    "text": "Esta ferramenta é ideal para:",
-                    "list": [
-                        "Locatários que querem saber o valor correto do aluguel atrasado antes de pagar",
-                        "Locadores que precisam calcular multas e juros de forma justa e documentada",
-                        "Imobiliárias que fazem cobranças administrativas ou extrajudiciais",
-                        "Advogados e administradores de imóveis que precisam de valores claros e auditáveis"
-                    ],
-                    "conclusion": "Ela elimina dúvidas comuns como: A multa é aplicada uma única vez ou por mês? O juro é de 1% ao mês ou 0,10% ao dia? Como funciona o cálculo pró-rata? O que acontece quando há mais de um aluguel vencido?"
-                },
-                {
-                    "title": "Como funciona o cálculo da multa e dos juros de aluguel atrasado?",
-                    "text": "A calculadora segue as cláusulas mais comuns encontradas em contratos de locação residencial e comercial, como:",
-                    "list": [
-                        "Multa contratual (geralmente 10% sobre o valor do aluguel)",
-                        "Juros de mora: 1% ao mês (com cálculo pró-rata por dia), ou Percentual diário (ex.: 0,10% ao dia)",
-                        "Carência para cobrança, quando prevista em contrato (ex.: cobrar após 1 dia corrido do vencimento)"
-                    ]
-                },
-                {
-                    "title": "Cálculo pró-rata por dia",
-                    "text": "Se o contrato estabelece juros mensais, a calculadora converte automaticamente para um valor diário proporcional, garantindo um cálculo justo, especialmente em atrasos curtos."
-                },
-                {
-                    "title": "Suporte a múltiplos aluguéis em atraso",
-                    "text": "Diferente de calculadoras simples, esta ferramenta permite informar várias parcelas vencidas, cada uma com: Valor do aluguel, Data de vencimento, Data de pagamento (opcional). Isso é essencial quando o atraso envolve 2, 3 ou mais meses, pois cada parcela tem um número diferente de dias em atraso e, portanto, um valor atualizado distinto. A calculadora soma tudo automaticamente e apresenta: Total principal, Total de multa, Total de juros, Total atualizado a pagar ou cobrar."
-                },
-                {
-                    "title": "Resultados claros e detalhados",
-                    "text": "Após inserir os dados, você visualiza:",
-                    "list": [
-                        "O valor atualizado parcela por parcela",
-                        "O total consolidado da dívida",
-                        "Quantos dias cada aluguel ficou em atraso",
-                        "Quanto da dívida corresponde a multa e quanto a juros"
-                    ],
-                    "conclusion": "Essas informações facilitam: Negociação amigável, Cobrança administrativa, Conferência de boletos bancários, Organização financeira pessoal ou profissional."
-                },
-                {
-                    "title": "Exemplos de uso prático",
-                    "list": [
-                        "“Atrasei o aluguel em 15 dias, quanto devo pagar?”",
-                        "“Tenho 3 meses de aluguel vencidos, cada um com valor diferente.”",
-                        "“O contrato cobra 10% de multa e 1% ao mês. Está certo esse valor?”",
-                        "“O boleto fala em 0,10% ao dia. Quanto isso dá na prática?”"
-                    ],
-                    "conclusion": "A calculadora resolve todos esses cenários em segundos."
-                },
-                {
-                    "title": "Importante: transparência e responsabilidade",
-                    "text": "Esta calculadora utiliza regras contratuais padrão, mas cada contrato pode conter cláusulas específicas. Os valores calculados são estimativas financeiras, úteis para conferência, negociação e planejamento. Para disputas judiciais ou cobranças formais, recomenda-se sempre a análise do contrato e, se necessário, a orientação de um profissional jurídico."
-                },
-                {
-                    "title": "Por que usar a Calculadora de Multa de Atraso do Kitnets.com?",
-                    "list": [
-                        "✅ Cálculo pró-rata correto",
-                        "✅ Suporte a múltiplos aluguéis em atraso",
-                        "✅ Regras flexíveis de multa e juros",
-                        "✅ Interface simples e rápida",
-                        "✅ Total transparência nos valores"
-                    ]
-                }
-            ],
-            "finalText": "Se você lida com aluguel atrasado — seja como locatário, locador ou imobiliária — esta é a forma mais prática de saber exatamente quanto é devido, sem surpresas."
-        }
-    },
-    "proRataRentCalculatorPage": {
-        "title": "Calculadora de Aluguel Proporcional (Pro-Rata)",
-        "menuTitle": "Aluguel Proporcional",
-        "description": "Calcule o valor proporcional do aluguel para períodos incompletos (início ou fim de contrato).",
-        "inputs": {
-            "contractDetails": "Dados do Contrato",
-            "monthlyRent": "Valor do Aluguel Mensal (R$)",
-            "startDate": "Data Inicial (Pro-Rata)",
-            "endDate": "Data Final (Pro-Rata)",
-            "advancedOptions": "Opções Avançadas",
-            "calculationMethod": "Método de Cálculo",
-            "commercialMonth": "Mês Comercial (30 dias)",
-            "realDays": "Dias Reais do Mês (28-31 dias)",
-            "includeStartDate": "Incluir Data Inicial",
-            "includeEndDate": "Incluir Data Final",
-            "commercialMonthTooltip": "Padrão na maioria dos contratos: considera todos os meses como tendo 30 dias.",
-            "realDaysTooltip": "Considera o número exato de dias do mês (ex: Fevereiro = 28/29 dias).",
-            "calculate": "Calcular Aluguel Proporcional"
-        },
-        "validation": {
-            "endDateBeforeStart": "A data final deve ser igual ou posterior à data inicial.",
-            "differentMonth": "Este cálculo considera apenas um mês. Para períodos maiores, utilize o valor cheio ou repita o cálculo.",
-            "rentZero": "O valor do aluguel deve ser maior que zero."
-        },
-        "results": {
-            "title": "Resultado do Cálculo",
-            "payTitle": "Aluguel Proporcional a Pagar",
-            "breakdownTitle": "Detalhamento",
-            "dailyValue": "Valor diário",
-            "daysCharged": "Dias cobrados",
-            "methodUsed": "Método utilizado",
-            "period": "Período coberto",
-            "copy": "Copiar",
-            "recalculate": "Recalcular"
-        },
-        "pageContent": {
-            "intro": "A Calculadora de Aluguel Proporcional permite calcular com precisão o valor do aluguel devido quando o contrato não cobre um mês completo, situação muito comum no início, encerramento ou rescisão antecipada da locação.\n\nCom poucos dados — valor do aluguel, data inicial e data final — você descobre exatamente quanto deve ser pago, evitando erros, discussões e cobranças indevidas.",
-            "sections": [
-                {
-                    "title": "📅 Quando o aluguel proporcional é utilizado?",
-                    "text": "O cálculo pro-rata de aluguel é aplicado principalmente em situações como:",
-                    "list": [
-                        "Entrada do inquilino após o início do mês",
-                        "Saída do imóvel antes do fim do mês",
-                        "Rescisão antecipada do contrato",
-                        "Ajustes contratuais com vigência parcial",
-                        "Transição entre contratos ou inquilinos"
-                    ],
-                    "conclusion": "Nesses casos, o valor do aluguel deve ser calculado proporcionalmente aos dias efetivamente ocupados."
-                },
-                {
-                    "title": "🧮 Como funciona o cálculo de aluguel proporcional?",
-                    "text": "O cálculo segue uma lógica simples e amplamente utilizada em contratos de locação:",
-                    "list": [
-                        "Determina-se o valor diário do aluguel (Pelo mês comercial de 30 dias ou dias reais do mês)",
-                        "Calcula-se o número de dias ocupados no período",
-                        "Multiplica-se: Valor diário × número de dias"
-                    ],
-                    "conclusion": "O resultado é o aluguel proporcional exato a ser pago."
-                },
-                {
-                    "title": "✅ Por que usar a Calculadora de Aluguel Proporcional da Kitnets.com?",
-                    "list": [
-                        "Cálculo instantâneo e preciso",
-                        "Compatível com práticas contratuais brasileiras",
-                        "Evita erros manuais e interpretações equivocadas",
-                        "Ideal para inquilinos, proprietários e imobiliárias",
-                        "Totalmente online e gratuita"
-                    ],
-                    "conclusion": "A calculadora mostra não apenas o valor final, mas também o valor diário do aluguel, a quantidade de dias considerados, o método de cálculo utilizado e o período exato da cobrança."
-                },
-                {
-                    "title": "⚖️ Aluguel proporcional é obrigatório por lei?",
-                    "text": "A Lei do Inquilinato (Lei nº 8.245/91) não define uma fórmula única, mas o cálculo proporcional é amplamente aceito no mercado imobiliário e geralmente previsto em contrato.\n\nPor isso, é fundamental que o cálculo respeite o método acordado em contrato e seja transparente para ambas as partes."
-                },
-                {
-                    "title": "📌 Exemplo prático de aluguel proporcional",
-                    "text": "Aluguel mensal: R$ 1.500,00\nEntrada no imóvel: dia 10\nSaída ou fechamento do período: dia 25\nMétodo: mês comercial (30 dias)\n\nValor diário: R$ 50,00\nDias cobrados: 16\nAluguel proporcional: R$ 800,00"
-                },
-                {
-                    "title": "🔗 Ferramentas relacionadas",
-                    "text": "Se você está lidando com contratos de locação, também pode ser útil:",
-                    "links": [
-                        {
-                            "text": "Calculadora de reajuste de aluguel",
-                            "url": "/calculadora-reajuste-aluguel"
-                        },
-                        {
-                            "text": "Calculadora de multa por rescisão antecipada",
-                            "url": "/calculadoras/multa-rescisao-contrato-aluguel"
-                        },
-                        {
-                            "text": "Calculadora de multa por atraso no aluguel",
-                            "url": "/calculadoras/multa-atraso-aluguel"
-                        }
-                    ],
-                    "conclusion": "Todas disponíveis gratuitamente na Kitnets.com."
-                },
-                {
-                    "title": "🧾 Observação importante",
-                    "text": "Esta calculadora tem caráter informativo e educativo. Sempre verifique as cláusulas do contrato de locação e, em caso de dúvida, consulte um profissional especializado."
-                }
-            ]
-        },
-        "seo": {
-            "title": "Calculadora de Aluguel Proporcional (Pro-Rata) Online | Kitnets.com",
-            "description": "Calcule o aluguel proporcional de forma simples e precisa. Ideal para início ou fim de contrato de locação. Ferramenta gratuita da Kitnets.com."
-        }
-    },
-    "calculatorsOverview": {
-        "title": "Calculadoras Financeiras, de Aluguel e viabilidade de investimentos",
-        "subtitle": "Simuladores gratuitos para aluguel, financiamento, reajustes, juros, inflação e planejamento financeiro — feitos para locadores, inquilinos e investidores imobiliários.",
-        "microCta": "Usar agora — sem cadastro",
-        "secondaryCta": "Criar conta para salvar simulações",
-        "searchPlaceholder": "Buscar calculadora...",
-        "mostUsed": "Mais Utilizadas",
-        "categories": {
-            "all": "Todas",
-            "rent": "Aluguel",
-            "finance": "Financiamento",
-            "indices": "Índices",
-            "interest": "Juros",
-            "planning": "Planejamento"
-        },
-        "conversion": {
-            "title": "Quer salvar suas simulações e contratos?",
-            "text": "Em breve, o Kitnets.com permitirá acompanhar reajustes, contratos e imóveis em um só lugar.",
-            "cta": "Entrar na lista de espera"
-        },
-        "cards": {
-            "ctaPrimary": "Calcular agora",
-            "ctaSecondary": "Entenda como funciona",
-            "items": {
-                "rentAdjustment": {
-                    "title": "Reajuste de Aluguel",
-                    "description": "Atualize o valor do aluguel usando índices como IGP-M, IPCA ou IVAR."
-                },
-                "proRataRent": {
-                    "title": "Aluguel Proporcional",
-                    "description": "Calcule o valor do aluguel para períodos incompletos (início/fim de contrato)."
-                },
-                "lateFee": {
-                    "title": "Multa por Atraso",
-                    "description": "Calcule multas e juros por atraso no pagamento do aluguel."
-                },
-                "terminationFee": {
-                    "title": "Multa Rescisão de Contrato",
-                    "description": "Calcule a multa proporcional para desocupação antecipada do imóvel."
-                },
-                "rentalIncome": {
-                    "title": "Renda do Aluguel",
-                    "description": "Descubra se a renda do aluguel paga as parcelas do seu financiamento."
-                },
-                "amortization": {
-                    "title": "Amortização Financiamento",
-                    "description": "Simule a redução de juros e prazo amortizando seu financiamento imobiliario."
-                },
-                "monthlyAnnualInterest": {
-                    "title": "Conv. Juros Mensal/Anual",
-                    "description": "Converta taxas de juros mensais para anuais e vice-versa."
-                },
-                "compoundInterest": {
-                    "title": "Juros Compostos",
-                    "description": "Simule o crescimento do seu patrimônio com o poder dos juros compostos."
-                },
-                "financialIndependence": {
-                    "title": "Independência Financeira",
-                    "description": "Planeje sua liberdade financeira considerando inflação e impostos."
-                },
-                "ipca": {
-                    "title": "IPCA (Inflação Oficial)",
-                    "description": "Consulte o índice oficial de inflação do Brasil."
-                },
-                "igpm": {
-                    "title": "IGP-M (Aluguel)",
-                    "description": "Acompanhe o índice mais usado em contratos de aluguel."
-                },
-                "cdi": {
-                    "title": "CDI (Renda Fixa)",
-                    "description": "Acompanhe a taxa que baliza os investimentos de renda fixa."
-                },
-                "selic": {
-                    "title": "Taxa Selic",
-                    "description": "Consulte a taxa básica de juros da economia brasileira."
-                },
-                "inpc": {
-                    "title": "INPC",
-                    "description": "Consulte o índice nacional de preços ao consumidor."
-                },
-                "holdingRental": {
-                    "title": "Aluguel na Holding",
-                    "description": "Estime a carga tributária sobre aluguéis em holding familiar (Lucro Presumido) durante e após a transição da Reforma Tributária (2026-2033)."
-                },
-                "irpf2026": {
-                    "title": "Calculadora IRPF 2026",
-                    "description": "Simulação oficial com redução da Lei 15.270/2025"
-                }
-            }
-        },
-        "seoContent": {
-            "intro": {
-                "title": "Calculadoras Financeiras, de Aluguel e Viabilidade de Investimentos Imobiliários",
-                "text": "O Kitnets.com reúne em um único lugar as principais calculadoras financeiras, imobiliárias e de planejamento patrimonial do mercado brasileiro. Nosso hub de calculadoras foi criado para ajudar proprietários, investidores, locadores, imobiliárias e holdings a tomarem decisões mais seguras, rápidas e fundamentadas em dados reais.\n\nAqui você encontra ferramentas práticas para aluguel, financiamento imobiliário, juros, índices econômicos, viabilidade de investimentos e planejamento financeiro, todas desenvolvidas com foco na realidade do mercado imobiliário brasileiro."
-            },
-            "updated": {
-                "title": "Calculadoras sempre atualizadas com o mercado e a legislação",
-                "text": "Diferente de simuladores genéricos, as calculadoras do Kitnets.com são constantemente mantidas e atualizadas para refletir:",
-                "items": [
-                    "As condições atuais do mercado imobiliário",
-                    "A evolução dos índices oficiais como IGP-M, IPCA, IVAR, CDI e Selic",
-                    "As boas práticas contratuais e regras mais utilizadas em contratos de aluguel",
-                    "Mudanças em regulamentações, normas e interpretações do mercado"
-                ],
-                "conclusion": "Isso garante que os resultados apresentados sejam confiáveis, realistas e aplicáveis na prática, tanto para uso pessoal quanto profissional."
-            },
-            "ecosystem": {
-                "title": "Um ecossistema completo de calculadoras imobiliárias e financeiras",
-                "text": "No hub de calculadoras do Kitnets.com você pode:",
-                "items": [
-                    "Calcular reajuste de aluguel por diferentes índices",
-                    "Simular aluguel proporcional em início ou fim de contrato",
-                    "Estimar multas por atraso e rescisão contratual",
-                    "Avaliar se a renda do aluguel cobre o financiamento",
-                    "Simular amortizações de financiamento imobiliário",
-                    "Converter juros mensais e anuais",
-                    "Projetar crescimento com juros compostos",
-                    "Planejar sua independência financeira, considerando inflação e impostos"
-                ],
-                "conclusion": "Tudo isso em uma interface simples, rápida e acessível, inclusive no celular."
-            },
-            "innovation": {
-                "title": "Pesquisa, dados e inovação contínua",
-                "text": "O Kitnets.com investe continuamente em pesquisa e desenvolvimento (R&D) para garantir que a plataforma evolua junto com o mercado. Nosso compromisso é claro:",
-                "items": [
-                    "Lançar pelo menos uma nova calculadora todos os meses, sempre baseada em demandas reais de proprietários, investidores e profissionais do setor imobiliário."
-                ],
-                "conclusion": "Isso transforma o Kitnets.com em um hub vivo, em constante expansão, acompanhando tendências econômicas, mudanças regulatórias e novas oportunidades de investimento."
-            },
-            "targetAudience": {
-                "title": "Para quem é o Hub de Calculadoras do Kitnets.com?",
-                "items": [
-                    "Proprietários de imóveis para locação",
-                    "Investidores imobiliários",
-                    "Quem está avaliando comprar um imóvel para renda",
-                    "Imobiliárias e administradoras",
-                    "Holdings patrimoniais",
-                    "Pessoas físicas que querem tomar decisões financeiras mais inteligentes"
-                ],
-                "conclusion": "Seja para tomar decisões rápidas ou para análises mais profundas, o Kitnets.com oferece as ferramentas certas."
-            },
-            "cta": {
-                "title": "Tome decisões com dados, não com achismos",
-                "text": "As calculadoras do Kitnets.com foram criadas para quem quer sair das planilhas improvisadas e passar a gerenciar aluguel, financiamento e investimentos de forma profissional.\n\nExplore o hub, utilize as calculadoras e acompanhe a evolução constante da plataforma.\nDados corretos hoje significam decisões melhores amanhã."
+                "title": "Evite prejuízos na rescisão",
+                "subtitle": "Faça o cálculo exato e negocie com segurança.",
+                "button": "Calcular multa agora"
             }
         }
     },
@@ -2609,6 +2482,146 @@
                 "Mostra o impacto ao longo do tempo, não apenas em um ano isolado"
             ],
             "conclusion": "Se você aluga imóveis por meio de uma holding familiar ou está avaliando essa estrutura, esta calculadora ajuda a entender, comparar cenários e se preparar para o novo sistema tributário brasileiro."
+        }
+    },
+    "rentalTaxCalculatorPage": {
+        "title": "Calculadora de Imposto sobre Aluguel - Pessoa Física (IRPF + IBS + CBS)",
+        "subtitle": "Simule sua carga tributária considerando IRPF + IBS/CBS (Reforma Tributária)",
+        "inputs": {
+            "properties": "Número de Imóveis Alugados",
+            "revenue": "Receita Bruta Anual de Aluguel",
+            "taxYear": "Ano de Cálculo",
+            "referenceYear": "Ano de Referência (Anterior)",
+            "otherIncome": "Outros Rendimentos Tributáveis",
+            "dependents": "Número de Dependentes",
+            "deductions": "Despesas Dedutíveis (Saúde, Educação, etc.)",
+            "calculate": "Calcular Impostos"
+        },
+        "results": {
+            "legalStatus": "Status Legal",
+            "smallLandlord": "Pequeno Locador (Apenas IRPF)",
+            "largeLandlord": "Grande Locador (IRPF + CBS + IBS)",
+            "legalRef": "Base Legal: Art. 251 (Lei IBS/CBS)",
+            "irpfCard": "Imposto de Renda (IRPF)",
+            "irpfBase": "Base de Cálculo IRPF",
+            "irpfTax": "Imposto Devido (IRPF)",
+            "irpfEffective": "Alíquota Efetiva IRPF",
+            "cbsCard": "CBS (Federal)",
+            "ibsCard": "IBS (Estadual/Municipal)",
+            "vatBase": "Base de Cálculo",
+            "vatRate": "Alíquota Aplicada",
+            "vatTax": "Imposto Devido",
+            "startYear": "Ano de Início",
+            "totalCard": "Carga Tributária Total",
+            "totalTax": "Total a Pagar",
+            "totalEffective": "Alíquota Efetiva Total"
+        },
+        "alerts": {
+            "classification": "Classificação baseada no ano anterior.",
+            "cumulative": "IBS e CBS não substituem o IRPF; a tributação é cumulativa.",
+            "advice": "Esta simulação não substitui a assessoria de um contador.",
+            "credits": "Créditos de IVA não considerados nesta versão."
+        },
+        "seo": {
+            "title": "Calculadora Imposto Aluguel Pessoa Física (IRPF, IBS, CBS) | Kitnets",
+            "description": "Calcule impostos de aluguel para PF. Veja impacto do IRPF, IBS e CBS para pequenos e grandes locadores com a Reforma Tributária."
+        },
+        "page": {
+            "intro": "A Calculadora de Imposto sobre Aluguel na Pessoa Física do Kitnets.com permite simular, de forma clara e atualizada, quanto um proprietário realmente paga de imposto sobre renda de aluguel, considerando as regras tradicionais do IRPF e as novas exigências da Reforma Tributária (IBS e CBS). \n\n Com ela, você entende: \n\n • Quando o aluguel é tributado apenas pelo Imposto de Renda \n • Quando a pessoa física passa a ser enquadrada como Grande Locador \n • Quando ocorre a incidência cumulativa de IRPF + IBS + CBS \n • Qual é a carga tributária total e a alíquota efetiva real \n\n Tudo com base na legislação vigente, especialmente o Art. 251 da Lei do IBS/CBS.",
+            "whoNeeds": {
+                "title": "Quem precisa usar esta calculadora?",
+                "text": "Esta ferramenta é ideal para:",
+                "list": [
+                    "Proprietários que alugam 1, 2, 3 ou mais imóveis",
+                    "Pessoas físicas com renda relevante de aluguel",
+                    "Investidores imobiliários que querem entender o impacto da reforma tributária",
+                    "Quem está avaliando se continuar na pessoa física ainda faz sentido",
+                    "Quem deseja comparar, no futuro, PF x PJ / holding imobiliária"
+                ],
+                "footer": "Se você recebe aluguel como pessoa física, esta calculadora é essencial."
+            },
+            "landlordDistinction": {
+                "title": "Pequeno locador x Grande locador: qual é a diferença?",
+                "intro": "A Reforma Tributária criou um ponto de atenção importante para a pessoa física que aluga imóveis.",
+                "smallTitle": "🔹 Pequeno locador (Pessoa Física)",
+                "smallText": "Você continua tributado apenas pelo IRPF quando não ultrapassa simultaneamente:",
+                "smallList": [
+                    "Mais de 3 imóveis alugados",
+                    "R$ 240.000 por ano em receita bruta de aluguel"
+                ],
+                "smallFooter": "Nesse caso, o aluguel é tratado como rendimento tributável comum, sujeito à tabela progressiva do Imposto de Renda.",
+                "largeTitle": "🔹 Grande locador (Pessoa Física)",
+                "largeText": "Você passa a ser enquadrado como Grande Locador quando, ao mesmo tempo:",
+                "largeList": [
+                    "Possui mais de 3 imóveis alugados",
+                    "Tem receita anual de aluguel acima de R$ 240.000"
+                ],
+                "largeFooter": "Nesse cenário, ocorre tributação cumulativa, ou seja: \n • IRPF continua sendo devido \n • IBS e CBS passam a incidir sobre a receita de aluguel \n • **Não há substituição de imposto** \n • **Não há opção de regime**",
+                "conclusion": "👉 A carga tributária aumenta de forma relevante, e é exatamente isso que esta calculadora demonstra com transparência."
+            },
+            "howItWorks": {
+                "title": "Como a calculadora funciona?",
+                "text": "A calculadora considera:",
+                "list": [
+                    "Número de imóveis alugados",
+                    "Receita bruta anual de aluguel",
+                    "Outros rendimentos tributáveis",
+                    "Dependentes",
+                    "Despesas dedutíveis",
+                    "Ano de cálculo",
+                    "Regras de enquadramento baseadas no ano-calendário anterior"
+                ],
+                "footer": "Com base nesses dados, o sistema: \n • Determina seu status legal \n • Calcula o IRPF devido \n • Calcula o IBS + CBS, quando aplicável \n • Mostra a carga tributária total \n • Apresenta a alíquota efetiva real, sem simplificações"
+            },
+            "substitution": {
+                "title": "IBS e CBS substituem o IRPF?",
+                "answer": "❌ Não.",
+                "explanation": "Este é um dos maiores pontos de confusão hoje.",
+                "highlight": "👉 IBS e CBS não substituem o IRPF.",
+                "text": "Quando aplicáveis, eles se somam ao Imposto de Renda, pois incidem sobre a atividade econômica de locação, enquanto o IRPF continua incidindo sobre a renda da pessoa física.",
+                "footer": "A calculadora deixa isso explícito, com valores separados e total consolidado."
+            },
+            "effectiveRate": {
+                "title": "Por que a alíquota efetiva pode parecer tão alta?",
+                "text": "Porque a pessoa física enquadrada como Grande Locador passa a pagar:",
+                "list": [
+                    "IRPF sobre a renda",
+                    "IBS + CBS sobre o faturamento do aluguel"
+                ],
+                "explanation": "Mesmo com a redução de 70% na alíquota do IVA para locação residencial, a carga combinada pode facilmente ultrapassar 30% da receita, dependendo do perfil do contribuinte.",
+                "footer": "👉 Este é o ponto exato em que muitos investidores começam a avaliar PJ ou holding imobiliária."
+            },
+            "transparency": {
+                "title": "Simulação transparente, sem promessas irreais",
+                "list": [
+                    "✔️ Base legal clara",
+                    "✔️ Regras corretas (AND, não OR)",
+                    "✔️ Tributação cumulativa corretamente aplicada",
+                    "✔️ Sem “otimizações mágicas”",
+                    "✔️ Sem esconder impostos"
+                ],
+                "footer": "Esta calculadora foi construída para informar e planejar, não para iludir."
+            },
+            "important": {
+                "title": "Importante saber",
+                "list": [
+                    "A classificação como Grande Locador é baseada no ano-calendário anterior",
+                    "Em alguns casos, a incidência de IBS/CBS pode ocorrer no próprio ano, conforme a lei",
+                    "Créditos de IVA não são considerados nesta versão",
+                    "O resultado é uma simulação, não substitui contador ou advogado tributarista"
+                ]
+            },
+            "planning": {
+                "title": "Planejamento tributário começa com informação",
+                "text": "Antes de decidir:",
+                "list": [
+                    "Continuar na pessoa física",
+                    "Abrir CNPJ",
+                    "Criar uma holding imobiliária"
+                ],
+                "footer": "👉 Entenda primeiro quanto você realmente paga hoje."
+            },
+            "cta": "Use a Calculadora de Imposto sobre Aluguel – Pessoa Física do Kitnets.com e tenha clareza total sobre sua carga tributária no cenário pós-Reforma Tributária."
         }
     },
     "irpf2026CalculatorPage": {
@@ -2771,5 +2784,136 @@
         "totalTableTax": "Total Imposto Tabela",
         "disclaimerTitle": "Nota Legal",
         "disclaimerText": "Esta calculadora segue estritamente a Lei nº 15.270/2025 e as orientações publicadas pela Receita Federal. O resultado possui caráter informativo."
+    },
+    "proRataRentCalculatorPage": {
+        "title": "Calculadora de Aluguel Proporcional (Pro-Rata)",
+        "menuTitle": "Aluguel Proporcional",
+        "description": "Calcule o valor proporcional do aluguel para períodos incompletos (início ou fim de contrato).",
+        "inputs": {
+            "monthlyRent": "Aluguel Mensual (R$)",
+            "startDate": "Data de Início",
+            "endDate": "Data Final",
+            "calculate": "Calcular"
+        },
+        "results": {
+            "payTitle": "Aluguel Proporcional a Pagar",
+            "dailyValue": "Valor Diário",
+            "daysCharged": "Dias Cobrados"
+        }
+    },
+    "highIncomeTaxCalculatorPage": {
+        "title": "Calculadora Imposto Mínimo para Altas Rendas (IRPFM)",
+        "subtitle": "Simule a tributação para rendas superiores a R$ 600 mil anuais conforme Lei 15.270/2025",
+        "inputs": {
+            "grossIncomeTitle": "Rendimentos Brutos Anuais",
+            "salaries": "Salários, Pró-Labore, Aposentadoria",
+            "rent": "Aluguéis",
+            "business": "Atividade Rural / Autônomo",
+            "financial": "Rendimentos Financeiros (Tributados/Isentos)",
+            "dividends": "Dividendos (Brasil)",
+            "other": "Outros Rendimentos",
+            "exclusionsTitle": "Exclusões (Art. 16-A, §1º)",
+            "capitalGains": "Ganhos de Capital (Exceto Bolsa)",
+            "rra": "RRA Tributado Exclusivamente na Fonte",
+            "inheritance": "Herança / Doação (Adiantamento Legítima)",
+            "deductionsTitle": "Deduções da Base de Cálculo (Art. 16-A, §3º)",
+            "savings": "Rendimento de Caderneta de Poupança",
+            "accidentIndemnity": "Indenizações por Acidente (Exceto Lucros Cessantes)",
+            "legalExemptions": "Isenções Legais (Lei 7.713/88 - Moléstia Grave/Idoso)",
+            "exemptFinancial": "Rendimentos Financeiros Isentos (Exceto Dividendos)",
+            "offsetsTitle": "Compensações e Créditos",
+            "irpfPaid": "IRPF Devido na Declaração Anual",
+            "withheldIr": "IR Retido na Fonte (Já incluído na Base)",
+            "offshoreIr": "IR Pago no Exterior (Lei 14.754)",
+            "definitiveIr": "IR Definitivo Já Pago",
+            "dividendsWithheld": "IRPFM Antecipado sobre Dividendos",
+            "calculate": "Calcular"
+        },
+        "results": {
+            "netIncome": "Renda Líquida para Teste",
+            "thresholdStatus": "Situação",
+            "aboveThreshold": "Sujeito ao IRPFM",
+            "belowThreshold": "Isento do IRPFM",
+            "effectiveRate": "Alíquota Efetiva do IRPFM",
+            "grossTax": "IRPFM Bruto",
+            "finalTax": "IRPFM a Pagar",
+            "redutor": "Redutor Aplicado",
+            "totalDeductions": "Total Deduções"
+        },
+        "tooltips": {
+            "redutor": "Mecanismo para garantir que PJ + PF não exceda 34% (geral) ou alíquotas financeiras.",
+            "dividendsAnticipation": "Antecipação mensal de 10% retida na fonte para dividendos acima de R$ 50k."
+        },
+        "seo": {
+            "title": "Calculadora IRPFM - Imposto Mínimo Altas Rendas (Lei 15.270/2025)",
+            "description": "Simule o Imposto Mínimo para Altas Rendas (IRPFM). Descubra se você está sujeito à tributação de grandes fortunas e calcule o imposto devido conforme a Lei 15.270/2025."
+        },
+        "disclaimer": "Simulação baseada na Lei 15.270/2025 (PL 1087/2025). Não substitui a declaração oficial.",
+        "takeaway": "Mesmo com isenções, deduções e rendas isentas, quem ganha acima de R$ 600 mil por ano passa a ter uma alíquota mínima efetiva, garantindo progressividade real no topo da renda.",
+        "article": {
+            "title": "Calculadora do Imposto Mínimo para Altas Rendas (IRPFM)",
+            "intro": "A Calculadora de Imposto Mínimo para Altas Rendas (IRPFM) do Kitnets.com permite simular, de forma clara e detalhada, quanto um contribuinte pessoa física pode pagar de imposto mínimo sobre a renda caso seus rendimentos anuais ultrapassem R$ 600 mil, conforme as regras introduzidas pela Lei nº 15.270/2025, válida a partir do ano-calendário de 2026.",
+            "description": "Essa nova tributação foi criada para garantir progressividade real no topo da renda, mesmo quando parte significativa dos ganhos é composta por dividendos, rendimentos isentos ou tributados de forma exclusiva.",
+            "whatIs": {
+                "title": "O que é o Imposto Mínimo para Altas Rendas?",
+                "content": "O IRPFM (Imposto de Renda da Pessoa Física Mínimo) estabelece que contribuintes com renda anual elevada passem a pagar uma alíquota efetiva mínima, calculada sobre o conjunto dos rendimentos recebidos no ano, incluindo:",
+                "list": [
+                    "Rendimentos do trabalho",
+                    "Aluguéis",
+                    "Atividade autônoma ou rural",
+                    "Rendimentos financeiros",
+                    "Dividendos recebidos no Brasil",
+                    "Outros rendimentos tributáveis, isentos ou exclusivos"
+                ],
+                "note": "Mesmo com isenções, deduções legais e rendas tradicionalmente não tributadas, quem ultrapassa o limite de R$ 600.000 por ano entra no regime do imposto mínimo."
+            },
+            "howItWorks": {
+                "title": "Como funciona a alíquota do IRPFM?",
+                "content": "A alíquota do imposto mínimo é progressiva e linear:",
+                "list": [
+                    "Até R$ 600 mil/ano → isento do IRPFM",
+                    "Entre R$ 600 mil e R$ 1,2 milhão → alíquota cresce gradualmente de 0% a 10%",
+                    "Acima de R$ 1,2 milhão → alíquota máxima de 10%"
+                ],
+                "note": "A calculadora mostra automaticamente a alíquota efetiva aplicada, de acordo com o valor informado."
+            },
+            "whatToSimulate": {
+                "title": "O que você pode simular nesta calculadora",
+                "content": "Com esta ferramenta, você consegue:",
+                "list": [
+                    "Ver se sua renda se enquadra no imposto mínimo",
+                    "Calcular a base de cálculo do IRPFM",
+                    "Aplicar corretamente: Exclusões legais (ganho de capital, herança, RRA, etc.) e Deduções permitidas (poupança, indenizações, isenções específicas)",
+                    "Considerar: IR já pago na declaração anual, IR retido na fonte, Imposto pago no exterior, IR definitivo já recolhido e IRPFM antecipado sobre dividendos",
+                    "Visualizar o IRPFM final a pagar ou zero, de forma transparente"
+                ]
+            },
+            "dividends": {
+                "title": "Tributação de dividendos: como entra no cálculo?",
+                "content": "A lei também prevê antecipação mensal do IRPFM quando dividendos pagos por uma mesma empresa a uma pessoa física superam R$ 50 mil no mês, com retenção de 10% na fonte. Essa retenção não é um imposto definitivo: ela entra como crédito no cálculo anual do imposto mínimo — e a calculadora considera esse ajuste automaticamente."
+            },
+            "redutor": {
+                "title": "Redutor do IRPFM: proteção contra bitributação",
+                "content": "Para evitar que a soma dos tributos pagos pela empresa (IRPJ + CSLL) e pela pessoa física ultrapasse determinados limites, a lei criou o redutor do IRPFM. Na calculadora, esse redutor pode ser informado de forma simples, permitindo simular cenários em que: A carga tributária total já foi elevada na pessoa jurídica ou O imposto mínimo da pessoa física é parcialmente reduzido ou até zerado."
+            },
+            "whyUse": {
+                "title": "Por que usar a Calculadora do Kitnets.com?",
+                "list": [
+                    "Atualizada com a Lei 15.270/2025",
+                    "Base legal explícita em cada etapa do cálculo",
+                    "Interface clara, com resumo da base e do imposto",
+                    "Ideal para planejamento financeiro e tributário",
+                    "Integra-se à lógica de outras calculadoras fiscais do Kitnets.com"
+                ]
+            },
+            "important": {
+                "title": "Importante",
+                "content": "Esta simulação tem caráter informativo e educacional. Ela não substitui a declaração oficial do Imposto de Renda nem o acompanhamento de um contador ou especialista tributário."
+            },
+            "cta": {
+                "title": "Comece agora",
+                "content": "Preencha os campos acima e descubra, em poucos segundos, se você está sujeito ao imposto mínimo para altas rendas e qual pode ser o impacto no seu IR."
+            }
+        }
     }
 }

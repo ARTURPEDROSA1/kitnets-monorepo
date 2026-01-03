@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@kitnets/ui";
 import { SignOutButton, useAuth } from "@clerk/nextjs";
-import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Search, Bell, ChevronDown, Rocket, HardHat, Briefcase, Building2, User, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart, ArrowLeftRight, FileText, AlertCircle, Plus, Minus } from "lucide-react";
+import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Search, Bell, ChevronDown, Rocket, HardHat, Briefcase, Building2, User, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart, ArrowLeftRight, FileText, AlertCircle, Plus, Minus, Gem } from "lucide-react";
 
 import { useTheme } from "next-themes";
 import Image from "next/image";
@@ -183,16 +183,14 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
 
                                 {FLAGS.SHOW_CALCULATORS && (
                                     <li>
-                                        <li>
-                                            <Link
-                                                href={lang === 'pt' ? '/calculadoras' : `/${lang}/calculadoras`}
-                                                onClick={() => setSidebarView('calculators-menu')}
-                                                className="w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group text-left"
-                                            >
-                                                <Calculator className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                <span className="ms-3">{dict.menu.calculators}</span>
-                                            </Link>
-                                        </li>
+                                        <Link
+                                            href={lang === 'pt' ? '/calculadoras' : `/${lang}/calculadoras`}
+                                            onClick={() => setSidebarView('calculators-menu')}
+                                            className="w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group text-left"
+                                        >
+                                            <Calculator className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                            <span className="ms-3">{dict.menu.calculators}</span>
+                                        </Link>
                                     </li>
                                 )}
 
@@ -592,6 +590,15 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                         <ul className="space-y-1 font-medium animate-in slide-in-from-top-1 fade-in duration-200">
                                             <li>
                                                 <Link
+                                                    href={lang === 'pt' ? '/calculadoras/imposto-aluguel-pessoa-fisica' : `/${lang}/calculadoras/imposto-aluguel-pessoa-fisica`}
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                >
+                                                    <User className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3 text-sm">{dict.menu.rentOnIndividual}</span>
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <Link
                                                     href={lang === 'pt' ? '/calculadoras/aluguel-na-holding' : `/${lang}/calculadoras/aluguel-na-holding`}
                                                     className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
                                                 >
@@ -608,6 +615,16 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                                     <span className="ms-3 text-sm">{dict.menu.irpf2026}</span>
                                                 </Link>
                                             </li>
+                                            <li>
+                                                <Link
+                                                    href={lang === 'pt' ? '/calculadoras/imposto-minimo-altas-rendas' : `/${lang}/calculadoras/imposto-minimo-altas-rendas`}
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                >
+                                                    <Gem className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3 text-sm">{dict.menu.highIncomeTax}</span>
+                                                </Link>
+                                            </li>
+
                                         </ul>
                                     )}
                                 </div>

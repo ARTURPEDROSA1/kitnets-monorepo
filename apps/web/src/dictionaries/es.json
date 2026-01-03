@@ -22,7 +22,10 @@
         "salariesAndIncome": "Salarios e Ingresos",
         "taxes": "Impuestos",
         "rentalOnHolding": "Alquiler en Holding",
-        "irpf2026": "Calculadora IRPF 2026"
+        "irpf2026": "Calculadora IRPF 2026",
+        "rentOnIndividual": "Alquiler en PF",
+        "highIncomeTax": "Impuesto Mínimo Altas Rentas",
+        "minTaxPF": "Impuesto Mínimo PF"
     },
     "filters": {
         "title": "Filtrar resultados",
@@ -410,6 +413,146 @@
         "seo": {
             "title": "¿La renta del alquiler paga la hipoteca? - Kitnets.com",
             "description": "Descubra en cuántos años la renta del alquiler pasa a pagar la hipoteca inmobiliaria. Simule SAC o PRICE, considere intereses, seguros, impuestos, vacancia y reajuste anual."
+        }
+    },
+    "rentalTaxCalculatorPage": {
+        "title": "Calculadora de Impuesto sobre Alquiler - Persona Física (IRPF + IBS + CBS)",
+        "subtitle": "Simule su carga tributaria considerando IRPF + IBS/CBS (Reforma Tributaria Brasileña)",
+        "inputs": {
+            "properties": "Número de Inmuebles Alquilados",
+            "revenue": "Ingresos Brutos Anuales por Alquiler",
+            "taxYear": "Año Fiscal",
+            "referenceYear": "Año de Referencia (Anterior)",
+            "otherIncome": "Otros Ingresos Imponibles",
+            "dependents": "Dependientes",
+            "deductions": "Gastos Deducibles (Salud, Educación, etc.)",
+            "calculate": "Calcular Impuestos"
+        },
+        "results": {
+            "legalStatus": "Estatus Legal",
+            "smallLandlord": "Pequeño Arrendador (Solo IRPF)",
+            "largeLandlord": "Gran Arrendador (IRPF + CBS + IBS)",
+            "legalRef": "Base Legal: Art. 251 (Ley IBS/CBS)",
+            "irpfCard": "Impuesto sobre la Renta (IRPF)",
+            "irpfBase": "Base Imponible IRPF",
+            "irpfTax": "IRPF a Pagar",
+            "irpfEffective": "Tasa Efectiva IRPF",
+            "cbsCard": "CBS (Federal)",
+            "ibsCard": "IBS (Estatal/Municipal)",
+            "vatBase": "Base Imponible",
+            "vatRate": "Tasa Aplicada",
+            "vatTax": "Impuesto a Pagar",
+            "startYear": "Año de Inicio",
+            "totalCard": "Carga Tributaria Total",
+            "totalTax": "Total a Pagar",
+            "totalEffective": "Tasa Efectiva Total"
+        },
+        "alerts": {
+            "classification": "Clasificación basada en el año anterior.",
+            "cumulative": "IBS y CBS no reemplazan al IRPF; la tributación es acumulativa.",
+            "advice": "Esta simulación no reemplaza el asesoramiento profesional.",
+            "credits": "Créditos de IVA no considerados en esta versión."
+        },
+        "seo": {
+            "title": "Calculadora Impuesto Alquiler Persona Física (IRPF, IBS y CBS)",
+            "description": "Calcule cómo se grava el alquiler para personas físicas en Brasil. Vea cuándo se aplican IRPF, IBS y CBS para pequeños y grandes arrendadores."
+        },
+        "page": {
+            "intro": "La Calculadora de Impuesto sobre Alquiler en Persona Física de Kitnets.com permite simular, de forma clara y actualizada, cuánto paga realmente un propietario de impuesto sobre la renta de alquiler, considerando las reglas tradicionales del IRPF y las nuevas exigencias de la Reforma Tributaria (IBS y CBS). \n\n Con ella, usted entiende: \n\n • Cuándo el alquiler es gravado solo por el Impuesto de Renta \n • Cuándo la persona física pasa a ser encuadrada como Gran Arrendador \n • Cuándo ocurre la incidencia acumulativa de IRPF + IBS + CBS \n • Cuál es la carga tributaria total y la alícuota efectiva real \n\n Todo con base en la legislación vigente, especialmente el Art. 251 de la Ley del IBS/CBS.",
+            "whoNeeds": {
+                "title": "¿Quién necesita usar esta calculadora?",
+                "text": "Esta herramienta es ideal para:",
+                "list": [
+                    "Propietarios que alquilan 1, 2, 3 o más inmuebles",
+                    "Personas físicas con renta relevante de alquiler",
+                    "Inversores inmobiliarios que quieren entender el impacto de la reforma tributaria",
+                    "Quien está evaluando si continuar en persona física aún tiene sentido",
+                    "Quien desea comparar, en el futuro, PF vs PJ / holding inmobiliaria"
+                ],
+                "footer": "Si usted recibe alquiler como persona física, esta calculadora es esencial."
+            },
+            "landlordDistinction": {
+                "title": "Pequeño arrendador vs Gran arrendador: ¿cuál es la diferencia?",
+                "intro": "La Reforma Tributaria creó un punto de atención importante para la persona física que alquila inmuebles.",
+                "smallTitle": "🔹 Pequeño arrendador (Persona Física)",
+                "smallText": "Usted continúa tributado solo por el IRPF cuando no supera simultáneamente:",
+                "smallList": [
+                    "Más de 3 inmuebles alquilados",
+                    "R$ 240.000 por año en ingresos brutos de alquiler"
+                ],
+                "smallFooter": "En este caso, el alquiler es tratado como rendimiento imponible común, sujeto a la tabla progresiva del Impuesto de Renda.",
+                "largeTitle": "🔹 Gran arrendador (Persona Física)",
+                "largeText": "Usted pasa a ser encuadrado como Gran Arrendador cuando, al mismo tiempo:",
+                "largeList": [
+                    "Posee más de 3 inmuebles alquilados",
+                    "Tiene ingresos anuales de alquiler por encima de R$ 240.000"
+                ],
+                "largeFooter": "En este escenario, ocurre tributación acumulativa, es decir: \n • IRPF continúa siendo debido \n • IBS y CBS pasan a incidir sobre los ingresos de alquiler \n • **No hay sustitución de impuesto** \n • **No hay opción de régimen**",
+                "conclusion": "👉 La carga tributaria aumenta de forma relevante, y es exactamente eso lo que esta calculadora demuestra con transparencia."
+            },
+            "howItWorks": {
+                "title": "¿Cómo funciona la calculadora?",
+                "text": "Considera:",
+                "list": [
+                    "Número de inmuebles alquilados",
+                    "Ingresos brutos anuales de alquiler",
+                    "Otros rendimientos imponibles",
+                    "Dependientes",
+                    "Gastos deducibles",
+                    "Año de cálculo",
+                    "Reglas de encuadramiento basadas en el año calendario anterior"
+                ],
+                "footer": "Con base en estos datos, el sistema: \n • Determina su estatus legal \n • Calcula el IRPF debido \n • Calcula el IBS + CBS, cuando aplicable \n • Muestra la carga tributaria total \n • Presenta la alícuota efectiva real, sin simplificaciones"
+            },
+            "substitution": {
+                "title": "¿IBS y CBS sustituyen el IRPF?",
+                "answer": "❌ No.",
+                "explanation": "Este es uno de los mayores puntos de confusión hoy.",
+                "highlight": "👉 IBS y CBS no sustituyen el IRPF.",
+                "text": "Cuando aplicables, se suman al Impuesto de Renda, pues inciden sobre la actividad económica de alquiler, mientras que el IRPF continúa incidiendo sobre la renta de la persona física.",
+                "footer": "La calculadora deja esto explícito, con valores separados y total consolidado."
+            },
+            "effectiveRate": {
+                "title": "¿Por qué la alícuota efectiva puede parecer tan alta?",
+                "text": "Porque la persona física encuadrada como Gran Arrendador pasa a pagar:",
+                "list": [
+                    "IRPF sobre la renta",
+                    "IBS + CBS sobre la facturación del alquiler"
+                ],
+                "explanation": "Incluso con la reducción del 70% en la alícuota del IVA para alquiler residencial, la carga combinada puede fácilmente superar el 30% de los ingresos, dependiendo del perfil del contribuyente.",
+                "footer": "👉 Este es el punto exacto en que muchos inversores comienzan a evaluar PJ o holding inmobiliaria."
+            },
+            "transparency": {
+                "title": "Simulación transparente, sin promesas irreales",
+                "list": [
+                    "✔️ Base legal clara",
+                    "✔️ Regras correctas (AND, no OR)",
+                    "✔️ Tributación acumulativa correctamente aplicada",
+                    "✔️ Sin \"optimizaciones mágicas\"",
+                    "✔️ Sin esconder impuestos"
+                ],
+                "footer": "Esta calculadora fue construida para informar y planificar, no para iludir."
+            },
+            "important": {
+                "title": "Importante saber",
+                "list": [
+                    "La clasificación como Gran Arrendador se basa en el año calendario anterior",
+                    "En algunos casos, la incidencia de IBS/CBS puede ocurrir en el propio año, conforme la ley",
+                    "Créditos de IVA no son considerados en esta versión",
+                    "El resultado es una simulación, no sustituye contador o abogado tributarista"
+                ]
+            },
+            "planning": {
+                "title": "La planificación tributaria comienza con información",
+                "text": "Antes de decidir:",
+                "list": [
+                    "Continuar en persona física",
+                    "Abrir CNPJ",
+                    "Crear una holding inmobiliaria"
+                ],
+                "footer": "👉 Entienda primero cuánto paga realmente hoy."
+            },
+            "cta": "Use la Calculadora de Impuesto sobre Alquiler – Persona Física de Kitnets.com y tenga claridad total sobre su carga tributaria en el escenario post-Reforma Tributaria."
         }
     },
     "rentAdjustmentCalculatorPage": {
@@ -1308,6 +1451,15 @@
         ],
         "finalCta": "Explore os indicadores, aprofunde sua análise e tome decisões melhores com base em dados reais."
     },
+    "rentOnIndividualCalculatorPage": {
+        "seo": {
+            "title": "Calculadora de Impuesto de Alquiler en PF - Kitnets.com",
+            "description": "Calcule cuánto pagará de impuesto de alquiler como Persona Física."
+        },
+        "title": "Calculadora de Alquiler en Persona Física",
+        "description": "Simule sus impuestos sobre el alquiler recibido como persona física.",
+        "menuTitle": "Alquiler en PF"
+    },
     "rentFineCalculatorPage": {
         "metaTitle": "Calculadora de Multa por Rescisión de Alquiler | Kitnets",
         "metaDescription": "Calcule la multa por terminación anticipada del contrato de alquiler según la Ley de Inquilanato. Simule diferentes escenarios.",
@@ -1509,7 +1661,8 @@
             "finance": "Financiación",
             "indices": "Índices",
             "interest": "Interés",
-            "planning": "Planificación"
+            "planning": "Planificación",
+            "taxes": "Impuestos"
         },
         "conversion": {
             "title": "¿Quieres guardar tus simulaciones y contratos?",
@@ -1583,6 +1736,14 @@
                 "irpf2026": {
                     "title": "Calculadora IRPF 2026",
                     "description": "Simulación oficial con reducción de la Ley 15.270/2025"
+                },
+                "rentOnIndividual": {
+                    "title": "Alquiler en PF",
+                    "description": "Simule sus impuestos sobre el alquiler recibido como persona física."
+                },
+                "minTaxPF": {
+                    "title": "Impuesto Mínimo PF",
+                    "description": "Calcule el Impuesto Mínimo para Altas Rentas (IRPFM) y verifique si califica bajo la nueva regla."
                 }
             }
         },
@@ -1917,5 +2078,120 @@
         "totalTableTax": "Total Impuesto Tabla",
         "disclaimerTitle": "Nota Legal",
         "disclaimerText": "Esta calculadora sigue estrictamente la Ley Nº 15.270/2025 y las directrices publicadas por la Receita Federal. El resultado tiene carácter informativo."
+    },
+    "highIncomeTaxCalculatorPage": {
+        "title": "Calculadora de Impuesto Mínimo para Altas Rentas (IRPFM)",
+        "subtitle": "Simule la tributación para ingresos superiores a R$ 600 mil anuales conforme Ley 15.270/2025",
+        "inputs": {
+            "grossIncomeTitle": "Ingresos Brutos Anuales",
+            "salaries": "Salarios, Pro-Labore, Pensiones",
+            "rent": "Alquileres",
+            "business": "Actividad Rural / Autónomo",
+            "financial": "Ingresos Financieros (Tributados/Exentos)",
+            "dividends": "Dividendos (Brasil)",
+            "other": "Otros Ingresos",
+            "exclusionsTitle": "Exclusiones (Art. 16-A, §1º)",
+            "capitalGains": "Ganancias de Capital (Excepto Bolsa)",
+            "rra": "RRA Tributado Exclusivamente en la Fuente",
+            "inheritance": "Herencia / Donación (Adelanto de Herencia)",
+            "deductionsTitle": "Deducciones de la Base de Cálculo (Art. 16-A, §3º)",
+            "savings": "Rendimiento de Cuenta de Ahorro",
+            "accidentIndemnity": "Indemnizaciones por Accidente (Excepto Lucro Cesante)",
+            "legalExemptions": "Exenciones Legales (Ley 7.713/88 - Enfermedad Grave/Anciano)",
+            "exemptFinancial": "Ingresos Financieros Exentos (Excepto Dividendos)",
+            "offsetsTitle": "Compensaciones y Créditos",
+            "irpfPaid": "IRPF Debido en la Declaración Anual",
+            "withheldIr": "IR Retenido en la Fuente (Ya incluido en la Base)",
+            "offshoreIr": "IR Pagado en el Exterior (Ley 14.754)",
+            "definitiveIr": "IR Definitivo Ya Pagado",
+            "dividendsWithheld": "IRPFM Anticipado sobre Dividendos",
+            "calculate": "Calcular"
+        },
+        "results": {
+            "netIncome": "Ingreso Líquido para Prueba",
+            "thresholdStatus": "Estado",
+            "aboveThreshold": "Sujeto al IRPFM",
+            "belowThreshold": "Exento del IRPFM",
+            "effectiveRate": "Tasa Efectiva IRPFM",
+            "grossTax": "IRPFM Bruto",
+            "finalTax": "IRPFM a Pagar",
+            "redutor": "Reductor Aplicado",
+            "totalDeductions": "Total Deducciones"
+        },
+        "tooltips": {
+            "redutor": "Mecanismo para garantizar que PJ + PF no supere el 34% (general) o tasas financieras.",
+            "dividendsAnticipation": "Anticipo mensual del 10% retenido en fuente para dividendos superiores a R$ 50k."
+        },
+        "seo": {
+            "title": "Calculadora IRPFM - Impuesto Mínimo Altas Rentas (Ley 15.270/2025)",
+            "description": "Simule el Impuesto Mínimo para Altas Rentas (IRPFM). Descubra si está sujeto a la tributación de grandes fortunas y calcule el impuesto debido según la Ley 15.270/2025."
+        },
+        "disclaimer": "Simulación basada en la Ley 15.270/2025 (PL 1087/2025). No sustituye la declaración oficial.",
+        "takeaway": "Incluso con exenciones, deducciones e ingresos exentos, quien gana por encima de R$ 600 mil al año pasa a tener una tasa mínima efectiva, garantizando progresividad real en la cima de la renta.",
+        "article": {
+            "title": "Calculadora de Impuesto Mínimo para Altas Rentas (IRPFM)",
+            "intro": "La Calculadora de Impuesto Mínimo para Altas Rentas (IRPFM) de Kitnets.com permite simular, de forma clara y detallada, cuánto un contribuyente persona física puede pagar de impuesto mínimo sobre la renta si sus ingresos anuales superan R$ 600 mil, conforme las reglas introducidas por la Ley Nº 15.270/2025, válida a partir del año calendario 2026.",
+            "description": "Esta nueva tributación fue creada para garantizar la progresividad real en la cima de la renta, incluso cuando una parte significativa de las ganancias se compone de dividendos, ingresos exentos o gravados de forma exclusiva.",
+            "whatIs": {
+                "title": "¿Qué es el Impuesto Mínimo para Altas Rentas?",
+                "content": "El IRPFM (Impuesto de Renta de la Persona Física Mínimo) establece que los contribuyentes con ingresos anuales elevados pasen a pagar una tasa efectiva mínima, calculada sobre el conjunto de los ingresos recibidos en el año, incluyendo:",
+                "list": [
+                    "Ingresos del trabajo",
+                    "Alquileres",
+                    "Actividad autónoma o rural",
+                    "Ingresos financieros",
+                    "Dividendos recibidos en Brasil",
+                    "Otros ingresos gravables, exentos o exclusivos"
+                ],
+                "note": "Incluso con exenciones, deducciones legales y rentas tradicionalmente no gravadas, quien supera el límite de R$ 600.000 por año entra en el régimen del impuesto mínimo."
+            },
+            "howItWorks": {
+                "title": "¿Cómo funciona la tasa del IRPFM?",
+                "content": "La tasa del impuesto mínimo es progresiva e lineal:",
+                "list": [
+                    "Hasta R$ 600 mil/año → exento del IRPFM",
+                    "Entre R$ 600 mil y R$ 1,2 millón → la tasa crece gradualmente del 0% al 10%",
+                    "Por encima de R$ 1,2 millón → tasa máxima del 10%"
+                ],
+                "note": "La calculadora muestra automáticamente la tasa efectiva aplicada, de acuerdo con el valor informado."
+            },
+            "whatToSimulate": {
+                "title": "Qué puede simular en esta calculadora",
+                "content": "Con esta herramienta, usted consigue:",
+                "list": [
+                    "Ver si sus ingresos se encuadran en el impuesto mínimo",
+                    "Calcular la base de cálculo del IRPFM",
+                    "Aplicar correctamente: Exclusiones legales (ganancia de capital, herencia, RRA, etc.) y Deducciones permitidas (ahorro, indemnizaciones, exenciones específicas)",
+                    "Considerar: IR pagado en la declaración anual, IR retenido en la fuente, Impuesto pagado en el exterior, IR definitivo ya recaudado e IRPFM anticipado sobre dividendos",
+                    "Visualizar el IRPFM final a pagar o cero, de forma transparente"
+                ]
+            },
+            "dividends": {
+                "title": "Tributación de dividendos: ¿cómo entra en el cálculo?",
+                "content": "La ley también prevé anticipación mensual del IRPFM cuando los dividendos pagados por una misma empresa a una persona física superan R$ 50 mil en el mes, con retención del 10% en la fuente. Esta retención no es un impuesto definitivo: entra como crédito en el cálculo anual del impuesto mínimo — y la calculadora considera este ajuste automáticamente."
+            },
+            "redutor": {
+                "title": "Reductor del IRPFM: protección contra doble tributación",
+                "content": "Para evitar que la suma de los tributos pagados por la empresa (IRPJ + CSLL) y por la persona física supere determinados límites, la ley creó el reductor del IRPFM. En la calculadora, este reductor puede ser informado de forma simple, permitiendo simular escenarios en que: La carga tributaria total ya fue elevada en la persona jurídica o El impuesto mínimo de la persona física es parcialmente reducido o hasta anulado."
+            },
+            "whyUse": {
+                "title": "¿Por qué usar la Calculadora de Kitnets.com?",
+                "list": [
+                    "Actualizada con la Ley 15.270/2025",
+                    "Base legal explícita en cada etapa del cálculo",
+                    "Interfaz clara, con resumen de la base y del impuesto",
+                    "Ideal para planificación financiera y tributaria",
+                    "Se integra a la lógica de otras calculadoras fiscales de Kitnets.com"
+                ]
+            },
+            "important": {
+                "title": "Importante",
+                "content": "Esta simulación tiene carácter informativo y educativo. No sustituye la declaración oficial del Impuesto de Renta ni el acompañamiento de un contador o especialista tributario."
+            },
+            "cta": {
+                "title": "Comience ahora",
+                "content": "Complete los campos arriba y descubra, en pocos segundos, si está sujeto al impuesto mínimo para altas rentas y cuál puede ser el impacto en su IR."
+            }
+        }
     }
 }

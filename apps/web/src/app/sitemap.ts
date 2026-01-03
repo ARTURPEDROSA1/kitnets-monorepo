@@ -51,6 +51,11 @@ const staticRoutes = [
     'conteudos/impostos-e-legislacao/imposto-sobre-dividendos',
     'autor/artur-pedrosa',
     'calculadoras/aluguel-na-holding',
+    'calculadoras/aluguel-na-pf',
+    'calculadoras/imposto-aluguel-pessoa-fisica',
+    'calculadoras/imposto-minimo-altas-rendas',
+    'calculadoras/imposto-minimo-pf',
+    'calculadoras/irpf-2026',
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
