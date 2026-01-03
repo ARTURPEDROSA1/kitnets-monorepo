@@ -28,7 +28,7 @@ export function Step0Landing() {
 
                     <Button
                         onClick={nextStep}
-                        className="h-14 px-8 text-lg font-medium bg-emerald-600 hover:bg-emerald-500 text-white rounded-full shadow-lg shadow-emerald-900/20 transition-all hover:scale-105 active:scale-95"
+                        className="h-14 px-8 text-lg font-medium bg-emerald-700 hover:bg-emerald-600 text-white rounded-full shadow-lg shadow-emerald-900/20 transition-all hover:scale-105 active:scale-95"
                     >
                         Entrar na lista de espera <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
@@ -236,7 +236,7 @@ export function Step0Landing() {
                         </p>
                         <Button
                             onClick={nextStep}
-                            className="w-full sm:w-auto h-14 px-10 text-lg font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow-lg shadow-emerald-900/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                            className="w-full sm:w-auto h-14 px-10 text-lg font-bold bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl shadow-lg shadow-emerald-900/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
                         >
                             Entrar na lista de espera
                         </Button>
