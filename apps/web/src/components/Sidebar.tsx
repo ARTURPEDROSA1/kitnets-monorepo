@@ -195,16 +195,14 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                 )}
 
                                 <li>
-                                    <li>
-                                        <Link
-                                            href={lang === 'pt' ? '/indices/panorama' : `/${lang}/indices/panorama`}
-                                            onClick={() => setSidebarView('indices-menu')}
-                                            className="w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group text-left"
-                                        >
-                                            <LineChart className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                            <span className="ms-3">Indicadores</span>
-                                        </Link>
-                                    </li>
+                                    <Link
+                                        href={lang === 'pt' ? '/indices/panorama' : `/${lang}/indices/panorama`}
+                                        onClick={() => setSidebarView('indices-menu')}
+                                        className="w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group text-left"
+                                    >
+                                        <LineChart className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                        <span className="ms-3">Indicadores</span>
+                                    </Link>
                                 </li>
 
                                 <li>
