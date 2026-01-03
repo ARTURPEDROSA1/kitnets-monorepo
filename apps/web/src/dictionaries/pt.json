@@ -19,7 +19,9 @@
         "investment": "Investimento",
         "contents": "Conteúdos",
         "taxesAndLegislation": "Impostos e legislação",
-        "salariesAndIncome": "Salário e Renda"
+        "salariesAndIncome": "Salário e Renda",
+        "taxes": "Impostos",
+        "rentalOnHolding": "Aluguel na Holding"
     },
     "filters": {
         "title": "Filtrar resultados",
@@ -2488,6 +2490,116 @@
                 "title": "Tome decisões com dados, não com achismos",
                 "text": "As calculadoras do Kitnets.com foram criadas para quem quer sair das planilhas improvisadas e passar a gerenciar aluguel, financiamento e investimentos de forma profissional.\n\nExplore o hub, utilize as calculadoras e acompanhe a evolução constante da plataforma.\nDados corretos hoje significam decisões melhores amanhã."
             }
+        }
+    },
+    "holdingRentalPage": {
+        "title": "Calculadora de Impostos sobre Aluguel em Holding Familiar (Lucro Presumido)",
+        "intro": "A Reforma Tributária brasileira mudou profundamente a forma como os aluguéis de imóveis serão tributados a partir de 2026. Com a criação do IVA Dual (IBS + CBS), muitos proprietários, investidores e holdings familiares passaram a ter dúvidas reais sobre quanto imposto será pago, quando PIS/COFINS deixam de existir e como a carga tributária evolui ao longo do tempo.\n\nEsta calculadora foi criada exatamente para responder a essas perguntas de forma clara, transparente e alinhada à legislação.",
+        "whatItDoes": {
+            "title": "O que esta calculadora faz",
+            "p1": "A Calculadora de Impostos: Holding Familiar (Lucro Presumido) permite estimar, de forma detalhada, a carga tributária incidente sobre aluguéis de imóveis quando a locação é realizada por uma Pessoa Jurídica, estruturada como holding familiar, optante pelo Lucro Presumido.",
+            "listTitle": "Ela considera:",
+            "list": [
+                "IRPJ (15% + adicional automático de 10% quando aplicável)",
+                "CSLL (9%)",
+                "PIS e COFINS (somente em 2026, durante a transição)",
+                "CBS e IBS (IVA Dual), com redução legal de 70% para operações imobiliárias",
+                "O cronograma oficial de transição da Reforma Tributária (2026–2033)"
+            ],
+            "p2": "Tudo isso em um único simulador, com visão anual ou mensal, gráficos e detalhamento completo."
+        },
+        "targetAudience": {
+            "title": "Para quem esta calculadora é indicada",
+            "list": [
+                "Proprietários de imóveis que alugam via holding familiar",
+                "Investidores imobiliários",
+                "Contadores e planejadores tributários",
+                "Famílias estruturando patrimônio em Pessoa Jurídica",
+                "Quem quer entender se a Reforma Tributária aumenta ou reduz impostos no aluguel"
+            ]
+        },
+        "howToUse": {
+            "title": "Como usar a calculadora (passo a passo)",
+            "steps": [
+                {
+                    "title": "1️⃣ Escolha o ano de referência (2026 a 2033)",
+                    "text": "Use o controle deslizante da linha do tempo para selecionar o ano desejado.",
+                    "bullets": [
+                        "2026: ano de transição (PIS/COFINS ainda existem; CBS e IBS começam a ser cobrados com alíquotas reduzidas)",
+                        "2027 em diante: PIS/COFINS são extintos; Apenas o IVA Dual (CBS + IBS) permanece"
+                    ],
+                    "note": "Isso permite visualizar claramente o impacto da transição tributária ao longo dos anos."
+                },
+                {
+                    "title": "2️⃣ Informe sua receita de aluguel",
+                    "text": "Você pode escolher entre:",
+                    "bullets": [
+                        "Receita Anual: informe o valor total recebido no ano",
+                        "Receita Mensal: informe mês a mês (ideal para quem tem variações de aluguel)"
+                    ],
+                    "note": "A calculadora identifica automaticamente se há incidência de IRPJ Adicional (10%), que ocorre quando a receita mensal ultrapassa R$ 20.000."
+                },
+                {
+                    "title": "3️⃣ (Opcional) Ajuste o IVA nominal",
+                    "text": "Por padrão, o simulador utiliza IVA nominal de 28%, dentro do intervalo discutido atualmente (26,5% a 28%).",
+                    "attention": "Atenção: A calculadora não aplica 28% diretamente no aluguel. Ela segue a regra correta da lei: Primeiro divide o IVA em CBS e IBS, Depois aplica a redução legal de 70% para locação de imóveis, Só então calcula o valor efetivo a pagar"
+                }
+            ]
+        },
+        "methodology": {
+            "title": "Como os impostos são calculados (metodologia)",
+            "sections": [
+                {
+                    "title": "📌 Impostos sobre o lucro (Lucro Presumido)",
+                    "text": "A base de cálculo é 32% da receita bruta. Sobre essa base incidem:",
+                    "list": [
+                        "IRPJ: 15%",
+                        "CSLL: 9%",
+                        "Se a receita mensal exceder R$ 20.000, aplica-se automaticamente IRPJ Adicional de 10% sobre o excedente"
+                    ]
+                },
+                {
+                    "title": "📌 Tributos sobre a receita (consumo)",
+                    "text": "Em 2026 (transição): PIS: 0,65%, COFINS: 3,00%, CBS e IBS começam a ser cobrados com alíquotas reduzidas. A partir de 2027: PIS e COFINS são extintos; Permanece apenas o IVA Dual (CBS + IBS)"
+                },
+                {
+                    "title": "Redução legal para imóveis",
+                    "text": "A legislação prevê redução de 70% nas alíquotas de CBS e IBS para operações de locação de imóveis. Na prática, isso significa que estal IVA nominal de 28% resulta em uma alíquota efetiva muito menor, aplicada corretamente pela calculadora."
+                }
+            ]
+        },
+        "resultsDesc": {
+            "title": "O que você vê nos resultados",
+            "list": [
+                "Receita Bruta",
+                "Total de Impostos",
+                "Receita Líquida",
+                "Alíquota Efetiva Total",
+                "Separação por grupos: Impostos sobre o lucro, IVA Dual, Tributos legados",
+                "Gráfico de composição da carga tributária",
+                "Gráfico de evolução da alíquota efetiva (2026–2033)"
+            ],
+            "note": "Além disso, há um detalhamento completo com base de cálculo, alíquotas nominais, reduções e valores anuais."
+        },
+        "important": {
+            "title": "Importante saber",
+            "list": [
+                "❌ Esta calculadora não considera créditos de IBS/CBS, por prudência",
+                "✅ Os cálculos seguem uma abordagem conservadora e educacional",
+                "📊 Ideal para planejamento e entendimento, não substitui assessoria contábil"
+            ],
+            "disclaimer": "Aviso legal: simulador para fins educativos. Consulte seu contador antes de tomar decisões."
+        },
+        "whyUnique": {
+            "title": "Por que esta calculadora é diferente",
+            "text": "Ao contrário de muitos conteúdos superficiais sobre a Reforma Tributária, esta ferramenta:",
+            "list": [
+                "Respeita a ordem correta de cálculo do IVA Dual",
+                "Considera a transição real entre PIS/COFINS e CBS/IBS",
+                "Aplica corretamente a redução de 70% para imóveis",
+                "Mostra o impacto ao longo do tempo, não apenas em um ano isolado"
+            ],
+            "conclusion": "Se você aluga imóveis por meio de uma holding familiar ou está avaliando essa estrutura, esta calculadora ajuda a entender, comparar cenários e se preparar para o novo sistema tributário brasileiro."
         }
     }
 }

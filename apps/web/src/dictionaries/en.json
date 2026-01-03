@@ -55,7 +55,9 @@
         "investment": "Investment",
         "contents": "Contents",
         "taxesAndLegislation": "Taxes & Legislation",
-        "salariesAndIncome": "Salaries & Income"
+        "salariesAndIncome": "Salaries & Income",
+        "taxes": "Taxes",
+        "rentalOnHolding": "Rental on Holding"
     },
     "home": {
         "welcome": "Welcome to Kitnets.com",
@@ -1589,6 +1591,116 @@
                 "title": "Make decisions with data, not guesswork",
                 "text": "Kitnets.com calculators were created for those who want to get out of improvised spreadsheets and start managing rent, financing, and investments professionally.\n\nExplore the hub, use the calculators, and follow the constant evolution of the platform.\nCorrect data today means better decisions tomorrow."
             }
+        }
+    },
+    "holdingRentalPage": {
+        "title": "Holding Rental Tax Calculator (Presumed Profit)",
+        "intro": "The Brazilian Tax Reform has profoundly changed how property rentals will be taxed starting in 2026. With the creation of the Dual VAT (IBS + CBS), many landlords, investors, and family holdings face real doubts about how much tax will be paid, when PIS/COFINS cease to exist, and how the tax burden evolves over time.\n\nThis calculator was created exactly to answer these questions clearly, transparently, and in alignment with legislation.",
+        "whatItDoes": {
+            "title": "What this calculator does",
+            "p1": "The Holding Tax Calculator (Presumed Profit) allows you to estimate, in detail, the tax burden on property rentals when leasing is conducted by a Legal Entity, structured as a family holding, opting for Presumed Profit.",
+            "listTitle": "It considers:",
+            "list": [
+                "IRPJ (15% + automatic 10% surcharge when applicable)",
+                "CSLL (9%)",
+                "PIS and COFINS (only in 2026, during the transition)",
+                "CBS and IBS (Dual VAT), with a 70% legal reduction for real estate operations",
+                "The official Tax Reform transition schedule (2026–2033)"
+            ],
+            "p2": "All this in a single simulator, with annual or monthly views, charts, and complete breakdown."
+        },
+        "targetAudience": {
+            "title": "Who is this calculator for?",
+            "list": [
+                "Property owners renting via family holding",
+                "Real estate investors",
+                "Accountants and tax planners",
+                "Families structuring assets in a Legal Entity",
+                "Anyone wanting to understand if the Tax Reform increases or reduces rental taxes"
+            ]
+        },
+        "howToUse": {
+            "title": "How to use the calculator (step by step)",
+            "steps": [
+                {
+                    "title": "1️⃣ Choose the reference year (2026 to 2033)",
+                    "text": "Use the timeline slider to select the desired year.",
+                    "bullets": [
+                        "2026: transition year (PIS/COFINS still exist; CBS and IBS start being charged at reduced rates)",
+                        "2027 onwards: PIS/COFINS are extinguished; Only Dual VAT (CBS + IBS) remains"
+                    ],
+                    "note": "This allows you to clearly visualize the impact of the tax transition over the years."
+                },
+                {
+                    "title": "2️⃣ Enter your rental revenue",
+                    "text": "You can choose between:",
+                    "bullets": [
+                        "Annual Revenue: enter the total amount received in the year",
+                        "Monthly Revenue: enter month by month (ideal for those with rental variations)"
+                    ],
+                    "note": "The calculator automatically identifies if there is an Additional IRPJ (10%) incidence, which occurs when monthly revenue exceeds R$ 20,000."
+                },
+                {
+                    "title": "3️⃣ (Optional) Adjust the nominal VAT",
+                    "text": "By default, the simulator uses a nominal VAT of 28%, within the currently discussed range (26.5% to 28%).",
+                    "attention": "Attention: The calculator does not apply 28% directly to the rent. It follows the correct rule of the law: First divides VAT into CBS and IBS, Then applies the 70% legal reduction for real estate rentals, Only then calculates the effective amount to pay"
+                }
+            ]
+        },
+        "methodology": {
+            "title": "How taxes are calculated (methodology)",
+            "sections": [
+                {
+                    "title": "📌 Taxes on Profit (Presumed Profit)",
+                    "text": "The calculation base is 32% of gross revenue. Upon this base apply:",
+                    "list": [
+                        "IRPJ: 15%",
+                        "CSLL: 9%",
+                        "If monthly revenue exceeds R$ 20,000, Additional IRPJ of 10% is automatically applied on the excess"
+                    ]
+                },
+                {
+                    "title": "📌 Taxes on revenue (consumption)",
+                    "text": "In 2026 (transition): PIS: 0.65%, COFINS: 3.00%, CBS and IBS start being charged at reduced rates. From 2027: PIS and COFINS are extinguished; Only Dual VAT (CBS + IBS) remains"
+                },
+                {
+                    "title": "Legal reduction for properties",
+                    "text": " Legislation provides for a 70% reduction in CBS and IBS rates for property rental operations. In practice, this means that a nominal VAT of 28% results in a much lower effective rate, correctly applied by the calculator."
+                }
+            ]
+        },
+        "resultsDesc": {
+            "title": "What you see in the results",
+            "list": [
+                "Gross Revenue",
+                "Total Taxes",
+                "Net Revenue",
+                "Total Effective Tax Rate",
+                "Separation by groups: Taxes on profit, Dual VAT, Legacy taxes",
+                "Tax burden composition chart",
+                "Effective rate evolution chart (2026–2033)"
+            ],
+            "note": "Additionally, there is a complete breakdown with calculation base, nominal rates, reductions, and annual values."
+        },
+        "important": {
+            "title": "Important to know",
+            "list": [
+                "❌ This calculator does not consider IBS/CBS credits, for prudence",
+                "✅ Calculations follow a conservative and educational approach",
+                "📊 Ideal for planning and understanding, does not replace accounting advice"
+            ],
+            "disclaimer": "Legal notice: simulator for educational purposes. Consult your accountant before making decisions."
+        },
+        "whyUnique": {
+            "title": "Why this calculator is different",
+            "text": "Unlike many superficial contents about the Tax Reform, this tool:",
+            "list": [
+                "Respects the correct order of Dual VAT calculation",
+                "Considers the real transition between PIS/COFINS and CBS/IBS",
+                "Correctly applies the 70% reduction for properties",
+                "Shows the impact over time, not just in an isolated year"
+            ],
+            "conclusion": "If you rent properties through a family holding or are evaluating this structure, this calculator helps you understand, compare scenarios, and prepare for the new Brazilian tax system."
         }
     }
 }

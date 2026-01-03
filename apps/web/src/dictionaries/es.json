@@ -19,7 +19,9 @@
         "investment": "Inversión",
         "contents": "Contenidos",
         "taxesAndLegislation": "Impuestos y legislación",
-        "salariesAndIncome": "Salarios e Ingresos"
+        "salariesAndIncome": "Salarios e Ingresos",
+        "taxes": "Impuestos",
+        "rentalOnHolding": "Alquiler en Holding"
     },
     "filters": {
         "title": "Filtrar resultados",
@@ -1630,6 +1632,116 @@
                 "title": "Toma decisiones con datos, no con suposiciones",
                 "text": "Las calculadoras de Kitnets.com fueron creadas para quien quiere salir de las planillas improvisadas y pasar a gestionar alquiler, financiación e inversiones de forma profesional.\n\nExplora el hub, utiliza las calculadoras y sigue la evolución constante de la plataforma.\nDatos correctos hoy significan mejores decisiones mañana."
             }
+        }
+    },
+    "holdingRentalPage": {
+        "title": "Calculadora de Impuestos de Alquiler en Holding Familiar (Lucro Presumido)",
+        "intro": "La Reforma Tributaria brasileña cambió profundamente la forma en que se tributarán los alquileres de inmuebles a partir de 2026. Con la creación del IVA Dual (IBS + CBS), muchos propietarios, inversores y holdings familiares han comenzado a tener dudas reales sobre cuánto impuesto se pagará, cuándo el PIS/COFINS dejarán de existir y cómo la carga tributaria evoluciona con el tiempo.\n\nEsta calculadora fue creada exactamente para responder a estas preguntas de forma clara, transparente y alineada con la legislación.",
+        "whatItDoes": {
+            "title": "Qué hace esta calculadora",
+            "p1": "La Calculadora de Impuestos: Holding Familiar (Lucro Presumido) permite estimar, de forma detallada, la carga tributaria sobre alquileres de inmuebles cuando la locación es realizada por una Persona Jurídica, estructurada como holding familiar, optante por el Lucro Presumido.",
+            "listTitle": "Ella considera:",
+            "list": [
+                "IRPJ (15% + adicional automático de 10% cuando aplicable)",
+                "CSLL (9%)",
+                "PIS y COFINS (solo en 2026, durante la transición)",
+                "CBS e IBS (IVA Dual), con reducción legal del 70% para operaciones inmobiliarias",
+                "El cronograma oficial de transición de la Reforma Tributaria (2026–2033)"
+            ],
+            "p2": "Todo esto en un único simulador, con visión anual o mensual, gráficos y detalle completo."
+        },
+        "targetAudience": {
+            "title": "¿Para quién es indicada esta calculadora?",
+            "list": [
+                "Propietarios de inmuebles que alquilan vía holding familiar",
+                "Inversores inmobiliarios",
+                "Contadores y planificadores tributarios",
+                "Familias estructurando patrimonio en Persona Jurídica",
+                "Quien quiere entender si la Reforma Tributaria aumenta o reduce impuestos en el alquiler"
+            ]
+        },
+        "howToUse": {
+            "title": "Cómo usar la calculadora (paso a paso)",
+            "steps": [
+                {
+                    "title": "1️⃣ Elija el año de referencia (2026 a 2033)",
+                    "text": "Use el control deslizante de la línea de tiempo para seleccionar el año deseado.",
+                    "bullets": [
+                        "2026: año de transición (PIS/COFINS aún existen; CBS e IBS comienzan a ser cobrados con alícuotas reducidas)",
+                        "2027 en adelante: PIS/COFINS son extinguidos; Solo el IVA Dual (CBS + IBS) permanece"
+                    ],
+                    "note": "Esto permite visualizar claramente el impacto de la transición tributaria a lo largo de los años."
+                },
+                {
+                    "title": "2️⃣ Informe su ingreso de alquiler",
+                    "text": "Puede elegir entre:",
+                    "bullets": [
+                        "Ingreso Anual: informe el valor total recibido en el año",
+                        "Ingreso Mensual: informe mes a mes (ideal para quien tiene variaciones de alquiler)"
+                    ],
+                    "note": "La calculadora identifica automáticamente si hay incidencia de IRPJ Adicional (10%), que ocurre cuando el ingreso mensual supera R$ 20.000."
+                },
+                {
+                    "title": "3️⃣ (Opcional) Ajuste el IVA nominal",
+                    "text": "Por defecto, el simulador utiliza IVA nominal del 28%, dentro del intervalo discutido actualmente (26,5% a 28%).",
+                    "attention": "Atención: La calculadora no aplica 28% directamente en el alquiler. Ella sigue la regla correcta de la ley: Primero divide el IVA en CBS e IBS, Después aplica la reducción legal del 70% para alquiler de inmuebles, Solo entonces calcula el valor efectivo a pagar"
+                }
+            ]
+        },
+        "methodology": {
+            "title": "Cómo se calculan los impuestos (metodología)",
+            "sections": [
+                {
+                    "title": "📌 Impuestos sobre el lucro (Lucro Presumido)",
+                    "text": "La base de cálculo es 32% del ingreso bruto. Sobre esa base inciden:",
+                    "list": [
+                        "IRPJ: 15%",
+                        "CSLL: 9%",
+                        "Si el ingreso mensual excede R$ 20.000, se aplica automáticamente IRPJ Adicional de 10% sobre el excedente"
+                    ]
+                },
+                {
+                    "title": "📌 Tributos sobre el ingreso (consumo)",
+                    "text": "En 2026 (transición): PIS: 0,65%, COFINS: 3,00%, CBS e IBS comienzan a ser cobrados con alícuotas reducidas. A partir de 2027: PIS y COFINS son extinguidos; Permanece solo el IVA Dual (CBS + IBS)"
+                },
+                {
+                    "title": "Reducción legal para inmuebles",
+                    "text": "La legislación prevé reducción del 70% en las alícuotas de CBS e IBS para operaciones de alquiler de inmuebles. En la práctica, esto significa que un IVA nominal del 28% resulta en una alícuota efectiva mucho menor, aplicada correcta y automáticamente por la calculadora."
+                }
+            ]
+        },
+        "resultsDesc": {
+            "title": "Lo que ve en los resultados",
+            "list": [
+                "Ingreso Bruto",
+                "Total de Impuestos",
+                "Ingreso Líquido",
+                "Alícuota Efectiva Total",
+                "Separación por grupos: Impuestos sobre el lucro, IVA Dual, Tributos legados",
+                "Gráfico de composición de la carga tributaria",
+                "Gráfico de evolución de la alícuota efectiva (2026–2033)"
+            ],
+            "note": "Además, hay un detalle completo con base de cálculo, alícuotas nominales, reducciones y valores anuales."
+        },
+        "important": {
+            "title": "Importante saber",
+            "list": [
+                "❌ Esta calculadora no considera créditos de IBS/CBS, por prudencia",
+                "✅ Los cálculos siguen un enfoque conservador y educativo",
+                "📊 Ideal para planificación y entendimiento, no sustituye asesoría contable"
+            ],
+            "disclaimer": "Aviso legal: simulador para fines educativos. Consulte a su contador antes de tomar decisiones."
+        },
+        "whyUnique": {
+            "title": "Por qué esta calculadora es diferente",
+            "text": "A diferencia de muchos contenidos superficiales sobre la Reforma Tributaria, esta herramienta:",
+            "list": [
+                "Respeta el orden correcto de cálculo del IVA Dual",
+                "Considera la transición real entre PIS/COFINS y CBS/IBS",
+                "Aplica correctamente la reducción del 70% para inmuebles",
+                "Muestra el impacto a lo largo del tiempo, no solo en un año aislado"
+            ],
+            "conclusion": "Si alquila inmuebles por medio de un holding familiar o está evaluando esa estructura, esta calculadora ayuda a entender, comparar escenarios y prepararse para el nuevo sistema tributario brasileño."
         }
     }
 }

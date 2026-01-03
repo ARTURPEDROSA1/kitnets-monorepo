@@ -10,11 +10,49 @@
 
  ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
    Creating an optimized production build ...
- ✓ Compiled successfully in 10.0s
+ ✓ Compiled successfully in 13.8s
    Running TypeScript ...
    Collecting page data using 7 workers ...
-   Generating static pages using 7 workers (0/164) ...
-   Generating static pages using 7 workers (41/164) 
+   Generating static pages using 7 workers (0/178) ...
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+   Generating static pages using 7 workers (44/178) 
+   Generating static pages using 7 workers (88/178) 
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+   Generating static pages using 7 workers (133/178) 
 The width(-1) and height(-1) of chart should be greater than 0,
        please check the style of container, or the props width(100%) and height(100%),
        or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
@@ -135,16 +173,6 @@ The width(-1) and height(-1) of chart should be greater than 0,
        please check the style of container, or the props width(100%) and height(100%),
        or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
        height and width.
-   Generating static pages using 7 workers (82/164) 
-The width(-1) and height(-1) of chart should be greater than 0,
-       please check the style of container, or the props width(100%) and height(100%),
-       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
-       height and width.
-The width(-1) and height(-1) of chart should be greater than 0,
-       please check the style of container, or the props width(100%) and height(100%),
-       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
-       height and width.
-   Generating static pages using 7 workers (123/164) 
 The width(-1) and height(-1) of chart should be greater than 0,
        please check the style of container, or the props width(100%) and height(100%),
        or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
@@ -193,14 +221,10 @@ The width(-1) and height(-1) of chart should be greater than 0,
        please check the style of container, or the props width(100%) and height(100%),
        or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
        height and width.
-The width(-1) and height(-1) of chart should be greater than 0,
-       please check the style of container, or the props width(100%) and height(100%),
-       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
-       height and width.
- ✓ Generating static pages using 7 workers (164/164) in 3.6s
+ ✓ Generating static pages using 7 workers (178/178) in 4.8s
    Finalizing page optimization ...
 
-Route (app)                                                           Revalidate  Expire
+Route (app)                                                                      Revalidate  Expire
 ┌ ○ /_not-found
 ├ ● /[lang]
 │ ├ /en
@@ -242,6 +266,10 @@ Route (app)                                                           Revalidate
 │ ├ /en/calculadoras
 │ ├ /pt/calculadoras
 │ └ /es/calculadoras
+├ ● /[lang]/calculadoras/aluguel-na-holding
+│ ├ /en/calculadoras/aluguel-na-holding
+│ ├ /pt/calculadoras/aluguel-na-holding
+│ └ /es/calculadoras/aluguel-na-holding
 ├ ● /[lang]/calculadoras/aluguel-proporcional
 │ ├ /en/calculadoras/aluguel-proporcional
 │ ├ /pt/calculadoras/aluguel-proporcional
@@ -278,6 +306,18 @@ Route (app)                                                           Revalidate
 │ ├ /en/conteudos/impostos-e-legislacao/imposto-sobre-dividendos
 │ ├ /pt/conteudos/impostos-e-legislacao/imposto-sobre-dividendos
 │ └ /es/conteudos/impostos-e-legislacao/imposto-sobre-dividendos
+├ ● /[lang]/conteudos/impostos-e-legislacao/renda-fixa-reforma-imposto-de-renda
+│ ├ /en/conteudos/impostos-e-legislacao/renda-fixa-reforma-imposto-de-renda
+│ ├ /pt/conteudos/impostos-e-legislacao/renda-fixa-reforma-imposto-de-renda
+│ └ /es/conteudos/impostos-e-legislacao/renda-fixa-reforma-imposto-de-renda
+├ ● /[lang]/conteudos/salario-e-renda
+│ ├ /en/conteudos/salario-e-renda
+│ ├ /pt/conteudos/salario-e-renda
+│ └ /es/conteudos/salario-e-renda
+├ ● /[lang]/conteudos/salario-e-renda/salario-minimo-2026
+│ ├ /en/conteudos/salario-e-renda/salario-minimo-2026
+│ ├ /pt/conteudos/salario-e-renda/salario-minimo-2026
+│ └ /es/conteudos/salario-e-renda/salario-minimo-2026
 ├ ƒ /[lang]/dashboard
 ├ ƒ /[lang]/dashboard/gateway/[id]
 ├ ● /[lang]/disclosure
@@ -290,10 +330,10 @@ Route (app)                                                           Revalidate
 │ └ /es/forgot-password
 ├ ○ /[lang]/icon.png
 ├ ƒ /[lang]/indices/[code]
-├ ● /[lang]/indices/panorama                                                  1h      1y
-│ ├ /en/indices/panorama                                                      1h      1y
-│ ├ /pt/indices/panorama                                                      1h      1y
-│ └ /es/indices/panorama                                                      1h      1y
+├ ● /[lang]/indices/panorama                                                             1h      1y
+│ ├ /en/indices/panorama                                                                 1h      1y
+│ ├ /pt/indices/panorama                                                                 1h      1y
+│ └ /es/indices/panorama                                                                 1h      1y
 ├ ● /[lang]/lancamentos
 │ ├ /en/lancamentos
 │ ├ /pt/lancamentos
@@ -382,6 +422,8 @@ Route (app)                                                           Revalidate
 ├ ƒ /api/enrichment/cpf
 ├ ƒ /api/gateways/claim
 ├ ƒ /api/ownership/analyze
+├ ○ /apple-icon.png
+├ ○ /icon.png
 ├ ○ /manifest.webmanifest
 ├ ○ /robots.txt
 └ ○ /sitemap.xml
