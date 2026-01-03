@@ -151,6 +151,9 @@ export default async function RootLayout({
     return (
         <ClerkProvider>
             <html lang={lang} suppressHydrationWarning>
+                <head>
+                    <link rel="preconnect" href="https://prompt-monarch-11.clerk.accounts.dev" crossOrigin="anonymous" />
+                </head>
                 <body
                     className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white dark:bg-black text-black dark:text-white`}
                 >
