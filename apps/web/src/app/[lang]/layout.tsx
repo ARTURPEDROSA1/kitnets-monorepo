@@ -165,7 +165,7 @@ export default async function RootLayout({
                             <div className="flex-1 p-4">
                                 {children}
                             </div>
-                            <Footer lang={lang} />
+                            <Footer lang={lang} dict={dict} />
                         </div>
                     </ThemeProvider>
                     <script

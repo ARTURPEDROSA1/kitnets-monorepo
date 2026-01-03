@@ -73,6 +73,15 @@ export default async function CalculatorOverviewPage({ params }: { params: Promi
                         "url": `https://kitnets.com/${lang}/calculadoras/multa-atraso-aluguel`
                     }
                 },
+                {
+                    "@type": "ListItem",
+                    "position": 3,
+                    "item": {
+                        "@type": "SoftwareApplication",
+                        "name": dict.rentOnIndividualCalculatorPage.seo.title,
+                        "url": `https://kitnets.com/${lang}/calculadoras/aluguel-na-pf`
+                    }
+                },
                 // Add other known calculators here if available in dictionary
             ]
         }
