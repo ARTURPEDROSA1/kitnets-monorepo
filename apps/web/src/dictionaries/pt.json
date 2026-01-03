@@ -1414,11 +1414,11 @@
                     "description": "Calcule o Imposto de Renda de Pessoa Física para o ano de 2026, com as novas regras e tabelas."
                 },
                 "rentOnIndividual": {
-                    "title": "Aluguel na PF",
+                    "title": "Aluguel na Pessoa Física",
                     "description": "Simule seus impostos sobre aluguel recebido como pessoa física."
                 },
                 "minTaxPF": {
-                    "title": "Imposto Mínimo PF",
+                    "title": "Imposto Mínimo Altas Rendas",
                     "description": "Calcule o Imposto Mínimo para Altas Rendas (IRPFM) e verifique se você se enquadra na nova regra."
                 }
             }

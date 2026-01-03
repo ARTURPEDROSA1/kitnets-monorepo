@@ -1727,11 +1727,11 @@
                     "description": "Official simulation with deduction from Law 15.270/2025"
                 },
                 "rentOnIndividual": {
-                    "title": "Rental on Individual",
+                    "title": "Rental Income Tax (Individual)",
                     "description": "Simulate your taxes on rental income received as an individual."
                 },
                 "minTaxPF": {
-                    "title": "Minimum Tax on Individuals",
+                    "title": "High Income Minimum Tax",
                     "description": "Calculate the Minimum Tax for High Incomes (IRPFM) and verify if you fall under the new rule."
                 }
             }

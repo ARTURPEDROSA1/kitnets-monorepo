@@ -111,6 +111,13 @@ const CALCULATORS: CalculatorItem[] = [
         categories: ['finance', 'planning', 'taxes'],
         dictKey: 'rentOnIndividual'
     },
+    {
+        id: 'minTaxPF',
+        icon: TrendingUp,
+        route: (lang) => `/${lang}/calculadoras/imposto-minimo-altas-rendas`,
+        categories: ['finance', 'planning', 'taxes'],
+        dictKey: 'minTaxPF'
+    },
 
 ];
 
