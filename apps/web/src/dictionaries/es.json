@@ -21,7 +21,8 @@
         "taxesAndLegislation": "Impuestos y legislación",
         "salariesAndIncome": "Salarios e Ingresos",
         "taxes": "Impuestos",
-        "rentalOnHolding": "Alquiler en Holding"
+        "rentalOnHolding": "Alquiler en Holding",
+        "irpf2026": "Calculadora IRPF 2026"
     },
     "filters": {
         "title": "Filtrar resultados",
@@ -1574,7 +1575,146 @@
                 "inpc": {
                     "title": "INPC",
                     "description": "Consulta el índice nacional de precios al consumidor."
+                },
+                "holdingRental": {
+                    "title": "Alquiler en Holding",
+                    "description": "Estime la carga tributaria sobre los ingresos por alquiler en una estructura de holding familiar durante y después de la transición de la Reforma Tributaria (2026-2033)."
+                },
+                "irpf2026": {
+                    "title": "Calculadora IRPF 2026",
+                    "description": "Simulación oficial con reducción de la Ley 15.270/2025"
                 }
+            }
+        },
+        "irpf2026CalculatorPage": {
+            "title": "Calculadora de Impuesto sobre la Renta 2026",
+            "subtitle": "Simule la Exención, Reducción de Impuestos e Impuesto a Pagar con las Nuevas Reglas",
+            "intro": "La Calculadora de Impuesto sobre la Renta 2026 de Kitnets.com le permite simular, de manera precisa y transparente, cuánto pagará realmente de IRPF a partir de enero de 2026, considerando la nueva exención hasta R$ 5.000, la reducción progresiva hasta R$ 7.350 y todas las reglas introducidas por la Ley nº 15.270/2025.",
+            "featuresList": [
+                "Si estará totalmente exento del Impuesto sobre la Renta en 2026",
+                "Cuál será la reducción exacta del impuesto en su caso",
+                "El impuesto final a pagar, mes a mes o en el ajuste anual",
+                "Su tasa efectiva real, después de todas las reducciones legales"
+            ],
+            "introConclusion": "Todo esto con la misma lógica utilizada por la Receita Federal, pero ya actualizada para 2026, algo que el simulador oficial aún no entrega por completo.",
+            "changes": {
+                "title": "¿Qué cambia en el Impuesto sobre la Renta en 2026?",
+                "intro": "A partir de enero de 2026, entran en vigor los cambios más relevantes en el IRPF de las últimas décadas:",
+                "items": [
+                    {
+                        "title": "Exención total hasta R$ 5.000 por mes",
+                        "text": "Quien recibe hasta R$ 5.000 de ingresos tributables mensuales podrá tener el impuesto a cero, aunque la tabla progresiva indique impuesto a pagar. Esto ocurre mediante una reducción legal de hasta R$ 312,89, limitada al valor del impuesto calculado."
+                    },
+                    {
+                        "title": "Reducción parcial entre R$ 5.000 y R$ 7.350",
+                        "text": "Los contribuyentes en este rango no quedan totalmente exentos, pero pasan a pagar menos impuesto, con una reducción decreciente y lineal, que disminuye conforme aumenta la renta y se reduce a cero exactamente en R$ 7.350."
+                    },
+                    {
+                        "title": "Por encima de R$ 7.350",
+                        "text": "Para rentas superiores, el cálculo sigue normalmente por la tabla progresiva, sin aplicación de reducción adicional."
+                    }
+                ],
+                "appliesTo": {
+                    "title": "Estas reglas valen tanto para:",
+                    "list": [
+                        "IR retenido en la fuente (salarios)",
+                        "Carnê-Leão (autónomos)",
+                        "13º salario",
+                        "Ajuste anual del IRPF 2026"
+                    ]
+                }
+            },
+            "howTo": {
+                "title": "Cómo funciona la Calculadora de Impuesto sobre la Renta 2026",
+                "subtitle": "Simulación en pocos pasos",
+                "steps": [
+                    {
+                        "title": "Informe sus ingresos tributables",
+                        "text": "Salario, retiro de socios o ingresos sujetos al IR mensual o anual."
+                    },
+                    {
+                        "title": "Informe sus deducciones (opcional)",
+                        "text": "INSS, dependientes, pensión alimenticia, previsión oficial u otras deducciones legales."
+                    },
+                    {
+                        "title": "Vea el resultado completo",
+                        "text": "La calculadora elige automáticamente la opción más ventajosa entre deducciones legales o descuento simplificado y aplica correctamente la tabla progresiva + reducción legal."
+                    }
+                ]
+            },
+            "results": {
+                "title": "Lo que la calculadora entrega en el resultado",
+                "intro": "Recibe un demostrativo completo, similar al de la Receita Federal:",
+                "list": [
+                    "Ingresos tributables",
+                    "Deducciones utilizadas",
+                    "Base de cálculo",
+                    "Impuesto calculado por la tabla progresiva",
+                    "Reducción aplicada por la Ley 15.270/2025",
+                    "Impuesto final a pagar",
+                    "Tasa efectiva (%)",
+                    "Detalle por rango de tributación"
+                ],
+                "classificationTitle": "Clasificación automática de su caso:",
+                "classification": [
+                    "Exento",
+                    "Beneficiado total",
+                    "Beneficiado parcial",
+                    "No beneficiado"
+                ]
+            },
+            "whyUse": {
+                "title": "¿Por qué usar esta calculadora de IR 2026?",
+                "items": [
+                    {
+                        "title": "Actualizada para la legislación más reciente",
+                        "text": "Mientras muchos simuladores aún usan reglas antiguas, esta herramienta ya aplica: Tabla progresiva 2026, Reducción mensual y anual, Límites exactos definidos por ley."
+                    },
+                    {
+                        "title": "Metodología oficial",
+                        "text": "Los cálculos siguen exactamente la lógica legal, incluyendo: Parcela a deducir, Límites de reducción, Prohibición de impuesto negativo, Base correcta para aplicación de la reducción (ingresos, no base)."
+                    },
+                    {
+                        "title": "Transparencia total",
+                        "text": "Aquí ve cómo se calcula el impuesto, rango por rango, sin 'caja negra'."
+                    }
+                ]
+            },
+            "targetAudience": {
+                "title": "¿Para quién es ideal esta calculadora?",
+                "list": [
+                    "Trabajadores CLT",
+                    "Autónomos y profesionales liberales (Carnê-Leão)",
+                    "Quien quiere saber si estará exento del IR en 2026",
+                    "Quien está negociando salario o cambio de empleo",
+                    "Planificación financiera y tributaria",
+                    "Educación financiera y fiscal"
+                ]
+            },
+            "warning": {
+                "title": "Importante: atención a múltiples fuentes de ingresos",
+                "text": "Aunque quede exento mensualmente, quien posee más de una fuente pagadora puede tener impuesto a pagar en el ajuste anual. La calculadora ayuda a anticipar este riesgo y entender el impacto real de la nueva regla."
+            },
+            "legal": {
+                "title": "Base legal y seguridad de la información",
+                "intro": "Esta calculadora fue desarrollada con base en:",
+                "list": [
+                    "Ley nº 15.270, de 26 de noviembre de 2025",
+                    "Ley nº 15.191, de 11 de agosto de 2025",
+                    "Tablas oficiales de incidencia mensual y anual del IRPF",
+                    "Orientaciones públicas de la Receita Federal"
+                ],
+                "disclaimer": "Resultado con carácter informativo. Para fines legales, prevalece siempre la apuración oficial en la Declaración de Impuesto sobre la Renta."
+            },
+            "cta": {
+                "title": "Simule ahora su Impuesto sobre la Renta 2026",
+                "subtitle": "Descubra en pocos segundos:",
+                "list": [
+                    "Si quedará exento",
+                    "Cuánto dejará de pagar de impuesto",
+                    "Cuál será su impuesto real en 2026"
+                ],
+                "button": "Use ahora la Calculadora de Impuesto sobre la Renta 2026"
             }
         },
         "seoContent": {
@@ -1743,5 +1883,39 @@
             ],
             "conclusion": "Si alquila inmuebles por medio de un holding familiar o está evaluando esa estructura, esta calculadora ayuda a entender, comparar escenarios y prepararse para el nuevo sistema tributario brasileño."
         }
+    },
+    "irpf2026CalculatorPage": {
+        "title": "Calculadora IRPF 2026",
+        "subtitle": "Simulación oficial con reducción de la Ley 15.270/2025",
+        "monthly": "Mensual 2026",
+        "annual": "Anual 2026",
+        "taxpayerData": "Datos del contribuyente",
+        "taxpayerDataDesc": "Complete los datos de sus ingresos y deducciones.",
+        "taxableIncome": "Ingresos Tributables",
+        "taxableIncomeHelp": "Salario bruto, alquileres recibidos, pensiones, etc.",
+        "dependents": "Dependientes",
+        "deductionPerDependent": "de deducción",
+        "officialPension": "Pensión Oficial (INSS)",
+        "alimony": "Pensión Alimenticia (Judicial)",
+        "otherDeductions": "Otras Deducciones",
+        "otherDeductionsHelp": "Libro de Caja, Pensión Privada...",
+        "over65": "65 años o más",
+        "over65Help": "Aplica porción exenta de",
+        "dueTax": "Impuesto Debido",
+        "effectiveRate": "Tasa Efectiva",
+        "deductions": "Deducciones",
+        "simplifiedDiscountUsed": "Descuento Simplificado Utilizado",
+        "legalDeductionsUsed": "Deducciones Legales Utilizadas",
+        "baseCalculation": "Base de Cálculo",
+        "tableTax": "Impuesto (Tabla Progresiva)",
+        "reductionApplied": "Reducción (Ley 15.270/25)",
+        "demonstrative": "Demostrativo de Cálculo",
+        "range": "Rango Base",
+        "rate": "Tasa",
+        "portion": "Porción",
+        "tax": "Impuesto",
+        "totalTableTax": "Total Impuesto Tabla",
+        "disclaimerTitle": "Nota Legal",
+        "disclaimerText": "Esta calculadora sigue estrictamente la Ley Nº 15.270/2025 y las directrices publicadas por la Receita Federal. El resultado tiene carácter informativo."
     }
 }

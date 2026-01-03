@@ -57,7 +57,8 @@
         "taxesAndLegislation": "Taxes & Legislation",
         "salariesAndIncome": "Salaries & Income",
         "taxes": "Taxes",
-        "rentalOnHolding": "Rental on Holding"
+        "rentalOnHolding": "Rental on Holding",
+        "irpf2026": "IRPF 2026 Calculator"
     },
     "home": {
         "welcome": "Welcome to Kitnets.com",
@@ -142,21 +143,6 @@
                 "title": "Advertising is not just publishing. It's operating.",
                 "description": "At Kitnets.com, advertising is just the beginning. The platform was created to operate properties professionally, with automation and control. For owners, brokers, and agencies:",
                 "items": [
-                    "Listings with highly qualified audience",
-                    "Centralized management of contracts, rents, and adjustments",
-                    "Organized communication with residents",
-                    "Complete history of values, documents, and events",
-                    "End of spreadsheets, parallel controls, and improvisation"
-                ],
-                "footer": "Everything in a single system, data-oriented."
-            },
-            {
-                "title": "Data-driven real estate management",
-                "description": "Kitnets.com works as a real estate SaaS with embedded intelligence, offering:",
-                "items": [
-                    "Clear and updated real-time dashboards",
-                    "Automatic reports",
-                    "Performance and profitability metrics",
                     "Unprecedented KPIs for compact properties",
                     "Complete history of properties, contracts, and adjustments"
                 ],
@@ -1533,7 +1519,146 @@
                 "inpc": {
                     "title": "INPC",
                     "description": "Check the national consumer price index."
+                },
+                "holdingRental": {
+                    "title": "Holding Rental",
+                    "description": "Estimate tax burden on rental income in family holding (Presumed Profit) during and after Tax Reform transition (2026-2033)."
+                },
+                "irpf2026": {
+                    "title": "IRPF 2026 Calculator",
+                    "description": "Official simulation with deduction from Law 15.270/2025"
                 }
+            }
+        },
+        "irpf2026CalculatorPage": {
+            "title": "Income Tax Calculator 2026",
+            "subtitle": "Simulate Exemption, Tax Reduction, and Tax Due with New Rules",
+            "intro": "Kitnets.com's 2026 Income Tax Calculator allows you to precisely and transparently simulate how much Personal Income Tax (IRPF) you will really pay starting January 2026, considering the new exemption up to R$ 5,000, progressive reduction up to R$ 7,350, and all rules introduced by Law No. 15,270/2025.",
+            "featuresList": [
+                "If you will be fully exempt from Income Tax in 2026",
+                "What will be the exact tax reduction in your case",
+                "The final tax due, month by month or in the annual adjustment",
+                "Your real effective rate, after all legal reductions"
+            ],
+            "introConclusion": "All this with the same logic used by the Federal Revenue (Receita Federal), but already updated for 2026, something the official simulator does not completely deliver yet.",
+            "changes": {
+                "title": "What changes in Income Tax in 2026?",
+                "intro": "Starting January 2026, the most significant IRPF changes in recent decades come into effect:",
+                "items": [
+                    {
+                        "title": "Total exemption up to R$ 5,000 per month",
+                        "text": "Those receiving up to R$ 5,000 in monthly taxable income may have zero tax, even if the progressive table indicates tax to pay. This happens through a legal reduction of up to R$ 312.89, limited to the calculated tax amount."
+                    },
+                    {
+                        "title": "Partial reduction between R$ 5,000 and R$ 7,350",
+                        "text": "Taxpayers in this range are not fully exempt but pay less tax, with a decreasing and linear reduction that diminishes as income increases and zeroes out exactly at R$ 7,350."
+                    },
+                    {
+                        "title": "Above R$ 7,350",
+                        "text": "For higher incomes, the calculation follows the progressive table normally, without additional reduction application."
+                    }
+                ],
+                "appliesTo": {
+                    "title": "These rules apply to:",
+                    "list": [
+                        "Withheld Income Tax (Salaries)",
+                        "Carnê-Leão (Self-employed)",
+                        "13th Salary",
+                        "IRPF 2026 Annual Adjustment"
+                    ]
+                }
+            },
+            "howTo": {
+                "title": "How the 2026 Income Tax Calculator Works",
+                "subtitle": "Simulation in a few steps",
+                "steps": [
+                    {
+                        "title": "Enter your taxable income",
+                        "text": "Salary, owner's draw, or income subject to monthly or annual IR."
+                    },
+                    {
+                        "title": "Enter your deductions (optional)",
+                        "text": "INSS, dependents, alimony, official pension, or other legal deductions."
+                    },
+                    {
+                        "title": "See the complete result",
+                        "text": "The calculator automatically chooses the most advantageous option between legal deductions or simplified discount and correctly applies the progressive table + legal reduction."
+                    }
+                ]
+            },
+            "results": {
+                "title": "What the calculator delivers in the result",
+                "intro": "You receive a complete statement, similar to that of the Federal Revenue:",
+                "list": [
+                    "Taxable income",
+                    "Deductions used",
+                    "Calculation base",
+                    "Tax calculated by progressive table",
+                    "Reduction applied by Law 15,270/2025",
+                    "Final tax due",
+                    "Effective rate (%)",
+                    "Detail by tax bracket"
+                ],
+                "classificationTitle": "Automatic classification of your case:",
+                "classification": [
+                    "Exempt",
+                    "Fully benefitted",
+                    "Partially benefitted",
+                    "Not benefitted"
+                ]
+            },
+            "whyUse": {
+                "title": "Why use this 2026 Tax Calculator?",
+                "items": [
+                    {
+                        "title": "Updated for the latest legislation",
+                        "text": "While many simulators still use old rules, this tool already applies: 2026 Progressive Table, Monthly and Annual Reduction, Exact limits defined by law."
+                    },
+                    {
+                        "title": "Official Methodology",
+                        "text": "Calculations follow the exact legal logic, including: Deductible portion, Reduction limits, Prohibition of negative tax, Correct base for reduction application (income, not base)."
+                    },
+                    {
+                        "title": "Total Transparency",
+                        "text": "Here you see how the tax is calculated, bracket by bracket, without a 'black box'."
+                    }
+                ]
+            },
+            "targetAudience": {
+                "title": "Who is this calculator ideal for?",
+                "list": [
+                    "CLT Workers",
+                    "Self-employed and professionals (Carnê-Leão)",
+                    "Anyone wanting to know if they will be exempt from IR in 2026",
+                    "Anyone negotiating salary or job change",
+                    "Financial and tax planning",
+                    "Financial and fiscal education"
+                ]
+            },
+            "warning": {
+                "title": "Important: attention to multiple income sources",
+                "text": "Even if you are exempt monthly, those with more than one paying source may have tax to pay in the annual adjustment. The calculator helps predict this risk and understand the real impact of the new rule."
+            },
+            "legal": {
+                "title": "Legal basis and information security",
+                "intro": "This calculator was developed based on:",
+                "list": [
+                    "Law No. 15,270, of November 26, 2025",
+                    "Law No. 15,191, of August 11, 2025",
+                    "Official monthly and annual IRPF incidence tables",
+                    "Public guidelines from the Federal Revenue"
+                ],
+                "disclaimer": "Result for informational purposes. For legal purposes, the official calculation in the Income Tax Declaration always prevails."
+            },
+            "cta": {
+                "title": "Simulate your 2026 Income Tax now",
+                "subtitle": "Discover in a few seconds:",
+                "list": [
+                    "If you will be exempt",
+                    "How much tax you will stop paying",
+                    "What your real tax will be in 2026"
+                ],
+                "button": "Use the 2026 Income Tax Calculator now"
             }
         },
         "seoContent": {
@@ -1702,5 +1827,166 @@
             ],
             "conclusion": "If you rent properties through a family holding or are evaluating this structure, this calculator helps you understand, compare scenarios, and prepare for the new Brazilian tax system."
         }
+    },
+    "irpf2026CalculatorPage": {
+        "title": "Income Tax Calculator 2026",
+        "subtitle": "Simulate Exemption, Tax Reduction and Tax Due with New Rules",
+        "intro": "The Kitnets.com 2026 Income Tax Calculator allows you to simulate, accurately and transparently, how much IRPF you will really pay starting January 2026, considering the new exemption up to R$ 5,000, the progressive reduction up to R$ 7,350 and all rules introduced by Law No. 15,270/2025.",
+        "featuresList": [
+            "If you will be totally exempt from Income Tax in 2026",
+            "What will be the exact tax reduction in your case",
+            "The final tax due, month by month or in the annual adjustment",
+            "Your effective tax rate, after all legal reductions"
+        ],
+        "introConclusion": "All this with the same logic used by the Federal Revenue, but already updated for 2026, something the official simulator does not yet fully deliver.",
+        "changes": {
+            "title": "What changes in Income Tax in 2026?",
+            "intro": "Starting January 2026, the most relevant changes in IRPF in recent decades come into force:",
+            "items": [
+                {
+                    "title": "Total exemption up to R$ 5,000 per month",
+                    "text": "Those receiving up to R$ 5,000 in monthly taxable income may have zero tax, even if the progressive table indicates tax to pay. This happens through a legal reduction of up to R$ 312.89, limited to the calculated tax amount."
+                },
+                {
+                    "title": "Partial reduction between R$ 5,000 and R$ 7,350",
+                    "text": "Taxpayers in this range are not totally exempt, but start paying less tax, with a decreasing and linear reduction, which decreases as income increases and zeros exactly at R$ 7,350."
+                },
+                {
+                    "title": "Above R$ 7,350",
+                    "text": "For higher incomes, the calculation follows normally by the progressive table, without applying additional reduction."
+                }
+            ],
+            "appliesTo": {
+                "title": "These rules apply to:",
+                "list": [
+                    "IR withheld at source (salaries)",
+                    "Carnê-Leão (self-employed)",
+                    "13th salary",
+                    "Annual IRPF 2026 adjustment"
+                ]
+            }
+        },
+        "howTo": {
+            "title": "How the 2026 Income Tax Calculator works",
+            "subtitle": "Simulation in a few steps",
+            "steps": [
+                {
+                    "title": "Enter your taxable income",
+                    "text": "Salary, pro-labore or income subject to monthly or annual IR."
+                },
+                {
+                    "title": "Enter your deductions (optional)",
+                    "text": "INSS, dependents, alimony, official pension or other legal deductions."
+                },
+                {
+                    "title": "See the complete result",
+                    "text": "The calculator automatically chooses the most advantageous option between legal deductions or simplified discount and correctly applies the progressive table + legal reduction."
+                }
+            ]
+        },
+        "results": {
+            "title": "What the calculator delivers in the result",
+            "intro": "You receive a complete statement, similar to that of the Federal Revenue:",
+            "list": [
+                "Taxable income",
+                "Deductions used",
+                "Calculation base",
+                "Tax calculated by progressive table",
+                "Reduction applied by Law 15,270/2025",
+                "Final tax due",
+                "Effective rate (%)",
+                "Detailing by tax bracket"
+            ],
+            "classificationTitle": "Automatic classification of your case:",
+            "classification": [
+                "Exempt",
+                "Total beneficiary",
+                "Partial beneficiary",
+                "Not benefited"
+            ]
+        },
+        "whyUse": {
+            "title": "Why use this 2026 IR calculator?",
+            "items": [
+                {
+                    "title": "Updated for the latest legislation",
+                    "text": "While many simulators still use old rules, this tool already applies: Progressive table 2026, Monthly and annual reduction, Exact limits defined in law."
+                },
+                {
+                    "title": "Official methodology",
+                    "text": "Calculations follow exactly the legal logic, including: Deductible portion, Reduction limits, Prohibition of negative tax, Correct base for reduction application (income, not base)."
+                },
+                {
+                    "title": "Total transparency",
+                    "text": "Here you see how the tax is calculated, bracket by bracket, without 'black box'."
+                }
+            ]
+        },
+        "targetAudience": {
+            "title": "Who is this calculator ideal for?",
+            "list": [
+                "CLT Workers",
+                "Self-employed and professionals (Carnê-Leão)",
+                "Those who want to know if they will be exempt from IR in 2026",
+                "Those negotiating salary or job change",
+                "Financial and tax planning",
+                "Financial and fiscal education"
+            ]
+        },
+        "warning": {
+            "title": "Important: attention to multiple income sources",
+            "text": "Even if you are exempt monthly, those with more than one paying source may have tax to pay in the annual adjustment. The calculator helps anticipate this risk and understand the real impact of the new rule."
+        },
+        "legal": {
+            "title": "Legal basis and information security",
+            "intro": "This calculator was developed based on:",
+            "list": [
+                "Law No. 15,270, of November 26, 2025",
+                "Law No. 15,191, of August 11, 2025",
+                "Official tables of monthly and annual IRPF incidence",
+                "Public guidelines from the Federal Revenue"
+            ],
+            "disclaimer": "Result with informative character. For legal purposes, the official calculation in the Income Tax Declaration always prevails."
+        },
+        "cta": {
+            "title": "Simulate your 2026 Income Tax now",
+            "subtitle": "Discover in a few seconds:",
+            "list": [
+                "If you will be exempt",
+                "How much less tax you will pay",
+                "What your real tax will be in 2026"
+            ],
+            "button": "Use the 2026 Income Tax Calculator now"
+        },
+        "monthly": "Monthly 2026",
+        "annual": "Annual 2026",
+        "taxpayerData": "Taxpayer Data",
+        "taxpayerDataDesc": "Fill in your income and deduction data.",
+        "taxableIncome": "Taxable Income",
+        "taxableIncomeHelp": "Gross salary, rental income, pensions, etc.",
+        "dependents": "Dependents",
+        "deductionPerDependent": "deduction per dependent",
+        "officialPension": "Official Pension (INSS)",
+        "alimony": "Alimony (Judicial)",
+        "otherDeductions": "Other Deductions",
+        "otherDeductionsHelp": "Cash Book, Private Pension...",
+        "over65": "65 years or older",
+        "over65Help": "Applies exempt portion of",
+        "dueTax": "Tax Due",
+        "effectiveRate": "Effective Rate",
+        "deductions": "Deductions",
+        "simplifiedDiscountUsed": "Simplified Discount Used",
+        "legalDeductionsUsed": "Legal Deductions Used",
+        "baseCalculation": "Calculation Base",
+        "tableTax": "Tax (Progressive Table)",
+        "reductionApplied": "Reduction (Law 15,270/25)",
+        "demonstrative": "Calculation Demonstrative",
+        "range": "Base Range",
+        "rate": "Rate",
+        "portion": "Portion",
+        "tax": "Tax",
+        "totalTableTax": "Total Table Tax",
+        "disclaimerTitle": "Legal Note",
+        "disclaimerText": "This calculator strictly follows Law No. 15,270/2025 and guidelines published by the Federal Revenue. The result is for informational purposes."
     }
 }
