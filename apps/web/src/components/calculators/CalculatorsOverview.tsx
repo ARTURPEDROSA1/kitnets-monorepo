@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { TrendingUp, AlertCircle, FileText, Coins, PiggyBank, ArrowLeftRight, Sun, Percent, Search, ArrowRight, Calculator } from 'lucide-react';
+import { TrendingUp, AlertCircle, FileText, Coins, PiggyBank, ArrowLeftRight, Sun, Percent, Search, ArrowRight, Calculator, Building2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -52,6 +52,14 @@ const CALCULATORS: CalculatorItem[] = [
         dictKey: 'proRataRent'
     },
     {
+        id: 'holdingRental',
+        icon: Building2,
+        route: (lang) => `/${lang}/calculadoras/aluguel-na-holding`,
+        categories: ['finance', 'planning', 'rent'],
+        dictKey: 'holdingRental',
+        mostUsed: true
+    },
+    {
         id: 'rentalIncome',
         icon: Coins,
         route: (lang) => `/${lang}/calculadoras/renda-aluguel`,
@@ -87,6 +95,14 @@ const CALCULATORS: CalculatorItem[] = [
         route: (lang) => `/${lang}/calculadora-independencia-financeira`,
         categories: ['planning'],
         dictKey: 'financialIndependence'
+    },
+    {
+        id: 'irpf2026',
+        icon: Calculator,
+        route: (lang) => `/${lang}/calculadoras/irpf-2026`,
+        categories: ['finance', 'planning'],
+        dictKey: 'irpf2026',
+        mostUsed: true
     },
 ];
 

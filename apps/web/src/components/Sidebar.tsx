@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@kitnets/ui";
 import { SignOutButton, useAuth } from "@clerk/nextjs";
-import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Search, Bell, ChevronDown, Rocket, HardHat, Briefcase, Building2, User, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart, ArrowLeftRight, FileText, AlertCircle } from "lucide-react";
+import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Search, Bell, ChevronDown, Rocket, HardHat, Briefcase, Building2, User, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart, ArrowLeftRight, FileText, AlertCircle, Plus, Minus } from "lucide-react";
 
 import { useTheme } from "next-themes";
 import Image from "next/image";
@@ -577,128 +577,177 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                             <div className="space-y-6">
                                 {/* Impostos */}
                                 <div className="space-y-1">
-                                    <h3 className="px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                    <button
+                                        onClick={() => toggleSection('taxes')}
+                                        className="flex w-full items-center justify-between px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground focus:outline-none"
+                                    >
                                         {dict.menu.taxes}
-                                    </h3>
-                                    <ul className="space-y-1 font-medium">
-                                        <li>
-                                            <Link
-                                                href={lang === 'pt' ? '/calculadoras/aluguel-na-holding' : `/${lang}/calculadoras/aluguel-na-holding`}
-                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
-                                            >
-                                                <Building2 className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                <span className="ms-3 text-sm">{dict.menu.rentalOnHolding}</span>
-                                            </Link>
-                                        </li>
-                                    </ul>
+                                        {expandedSections['taxes'] ? (
+                                            <Minus className="h-4 w-4" />
+                                        ) : (
+                                            <Plus className="h-4 w-4" />
+                                        )}
+                                    </button>
+                                    {expandedSections['taxes'] && (
+                                        <ul className="space-y-1 font-medium animate-in slide-in-from-top-1 fade-in duration-200">
+                                            <li>
+                                                <Link
+                                                    href={lang === 'pt' ? '/calculadoras/aluguel-na-holding' : `/${lang}/calculadoras/aluguel-na-holding`}
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                >
+                                                    <Building2 className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3 text-sm">{dict.menu.rentalOnHolding}</span>
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <Link
+                                                    href={lang === 'pt' ? '/calculadoras/irpf-2026' : `/${lang}/calculadoras/irpf-2026`}
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                >
+                                                    <Calculator className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3 text-sm">{dict.menu.irpf2026}</span>
+                                                </Link>
+                                            </li>
+                                        </ul>
+                                    )}
                                 </div>
 
                                 {/* Financeiro */}
                                 <div className="space-y-1">
-                                    <h3 className="px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                    <button
+                                        onClick={() => toggleSection('finance')}
+                                        className="flex w-full items-center justify-between px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground focus:outline-none"
+                                    >
                                         {dict.menu.finance}
-                                    </h3>
-                                    <ul className="space-y-1 font-medium">
-                                        <li>
-                                            <Link
-                                                href={lang === 'pt' ? '/calculadoras/conversor-juros-mensal-anual' : `/${lang}/calculadoras/conversor-juros-mensal-anual`}
-                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
-                                            >
-                                                <ArrowLeftRight className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                <span className="ms-3 text-sm">Conversor de Juros Mensal e Anual</span>
-                                            </Link>
-                                        </li>
-                                        <li>
-                                            <Link
-                                                href={lang === 'pt' ? '/calculadora-juros-compostos' : `/${lang}/calculadora-juros-compostos`}
-                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
-                                            >
-                                                <TrendingUp className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                <span className="ms-3 text-sm">Juros Compostos</span>
-                                            </Link>
-                                        </li>
-                                        <li>
-                                            <Link
-                                                href={lang === 'pt' ? '/calculadora-independencia-financeira' : `/${lang}/calculadora-independencia-financeira`}
-                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
-                                            >
-                                                <Sun className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                <span className="ms-3 text-sm">{dict.menu.financialIndependence}</span>
-                                            </Link>
-                                        </li>
-                                    </ul>
+                                        {expandedSections['finance'] ? (
+                                            <Minus className="h-4 w-4" />
+                                        ) : (
+                                            <Plus className="h-4 w-4" />
+                                        )}
+                                    </button>
+                                    {expandedSections['finance'] && (
+                                        <ul className="space-y-1 font-medium animate-in slide-in-from-top-1 fade-in duration-200">
+                                            <li>
+                                                <Link
+                                                    href={lang === 'pt' ? '/calculadoras/conversor-juros-mensal-anual' : `/${lang}/calculadoras/conversor-juros-mensal-anual`}
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                >
+                                                    <ArrowLeftRight className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3 text-sm">Conversor de Juros Mensal e Anual</span>
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <Link
+                                                    href={lang === 'pt' ? '/calculadora-juros-compostos' : `/${lang}/calculadora-juros-compostos`}
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                >
+                                                    <TrendingUp className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3 text-sm">Juros Compostos</span>
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <Link
+                                                    href={lang === 'pt' ? '/calculadora-independencia-financeira' : `/${lang}/calculadora-independencia-financeira`}
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                >
+                                                    <Sun className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3 text-sm">{dict.menu.financialIndependence}</span>
+                                                </Link>
+                                            </li>
+                                        </ul>
+                                    )}
                                 </div>
 
                                 {/* Aluguel */}
                                 <div className="space-y-1">
-                                    <h3 className="px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                    <button
+                                        onClick={() => toggleSection('rent')}
+                                        className="flex w-full items-center justify-between px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground focus:outline-none"
+                                    >
                                         {dict.menu.rentCategory}
-                                    </h3>
-                                    <ul className="space-y-1 font-medium">
-                                        <li>
-                                            <Link
-                                                href={lang === 'pt' ? '/calculadora-reajuste-aluguel' : `/${lang}/calculadora-reajuste-aluguel`}
-                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
-                                            >
-                                                <TrendingUp className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                <span className="ms-3 text-sm">Reajuste de Aluguel</span>
-                                            </Link>
-                                        </li>
-                                        <li>
-                                            <Link
-                                                href={lang === 'pt' ? '/calculadoras/multa-atraso-aluguel' : `/${lang}/calculadoras/multa-atraso-aluguel`}
-                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
-                                            >
-                                                <AlertCircle className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                <span className="ms-3 text-sm">{dict.rentLateFineCalculatorPage?.menuTitle || "Multa por Atraso"}</span>
-                                            </Link>
-                                        </li>
-                                        <li>
-                                            <Link
-                                                href={lang === 'pt' ? '/calculadoras/multa-rescisao-contrato-aluguel' : `/${lang}/calculadoras/multa-rescisao-contrato-aluguel`}
-                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
-                                            >
-                                                <FileText className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                <span className="ms-3 text-sm">{dict.rentFineCalculatorPage?.menuTitle || "Calculadora Rescisão"}</span>
-                                            </Link>
-                                        </li>
-                                        <li>
-                                            <Link
-                                                href={lang === 'pt' ? '/calculadoras/aluguel-proporcional' : `/${lang}/calculadoras/aluguel-proporcional`}
-                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
-                                            >
-                                                <Calculator className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                <span className="ms-3 text-sm">{dict.proRataRentCalculatorPage?.menuTitle || "Aluguel Proporcional"}</span>
-                                            </Link>
-                                        </li>
-                                    </ul>
+                                        {expandedSections['rent'] ? (
+                                            <Minus className="h-4 w-4" />
+                                        ) : (
+                                            <Plus className="h-4 w-4" />
+                                        )}
+                                    </button>
+                                    {expandedSections['rent'] && (
+                                        <ul className="space-y-1 font-medium animate-in slide-in-from-top-1 fade-in duration-200">
+                                            <li>
+                                                <Link
+                                                    href={lang === 'pt' ? '/calculadora-reajuste-aluguel' : `/${lang}/calculadora-reajuste-aluguel`}
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                >
+                                                    <TrendingUp className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3 text-sm">Reajuste de Aluguel</span>
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <Link
+                                                    href={lang === 'pt' ? '/calculadoras/multa-atraso-aluguel' : `/${lang}/calculadoras/multa-atraso-aluguel`}
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                >
+                                                    <AlertCircle className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3 text-sm">{dict.rentLateFineCalculatorPage?.menuTitle || "Multa por Atraso"}</span>
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <Link
+                                                    href={lang === 'pt' ? '/calculadoras/multa-rescisao-contrato-aluguel' : `/${lang}/calculadoras/multa-rescisao-contrato-aluguel`}
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                >
+                                                    <FileText className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3 text-sm">{dict.rentFineCalculatorPage?.menuTitle || "Calculadora Rescisão"}</span>
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <Link
+                                                    href={lang === 'pt' ? '/calculadoras/aluguel-proporcional' : `/${lang}/calculadoras/aluguel-proporcional`}
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                >
+                                                    <Calculator className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3 text-sm">{dict.proRataRentCalculatorPage?.menuTitle || "Aluguel Proporcional"}</span>
+                                                </Link>
+                                            </li>
+                                        </ul>
+                                    )}
                                 </div>
 
                                 {/* Investimento */}
                                 <div className="space-y-1">
-                                    <h3 className="px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                    <button
+                                        onClick={() => toggleSection('investment')}
+                                        className="flex w-full items-center justify-between px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground focus:outline-none"
+                                    >
                                         {dict.menu.investment}
-                                    </h3>
-                                    <ul className="space-y-1 font-medium">
-                                        <li>
-                                            <Link
-                                                href={lang === 'pt' ? '/calculadoras/renda-aluguel' : `/${lang}/calculadoras/renda-aluguel`}
-                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
-                                            >
-                                                <Coins className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                <span className="ms-3 text-sm">Renda do Aluguel paga o Imóvel?</span>
-                                            </Link>
-                                        </li>
-                                        <li>
-                                            <Link
-                                                href={lang === 'pt' ? '/calculadora-amortizacao-financiamento-imobiliario' : `/${lang}/calculadora-amortizacao-financiamento-imobiliario`}
-                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
-                                            >
-                                                <PiggyBank className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                <span className="ms-3 text-sm">Simulador de Amortização</span>
-                                            </Link>
-                                        </li>
-                                    </ul>
+                                        {expandedSections['investment'] ? (
+                                            <Minus className="h-4 w-4" />
+                                        ) : (
+                                            <Plus className="h-4 w-4" />
+                                        )}
+                                    </button>
+                                    {expandedSections['investment'] && (
+                                        <ul className="space-y-1 font-medium animate-in slide-in-from-top-1 fade-in duration-200">
+                                            <li>
+                                                <Link
+                                                    href={lang === 'pt' ? '/calculadoras/renda-aluguel' : `/${lang}/calculadoras/renda-aluguel`}
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                >
+                                                    <Coins className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3 text-sm">Renda do Aluguel paga o Imóvel?</span>
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <Link
+                                                    href={lang === 'pt' ? '/calculadora-amortizacao-financiamento-imobiliario' : `/${lang}/calculadora-amortizacao-financiamento-imobiliario`}
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                >
+                                                    <PiggyBank className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3 text-sm">Simulador de Amortização</span>
+                                                </Link>
+                                            </li>
+                                        </ul>
+                                    )}
                                 </div>
 
 

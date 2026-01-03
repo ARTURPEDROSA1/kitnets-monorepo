@@ -15,12 +15,15 @@ import {
     Cell,
     ReferenceLine
 } from "recharts";
-import { Settings, AlertTriangle, Building2, ChevronDown, ChevronUp } from "lucide-react";
+import { Settings, AlertTriangle, Building2, ChevronDown, ChevronUp, Printer, Share2, Check, FileText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dictionary } from "@/dictionaries";
+import { useCalculatorLeadCapture } from "../../../hooks/useCalculatorLeadCapture";
+import LeadCaptureModal from "../LeadCaptureModal";
 
 // --- Types & Constants ---
 
@@ -75,6 +78,89 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
     const [annualRevenueInput, setAnnualRevenueInput] = useState<number>(0);
     const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
     const [isDetailsOpen, setIsDetailsOpen] = useState<boolean>(false);
+
+    // Lead Capture Logic
+    const {
+        isModalOpen,
+        setIsModalOpen,
+        leadMetadata,
+        checkAdvancedTrigger,
+        checkExportTrigger,
+        trackInteraction,
+        hasVerifiedCookie
+    } = useCalculatorLeadCapture({ isSimpleCalculator: false });
+
+    const interactionCountRef = React.useRef(0);
+    const [isCopied, setIsCopied] = useState(false);
+    const [isTextCopied, setIsTextCopied] = useState(false);
+
+    const handleInteraction = () => {
+        if (hasVerifiedCookie) return;
+        trackInteraction();
+        interactionCountRef.current += 1;
+        if (interactionCountRef.current === 6) {
+            checkAdvancedTrigger();
+        }
+    };
+
+    const handleCopyLink = () => {
+        navigator.clipboard.writeText(window.location.href);
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2000);
+    };
+
+    const handleCopyResults = () => {
+        if (checkExportTrigger('copy')) return;
+
+        const lines = [
+            `RESUMO DA SIMULAÇÃO: HOLDING FAMILIAR (LUCRO PRESUMIDO)`,
+            `Ano de Referência: ${selectedYear}`,
+            ``,
+            `RESULTADOS PRINCIPAIS`,
+            `--------------------------------`,
+            `Receita Bruta Anual: ${formatCurrency(annualTotals.revenue)}`,
+            `Total de Impostos: ${formatCurrency(annualTotals.totalTax)}`,
+            `Receita Líquida: ${formatCurrency(annualTotals.revenue - annualTotals.totalTax)}`,
+            `Alíquota Efetiva: ${effectiveTaxRate.toFixed(2)}%`,
+            ``,
+            `DETALHAMENTO DOS IMPOSTOS`,
+            `--------------------------------`,
+            `1. IMPOSTOS SOBRE O LUCRO (IRPJ + CSLL)`,
+            `   IRPJ Base (15%): ${formatCurrency(annualTotals.irpjBasic)}`,
+            ...(annualTotals.irpjAdditional > 0 ? [`   IRPJ Adicional (10%): ${formatCurrency(annualTotals.irpjAdditional)}`] : []),
+            `   CSLL (9%): ${formatCurrency(annualTotals.csll)}`,
+            ``,
+            `2. IVA DUAL (CONSUMO)`,
+            `   CBS Federal (${rates.cbs.toFixed(2)}% nominal -> ${effectiveCbsRate.toFixed(2)}% efetiva): ${formatCurrency(annualTotals.cbs)}`,
+            `   IBS Estadual/Mun. (${rates.ibs.toFixed(2)}% nominal -> ${effectiveIbsRate.toFixed(2)}% efetiva): ${formatCurrency(annualTotals.ibs)}`,
+        ];
+
+        if (showLegacy) {
+            lines.push(
+                ``,
+                `3. TRIBUTOS LEGADOS (Transição 2026)`,
+                `   PIS: ${formatCurrency(annualTotals.pis)}`,
+                `   COFINS: ${formatCurrency(annualTotals.cofins)}`
+            );
+        }
+
+        lines.push(
+            ``,
+            `TOTAL GERAL: ${formatCurrency(annualTotals.totalTax)} (${effectiveTaxRate.toFixed(2)}%)`,
+            `--------------------------------`,
+            `Calculado via kitnets.com.br`
+        );
+
+        const text = lines.join('\n');
+        navigator.clipboard.writeText(text);
+        setIsTextCopied(true);
+        setTimeout(() => setIsTextCopied(false), 2000);
+    };
+
+    const handlePrint = () => {
+        if (checkExportTrigger('print')) return;
+        window.print();
+    };
 
     // --- Logic ---
 
@@ -247,9 +333,25 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
         <div className="space-y-8 animate-in fade-in duration-500">
             {/* Header */}
             <div>
-                <div className="flex items-center gap-2 mb-2">
-                    <Building2 className="h-6 w-6 text-primary" />
-                    <h2 className="text-2xl font-bold tracking-tight">Calculadora de Impostos: Holding Familiar (Lucro Presumido)</h2>
+                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-2">
+                    <div className="flex items-center gap-2">
+                        <Building2 className="h-6 w-6 text-primary shrink-0" />
+                        <h2 className="text-2xl font-bold tracking-tight">Calculadora de Impostos: Holding Familiar (Lucro Presumido)</h2>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                        <Button variant="outline" size="sm" onClick={handleCopyLink} className="gap-2">
+                            {isCopied ? <Check className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
+                            {isCopied ? "Link Copiado" : "Link"}
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={handleCopyResults} className="gap-2">
+                            {isTextCopied ? <Check className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
+                            {isTextCopied ? "Texto Copiado" : "Copiar Texto"}
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={handlePrint} className="gap-2">
+                            <Printer className="h-4 w-4" />
+                            Imprimir
+                        </Button>
+                    </div>
                 </div>
                 <p className="text-muted-foreground">
                     Estime a carga tributária sobre aluguéis no novo sistema tributário (Reforma Tributária - IVA Dual).
@@ -289,7 +391,10 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
                                     max="2033"
                                     step="1"
                                     value={selectedYear}
-                                    onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                                    onChange={(e) => {
+                                        setSelectedYear(parseInt(e.target.value));
+                                        handleInteraction();
+                                    }}
                                     className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
                                 />
                                 <div className="flex justify-between text-xs text-muted-foreground">
@@ -302,13 +407,19 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
                             <div className="space-y-4">
                                 <div className="flex p-1 bg-muted rounded-lg">
                                     <button
-                                        onClick={() => setPeriodMode('monthly')}
+                                        onClick={() => {
+                                            setPeriodMode('monthly');
+                                            handleInteraction();
+                                        }}
                                         className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${periodMode === 'monthly' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                                     >
                                         Receita Mensal
                                     </button>
                                     <button
-                                        onClick={() => setPeriodMode('annual')}
+                                        onClick={() => {
+                                            setPeriodMode('annual');
+                                            handleInteraction();
+                                        }}
                                         className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${periodMode === 'annual' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                                     >
                                         Receita Anual
@@ -322,7 +433,10 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
                                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">R$</span>
                                             <Input
                                                 value={formatCurrency(annualRevenueInput).replace('R$', '').trim()}
-                                                onChange={(e) => handleAnnualRevenueChange(e.target.value)}
+                                                onChange={(e) => {
+                                                    handleAnnualRevenueChange(e.target.value);
+                                                    handleInteraction();
+                                                }}
                                                 className="pl-10"
                                             />
                                         </div>
@@ -337,7 +451,10 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
                                                         <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">R$</span>
                                                         <Input
                                                             value={formatCurrency(val).replace('R$', '').trim()}
-                                                            onChange={(e) => handleMonthlyRevenueChange(idx, e.target.value)}
+                                                            onChange={(e) => {
+                                                                handleMonthlyRevenueChange(idx, e.target.value);
+                                                                handleInteraction();
+                                                            }}
                                                             className="pl-6 h-8 text-sm"
                                                         />
                                                     </div>
@@ -351,7 +468,10 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
                             {/* Advanced Toggle */}
                             <div className="pt-2">
                                 <button
-                                    onClick={() => setShowAdvanced(!showAdvanced)}
+                                    onClick={() => {
+                                        setShowAdvanced(!showAdvanced);
+                                        handleInteraction();
+                                    }}
                                     className="text-xs flex items-center gap-1 text-muted-foreground hover:text-foreground"
                                 >
                                     {showAdvanced ? 'Ocultar Avançado' : 'Mostrar Avançado'}
@@ -371,7 +491,10 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
                                                 max="28.0"
                                                 step="0.1"
                                                 value={nominalIva}
-                                                onChange={(e) => setNominalIva(parseFloat(e.target.value))}
+                                                onChange={(e) => {
+                                                    setNominalIva(parseFloat(e.target.value));
+                                                    handleInteraction();
+                                                }}
                                                 className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
                                             />
                                         </div>
@@ -602,10 +725,10 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
 
                         {isDetailsOpen && (
                             <div className="p-0 border-t animate-in slide-in-from-top-2 duration-300">
-                                <Table>
+                                <Table className="min-w-[1000px]">
                                     <TableHeader>
                                         <TableRow className="bg-muted/30 text-xs hover:bg-muted/30">
-                                            <TableHead>Tributo</TableHead>
+                                            <TableHead className="sticky left-0 z-20 bg-muted shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[130px] min-w-[130px] max-w-[130px] md:w-auto md:min-w-0 md:max-w-none">Tributo</TableHead>
                                             <TableHead>Base de Cálculo</TableHead>
                                             <TableHead>Alíquota Nominal</TableHead>
                                             <TableHead>Fator de Redução</TableHead>
@@ -615,9 +738,12 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
                                     </TableHeader>
                                     <TableBody className="text-sm">
                                         {/* Group: Profit */}
-                                        <TableRow className="bg-sky-50/50 dark:bg-sky-900/10"><TableCell colSpan={6} className="py-2 text-xs font-semibold text-sky-700 dark:text-sky-400">IMPOSTOS SOBRE O LUCRO (IRPJ + CSLL)</TableCell></TableRow>
+                                        <TableRow className="bg-sky-50/50 dark:bg-sky-900/10">
+                                            <TableCell className="py-2 text-xs font-semibold text-sky-700 dark:text-sky-400 sticky left-0 z-10 bg-sky-50 dark:bg-sky-900/20 shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[130px] min-w-[130px] max-w-[130px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">IMPOSTOS SOBRE O LUCRO (IRPJ + CSLL)</TableCell>
+                                            <TableCell colSpan={5} />
+                                        </TableRow>
                                         <TableRow>
-                                            <TableCell className="font-medium">IRPJ (Base)</TableCell>
+                                            <TableCell className="font-medium sticky left-0 z-10 bg-card shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[130px] min-w-[130px] max-w-[130px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">IRPJ (Base)</TableCell>
                                             <TableCell>32% da Receita</TableCell>
                                             <TableCell>15%</TableCell>
                                             <TableCell>-</TableCell>
@@ -626,7 +752,7 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
                                         </TableRow>
                                         {annualTotals.irpjAdditional > 0 && (
                                             <TableRow>
-                                                <TableCell className="font-medium">IRPJ (Adicional)</TableCell>
+                                                <TableCell className="font-medium sticky left-0 z-10 bg-card shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[130px] min-w-[130px] max-w-[130px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">IRPJ (Adicional)</TableCell>
                                                 <TableCell className="text-xs text-muted-foreground">Excedente R$ 20k/mês</TableCell>
                                                 <TableCell>10%</TableCell>
                                                 <TableCell>-</TableCell>
@@ -635,7 +761,7 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
                                             </TableRow>
                                         )}
                                         <TableRow>
-                                            <TableCell className="font-medium">CSLL</TableCell>
+                                            <TableCell className="font-medium sticky left-0 z-10 bg-card shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[130px] min-w-[130px] max-w-[130px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">CSLL</TableCell>
                                             <TableCell>32% da Receita</TableCell>
                                             <TableCell>9%</TableCell>
                                             <TableCell>-</TableCell>
@@ -644,9 +770,12 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
                                         </TableRow>
 
                                         {/* Group: IVA */}
-                                        <TableRow className="bg-orange-50/50 dark:bg-orange-900/10"><TableCell colSpan={6} className="py-2 text-xs font-semibold text-orange-700 dark:text-orange-400">IVA DUAL (CONSUMO)</TableCell></TableRow>
+                                        <TableRow className="bg-orange-50/50 dark:bg-orange-900/10">
+                                            <TableCell className="py-2 text-xs font-semibold text-orange-700 dark:text-orange-400 sticky left-0 z-10 bg-orange-50 dark:bg-orange-900/20 shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[130px] min-w-[130px] max-w-[130px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">IVA DUAL (CONSUMO)</TableCell>
+                                            <TableCell colSpan={5} />
+                                        </TableRow>
                                         <TableRow>
-                                            <TableCell className="font-medium">CBS (Federal)</TableCell>
+                                            <TableCell className="font-medium sticky left-0 z-10 bg-card shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[130px] min-w-[130px] max-w-[130px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">CBS (Federal)</TableCell>
                                             <TableCell>100% da Receita</TableCell>
                                             <TableCell>{rates.cbs.toFixed(2)}%</TableCell>
                                             <TableCell>Redução 70%</TableCell>
@@ -654,7 +783,7 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
                                             <TableCell className="text-right">{formatCurrency(annualTotals.cbs)}</TableCell>
                                         </TableRow>
                                         <TableRow>
-                                            <TableCell className="font-medium">IBS (Estadual/Municipal)</TableCell>
+                                            <TableCell className="font-medium sticky left-0 z-10 bg-card shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[130px] min-w-[130px] max-w-[130px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">IBS (Estadual/Municipal)</TableCell>
                                             <TableCell>100% da Receita</TableCell>
                                             <TableCell>{rates.ibs.toFixed(2)}%</TableCell>
                                             <TableCell>Redução 70%</TableCell>
@@ -665,9 +794,12 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
                                         {/* Group: Legacy */}
                                         {((rates.pis || 0) > 0 || (rates.cofins || 0) > 0) && (
                                             <>
-                                                <TableRow className="bg-rose-50/50 dark:bg-rose-900/10"><TableCell colSpan={6} className="py-2 text-xs font-semibold text-rose-700 dark:text-rose-400">TRIBUTOS LEGADOS (TRANSICÃO 2026)</TableCell></TableRow>
+                                                <TableRow className="bg-rose-50/50 dark:bg-rose-900/10">
+                                                    <TableCell className="py-2 text-xs font-semibold text-rose-700 dark:text-rose-400 sticky left-0 z-10 bg-rose-50 dark:bg-rose-900/20 shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[130px] min-w-[130px] max-w-[130px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">TRIBUTOS LEGADOS (TRANSICÃO 2026)</TableCell>
+                                                    <TableCell colSpan={5} />
+                                                </TableRow>
                                                 <TableRow>
-                                                    <TableCell className="font-medium">PIS</TableCell>
+                                                    <TableCell className="font-medium sticky left-0 z-10 bg-card shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[130px] min-w-[130px] max-w-[130px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">PIS</TableCell>
                                                     <TableCell>100% da Receita</TableCell>
                                                     <TableCell>{(rates.pis || 0).toFixed(2)}%</TableCell>
                                                     <TableCell>-</TableCell>
@@ -675,7 +807,7 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
                                                     <TableCell className="text-right">{formatCurrency(annualTotals.pis)}</TableCell>
                                                 </TableRow>
                                                 <TableRow>
-                                                    <TableCell className="font-medium">COFINS</TableCell>
+                                                    <TableCell className="font-medium sticky left-0 z-10 bg-card shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[130px] min-w-[130px] max-w-[130px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">COFINS</TableCell>
                                                     <TableCell>100% da Receita</TableCell>
                                                     <TableCell>{(rates.cofins || 0).toFixed(2)}%</TableCell>
                                                     <TableCell>-</TableCell>
@@ -686,7 +818,7 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
                                         )}
 
                                         <TableRow className="font-bold border-t-2">
-                                            <TableCell>TOTAL GERAL</TableCell>
+                                            <TableCell className="sticky left-0 z-10 bg-card shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[130px] min-w-[130px] max-w-[130px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">TOTAL GERAL</TableCell>
                                             <TableCell>-</TableCell>
                                             <TableCell>-</TableCell>
                                             <TableCell>-</TableCell>
@@ -705,6 +837,13 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
 
                 </div>
             </div>
+            <LeadCaptureModal
+                open={isModalOpen}
+                onOpenChange={setIsModalOpen}
+                calculatorType="holding-rental-tax"
+                leadMetadata={leadMetadata}
+                forceCapture={true}
+            />
         </div>
     );
 }

@@ -44,19 +44,37 @@ export async function generateMetadata({ params }: { params: Promise<{ lang: str
             shortcut: '/favicon.ico',
             apple: '/apple-icon.png',
         },
+        applicationName: 'Kitnets.com',
+        authors: [{ name: "Kitnets.com Team", url: baseUrl }],
+        generator: 'Next.js',
         keywords: [
             "kitnets", "aluguel", "moradia", "imóveis", "calculadoras", "financiamento",
             "investimento", "IPCA", "IGPM", "INPC", "real estate", "rent", "Brazil",
-            "multa aluguel", "rescisão contrato", "aluguel atrasado", "rental fine", "lease termination"
+            "multa aluguel", "rescisão contrato", "aluguel atrasado", "rental fine", "lease termination",
+            "calculadora aluguel", "índices econômicos", "mercado imobiliário"
         ],
-        authors: [{ name: "Kitnets.com Team", url: baseUrl }],
+        referrer: 'origin-when-cross-origin',
         creator: "Kitnets.com",
         publisher: "Kitnets.com",
         category: "Real Estate",
+        classification: "Real Estate Portal",
+        formatDetection: {
+            email: false,
+            address: false,
+            telephone: false,
+        },
+        alternates: {
+            canonical: './',
+            languages: {
+                'pt': `${baseUrl}/pt`,
+                'en': `${baseUrl}/en`,
+                'es': `${baseUrl}/es`,
+            },
+        },
         openGraph: {
             type: 'website',
             locale: lang,
-            url: `${baseUrl}/${lang}`,
+            // url: inherited from metadataBase + path if not specified, which is better than hardcoding root
             title: 'Kitnets.com',
             description: dict.home.subtitle,
             siteName: 'Kitnets.com',
@@ -72,12 +90,24 @@ export async function generateMetadata({ params }: { params: Promise<{ lang: str
         robots: {
             index: true,
             follow: true,
+            googleBot: {
+                index: true,
+                follow: true,
+                'max-video-preview': -1,
+                'max-image-preview': 'large',
+                'max-snippet': -1,
+            },
         },
         twitter: {
             card: 'summary',
             title: 'Kitnets.com',
             description: dict.home.subtitle,
             images: [`${baseUrl}/icon.png`],
+        },
+        appleWebApp: {
+            capable: true,
+            title: 'Kitnets',
+            statusBarStyle: 'default',
         },
     };
 }

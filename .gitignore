@@ -41,3 +41,6 @@ Thumbs.db
 # Kitnets Specific
 data/*.db
 data/*.db-journal
+
+# Turbo
+.turbo
