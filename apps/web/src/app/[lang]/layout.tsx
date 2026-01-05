@@ -63,14 +63,8 @@ export async function generateMetadata({ params }: { params: Promise<{ lang: str
             address: false,
             telephone: false,
         },
-        alternates: {
-            canonical: './',
-            languages: {
-                'pt': `${baseUrl}/pt`,
-                'en': `${baseUrl}/en`,
-                'es': `${baseUrl}/es`,
-            },
-        },
+        // alternates: removed to allow pages to define their own specific canonicals
+        // or we could implement a default based on headers, but static metadata is safer at page level
         openGraph: {
             type: 'website',
             locale: lang,

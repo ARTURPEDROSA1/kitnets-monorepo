@@ -2628,13 +2628,14 @@
         "title": "Calculadora de Imposto de Renda 2026",
         "subtitle": "Simule a Isenção, a Redução do IR e o Imposto Devido com as Novas Regras",
         "intro": "A Calculadora de Imposto de Renda 2026 do Kitnets.com permite simular, de forma precisa e transparente, quanto você realmente pagará de IRPF a partir de janeiro de 2026, considerando a nova isenção até R$ 5.000, a redução progressiva até R$ 7.350 e todas as regras introduzidas pela Lei nº 15.270/2025.",
+        "featuresIntro": "Com ela, você descobre em segundos:",
         "featuresList": [
             "Se ficará totalmente isento de Imposto de Renda em 2026",
             "Qual será a redução exata do imposto no seu caso",
             "O imposto final devido, mês a mês ou no ajuste anual",
             "Sua alíquota efetiva real, após todas as reduções legais"
         ],
-        "introConclusion": "Tudo isso com a mesma lógica usada pela Receita Federal, mas já atualizada para 2026, algo que o simulador oficial ainda não entrega por completo.",
+        "introConclusion": "Tudo isso com a mesma lógica usada pela Receita Federal, mas já atualizada para 2026.",
         "changes": {
             "title": "O que muda no Imposto de Renda em 2026?",
             "intro": "A partir de janeiro de 2026, entram em vigor as mudanças mais relevantes no IRPF das últimas décadas:",

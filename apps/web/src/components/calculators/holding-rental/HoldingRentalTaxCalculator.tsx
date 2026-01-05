@@ -728,7 +728,7 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
                                 <Table className="min-w-[1000px]">
                                     <TableHeader>
                                         <TableRow className="bg-muted/30 text-xs hover:bg-muted/30">
-                                            <TableHead className="sticky left-0 z-20 bg-muted shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[130px] min-w-[130px] max-w-[130px] md:w-auto md:min-w-0 md:max-w-none">Tributo</TableHead>
+                                            <TableHead className="sticky left-0 z-20 bg-muted shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[160px] min-w-[160px] max-w-[160px] md:w-auto md:min-w-0 md:max-w-none">Tributo</TableHead>
                                             <TableHead>Base de Cálculo</TableHead>
                                             <TableHead>Alíquota Nominal</TableHead>
                                             <TableHead>Fator de Redução</TableHead>
@@ -739,11 +739,11 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
                                     <TableBody className="text-sm">
                                         {/* Group: Profit */}
                                         <TableRow className="bg-sky-50/50 dark:bg-sky-900/10">
-                                            <TableCell className="py-2 text-xs font-semibold text-sky-700 dark:text-sky-400 sticky left-0 z-10 bg-sky-50 dark:bg-sky-900/20 shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[130px] min-w-[130px] max-w-[130px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">IMPOSTOS SOBRE O LUCRO (IRPJ + CSLL)</TableCell>
+                                            <TableCell className="py-2 text-xs font-semibold text-sky-700 dark:text-sky-400 sticky left-0 z-10 bg-sky-50 dark:bg-sky-900/20 shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[160px] min-w-[160px] max-w-[160px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">IMPOSTOS SOBRE O LUCRO (IRPJ + CSLL)</TableCell>
                                             <TableCell colSpan={5} />
                                         </TableRow>
                                         <TableRow>
-                                            <TableCell className="font-medium sticky left-0 z-10 bg-card shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[130px] min-w-[130px] max-w-[130px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">IRPJ (Base)</TableCell>
+                                            <TableCell className="font-medium sticky left-0 z-10 bg-card shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[160px] min-w-[160px] max-w-[160px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">IRPJ (Base)</TableCell>
                                             <TableCell>32% da Receita</TableCell>
                                             <TableCell>15%</TableCell>
                                             <TableCell>-</TableCell>
@@ -752,7 +752,7 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
                                         </TableRow>
                                         {annualTotals.irpjAdditional > 0 && (
                                             <TableRow>
-                                                <TableCell className="font-medium sticky left-0 z-10 bg-card shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[130px] min-w-[130px] max-w-[130px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">IRPJ (Adicional)</TableCell>
+                                                <TableCell className="font-medium sticky left-0 z-10 bg-card shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[160px] min-w-[160px] max-w-[160px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">IRPJ (Adicional)</TableCell>
                                                 <TableCell className="text-xs text-muted-foreground">Excedente R$ 20k/mês</TableCell>
                                                 <TableCell>10%</TableCell>
                                                 <TableCell>-</TableCell>
@@ -761,7 +761,7 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
                                             </TableRow>
                                         )}
                                         <TableRow>
-                                            <TableCell className="font-medium sticky left-0 z-10 bg-card shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[130px] min-w-[130px] max-w-[130px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">CSLL</TableCell>
+                                            <TableCell className="font-medium sticky left-0 z-10 bg-card shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[160px] min-w-[160px] max-w-[160px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">CSLL</TableCell>
                                             <TableCell>32% da Receita</TableCell>
                                             <TableCell>9%</TableCell>
                                             <TableCell>-</TableCell>
@@ -771,11 +771,11 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
 
                                         {/* Group: IVA */}
                                         <TableRow className="bg-orange-50/50 dark:bg-orange-900/10">
-                                            <TableCell className="py-2 text-xs font-semibold text-orange-700 dark:text-orange-400 sticky left-0 z-10 bg-orange-50 dark:bg-orange-900/20 shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[130px] min-w-[130px] max-w-[130px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">IVA DUAL (CONSUMO)</TableCell>
+                                            <TableCell className="py-2 text-xs font-semibold text-orange-700 dark:text-orange-400 sticky left-0 z-10 bg-orange-50 dark:bg-orange-900/20 shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[160px] min-w-[160px] max-w-[160px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">IVA DUAL (CONSUMO)</TableCell>
                                             <TableCell colSpan={5} />
                                         </TableRow>
                                         <TableRow>
-                                            <TableCell className="font-medium sticky left-0 z-10 bg-card shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[130px] min-w-[130px] max-w-[130px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">CBS (Federal)</TableCell>
+                                            <TableCell className="font-medium sticky left-0 z-10 bg-card shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[160px] min-w-[160px] max-w-[160px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">CBS (Federal)</TableCell>
                                             <TableCell>100% da Receita</TableCell>
                                             <TableCell>{rates.cbs.toFixed(2)}%</TableCell>
                                             <TableCell>Redução 70%</TableCell>
@@ -783,7 +783,7 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
                                             <TableCell className="text-right">{formatCurrency(annualTotals.cbs)}</TableCell>
                                         </TableRow>
                                         <TableRow>
-                                            <TableCell className="font-medium sticky left-0 z-10 bg-card shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[130px] min-w-[130px] max-w-[130px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">IBS (Estadual/Municipal)</TableCell>
+                                            <TableCell className="font-medium sticky left-0 z-10 bg-card shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[160px] min-w-[160px] max-w-[160px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">IBS (Estadual/Municipal)</TableCell>
                                             <TableCell>100% da Receita</TableCell>
                                             <TableCell>{rates.ibs.toFixed(2)}%</TableCell>
                                             <TableCell>Redução 70%</TableCell>
@@ -795,11 +795,11 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
                                         {((rates.pis || 0) > 0 || (rates.cofins || 0) > 0) && (
                                             <>
                                                 <TableRow className="bg-rose-50/50 dark:bg-rose-900/10">
-                                                    <TableCell className="py-2 text-xs font-semibold text-rose-700 dark:text-rose-400 sticky left-0 z-10 bg-rose-50 dark:bg-rose-900/20 shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[130px] min-w-[130px] max-w-[130px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">TRIBUTOS LEGADOS (TRANSICÃO 2026)</TableCell>
+                                                    <TableCell className="py-2 text-xs font-semibold text-rose-700 dark:text-rose-400 sticky left-0 z-10 bg-rose-50 dark:bg-rose-900/20 shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[160px] min-w-[160px] max-w-[160px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">TRIBUTOS LEGADOS (TRANSICÃO 2026)</TableCell>
                                                     <TableCell colSpan={5} />
                                                 </TableRow>
                                                 <TableRow>
-                                                    <TableCell className="font-medium sticky left-0 z-10 bg-card shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[130px] min-w-[130px] max-w-[130px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">PIS</TableCell>
+                                                    <TableCell className="font-medium sticky left-0 z-10 bg-card shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[160px] min-w-[160px] max-w-[160px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">PIS</TableCell>
                                                     <TableCell>100% da Receita</TableCell>
                                                     <TableCell>{(rates.pis || 0).toFixed(2)}%</TableCell>
                                                     <TableCell>-</TableCell>
@@ -807,7 +807,7 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
                                                     <TableCell className="text-right">{formatCurrency(annualTotals.pis)}</TableCell>
                                                 </TableRow>
                                                 <TableRow>
-                                                    <TableCell className="font-medium sticky left-0 z-10 bg-card shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[130px] min-w-[130px] max-w-[130px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">COFINS</TableCell>
+                                                    <TableCell className="font-medium sticky left-0 z-10 bg-card shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[160px] min-w-[160px] max-w-[160px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">COFINS</TableCell>
                                                     <TableCell>100% da Receita</TableCell>
                                                     <TableCell>{(rates.cofins || 0).toFixed(2)}%</TableCell>
                                                     <TableCell>-</TableCell>
@@ -818,7 +818,7 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
                                         )}
 
                                         <TableRow className="font-bold border-t-2">
-                                            <TableCell className="sticky left-0 z-10 bg-card shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[130px] min-w-[130px] max-w-[130px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">TOTAL GERAL</TableCell>
+                                            <TableCell className="sticky left-0 z-10 bg-card shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[160px] min-w-[160px] max-w-[160px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">TOTAL GERAL</TableCell>
                                             <TableCell>-</TableCell>
                                             <TableCell>-</TableCell>
                                             <TableCell>-</TableCell>
