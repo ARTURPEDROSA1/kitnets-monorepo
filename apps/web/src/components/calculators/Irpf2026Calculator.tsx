@@ -4,11 +4,50 @@ import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Info, HelpCircle, DollarSign, Calculator, FileText, CheckCircle2 } from 'lucide-react';
+import { Info, HelpCircle, Calculator, FileText, CheckCircle2 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Separator } from '@/components/ui/separator';
 
 import { calculateIrpf2026, CONSTANTS_2026_MONTHLY, CONSTANTS_2026_ANNUAL, CalculationResult } from '@/lib/irpf2026';
+
+const MoneyInput = ({
+    id,
+    value,
+    onChange,
+    placeholder = "0,00",
+    className
+}: {
+    id: string;
+    value: number;
+    onChange: (value: number) => void;
+    placeholder?: string;
+    className?: string;
+}) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const rawValue = e.target.value.replace(/\D/g, '');
+        const numericValue = rawValue ? parseInt(rawValue, 10) / 100 : 0;
+        onChange(numericValue);
+    };
+
+    const displayValue = value
+        ? new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 }).format(value)
+        : '';
+
+    return (
+        <div className="relative">
+            <span className="absolute left-3 top-2.5 text-sm text-muted-foreground select-none">R$</span>
+            <Input
+                id={id}
+                type="text"
+                inputMode="numeric"
+                placeholder={placeholder}
+                className={`pl-9 ${className}`}
+                value={displayValue}
+                onChange={handleChange}
+            />
+        </div>
+    );
+};
 
 export function Irpf2026Calculator() {
     // Inputs
@@ -87,17 +126,11 @@ export function Irpf2026Calculator() {
                                     </Tooltip>
                                 </TooltipProvider>
                             </Label>
-                            <div className="relative">
-                                <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    id="grossIncome"
-                                    type="number"
-                                    placeholder="0,00"
-                                    className="pl-9"
-                                    value={grossIncome || ''}
-                                    onChange={(e) => setGrossIncome(Number(e.target.value))}
-                                />
-                            </div>
+                            <MoneyInput
+                                id="grossIncome"
+                                value={grossIncome}
+                                onChange={setGrossIncome}
+                            />
                         </div>
 
                         <Separator />
@@ -120,12 +153,10 @@ export function Irpf2026Calculator() {
 
                             <div className="space-y-2">
                                 <Label htmlFor="officialPension">Previdência Oficial (INSS)</Label>
-                                <Input
+                                <MoneyInput
                                     id="officialPension"
-                                    type="number"
-                                    placeholder="0,00"
-                                    value={officialPension || ''}
-                                    onChange={(e) => setOfficialPension(Number(e.target.value))}
+                                    value={officialPension}
+                                    onChange={setOfficialPension}
                                 />
                             </div>
                         </div>
@@ -133,23 +164,19 @@ export function Irpf2026Calculator() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="alimony">Pensão Alimentícia (Judicial)</Label>
-                                <Input
+                                <MoneyInput
                                     id="alimony"
-                                    type="number"
-                                    placeholder="0,00"
-                                    value={alimony || ''}
-                                    onChange={(e) => setAlimony(Number(e.target.value))}
+                                    value={alimony}
+                                    onChange={setAlimony}
                                 />
                             </div>
 
                             <div className="space-y-2">
                                 <Label htmlFor="otherDeductions">Outras Deduções</Label>
-                                <Input
+                                <MoneyInput
                                     id="otherDeductions"
-                                    type="number"
-                                    placeholder="0,00"
-                                    value={otherDeductions || ''}
-                                    onChange={(e) => setOtherDeductions(Number(e.target.value))}
+                                    value={otherDeductions}
+                                    onChange={setOtherDeductions}
                                 />
                                 <p className="text-xs text-muted-foreground">Livro Caixa, Previdência Privada...</p>
                             </div>

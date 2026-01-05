@@ -80,6 +80,11 @@ export default async function Page({ params }: { params: Promise<{ lang: string 
                         <p className="text-xl text-muted-foreground">{content.subtitle}</p>
                         <p className="text-lg leading-relaxed">{content.intro}</p>
 
+
+                        {content.featuresIntro && (
+                            <p className="text-lg font-medium pt-4">{content.featuresIntro}</p>
+                        )}
+
                         {content.featuresList && (
                             <ul className="grid gap-3 pt-2">
                                 {content.featuresList.map((feature: string, i: number) => (

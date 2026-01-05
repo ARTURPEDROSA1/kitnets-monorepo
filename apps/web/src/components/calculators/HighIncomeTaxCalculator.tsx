@@ -18,37 +18,49 @@ interface Props {
 }
 
 // Input Helper Component moved outside to prevent re-creation on every render
-const CurrencyInput = ({ id, label, value, onChange, tooltip }: { id: string, label: string, value: number, onChange: (val: number) => void, tooltip?: string }) => (
-    <div className="space-y-2">
-        <Label htmlFor={id} className="flex items-center gap-2 text-sm font-medium">
-            {label}
-            {tooltip && (
-                <TooltipProvider>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground cursor-help" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p className="max-w-xs text-xs">{tooltip}</p>
-                        </TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
-            )}
-        </Label>
-        <div className="relative">
-            <span className="absolute left-3 top-2.5 text-sm text-muted-foreground">R$</span>
-            <Input
-                id={id}
-                type="number"
-                min="0"
-                placeholder="0,00"
-                className="pl-9"
-                value={value || ''}
-                onChange={(e) => onChange(Number(e.target.value))}
-            />
+const CurrencyInput = ({ id, label, value, onChange, tooltip }: { id: string, label: string, value: number, onChange: (val: number) => void, tooltip?: string }) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const rawValue = e.target.value.replace(/\D/g, '');
+        const numberValue = rawValue ? parseInt(rawValue, 10) / 100 : 0;
+        onChange(numberValue);
+    };
+
+    const displayValue = value
+        ? value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : '';
+
+    return (
+        <div className="space-y-2">
+            <Label htmlFor={id} className="flex items-center gap-2 text-sm font-medium">
+                {label}
+                {tooltip && (
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p className="max-w-xs text-xs">{tooltip}</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                )}
+            </Label>
+            <div className="relative">
+                <span className="absolute left-3 top-2.5 text-sm text-muted-foreground">R$</span>
+                <Input
+                    id={id}
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="0,00"
+                    className="pl-9"
+                    value={displayValue}
+                    onChange={handleChange}
+                />
+            </div>
         </div>
-    </div>
-);
+    );
+};
 
 export function HighIncomeTaxCalculator({ dict }: Props) {
     const t = dict.highIncomeTaxCalculatorPage;

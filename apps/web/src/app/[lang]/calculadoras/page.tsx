@@ -11,23 +11,23 @@ export async function generateMetadata({ params }: { params: Promise<{ lang: str
         title: t.title,
         description: t.subtitle,
         alternates: {
-            canonical: `https://kitnets.com/${lang}/calculadoras`,
+            canonical: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://kitnets.com'}/${lang}/calculadoras`,
             languages: {
-                'pt': 'https://kitnets.com/pt/calculadoras',
-                'en': 'https://kitnets.com/en/calculadoras',
-                'es': 'https://kitnets.com/es/calculadoras',
+                'pt': `${process.env.NEXT_PUBLIC_BASE_URL || 'https://kitnets.com'}/pt/calculadoras`,
+                'en': `${process.env.NEXT_PUBLIC_BASE_URL || 'https://kitnets.com'}/en/calculadoras`,
+                'es': `${process.env.NEXT_PUBLIC_BASE_URL || 'https://kitnets.com'}/es/calculadoras`,
             },
         },
         openGraph: {
             title: t.title,
             description: t.subtitle,
-            url: `https://kitnets.com/${lang}/calculadoras`,
+            url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://kitnets.com'}/${lang}/calculadoras`,
             siteName: 'Kitnets.com',
             locale: lang,
             type: 'website',
             images: [
                 {
-                    url: 'https://kitnets.com/og-calculators.jpg',
+                    url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://kitnets.com'}/og-calculators.jpg`,
                     width: 1200,
                     height: 630,
                     alt: t.title,
@@ -51,7 +51,7 @@ export default async function CalculatorOverviewPage({ params }: { params: Promi
         "@type": "CollectionPage",
         "name": dict.calculatorsOverview.title,
         "description": dict.calculatorsOverview.subtitle,
-        "url": `https://kitnets.com/${lang}/calculadoras`,
+        "url": `${process.env.NEXT_PUBLIC_BASE_URL || 'https://kitnets.com'}/${lang}/calculadoras`,
         "mainEntity": {
             "@type": "ItemList",
             "itemListElement": [
@@ -61,7 +61,7 @@ export default async function CalculatorOverviewPage({ params }: { params: Promi
                     "item": {
                         "@type": "SoftwareApplication",
                         "name": dict.rentAdjustmentCalculatorPage.seo.title,
-                        "url": `https://kitnets.com/${lang}/calculadora-reajuste-aluguel`
+                        "url": `${process.env.NEXT_PUBLIC_BASE_URL || 'https://kitnets.com'}/${lang}/calculadora-reajuste-aluguel`
                     }
                 },
                 {
@@ -70,7 +70,7 @@ export default async function CalculatorOverviewPage({ params }: { params: Promi
                     "item": {
                         "@type": "SoftwareApplication",
                         "name": dict.rentLateFineCalculatorPage.seo.title,
-                        "url": `https://kitnets.com/${lang}/calculadoras/multa-atraso-aluguel`
+                        "url": `${process.env.NEXT_PUBLIC_BASE_URL || 'https://kitnets.com'}/${lang}/calculadoras/multa-atraso-aluguel`
                     }
                 },
                 {
@@ -79,7 +79,7 @@ export default async function CalculatorOverviewPage({ params }: { params: Promi
                     "item": {
                         "@type": "SoftwareApplication",
                         "name": dict.rentOnIndividualCalculatorPage.seo.title,
-                        "url": `https://kitnets.com/${lang}/calculadoras/aluguel-na-pf`
+                        "url": `${process.env.NEXT_PUBLIC_BASE_URL || 'https://kitnets.com'}/${lang}/calculadoras/aluguel-na-pf`
                     }
                 },
                 // Add other known calculators here if available in dictionary
