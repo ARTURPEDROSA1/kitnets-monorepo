@@ -3,12 +3,12 @@ import { notFound } from 'next/navigation';
 import { getIndexMetadata, getIndexValuesByDateRange, getAllIndexes } from '@/lib/indexes';
 import { getFipeZapData } from '@/lib/fipezap';
 import { getDictionary } from '../../../../dictionaries';
-import { IndexChart } from '@/components/indices/IndexChart';
-import { IndexHeatmap } from '@/components/indices/IndexHeatmap';
+import { IndexChartLazy } from '@/components/indices/IndexChartLazy';
+import { IndexHeatmapLazy } from '@/components/indices/IndexHeatmapLazy';
 import { IndexDateFilter } from '@/components/indices/IndexDateFilter';
 import { IndexHistoryTable } from '@/components/indices/IndexHistoryTable';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, MapPinned, Home, CalendarDays, Hourglass } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { FipeZapDashboardWrapper } from '@/components/indices/FipeZap/FipeZapDashboardWrapper';
 import { MinimumWageDashboardWrapper } from '@/components/indices/MinimumWage/MinimumWageDashboardWrapper';
@@ -42,6 +42,12 @@ interface IndexContent {
 
 // Revalidate every hour
 export const revalidate = 3600;
+
+const ivarReleaseDates2026 = [
+    { formatted: '06/02/2026', time: '9h', ref: 'Janeiro/2026', label: 'Índice de Variação de Aluguéis Residenciais (IVAR)' },
+    { formatted: '05/03/2026', time: '9h', ref: 'Fevereiro/2026', label: 'Índice de Variação de Aluguéis Residenciais (IVAR)' },
+    { formatted: '08/04/2026', time: '9h', ref: 'Março/2026', label: 'Índice de Variação de Aluguéis Residenciais (IVAR)' },
+];
 
 export async function generateStaticParams() {
     const indices = await getAllIndexes();
@@ -179,6 +185,24 @@ export default async function IndexPage({ params, searchParams }: Props) {
         variableMeasured: 'Percentage Change',
         dateModified: latest ? new Date(latest.year, latest.month - 1, 1).toISOString() : new Date().toISOString(),
     };
+
+    // Schema.org Structured Data - FAQ
+    const faqItems = indexContent?.sections
+        ?.filter(s => s.title.includes('?'))
+        .map(s => ({
+            '@type': 'Question',
+            name: s.title,
+            acceptedAnswer: {
+                '@type': 'Answer',
+                text: `${s.text || ''} ${s.items ? s.items.map(i => `${i.title}: ${i.text}`).join('. ') : ''}`
+            }
+        }));
+
+    const faqJsonLd = faqItems && faqItems.length > 0 ? {
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: faqItems
+    } : null;
 
     // Schema.org Structured Data - Breadcrumbs
     const breadcrumbJsonLd = {
@@ -406,8 +430,23 @@ export default async function IndexPage({ params, searchParams }: Props) {
                                                 return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
                                             }
 
+
                                             if (code === 'IVAR') {
-                                                return '07 de jan';
+                                                const today = new Date();
+                                                today.setHours(0, 0, 0, 0);
+
+                                                const nextDate = ivarReleaseDates2026.find(item => {
+                                                    const [day, month, year] = item.formatted.split('/').map(Number);
+                                                    const dateObj = new Date(year, month - 1, day);
+                                                    return dateObj >= today;
+                                                });
+
+                                                if (nextDate) {
+                                                    const [day, month, year] = nextDate.formatted.split('/').map(Number);
+                                                    const dateObj = new Date(year, month - 1, day);
+                                                    return dateObj.toLocaleDateString(lang === 'pt' ? 'pt-BR' : lang === 'es' ? 'es-ES' : 'en-US', { day: '2-digit', month: 'short' });
+                                                }
+                                                return 'A definir';
                                             }
 
                                             // Default (IPCA, etc) - Release happens month AFTER Next Ref Month (2 months after latest data month?)
@@ -448,7 +487,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
                                 <p className="text-xs md:text-sm text-muted-foreground">Visualização gráfica da evolução do índice no período selecionado.</p>
                             </div>
                             <div className="p-3 md:p-6 pt-0">
-                                <IndexChart data={history} indexCode={code} />
+                                <IndexChartLazy data={history} indexCode={code} />
                             </div>
                         </div>
                     </div>
@@ -461,7 +500,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
                                 <p className="text-xs md:text-sm text-muted-foreground">Comportamento mensal e acumulado anual.</p>
                             </div>
                             <div className="p-3 md:p-6 pt-0">
-                                <IndexHeatmap data={history} />
+                                <IndexHeatmapLazy data={history} />
                             </div>
                         </div>
                     </div>
@@ -527,6 +566,39 @@ export default async function IndexPage({ params, searchParams }: Props) {
                             </div>
                         </div>
                     )}
+
+                    {/* IVAR Calendar Specific Section */}
+                    {code === 'IVAR' && (
+                        <div className="md:col-span-3 min-w-0">
+                            <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
+                                <div className="flex flex-col space-y-1.5 p-3 md:p-6">
+                                    <h3 className="text-lg md:text-2xl font-semibold leading-none tracking-tight">Calendário de divulgação IVAR 2026</h3>
+                                </div>
+                                <div className="p-3 md:p-6 pt-0 overflow-x-auto">
+                                    <table className="w-full text-left">
+                                        <thead className="text-muted-foreground bg-muted/50 text-xs uppercase">
+                                            <tr className="border-b">
+                                                <th className="p-4 font-medium min-w-[120px]">Prev. divulgação</th>
+                                                <th className="p-4 font-medium min-w-[200px]">Pesquisa</th>
+                                                <th className="p-4 font-medium min-w-[150px]">Referência</th>
+                                                <th className="p-4 font-medium">Horário</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y">
+                                            {ivarReleaseDates2026.map((item, i) => (
+                                                <tr key={i} className="hover:bg-muted/50 transition-colors">
+                                                    <td className="p-4 font-medium">{item.formatted}</td>
+                                                    <td className="p-4 text-muted-foreground">{item.label}</td>
+                                                    <td className="p-4 text-muted-foreground">{item.ref}</td>
+                                                    <td className="p-4 text-muted-foreground">{item.time}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -555,12 +627,24 @@ export default async function IndexPage({ params, searchParams }: Props) {
 
                             {section.items && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {section.items.map((item, itemIdx: number) => (
-                                        <div key={itemIdx} className="bg-card border rounded-lg p-4">
-                                            <h4 className="font-semibold text-foreground mb-1">{item.title}</h4>
-                                            <p className="text-sm text-muted-foreground">{item.text}</p>
-                                        </div>
-                                    ))}
+                                    {section.items.map((item, itemIdx: number) => {
+                                        let Icon = null;
+                                        const titleLower = item.title.toLowerCase();
+                                        if (titleLower.includes("geográfica")) Icon = MapPinned;
+                                        else if (titleLower.includes("setorial")) Icon = Home;
+                                        else if (titleLower.includes("coleta")) Icon = CalendarDays;
+                                        else if (titleLower.includes("periodicidade")) Icon = Hourglass;
+
+                                        return (
+                                            <div key={itemIdx} className="bg-card border rounded-lg p-4 flex items-start gap-3">
+                                                {Icon && <Icon className="h-5 w-5 text-primary mt-1 shrink-0" />}
+                                                <div>
+                                                    <h4 className="font-semibold text-foreground mb-1">{item.title}</h4>
+                                                    <p className="text-sm text-muted-foreground">{item.text}</p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             )}
 
@@ -622,6 +706,12 @@ export default async function IndexPage({ params, searchParams }: Props) {
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
             />
+            {faqJsonLd && (
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+                />
+            )}
         </div>
     );
 }

@@ -1723,7 +1723,25 @@
             "sections": [
                 {
                     "title": "O que é o IVAR?",
-                    "text": "O IVAR (Índice de Variação de Aluguéis Residenciais) é um indicador econômico oficial criado para medir, de forma precisa, a variação dos preços dos aluguéis residenciais no Brasil. Calculado e divulgado mensalmente pela FGV (Fundação Getulio Vargas), o IVAR acompanha exclusivamente o comportamento do mercado de locação, tornando-se uma referência cada vez mais relevante para proprietários, inquilinos, investidores imobiliários, imobiliárias e analistas econômicos."
+                    "text": "O IVAR (Índice de Variação de Aluguéis Residenciais) é um indicador econômico oficial criado para medir, de forma precisa, a variação dos preços dos aluguéis residenciais no Brasil. Calculado e divulgado mensalmente pela FGV (Fundação Getulio Vargas), o IVAR acompanha exclusivamente o comportamento do mercado de locação, tornando-se uma referência cada vez mais relevante para proprietários, inquilinos, investidores imobiliários, imobiliárias e analistas econômicos.",
+                    "items": [
+                        {
+                            "title": "Abrangência geográfica:",
+                            "text": "Belo Horizonte, Porto Alegre, Rio de Janeiro e São Paulo."
+                        },
+                        {
+                            "title": "Abrangência setorial:",
+                            "text": "Imóveis Residenciais alugados."
+                        },
+                        {
+                            "title": "Período de coleta:",
+                            "text": "Primeiro ao último dia de cada mês."
+                        },
+                        {
+                            "title": "Periodicidade:",
+                            "text": "Mensal"
+                        }
+                    ]
                 },
                 {
                     "title": "Para que serve o IVAR?",

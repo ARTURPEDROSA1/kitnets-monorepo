@@ -190,6 +190,7 @@ BEGIN
     -- IVAR (FGV)
     INSERT INTO public.economic_index_values (index_id, year, month, reference_date, value_percent, source_url) VALUES
     -- 2025
+    (v_ivar_id, 2025, 12, '2025-12-01', 0.51, 'portal.fgv.br'),
     (v_ivar_id, 2025, 11, '2025-11-01', 0.37, 'brasilindicadores.com.br'),
     (v_ivar_id, 2025, 10, '2025-10-01', 0.57, 'brasilindicadores.com.br'),
     (v_ivar_id, 2025, 9,  '2025-09-01', 0.30, 'brasilindicadores.com.br'),
