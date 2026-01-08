@@ -63,12 +63,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     // 1. Static Routes
     staticRoutes.forEach((route) => {
+        const languagesAlternates: Record<string, string> = {};
+        languages.forEach(l => {
+            languagesAlternates[l] = `${baseUrl}/${l}${route ? `/${route}` : ''}`;
+        });
+
         languages.forEach((lang) => {
             sitemapEntry.push({
                 url: `${baseUrl}/${lang}${route ? `/${route}` : ''}`,
                 lastModified: new Date(),
                 changeFrequency: route === '' ? 'daily' : 'weekly',
                 priority: route === '' ? 1 : 0.8,
+                alternates: {
+                    languages: languagesAlternates
+                }
             });
         });
     });
@@ -77,12 +85,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     try {
         const indexes = await getAllIndexes();
         indexes.forEach((idx) => {
+            const languagesAlternates: Record<string, string> = {};
+            languages.forEach(l => {
+                languagesAlternates[l] = `${baseUrl}/${l}/indices/${idx.code.toLowerCase()}`;
+            });
+
             languages.forEach((lang) => {
                 sitemapEntry.push({
                     url: `${baseUrl}/${lang}/indices/${idx.code.toLowerCase()}`,
                     lastModified: new Date(),
                     changeFrequency: 'monthly',
                     priority: 0.9,
+                    alternates: {
+                        languages: languagesAlternates
+                    }
                 });
             });
         });

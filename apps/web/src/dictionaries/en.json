@@ -61,6 +61,8 @@
         "irpf2026": "IRPF 2026 Calculator",
         "rentOnIndividual": "Rental on Individual",
         "highIncomeTax": "Minimum Tax High Income",
+        "owners": "Owners",
+        "owner": "Owner",
         "minTaxPF": "Minimum Tax Individual"
     },
     "filters": {
