@@ -7,6 +7,6 @@ export const FLAGS = {
     // Features to hide for soft launch
     SHOW_MARKETPLACE: false, // Advertise, Rent, Buy, Launches
     SHOW_LOGIN_LINKS: false, // Broker, Agency, Resident, Owner, Developer login links in sidebar
-    SHOW_DASHBOARD_LINKS: false, // My Profile, Dashboard, Sign Out in sidebar
+    SHOW_DASHBOARD_LINKS: true, // My Profile, Dashboard, Sign Out in sidebar
     SHOW_HOME_CTA: true, // Main CTA on home page (usually points to Onboarding/Advertise)
 };

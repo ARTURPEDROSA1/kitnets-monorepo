@@ -49,13 +49,13 @@ export function IndividualRentalTaxCalculator({ content }: IndividualRentalTaxCa
 
     const result: RentalTaxResult = useMemo(() => {
         const input: RentalTaxInput = {
-            numberOfProperties,
+            numberOfProperties: Number.isNaN(numberOfProperties) ? 0 : numberOfProperties,
             annualRentalRevenue,
             otherTaxableIncome,
-            dependents,
+            dependents: Number.isNaN(dependents) ? 0 : dependents,
             deductibleExpenses,
-            taxYear,
-            referenceYear: taxYear - 1
+            taxYear: Number.isNaN(taxYear) ? 2026 : taxYear,
+            referenceYear: (Number.isNaN(taxYear) ? 2026 : taxYear) - 1
         };
         return calculateRentalTax(input);
     }, [numberOfProperties, annualRentalRevenue, otherTaxableIncome, dependents, deductibleExpenses, taxYear]);
@@ -79,8 +79,11 @@ export function IndividualRentalTaxCalculator({ content }: IndividualRentalTaxCa
                                 id="properties"
                                 type="number"
                                 min={0}
-                                value={numberOfProperties}
-                                onChange={(e) => setNumberOfProperties(Number(e.target.value))}
+                                value={Number.isNaN(numberOfProperties) ? "" : numberOfProperties}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    setNumberOfProperties(val === "" ? NaN : Number(val));
+                                }}
                             />
                         </div>
 
@@ -121,8 +124,11 @@ export function IndividualRentalTaxCalculator({ content }: IndividualRentalTaxCa
                                     id="dependents"
                                     type="number"
                                     min={0}
-                                    value={dependents}
-                                    onChange={(e) => setDependents(Number(e.target.value))}
+                                    value={Number.isNaN(dependents) ? "" : dependents}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        setDependents(val === "" ? NaN : Number(val));
+                                    }}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -131,8 +137,11 @@ export function IndividualRentalTaxCalculator({ content }: IndividualRentalTaxCa
                                     id="taxYear"
                                     type="number"
                                     min={2024}
-                                    value={taxYear}
-                                    onChange={(e) => setTaxYear(Number(e.target.value))}
+                                    value={Number.isNaN(taxYear) ? "" : taxYear}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        setTaxYear(val === "" ? NaN : Number(val));
+                                    }}
                                 />
                             </div>
                         </div>

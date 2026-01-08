@@ -60,6 +60,14 @@ export default async function LoginPage({ params }: { params: Promise<{ lang: "e
                                 </Button>
                             </Link>
                         </div>
+
+                        <div className="mt-4">
+                            <Link href={lang === 'pt' ? '/login/proprietario' : `/${lang}/login/proprietario`} className="w-full">
+                                <Button variant="ghost" className="w-full">
+                                    {dict.ownerLogin.title}
+                                </Button>
+                            </Link>
+                        </div>
                     </div>
                 </div>
 
