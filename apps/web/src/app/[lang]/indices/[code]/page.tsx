@@ -460,8 +460,8 @@ export default async function IndexPage({ params, searchParams }: Props) {
                                                 releaseYear++;
                                             }
 
-                                            // Format 09/MMM (IPCA usually around 9th-11th)
-                                            const date = new Date(releaseYear, releaseMonth - 1, 9);
+                                            // Format 10/MMM (IPCA usually around 9th-11th)
+                                            const date = new Date(releaseYear, releaseMonth - 1, 10);
                                             return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
                                         })()}
                                     </span>

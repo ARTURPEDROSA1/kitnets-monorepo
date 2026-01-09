@@ -1483,6 +1483,10 @@
             "pageDescription": "Nesta página do Kitnets.com, você pode acompanhar o histórico completo do IPCA desde janeiro de 1995 até a data atual, com dados confiáveis, organizados e fáceis de analisar.",
             "sections": [
                 {
+                    "title": "Análise: Dezembro de 2025",
+                    "text": "O IPCA do último mês foi de 0,33% em Dez/2025 e o IPCA acumulado de 12 meses foi de 4,26% em Dez/2025."
+                },
+                {
                     "title": "O que você encontra nesta página",
                     "items": [
                         {
@@ -1623,6 +1627,10 @@
             "description": "A Série Histórica do INPC apresenta a evolução completa do Índice Nacional de Preços ao Consumidor, calculado mensalmente pelo IBGE, desde janeiro de 1995 até a data mais recente disponível.",
             "pageDescription": "Na Kitnets.com, você acompanha o INPC histórico mês a mês, com dados oficiais, gráficos interativos, tabela detalhada e mapa de calor mensal — tudo em um único lugar, de forma clara e confiável.",
             "sections": [
+                {
+                    "title": "Análise: Dezembro de 2025",
+                    "text": "O INPC do último mês foi de 0,21% em Dez/2025. O INPC acumulado em 12 meses e no ano de 2025 fechou em 3,90%."
+                },
                 {
                     "title": "O que é o INPC?",
                     "text": "O INPC (Índice Nacional de Preços ao Consumidor) mede a variação dos preços de bens e serviços consumidos por famílias com renda mensal entre 1 e 5 salários mínimos. Por refletir o custo de vida da população de menor renda, o INPC é amplamente utilizado para:",
