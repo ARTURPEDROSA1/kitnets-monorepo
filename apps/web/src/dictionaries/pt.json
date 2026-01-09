@@ -1110,6 +1110,7 @@
             "section2": "Fase 2: Independência Financeira (Usufruto)",
             "initialCapital": "Capital Inicial (Hoje)",
             "monthlyContribution": "Aporte Mensal (Valor Real)",
+            "annualContributionIncrease": "Aumento anual do aporte (%)",
             "years": "Período de Acumulação (Anos)",
             "nominalReturn": "Rentabilidade Nominal Anual Estimada (%)",
             "inflation": "Inflação Anual Estimada (IPCA %)",

@@ -863,6 +863,7 @@
             "section2": "Phase 2: Financial Independence (Withdrawal)",
             "initialCapital": "Initial Capital (Today)",
             "monthlyContribution": "Monthly Contribution (Real Value)",
+            "annualContributionIncrease": "Annual Contribution Increase (%)",
             "years": "Accumulation Period (Years)",
             "nominalReturn": "Estimated Nominal Annual Return (%)",
             "inflation": "Estimated Annual Inflation (CPI %)",

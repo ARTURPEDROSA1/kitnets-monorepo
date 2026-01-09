@@ -337,6 +337,33 @@ export function CalculatorsOverview({ lang, dict }: { lang: string; dict: Dictio
                     </div>
                 </div>
             </div>
+            {/* Structured Data for SEO */}
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{
+                    __html: JSON.stringify({
+                        "@context": "https://schema.org",
+                        "@type": "CollectionPage",
+                        "name": t.title,
+                        "description": (t as any).seoContent?.intro.text,
+                        "hasPart": CALCULATORS.map(calc => {
+                            const texts = (t.cards.items as any)[calc.dictKey];
+                            return {
+                                "@type": "SoftwareApplication",
+                                "name": texts?.title,
+                                "description": texts?.description,
+                                "applicationCategory": "FinanceApplication",
+                                "operatingSystem": "WebBrowser",
+                                "offers": {
+                                    "@type": "Offer",
+                                    "price": "0",
+                                    "priceCurrency": "BRL"
+                                }
+                            };
+                        })
+                    })
+                }}
+            />
         </div>
     );
 }
