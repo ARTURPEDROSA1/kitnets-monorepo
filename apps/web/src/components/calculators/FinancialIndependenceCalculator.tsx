@@ -114,6 +114,7 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
     // State
     const [initialCapital, setInitialCapital] = React.useState<string>("5000");
     const [monthlyContribution, setMonthlyContribution] = React.useState<string>("1000");
+    const [annualContributionIncrease, setAnnualContributionIncrease] = React.useState<string>("5");
     const [years, setYears] = React.useState<string>("30");
     const [nominalReturn, setNominalReturn] = React.useState<string>("12");
     const [inflation, setInflation] = React.useState<string>("4");
@@ -147,6 +148,7 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
     const taxRateVal = calculatedTaxRate;
     const withdrawalYearsVal = parseFloat(withdrawalYears) || 0;
     const withdrawalRealReturnAnnualVal = parseFloat(withdrawalRealReturnAnnual) || 0;
+    const annualContributionIncreaseVal = parseFloat(annualContributionIncrease) || 0;
 
     // Derived Rates
     const realAnnualRate = ((1 + nominalReturnVal / 100) / (1 + inflationVal / 100)) - 1;
@@ -172,7 +174,7 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
     const wdMonths = withdrawalYearsVal * 12;
 
     // Accumulation Arrays
-    const accumulationData: { month: number; year: number; balance: number; principal: number; interest: number }[] = [];
+    const accumulationData: { month: number; year: number; balance: number; principal: number; contributions: number; interest: number }[] = [];
     let currentBalance = initialCapitalVal;
     let currentPrincipal = initialCapitalVal;
 
@@ -181,12 +183,20 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
         year: 0,
         balance: currentBalance,
         principal: currentPrincipal,
+        contributions: 0,
         interest: 0
     });
 
+    let currentMonthlyContribution = monthlyContributionVal;
+
     for (let i = 1; i <= months; i++) {
-        currentBalance = currentBalance * (1 + accumulationMonthlyRate) + monthlyContributionVal;
-        currentPrincipal += monthlyContributionVal;
+        // Apply annual increase at the start of each new year (every 12 months)
+        if (i > 1 && (i - 1) % 12 === 0) {
+            currentMonthlyContribution = currentMonthlyContribution * (1 + annualContributionIncreaseVal / 100);
+        }
+
+        currentBalance = currentBalance * (1 + accumulationMonthlyRate) + currentMonthlyContribution;
+        currentPrincipal += currentMonthlyContribution;
 
         if (i % 12 === 0) {
             accumulationData.push({
@@ -194,6 +204,7 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
                 year: i / 12,
                 balance: currentBalance,
                 principal: currentPrincipal,
+                contributions: currentPrincipal - initialCapitalVal,
                 interest: currentBalance - currentPrincipal
             });
         }
@@ -419,13 +430,25 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
                                     onChange={(val) => { handleInteraction('initialCapital'); setInitialCapital(val.toString()); }}
                                 />
                             </div>
-                            <div className="space-y-2">
-                                <Label>{t?.monthlyContribution}</Label>
-                                <MoneyInput
-                                    value={monthlyContribution}
-                                    onChange={(val) => { handleInteraction('monthlyContribution'); setMonthlyContribution(val.toString()); }}
-                                />
+
+                            <div className="grid grid-cols-2 gap-4 items-start">
+                                <div className="space-y-2">
+                                    <Label>{t?.monthlyContribution}</Label>
+                                    <MoneyInput
+                                        value={monthlyContribution}
+                                        onChange={(val) => { handleInteraction('monthlyContribution'); setMonthlyContribution(val.toString()); }}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>{t?.annualContributionIncrease}</Label>
+                                    <Input
+                                        type="number"
+                                        value={annualContributionIncrease}
+                                        onChange={(e) => { handleInteraction('annualContributionIncrease'); setAnnualContributionIncrease(e.target.value); }}
+                                    />
+                                </div>
                             </div>
+
                             <div className="space-y-2">
                                 <Label>{t?.years}</Label>
                                 <Input
@@ -509,7 +532,7 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
                                     <Input
                                         type="number"
                                         value={withdrawalRealReturnAnnual}
-                                        onChange={(val) => { handleInteraction('withdrawalRealReturnAnnual'); setWithdrawalRealReturnAnnual(val.toString()); }}
+                                        onChange={(e) => { handleInteraction('withdrawalRealReturnAnnual'); setWithdrawalRealReturnAnnual(e.target.value); }}
                                         className="mt-auto"
                                     />
                                 </div>
@@ -720,8 +743,8 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
                             {sortedAccumulationData.map((row) => (
                                 <tr key={row.year} className="hover:bg-muted/50 group">
                                     <td className="px-6 py-3 sticky left-0 z-10 bg-card group-hover:bg-muted">{row.year}</td>
-                                    <td className="px-6 py-3">{formatCurrency(row.principal - (row.year * 12 * monthlyContributionVal))}</td>
-                                    <td className="px-6 py-3">{formatCurrency(row.year * 12 * monthlyContributionVal)}</td>
+                                    <td className="px-6 py-3">{formatCurrency(initialCapitalVal)}</td>
+                                    <td className="px-6 py-3">{formatCurrency(row.principal - initialCapitalVal)}</td>
                                     <td className="px-6 py-3 text-green-600">{formatCurrency(row.interest)}</td>
                                     <td className="px-6 py-3 font-medium">{formatCurrency(row.balance)}</td>
                                 </tr>
@@ -985,6 +1008,25 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
                     </div>
                 </div>
             )}
+            {/* Structured Data for SEO */}
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{
+                    __html: JSON.stringify({
+                        "@context": "https://schema.org",
+                        "@type": "SoftwareApplication",
+                        "name": dict.financialIndependenceCalculator?.title || "Financial Independence Calculator",
+                        "description": dict.financialIndependenceCalculator?.subtitle || "Simulate your financial freedom with real inflation and taxes.",
+                        "applicationCategory": "FinanceApplication",
+                        "operatingSystem": "WebBrowser",
+                        "offers": {
+                            "@type": "Offer",
+                            "price": "0",
+                            "priceCurrency": "BRL"
+                        }
+                    })
+                }}
+            />
         </div>
     );
 }
