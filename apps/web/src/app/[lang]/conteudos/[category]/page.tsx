@@ -22,16 +22,30 @@ export default async function CategoryPage({ params, searchParams }: Props) {
     const pageSize = 12;
 
     const supabase = await createClient();
-    const { data: categoryData } = await supabase
+    const { data: categoryData, error: catError } = await supabase
         .from('categories')
         .select('*')
         .eq('slug', category)
         .single();
 
-    // Fallback title if category lookup fails (though getArticlesByCategory should also fail/return empty then)
+    // Fallback title if category lookup fails
     const categoryName = categoryData?.name || category.replace(/-/g, ' ');
 
-    const { data: articles, count } = await getArticlesByCategory(lang, category, pageNum, pageSize);
+    let articles: any[] = [];
+    let count: number | null = 0;
+    let errorMsg: string | null = null;
+
+    // Fetch articles
+    // If we have an ID, use it (more robust). If not, try slug.
+    const filterValue = categoryData?.id || category;
+
+    const result = await getArticlesByCategory(lang, filterValue, pageNum, pageSize);
+    articles = result.data;
+    count = result.count;
+    if (result.error) {
+        errorMsg = JSON.stringify(result.error);
+        console.error("Error fetching articles:", result.error);
+    }
 
     const totalPages = count ? Math.ceil(count / pageSize) : 0;
 
@@ -42,9 +56,21 @@ export default async function CategoryPage({ params, searchParams }: Props) {
                 {categoryData?.description && (
                     <p className="text-muted-foreground mt-2">{categoryData.description}</p>
                 )}
+                {/* Debug info if things go wrong */}
+                {!categoryData && (
+                    <div className="text-xs text-muted-foreground mt-2">
+                        Debug: Category lookup failed or returned null. Slug: {category}. Error: {catError?.message}
+                    </div>
+                )}
             </div>
 
-            {articles.length === 0 ? (
+            {errorMsg && (
+                <div className="p-4 bg-red-100 text-red-900 rounded mb-6">
+                    Error loading articles: {errorMsg}
+                </div>
+            )}
+
+            {articles.length === 0 && !errorMsg ? (
                 <p className="text-muted-foreground">No articles found in this category.</p>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

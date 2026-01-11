@@ -50,7 +50,7 @@ export const getArticleBySlug = async (
 
 export const getArticlesByCategory = async (
     lang: string,
-    categorySlug: string,
+    categorySlugOrId: string,
     page: number = 1,
     pageSize: number = 12
 ) => {
@@ -58,7 +58,7 @@ export const getArticlesByCategory = async (
     const start = (page - 1) * pageSize;
     const end = start + pageSize - 1;
 
-    const { data, error, count } = await supabase
+    let query = supabase
         .from('articles')
         .select(`
       *,
@@ -69,23 +69,32 @@ export const getArticlesByCategory = async (
     `, { count: 'exact' })
         .eq('status', 'published')
         // .lte('published_at', new Date().toISOString())
-        .eq('category.slug', categorySlug)
         .eq('translation.lang', lang)
         .order('published_at', { ascending: false })
         .range(start, end);
 
+    // Check if UUID
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(categorySlugOrId);
+
+    if (isUuid) {
+        query = query.eq('primary_category_id', categorySlugOrId);
+    } else {
+        query = query.eq('category.slug', categorySlugOrId);
+    }
+
+    const { data, error, count } = await query;
+
     if (error) {
         console.error('Error fetching articles by category:', error);
-        return { data: [], count: 0 };
+        return { data: [], count: 0, error };
     }
 
     const articles = data.map((d: any) => ({
         ...d,
         tags: d.article_tags.map((at: any) => at.tag),
-        // Single translation due to !inner join
     }));
 
-    return { data: articles, count };
+    return { data: articles, count, error: null };
 };
 
 export const getArticlesByAuthor = async (
@@ -108,7 +117,7 @@ export const getArticlesByAuthor = async (
         article_tags(tag:tags(*))
       `, { count: 'exact' })
         .eq('status', 'published')
-        .lte('published_at', new Date().toISOString())
+        // .lte('published_at', new Date().toISOString())
         .eq('author.slug', authorSlug)
         .eq('translation.lang', lang)
         .order('published_at', { ascending: false })
