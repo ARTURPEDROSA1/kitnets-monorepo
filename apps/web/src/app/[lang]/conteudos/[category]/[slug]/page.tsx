@@ -37,6 +37,16 @@ export default async function ArticlePage({ params }: Props) {
     return (
         <article className="container mx-auto px-4 py-8 max-w-4xl">
             <header className="mb-8">
+                {article.translation.metadata?.og_image_url && (
+                    <div className="relative w-full h-64 md:h-96 mb-8 rounded-xl overflow-hidden">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                            src={article.translation.metadata.og_image_url}
+                            alt={article.translation.title}
+                            className="w-full h-full object-cover"
+                        />
+                    </div>
+                )}
                 <h1 className="text-4xl font-bold mb-4">{article.translation.title}</h1>
                 <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     {article.author ? (
