@@ -1,7 +1,9 @@
 import { getArticlesByAuthor, getAuthorBySlug } from '@/services/cms';
 import Link from 'next/link';
+import { getDictionary } from '@/dictionaries';
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
+import { Youtube } from 'lucide-react';
 
 type Props = {
     params: Promise<{ lang: string; slug: string }>;
@@ -25,6 +27,7 @@ export default async function AuthorPage({ params, searchParams }: Props) {
     const { page } = await searchParams;
     const pageNum = page ? parseInt(page) : 1;
     const pageSize = 12;
+    const dict = getDictionary(lang);
 
     const author = await getAuthorBySlug(slug);
 
@@ -53,9 +56,45 @@ export default async function AuthorPage({ params, searchParams }: Props) {
                 {author.bio && (
                     <p className="text-muted-foreground max-w-2xl">{author.bio}</p>
                 )}
+
+                {author.social_links && (
+                    <div className="flex items-center gap-4 mt-6">
+                        {author.social_links.youtube && (
+                            <a
+                                href={author.social_links.youtube}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-2 rounded-full bg-muted/50 hover:bg-muted text-muted-foreground hover:text-[#FF0000] transition-all duration-300"
+                                title="YouTube"
+                            >
+                                <Youtube size={24} />
+                            </a>
+                        )}
+                        {author.social_links.website && (
+                            <a
+                                href={author.social_links.website}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-2 rounded-full bg-muted/50 hover:bg-muted transition-all duration-300 flex items-center justify-center w-10 h-10"
+                                title="Website"
+                            >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                    src={
+                                        ['kitnets.com', 'www.kitnets.com', 'localhost'].includes(new URL(author.social_links.website).hostname)
+                                            ? '/icon.png'
+                                            : `https://www.google.com/s2/favicons?domain=${new URL(author.social_links.website).hostname}&sz=64`
+                                    }
+                                    alt="Website"
+                                    className="w-5 h-5 rounded-sm"
+                                />
+                            </a>
+                        )}
+                    </div>
+                )}
             </div>
 
-            <h2 className="text-2xl font-bold mb-6">Articles by {author.name}</h2>
+            <h2 className="text-2xl font-bold mb-6">{dict.author?.articlesBy ? `${dict.author.articlesBy} ${author.name}` : `Articles by ${author.name}`}</h2>
 
             {articles.length === 0 ? (
                 <p className="text-muted-foreground">No articles found for this author.</p>

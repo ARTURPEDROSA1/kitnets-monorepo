@@ -122,6 +122,7 @@ export const getArticlesByAuthor = async (
         .eq('author.slug', authorSlug)
         .eq('translation.lang', lang)
         .order('published_at', { ascending: false })
+        .order('created_at', { ascending: false })
         .range(start, end);
 
     if (error) {
@@ -199,4 +200,43 @@ export const getAuthorBySlug = async (slug: string) => {
     }
 
     return data as Author;
+};
+
+export const getAllArticles = async () => {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+        .from('articles')
+        .select(`
+            updated_at,
+            category:categories!articles_primary_category_id_fkey!inner(slug),
+            translation:article_translations!inner(slug, lang)
+        `)
+        .eq('status', 'published');
+
+    if (error) {
+        console.error('Error fetching all articles:', error);
+        return [];
+    }
+
+    const allRoutes: {
+        lang: string;
+        categorySlug: string;
+        slug: string;
+        updatedAt: string;
+    }[] = [];
+
+    data?.forEach((article: any) => {
+        const translations = Array.isArray(article.translation) ? article.translation : [article.translation];
+        translations.forEach((t: any) => {
+            allRoutes.push({
+                lang: t.lang,
+                categorySlug: article.category.slug,
+                slug: t.slug,
+                updatedAt: article.updated_at
+            });
+        });
+    });
+
+    return allRoutes;
 };

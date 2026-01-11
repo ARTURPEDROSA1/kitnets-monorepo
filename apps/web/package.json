@@ -29,11 +29,14 @@
     "openai": "^6.15.0",
     "react": "19.2.1",
     "react-dom": "19.2.1",
-    "recharts": "^3.6.0"
+    "recharts": "^3.6.0",
+    "remark-breaks": "^4.0.0",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@kitnets/config": "*",
     "@tailwindcss/postcss": "^4",
+    "@tailwindcss/typography": "^0.5.19",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

@@ -65,6 +65,9 @@
         "owner": "Owner",
         "minTaxPF": "Minimum Tax Individual"
     },
+    "author": {
+        "articlesBy": "Articles by"
+    },
     "filters": {
         "title": "Filters",
         "location": "Location",
