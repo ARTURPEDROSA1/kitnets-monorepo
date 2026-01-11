@@ -184,3 +184,19 @@ export const getArticlesByTag = async (
 
     return { data: articles, count };
 };
+
+export const getAuthorBySlug = async (slug: string) => {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+        .from('authors')
+        .select('*')
+        .eq('slug', slug)
+        .single();
+
+    if (error) {
+        console.error('Error fetching author:', error);
+        return null;
+    }
+
+    return data as Author;
+};
