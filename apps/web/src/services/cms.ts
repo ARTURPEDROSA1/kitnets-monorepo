@@ -44,7 +44,7 @@ export const getArticleBySlug = async (
     return {
         ...data,
         tags,
-        translation: data.translation // Accessing the single result from inner join
+        translation: Array.isArray(data.translation) ? data.translation[0] : data.translation
     } as unknown as ArticleWithDetails;
 };
 
@@ -92,6 +92,7 @@ export const getArticlesByCategory = async (
     const articles = data.map((d: any) => ({
         ...d,
         tags: d.article_tags.map((at: any) => at.tag),
+        translation: Array.isArray(d.translation) ? d.translation[0] : d.translation,
     }));
 
     return { data: articles, count, error: null };
@@ -131,6 +132,7 @@ export const getArticlesByAuthor = async (
     const articles = data.map((d: any) => ({
         ...d,
         tags: d.article_tags.map((at: any) => at.tag),
+        translation: Array.isArray(d.translation) ? d.translation[0] : d.translation,
     }));
 
     return { data: articles, count };
@@ -171,6 +173,7 @@ export const getArticlesByTag = async (
     const articles = data.map((d: any) => ({
         ...d,
         tags: d.article_tags.map((at: any) => at.tag),
+        translation: Array.isArray(d.translation) ? d.translation[0] : d.translation,
         // Note: !inner on article_tags ensures we only get articles with the tag,
         // but we might want to fetch ALL tags for the article, not just the matching one.
         // This query returns only the matching tag in article_tags array usually if using !inner this way on the join?
