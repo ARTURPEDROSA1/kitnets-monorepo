@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getArticleBySlug } from '@/services/cms';
 import { MDXRenderer } from '@/components/cms/MDXRenderer';
@@ -50,13 +51,13 @@ export default async function ArticlePage({ params }: Props) {
                 <h1 className="text-4xl font-bold mb-4">{article.translation.title}</h1>
                 <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     {article.author ? (
-                        <div className="flex items-center gap-2">
+                        <Link href={`/${lang}/conteudos/autor/${article.author.slug}`} className="flex items-center gap-2 hover:text-primary transition-colors hover:underline">
                             {article.author.avatar_url && (
                                 // eslint-disable-next-line @next/next/no-img-element
-                                <img src={article.author.avatar_url} alt={article.author.name} className="w-8 h-8 rounded-full" />
+                                <img src={article.author.avatar_url} alt={article.author.name} className="w-8 h-8 rounded-full object-cover" />
                             )}
-                            <span>{article.author.name}</span>
-                        </div>
+                            <span className="font-medium">{article.author.name}</span>
+                        </Link>
                     ) : null}
                     <span>•</span>
                     <time dateTime={article.published_at || ''}>
@@ -75,6 +76,33 @@ export default async function ArticlePage({ params }: Props) {
                     <MDXRemoteRSC source={article.translation.content_mdx} components={COMPONENTS} />
                 )}
             </div>
+
+            {/* Author Bio Section */}
+            {article.author && (
+                <div className="mt-12 pt-8 border-t flex flex-col sm:flex-row items-center sm:items-start gap-6">
+                    {article.author.avatar_url && (
+                        <Link href={`/${lang}/conteudos/autor/${article.author.slug}`} className="flex-shrink-0">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                                src={article.author.avatar_url}
+                                alt={article.author.name}
+                                className="w-20 h-20 rounded-full object-cover border-2 border-muted"
+                            />
+                        </Link>
+                    )}
+                    <div className="text-center sm:text-left">
+                        <Link href={`/${lang}/conteudos/autor/${article.author.slug}`} className="hover:underline">
+                            <h3 className="text-xl font-bold">{article.author.name}</h3>
+                        </Link>
+                        {article.author.bio && (
+                            <p className="text-muted-foreground mt-2">{article.author.bio}</p>
+                        )}
+                        <Link href={`/${lang}/conteudos/autor/${article.author.slug}`} className="text-primary hover:underline text-sm mt-2 inline-block">
+                            View all articles by {article.author.name}
+                        </Link>
+                    </div>
+                </div>
+            )}
 
             {article.tags && article.tags.length > 0 && (
                 <div className="mt-12 flex gap-2 flex-wrap">
