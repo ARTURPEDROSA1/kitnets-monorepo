@@ -28,6 +28,9 @@
         "highIncomeTax": "Impuesto Mínimo Altas Rentas",
         "minTaxPF": "Impuesto Mínimo PF"
     },
+    "author": {
+        "articlesBy": "Artículos de"
+    },
     "filters": {
         "title": "Filtrar resultados",
         "location": "Ubicación",
