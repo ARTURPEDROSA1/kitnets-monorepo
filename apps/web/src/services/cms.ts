@@ -19,7 +19,7 @@ export const getArticleBySlug = async (
         .from('articles')
         .select(`
       *,
-      category:categories!inner(*),
+      category:categories!articles_primary_category_id_fkey!inner(*),
       author:authors(*),
       translation:article_translations!inner(*),
       article_tags(tag:tags(*))
@@ -62,7 +62,7 @@ export const getArticlesByCategory = async (
         .from('articles')
         .select(`
       *,
-      category:categories!inner(*),
+      category:categories!articles_primary_category_id_fkey!inner(*),
       author:authors(*),
       translation:article_translations!inner(title, slug, excerpt, metadata, created_at, reading_time_minutes),
       article_tags(tag:tags(*))
@@ -111,7 +111,7 @@ export const getArticlesByAuthor = async (
         .from('articles')
         .select(`
         *,
-        category:categories(*),
+        category:categories!articles_primary_category_id_fkey(*),
         author:authors!inner(*),
         translation:article_translations!inner(title, slug, excerpt, metadata, created_at, reading_time_minutes),
         article_tags(tag:tags(*))
@@ -151,7 +151,7 @@ export const getArticlesByTag = async (
         .from('articles')
         .select(`
         *,
-        category:categories(*),
+        category:categories!articles_primary_category_id_fkey(*),
         author:authors(*),
         translation:article_translations!inner(title, slug, excerpt, metadata, created_at, reading_time_minutes),
         article_tags!inner(tag:tags!inner(*)) 
