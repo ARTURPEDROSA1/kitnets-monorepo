@@ -68,7 +68,7 @@ export const getArticlesByCategory = async (
       article_tags(tag:tags(*))
     `, { count: 'exact' })
         .eq('status', 'published')
-        .lte('published_at', new Date().toISOString())
+        // .lte('published_at', new Date().toISOString())
         .eq('category.slug', categorySlug)
         .eq('translation.lang', lang)
         .order('published_at', { ascending: false })

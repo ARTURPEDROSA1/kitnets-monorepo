@@ -1,6 +1,7 @@
 import { getArticlesByCategory } from '@/services/cms';
 import Link from 'next/link';
 import { Metadata } from 'next';
+import { createClient } from '@/utils/supabase/server';
 
 type Props = {
     params: Promise<{ lang: string; category: string }>;
@@ -20,13 +21,28 @@ export default async function CategoryPage({ params, searchParams }: Props) {
     const pageNum = page ? parseInt(page) : 1;
     const pageSize = 12;
 
+    const supabase = await createClient();
+    const { data: categoryData } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('slug', category)
+        .single();
+
+    // Fallback title if category lookup fails (though getArticlesByCategory should also fail/return empty then)
+    const categoryName = categoryData?.name || category.replace(/-/g, ' ');
+
     const { data: articles, count } = await getArticlesByCategory(lang, category, pageNum, pageSize);
 
     const totalPages = count ? Math.ceil(count / pageSize) : 0;
 
     return (
         <div className="container mx-auto px-4 py-8">
-            <h1 className="text-3xl font-bold mb-8 capitalize">Category: {category}</h1>
+            <div className="mb-8">
+                <h1 className="text-3xl font-bold capitalize">{categoryName}</h1>
+                {categoryData?.description && (
+                    <p className="text-muted-foreground mt-2">{categoryData.description}</p>
+                )}
+            </div>
 
             {articles.length === 0 ? (
                 <p className="text-muted-foreground">No articles found in this category.</p>
