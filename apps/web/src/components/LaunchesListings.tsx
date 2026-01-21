@@ -120,7 +120,7 @@ export function LaunchesListings({ t }: LaunchesListingsProps) {
             </div>
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {listings.map((listing) => (
+                {listings.map((listing, index) => (
                     <div key={listing.id} className="group overflow-hidden rounded-xl border border-border bg-card transition-all duration-300 hover:shadow-lg">
                         {/* Image Placeholder */}
                         <div className="relative h-48 bg-muted overflow-hidden">
@@ -130,6 +130,7 @@ export function LaunchesListings({ t }: LaunchesListingsProps) {
                                 fill
                                 className="object-cover transition-transform duration-500 group-hover:scale-105"
                                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                                priority={index < 4}
                             />
                             <div className="absolute left-2 top-2 rounded bg-black/60 px-2 py-1 text-xs text-white capitalize z-10">
                                 {listing.tags[0]}

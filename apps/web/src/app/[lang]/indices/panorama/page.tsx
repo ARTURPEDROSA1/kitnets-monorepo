@@ -2,7 +2,8 @@ import { Metadata } from 'next';
 import { getAllIndexes, getIndexValues, IndexMetadata, IndexValue } from '@/lib/indexes';
 import { getFipeZapData, FipeZapDataPoint } from '@/lib/fipezap';
 import { getMinimumWageData, MinimumWageData } from '@/lib/minimum-wage';
-import { MiniIndexChart } from '@/components/indices/MiniIndexChart';
+import { LazyMiniIndexChart as MiniIndexChart } from '@/components/indices/LazyMiniIndexChart';
+
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { getDictionary } from '../../../../dictionaries';
