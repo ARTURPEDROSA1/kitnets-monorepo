@@ -42,7 +42,7 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-import CalculatorCta from "@/components/calculators/CalculatorCta";
+
 import CalculatorContent from "@/components/calculators/CalculatorContent";
 import LeadCaptureModal from "@/components/calculators/LeadCaptureModal";
 import { useCalculatorLeadCapture } from "@/hooks/useCalculatorLeadCapture";
@@ -236,7 +236,8 @@ export default function RentLateFineCalculatorClient() {
     const params = useParams();
     const lang = (params?.lang as string) || "pt";
     const dict = getDictionary(lang);
-    const t = dict.rentLateFineCalculatorPage;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const t = dict.rentLateFineCalculatorPage as any;
 
     // --- State ---
 
@@ -475,7 +476,6 @@ export default function RentLateFineCalculatorClient() {
             {/* Header */}
             <div className="space-y-2 print:hidden">
                 <h1 className="text-3xl font-bold tracking-tight text-foreground">{t.title}</h1>
-                <p className="text-muted-foreground max-w-2xl">{t.description}</p>
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 print:block">
@@ -796,17 +796,13 @@ export default function RentLateFineCalculatorClient() {
 
             <Separator className="my-8" />
 
-            <div className="print:hidden space-y-12">
-                <CalculatorContent content={t.pageContent} />
-                <CalculatorCta dict={dict.calculatorCta} lang={lang} />
-            </div>
+            {t.pageContent && (
+                <div className="print:hidden space-y-12">
+                    <CalculatorContent content={t.pageContent} />
+                </div>
+            )}
 
-            <Separator className="my-8" />
 
-            {/* Disclaimer */}
-            <div className="max-w-4xl text-xs text-muted-foreground mx-auto text-center leading-relaxed print:text-[10px]">
-                <p>{t.results?.footerDisclaimer}</p>
-            </div>
 
             <LeadCaptureModal
                 open={isModalOpen}

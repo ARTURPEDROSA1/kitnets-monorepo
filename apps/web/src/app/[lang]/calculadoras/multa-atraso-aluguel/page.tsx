@@ -1,5 +1,7 @@
 import { getDictionary } from "@/dictionaries";
 import RentLateFineCalculatorClient from "./RentLateFineCalculatorClient";
+import RentLateFineContent from "./RentLateFineContent";
+import CalculatorCta from "@/components/calculators/CalculatorCta";
 import { Metadata } from "next";
 
 type Props = {
@@ -19,8 +21,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
             canonical: `https://kitnets.com/${lang}/calculadoras/multa-atraso-aluguel`,
             languages: {
                 'pt': 'https://kitnets.com/pt/calculadoras/multa-atraso-aluguel',
-                'en': 'https://kitnets.com/en/calculators/rent-late-fine',
-                'es': 'https://kitnets.com/es/calculadoras/multa-alquiler',
+                'en': 'https://kitnets.com/en/calculadoras/multa-atraso-aluguel',
+                'es': 'https://kitnets.com/es/calculadoras/multa-atraso-aluguel',
             },
         },
         openGraph: {
@@ -89,6 +91,10 @@ export default async function RentLateFineCalculatorPage({ params }: Props) {
                 dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
             />
             <RentLateFineCalculatorClient />
+            <RentLateFineContent lang={lang} />
+            <div className="mt-16 mb-8 max-w-4xl mx-auto">
+                <CalculatorCta dict={dict.calculatorCta} lang={lang} />
+            </div>
         </>
     );
 }

@@ -2315,5 +2315,118 @@
                 "content": "Fill in the fields above and find out, in a few seconds, if you are subject to the minimum tax for high income and what the impact on your IR might be."
             }
         }
+    },
+    "proRataRentCalculatorPage": {
+        "title": "Pro-Rata Rent Calculator",
+        "description": "Calculate pro-rata rent accurately.",
+        "inputs": {
+            "contractDetails": "Contract Details",
+            "monthlyRent": "Monthly Rent Value",
+            "startDate": "Start Date",
+            "endDate": "End Date",
+            "advancedOptions": "Advanced Options",
+            "commercialMonth": "Commercial Month (30 days)",
+            "commercialMonthTooltip": "Considers all months as having 30 days. Standard method in real estate contracts.",
+            "realDays": "Real Days",
+            "realDaysTooltip": "Considers exact number of days in the month (28, 29, 30 or 31). More precise for accounting.",
+            "includeStartDate": "Include start day in billing",
+            "includeEndDate": "Include end day in billing"
+        },
+        "results": {
+            "title": "Result",
+            "payTitle": "Pro-Rata Value",
+            "dailyValue": "Daily Value",
+            "daysCharged": "Charged Days",
+            "period": "Calculated Period",
+            "breakdownTitle": "View calculation details",
+            "methodUsed": "Method",
+            "copy": "Copy Result"
+        },
+        "validation": {
+            "rentZero": "Enter the rent value.",
+            "endDateBeforeStart": "End date must be after start date.",
+            "differentMonth": "Warning: dates in different months."
+        },
+        "seo": {
+            "title": "Pro-Rata Rent Calculator Online | Kitnets.com",
+            "description": "Calculate pro-rata rent simply and accurately. Ideal for start or end of rental contracts. Free tool by Kitnets.com."
+        },
+        "pageContent": {
+            "intro": "The Pro-Rata Rent Calculator allows you to accurately calculate the rent due when the contract does not cover a full month, a widely common situation at the beginning, ending, or early termination of a lease.\n\nWith just a few details — rent amount, start date, and end date — you find out exactly how much should be paid, avoiding errors, disputes, and improper charges.",
+            "sections": [
+                {
+                    "title": "📅 When is pro-rata rent used?",
+                    "list": [
+                        "Tenant entry after the month starts",
+                        "Vacating property before month ends",
+                        "Early contract termination",
+                        "Contract adjustments with partial validity",
+                        "Transition between contracts or tenants"
+                    ],
+                    "text": "In these cases, rent must be calculated proportionally to the days effectively occupied."
+                },
+                {
+                    "title": "🧮 How calculation works?",
+                    "text": "The calculation follows simple logic widely used in rental contracts:",
+                    "list": [
+                        "Determine daily rent value (By commercial 30-day month or real days)",
+                        "Calculate number of occupied days",
+                        "Multiply: Daily Value × Number of Days"
+                    ],
+                    "conclusion": "The result is the exact pro-rata rent to be paid."
+                },
+                {
+                    "title": "✅ Why use Kitnets.com Calculator?",
+                    "list": [
+                        "Instant and accurate calculation",
+                        "Compatible with Brazilian contract practices",
+                        "Avoids manual errors",
+                        "Ideal for tenants, owners, and agencies",
+                        "Fully online and free"
+                    ],
+                    "text": "The calculator shows not only the final value but also daily value, days considered, and exact period."
+                },
+                {
+                    "title": "⚖️ Is it mandatory by law?",
+                    "text": "The Tenancy Law (Law No. 8.245/91) does not define a single formula, but proportional calculation is widely accepted and usually foreseen in contracts.",
+                    "list": [
+                        "Respect method agreed in contract",
+                        "Be transparent for both parties"
+                    ],
+                    "conclusion": "This calculator helps exactly with that."
+                },
+                {
+                    "title": "📌 Practical Example",
+                    "text": "Rent: R$ 1,500.00\nEntry: 10th\nExit: 25th\nMethod: Commercial month (30 days)\nDaily Value: R$ 50.00\nDays Charged: 16\nPro-Rata Rent: R$ 800.00"
+                },
+                {
+                    "title": "🔗 Related Tools",
+                    "text": "If dealing with rental contracts, also check:",
+                    "links": [
+                        {
+                            "text": "Rent Adjustment Calculator",
+                            "url": "/calculadora-reajuste-aluguel"
+                        },
+                        {
+                            "text": "Early Termination Fine Calculator",
+                            "url": "/calculadoras/multa-rescisao-contrato-aluguel"
+                        },
+                        {
+                            "text": "Late Payment Fine Calculator",
+                            "url": "/calculadoras/multa-atraso-aluguel"
+                        }
+                    ]
+                },
+                {
+                    "title": "🧾 Important Note",
+                    "text": "This calculator is for informational and educational purposes. Always check lease contract clauses and consult a professional if in doubt."
+                }
+            ]
+        }
+    },
+    "calculatorCta": {
+        "title": "Professionalize your rental management",
+        "description": "Kitnets.com offers complete tools for owners and agencies to manage contracts, payments, and adjustments automatically.",
+        "button": "Explore Platform"
     }
 }
