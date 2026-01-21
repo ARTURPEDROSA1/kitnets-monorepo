@@ -12,6 +12,7 @@ import {
     AlertTriangle,
     Info,
     Copy,
+    Check,
 } from "lucide-react";
 import LeadCaptureModal from "@/components/calculators/LeadCaptureModal";
 import { useCalculatorLeadCapture } from "@/hooks/useCalculatorLeadCapture";
@@ -279,11 +280,15 @@ export default function ProRataRentCalculatorClient() {
 
     }, [isValid, numericRent, startD, endD, calculationMethod, includeStartDate, includeEndDate]);
 
+    const [isCopied, setIsCopied] = useState(false);
+
     const handleCopy = () => {
         if (checkExportTrigger('copy')) return;
         if (!calculationResult) return;
         const text = `Cálculo de Aluguel Proporcional\nPeríodo: ${calculationResult.period}\nDias cobrados: ${calculationResult.chargeableDays}\nValor: ${formatCurrency(calculationResult.proRataValue)}`;
         navigator.clipboard.writeText(text);
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2000);
     };
 
     return (
@@ -488,9 +493,25 @@ export default function ProRataRentCalculatorClient() {
                                 </div>
 
                                 <div className="flex gap-2 mt-6">
-                                    <Button variant="secondary" className="flex-1" onClick={handleCopy}>
-                                        <Copy className="w-4 h-4 mr-2" />
-                                        {tResults.copy}
+                                    <Button
+                                        variant={isCopied ? "default" : "secondary"}
+                                        className={cn(
+                                            "flex-1 transition-all duration-300",
+                                            isCopied && "bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg scale-[1.02]"
+                                        )}
+                                        onClick={handleCopy}
+                                    >
+                                        {isCopied ? (
+                                            <>
+                                                <Check className="w-4 h-4 mr-2" />
+                                                Copiado!
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Copy className="w-4 h-4 mr-2" />
+                                                {tResults.copy}
+                                            </>
+                                        )}
                                     </Button>
                                 </div>
 
@@ -508,23 +529,24 @@ export default function ProRataRentCalculatorClient() {
             </div>
 
             {/* Content / SEO Block */}
-            <div className="mt-16 pt-8 border-t space-y-6 max-w-4xl">
-                <div className="prose dark:prose-invert max-w-none">
-                    <h2 className="text-2xl font-bold mb-4">{t.seo?.title || "Calculadora de Aluguel Proporcional"}</h2>
-                    <p>{t.pageContent?.intro}</p>
+            {/* Content / SEO Block */}
+            <div className="mt-16 pt-8 border-t space-y-6 max-w-4xl text-foreground">
+                <div className="prose dark:prose-invert max-w-none text-foreground">
+                    <h2 className="text-2xl font-bold mb-4 text-foreground">{t.seo?.title || "Calculadora de Aluguel Proporcional"}</h2>
+                    <p className="text-muted-foreground">{t.pageContent?.intro}</p>
                     {t.pageContent?.sections?.map((section: any, i: number) => (
                         <div key={i} className="mt-6">
-                            <h3 className="text-lg font-semibold mb-2">{section.title}</h3>
-                            <p className="whitespace-pre-line">{section.text}</p>
+                            <h3 className="text-lg font-semibold mb-2 text-foreground">{section.title}</h3>
+                            <p className="whitespace-pre-line text-muted-foreground">{section.text}</p>
                             {section.list && (
-                                <ul className="list-disc pl-5 mt-2 space-y-1">
+                                <ul className="list-disc pl-5 mt-2 space-y-1 text-muted-foreground">
                                     {section.list.map((li: string, j: number) => (
                                         <li key={j}>{li}</li>
                                     ))}
                                 </ul>
                             )}
                             {section.conclusion && (
-                                <p className="mt-2 whitespace-pre-line">{section.conclusion}</p>
+                                <p className="mt-2 whitespace-pre-line text-muted-foreground font-medium">{section.conclusion}</p>
                             )}
                             {section.links && (
                                 <div className="mt-4 flex flex-col gap-2">

@@ -2254,10 +2254,6 @@
                 "exportCsv": "Baixar CSV"
             },
             "footerDisclaimer": "Esta calculadora é uma estimativa baseada nos parâmetros informados e práticas contratuais comuns (multa e juros). Contratos podem prever regras específicas e a cobrança real pode variar. Para casos de disputa, consulte sua imobiliária/advogado."
-        },
-        "pageContent": {
-            "intro": "Calcule juros e multas de aluguel de forma simples.",
-            "sections": []
         }
     },
     "rentFineCalculatorPage": {
@@ -2947,5 +2943,118 @@
                 "content": "Preencha os campos acima e descubra, em poucos segundos, se você está sujeito ao imposto mínimo para altas rendas e qual pode ser o impacto no seu IR."
             }
         }
+    },
+    "proRataRentCalculatorPage": {
+        "title": "Calculadora de Aluguel Proporcional (Pro-Rata)",
+        "description": "Calcule com precisão o valor proporcional do aluguel.",
+        "inputs": {
+            "contractDetails": "Detalhes do Contrato",
+            "monthlyRent": "Valor do Aluguel Mensal",
+            "startDate": "Data de Início",
+            "endDate": "Data Final",
+            "advancedOptions": "Opções Avançadas",
+            "commercialMonth": "Mês Comercial (30 dias)",
+            "commercialMonthTooltip": "Considera que todos os meses possuem 30 dias. Método padrão em contratos imobiliários.",
+            "realDays": "Dias Reais",
+            "realDaysTooltip": "Considera o número exato de dias do mês (28, 29, 30 ou 31). Mais preciso para contabilidade.",
+            "includeStartDate": "Incluir dia de início na cobrança",
+            "includeEndDate": "Incluir dia final na cobrança"
+        },
+        "results": {
+            "title": "Resultado",
+            "payTitle": "Valor Proporcional",
+            "dailyValue": "Valor da Diária",
+            "daysCharged": "Dias Cobrados",
+            "period": "Período Calculado",
+            "breakdownTitle": "Ver detalhes do cálculo",
+            "methodUsed": "Método",
+            "copy": "Copiar Resultado"
+        },
+        "validation": {
+            "rentZero": "Informe o valor do aluguel.",
+            "endDateBeforeStart": "A data final deve ser posterior à inicial.",
+            "differentMonth": "Atenção: datas em meses diferentes."
+        },
+        "seo": {
+            "title": "Calculadora de Aluguel Proporcional (Pro-Rata) Online | Kitnets.com",
+            "description": "Calcule o aluguel proporcional de forma simples e precisa. Ideal para início ou fim de contrato de locação. Ferramenta gratuita da Kitnets.com."
+        },
+        "pageContent": {
+            "intro": "A Calculadora de Aluguel Proporcional permite calcular com precisão o valor do aluguel devido quando o contrato não cobre um mês completo, situação muito comum no início, encerramento ou rescisão antecipada da locação.\n\nCom poucos dados — valor do aluguel, data inicial e data final — você descobre exatamente quanto deve ser pago, evitando erros, discussões e cobranças indevidas.",
+            "sections": [
+                {
+                    "title": "📅 Quando o aluguel proporcional é utilizado?",
+                    "list": [
+                        "Entrada do inquilino após o início do mês",
+                        "Saída do imóvel antes do fim do mês",
+                        "Rescisão antecipada do contrato",
+                        "Ajustes contratuais com vigência parcial",
+                        "Transição entre contratos ou inquilinos"
+                    ],
+                    "text": "Nesses casos, o valor do aluguel deve ser calculado proporcionalmente aos dias efetivamente ocupados."
+                },
+                {
+                    "title": "🧮 Como funciona o cálculo de aluguel proporcional?",
+                    "text": "O cálculo segue uma lógica simples e amplamente utilizada em contratos de locação:",
+                    "list": [
+                        "Determina-se o valor diário do aluguel (Pelo mês comercial de 30 dias ou pelos dias reais do mês)",
+                        "Calcula-se o número de dias ocupados no período",
+                        "Multiplica-se: Valor diário × número de dias"
+                    ],
+                    "conclusion": "O resultado é o aluguel proporcional exato a ser pago."
+                },
+                {
+                    "title": "✅ Por que usar a Calculadora da Kitnets.com?",
+                    "list": [
+                        "Cálculo instantâneo e preciso",
+                        "Compatível com práticas contratuais brasileiras",
+                        "Evita erros manuais e interpretações equivocadas",
+                        "Ideal para inquilinos, proprietários e imobiliárias",
+                        "Totalmente online e gratuita"
+                    ],
+                    "text": "A calculadora mostra não apenas o valor final, mas também o valor diário, dias considerados e o período exato."
+                },
+                {
+                    "title": "⚖️ Aluguel proporcional é obrigatório por lei?",
+                    "text": "A Lei do Inquilinato (Lei nº 8.245/91) não define uma fórmula única, mas o cálculo proporcional é amplamente aceito no mercado imobiliário e geralmente previsto em contrato.",
+                    "list": [
+                        "Respeite o método acordado em contrato",
+                        "Seja transparente para ambas as partes"
+                    ],
+                    "conclusion": "Esta calculadora ajuda exatamente nisso."
+                },
+                {
+                    "title": "📌 Exemplo prático",
+                    "text": "Aluguel: R$ 1.500,00\nEntrada: dia 10\nSaída: dia 25\nMétodo: mês comercial (30 dias)\nValor diário: R$ 50,00\nDias cobrados: 16\nAluguel proporcional: R$ 800,00"
+                },
+                {
+                    "title": "🔗 Ferramentas relacionadas",
+                    "text": "Se você está lidando com contratos de locação, também pode ser útil:",
+                    "links": [
+                        {
+                            "text": "Calculadora de Reajuste de Alquuel",
+                            "url": "/calculadora-reajuste-aluguel"
+                        },
+                        {
+                            "text": "Calculadora de Multa por Rescisão",
+                            "url": "/calculadoras/multa-rescisao-contrato-aluguel"
+                        },
+                        {
+                            "text": "Calculadora de Multa por Atraso",
+                            "url": "/calculadoras/multa-atraso-aluguel"
+                        }
+                    ]
+                },
+                {
+                    "title": "🧾 Observação importante",
+                    "text": "Esta calculadora tem caráter informativo e educativo. Sempre verifique as cláusulas do contrato de locação e, em caso de dúvida, consulte um profissional especializado."
+                }
+            ]
+        }
+    },
+    "calculatorCta": {
+        "title": "Profissionalize sua gestão de aluguéis",
+        "description": "O Kitnets.com oferece ferramentas completas para proprietários e imobiliárias gerenciarem contratos, cobranças e reajustes automaticamente.",
+        "button": "Conhecer Plataforma"
     }
 }

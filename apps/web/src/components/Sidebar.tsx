@@ -10,7 +10,6 @@ import { PropertyFilters } from "./PropertyFilters";
 
 import { useTheme } from "next-themes";
 import Image from "next/image";
-import { Dictionary } from "../dictionaries";
 import { FLAGS } from "../lib/flags";
 
 const languages = [
@@ -19,7 +18,8 @@ const languages = [
     { code: "es", label: "Español" },
 ];
 
-export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
     const pathname = usePathname();
     const { setTheme, theme } = useTheme();
     const { isSignedIn } = useAuth();
