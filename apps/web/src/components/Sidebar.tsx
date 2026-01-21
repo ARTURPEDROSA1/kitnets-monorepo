@@ -137,6 +137,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                         height={32}
                                         className="h-8 w-8 me-3"
                                         sizes="32px"
+                                        priority
                                     />
                                     <span className="whitespace-nowrap text-xl font-semibold text-foreground leading-none">
                                         Kitnets.com
@@ -158,7 +159,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                             <Link
                                                 href={lang === 'pt' ? '/anunciar' : `/${lang}/anunciar`}
                                                 aria-current={isActive(lang === 'pt' ? '/anunciar' : `/${lang}/anunciar`) ? "page" : undefined}
-                                                className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group ${isActive(lang === 'pt' ? '/anunciar' : `/${lang}/anunciar`) ? 'bg-accent' : ''}`}
+                                                className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/anunciar' : `/${lang}/anunciar`) ? 'bg-accent' : ''}`}
                                             >
                                                 <Megaphone className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                 <span className="ms-3">{dict.menu.advertise}</span>
@@ -169,7 +170,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                                 href={lang === 'pt' ? '/alugar' : `/${lang}/alugar`}
                                                 onClick={() => setSidebarView('rent-filters')}
                                                 aria-current={isActive(lang === 'pt' ? '/alugar' : `/${lang}/alugar`) ? "page" : undefined}
-                                                className={`w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group text-left ${isActive(lang === 'pt' ? '/alugar' : `/${lang}/alugar`) ? 'bg-accent' : ''}`}
+                                                className={`w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/alugar' : `/${lang}/alugar`) ? 'bg-accent' : ''}`}
                                             >
                                                 <Key className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                 <span className="ms-3">{dict.menu.rent}</span>
@@ -180,7 +181,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                                 href={lang === 'pt' ? '/comprar' : `/${lang}/comprar`}
                                                 onClick={() => setSidebarView('buy-filters')}
                                                 aria-current={isActive(lang === 'pt' ? '/comprar' : `/${lang}/comprar`) ? "page" : undefined}
-                                                className={`w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group text-left ${isActive(lang === 'pt' ? '/comprar' : `/${lang}/comprar`) ? 'bg-accent' : ''}`}
+                                                className={`w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/comprar' : `/${lang}/comprar`) ? 'bg-accent' : ''}`}
                                             >
                                                 <Home className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                 <span className="ms-3">{dict.menu.buy}</span>
@@ -191,7 +192,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                                 href={lang === 'pt' ? '/lancamentos' : `/${lang}/lancamentos`}
                                                 onClick={() => setSidebarView('launches-filters')}
                                                 aria-current={isActive(lang === 'pt' ? '/lancamentos' : `/${lang}/lancamentos`) ? "page" : undefined}
-                                                className={`w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group text-left ${isActive(lang === 'pt' ? '/lancamentos' : `/${lang}/lancamentos`) ? 'bg-accent' : ''}`}
+                                                className={`w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/lancamentos' : `/${lang}/lancamentos`) ? 'bg-accent' : ''}`}
                                             >
                                                 <Rocket className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                 <span className="ms-3">{dict.menu.launches}</span>
@@ -206,7 +207,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                             href={lang === 'pt' ? '/calculadoras' : `/${lang}/calculadoras`}
                                             onClick={() => setSidebarView('calculators-menu')}
                                             aria-current={isActive(lang === 'pt' ? '/calculadoras' : `/${lang}/calculadoras`) ? "page" : undefined}
-                                            className={`w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group text-left ${isActive(lang === 'pt' ? '/calculadoras' : `/${lang}/calculadoras`) ? 'bg-accent' : ''}`}
+                                            className={`w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/calculadoras' : `/${lang}/calculadoras`) ? 'bg-accent' : ''}`}
                                         >
                                             <Calculator className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                             <span className="ms-3">{dict.menu.calculators}</span>
@@ -219,7 +220,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                         href={lang === 'pt' ? '/indices/panorama' : `/${lang}/indices/panorama`}
                                         onClick={() => setSidebarView('indices-menu')}
                                         aria-current={isActive(lang === 'pt' ? '/indices/panorama' : `/${lang}/indices/panorama`) ? "page" : undefined}
-                                        className={`w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group text-left ${isActive(lang === 'pt' ? '/indices/panorama' : `/${lang}/indices/panorama`) ? 'bg-accent' : ''}`}
+                                        className={`w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/indices/panorama' : `/${lang}/indices/panorama`) ? 'bg-accent' : ''}`}
                                     >
                                         <LineChart className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                         <span className="ms-3">Indicadores</span>
@@ -231,7 +232,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                         href={lang === 'pt' ? '/conteudos' : `/${lang}/conteudos`}
                                         onClick={() => setSidebarView('contents-menu')}
                                         aria-current={isActive(lang === 'pt' ? '/conteudos' : `/${lang}/conteudos`) ? "page" : undefined}
-                                        className={`w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group text-left ${isActive(lang === 'pt' ? '/conteudos' : `/${lang}/conteudos`) ? 'bg-accent' : ''}`}
+                                        className={`w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/conteudos' : `/${lang}/conteudos`) ? 'bg-accent' : ''}`}
                                     >
                                         <FileText className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                         <span className="ms-3">{dict.menu.contents}</span>
@@ -243,7 +244,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                         <Link
                                             href={lang === 'pt' ? '/links-uteis' : `/${lang}/links-uteis`}
                                             aria-current={isActive(lang === 'pt' ? '/links-uteis' : `/${lang}/links-uteis`) ? "page" : undefined}
-                                            className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group ${isActive(lang === 'pt' ? '/links-uteis' : `/${lang}/links-uteis`) ? 'bg-accent' : ''}`}
+                                            className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/links-uteis' : `/${lang}/links-uteis`) ? 'bg-accent' : ''}`}
                                         >
                                             <LinkIcon className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                             <span className="ms-3">{dict.menu.usefulLinks}</span>
@@ -256,7 +257,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                         <Link
                                             href={lang === 'pt' ? '/perguntas-frequentes' : `/${lang}/perguntas-frequentes`}
                                             aria-current={isActive(lang === 'pt' ? '/perguntas-frequentes' : `/${lang}/perguntas-frequentes`) ? "page" : undefined}
-                                            className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group ${isActive(lang === 'pt' ? '/perguntas-frequentes' : `/${lang}/perguntas-frequentes`) ? 'bg-accent' : ''}`}
+                                            className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/perguntas-frequentes' : `/${lang}/perguntas-frequentes`) ? 'bg-accent' : ''}`}
                                         >
                                             <HelpCircle className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                             <span className="ms-3">{dict.menu.faq}</span>
@@ -272,7 +273,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                                 <Link
                                                     href={lang === 'pt' ? '/dashboard' : `/${lang}/dashboard`}
                                                     aria-current={isActive(lang === 'pt' ? '/dashboard' : `/${lang}/dashboard`) ? "page" : undefined}
-                                                    className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group ${isActive(lang === 'pt' ? '/dashboard' : `/${lang}/dashboard`) ? 'bg-accent' : ''}`}
+                                                    className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/dashboard' : `/${lang}/dashboard`) ? 'bg-accent' : ''}`}
                                                 >
                                                     <LayoutDashboard className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                     <span className="ms-3">Dashboard</span>
@@ -282,7 +283,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                                 <Link
                                                     href={lang === 'pt' ? '/profile' : `/${lang}/profile`}
                                                     aria-current={isActive(lang === 'pt' ? '/profile' : `/${lang}/profile`) ? "page" : undefined}
-                                                    className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group ${isActive(lang === 'pt' ? '/profile' : `/${lang}/profile`) ? 'bg-accent' : ''}`}
+                                                    className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/profile' : `/${lang}/profile`) ? 'bg-accent' : ''}`}
                                                 >
                                                     <User className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                     <span className="ms-3">Meu Perfil</span>
@@ -290,7 +291,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                             </li>
                                             <li>
                                                 <SignOutButton>
-                                                    <button className="flex w-full items-center rounded-lg p-2 text-foreground hover:bg-red-50 hover:text-red-600 group">
+                                                    <button className="flex w-full items-center rounded-lg p-2 text-foreground hover:bg-red-50 hover:text-red-600 group min-h-[44px]">
                                                         <svg
                                                             className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-red-600"
                                                             aria-hidden="true"
@@ -318,7 +319,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                             <Link
                                                 href={lang === 'pt' ? '/login/proprietario' : `/${lang}/login/proprietario`}
                                                 aria-current={isActive(lang === 'pt' ? '/login/proprietario' : `/${lang}/login/proprietario`) ? "page" : undefined}
-                                                className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group ${isActive(lang === 'pt' ? '/login/proprietario' : `/${lang}/login/proprietario`) ? 'bg-accent' : ''}`}
+                                                className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/login/proprietario' : `/${lang}/login/proprietario`) ? 'bg-accent' : ''}`}
                                             >
                                                 <KeyRound className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                 <span className="ms-3">{dict.menu.owner}</span>
@@ -329,7 +330,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                                 <li>
                                                     <Link
                                                         href={lang === 'pt' ? '/login/corretor' : `/${lang}/login/corretor`}
-                                                        className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                        className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
                                                     >
                                                         <Briefcase className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                         <span className="ms-3">{dict.menu.brokers}</span>
@@ -338,7 +339,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                                 <li>
                                                     <Link
                                                         href={lang === 'pt' ? '/login/imobiliaria' : `/${lang}/login/imobiliaria`}
-                                                        className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                        className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
                                                     >
                                                         <Building2 className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                         <span className="ms-3">{dict.menu.agencies}</span>
@@ -347,7 +348,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                                 <li>
                                                     <Link
                                                         href={lang === 'pt' ? '/login' : `/${lang}/login`}
-                                                        className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                        className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
                                                     >
                                                         <User className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                         <span className="ms-3">{dict.menu.residents}</span>
@@ -356,7 +357,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                                 <li>
                                                     <Link
                                                         href={lang === 'pt' ? '/login/proprietario' : `/${lang}/login/proprietario`}
-                                                        className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                        className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
                                                     >
                                                         <KeyRound className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                         <span className="ms-3">{dict.menu.owners}</span>
@@ -365,7 +366,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                                 <li>
                                                     <Link
                                                         href={lang === 'pt' ? '/login/construtora' : `/${lang}/login/construtora`}
-                                                        className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                        className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
                                                     >
                                                         <HardHat className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                         <span className="ms-3">{dict.menu.developers}</span>
@@ -415,7 +416,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                             <li>
                                                 <Link
                                                     href={lang === 'pt' ? '/calculadoras/imposto-aluguel-pessoa-fisica' : `/${lang}/calculadoras/imposto-aluguel-pessoa-fisica`}
-                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
                                                 >
                                                     <User className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                     <span className="ms-3 text-sm">{dict.menu.rentOnIndividual}</span>
@@ -424,7 +425,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                             <li>
                                                 <Link
                                                     href={lang === 'pt' ? '/calculadoras/aluguel-na-holding' : `/${lang}/calculadoras/aluguel-na-holding`}
-                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
                                                 >
                                                     <Building2 className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                     <span className="ms-3 text-sm">{dict.menu.rentalOnHolding}</span>
@@ -433,7 +434,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                             <li>
                                                 <Link
                                                     href={lang === 'pt' ? '/calculadoras/irpf-2026' : `/${lang}/calculadoras/irpf-2026`}
-                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
                                                 >
                                                     <Calculator className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                     <span className="ms-3 text-sm">{dict.menu.irpf2026}</span>
@@ -442,7 +443,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                             <li>
                                                 <Link
                                                     href={lang === 'pt' ? '/calculadoras/imposto-minimo-altas-rendas' : `/${lang}/calculadoras/imposto-minimo-altas-rendas`}
-                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
                                                 >
                                                     <Gem className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                     <span className="ms-3 text-sm">{dict.menu.highIncomeTax}</span>
@@ -471,7 +472,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                             <li>
                                                 <Link
                                                     href={lang === 'pt' ? '/calculadoras/conversor-juros-mensal-anual' : `/${lang}/calculadoras/conversor-juros-mensal-anual`}
-                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
                                                 >
                                                     <ArrowLeftRight className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                     <span className="ms-3 text-sm">Conversor de Juros Mensal e Anual</span>
@@ -480,7 +481,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                             <li>
                                                 <Link
                                                     href={lang === 'pt' ? '/calculadora-juros-compostos' : `/${lang}/calculadora-juros-compostos`}
-                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
                                                 >
                                                     <TrendingUp className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                     <span className="ms-3 text-sm">Juros Compostos</span>
@@ -489,7 +490,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                             <li>
                                                 <Link
                                                     href={lang === 'pt' ? '/calculadora-independencia-financeira' : `/${lang}/calculadora-independencia-financeira`}
-                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
                                                 >
                                                     <Sun className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                     <span className="ms-3 text-sm">{dict.menu.financialIndependence}</span>
@@ -517,7 +518,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                             <li>
                                                 <Link
                                                     href={lang === 'pt' ? '/calculadora-reajuste-aluguel' : `/${lang}/calculadora-reajuste-aluguel`}
-                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
                                                 >
                                                     <TrendingUp className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                     <span className="ms-3 text-sm">Reajuste de Aluguel</span>
@@ -526,7 +527,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                             <li>
                                                 <Link
                                                     href={lang === 'pt' ? '/calculadoras/multa-atraso-aluguel' : `/${lang}/calculadoras/multa-atraso-aluguel`}
-                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
                                                 >
                                                     <AlertCircle className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                     <span className="ms-3 text-sm">{dict.rentLateFineCalculatorPage?.menuTitle || "Multa por Atraso"}</span>
@@ -535,7 +536,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                             <li>
                                                 <Link
                                                     href={lang === 'pt' ? '/calculadoras/multa-rescisao-contrato-aluguel' : `/${lang}/calculadoras/multa-rescisao-contrato-aluguel`}
-                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
                                                 >
                                                     <FileText className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                     <span className="ms-3 text-sm">{dict.rentFineCalculatorPage?.menuTitle || "Calculadora Rescisão"}</span>
@@ -544,7 +545,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                             <li>
                                                 <Link
                                                     href={lang === 'pt' ? '/calculadoras/aluguel-proporcional' : `/${lang}/calculadoras/aluguel-proporcional`}
-                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
                                                 >
                                                     <Calculator className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                     <span className="ms-3 text-sm">{dict.proRataRentCalculatorPage?.menuTitle || "Aluguel Proporcional"}</span>
@@ -572,7 +573,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                             <li>
                                                 <Link
                                                     href={lang === 'pt' ? '/calculadoras/renda-aluguel' : `/${lang}/calculadoras/renda-aluguel`}
-                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
                                                 >
                                                     <Coins className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                     <span className="ms-3 text-sm">Renda do Aluguel paga o Imóvel?</span>
@@ -581,7 +582,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                             <li>
                                                 <Link
                                                     href={lang === 'pt' ? '/calculadora-amortizacao-financiamento-imobiliario' : `/${lang}/calculadora-amortizacao-financiamento-imobiliario`}
-                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
                                                 >
                                                     <PiggyBank className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                     <span className="ms-3 text-sm">Simulador de Amortização</span>
@@ -606,7 +607,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                 <li>
                                     <Link
                                         href={lang === 'pt' ? '/indices/panorama' : `/${lang}/indices/panorama`}
-                                        className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                        className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
                                     >
                                         <LayoutDashboard className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                         <span className="ms-3 text-sm">Panorama Econômico</span>
@@ -616,7 +617,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                     <li key={code}>
                                         <Link
                                             href={lang === 'pt' ? `/indices/${code.toLowerCase()}` : `/${lang}/indices/${code.toLowerCase()}`}
-                                            className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                            className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
                                         >
                                             <TrendingUp className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                             <span className="ms-3 text-sm">{code === 'IGPM' ? 'IGP-M' : code === 'REAJUSTE-SALARIO-MINIMO' ? 'Salário Mínimo' : code}</span>
@@ -639,7 +640,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                         <li>
                                             <Link
                                                 href={lang === 'pt' ? '/conteudos/impostos-e-legislacao' : `/${lang}/conteudos/impostos-e-legislacao`}
-                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
                                             >
                                                 <FileText className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                 <span className="ms-3 text-sm">{dict.menu.taxesAndLegislation}</span>
@@ -648,7 +649,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: Dictionary }) {
                                         <li>
                                             <Link
                                                 href={lang === 'pt' ? '/conteudos/salario-e-renda' : `/${lang}/conteudos/salario-e-renda`}
-                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group"
+                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
                                             >
                                                 <FileText className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                 <span className="ms-3 text-sm">{dict.menu.salariesAndIncome}</span>

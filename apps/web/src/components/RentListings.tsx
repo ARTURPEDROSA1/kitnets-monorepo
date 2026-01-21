@@ -41,7 +41,7 @@ export function RentListings({ t }: RentListingsProps) {
 
                 const { data, error } = await sb
                     .from('listings')
-                    .select('*')
+                    .select('id, title, location, price, area, bedrooms, bathrooms, parking, photos, type')
                     .eq('intent', 'rent'); // Only rent listings for now
 
                 if (error) {
