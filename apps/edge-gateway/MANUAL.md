@@ -47,7 +47,8 @@ All configuration is managed via the **Web Dashboard** (`http://<IP>:3000`).
 
 ### System Settings
 
-* **Modbus Host**: The IP address of your PLC (e.g., `192.168.1.50`).
+- **Modbus Host**: The IP address of your PLC (e.g., `192.168.1.50`).
+
 - **Poll Interval**: How often to read Modbus registers (default: `1000ms`).
 - **MQTT Broker URL**:
   - **Default**: `mqtt://test.mosquitto.org` (Public test broker).
@@ -57,12 +58,30 @@ All configuration is managed via the **Web Dashboard** (`http://<IP>:3000`).
 ### Meter Configuration
 
 You can add or modify Pulse Meters connected to the PLC.
+
 - **Meter ID**: Unique identifier (e.g., `HIDROMETRO35`).
 - **Display Name**: Friendly name shown on reports.
 - **Pulse Volume**: Liters per pulse (usually `10`).
 - **Registers**: Mosbus register addresses for LSB and MSB.
 - **Physical Offset (m³)**: (New in v1.2) - Enter the initial reading from the physical meter so the digital display matches the real world.
   - ***Note**: Changing Meter settings is applied **INSTANTLY** and does NOT require a service restart.*
+
+### Maintenance (Troubleshooting)
+
+A new **Maintenance** section (orange border) provides tools to fix data issues without using the command line:
+
+1. **Reset Today's Data (Fix Spikes)**:
+    - Use this if you see impossibly high consumption values for the current day (e.g., millions of liters due to a glitch).
+    - **Action**: Deletes today's history from the database and resets the internal "Start of Day" counters to the *current* meter reading.
+    - **Result**: Today's consumption will reset to `0` and start counting fresh from this moment.
+
+2. **Delete ALL Monthly History**:
+    - **Warning**: This action is irreversible.
+    - **Action**: Wipes **ALL** historical monthly records from the database.
+    - **Result**: The "History (Monthly)" charts and tables will be empty until new months are generated.
+
+3. **Restart Service manually**:
+    - Forces the gateway service to reboot. The page will reload after 10 seconds.
 
 ---
 
@@ -97,7 +116,8 @@ The Gateway publishes live consumption data to an MQTT broker. You can subscribe
 
 ### Connection Details
 
-* **Broker**: `test.mosquitto.org` (or your verified custom broker).
+- **Broker**: `test.mosquitto.org` (or your verified custom broker).
+
 - **Port**: `1883` (TCP).
 - **Base Topic**: `kitnets/property_1`
 - **QoS**: 1 (At least once).
