@@ -5,31 +5,37 @@ export default function DataTable() {
     const [meters, setMeters] = useState<any[]>([]);
 
     useEffect(() => {
-        // Fetch config to get meter names/IDs
-        fetch('/api/config').then(r => r.json()).then(d => {
-            setMeters(d.meters);
-        });
+        const load = () => {
+            // Fetch config to get meter names/IDs
+            fetch('/api/config').then(r => r.json()).then(d => {
+                setMeters(d.meters);
+            });
 
-        // Fetch history
-        fetch('/api/history-consolidated/daily').then(r => r.json()).then(d => {
-            // Generate last 30 days
-            const last30: any[] = [];
-            const today = new Date();
+            // Fetch history
+            fetch('/api/history-consolidated/daily').then(r => r.json()).then(d => {
+                // Generate last 30 days
+                const last30: any[] = [];
+                const today = new Date();
 
-            for (let i = 0; i < 30; i++) {
-                const dObj = new Date(today);
-                dObj.setDate(today.getDate() - i);
+                for (let i = 0; i < 30; i++) {
+                    const dObj = new Date(today);
+                    dObj.setDate(today.getDate() - i);
 
-                const year = dObj.getFullYear();
-                const month = String(dObj.getMonth() + 1).padStart(2, '0');
-                const day = String(dObj.getDate()).padStart(2, '0');
-                const dateStr = `${year}-${month}-${day}`;
+                    const year = dObj.getFullYear();
+                    const month = String(dObj.getMonth() + 1).padStart(2, '0');
+                    const day = String(dObj.getDate()).padStart(2, '0');
+                    const dateStr = `${year}-${month}-${day}`;
 
-                const existing = d.find((r: any) => r.date === dateStr);
-                last30.push(existing || { date: dateStr });
-            }
-            setData(last30);
-        });
+                    const existing = d.find((r: any) => r.date === dateStr);
+                    last30.push(existing || { date: dateStr });
+                }
+                setData(last30);
+            });
+        };
+
+        load();
+        const interval = setInterval(load, 300000); // 5 minutes
+        return () => clearInterval(interval);
     }, []);
 
     if (data.length === 0 || meters.length === 0) return <div className="card">Loading data...</div>;
