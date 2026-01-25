@@ -91,7 +91,7 @@ import { saveRuntimeState } from './services/state';
 // Restart Service
 server.post('/api/restart', async (req, reply) => {
     setTimeout(() => {
-        process.exit(0); // Systemd will restart it
+        process.exit(1); // Exit with error code to trigger systemd Restart=on-failure
     }, 1000);
     return { success: true, message: "Restarting..." };
 });
