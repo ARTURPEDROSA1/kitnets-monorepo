@@ -58,7 +58,7 @@ export default function DataTable() {
                     {data.map((row, i) => (
                         <tr key={row.date} style={{ background: i % 2 === 0 ? 'rgba(0,0,0,0.1)' : 'transparent' }}>
                             <td style={{ padding: '0.75rem', borderBottom: '1px solid #333' }}>
-                                {new Date(row.date).toLocaleDateString('pt-BR')}
+                                {row.date.split('-').reverse().join('/')}
                             </td>
                             {meters.map(m => {
                                 const val = row[m.meter_id];
