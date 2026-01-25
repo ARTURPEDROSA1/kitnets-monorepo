@@ -44,10 +44,15 @@ export class ModbusService extends EventEmitter {
     private ensureStartCounters() {
         let changed = false;
         for (const id in this.latestCounters) {
-            if (this.dailyStartCounters[id] === undefined) {
-                // No history found, so "Start of Day" = "Now" (First run behavior)
-                this.dailyStartCounters[id] = this.latestCounters[id];
+            const current = this.latestCounters[id];
+            // Fix: If start counter is missing (undefined) OR if it is zero while current is remarkably high (> 200 pulses),
+            // we assume the start-of-day reference is invalid/lost (e.g. from a bad state load or defaulting to 0).
+            // in this case, we snap 'startOfDay' to 'current' so that we start counting '0' usage from this moment,
+            // rather than reporting the entire lifetime of the meter as 'Today's Consumption'.
+            if (this.dailyStartCounters[id] === undefined || (this.dailyStartCounters[id] === 0 && current > 200)) {
+                this.dailyStartCounters[id] = current;
                 changed = true;
+                console.log(`[Sanity] Snapped Start-of-Day for meter ${id} to current value (${current}) to prevent inflated daily stats.`);
             }
         }
         if (changed) {
