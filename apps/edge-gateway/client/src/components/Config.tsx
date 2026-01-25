@@ -185,6 +185,19 @@ export default function Config() {
                     }}>
                         Reset Today's Data (Fix Spikes)
                     </button>
+                    <button className="danger" onClick={async () => {
+                        if (confirm('Verify: Delete ALL Monthly History? \n\nThis will wipe all historical monthly data from the database. This action cannot be undone.')) {
+                            try {
+                                const res = await fetch('/api/debug/reset-monthly', { method: 'POST' });
+                                const json = await res.json();
+                                alert(json.message || json.error);
+                            } catch (e) {
+                                alert('Request failed');
+                            }
+                        }
+                    }}>
+                        Delete ALL Monthly History
+                    </button>
                     <button className="warning" onClick={restartService}>
                         Restart Service manually
                     </button>

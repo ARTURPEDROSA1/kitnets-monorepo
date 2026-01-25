@@ -119,6 +119,16 @@ server.post('/api/debug/reset-today', async (req, reply) => {
     }
 });
 
+server.post('/api/debug/reset-monthly', async (req, reply) => {
+    try {
+        await db.run("DELETE FROM monthly_consumption");
+        return { success: true, message: "All monthly consumption history deleted." };
+    } catch (e) {
+        server.log.error(e);
+        reply.code(500).send({ error: "Failed to reset monthly data" });
+    }
+});
+
 server.put('/api/config', async (req, reply) => {
     const body = req.body as any;
     try {
