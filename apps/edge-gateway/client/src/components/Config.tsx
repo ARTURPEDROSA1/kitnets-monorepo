@@ -166,6 +166,31 @@ export default function Config() {
                 </div>
             </div>
 
+            <div className="card" style={{ marginBottom: '2rem', borderLeft: '4px solid #f59e0b' }}>
+                <h3>Maintenance</h3>
+                <p style={{ color: '#94a3b8', marginBottom: '1rem' }}>
+                    Use these tools to troubleshoot issues with data or the gateway service.
+                </p>
+                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                    <button className="danger" onClick={async () => {
+                        if (confirm('Verify: Reset Today\'s Data? \n\nThis will clear the history for the current day and assume counting starts from NOW. Use this if you see impossibly high consumption values for today.')) {
+                            try {
+                                const res = await fetch('/api/debug/reset-today', { method: 'POST' });
+                                const json = await res.json();
+                                alert(json.message || json.error);
+                            } catch (e) {
+                                alert('Request failed');
+                            }
+                        }
+                    }}>
+                        Reset Today's Data (Fix Spikes)
+                    </button>
+                    <button className="warning" onClick={restartService}>
+                        Restart Service manually
+                    </button>
+                </div>
+            </div>
+
             <h3>Meters</h3>
             <div className="grid">
                 {config.meters.map((m: any, i: number) => (
