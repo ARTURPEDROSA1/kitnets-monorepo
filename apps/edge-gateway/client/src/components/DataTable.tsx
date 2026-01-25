@@ -12,9 +12,23 @@ export default function DataTable() {
 
         // Fetch history
         fetch('/api/history-consolidated/daily').then(r => r.json()).then(d => {
-            // Sort by date descending and take top 30
-            const sorted = d.sort((a: any, b: any) => b.date.localeCompare(a.date)).slice(0, 30);
-            setData(sorted);
+            // Generate last 30 days
+            const last30: any[] = [];
+            const today = new Date();
+
+            for (let i = 0; i < 30; i++) {
+                const dObj = new Date(today);
+                dObj.setDate(today.getDate() - i);
+
+                const year = dObj.getFullYear();
+                const month = String(dObj.getMonth() + 1).padStart(2, '0');
+                const day = String(dObj.getDate()).padStart(2, '0');
+                const dateStr = `${year}-${month}-${day}`;
+
+                const existing = d.find((r: any) => r.date === dateStr);
+                last30.push(existing || { date: dateStr });
+            }
+            setData(last30);
         });
     }, []);
 

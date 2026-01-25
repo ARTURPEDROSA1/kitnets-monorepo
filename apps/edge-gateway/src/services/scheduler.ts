@@ -37,6 +37,17 @@ export const startScheduler = () => {
 
                 let prevCounter = lastSnapshot ? lastSnapshot.counter_value_end_day : 0;
 
+                if (!lastSnapshot) {
+                    // FIX: If no history, use session start counter to avoid huge spike (First Run)
+                    // If session start is also missing, assume 0 delta (prev = current)
+                    const sessionStart = modbusService.dailyStartCounters[meter.meter_id];
+                    if (sessionStart !== undefined) {
+                        prevCounter = sessionStart;
+                    } else {
+                        prevCounter = currentCounter; // Zero delta for safety
+                    }
+                }
+
                 // Handle Wrap-around (32-bit). Max 4,294,967,295.
                 // If current < prev, likely wrap around.
                 let delta = 0;
