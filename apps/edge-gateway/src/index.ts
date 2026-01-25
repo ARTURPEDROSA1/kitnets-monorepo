@@ -86,12 +86,37 @@ server.put('/api/settings', async (req, reply) => {
     }
 });
 
+import { saveRuntimeState } from './services/state';
+
 // Restart Service
 server.post('/api/restart', async (req, reply) => {
     setTimeout(() => {
         process.exit(0); // Systemd will restart it
     }, 1000);
     return { success: true, message: "Restarting..." };
+});
+
+server.post('/api/debug/reset-today', async (req, reply) => {
+    try {
+        const todayStr = getLocalDateStr();
+
+        // 1. Delete from DB
+        await db.run("DELETE FROM daily_snapshots WHERE date = ?", [todayStr]);
+
+        // 2. Reset In-Memory State
+        modbusService.dailyStartCounters = {};
+
+        // 3. Clear State File
+        saveRuntimeState({});
+
+        // 4. Force immediate re-snap of start counters on next poll
+        // (The polling loop runs every second, so this will happen almost instantly)
+
+        return { success: true, message: `Data for ${todayStr} cleared. Counters will snap to current values on next poll.` };
+    } catch (e) {
+        server.log.error(e);
+        reply.code(500).send({ error: "Failed to reset today's data" });
+    }
 });
 
 server.put('/api/config', async (req, reply) => {
