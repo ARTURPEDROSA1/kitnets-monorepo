@@ -111,8 +111,8 @@ export class DatabaseService {
             });
 
             // Cleanup Anomalies (Fix for "Start of Day" reset bug)
-            // If consumption is > 50,000 Liters in one day, it's definitely an error for these units.
-            this.db.run(`DELETE FROM daily_snapshots WHERE daily_liters > 50000`, (err) => {
+            // If consumption is > 20,000 Liters in one day, it's definitely an error for these units.
+            this.db.run(`DELETE FROM daily_snapshots WHERE daily_liters > 20000`, (err) => {
                 if (!err) console.log("Cleaned up anomalous daily snapshots.");
             });
 
