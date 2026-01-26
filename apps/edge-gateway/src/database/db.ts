@@ -133,44 +133,45 @@ export class DatabaseService {
                 });
                 */
             });
-        }
+        });
+    }
 
-    public get<T>(sql: string, params: any[] = []): Promise < T | undefined > {
-            return new Promise((resolve, reject) => {
-                this.db.get(sql, params, (err, row) => {
-                    if (err) reject(err);
-                    else resolve(row as T);
-                });
+    public get<T>(sql: string, params: any[] = []): Promise<T | undefined> {
+        return new Promise((resolve, reject) => {
+            this.db.get(sql, params, (err, row) => {
+                if (err) reject(err);
+                else resolve(row as T);
             });
-        }
+        });
+    }
 
-    public all<T>(sql: string, params: any[] = []): Promise < T[] > {
-            return new Promise((resolve, reject) => {
-                this.db.all(sql, params, (err, rows) => {
-                    if (err) reject(err);
-                    else resolve(rows as T[]);
-                });
+    public all<T>(sql: string, params: any[] = []): Promise<T[]> {
+        return new Promise((resolve, reject) => {
+            this.db.all(sql, params, (err, rows) => {
+                if (err) reject(err);
+                else resolve(rows as T[]);
             });
-        }
+        });
+    }
 
-    public run(sql: string, params: any[] = []): Promise < { lastID: number, changes: number } > {
-            return new Promise((resolve, reject) => {
-                this.db.run(sql, params, function (err) {
-                    if (err) reject(err);
-                    else resolve({ lastID: this.lastID, changes: this.changes });
-                });
+    public run(sql: string, params: any[] = []): Promise<{ lastID: number, changes: number }> {
+        return new Promise((resolve, reject) => {
+            this.db.run(sql, params, function (err) {
+                if (err) reject(err);
+                else resolve({ lastID: this.lastID, changes: this.changes });
             });
-        }
+        });
+    }
 
-    public healthCheck(): Promise < boolean > {
-            return new Promise((resolve) => {
-                this.db.get("SELECT 1", (err) => {
-                    if (err) resolve(false);
-                    else resolve(true);
-                });
+    public healthCheck(): Promise<boolean> {
+        return new Promise((resolve) => {
+            this.db.get("SELECT 1", (err) => {
+                if (err) resolve(false);
+                else resolve(true);
             });
-        }
+        });
+    }
 }
 
-    const db = new DatabaseService();
+const db = new DatabaseService();
 export default db;
