@@ -18,11 +18,14 @@ export async function POST(request: Request) {
 
         const supabase = createAdminClient();
 
+        // Deduplicate readings in this batch (Postgres upsert fails if batch contains duplicates for the same key)
+        const uniqueReadings = Array.from(new Map(readings.map((r: any) => [`${r.meter_id}_${r.timestamp}`, r])).values());
+
         // 2. Insert Readings
         const { error } = await supabase
             .from('meter_readings')
             .upsert(
-                readings.map((r: any) => ({
+                uniqueReadings.map((r: any) => ({
                     meter_id: r.meter_id,
                     value: r.value,
                     read_at: r.timestamp,
