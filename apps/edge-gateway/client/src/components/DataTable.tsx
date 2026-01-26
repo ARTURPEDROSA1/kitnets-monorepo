@@ -17,7 +17,11 @@ export default function DataTable() {
 
                 // Generate last 30 days
                 const last30: any[] = [];
-                const today = new Date(); // Local
+                // Fix: Force "Today" to be interpreted in Sao Paulo time
+                const now = new Date();
+                // Get the date string in SP time, then parse it back to a Date object that effectively represents that local time
+                const spDateStr = now.toLocaleDateString('en-US', { timeZone: 'America/Sao_Paulo' });
+                const today = new Date(spDateStr);
 
                 for (let i = 0; i < 30; i++) {
                     const dObj = new Date(today);
