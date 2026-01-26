@@ -6,16 +6,18 @@ export default function DataTable() {
 
     useEffect(() => {
         const load = () => {
-            // Fetch config to get meter names/IDs
-            fetch('/api/config').then(r => r.json()).then(d => {
-                setMeters(d.meters);
-            });
+            // Fetch Config, History, and Dashboard in parallel
+            Promise.all([
+                fetch('/api/config').then(r => r.json()),
+                fetch('/api/history-consolidated/daily').then(r => r.json()),
+                fetch('/api/dashboard').then(r => r.json())
+            ]).then(([configData, historyData, dashboardData]) => {
+                const currentMeters = configData.meters;
+                setMeters(currentMeters);
 
-            // Fetch history
-            fetch('/api/history-consolidated/daily').then(r => r.json()).then(d => {
                 // Generate last 30 days
                 const last30: any[] = [];
-                const today = new Date();
+                const today = new Date(); // Local
 
                 for (let i = 0; i < 30; i++) {
                     const dObj = new Date(today);
@@ -26,8 +28,25 @@ export default function DataTable() {
                     const day = String(dObj.getDate()).padStart(2, '0');
                     const dateStr = `${year}-${month}-${day}`;
 
-                    const existing = d.find((r: any) => r.date === dateStr);
-                    last30.push(existing || { date: dateStr });
+                    let row = historyData.find((r: any) => r.date === dateStr);
+
+                    // If today, try to use live data if history is missing or empty
+                    if (i === 0 && dashboardData && dashboardData.meters) {
+                        const liveRow: any = { date: dateStr };
+                        let hasLive = false;
+                        currentMeters.forEach((m: any) => {
+                            if (dashboardData.meters[m.meter_id]) {
+                                liveRow[m.meter_id] = dashboardData.meters[m.meter_id].daily_liters;
+                                hasLive = true;
+                            }
+                        });
+                        // Prefer live data for today
+                        if (hasLive) {
+                            row = { ...row, ...liveRow };
+                        }
+                    }
+
+                    last30.push(row || { date: dateStr });
                 }
                 setData(last30);
             });
