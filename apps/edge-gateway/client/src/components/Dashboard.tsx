@@ -31,7 +31,9 @@ export default function Dashboard() {
     const handleForceSync = async () => {
         if (!confirm('Sync now?')) return;
         try {
-            await fetch('/api/debug/force-sync', { method: 'POST' });
+            const res = await fetch('/api/debug/force-sync', { method: 'POST' });
+            const json = await res.json();
+            alert(`Result: ${json.last_result}\nMessage: ${json.message}`);
             // Refresh data to show updated sync status
             fetchData();
         } catch (e) {
