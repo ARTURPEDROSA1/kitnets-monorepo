@@ -484,7 +484,9 @@ server.get('/api/dashboard', async (req, reply) => {
             yesterday_liters,
             month_m3,
             prev_month_m3
-        }
+        },
+        last_sync: syncService.lastSyncSuccess,
+        last_sync_result: syncService.lastSyncResult
     };
 });
 
