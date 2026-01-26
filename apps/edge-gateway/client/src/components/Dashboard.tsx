@@ -45,6 +45,9 @@ export default function Dashboard() {
                             <span className={`status-badge status-${(data as any).db_status === 'OK' ? 'ok' : 'down'}`}>
                                 DB: {(data as any).db_status || 'Checking...'}
                             </span>
+                            <span className={`status-badge status-${(data as any).last_sync ? 'ok' : 'waiting'}`} title={(data as any).last_sync || 'No sync since boot'}>
+                                SYNC: {(data as any).last_sync ? 'OK' : 'WAIT'}
+                            </span>
                         </div>
                         <div>
                             <small className="text-muted" style={{ display: 'block' }}>
@@ -53,6 +56,11 @@ export default function Dashboard() {
                             <small className="text-muted" style={{ display: 'block' }}>
                                 Started: {uptime ? new Date(Date.now() - (uptime * 1000)).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : 'Loading...'}
                             </small>
+                            {(data as any).last_sync && (
+                                <small className="text-muted" style={{ display: 'block', color: 'var(--accent)' }}>
+                                    Last Sync: {new Date((data as any).last_sync).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
+                                </small>
+                            )}
                         </div>
                     </div>
                 </div>

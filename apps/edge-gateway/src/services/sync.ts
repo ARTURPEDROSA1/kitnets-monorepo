@@ -13,6 +13,9 @@ export const syncService = {
     apiUrl: 'https://kitnets.com/api/gateways/ingest', // Production URL
     token: process.env.GATEWAY_INGEST_KEY || 'MISSING_KEY',
 
+    // State
+    lastSyncSuccess: null as string | null,
+
     /**
      * Enqueues a reading to be synced.
      */
@@ -67,6 +70,7 @@ export const syncService = {
                 const ids = batch.map(r => r.id).join(',');
                 await db.run(`DELETE FROM readings_queue WHERE id IN (${ids})`);
                 console.log(`[Sync] Successfully synced ${batch.length} readings.`);
+                this.lastSyncSuccess = new Date().toISOString();
             } else {
                 console.error(`[Sync] Failed: ${response.status} ${response.statusText}`);
                 // Increment retry count ? (Optional, currently just stays in queue)

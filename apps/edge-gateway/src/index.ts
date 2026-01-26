@@ -49,7 +49,8 @@ server.get('/api/health', async (request, reply) => {
         uptime: process.uptime(),
         build_id: BUILD_ID,
         modbus_last_update: modbusService.lastUpdate,
-        digital_input: modbusService.digitalInputRegisterValue
+        digital_input: modbusService.digitalInputRegisterValue,
+        last_sync: syncService.lastSyncSuccess
     };
 });
 
