@@ -48,10 +48,10 @@ export default function Dashboard() {
                         </div>
                         <div>
                             <small className="text-muted" style={{ display: 'block' }}>
-                                Last Update: {new Date(last_update).toLocaleTimeString()}
+                                Last Update: {new Date(last_update).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
                             </small>
                             <small className="text-muted" style={{ display: 'block' }}>
-                                Started: {uptime ? new Date(Date.now() - (uptime * 1000)).toLocaleString() : 'Loading...'}
+                                Started: {uptime ? new Date(Date.now() - (uptime * 1000)).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : 'Loading...'}
                             </small>
                         </div>
                     </div>
