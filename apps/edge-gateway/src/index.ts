@@ -9,6 +9,7 @@ import { mqttService } from './services/mqtt';
 import { startScheduler } from './services/scheduler';
 import { getLocalDateStr } from "./utils/date";
 import db from './database/db';
+import { syncService } from './services/sync';
 import { MeterConfig } from './types';
 
 const server = Fastify({
@@ -78,7 +79,16 @@ server.put('/api/settings', async (req, reply) => {
     try {
         if (body.MODBUS_HOST) await db.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', ['MODBUS_HOST', body.MODBUS_HOST]);
         if (body.POLL_INTERVAL_MS) await db.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', ['POLL_INTERVAL_MS', String(body.POLL_INTERVAL_MS)]);
-        if (body.MQTT_BROKER_URL) await db.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', ['MQTT_BROKER_URL', body.MQTT_BROKER_URL]);
+        // if (body.MQTT_BROKER_URL) await db.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', ['MQTT_BROKER_URL', body.MQTT_BROKER_URL]); // Deprecated
+
+        // Cloud Sync Persistence
+        if (body.cloud_sync) {
+            if (body.cloud_sync.ingestionApiUrl)
+                await db.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', ['cloud_sync_ingestionApiUrl', body.cloud_sync.ingestionApiUrl]);
+            if (body.cloud_sync.gatewayToken)
+                await db.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', ['cloud_sync_gatewayToken', body.cloud_sync.gatewayToken]);
+            // if (body.cloud_sync.syncIntervalMinutes) ...
+        }
 
         return { success: true };
     } catch (e) {
@@ -462,7 +472,12 @@ const start = async () => {
         settings.forEach(row => {
             if (row.key === 'MODBUS_HOST') CONFIG.MODBUS.HOST = row.value;
             if (row.key === 'POLL_INTERVAL_MS') CONFIG.MODBUS.POLL_INTERVAL_MS = parseInt(row.value);
-            if (row.key === 'MQTT_BROKER_URL') CONFIG.MQTT.BROKER_URL = row.value;
+            // if (row.key === 'MQTT_BROKER_URL') CONFIG.MQTT.BROKER_URL = row.value; // Deprecated
+
+            // Cloud Sync Settings
+            if (row.key === 'cloud_sync_ingestionApiUrl') syncService.apiUrl = row.value;
+            if (row.key === 'cloud_sync_gatewayToken') syncService.token = row.value;
+            // if (row.key === 'cloud_sync_syncIntervalMinutes') ... (use raw query in scheduler if needed or export vars)
         });
 
         console.log("Starting with Config:", JSON.stringify(CONFIG, null, 2));
