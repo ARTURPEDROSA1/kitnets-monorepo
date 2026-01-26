@@ -61,10 +61,17 @@ server.get('/api/config', async (req, reply) => {
     // Merge DB settings into the CONFIG object for display
     const mergedConfig = JSON.parse(JSON.stringify(CONFIG)); // Deep copy defaults
 
+    // Initialize Cloud Sync config structure if missing
+    if (!mergedConfig.cloud_sync) mergedConfig.cloud_sync = {};
+
     systemRows.forEach(row => {
         if (row.key === 'MODBUS_HOST') mergedConfig.MODBUS.HOST = row.value;
         if (row.key === 'POLL_INTERVAL_MS') mergedConfig.MODBUS.POLL_INTERVAL_MS = parseInt(row.value);
         if (row.key === 'MQTT_BROKER_URL') mergedConfig.MQTT.BROKER_URL = row.value;
+
+        // Cloud Sync Read
+        if (row.key === 'cloud_sync_ingestionApiUrl') mergedConfig.cloud_sync.ingestionApiUrl = row.value;
+        if (row.key === 'cloud_sync_gatewayToken') mergedConfig.cloud_sync.gatewayToken = row.value;
     });
 
     return {
