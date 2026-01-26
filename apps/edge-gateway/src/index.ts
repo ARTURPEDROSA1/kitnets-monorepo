@@ -1,3 +1,4 @@
+process.env.TZ = 'America/Sao_Paulo';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import staticFiles from '@fastify/static';

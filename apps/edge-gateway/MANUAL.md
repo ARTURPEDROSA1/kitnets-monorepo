@@ -55,21 +55,6 @@ All configuration is managed via the **Web Dashboard** (`http://<IP>:3000`).
   - **Custom**: You can enter your own broker URL (e.g., `mqtt://192.168.1.10:1883` or a cloud URL).
   - ***Note**: Changing System Settings requires a restart (prompted automatically).*
 
-### Meter Configuration
-
-You can add or modify Pulse Meters connected to the PLC.
-
-- **Meter ID**: Unique identifier (e.g., `HIDROMETRO35`).
-- **Display Name**: Friendly name shown on reports.
-- **Pulse Volume**: Liters per pulse (usually `10`).
-- **Registers**: Mosbus register addresses for LSB and MSB.
-- **Physical Offset (m³)**: (New in v1.2) - Enter the initial reading from the physical meter so the digital display matches the real world.
-  - ***Note**: Changing Meter settings is applied **INSTANTLY** and does NOT require a service restart.*
-
-### Maintenance (Troubleshooting)
-
-A new **Maintenance** section (orange border) provides tools to fix data issues without using the command line:
-
 1. **Reset Today's Data (Fix Spikes)**:
     - Use this if you see impossibly high consumption values for the current day (e.g., millions of liters due to a glitch).
     - **Action**: Deletes today's history from the database and resets the internal "Start of Day" counters to the *current* meter reading.

@@ -4,6 +4,8 @@ import { mqttService } from './mqtt';
 import db from '../database/db';
 import { DailySnapshot, MeterConfig } from '../types';
 
+import { getLocalDateStr } from '../utils/date';
+
 export const startScheduler = () => {
     // Scheduler for V1.2
 
@@ -22,61 +24,7 @@ export const startScheduler = () => {
     // Daily processing at 23:59
     cron.schedule('59 23 * * *', async () => {
         console.log("Running daily processing...");
-        try {
-            const meters = await db.all<MeterConfig>('SELECT * FROM meter_config WHERE enabled = 1');
-            const today = new Date().toISOString().split('T')[0];
-
-            for (const meter of meters) {
-                const currentCounter = modbusService.latestCounters[meter.meter_id] || 0;
-
-                // Get previous day snapshot to calc delta
-                const lastSnapshot = await db.get<DailySnapshot>(
-                    `SELECT * FROM daily_snapshots WHERE meter_id = ? ORDER BY date DESC LIMIT 1`,
-                    [meter.meter_id]
-                );
-
-                let prevCounter = lastSnapshot ? lastSnapshot.counter_value_end_day : 0;
-
-                if (!lastSnapshot) {
-                    // FIX: If no history, use session start counter to avoid huge spike (First Run)
-                    // If session start is also missing, assume 0 delta (prev = current)
-                    const sessionStart = modbusService.dailyStartCounters[meter.meter_id];
-                    if (sessionStart !== undefined) {
-                        prevCounter = sessionStart;
-                    } else {
-                        prevCounter = currentCounter; // Zero delta for safety
-                    }
-                }
-
-                // Handle Wrap-around (32-bit). Max 4,294,967,295.
-                // If current < prev, likely wrap around.
-                let delta = 0;
-                if (currentCounter >= prevCounter) {
-                    delta = currentCounter - prevCounter;
-                } else {
-                    // Wrap around
-                    delta = (4294967295 - prevCounter) + currentCounter + 1;
-                }
-
-                const liters = delta * meter.pulse_volume_liters;
-
-                // Insert snapshot
-                await db.run(
-                    `INSERT INTO daily_snapshots (meter_id, date, counter_value_end_day, counter_value_prev_day, delta_pulses, daily_liters) 
-                     VALUES (?, ?, ?, ?, ?, ?)`,
-                    [meter.meter_id, today, currentCounter, prevCounter, delta, liters]
-                );
-
-                // Publish MQTT
-                mqttService.publishDaily(meter.meter_id, {
-                    date: today,
-                    liters,
-                    counter: currentCounter
-                });
-            }
-        } catch (e) {
-            console.error("Daily processing failed:", e);
-        }
+        await runDailyProcessing();
     });
 
     // Monthly Processing: 00:01 1st day of month
@@ -159,4 +107,87 @@ export const startScheduler = () => {
         }
     });
 
+    // STARTUP CHECK: Did we miss yesterday's close due to downtime/timezone bugs?
+    setTimeout(async () => {
+        try {
+            const today = new Date();
+            const yesterday = new Date(today);
+            yesterday.setDate(today.getDate() - 1);
+            const yesterdayStr = getLocalDateStr(yesterday);
+
+            // Check if we have data for yesterday
+            const hasData = await db.get(`SELECT 1 FROM daily_snapshots WHERE date = ?`, [yesterdayStr]);
+
+            if (!hasData) {
+                console.log(`[Startup] Missing daily snapshot for ${yesterdayStr}. Running catch-up logic...`);
+
+                // 1. Force "End of Day" snapshot relative to NOW (Best Effort)
+                await runDailyProcessing(yesterdayStr);
+
+                // 2. Reset "Start of Day" counters to current values so "Today" starts fresh
+                console.log("[Startup] Resetting daily start counters to current values.");
+                const meters = await db.all<MeterConfig>('SELECT * FROM meter_config WHERE enabled = 1');
+                for (const m of meters) {
+                    const current = modbusService.latestCounters[m.meter_id];
+                    if (current !== undefined) {
+                        modbusService.dailyStartCounters[m.meter_id] = current;
+                    }
+                }
+            }
+        } catch (e) {
+            console.error("[Startup] Failed to run catch-up logic:", e);
+        }
+    }, 10000); // Run 10s after boot to ensure Modbus has first poll
 };
+
+// Extracted Daily Processing Function (Reusable)
+async function runDailyProcessing(customDateStr?: string) {
+    try {
+        const meters = await db.all<MeterConfig>('SELECT * FROM meter_config WHERE enabled = 1');
+        const dateStr = customDateStr || getLocalDateStr();
+
+        for (const meter of meters) {
+            const currentCounter = modbusService.latestCounters[meter.meter_id] || 0;
+
+            const lastSnapshot = await db.get<DailySnapshot>(
+                `SELECT * FROM daily_snapshots WHERE meter_id = ? ORDER BY date DESC LIMIT 1`,
+                [meter.meter_id]
+            );
+
+            let prevCounter = lastSnapshot ? lastSnapshot.counter_value_end_day : 0;
+
+            if (!lastSnapshot) {
+                const sessionStart = modbusService.dailyStartCounters[meter.meter_id];
+                if (sessionStart !== undefined) {
+                    prevCounter = sessionStart;
+                } else {
+                    prevCounter = currentCounter;
+                }
+            }
+
+            let delta = 0;
+            if (currentCounter >= prevCounter) {
+                delta = currentCounter - prevCounter;
+            } else {
+                delta = (4294967295 - prevCounter) + currentCounter + 1;
+            }
+
+            const liters = delta * meter.pulse_volume_liters;
+
+            await db.run(
+                `INSERT OR REPLACE INTO daily_snapshots (meter_id, date, counter_value_end_day, counter_value_prev_day, delta_pulses, daily_liters) 
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [meter.meter_id, dateStr, currentCounter, prevCounter, delta, liters]
+            );
+
+            mqttService.publishDaily(meter.meter_id, {
+                date: dateStr,
+                liters,
+                counter: currentCounter
+            });
+        }
+        console.log(`Daily processing completed for ${dateStr}`);
+    } catch (e) {
+        console.error("Daily processing failed:", e);
+    }
+}

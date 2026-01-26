@@ -117,9 +117,12 @@ export class DatabaseService {
             });
 
             // Cleanup Future Dates (Fix for UTC/Local mismatch)
+            // Cleanup Future Dates - DISABLED (Caused data loss due to UTC/Local mismatch)
+            /*
             this.db.run(`DELETE FROM daily_snapshots WHERE date > date('now', 'localtime')`, (err) => {
                 if (!err) console.log("Cleaned up future daily snapshots.");
             });
+            */
         });
     }
 
