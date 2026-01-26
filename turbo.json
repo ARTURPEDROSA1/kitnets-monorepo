@@ -3,6 +3,12 @@
     "globalDependencies": [
         "**/.env.*local"
     ],
+    "globalEnv": [
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "GATEWAY_INGEST_KEY",
+        "CLERK_SECRET_KEY",
+        "EXT_PUBLIC_CLERK_SIGN_IN_URL"
+    ],
     "tasks": {
         "build": {
             "dependsOn": [
