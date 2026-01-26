@@ -50,7 +50,8 @@ server.get('/api/health', async (request, reply) => {
         build_id: BUILD_ID,
         modbus_last_update: modbusService.lastUpdate,
         digital_input: modbusService.digitalInputRegisterValue,
-        last_sync: syncService.lastSyncSuccess
+        last_sync: syncService.lastSyncSuccess,
+        last_sync_result: syncService.lastSyncResult
     };
 });
 

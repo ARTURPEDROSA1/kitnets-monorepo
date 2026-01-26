@@ -15,6 +15,7 @@ export const syncService = {
 
     // State
     lastSyncSuccess: null as string | null,
+    lastSyncResult: 'Idle' as string, // Debug info
 
     /**
      * Enqueues a reading to be synced.
@@ -35,6 +36,7 @@ export const syncService = {
      */
     async processQueue() {
         if (!this.token || this.token === 'MISSING_KEY') {
+            this.lastSyncResult = 'Error: No Gateway Token configured';
             console.warn('[Sync] No Ingest Key configured. Skipping sync.');
             return;
         }
@@ -45,7 +47,10 @@ export const syncService = {
                 `SELECT * FROM readings_queue ORDER BY created_at ASC LIMIT 50`
             );
 
-            if (batch.length === 0) return; // Empty queue
+            if (batch.length === 0) {
+                // this.lastSyncResult = 'Queue Empty'; // Too verbose to update every time?
+                return;
+            }
 
             console.log(`[Sync] Processing ${batch.length} readings...`);
 
@@ -71,11 +76,14 @@ export const syncService = {
                 await db.run(`DELETE FROM readings_queue WHERE id IN (${ids})`);
                 console.log(`[Sync] Successfully synced ${batch.length} readings.`);
                 this.lastSyncSuccess = new Date().toISOString();
+                this.lastSyncResult = `Success: Sent ${batch.length} items`;
             } else {
+                const text = await response.text();
+                this.lastSyncResult = `Failed: ${response.status} ${response.statusText} - ${text.substring(0, 50)}`;
                 console.error(`[Sync] Failed: ${response.status} ${response.statusText}`);
-                // Increment retry count ? (Optional, currently just stays in queue)
             }
         } catch (e) {
+            this.lastSyncResult = `Network Error: ${String(e)}`;
             console.error('[Sync] Network/Logic Error:', e);
         }
     }
