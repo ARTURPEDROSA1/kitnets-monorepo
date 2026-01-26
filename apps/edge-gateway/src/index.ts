@@ -148,6 +148,58 @@ server.put('/api/config', async (req, reply) => {
     }
 });
 
+server.post('/api/debug/fix-data-glitch', async (req, reply) => {
+    try {
+        console.log("Running Fix Data Glitch...");
+        const today = getLocalDateStr(); // 2026-01-26
+        const yesterdayDate = new Date();
+        yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+        const yesterday = getLocalDateStr(yesterdayDate); // 2026-01-25
+
+        const meters = await db.all<MeterConfig>('SELECT * FROM meter_config WHERE enabled = 1');
+
+        for (const m of meters) {
+            const current = modbusService.latestCounters[m.meter_id];
+            if (current === undefined) continue;
+
+            const startOfDay = modbusService.dailyStartCounters[m.meter_id] || current; // The "Bad" start point (yesterday)
+
+            // Calculate the "glitched" consumption (includes yesterday's usage)
+            let delta = 0;
+            if (current >= startOfDay) delta = current - startOfDay;
+            else delta = (4294967295 - startOfDay) + current + 1;
+
+            const liters = delta * m.pulse_volume_liters;
+
+            // If consumption is significant (> 10L), assume it belongs to yesterday
+            // We move everything to yesterday and start fresh.
+
+            if (liters > 10) {
+                // 1. Add to Yesterday's DB Record
+                await db.run(
+                    `UPDATE daily_snapshots 
+                     SET daily_liters = daily_liters + ?, 
+                         counter_value_end_day = ?, 
+                         delta_pulses = delta_pulses + ?
+                     WHERE meter_id = ? AND date = ?`,
+                    [liters, current, delta, m.meter_id, yesterday]
+                );
+
+                // 2. Reset "Today" to start from NOW
+                modbusService.dailyStartCounters[m.meter_id] = current;
+            }
+        }
+
+        // Persist the new "Start of Day"
+        saveRuntimeState(modbusService.dailyStartCounters);
+
+        return { success: true, message: "Fixed: Moved 'Today's' consumption to 'Yesterday' and reset counters." };
+    } catch (e) {
+        server.log.error(e);
+        return { success: false, error: "Failed to fix data." };
+    }
+});
+
 server.get('/api/meters/:id/daily', async (req: any, reply) => {
     const { id } = req.params;
     const history = await db.all<any>('SELECT * FROM daily_snapshots WHERE meter_id = ? ORDER BY date DESC LIMIT 365', [id]);
