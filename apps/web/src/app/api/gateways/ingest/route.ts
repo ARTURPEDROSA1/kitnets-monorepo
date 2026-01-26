@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '../../../../../utils/supabase/admin';
+import { createAdminClient } from '../../../../utils/supabase/admin';
 
 export async function POST(request: Request) {
     // 1. Authenticate the Gateway
