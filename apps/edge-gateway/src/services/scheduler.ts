@@ -26,49 +26,21 @@ export const startScheduler = () => {
     cron.schedule('59 23 * * *', async () => {
         console.log("Running daily processing...");
         await runDailyProcessing();
+
+        // Update Monthly Stats for CURRENT month immediately after daily close (V1.4)
+        console.log("Running monthly aggregation update...");
+        await runMonthlyProcessing();
     });
 
-    // Monthly Processing: 00:01 1st day of month
+    // Monthly Processing: 00:01 1st day of month (Legacy/Backup - mostly redundant now)
     cron.schedule('1 0 1 * *', async () => {
-        console.log("Running monthly processing...");
-        try {
-            const meters = await db.all<MeterConfig>('SELECT * FROM meter_config WHERE enabled = 1');
-            const now = new Date();
-            // We want the *previous* month.
-            const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-            const year = prevMonthDate.getFullYear();
-            const month = prevMonthDate.getMonth() + 1; // 1-12
-
-            const monthStr = `${year}-${String(month).padStart(2, '0')}`;
-
-            for (const meter of meters) {
-                const res = await db.get<{ sum_liters: number, count: number }>(
-                    `SELECT sum(daily_liters) as sum_liters, count(*) as count FROM daily_snapshots WHERE meter_id = ? AND date LIKE ?`,
-                    [meter.meter_id, `${monthStr}%`]
-                );
-
-                const monthlyLiters = res?.sum_liters || 0;
-                const monthlyM3 = monthlyLiters / 1000;
-                const count = res?.count || 0;
-
-                await db.run(
-                    `INSERT INTO monthly_consumption (meter_id, year, month, monthly_liters, monthly_m3, source_days_count)
-                     VALUES (?, ?, ?, ?, ?, ?)
-                     ON CONFLICT(meter_id, year, month) DO UPDATE SET monthly_liters=excluded.monthly_liters, monthly_m3=excluded.monthly_m3`,
-                    [meter.meter_id, year, month, monthlyLiters, monthlyM3, count]
-                );
-
-                /*
-                mqttService.publishMonthly(meter.meter_id, {
-                    year, month,
-                    monthlyLiters,
-                    monthlyM3
-                });
-                */
-            }
-        } catch (e) {
-            console.error("Monthly processing failed:", e);
-        }
+        // Redundant with daily runner, but can act as final check for PREVIOUS month?
+        // Actually, if we run it on the 1st, we want the PREVIOUS month.
+        // Let's keep it but use the shared function for the previous month.
+        console.log("Running monthly finalization...");
+        const now = new Date();
+        const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        await runMonthlyProcessing(prevMonthDate);
     });
     // Live Data Publishing (Every 2 minutes) V1.2
     cron.schedule('*/2 * * * *', async () => {
@@ -188,17 +160,43 @@ async function runDailyProcessing(customDateStr?: string) {
                  VALUES (?, ?, ?, ?, ?, ?)`,
                 [meter.meter_id, dateStr, currentCounter, prevCounter, delta, liters]
             );
-
-            /*
-            mqttService.publishDaily(meter.meter_id, {
-                date: dateStr,
-                liters,
-                counter: currentCounter
-            });
-            */
         }
         console.log(`Daily processing completed for ${dateStr}`);
     } catch (e) {
         console.error("Daily processing failed:", e);
+    }
+}
+
+// NEW: Monthly Aggregation Function (Runs Daily to keep Month-to-Date up to date)
+async function runMonthlyProcessing(targetDate?: Date) {
+    try {
+        const meters = await db.all<MeterConfig>('SELECT * FROM meter_config WHERE enabled = 1');
+        const now = targetDate || new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1; // 1-12
+
+        const monthStr = `${year}-${String(month).padStart(2, '0')}`;
+
+        for (const meter of meters) {
+            // Aggregate all DAILY snapshots for this month so far
+            const res = await db.get<{ sum_liters: number, count: number }>(
+                `SELECT sum(daily_liters) as sum_liters, count(*) as count FROM daily_snapshots WHERE meter_id = ? AND date LIKE ?`,
+                [meter.meter_id, `${monthStr}%`]
+            );
+
+            const monthlyLiters = res?.sum_liters || 0;
+            const monthlyM3 = monthlyLiters / 1000;
+            const count = res?.count || 0;
+
+            await db.run(
+                `INSERT INTO monthly_consumption (meter_id, year, month, monthly_liters, monthly_m3, source_days_count)
+                 VALUES (?, ?, ?, ?, ?, ?)
+                 ON CONFLICT(meter_id, year, month) DO UPDATE SET monthly_liters=excluded.monthly_liters, monthly_m3=excluded.monthly_m3, source_days_count=excluded.source_days_count, created_at=CURRENT_TIMESTAMP`,
+                [meter.meter_id, year, month, monthlyLiters, monthlyM3, count]
+            );
+        }
+        console.log(`Monthly aggregation updated for ${monthStr}`);
+    } catch (e) {
+        console.error("Monthly aggregation failed:", e);
     }
 }
