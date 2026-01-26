@@ -29,7 +29,7 @@ export async function POST(request: Request) {
                     meter_id: r.meter_id,
                     value: r.value,
                     read_at: r.timestamp,
-                    // synced_at defaults to NOW()
+                    synced_at: new Date().toISOString()
                 })),
                 { onConflict: 'meter_id, read_at' } // Idempotency
             );
