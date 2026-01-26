@@ -61,6 +61,11 @@ export default function Dashboard() {
                                     Last Sync: {new Date((data as any).last_sync).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
                                 </small>
                             )}
+                            {(data as any).last_sync_result && (data as any).last_sync_result !== 'Idle' && (
+                                <small className="text-muted" style={{ display: 'block', color: (data as any).last_sync_result.startsWith('Success') ? '#4ade80' : '#f87171' }}>
+                                    {(data as any).last_sync_result}
+                                </small>
+                            )}
                         </div>
                     </div>
                 </div>
