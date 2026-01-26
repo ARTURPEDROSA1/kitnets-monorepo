@@ -219,6 +219,21 @@ server.post('/api/debug/fix-data-glitch', async (req, reply) => {
     }
 });
 
+server.post('/api/debug/force-sync', async (req, reply) => {
+    try {
+        console.log("Forcing manual sync...");
+        await syncService.processQueue();
+        return {
+            success: true,
+            message: "Sync triggered.",
+            last_result: syncService.lastSyncResult
+        };
+    } catch (e) {
+        server.log.error(e);
+        reply.code(500).send({ error: "Failed to trigger sync" });
+    }
+});
+
 server.get('/api/meters/:id/daily', async (req: any, reply) => {
     const { id } = req.params;
     const history = await db.all<any>('SELECT * FROM daily_snapshots WHERE meter_id = ? ORDER BY date DESC LIMIT 365', [id]);

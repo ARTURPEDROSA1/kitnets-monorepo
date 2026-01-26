@@ -28,6 +28,18 @@ export default function Dashboard() {
         return () => clearInterval(interval);
     }, []);
 
+    const handleForceSync = async () => {
+        if (!confirm('Sync now?')) return;
+        try {
+            await fetch('/api/debug/force-sync', { method: 'POST' });
+            // Refresh data to show updated sync status
+            fetchData();
+        } catch (e) {
+            console.error("Force sync failed", e);
+            alert("Sync failed error");
+        }
+    };
+
     if (!data) return <div className="card">Loading...</div>;
 
     const { gateway_status, digital_input, meters, last_update, uptime } = data;
@@ -36,7 +48,23 @@ export default function Dashboard() {
         <div className="dashboard">
             <div className="grid" style={{ marginBottom: '2rem' }}>
                 <div className="card">
-                    <h3>Gateway Health</h3>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <h3>Gateway Health</h3>
+                        <button
+                            onClick={handleForceSync}
+                            style={{
+                                background: 'transparent',
+                                border: '1px solid var(--accent)',
+                                color: 'var(--accent)',
+                                padding: '0.25rem 0.5rem',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '0.8rem'
+                            }}
+                        >
+                            Force Sync
+                        </button>
+                    </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '1rem' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                             <span className={`status-badge status-${gateway_status === 'HEALTHY' ? 'ok' : 'down'}`}>
