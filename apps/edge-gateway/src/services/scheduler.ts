@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import { modbusService } from './modbus';
-import { mqttService } from './mqtt';
+// import { mqttService } from './mqtt'; // DEPRECATED: Replaced by syncService
+import { syncService } from './sync';
 import db from '../database/db';
 import { DailySnapshot, MeterConfig } from '../types';
 
@@ -57,11 +58,13 @@ export const startScheduler = () => {
                     [meter.meter_id, year, month, monthlyLiters, monthlyM3, count]
                 );
 
+                /*
                 mqttService.publishMonthly(meter.meter_id, {
                     year, month,
                     monthlyLiters,
                     monthlyM3
                 });
+                */
             }
         } catch (e) {
             console.error("Monthly processing failed:", e);
@@ -92,19 +95,25 @@ export const startScheduler = () => {
                 const offset = m.physical_meter_offset_m3 || 0;
                 const effective_m3 = offset + raw_m3;
 
-                mqttService.publishLive(m.meter_id, {
-                    meter: m.meter_id,
-                    timestamp: now.toISOString(),
-                    pulse_count: current,
-                    raw_gateway_m3: raw_m3,
-                    offset_m3: offset,
-                    effective_m3: effective_m3,
-                    daily_liters_so_far: dailyLiters
-                });
+                // NEW: Store-and-Forward Queue (Replaces MQTT Live Publish)
+                // We queue the READING, not the calculated Liters/M3 (let backend handle raw data logic if possible, 
+                // but for now we follow the "effective" logic if the API expects raw counter).
+                // Actually, the API we built expects { meter_id, value (counter), timestamp }
+
+                await syncService.enqueue(m.meter_id, current, now.toISOString());
+                /*
+                deprecated: mqttService.publishLive
+                */
             }
         } catch (e) {
             console.error("Live publish failed", e);
         }
+    });
+
+    // SYNC JOB (Store-and-Forward Upload) - V1.3
+    cron.schedule('*/5 * * * *', async () => {
+        // Runs every 5 minutes
+        await syncService.processQueue();
     });
 
     // STARTUP CHECK: Did we miss yesterday's close due to downtime/timezone bugs?
@@ -180,11 +189,13 @@ async function runDailyProcessing(customDateStr?: string) {
                 [meter.meter_id, dateStr, currentCounter, prevCounter, delta, liters]
             );
 
+            /*
             mqttService.publishDaily(meter.meter_id, {
                 date: dateStr,
                 liters,
                 counter: currentCounter
             });
+            */
         }
         console.log(`Daily processing completed for ${dateStr}`);
     } catch (e) {

@@ -31,7 +31,8 @@ export default function Config() {
                 body: JSON.stringify({
                     MODBUS_HOST: config.config.MODBUS.HOST,
                     POLL_INTERVAL_MS: config.config.MODBUS.POLL_INTERVAL_MS,
-                    MQTT_BROKER_URL: config.config.MQTT.BROKER_URL
+                    cloud_sync: config.config.cloud_sync, // Sync Settings
+                    // MQTT: null // Removing MQTT
                 })
             });
 
@@ -39,7 +40,7 @@ export default function Config() {
             const systemChanged =
                 config.config.MODBUS.HOST !== initialSystemConfig.MODBUS.HOST ||
                 config.config.MODBUS.POLL_INTERVAL_MS !== initialSystemConfig.MODBUS.POLL_INTERVAL_MS ||
-                config.config.MQTT.BROKER_URL !== initialSystemConfig.MQTT.BROKER_URL;
+                JSON.stringify(config.config.cloud_sync) !== JSON.stringify(initialSystemConfig.cloud_sync);
 
             alert('Saved successfully!');
 
@@ -98,8 +99,9 @@ export default function Config() {
 
     if (!config) return <div>Loading...</div>;
 
-    const mqttBroker = config.config.MQTT.BROKER_URL;
-    const isCustomMqtt = mqttBroker !== 'mqtt://test.mosquitto.org' && mqttBroker !== 'mqtt://mqtt.eclipseprojects.io';
+    // MQTT Variables removed
+    // const mqttBroker = config.config.MQTT.BROKER_URL;
+    // const isCustomMqtt = ...
 
     return (
         <div style={{ paddingBottom: '3rem' }}>
@@ -141,27 +143,41 @@ export default function Config() {
                             onChange={(e) => updateSystem('MODBUS', 'POLL_INTERVAL_MS', parseInt(e.target.value))}
                         />
                     </div>
+                </div>
+
+                <h4 style={{ marginTop: '1.5rem', marginBottom: '1rem', borderTop: '1px solid #334155', paddingTop: '1rem' }}>
+                    Cloud Sync (Store-and-Forward)
+                </h4>
+                <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '1rem' }}>
+                    Configure the destination for meter readings. Data is queued locally if offline.
+                </p>
+
+                <div className="grid">
                     <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                        <label>MQTT Broker URL</label>
-                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                            <select
-                                value={isCustomMqtt ? 'custom' : mqttBroker}
-                                onChange={(e) => {
-                                    if (e.target.value !== 'custom') updateSystem('MQTT', 'BROKER_URL', e.target.value);
-                                }}
-                                style={{ padding: '0.5rem', borderRadius: '4px', background: '#334155', color: 'white', border: '1px solid #475569' }}
-                            >
-                                <option value="mqtt://test.mosquitto.org">test.mosquitto.org (Public)</option>
-                                <option value="mqtt://mqtt.eclipseprojects.io">mqtt.eclipseprojects.io (Public)</option>
-                                <option value="custom">Custom...</option>
-                            </select>
-                            <input
-                                style={{ flex: 1, minWidth: '200px' }}
-                                value={config.config.MQTT.BROKER_URL}
-                                onChange={(e) => updateSystem('MQTT', 'BROKER_URL', e.target.value)}
-                                placeholder="mqtt://broker:1883"
-                            />
-                        </div>
+                        <label>Ingestion API URL</label>
+                        <input
+                            placeholder="https://kitnets.com/api/gateways/ingest"
+                            value={config.config.cloud_sync?.ingestionApiUrl || ''}
+                            onChange={(e) => updateSystem('cloud_sync', 'ingestionApiUrl', e.target.value)}
+                        />
+                    </div>
+                    <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                        <label>Gateway Token (Security Key)</label>
+                        <input
+                            type="password"
+                            placeholder="Secret token matching .env GATEWAY_INGEST_KEY"
+                            value={config.config.cloud_sync?.gatewayToken || ''}
+                            onChange={(e) => updateSystem('cloud_sync', 'gatewayToken', e.target.value)}
+                        />
+                    </div>
+                    <div className="form-group">
+                        <label>Sync Interval (Minutes)</label>
+                        <input
+                            type="number"
+                            min="1"
+                            value={config.config.cloud_sync?.syncIntervalMinutes || 5}
+                            onChange={(e) => updateSystem('cloud_sync', 'syncIntervalMinutes', parseInt(e.target.value))}
+                        />
                     </div>
                 </div>
             </div>

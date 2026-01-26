@@ -108,60 +108,69 @@ export class DatabaseService {
                     stmt.finalize();
                     console.log("Seeded default meters.");
                 }
-            });
+                // readings_queue (Store-and-Forward)
+                this.db.run(`
+            CREATE TABLE IF NOT EXISTS readings_queue (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                meter_id TEXT,
+                value REAL,
+                timestamp DATETIME,
+                attempts INTEGER DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )`);
 
-            // Cleanup Anomalies (Fix for "Start of Day" reset bug)
-            // If consumption is > 20,000 Liters in one day, it's definitely an error for these units.
-            this.db.run(`DELETE FROM daily_snapshots WHERE daily_liters > 20000`, (err) => {
-                if (!err) console.log("Cleaned up anomalous daily snapshots.");
-            });
+                // Cleanup Anomalies (Fix for "Start of Day" reset bug)
+                // If consumption is > 20,000 Liters in one day, it's definitely an error for these units.
+                this.db.run(`DELETE FROM daily_snapshots WHERE daily_liters > 20000`, (err) => {
+                    if (!err) console.log("Cleaned up anomalous daily snapshots.");
+                });
 
-            // Cleanup Future Dates (Fix for UTC/Local mismatch)
-            // Cleanup Future Dates - DISABLED (Caused data loss due to UTC/Local mismatch)
-            /*
-            this.db.run(`DELETE FROM daily_snapshots WHERE date > date('now', 'localtime')`, (err) => {
-                if (!err) console.log("Cleaned up future daily snapshots.");
+                // Cleanup Future Dates (Fix for UTC/Local mismatch)
+                // Cleanup Future Dates - DISABLED (Caused data loss due to UTC/Local mismatch)
+                /*
+                this.db.run(`DELETE FROM daily_snapshots WHERE date > date('now', 'localtime')`, (err) => {
+                    if (!err) console.log("Cleaned up future daily snapshots.");
+                });
+                */
             });
-            */
-        });
-    }
+        }
 
-    public get<T>(sql: string, params: any[] = []): Promise<T | undefined> {
-        return new Promise((resolve, reject) => {
-            this.db.get(sql, params, (err, row) => {
-                if (err) reject(err);
-                else resolve(row as T);
+    public get<T>(sql: string, params: any[] = []): Promise < T | undefined > {
+            return new Promise((resolve, reject) => {
+                this.db.get(sql, params, (err, row) => {
+                    if (err) reject(err);
+                    else resolve(row as T);
+                });
             });
-        });
-    }
+        }
 
-    public all<T>(sql: string, params: any[] = []): Promise<T[]> {
-        return new Promise((resolve, reject) => {
-            this.db.all(sql, params, (err, rows) => {
-                if (err) reject(err);
-                else resolve(rows as T[]);
+    public all<T>(sql: string, params: any[] = []): Promise < T[] > {
+            return new Promise((resolve, reject) => {
+                this.db.all(sql, params, (err, rows) => {
+                    if (err) reject(err);
+                    else resolve(rows as T[]);
+                });
             });
-        });
-    }
+        }
 
-    public run(sql: string, params: any[] = []): Promise<{ lastID: number, changes: number }> {
-        return new Promise((resolve, reject) => {
-            this.db.run(sql, params, function (err) {
-                if (err) reject(err);
-                else resolve({ lastID: this.lastID, changes: this.changes });
+    public run(sql: string, params: any[] = []): Promise < { lastID: number, changes: number } > {
+            return new Promise((resolve, reject) => {
+                this.db.run(sql, params, function (err) {
+                    if (err) reject(err);
+                    else resolve({ lastID: this.lastID, changes: this.changes });
+                });
             });
-        });
-    }
+        }
 
-    public healthCheck(): Promise<boolean> {
-        return new Promise((resolve) => {
-            this.db.get("SELECT 1", (err) => {
-                if (err) resolve(false);
-                else resolve(true);
+    public healthCheck(): Promise < boolean > {
+            return new Promise((resolve) => {
+                this.db.get("SELECT 1", (err) => {
+                    if (err) resolve(false);
+                    else resolve(true);
+                });
             });
-        });
-    }
+        }
 }
 
-const db = new DatabaseService();
+    const db = new DatabaseService();
 export default db;
