@@ -222,7 +222,7 @@ server.post('/api/debug/fix-data-glitch', async (req, reply) => {
 server.post('/api/debug/force-sync', async (req, reply) => {
     try {
         console.log("Forcing manual sync...");
-        await syncService.processQueue();
+        await syncService.processQueue(true);
         return {
             success: true,
             message: "Sync triggered.",

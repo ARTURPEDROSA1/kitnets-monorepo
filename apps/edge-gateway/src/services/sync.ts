@@ -34,7 +34,7 @@ export const syncService = {
     /**
      * Process the queue: Pick oldest 50 -> Send -> Delete on Success
      */
-    async processQueue() {
+    async processQueue(isManual = false) {
         if (!this.token || this.token === 'MISSING_KEY') {
             this.lastSyncResult = 'Error: No Gateway Token configured';
             console.warn('[Sync] No Ingest Key configured. Skipping sync.');
@@ -48,7 +48,10 @@ export const syncService = {
             );
 
             if (batch.length === 0) {
-                // this.lastSyncResult = 'Queue Empty'; // Too verbose to update every time?
+                if (isManual) {
+                    this.lastSyncResult = 'Queue Empty';
+                    console.log('[Sync] Queue is empty.');
+                }
                 return;
             }
 
