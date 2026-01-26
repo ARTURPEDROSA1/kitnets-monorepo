@@ -96,11 +96,11 @@ export const startScheduler = () => {
                 const effective_m3 = offset + raw_m3;
 
                 // NEW: Store-and-Forward Queue (Replaces MQTT Live Publish)
-                // We queue the READING, not the calculated Liters/M3 (let backend handle raw data logic if possible, 
-                // but for now we follow the "effective" logic if the API expects raw counter).
-                // Actually, the API we built expects { meter_id, value (counter), timestamp }
+                // We queue the Daily Liters (not raw counter) so Supabase updates "Today's Consumption".
+                // Timestamp is set to the DATE string (YYYY-MM-DD) so that UPSERT overwrites the same row for this day.
 
-                await syncService.enqueue(m.meter_id, current, now.toISOString());
+                const todayDateStr = getLocalDateStr(); // e.g., "2026-01-26"
+                await syncService.enqueue(m.meter_id, dailyLiters, todayDateStr);
                 /*
                 deprecated: mqttService.publishLive
                 */
