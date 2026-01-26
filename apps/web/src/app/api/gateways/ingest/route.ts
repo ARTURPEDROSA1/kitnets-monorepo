@@ -33,7 +33,7 @@ export async function POST(request: Request) {
 
         if (error) {
             console.error('Supabase Insert Error:', error);
-            return NextResponse.json({ error: 'Database error' }, { status: 500 });
+            return NextResponse.json({ error: 'Database error', details: error.message, hint: error.hint }, { status: 500 });
         }
 
         return NextResponse.json({ success: true, count: readings.length });
