@@ -13,6 +13,20 @@ interface ConsumptionChartProps {
     onClick?: (data: any) => void;
 }
 
+const CustomTooltip = ({ active, payload, label, unit }: any) => {
+    if (active && payload && payload.length) {
+        return (
+            <div className="bg-background border border-border p-3 rounded-lg shadow-lg text-sm">
+                <p className="font-medium text-foreground mb-1">{label}</p>
+                <p className="text-primary font-bold">
+                    {payload[0].value} {unit}
+                </p>
+            </div>
+        );
+    }
+    return null;
+};
+
 export function ConsumptionChart({
     data,
     dataKey = "consumption",
@@ -39,20 +53,6 @@ export function ConsumptionChart({
         );
     }
 
-    const CustomTooltip = ({ active, payload, label }: any) => {
-        if (active && payload && payload.length) {
-            return (
-                <div className="bg-background border border-border p-3 rounded-lg shadow-lg text-sm">
-                    <p className="font-medium text-foreground mb-1">{label}</p>
-                    <p className="text-primary font-bold">
-                        {payload[0].value} {unit}
-                    </p>
-                </div>
-            );
-        }
-        return null;
-    };
-
     return (
         <div style={{ width: '100%', height }}>
             <ResponsiveContainer>
@@ -64,8 +64,7 @@ export function ConsumptionChart({
                         left: 20,
                         bottom: 5,
                     }}
-                    onClick={onClick ? (e) => e && e.activePayload && onClick(e.activePayload[0].payload) : undefined}
-                    cursor={onClick ? "pointer" : "default"}
+                    onClick={onClick ? (e: any) => e && e.activePayload && onClick(e.activePayload[0].payload) : undefined}
                 >
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                     <XAxis
@@ -82,12 +81,13 @@ export function ConsumptionChart({
                         axisLine={false}
                         tickFormatter={(value) => `${value}`}
                     />
-                    <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted) / 0.2)' }} />
+                    <Tooltip content={<CustomTooltip unit={unit} />} cursor={{ fill: 'hsl(var(--muted) / 0.2)' }} />
                     <Bar
                         dataKey={dataKey}
                         fill={color}
                         radius={[4, 4, 0, 0]}
                         maxBarSize={50}
+                        style={{ cursor: onClick ? 'pointer' : 'default' }}
                     />
                 </BarChart>
             </ResponsiveContainer>
