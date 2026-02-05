@@ -14,12 +14,16 @@ export const startScheduler = () => {
     cron.schedule('0 0 * * *', async () => {
         console.log("Resetting daily start counters...");
         const meters = await db.all<MeterConfig>('SELECT * FROM meter_config WHERE enabled = 1');
+
+        const newCounters = { ...modbusService.dailyStartCounters };
+
         for (const m of meters) {
             const current = modbusService.latestCounters[m.meter_id];
             if (current !== undefined) {
-                modbusService.dailyStartCounters[m.meter_id] = current;
+                newCounters[m.meter_id] = current;
             }
         }
+        modbusService.setStartCounters(newCounters);
     });
 
     // Daily processing at 23:59
@@ -108,12 +112,15 @@ export const startScheduler = () => {
                 // 2. Reset "Start of Day" counters to current values so "Today" starts fresh
                 console.log("[Startup] Resetting daily start counters to current values.");
                 const meters = await db.all<MeterConfig>('SELECT * FROM meter_config WHERE enabled = 1');
+                const newCounters = { ...modbusService.dailyStartCounters };
+
                 for (const m of meters) {
                     const current = modbusService.latestCounters[m.meter_id];
                     if (current !== undefined) {
-                        modbusService.dailyStartCounters[m.meter_id] = current;
+                        newCounters[m.meter_id] = current;
                     }
                 }
+                modbusService.setStartCounters(newCounters);
             }
         } catch (e) {
             console.error("[Startup] Failed to run catch-up logic:", e);

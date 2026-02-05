@@ -253,6 +253,12 @@ export class ModbusService extends EventEmitter {
             throw e;
         }
     }
+
+    public setStartCounters(counters: Record<string, number>) {
+        this.dailyStartCounters = counters;
+        saveRuntimeState(this.dailyStartCounters);
+        console.log("Updated and Saved Daily Start Counters:", this.dailyStartCounters);
+    }
 }
 
 export const modbusService = new ModbusService();
