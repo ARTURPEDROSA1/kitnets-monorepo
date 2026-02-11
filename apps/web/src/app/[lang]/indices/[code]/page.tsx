@@ -780,55 +780,102 @@ export default async function IndexPage({ params, searchParams }: Props) {
                         )}
                     </div>
 
-                    {indexContent.sections && indexContent.sections.map((section: IndexSection, idx: number) => (
-                        <section key={idx} className="space-y-4 md:space-y-6">
-                            <h3 className="text-xl md:text-2xl font-semibold text-foreground">{section.title}</h3>
+                    {indexContent.sections && indexContent.sections.map((section: IndexSection, idx: number) => {
+                        // Dynamically generate "Análise" section from latest Supabase data
+                        // so the cron job auto-updates this text when new data is ingested
+                        const isAnalysisSection = section.title.startsWith('Análise:');
+                        const isAutoUpdatableIndex = ['IPCA', 'INPC', 'IGPM'].includes(code);
 
-                            {section.text && (
-                                <p className="text-muted-foreground leading-relaxed">{section.text}</p>
-                            )}
+                        let dynamicTitle = section.title;
+                        let dynamicText = section.text;
 
-                            {section.items && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {section.items.map((item, itemIdx: number) => {
-                                        let Icon = null;
-                                        const titleLower = item.title.toLowerCase();
-                                        if (titleLower.includes("geográfica")) Icon = MapPinned;
-                                        else if (titleLower.includes("setorial")) Icon = Home;
-                                        else if (titleLower.includes("coleta")) Icon = CalendarDays;
-                                        else if (titleLower.includes("periodicidade")) Icon = Hourglass;
+                        if (isAnalysisSection && isAutoUpdatableIndex && latest) {
+                            const monthNames: Record<string, string[]> = {
+                                pt: ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'],
+                                en: ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+                                es: ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'],
+                            };
+                            const months = monthNames[lang] || monthNames['pt'];
+                            const monthLabel = months[latest.month];
+                            const shortRef = `${String(latest.month).padStart(2, '0')}/${latest.year}`;
 
-                                        return (
-                                            <div key={itemIdx} className="bg-card border rounded-lg p-4 flex items-start gap-3">
-                                                {Icon && <Icon className="h-5 w-5 text-primary mt-1 shrink-0" />}
-                                                <div>
-                                                    <h4 className="font-semibold text-foreground mb-1">{item.title}</h4>
-                                                    <p className="text-sm text-muted-foreground">{item.text}</p>
+                            dynamicTitle = lang === 'pt'
+                                ? `Análise: ${monthLabel} de ${latest.year}`
+                                : lang === 'es'
+                                    ? `Análisis: ${monthLabel} de ${latest.year}`
+                                    : `Analysis: ${monthLabel} ${latest.year}`;
+
+                            if (lang === 'pt') {
+                                dynamicText = `O ${code} do último mês foi de ${latest.value_percent?.toFixed(2).replace('.', ',')}% em ${monthLabel.slice(0, 3)}/${latest.year}`;
+                                if (latest.accumulated_12m) {
+                                    dynamicText += ` e o ${code} acumulado de 12 meses foi de ${latest.accumulated_12m.toFixed(2).replace('.', ',')}% em ${monthLabel.slice(0, 3)}/${latest.year}`;
+                                }
+                                dynamicText += '.';
+                            } else if (lang === 'es') {
+                                dynamicText = `El ${code} del último mes fue de ${latest.value_percent?.toFixed(2)}% en ${shortRef}`;
+                                if (latest.accumulated_12m) {
+                                    dynamicText += ` y el ${code} acumulado de 12 meses fue de ${latest.accumulated_12m.toFixed(2)}% en ${shortRef}`;
+                                }
+                                dynamicText += '.';
+                            } else {
+                                dynamicText = `Last month's ${code} was ${latest.value_percent?.toFixed(2)}% in ${shortRef}`;
+                                if (latest.accumulated_12m) {
+                                    dynamicText += ` and the 12-month accumulated ${code} was ${latest.accumulated_12m.toFixed(2)}% in ${shortRef}`;
+                                }
+                                dynamicText += '.';
+                            }
+                        }
+
+                        return (
+                            <section key={idx} className="space-y-4 md:space-y-6">
+                                <h3 className="text-xl md:text-2xl font-semibold text-foreground">{dynamicTitle}</h3>
+
+                                {dynamicText && (
+                                    <p className="text-muted-foreground leading-relaxed">{dynamicText}</p>
+                                )}
+
+                                {section.items && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {section.items.map((item, itemIdx: number) => {
+                                            let Icon = null;
+                                            const titleLower = item.title.toLowerCase();
+                                            if (titleLower.includes("geográfica")) Icon = MapPinned;
+                                            else if (titleLower.includes("setorial")) Icon = Home;
+                                            else if (titleLower.includes("coleta")) Icon = CalendarDays;
+                                            else if (titleLower.includes("periodicidade")) Icon = Hourglass;
+
+                                            return (
+                                                <div key={itemIdx} className="bg-card border rounded-lg p-4 flex items-start gap-3">
+                                                    {Icon && <Icon className="h-5 w-5 text-primary mt-1 shrink-0" />}
+                                                    <div>
+                                                        <h4 className="font-semibold text-foreground mb-1">{item.title}</h4>
+                                                        <p className="text-sm text-muted-foreground">{item.text}</p>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
+                                            );
+                                        })}
+                                    </div>
+                                )}
 
-                            {section.list && (
-                                <ul className="space-y-2">
-                                    {section.list.map((listItem: string, listIdx: number) => (
-                                        <li key={listIdx} className="flex items-start gap-2 text-muted-foreground">
-                                            <span className="mt-2 h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
-                                            <span>{listItem}</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
+                                {section.list && (
+                                    <ul className="space-y-2">
+                                        {section.list.map((listItem: string, listIdx: number) => (
+                                            <li key={listIdx} className="flex items-start gap-2 text-muted-foreground">
+                                                <span className="mt-2 h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
+                                                <span>{listItem}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
 
-                            {section.footer && (
-                                <p className="text-muted-foreground leading-relaxed mt-4">
-                                    {section.footer}
-                                </p>
-                            )}
-                        </section>
-                    ))}
+                                {section.footer && (
+                                    <p className="text-muted-foreground leading-relaxed mt-4">
+                                        {section.footer}
+                                    </p>
+                                )}
+                            </section>
+                        );
+                    })}
 
                     <div className="bg-muted/50 rounded-xl p-6 md:p-8 space-y-4">
                         <p className="text-lg font-medium text-foreground">
