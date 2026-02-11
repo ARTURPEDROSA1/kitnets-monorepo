@@ -241,6 +241,26 @@ server.post('/api/debug/resync-recent', async (req, reply) => {
             count++;
         }
 
+        // 3. Also inject TODAY's live partial consumption (so we don't wait 5 mins for next tick)
+        const todayStr = getLocalDateStr();
+        const meters = await db.all<MeterConfig>('SELECT * FROM meter_config WHERE enabled = 1');
+
+        for (const m of meters) {
+            const current = modbusService.latestCounters[m.meter_id];
+            if (current === undefined) continue;
+
+            const startOfDay = modbusService.dailyStartCounters[m.meter_id] || current;
+
+            let delta = 0;
+            if (current >= startOfDay) delta = current - startOfDay;
+            else delta = (4294967295 - startOfDay) + current + 1;
+
+            const liveLiters = delta * m.pulse_volume_liters;
+
+            await syncService.enqueue(m.meter_id, liveLiters, todayStr);
+            count++;
+        }
+
         // Trigger immediate processing
         await syncService.processQueue(true);
 
