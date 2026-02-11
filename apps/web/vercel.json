@@ -3,6 +3,10 @@
         {
             "path": "/api/cron/update-igpm",
             "schedule": "0 10 * * *"
+        },
+        {
+            "path": "/api/cron/update-ipca-inpc",
+            "schedule": "10 12 * * *"
         }
     ]
 }
