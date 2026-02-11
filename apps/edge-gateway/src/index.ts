@@ -221,7 +221,11 @@ server.post('/api/debug/fix-data-glitch', async (req, reply) => {
 
 server.post('/api/debug/resync-recent', async (req, reply) => {
     try {
-        console.log("Forcing re-sync of last 7 days...");
+        console.log("Forcing re-sync of last 7 days (CLEANING QUEUE)...");
+
+        // 1. Flush the queue (Clear stuck/invalid pending retries)
+        await db.run('DELETE FROM readings_queue');
+
         const date = new Date();
         date.setDate(date.getDate() - 7);
         const limitDateStr = getLocalDateStr(date);
@@ -240,7 +244,7 @@ server.post('/api/debug/resync-recent', async (req, reply) => {
         // Trigger immediate processing
         await syncService.processQueue(true);
 
-        return { success: true, message: `Re-queued ${count} records/days for sync.` };
+        return { success: true, message: `Queue CLEARED. Re-queued ${count} historical records from ${limitDateStr} for sync.` };
     } catch (e) {
         server.log.error(e);
         reply.code(500).send({ error: "Failed to resync data" });
