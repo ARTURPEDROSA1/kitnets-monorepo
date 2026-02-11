@@ -16,6 +16,7 @@ export const syncService = {
     // State
     lastSyncSuccess: null as string | null,
     lastSyncResult: 'Idle' as string, // Debug info
+    consecutiveFailures: 0,
 
     /**
      * Enqueues a reading to be synced.
@@ -80,14 +81,37 @@ export const syncService = {
                 console.log(`[Sync] Successfully synced ${batch.length} readings.`);
                 this.lastSyncSuccess = new Date().toISOString();
                 this.lastSyncResult = `Success: Sent ${batch.length} items`;
+                this.consecutiveFailures = 0; // Reset on success
             } else {
                 const text = await response.text();
                 this.lastSyncResult = `Failed: ${response.status} ${response.statusText} - ${text.substring(0, 50)}`;
                 console.error(`[Sync] Failed: ${response.status} ${response.statusText}`);
+                this.handleFailure();
             }
         } catch (e) {
             this.lastSyncResult = `Network Error: ${String(e)}`;
             console.error('[Sync] Network/Logic Error:', e);
+            this.handleFailure();
+        }
+    },
+
+    handleFailure() {
+        this.consecutiveFailures++;
+        console.warn(`[Sync] Consecutive Failure Count: ${this.consecutiveFailures}/10`);
+
+        if (this.consecutiveFailures >= 10) {
+            console.error(`[Sync] CRITICAL: 10 consecutive failures. Rebooting System to recover network...`);
+            this.lastSyncResult = 'CRITICAL: Rebooting System...';
+
+            // Execute Reboot
+            const { exec } = require('child_process');
+            exec('sudo reboot', (error: any, stdout: any, stderr: any) => {
+                if (error) {
+                    console.error(`[Sync] Reboot command failed: ${error.message}`);
+                    return;
+                }
+                console.log(`[Sync] Reboot initiated.`);
+            });
         }
     }
 };
