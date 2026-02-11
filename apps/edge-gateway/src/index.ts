@@ -219,6 +219,34 @@ server.post('/api/debug/fix-data-glitch', async (req, reply) => {
     }
 });
 
+server.post('/api/debug/resync-recent', async (req, reply) => {
+    try {
+        console.log("Forcing re-sync of last 7 days...");
+        const date = new Date();
+        date.setDate(date.getDate() - 7);
+        const limitDateStr = getLocalDateStr(date);
+
+        const snapshots = await db.all<any>(
+            'SELECT * FROM daily_snapshots WHERE date >= ?',
+            [limitDateStr]
+        );
+
+        let count = 0;
+        for (const s of snapshots) {
+            await syncService.enqueue(s.meter_id, s.daily_liters, s.date);
+            count++;
+        }
+
+        // Trigger immediate processing
+        await syncService.processQueue(true);
+
+        return { success: true, message: `Re-queued ${count} records/days for sync.` };
+    } catch (e) {
+        server.log.error(e);
+        reply.code(500).send({ error: "Failed to resync data" });
+    }
+});
+
 server.post('/api/debug/force-sync', async (req, reply) => {
     try {
         console.log("Forcing manual sync...");

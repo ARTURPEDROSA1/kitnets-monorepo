@@ -214,6 +214,19 @@ export default function Config() {
                     }}>
                         Delete ALL Monthly History
                     </button>
+                    <button className="warning" onClick={async () => {
+                        if (confirm('Re-sync last 7 days? \n\nThis will take the local SQLite daily records from the last week and force-push them to the Cloud. Use this if Supabase is missing recent days due to network outage.')) {
+                            try {
+                                const res = await fetch('/api/debug/resync-recent', { method: 'POST' });
+                                const json = await res.json();
+                                alert(json.message || json.error);
+                            } catch (e) {
+                                alert('Request failed');
+                            }
+                        }
+                    }}>
+                        Re-sync Last 7 Days (Fix Missing Cloud Data)
+                    </button>
                     <button className="warning" onClick={restartService}>
                         Restart Service manually
                     </button>
