@@ -93,6 +93,13 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
         keywords: indexContent?.keywords || [metadata.code, metadata.name, 'índice econômico', 'inflação', 'reajuste aluguel', 'brasil', 'economia', 'histórico', 'tabela', 'gráfico'],
         authors: [{ name: 'Kitnets.com' }],
         applicationName: 'Kitnets',
+        robots: {
+            index: true,
+            follow: true,
+            'max-snippet': -1,
+            'max-image-preview': 'large' as const,
+            'max-video-preview': -1,
+        },
         alternates: {
             canonical: `/${lang}/indices/${code.toLowerCase()}${type ? `?type=${type}` : ''}${bedrooms ? `&bedrooms=${bedrooms}` : ''}`,
             languages: {
@@ -107,7 +114,10 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
             type: 'article',
             siteName: 'Kitnets',
             locale: lang,
-            tags: [metadata.code, 'Economia', 'Índices'],
+            tags: [metadata.code, 'Economia', 'Índices', 'Inflação', 'Brasil', '2026'],
+            publishedTime: '2024-01-01T00:00:00Z',
+            modifiedTime: new Date().toISOString(),
+            authors: ['Kitnets.com'],
         },
         twitter: {
             card: 'summary_large_image',
@@ -181,9 +191,44 @@ export default async function IndexPage({ params, searchParams }: Props) {
             name: 'Kitnets.com',
             url: 'https://kitnets.com'
         },
-        temporalCoverage: history.length > 0 ? `${history[history.length - 1].year}-${history[history.length - 1].month}/${history[0].year}-${history[0].month}` : '2023-2025',
+        temporalCoverage: history.length > 0 ? `${history[history.length - 1].year}-${String(history[history.length - 1].month).padStart(2, '0')}/${history[0].year}-${String(history[0].month).padStart(2, '0')}` : '2023-2026',
         variableMeasured: 'Percentage Change',
-        dateModified: latest ? new Date(latest.year, latest.month - 1, 1).toISOString() : new Date().toISOString(),
+        dateModified: latest ? new Date(latest.year, latest.month - 1, 15).toISOString() : new Date().toISOString(),
+    };
+
+    // Schema.org Structured Data - WebPage (for richer SERP snippets)
+    const webPageJsonLd = {
+        '@context': 'https://schema.org',
+        '@type': 'WebPage',
+        name: indexContent?.title || `Índice ${metadata.code}`,
+        description: indexContent?.description || `Acompanhe a variação do ${metadata.code}`,
+        url: `https://kitnets.com/${lang}/indices/${code.toLowerCase()}`,
+        datePublished: '2024-01-01T00:00:00Z',
+        dateModified: latest ? new Date(latest.year, latest.month - 1, 15).toISOString() : new Date().toISOString(),
+        inLanguage: lang === 'pt' ? 'pt-BR' : lang === 'es' ? 'es' : 'en',
+        isPartOf: {
+            '@type': 'WebSite',
+            name: 'Kitnets.com',
+            url: 'https://kitnets.com'
+        },
+        publisher: {
+            '@type': 'Organization',
+            name: 'Kitnets.com',
+            url: 'https://kitnets.com'
+        },
+        about: {
+            '@type': 'Thing',
+            name: metadata.code,
+            description: metadata.name
+        },
+        mainEntity: {
+            '@type': 'Dataset',
+            name: `Histórico do Índice ${metadata.code}`
+        },
+        speakable: {
+            '@type': 'SpeakableSpecification',
+            cssSelector: ['h1', 'h2', '.text-primary']
+        }
     };
 
     // Schema.org Structured Data - FAQ
@@ -306,7 +351,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
                     {/* Key Metrics Cards */}
                     <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
                         {/* Card 1: Variação Mensal */}
-                        <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
+                        <div className="rounded-xl border bg-card text-card-foreground shadow-sm" role="region" aria-label={`${code} variação mensal`}>
                             <div className="flex flex-col space-y-1 p-3 md:p-6 pb-1 md:pb-2">
                                 <h3 className="text-sm font-medium text-muted-foreground whitespace-nowrap">{code} hoje:</h3>
                             </div>
@@ -315,13 +360,13 @@ export default async function IndexPage({ params, searchParams }: Props) {
                                     {latest ? `${latest.value_percent}%` : '--'}
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-1">
-                                    Referente a {latest ? `${latest.month.toString().padStart(2, '0')}/${latest.year}` : '--'}
+                                    Referente a <time dateTime={latest ? `${latest.year}-${String(latest.month).padStart(2, '0')}` : ''}>{latest ? `${latest.month.toString().padStart(2, '0')}/${latest.year}` : '--'}</time>
                                 </p>
                             </div>
                         </div>
 
                         {/* Card 2: Acumulado 12m */}
-                        <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
+                        <div className="rounded-xl border bg-card text-card-foreground shadow-sm" role="region" aria-label={`${code} acumulado 12 meses`}>
                             <div className="flex flex-col space-y-1 p-3 md:p-6 pb-1 md:pb-2">
                                 <h3 className="text-sm font-medium text-muted-foreground whitespace-nowrap">{code} acumulado em 12 meses:</h3>
                             </div>
@@ -336,7 +381,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
                         </div>
 
                         {/* Card 3: Acumulado Ano (YTD) */}
-                        <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
+                        <div className="rounded-xl border bg-card text-card-foreground shadow-sm" role="region" aria-label={`${code} acumulado no ano`}>
                             <div className="flex flex-col space-y-1 p-3 md:p-6 pb-1 md:pb-2">
                                 <h3 className="text-sm font-medium text-muted-foreground whitespace-nowrap">{code} acumulado em {latest?.year}:</h3>
                             </div>
@@ -449,18 +494,55 @@ export default async function IndexPage({ params, searchParams }: Props) {
                                                 return 'A definir';
                                             }
 
-                                            // Default (IPCA, etc) - Release happens month AFTER Next Ref Month (2 months after latest data month?)
-                                            // Logic in original code: nextRef = latest+1. Release = nextRef+1.
-                                            // Example: Latest = Nov. Next Ref = Dec. Release for Dec = Jan.
-                                            // So releaseMonth = nextRefMonth + 1.
+                                            // IPCA / INPC — IBGE official release calendar 2026
+                                            // Key = release month, Value = release day
+                                            if (code === 'IPCA' || code === 'INPC') {
+                                                const ibgeReleaseDates2026: Record<number, number> = {
+                                                    1: 10,  // 10/Jan — ref Dez/2025
+                                                    2: 10,  // 10/Feb — ref Jan/2026
+                                                    3: 12,  // 12/Mar — ref Feb/2026
+                                                    4: 10,  // 10/Apr — ref Mar/2026
+                                                    5: 12,  // 12/May — ref Apr/2026
+                                                    6: 12,  // 12/Jun — ref May/2026
+                                                    7: 10,  // 10/Jul — ref Jun/2026
+                                                    8: 11,  // 11/Aug — ref Jul/2026
+                                                    9: 11,  // 11/Sep — ref Aug/2026
+                                                    10: 9,  // 09/Oct — ref Sep/2026
+                                                    11: 12, // 12/Nov — ref Oct/2026
+                                                    12: 11, // 11/Dec — ref Nov/2026
+                                                };
+
+                                                // Release month is 2 months after latest data month
+                                                let relMonth = nextRefMonth + 1;
+                                                let relYear = nextRefYear;
+                                                if (relMonth > 12) { relMonth = 1; relYear++; }
+
+                                                const getIbgeDay = (m: number, y: number) =>
+                                                    (y === 2026 && ibgeReleaseDates2026[m]) ? ibgeReleaseDates2026[m] : 10;
+
+                                                let day = getIbgeDay(relMonth, relYear);
+                                                let date = new Date(relYear, relMonth - 1, day);
+
+                                                const now = new Date();
+                                                now.setHours(0, 0, 0, 0);
+
+                                                if (date <= now) {
+                                                    relMonth++;
+                                                    if (relMonth > 12) { relMonth = 1; relYear++; }
+                                                    day = getIbgeDay(relMonth, relYear);
+                                                    date = new Date(relYear, relMonth - 1, day);
+                                                }
+
+                                                return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+                                            }
+
+                                            // Default fallback for other indexes
                                             let releaseMonth = nextRefMonth + 1;
                                             let releaseYear = nextRefYear;
                                             if (releaseMonth > 12) {
                                                 releaseMonth = 1;
                                                 releaseYear++;
                                             }
-
-                                            // Format 10/MMM (IPCA usually around 9th-11th)
                                             const date = new Date(releaseYear, releaseMonth - 1, 10);
                                             return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
                                         })()}
@@ -480,7 +562,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
                     </div>
 
                     {/* Chart Section */}
-                    <div className="md:col-span-3 min-w-0">
+                    <div id="grafico" className="md:col-span-3 min-w-0 scroll-mt-20">
                         <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
                             <div className="flex flex-col space-y-1.5 p-3 md:p-6">
                                 <h3 className="text-lg md:text-2xl font-semibold leading-none tracking-tight">Histórico de Variação (%)</h3>
@@ -493,7 +575,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
                     </div>
 
                     {/* Heatmap Section */}
-                    <div className="md:col-span-3 min-w-0">
+                    <div id="mapa-calor" className="md:col-span-3 min-w-0 scroll-mt-20">
                         <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
                             <div className="flex flex-col space-y-1.5 p-3 md:p-6">
                                 <h3 className="text-lg md:text-2xl font-semibold leading-none tracking-tight">Mapa de Calor Mensal</h3>
@@ -506,7 +588,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
                     </div>
 
                     {/* Table Section */}
-                    <div className="md:col-span-3 min-w-0">
+                    <div id="tabela" className="md:col-span-3 min-w-0 scroll-mt-20">
                         <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
                             <div className="flex flex-col space-y-1.5 p-3 md:p-6">
                                 <h3 className="text-lg md:text-2xl font-semibold leading-none tracking-tight">Série Histórica</h3>
@@ -515,6 +597,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
                             <div className="p-3 md:p-6 pt-0">
                                 <IndexHistoryTable data={history} />
                             </div>
+                            <p className="text-xs text-center text-muted-foreground pb-3 md:hidden">← Deslize para ver mais →</p>
                         </div>
                     </div>
 
@@ -566,6 +649,86 @@ export default async function IndexPage({ params, searchParams }: Props) {
                             </div>
                         </div>
                     )}
+
+                    {/* IPCA / INPC Calendar Section */}
+                    {(code === 'IPCA' || code === 'INPC') && (() => {
+                        const ibgeCalendar2026 = [
+                            { date: '10/01/2026', ref: 'Dezembro/2025', time: '9h' },
+                            { date: '10/02/2026', ref: 'Janeiro/2026', time: '9h' },
+                            { date: '12/03/2026', ref: 'Fevereiro/2026', time: '9h' },
+                            { date: '10/04/2026', ref: 'Março/2026', time: '9h' },
+                            { date: '12/05/2026', ref: 'Abril/2026', time: '9h' },
+                            { date: '12/06/2026', ref: 'Maio/2026', time: '9h' },
+                            { date: '10/07/2026', ref: 'Junho/2026', time: '9h' },
+                            { date: '11/08/2026', ref: 'Julho/2026', time: '9h' },
+                            { date: '11/09/2026', ref: 'Agosto/2026', time: '9h' },
+                            { date: '09/10/2026', ref: 'Setembro/2026', time: '9h' },
+                            { date: '12/11/2026', ref: 'Outubro/2026', time: '9h' },
+                            { date: '11/12/2026', ref: 'Novembro/2026', time: '9h' },
+                            { date: '12/01/2027', ref: 'Dezembro/2026', time: '9h' },
+                        ];
+
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+
+                        const parseDate = (d: string) => {
+                            const [day, month, year] = d.split('/').map(Number);
+                            return new Date(year, month - 1, day);
+                        };
+
+                        // Find the index of the next upcoming release (first date >= today)
+                        const nextIdx = ibgeCalendar2026.findIndex(item => parseDate(item.date) >= today);
+                        const pesquisa = `${code} — Índice Nacional de Preços ao Consumidor ${code === 'IPCA' ? 'Amplo' : ''}`;
+
+                        return (
+                            <div id="calendario" className="md:col-span-3 min-w-0 scroll-mt-20">
+                                <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
+                                    <div className="flex flex-col space-y-1.5 p-3 md:p-6">
+                                        <h3 className="text-lg md:text-2xl font-semibold leading-none tracking-tight">Calendário de divulgação {code} 2026</h3>
+                                    </div>
+                                    <div className="p-3 md:p-6 pt-0 overflow-x-auto">
+                                        <table className="w-full text-left">
+                                            <thead className="text-muted-foreground bg-muted/50 text-xs uppercase">
+                                                <tr className="border-b">
+                                                    <th className="p-4 font-medium min-w-[120px]">Prev. divulgação</th>
+                                                    <th className="p-4 font-medium min-w-[200px]">Pesquisa</th>
+                                                    <th className="p-4 font-medium min-w-[150px]">Referência</th>
+                                                    <th className="p-4 font-medium">Horário</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y">
+                                                {ibgeCalendar2026.map((item, i) => {
+                                                    const isNext = i === nextIdx;
+                                                    const isPast = nextIdx === -1 ? true : i < nextIdx;
+
+                                                    return (
+                                                        <tr
+                                                            key={i}
+                                                            className={
+                                                                isNext
+                                                                    ? 'bg-emerald-50 dark:bg-emerald-950/40 border-l-4 border-l-emerald-500 font-semibold'
+                                                                    : isPast
+                                                                        ? 'opacity-50 hover:opacity-75 transition-opacity'
+                                                                        : 'hover:bg-muted/50 transition-colors'
+                                                            }
+                                                        >
+                                                            <td className={`p-4 ${isNext ? 'text-emerald-700 dark:text-emerald-400 font-bold' : 'font-medium'}`}>
+                                                                {item.date}
+                                                                {isNext && <span className="ml-2 text-xs bg-emerald-500 text-white px-2 py-0.5 rounded-full">Próxima</span>}
+                                                            </td>
+                                                            <td className={`p-4 ${isNext ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'}`}>{pesquisa}</td>
+                                                            <td className={`p-4 ${isNext ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'}`}>{item.ref}</td>
+                                                            <td className={`p-4 ${isNext ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'}`}>{item.time}</td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })()}
 
                     {/* IVAR Calendar Specific Section */}
                     {code === 'IVAR' && (
@@ -701,6 +864,10 @@ export default async function IndexPage({ params, searchParams }: Props) {
             <script
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+            />
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(webPageJsonLd) }}
             />
             <script
                 type="application/ld+json"

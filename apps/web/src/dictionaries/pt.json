@@ -1481,13 +1481,32 @@
     },
     "indices": {
         "ipca": {
-            "title": "IPCA – Índice Nacional de Preços ao Consumidor Amplo | Histórico Completo e Análise",
+            "title": "IPCA Hoje 2026 – Índice Nacional de Preços ao Consumidor Amplo | Histórico Completo e Análise",
             "description": "O IPCA (Índice Nacional de Preços ao Consumidor Amplo) é o principal indicador oficial de inflação do Brasil, calculado e divulgado mensalmente pelo IBGE. Ele mede a variação dos preços de bens e serviços consumidos pelas famílias brasileiras e é amplamente utilizado como referência para política monetária, reajustes de contratos, aluguéis, salários, benefícios, investimentos e análises econômicas de longo prazo.",
             "pageDescription": "Nesta página do Kitnets.com, você pode acompanhar o histórico completo do IPCA desde janeiro de 1995 até a data atual, com dados confiáveis, organizados e fáceis de analisar.",
+            "keywords": [
+                "IPCA hoje",
+                "IPCA 2026",
+                "IPCA acumulado",
+                "IPCA acumulado 12 meses",
+                "inflação hoje",
+                "inflação 2026",
+                "inflação acumulada",
+                "IPCA mensal",
+                "IPCA janeiro 2026",
+                "IPCA IBGE",
+                "índice de inflação",
+                "IPCA histórico",
+                "IPCA tabela",
+                "IPCA gráfico",
+                "reajuste aluguel IPCA",
+                "IPCA mês a mês",
+                "próxima divulgação IPCA"
+            ],
             "sections": [
                 {
-                    "title": "Análise: Dezembro de 2025",
-                    "text": "O IPCA do último mês foi de 0,33% em Dez/2025 e o IPCA acumulado de 12 meses foi de 4,26% em Dez/2025."
+                    "title": "Análise: Janeiro de 2026",
+                    "text": "O IPCA do último mês foi de 0,33% em Jan/2026 e o IPCA acumulado de 12 meses foi de 4,44% em Jan/2026."
                 },
                 {
                     "title": "O que você encontra nesta página",
@@ -1626,13 +1645,31 @@
             "cta": "Na Kitnets.com, você encontra todas as informações do IGP-M em um só lugar, com transparência, profundidade histórica e ferramentas visuais que facilitam a tomada de decisão."
         },
         "inpc": {
-            "title": "Série Histórica do INPC desde 1995 (IBGE)",
+            "title": "INPC Hoje 2026 – Índice Nacional de Preços ao Consumidor | Série Histórica Completa (IBGE)",
             "description": "A Série Histórica do INPC apresenta a evolução completa do Índice Nacional de Preços ao Consumidor, calculado mensalmente pelo IBGE, desde janeiro de 1995 até a data mais recente disponível.",
             "pageDescription": "Na Kitnets.com, você acompanha o INPC histórico mês a mês, com dados oficiais, gráficos interativos, tabela detalhada e mapa de calor mensal — tudo em um único lugar, de forma clara e confiável.",
+            "keywords": [
+                "INPC hoje",
+                "INPC 2026",
+                "INPC acumulado",
+                "INPC acumulado 12 meses",
+                "INPC janeiro 2026",
+                "INPC IBGE",
+                "INPC histórico",
+                "INPC tabela",
+                "INPC gráfico",
+                "reajuste salarial INPC",
+                "inflação salário mínimo",
+                "INPC mês a mês",
+                "série histórica INPC",
+                "índice de preços ao consumidor",
+                "INPC x IPCA",
+                "próxima divulgação INPC"
+            ],
             "sections": [
                 {
-                    "title": "Análise: Dezembro de 2025",
-                    "text": "O INPC do último mês foi de 0,21% em Dez/2025. O INPC acumulado em 12 meses e no ano de 2025 fechou em 3,90%."
+                    "title": "Análise: Janeiro de 2026",
+                    "text": "O INPC do último mês foi de 0,39% em Jan/2026 e o INPC acumulado de 12 meses foi de 4,30% em Jan/2026."
                 },
                 {
                     "title": "O que é o INPC?",
@@ -1715,6 +1752,7 @@
                     "text": "Se você procura dados completos, confiáveis e fáceis de analisar, a Kitnets.com oferece uma das visualizações mais completas da série histórica do INPC desde 1995."
                 }
             ],
+            "closing": "O INPC é um dos termômetros mais importantes do custo de vida real no Brasil. Acompanhar sua evolução mensal e acumulada é essencial para negociações salariais, planejamento financeiro e compreensão dos impactos da inflação sobre a população de menor renda.",
             "cta": "Acesse agora o INPC histórico completo, com gráficos, tabela e mapa de calor."
         },
         "ivar": {
