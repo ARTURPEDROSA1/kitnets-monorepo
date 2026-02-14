@@ -167,6 +167,15 @@ UPDATE public.gateways
 SET property_id = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'
 WHERE id = '587ea104-bca7-4af2-8c47-52b642d51e14';
 
+-- 5b2. Set property owner from gateway owner (required for RLS)
+UPDATE public.properties
+SET owner_id = (
+    SELECT owner_id FROM public.gateways
+    WHERE id = '587ea104-bca7-4af2-8c47-52b642d51e14'
+)
+WHERE id = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'
+  AND owner_id IS NULL;
+
 
 -- 5c. Seed 12 months of historical water bills
 -- Source: SAAE Itabirito — Hidrometro Y21SG1602635
