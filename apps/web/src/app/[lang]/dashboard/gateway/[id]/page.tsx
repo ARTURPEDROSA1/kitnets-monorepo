@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { Button } from "@kitnets/ui";
-import { ArrowLeft, RefreshCw, Zap, Droplets, Flame } from "lucide-react";
+import { ArrowLeft, RefreshCw, Zap, Droplets, Flame, FileText } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { KPICard } from "@/components/dashboard/KPICards";
@@ -336,6 +336,19 @@ export default function GatewayDetailPage() {
                         loading={loading}
                     />
                 </div>
+
+                {/* Link to billing history */}
+                {gateway.property_id && (
+                    <div className="mt-4">
+                        <Link
+                            href={`/${lang}/dashboard/billing/${gateway.property_id}?gateway=${id}`}
+                            className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+                        >
+                            <FileText className="w-4 h-4" />
+                            Ver Contas SAAE →
+                        </Link>
+                    </div>
+                )}
             </div>
 
             {/* ── Consolidated Chart with Tabs ────────────────── */}

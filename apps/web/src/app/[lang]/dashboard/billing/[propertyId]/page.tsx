@@ -1,0 +1,374 @@
+"use client";
+
+import { useEffect, useState, useMemo } from "react";
+import { createClient } from "@/utils/supabase/client";
+import { ArrowLeft, FileText, TrendingUp, DollarSign, Droplets, Calendar } from "lucide-react";
+import Link from "next/link";
+import { useParams, useSearchParams } from "next/navigation";
+import { ConsumptionChart } from "@/components/dashboard/ConsumptionChart";
+
+interface Bill {
+    id: string;
+    reference_month: string;
+    meter_number: string;
+    previous_reading: number;
+    current_reading: number;
+    consumption_m3: number;
+    billed_consumption_m3: number;
+    reading_date: string;
+    due_date: string;
+    water_tariff: number;
+    sewage_tariff: number;
+    water_basic_fee: number;
+    sewage_basic_fee: number;
+    total_amount: number;
+    effective_rate_per_m3: number;
+    occurrence_code: string;
+}
+
+interface Property {
+    id: string;
+    name: string;
+    address: string;
+    city: string;
+    state: string;
+    zip: string;
+    connection_code: string;
+}
+
+const MONTH_NAMES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+function formatMonth(ref: string): string {
+    const [year, month] = ref.split("-");
+    return `${MONTH_NAMES[parseInt(month) - 1]}/${year}`;
+}
+
+function formatCurrency(value: number): string {
+    return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function formatDate(dateStr: string | null): string {
+    if (!dateStr) return "-";
+    const [y, m, d] = dateStr.substring(0, 10).split("-");
+    return `${d}/${m}/${y}`;
+}
+
+export default function BillingPage() {
+    const params = useParams();
+    const searchParams = useSearchParams();
+    const lang = params.lang as string;
+    const propertyId = params.propertyId as string;
+    const gatewayId = searchParams.get("gateway");
+    const supabase = createClient();
+
+    const [property, setProperty] = useState<Property | null>(null);
+    const [bills, setBills] = useState<Bill[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true);
+
+            // Fetch property details
+            const { data: propData } = await supabase
+                .rpc("get_property_details", { p_property_id: propertyId });
+            if (propData?.[0]) {
+                setProperty(propData[0]);
+            }
+
+            // Fetch all bills
+            const { data: billsData } = await supabase
+                .rpc("get_property_bills", { p_property_id: propertyId });
+            if (billsData) {
+                setBills(billsData);
+            }
+
+            setLoading(false);
+        };
+
+        fetchData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [propertyId]);
+
+    // ── Derived data ──────────────────────────────────────────
+    const summaryStats = useMemo(() => {
+        if (bills.length === 0) return null;
+        const totalCost = bills.reduce((sum, b) => sum + Number(b.total_amount), 0);
+        const totalConsumption = bills.reduce((sum, b) => sum + Number(b.consumption_m3), 0);
+        const avgMonthlyCost = totalCost / bills.length;
+        const avgMonthlyConsumption = totalConsumption / bills.length;
+        const latestRate = Number(bills[0].effective_rate_per_m3);
+        const highestBill = bills.reduce((max, b) => Number(b.total_amount) > Number(max.total_amount) ? b : max, bills[0]);
+        return { totalCost, totalConsumption, avgMonthlyCost, avgMonthlyConsumption, latestRate, highestBill };
+    }, [bills]);
+
+    // Chart data: consumption + cost by month (chronological)
+    const chartData = useMemo(() => {
+        return [...bills]
+            .sort((a, b) => a.reference_month.localeCompare(b.reference_month))
+            .map((b) => ({
+                date_label: formatMonth(b.reference_month),
+                consumption: Number(b.consumption_m3),
+                cost: Number(b.total_amount),
+                rate: Number(b.effective_rate_per_m3),
+            }));
+    }, [bills]);
+
+    // ── Loading state ─────────────────────────────────────────
+    if (loading) {
+        return (
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <div className="animate-pulse space-y-6">
+                    <div className="h-8 bg-muted rounded w-64" />
+                    <div className="h-4 bg-muted rounded w-48" />
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {[...Array(4)].map((_, i) => (
+                            <div key={i} className="h-28 bg-muted rounded-xl" />
+                        ))}
+                    </div>
+                    <div className="h-80 bg-muted rounded-xl" />
+                </div>
+            </div>
+        );
+    }
+
+    const backHref = gatewayId
+        ? `/${lang}/dashboard/gateway/${gatewayId}`
+        : `/${lang}/dashboard`;
+
+    return (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            {/* ── Header ─────────────────────────────────────── */}
+            <div className="mb-8">
+                <Link
+                    href={backHref}
+                    className="flex items-center text-sm text-muted-foreground hover:text-foreground mb-4"
+                >
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Voltar
+                </Link>
+
+                <div className="flex items-start justify-between">
+                    <div>
+                        <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
+                            <FileText className="w-8 h-8 text-primary" />
+                            Histórico de Contas
+                        </h1>
+                        {property && (
+                            <div className="mt-2 space-y-1">
+                                <p className="text-muted-foreground">{property.name}</p>
+                                <p className="text-sm text-muted-foreground">{property.address} — {property.city}/{property.state}</p>
+                                {property.connection_code && (
+                                    <p className="text-xs text-muted-foreground font-mono">Ligação: {property.connection_code}</p>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                    <div className="text-right text-sm text-muted-foreground">
+                        <p>{bills.length} contas registradas</p>
+                        {bills[0] && <p className="font-mono">Hidrômetro: {bills[0].meter_number}</p>}
+                    </div>
+                </div>
+            </div>
+
+            {/* ── Summary Cards ──────────────────────────────── */}
+            {summaryStats && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+                    <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+                        <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                            <DollarSign className="w-4 h-4" />
+                            <span className="text-xs font-medium uppercase tracking-wide">Total ({bills.length} meses)</span>
+                        </div>
+                        <p className="text-2xl font-bold text-foreground">
+                            {formatCurrency(summaryStats.totalCost)}
+                        </p>
+                    </div>
+                    <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+                        <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                            <TrendingUp className="w-4 h-4" />
+                            <span className="text-xs font-medium uppercase tracking-wide">Média Mensal</span>
+                        </div>
+                        <p className="text-2xl font-bold text-foreground">
+                            {formatCurrency(summaryStats.avgMonthlyCost)}
+                        </p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                            {Math.round(summaryStats.avgMonthlyConsumption)} m³/mês
+                        </p>
+                    </div>
+                    <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+                        <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                            <Droplets className="w-4 h-4" />
+                            <span className="text-xs font-medium uppercase tracking-wide">Consumo Total</span>
+                        </div>
+                        <p className="text-2xl font-bold text-foreground">
+                            {summaryStats.totalConsumption} <span className="text-base font-normal text-muted-foreground">m³</span>
+                        </p>
+                    </div>
+                    <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+                        <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                            <Calendar className="w-4 h-4" />
+                            <span className="text-xs font-medium uppercase tracking-wide">Conta Mais Alta</span>
+                        </div>
+                        <p className="text-2xl font-bold text-foreground">
+                            {formatCurrency(Number(summaryStats.highestBill.total_amount))}
+                        </p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                            {formatMonth(summaryStats.highestBill.reference_month)} — {Number(summaryStats.highestBill.consumption_m3)} m³
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Consumption Chart ──────────────────────────── */}
+            <div className="bg-card border border-border rounded-xl p-6 shadow-sm mb-10">
+                <h2 className="text-lg font-semibold text-foreground mb-1">Consumo Mensal (m³)</h2>
+                <p className="text-sm text-muted-foreground mb-6">Evolução do consumo da concessionária nos últimos {bills.length} meses</p>
+                <ConsumptionChart
+                    data={chartData}
+                    dataKey="consumption"
+                    unit="m³"
+                    color="#3b82f6"
+                    height={300}
+                />
+            </div>
+
+            {/* ── Cost Chart ─────────────────────────────────── */}
+            <div className="bg-card border border-border rounded-xl p-6 shadow-sm mb-10">
+                <h2 className="text-lg font-semibold text-foreground mb-1">Valor Mensal (R$)</h2>
+                <p className="text-sm text-muted-foreground mb-6">Evolução do custo da conta de água</p>
+                <ConsumptionChart
+                    data={chartData}
+                    dataKey="cost"
+                    unit="R$"
+                    color="#10b981"
+                    height={300}
+                />
+            </div>
+
+            {/* ── Bills Table ────────────────────────────────── */}
+            <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden mb-10">
+                <div className="p-6 border-b border-border">
+                    <h2 className="text-lg font-semibold text-foreground">Detalhamento das Contas</h2>
+                    <p className="text-sm text-muted-foreground">Clique em uma linha para ver detalhes</p>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="border-b border-border bg-muted/30">
+                                <th className="text-left px-6 py-3 font-medium text-muted-foreground">Mês/Ano</th>
+                                <th className="text-right px-6 py-3 font-medium text-muted-foreground">Consumo</th>
+                                <th className="text-right px-6 py-3 font-medium text-muted-foreground">Valor</th>
+                                <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Taxa</th>
+                                <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">Leitura</th>
+                                <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">Vencimento</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {bills.map((bill) => (
+                                <tr
+                                    key={bill.id}
+                                    onClick={() => setSelectedBill(selectedBill?.id === bill.id ? null : bill)}
+                                    className={`border-b border-border cursor-pointer transition-colors hover:bg-muted/20 ${selectedBill?.id === bill.id ? "bg-primary/5" : ""
+                                        }`}
+                                >
+                                    <td className="px-6 py-4 font-medium text-foreground">
+                                        {formatMonth(bill.reference_month)}
+                                    </td>
+                                    <td className="px-6 py-4 text-right text-foreground">
+                                        {Number(bill.consumption_m3)} m³
+                                    </td>
+                                    <td className="px-6 py-4 text-right font-semibold text-foreground">
+                                        {formatCurrency(Number(bill.total_amount))}
+                                    </td>
+                                    <td className="px-6 py-4 text-right text-muted-foreground hidden md:table-cell">
+                                        R$ {Number(bill.effective_rate_per_m3).toFixed(2)}/m³
+                                    </td>
+                                    <td className="px-6 py-4 text-right text-muted-foreground hidden lg:table-cell font-mono text-xs">
+                                        {Number(bill.previous_reading)} → {Number(bill.current_reading)}
+                                    </td>
+                                    <td className="px-6 py-4 text-right text-muted-foreground hidden lg:table-cell">
+                                        {formatDate(bill.due_date)}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* ── Expanded bill detail ───────────────────── */}
+                {selectedBill && (
+                    <div className="p-6 bg-muted/10 border-t border-border animate-in fade-in slide-in-from-top-1 duration-200">
+                        <h3 className="font-semibold text-foreground mb-4">
+                            Detalhes — {formatMonth(selectedBill.reference_month)}
+                        </h3>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                            <div>
+                                <p className="text-muted-foreground">Hidrômetro</p>
+                                <p className="font-mono font-medium">{selectedBill.meter_number}</p>
+                            </div>
+                            <div>
+                                <p className="text-muted-foreground">Data da Leitura</p>
+                                <p className="font-medium">{formatDate(selectedBill.reading_date)}</p>
+                            </div>
+                            <div>
+                                <p className="text-muted-foreground">Leitura Anterior</p>
+                                <p className="font-medium">{Number(selectedBill.previous_reading)}</p>
+                            </div>
+                            <div>
+                                <p className="text-muted-foreground">Leitura Atual</p>
+                                <p className="font-medium">{Number(selectedBill.current_reading)}</p>
+                            </div>
+                            <div>
+                                <p className="text-muted-foreground">Cons. Real</p>
+                                <p className="font-medium">{Number(selectedBill.consumption_m3)} m³</p>
+                            </div>
+                            <div>
+                                <p className="text-muted-foreground">Cons. Faturado</p>
+                                <p className="font-medium">{Number(selectedBill.billed_consumption_m3)} m³</p>
+                            </div>
+                            <div>
+                                <p className="text-muted-foreground">Vencimento</p>
+                                <p className="font-medium">{formatDate(selectedBill.due_date)}</p>
+                            </div>
+                            <div>
+                                <p className="text-muted-foreground">Ocorrência</p>
+                                <p className="font-medium">{selectedBill.occurrence_code || "-"}</p>
+                            </div>
+                        </div>
+
+                        {/* Tariff breakdown (if available) */}
+                        {Number(selectedBill.water_tariff) > 0 && (
+                            <div className="mt-4 pt-4 border-t border-border">
+                                <p className="text-sm font-semibold text-muted-foreground mb-3">Composição da Conta</p>
+                                <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
+                                    <div className="bg-background rounded-lg p-3 border border-border">
+                                        <p className="text-xs text-muted-foreground">Tarifa de Água</p>
+                                        <p className="font-semibold">{formatCurrency(Number(selectedBill.water_tariff))}</p>
+                                    </div>
+                                    <div className="bg-background rounded-lg p-3 border border-border">
+                                        <p className="text-xs text-muted-foreground">Tarifa de Esgoto</p>
+                                        <p className="font-semibold">{formatCurrency(Number(selectedBill.sewage_tariff))}</p>
+                                    </div>
+                                    <div className="bg-background rounded-lg p-3 border border-border">
+                                        <p className="text-xs text-muted-foreground">TBOA (Água)</p>
+                                        <p className="font-semibold">{formatCurrency(Number(selectedBill.water_basic_fee))}</p>
+                                    </div>
+                                    <div className="bg-background rounded-lg p-3 border border-border">
+                                        <p className="text-xs text-muted-foreground">TBOE (Esgoto)</p>
+                                        <p className="font-semibold">{formatCurrency(Number(selectedBill.sewage_basic_fee))}</p>
+                                    </div>
+                                    <div className="bg-primary/10 rounded-lg p-3 border border-primary/20">
+                                        <p className="text-xs text-primary font-medium">Total</p>
+                                        <p className="font-bold text-primary">{formatCurrency(Number(selectedBill.total_amount))}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
