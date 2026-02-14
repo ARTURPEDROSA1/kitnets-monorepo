@@ -96,27 +96,31 @@ export function DateRangePicker({ onChange, defaultValue = "last7" }: DateRangeP
 
             {/* Custom date inputs (shown when "Período" is selected) */}
             {showCustom && (
-                <div className="flex items-center gap-2 flex-wrap bg-background border border-border rounded-lg p-2 animate-in fade-in slide-in-from-top-1 duration-200">
-                    <label className="text-sm text-muted-foreground whitespace-nowrap">De:</label>
-                    <input
-                        type="date"
-                        value={customStart}
-                        max={customEnd}
-                        onChange={(e) => setCustomStart(e.target.value)}
-                        className="px-2.5 py-1.5 text-sm rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                    />
-                    <label className="text-sm text-muted-foreground whitespace-nowrap">Até:</label>
-                    <input
-                        type="date"
-                        value={customEnd}
-                        min={customStart}
-                        max={format(new Date(), "yyyy-MM-dd")}
-                        onChange={(e) => setCustomEnd(e.target.value)}
-                        className="px-2.5 py-1.5 text-sm rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                    />
+                <div className="flex flex-col gap-2 bg-background border border-border rounded-lg p-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                    <div className="flex items-center gap-2">
+                        <label className="text-sm text-muted-foreground w-10 shrink-0">De:</label>
+                        <input
+                            type="date"
+                            value={customStart}
+                            max={customEnd}
+                            onChange={(e) => setCustomStart(e.target.value)}
+                            className="flex-1 min-w-0 px-2.5 py-2 text-sm rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        />
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <label className="text-sm text-muted-foreground w-10 shrink-0">Até:</label>
+                        <input
+                            type="date"
+                            value={customEnd}
+                            min={customStart}
+                            max={format(new Date(), "yyyy-MM-dd")}
+                            onChange={(e) => setCustomEnd(e.target.value)}
+                            className="flex-1 min-w-0 px-2.5 py-2 text-sm rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        />
+                    </div>
                     <button
                         onClick={handleCustomApply}
-                        className="px-4 py-1.5 text-sm font-medium rounded-md bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors whitespace-nowrap"
+                        className="w-full px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors"
                     >
                         Aplicar
                     </button>
