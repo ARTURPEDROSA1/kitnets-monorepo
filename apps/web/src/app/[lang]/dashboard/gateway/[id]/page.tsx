@@ -395,14 +395,14 @@ export default function GatewayDetailPage() {
                                     <div className="mt-2 space-y-1">
                                         {/* Equal split */}
                                         <div className="flex items-center justify-end gap-1.5">
-                                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Rateio igual</span>
+                                            <span className="text-xs uppercase tracking-wider text-muted-foreground">Rateio igual</span>
                                             <span className="text-xs font-semibold text-foreground bg-muted/60 px-1.5 py-0.5 rounded">
                                                 R$ {(kpis.estimatedCost / metersData.length).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </span>
                                         </div>
                                         {/* Proportional split */}
                                         <div className="flex items-center justify-end gap-1.5">
-                                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Proporcional</span>
+                                            <span className="text-xs uppercase tracking-wider text-muted-foreground">Proporcional</span>
                                             <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-400 px-1.5 py-0.5 rounded">
                                                 R$ {(kpis.totalConsumption > 0
                                                     ? (meter.totalConsumption / kpis.totalConsumption) * kpis.estimatedCost
@@ -411,7 +411,7 @@ export default function GatewayDetailPage() {
                                             </span>
                                         </div>
                                         {/* Percentage of total */}
-                                        <p className="text-[10px] text-muted-foreground">
+                                        <p className="text-xs text-muted-foreground">
                                             {kpis.totalConsumption > 0
                                                 ? ((meter.totalConsumption / kpis.totalConsumption) * 100).toFixed(1)
                                                 : "0"
