@@ -10,7 +10,7 @@ import { KPICard } from "@/components/dashboard/KPICards";
 import { ConsumptionChart } from "@/components/dashboard/ConsumptionChart";
 import { ConsumptionTabs, DailyTotal } from "@/components/dashboard/ConsumptionTabs";
 import { DateRangePicker } from "@/components/dashboard/DateRangePicker";
-import { format, differenceInDays, subDays } from "date-fns";
+import { format, differenceInDays, subDays, startOfMonth } from "date-fns";
 
 interface DateRange {
     start: Date;
@@ -44,9 +44,9 @@ export default function GatewayDetailPage() {
     const [metersData, setMetersData] = useState<any[]>([]);
     const [dailyTotalsData, setDailyTotalsData] = useState<DailyTotal[]>([]);
     const [dateRange, setDateRange] = useState<DateRange>({
-        start: subDays(new Date(), 6),
+        start: startOfMonth(new Date()),
         end: new Date(),
-        label: "Últimos 7 dias",
+        label: "Este Mês",
     });
     const [kpis, setKpis] = useState<KPIs>({
         totalConsumption: 0,
@@ -281,7 +281,7 @@ export default function GatewayDetailPage() {
 
             {/* ── Date Range Picker ──────────────────────────── */}
             <div className="mb-8">
-                <DateRangePicker onChange={handleDateRangeChange} defaultValue="last7" />
+                <DateRangePicker onChange={handleDateRangeChange} defaultValue="thisMonth" />
             </div>
 
             {/* ── KPI Cards ──────────────────────────────────── */}
