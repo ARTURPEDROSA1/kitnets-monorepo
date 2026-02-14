@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { ArrowLeft, Save, Calculator, AlertCircle, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 
 interface PropertyInfo {
     id: string;
@@ -60,6 +60,7 @@ function formatCurrency(value: number): string {
 export default function ManualBillEntryPage() {
     const params = useParams();
     const searchParams = useSearchParams();
+    const router = useRouter();
 
     const lang = params.lang as string;
     const propertyId = params.propertyId as string;
@@ -229,8 +230,11 @@ export default function ManualBillEntryPage() {
                 setError(`Erro ao salvar: ${rpcError.message}`);
             } else {
                 setSuccess(true);
-                // Scroll to top
                 window.scrollTo({ top: 0, behavior: "smooth" });
+                // Auto-navigate back after brief delay
+                setTimeout(() => {
+                    router.push(backHref);
+                }, 1500);
             }
         } catch (err) {
             setError("Erro inesperado ao salvar a conta.");
