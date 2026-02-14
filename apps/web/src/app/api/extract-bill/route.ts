@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-});
-
 const EXTRACTION_PROMPT = `You are an expert at reading Brazilian water utility bills (contas de água).
 Analyze this bill image carefully and extract ALL data fields.
 
@@ -61,6 +57,10 @@ export async function POST(request: Request) {
                 { status: 500 }
             );
         }
+
+        const openai = new OpenAI({
+            apiKey: process.env.OPENAI_API_KEY,
+        });
 
         const formData = await request.formData();
         const file = formData.get("file") as File | null;
