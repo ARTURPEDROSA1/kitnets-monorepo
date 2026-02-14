@@ -14,8 +14,14 @@ ALTER TABLE public.water_bills
 -- Controls how bills are split across units/meters
 -- ============================================================
 ALTER TABLE public.properties
-    ADD COLUMN IF NOT EXISTS allocation_model TEXT DEFAULT 'proportional'
-    CHECK (allocation_model IN ('equal', 'proportional', 'fixed'));
+    ADD COLUMN IF NOT EXISTS allocation_model TEXT DEFAULT 'proportional';
+
+DO $$ BEGIN
+    ALTER TABLE public.properties
+        ADD CONSTRAINT chk_allocation_model
+        CHECK (allocation_model IN ('equal', 'proportional', 'fixed'));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- 3. Update existing Jan 2026 bill with original reading date
 UPDATE public.water_bills
@@ -95,7 +101,10 @@ END;
 $$;
 
 -- 5. Update get_property_bills to include reading_date_orig
+--    Must DROP first because return type is changing
 -- ============================================================
+DROP FUNCTION IF EXISTS get_property_bills(uuid);
+
 CREATE OR REPLACE FUNCTION get_property_bills(p_property_id UUID)
 RETURNS TABLE(
     id UUID,
