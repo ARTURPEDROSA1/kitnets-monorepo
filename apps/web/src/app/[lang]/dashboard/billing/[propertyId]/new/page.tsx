@@ -64,6 +64,7 @@ export default function ManualBillEntryPage() {
     const lang = params.lang as string;
     const propertyId = params.propertyId as string;
     const gatewayId = searchParams.get("gateway");
+    const editMonth = searchParams.get("edit"); // e.g. "2026-02" — edit mode
     const supabase = createClient();
 
     const [property, setProperty] = useState<PropertyInfo | null>(null);
@@ -71,6 +72,7 @@ export default function ManualBillEntryPage() {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
+    const [isEditMode, setIsEditMode] = useState(!!editMonth);
     const [lastBill, setLastBill] = useState<{ meter_number: string; current_reading: number; reference_month: string } | null>(null);
 
     useEffect(() => {
@@ -82,16 +84,41 @@ export default function ManualBillEntryPage() {
                 setProperty(propData[0]);
             }
 
-            // Last bill (for pre-filling meter number and previous reading)
+            // Fetch all bills
             const { data: bills } = await supabase
                 .rpc("get_property_bills", { p_property_id: propertyId });
-            if (bills?.[0]) {
+
+            // ── Edit mode: load existing bill into form ──
+            if (editMonth && bills) {
+                const bill = bills.find((b: { reference_month: string }) => b.reference_month === editMonth);
+                if (bill) {
+                    setIsEditMode(true);
+                    setForm({
+                        referenceMonth: bill.reference_month || "",
+                        meterNumber: bill.meter_number || "",
+                        previousReading: bill.previous_reading != null ? String(Number(bill.previous_reading)) : "",
+                        currentReading: bill.current_reading != null ? String(Number(bill.current_reading)) : "",
+                        consumptionM3: bill.consumption_m3 != null ? String(Number(bill.consumption_m3)) : "",
+                        billedConsumptionM3: bill.billed_consumption_m3 != null ? String(Number(bill.billed_consumption_m3)) : "",
+                        readingDate: bill.reading_date ? String(bill.reading_date).substring(0, 10) : "",
+                        readingDateOrig: bill.reading_date_orig ? String(bill.reading_date_orig).substring(0, 10) : "",
+                        dueDate: bill.due_date ? String(bill.due_date).substring(0, 10) : "",
+                        waterTariff: Number(bill.water_tariff) ? String(Number(bill.water_tariff)) : "",
+                        sewageTariff: Number(bill.sewage_tariff) ? String(Number(bill.sewage_tariff)) : "",
+                        waterBasicFee: Number(bill.water_basic_fee) ? String(Number(bill.water_basic_fee)) : "",
+                        sewageBasicFee: Number(bill.sewage_basic_fee) ? String(Number(bill.sewage_basic_fee)) : "",
+                        totalAmount: bill.total_amount != null ? String(Number(bill.total_amount)) : "",
+                        occurrenceCode: bill.occurrence_code || "",
+                        notes: "",
+                    });
+                }
+            } else if (bills?.[0]) {
+                // ── New mode: pre-fill from last bill ──
                 setLastBill({
                     meter_number: bills[0].meter_number,
                     current_reading: Number(bills[0].current_reading),
                     reference_month: bills[0].reference_month,
                 });
-                // Pre-fill meter number and previous reading from last bill
                 setForm(prev => ({
                     ...prev,
                     meterNumber: bills[0].meter_number || "",
@@ -231,7 +258,7 @@ export default function ManualBillEntryPage() {
 
                 <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
                     <Save className="w-8 h-8 text-primary" />
-                    Lançamento Manual de Conta
+                    {isEditMode ? "Editar Conta" : "Lançamento Manual de Conta"}
                 </h1>
                 {property && (
                     <p className="mt-2 text-muted-foreground">
@@ -245,7 +272,9 @@ export default function ManualBillEntryPage() {
                 <div className="mb-6 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4 flex items-center gap-3">
                     <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
                     <div>
-                        <p className="font-medium text-emerald-800 dark:text-emerald-300">Conta salva com sucesso!</p>
+                        <p className="font-medium text-emerald-800 dark:text-emerald-300">
+                            {isEditMode ? "Conta atualizada com sucesso!" : "Conta salva com sucesso!"}
+                        </p>
                         <p className="text-sm text-emerald-600 dark:text-emerald-400">
                             Referência: {form.referenceMonth} — {formatCurrency(parseFloat(form.totalAmount))}
                         </p>
@@ -284,8 +313,9 @@ export default function ManualBillEntryPage() {
                                 type="month"
                                 value={form.referenceMonth}
                                 onChange={(e) => handleChange("referenceMonth", e.target.value)}
-                                className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                                className={`w-full px-3 py-2.5 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors ${isEditMode ? "opacity-60 cursor-not-allowed" : ""}`}
                                 required
+                                readOnly={isEditMode}
                             />
                         </div>
                         <div>
@@ -580,7 +610,7 @@ export default function ManualBillEntryPage() {
                         ) : (
                             <>
                                 <Save className="w-4 h-4" />
-                                Salvar Conta
+                                {isEditMode ? "Atualizar Conta" : "Salvar Conta"}
                             </>
                         )}
                     </button>
