@@ -23,6 +23,8 @@ interface KPIs {
     avgPerDay: number;
     peakDay: { date: string; value: number } | null;
     previousPeriodChange: number | null;
+    estimatedCost: number | null;
+    rateInfo: string | null; // e.g. "R$ 9,83/m³ (Jan/2026)"
 }
 
 /** Extract "DD/MM" from an ISO date string without timezone conversion */
@@ -51,6 +53,8 @@ export default function GatewayDetailPage() {
         avgPerDay: 0,
         peakDay: null,
         previousPeriodChange: null,
+        estimatedCost: null,
+        rateInfo: null,
     });
 
     // Track date range timestamps for stable effect deps
@@ -87,7 +91,7 @@ export default function GatewayDetailPage() {
             if (meterIds.length === 0) {
                 setMetersData([]);
                 setDailyTotalsData([]);
-                setKpis({ totalConsumption: 0, avgPerDay: 0, peakDay: null, previousPeriodChange: null });
+                setKpis({ totalConsumption: 0, avgPerDay: 0, peakDay: null, previousPeriodChange: null, estimatedCost: null, rateInfo: null });
                 setLoading(false);
                 return;
             }
@@ -169,7 +173,33 @@ export default function GatewayDetailPage() {
                     ? Math.round(((totalConsumption - prevTotal) / prevTotal) * 100)
                     : null;
 
-            setKpis({ totalConsumption, avgPerDay, peakDay, previousPeriodChange });
+            // ── Billing: fetch latest water bill for cost estimation ──
+            let estimatedCost: number | null = null;
+            let rateInfo: string | null = null;
+
+            if (gw.property_id) {
+                const { data: latestBill } = await supabase
+                    .from("water_bills")
+                    .select("effective_rate_per_m3, reference_month")
+                    .eq("property_id", gw.property_id)
+                    .order("reference_month", { ascending: false })
+                    .limit(1)
+                    .single();
+
+                if (latestBill && latestBill.effective_rate_per_m3) {
+                    const rate = Number(latestBill.effective_rate_per_m3);
+                    // totalConsumption is in liters, rate is R$/m³
+                    estimatedCost = Math.round((totalConsumption / 1000) * rate * 100) / 100;
+                    const [year, month] = latestBill.reference_month.split("-");
+                    const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+                    const monthLabel = monthNames[parseInt(month) - 1];
+                    rateInfo = `R$ ${rate.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}/m³ (${monthLabel}/${year})`;
+                }
+            }
+
+            if (cancelled) return;
+
+            setKpis({ totalConsumption, avgPerDay, peakDay, previousPeriodChange, estimatedCost, rateInfo });
             setDailyTotalsData(
                 Object.entries(dailyTotals)
                     .map(([date, total]) => ({ date, total }))
@@ -300,8 +330,12 @@ export default function GatewayDetailPage() {
                     />
                     <KPICard
                         title="Custo Estimado"
-                        value="-"
-                        description="Sem tarifa configurada"
+                        value={
+                            kpis.estimatedCost !== null
+                                ? `R$ ${kpis.estimatedCost.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+                                : "-"
+                        }
+                        description={kpis.rateInfo || "Sem tarifa configurada"}
                         icon="money"
                         loading={loading}
                     />
