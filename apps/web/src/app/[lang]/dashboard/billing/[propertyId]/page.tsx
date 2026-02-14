@@ -68,8 +68,8 @@ export default function BillingPage() {
     const [bills, setBills] = useState<Bill[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
-    const [showAddress, setShowAddress] = useState(true);
-    const [showValues, setShowValues] = useState(true);
+    const [showAddress, setShowAddress] = useState(false);
+    const [showValues, setShowValues] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
