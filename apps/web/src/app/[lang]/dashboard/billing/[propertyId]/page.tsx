@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { ArrowLeft, FileText, TrendingUp, DollarSign, Droplets, Calendar } from "lucide-react";
+import { ArrowLeft, FileText, TrendingUp, DollarSign, Droplets, Calendar, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { ConsumptionChart } from "@/components/dashboard/ConsumptionChart";
@@ -266,108 +266,113 @@ export default function BillingPage() {
                             </tr>
                         </thead>
                         <tbody>
-                            {bills.map((bill) => (
-                                <tr
-                                    key={bill.id}
-                                    onClick={() => setSelectedBill(selectedBill?.id === bill.id ? null : bill)}
-                                    className={`border-b border-border cursor-pointer transition-colors hover:bg-muted/20 ${selectedBill?.id === bill.id ? "bg-primary/5" : ""
-                                        }`}
-                                >
-                                    <td className="px-6 py-4 font-medium text-foreground">
-                                        {formatMonth(bill.reference_month)}
-                                    </td>
-                                    <td className="px-6 py-4 text-right text-foreground">
-                                        {Number(bill.consumption_m3)} m³
-                                    </td>
-                                    <td className="px-6 py-4 text-right font-semibold text-foreground">
-                                        {formatCurrency(Number(bill.total_amount))}
-                                    </td>
-                                    <td className="px-6 py-4 text-right text-muted-foreground hidden md:table-cell">
-                                        R$ {Number(bill.effective_rate_per_m3).toFixed(2)}/m³
-                                    </td>
-                                    <td className="px-6 py-4 text-right text-muted-foreground hidden lg:table-cell font-mono text-xs">
-                                        {Number(bill.previous_reading)} → {Number(bill.current_reading)}
-                                    </td>
-                                    <td className="px-6 py-4 text-right text-muted-foreground hidden lg:table-cell">
-                                        {formatDate(bill.due_date)}
-                                    </td>
-                                </tr>
-                            ))}
+                            {bills.map((bill) => {
+                                const isSelected = selectedBill?.id === bill.id;
+                                return (
+                                    <React.Fragment key={bill.id}>
+                                        <tr
+                                            onClick={() => setSelectedBill(isSelected ? null : bill)}
+                                            className={`border-b border-border cursor-pointer transition-colors hover:bg-muted/20 ${isSelected ? "bg-primary/5" : ""}`}
+                                        >
+                                            <td className="px-6 py-4 font-medium text-foreground">
+                                                <span className="inline-flex items-center gap-2">
+                                                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${isSelected ? "rotate-180" : ""}`} />
+                                                    {formatMonth(bill.reference_month)}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-right text-foreground">
+                                                {Number(bill.consumption_m3)} m³
+                                            </td>
+                                            <td className="px-6 py-4 text-right font-semibold text-foreground">
+                                                {formatCurrency(Number(bill.total_amount))}
+                                            </td>
+                                            <td className="px-6 py-4 text-right text-muted-foreground hidden md:table-cell">
+                                                R$ {Number(bill.effective_rate_per_m3).toFixed(2)}/m³
+                                            </td>
+                                            <td className="px-6 py-4 text-right text-muted-foreground hidden lg:table-cell font-mono text-xs">
+                                                {Number(bill.previous_reading)} → {Number(bill.current_reading)}
+                                            </td>
+                                            <td className="px-6 py-4 text-right text-muted-foreground hidden lg:table-cell">
+                                                {formatDate(bill.due_date)}
+                                            </td>
+                                        </tr>
+
+                                        {/* Inline expanded detail */}
+                                        {isSelected && (
+                                            <tr className="bg-muted/10">
+                                                <td colSpan={6} className="px-6 py-5">
+                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                                        <div>
+                                                            <p className="text-muted-foreground text-xs">Hidrômetro</p>
+                                                            <p className="font-mono font-medium">{bill.meter_number}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-muted-foreground text-xs">Data da Leitura</p>
+                                                            <p className="font-medium">{formatDate(bill.reading_date)}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-muted-foreground text-xs">Leitura Anterior</p>
+                                                            <p className="font-medium">{Number(bill.previous_reading)}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-muted-foreground text-xs">Leitura Atual</p>
+                                                            <p className="font-medium">{Number(bill.current_reading)}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-muted-foreground text-xs">Cons. Real</p>
+                                                            <p className="font-medium">{Number(bill.consumption_m3)} m³</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-muted-foreground text-xs">Cons. Faturado</p>
+                                                            <p className="font-medium">{Number(bill.billed_consumption_m3)} m³</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-muted-foreground text-xs">Vencimento</p>
+                                                            <p className="font-medium">{formatDate(bill.due_date)}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-muted-foreground text-xs">Ocorrência</p>
+                                                            <p className="font-medium">{bill.occurrence_code || "-"}</p>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Tariff breakdown */}
+                                                    {Number(bill.water_tariff) > 0 && (
+                                                        <div className="mt-4 pt-4 border-t border-border">
+                                                            <p className="text-sm font-semibold text-muted-foreground mb-3">Composição da Conta</p>
+                                                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
+                                                                <div className="bg-background rounded-lg p-3 border border-border">
+                                                                    <p className="text-xs text-muted-foreground">Tarifa de Água</p>
+                                                                    <p className="font-semibold">{formatCurrency(Number(bill.water_tariff))}</p>
+                                                                </div>
+                                                                <div className="bg-background rounded-lg p-3 border border-border">
+                                                                    <p className="text-xs text-muted-foreground">Tarifa de Esgoto</p>
+                                                                    <p className="font-semibold">{formatCurrency(Number(bill.sewage_tariff))}</p>
+                                                                </div>
+                                                                <div className="bg-background rounded-lg p-3 border border-border">
+                                                                    <p className="text-xs text-muted-foreground">TBOA (Água)</p>
+                                                                    <p className="font-semibold">{formatCurrency(Number(bill.water_basic_fee))}</p>
+                                                                </div>
+                                                                <div className="bg-background rounded-lg p-3 border border-border">
+                                                                    <p className="text-xs text-muted-foreground">TBOE (Esgoto)</p>
+                                                                    <p className="font-semibold">{formatCurrency(Number(bill.sewage_basic_fee))}</p>
+                                                                </div>
+                                                                <div className="bg-primary/10 rounded-lg p-3 border border-primary/20">
+                                                                    <p className="text-xs text-primary font-medium">Total</p>
+                                                                    <p className="font-bold text-primary">{formatCurrency(Number(bill.total_amount))}</p>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </React.Fragment>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>
-
-                {/* ── Expanded bill detail ───────────────────── */}
-                {selectedBill && (
-                    <div className="p-6 bg-muted/10 border-t border-border animate-in fade-in slide-in-from-top-1 duration-200">
-                        <h3 className="font-semibold text-foreground mb-4">
-                            Detalhes — {formatMonth(selectedBill.reference_month)}
-                        </h3>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                            <div>
-                                <p className="text-muted-foreground">Hidrômetro</p>
-                                <p className="font-mono font-medium">{selectedBill.meter_number}</p>
-                            </div>
-                            <div>
-                                <p className="text-muted-foreground">Data da Leitura</p>
-                                <p className="font-medium">{formatDate(selectedBill.reading_date)}</p>
-                            </div>
-                            <div>
-                                <p className="text-muted-foreground">Leitura Anterior</p>
-                                <p className="font-medium">{Number(selectedBill.previous_reading)}</p>
-                            </div>
-                            <div>
-                                <p className="text-muted-foreground">Leitura Atual</p>
-                                <p className="font-medium">{Number(selectedBill.current_reading)}</p>
-                            </div>
-                            <div>
-                                <p className="text-muted-foreground">Cons. Real</p>
-                                <p className="font-medium">{Number(selectedBill.consumption_m3)} m³</p>
-                            </div>
-                            <div>
-                                <p className="text-muted-foreground">Cons. Faturado</p>
-                                <p className="font-medium">{Number(selectedBill.billed_consumption_m3)} m³</p>
-                            </div>
-                            <div>
-                                <p className="text-muted-foreground">Vencimento</p>
-                                <p className="font-medium">{formatDate(selectedBill.due_date)}</p>
-                            </div>
-                            <div>
-                                <p className="text-muted-foreground">Ocorrência</p>
-                                <p className="font-medium">{selectedBill.occurrence_code || "-"}</p>
-                            </div>
-                        </div>
-
-                        {/* Tariff breakdown (if available) */}
-                        {Number(selectedBill.water_tariff) > 0 && (
-                            <div className="mt-4 pt-4 border-t border-border">
-                                <p className="text-sm font-semibold text-muted-foreground mb-3">Composição da Conta</p>
-                                <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
-                                    <div className="bg-background rounded-lg p-3 border border-border">
-                                        <p className="text-xs text-muted-foreground">Tarifa de Água</p>
-                                        <p className="font-semibold">{formatCurrency(Number(selectedBill.water_tariff))}</p>
-                                    </div>
-                                    <div className="bg-background rounded-lg p-3 border border-border">
-                                        <p className="text-xs text-muted-foreground">Tarifa de Esgoto</p>
-                                        <p className="font-semibold">{formatCurrency(Number(selectedBill.sewage_tariff))}</p>
-                                    </div>
-                                    <div className="bg-background rounded-lg p-3 border border-border">
-                                        <p className="text-xs text-muted-foreground">TBOA (Água)</p>
-                                        <p className="font-semibold">{formatCurrency(Number(selectedBill.water_basic_fee))}</p>
-                                    </div>
-                                    <div className="bg-background rounded-lg p-3 border border-border">
-                                        <p className="text-xs text-muted-foreground">TBOE (Esgoto)</p>
-                                        <p className="font-semibold">{formatCurrency(Number(selectedBill.sewage_basic_fee))}</p>
-                                    </div>
-                                    <div className="bg-primary/10 rounded-lg p-3 border border-primary/20">
-                                        <p className="text-xs text-primary font-medium">Total</p>
-                                        <p className="font-bold text-primary">{formatCurrency(Number(selectedBill.total_amount))}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
             </div>
         </div>
     );
