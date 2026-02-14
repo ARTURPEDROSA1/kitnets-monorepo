@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { ArrowLeft, FileText, TrendingUp, DollarSign, Droplets, Calendar, ChevronDown, Eye, EyeOff, BadgeDollarSign } from "lucide-react";
+import { ArrowLeft, FileText, TrendingUp, DollarSign, Droplets, Calendar, ChevronDown, Eye, EyeOff, BadgeDollarSign, Plus } from "lucide-react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { ConsumptionChart } from "@/components/dashboard/ConsumptionChart";
@@ -189,9 +189,16 @@ export default function BillingPage() {
                             </div>
                         )}
                     </div>
-                    <div className="text-right text-sm text-muted-foreground">
-                        <p>{bills.length} contas registradas</p>
-                        {bills[0] && <p className="font-mono">Hidrômetro: {showAddress ? bills[0].meter_number : MASK}</p>}
+                    <div className="text-right">
+                        <Link
+                            href={`/${lang}/dashboard/billing/${propertyId}/new${gatewayId ? `?gateway=${gatewayId}` : ""}`}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground text-sm font-semibold rounded-lg hover:bg-primary/90 transition-colors shadow-sm mb-2"
+                        >
+                            <Plus className="w-4 h-4" />
+                            Nova Conta
+                        </Link>
+                        <p className="text-sm text-muted-foreground">{bills.length} contas registradas</p>
+                        {bills[0] && <p className="font-mono text-sm text-muted-foreground">Hidrômetro: {showAddress ? bills[0].meter_number : MASK}</p>}
                     </div>
                 </div>
             </div>
