@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { ArrowLeft, FileText, TrendingUp, DollarSign, Droplets, Calendar, ChevronDown } from "lucide-react";
+import { ArrowLeft, FileText, TrendingUp, DollarSign, Droplets, Calendar, ChevronDown, Eye, EyeOff, BadgeDollarSign } from "lucide-react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { ConsumptionChart } from "@/components/dashboard/ConsumptionChart";
@@ -53,6 +53,9 @@ function formatDate(dateStr: string | null): string {
     return `${d}/${m}/${y}`;
 }
 
+const MASK = "••••••";
+const MASK_CURRENCY = "R$ •••";
+
 export default function BillingPage() {
     const params = useParams();
     const searchParams = useSearchParams();
@@ -65,6 +68,8 @@ export default function BillingPage() {
     const [bills, setBills] = useState<Bill[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
+    const [showAddress, setShowAddress] = useState(true);
+    const [showValues, setShowValues] = useState(true);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -151,23 +156,42 @@ export default function BillingPage() {
 
                 <div className="flex items-start justify-between">
                     <div>
-                        <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
-                            <FileText className="w-8 h-8 text-primary" />
-                            Histórico de Contas
-                        </h1>
+                        <div className="flex items-center gap-3">
+                            <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
+                                <FileText className="w-8 h-8 text-primary" />
+                                Histórico de Contas
+                            </h1>
+                            {/* Privacy toggles */}
+                            <div className="flex items-center gap-1 ml-2">
+                                <button
+                                    onClick={() => setShowAddress(!showAddress)}
+                                    className="p-2 rounded-lg hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
+                                    title={showAddress ? "Ocultar dados do imóvel" : "Mostrar dados do imóvel"}
+                                >
+                                    {showAddress ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
+                                </button>
+                                <button
+                                    onClick={() => setShowValues(!showValues)}
+                                    className={`p-2 rounded-lg hover:bg-muted/50 transition-colors ${showValues ? "text-muted-foreground hover:text-foreground" : "text-muted-foreground/50 hover:text-foreground"}`}
+                                    title={showValues ? "Ocultar valores em R$" : "Mostrar valores em R$"}
+                                >
+                                    <BadgeDollarSign className={`w-5 h-5 ${!showValues ? "opacity-40" : ""}`} />
+                                </button>
+                            </div>
+                        </div>
                         {property && (
                             <div className="mt-2 space-y-1">
-                                <p className="text-muted-foreground">{property.name}</p>
-                                <p className="text-sm text-muted-foreground">{property.address} — {property.city}/{property.state}</p>
+                                <p className="text-muted-foreground">{showAddress ? property.name : MASK}</p>
+                                <p className="text-sm text-muted-foreground">{showAddress ? `${property.address} — ${property.city}/${property.state}` : MASK}</p>
                                 {property.connection_code && (
-                                    <p className="text-xs text-muted-foreground font-mono">Ligação: {property.connection_code}</p>
+                                    <p className="text-xs text-muted-foreground font-mono">Ligação: {showAddress ? property.connection_code : MASK}</p>
                                 )}
                             </div>
                         )}
                     </div>
                     <div className="text-right text-sm text-muted-foreground">
                         <p>{bills.length} contas registradas</p>
-                        {bills[0] && <p className="font-mono">Hidrômetro: {bills[0].meter_number}</p>}
+                        {bills[0] && <p className="font-mono">Hidrômetro: {showAddress ? bills[0].meter_number : MASK}</p>}
                     </div>
                 </div>
             </div>
@@ -181,7 +205,7 @@ export default function BillingPage() {
                             <span className="text-xs font-medium uppercase tracking-wide">Total ({bills.length} meses)</span>
                         </div>
                         <p className="text-2xl font-bold text-foreground">
-                            {formatCurrency(summaryStats.totalCost)}
+                            {showValues ? formatCurrency(summaryStats.totalCost) : MASK_CURRENCY}
                         </p>
                     </div>
                     <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
@@ -190,7 +214,7 @@ export default function BillingPage() {
                             <span className="text-xs font-medium uppercase tracking-wide">Média Mensal</span>
                         </div>
                         <p className="text-2xl font-bold text-foreground">
-                            {formatCurrency(summaryStats.avgMonthlyCost)}
+                            {showValues ? formatCurrency(summaryStats.avgMonthlyCost) : MASK_CURRENCY}
                         </p>
                         <p className="text-sm text-muted-foreground mt-1">
                             {Math.round(summaryStats.avgMonthlyConsumption)} m³/mês
@@ -211,7 +235,7 @@ export default function BillingPage() {
                             <span className="text-xs font-medium uppercase tracking-wide">Conta Mais Alta</span>
                         </div>
                         <p className="text-2xl font-bold text-foreground">
-                            {formatCurrency(Number(summaryStats.highestBill.total_amount))}
+                            {showValues ? formatCurrency(Number(summaryStats.highestBill.total_amount)) : MASK_CURRENCY}
                         </p>
                         <p className="text-sm text-muted-foreground mt-1">
                             {formatMonth(summaryStats.highestBill.reference_month)} — {Number(summaryStats.highestBill.consumption_m3)} m³
@@ -284,10 +308,10 @@ export default function BillingPage() {
                                                 {Number(bill.consumption_m3)} m³
                                             </td>
                                             <td className="px-6 py-4 text-right font-semibold text-foreground">
-                                                {formatCurrency(Number(bill.total_amount))}
+                                                {showValues ? formatCurrency(Number(bill.total_amount)) : MASK_CURRENCY}
                                             </td>
                                             <td className="px-6 py-4 text-right text-muted-foreground hidden md:table-cell">
-                                                R$ {Number(bill.effective_rate_per_m3).toFixed(2)}/m³
+                                                {showValues ? `R$ ${Number(bill.effective_rate_per_m3).toFixed(2)}/m³` : MASK_CURRENCY}
                                             </td>
                                             <td className="px-6 py-4 text-right text-muted-foreground hidden lg:table-cell font-mono text-xs">
                                                 {Number(bill.previous_reading)} → {Number(bill.current_reading)}
@@ -304,7 +328,7 @@ export default function BillingPage() {
                                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                                                         <div>
                                                             <p className="text-muted-foreground text-xs">Hidrômetro</p>
-                                                            <p className="font-mono font-medium">{bill.meter_number}</p>
+                                                            <p className="font-mono font-medium">{showAddress ? bill.meter_number : MASK}</p>
                                                         </div>
                                                         <div>
                                                             <p className="text-muted-foreground text-xs">Data da Leitura</p>
@@ -343,23 +367,23 @@ export default function BillingPage() {
                                                             <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
                                                                 <div className="bg-background rounded-lg p-3 border border-border">
                                                                     <p className="text-xs text-muted-foreground">Tarifa de Água</p>
-                                                                    <p className="font-semibold">{formatCurrency(Number(bill.water_tariff))}</p>
+                                                                    <p className="font-semibold">{showValues ? formatCurrency(Number(bill.water_tariff)) : MASK_CURRENCY}</p>
                                                                 </div>
                                                                 <div className="bg-background rounded-lg p-3 border border-border">
                                                                     <p className="text-xs text-muted-foreground">Tarifa de Esgoto</p>
-                                                                    <p className="font-semibold">{formatCurrency(Number(bill.sewage_tariff))}</p>
+                                                                    <p className="font-semibold">{showValues ? formatCurrency(Number(bill.sewage_tariff)) : MASK_CURRENCY}</p>
                                                                 </div>
                                                                 <div className="bg-background rounded-lg p-3 border border-border">
                                                                     <p className="text-xs text-muted-foreground">TBOA (Água)</p>
-                                                                    <p className="font-semibold">{formatCurrency(Number(bill.water_basic_fee))}</p>
+                                                                    <p className="font-semibold">{showValues ? formatCurrency(Number(bill.water_basic_fee)) : MASK_CURRENCY}</p>
                                                                 </div>
                                                                 <div className="bg-background rounded-lg p-3 border border-border">
                                                                     <p className="text-xs text-muted-foreground">TBOE (Esgoto)</p>
-                                                                    <p className="font-semibold">{formatCurrency(Number(bill.sewage_basic_fee))}</p>
+                                                                    <p className="font-semibold">{showValues ? formatCurrency(Number(bill.sewage_basic_fee)) : MASK_CURRENCY}</p>
                                                                 </div>
                                                                 <div className="bg-primary/10 rounded-lg p-3 border border-primary/20">
                                                                     <p className="text-xs text-primary font-medium">Total</p>
-                                                                    <p className="font-bold text-primary">{formatCurrency(Number(bill.total_amount))}</p>
+                                                                    <p className="font-bold text-primary">{showValues ? formatCurrency(Number(bill.total_amount)) : MASK_CURRENCY}</p>
                                                                 </div>
                                                             </div>
                                                         </div>
