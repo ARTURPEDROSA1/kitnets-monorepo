@@ -178,14 +178,10 @@ export default function GatewayDetailPage() {
             let rateInfo: string | null = null;
 
             if (gw.property_id) {
-                const { data: latestBill } = await supabase
-                    .from("water_bills")
-                    .select("effective_rate_per_m3, reference_month")
-                    .eq("property_id", gw.property_id)
-                    .order("reference_month", { ascending: false })
-                    .limit(1)
-                    .single();
+                const { data: rateData } = await supabase
+                    .rpc("get_latest_billing_rate", { p_property_id: gw.property_id });
 
+                const latestBill = rateData?.[0];
                 if (latestBill && latestBill.effective_rate_per_m3) {
                     const rate = Number(latestBill.effective_rate_per_m3);
                     // totalConsumption is in liters, rate is R$/m³
@@ -193,7 +189,7 @@ export default function GatewayDetailPage() {
                     const [year, month] = latestBill.reference_month.split("-");
                     const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
                     const monthLabel = monthNames[parseInt(month) - 1];
-                    rateInfo = `R$ ${rate.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}/m³ (${monthLabel}/${year})`;
+                    rateInfo = `R$ ${rate.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}/m\u00b3 (${monthLabel}/${year})`;
                 }
             }
 
