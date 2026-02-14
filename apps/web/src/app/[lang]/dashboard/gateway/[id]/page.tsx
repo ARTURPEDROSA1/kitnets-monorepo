@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { Button } from "@kitnets/ui";
 import { ArrowLeft, RefreshCw, Zap, Droplets, Flame } from "lucide-react";
@@ -39,7 +39,11 @@ export default function GatewayDetailPage() {
     const [gateway, setGateway] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [metersData, setMetersData] = useState<any[]>([]);
-    const [dateRange, setDateRange] = useState<DateRange | null>(null);
+    const [dateRange, setDateRange] = useState<DateRange>({
+        start: subDays(new Date(), 6),
+        end: new Date(),
+        label: "Últimos 7 dias",
+    });
     const [kpis, setKpis] = useState<KPIs>({
         totalConsumption: 0,
         avgPerDay: 0,
@@ -48,8 +52,8 @@ export default function GatewayDetailPage() {
     });
 
     // Track date range timestamps for stable effect deps
-    const startMs = dateRange?.start.getTime();
-    const endMs = dateRange?.end.getTime();
+    const startMs = dateRange.start.getTime();
+    const endMs = dateRange.end.getTime();
 
     useEffect(() => {
         if (!dateRange) return;
