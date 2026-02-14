@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { KPICard } from "@/components/dashboard/KPICards";
 import { ConsumptionChart } from "@/components/dashboard/ConsumptionChart";
+import { ConsumptionTabs, DailyTotal } from "@/components/dashboard/ConsumptionTabs";
 import { DateRangePicker } from "@/components/dashboard/DateRangePicker";
 import { format, differenceInDays, subDays } from "date-fns";
 
@@ -39,6 +40,7 @@ export default function GatewayDetailPage() {
     const [gateway, setGateway] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [metersData, setMetersData] = useState<any[]>([]);
+    const [dailyTotalsData, setDailyTotalsData] = useState<DailyTotal[]>([]);
     const [dateRange, setDateRange] = useState<DateRange>({
         start: subDays(new Date(), 6),
         end: new Date(),
@@ -84,6 +86,7 @@ export default function GatewayDetailPage() {
 
             if (meterIds.length === 0) {
                 setMetersData([]);
+                setDailyTotalsData([]);
                 setKpis({ totalConsumption: 0, avgPerDay: 0, peakDay: null, previousPeriodChange: null });
                 setLoading(false);
                 return;
@@ -167,6 +170,10 @@ export default function GatewayDetailPage() {
                     : null;
 
             setKpis({ totalConsumption, avgPerDay, peakDay, previousPeriodChange });
+            setDailyTotalsData(
+                Object.entries(dailyTotals)
+                    .map(([date, total]) => ({ date, total }))
+            );
             setMetersData(processedMeters);
             setLoading(false);
         };
@@ -299,6 +306,11 @@ export default function GatewayDetailPage() {
                         loading={loading}
                     />
                 </div>
+            </div>
+
+            {/* ── Consolidated Chart with Tabs ────────────────── */}
+            <div className="mb-12">
+                <ConsumptionTabs dailyData={dailyTotalsData} loading={loading} />
             </div>
 
             {/* ── Per-meter detail cards ──────────────────────── */}
