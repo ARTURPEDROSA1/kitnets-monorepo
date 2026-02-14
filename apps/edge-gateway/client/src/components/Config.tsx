@@ -215,7 +215,7 @@ export default function Config() {
                         Delete ALL Monthly History
                     </button>
                     <button className="warning" onClick={async () => {
-                        if (confirm('Verify: Clear Queue & Re-sync last 7 days? \n\nThis will DELETE any pending stuck uploads and force-push the clean local history from the last week. Use this to fix discrepancies.')) {
+                        if (confirm('Verify: Clear Queue & Re-sync last 30 days? \n\nThis will DELETE any pending stuck uploads and force-push the clean local history from the last 30 days. Use this to fix discrepancies.')) {
                             try {
                                 const res = await fetch('/api/debug/resync-recent', { method: 'POST' });
                                 const json = await res.json();

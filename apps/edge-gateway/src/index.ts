@@ -221,13 +221,13 @@ server.post('/api/debug/fix-data-glitch', async (req, reply) => {
 
 server.post('/api/debug/resync-recent', async (req, reply) => {
     try {
-        console.log("Forcing re-sync of last 7 days (CLEANING QUEUE)...");
+        console.log("Forcing re-sync of last 30 days (CLEANING QUEUE)...");
 
         // 1. Flush the queue (Clear stuck/invalid pending retries)
         await db.run('DELETE FROM readings_queue');
 
         const date = new Date();
-        date.setDate(date.getDate() - 7);
+        date.setDate(date.getDate() - 30);
         const limitDateStr = getLocalDateStr(date);
 
         const snapshots = await db.all<any>(
