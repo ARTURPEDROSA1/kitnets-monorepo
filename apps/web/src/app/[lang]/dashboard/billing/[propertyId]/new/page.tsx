@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { ArrowLeft, Save, Calculator, AlertCircle, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Save, Calculator, AlertCircle, CheckCircle2, Upload, FileText } from "lucide-react";
 import Link from "next/link";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 
@@ -75,6 +75,10 @@ export default function ManualBillEntryPage() {
     const [success, setSuccess] = useState(false);
     const [isEditMode, setIsEditMode] = useState(!!editMonth);
     const [lastBill, setLastBill] = useState<{ meter_number: string; current_reading: number; reference_month: string } | null>(null);
+    const [extracting, setExtracting] = useState(false);
+    const [extractionConfidence, setExtractionConfidence] = useState<number | null>(null);
+    const [dragActive, setDragActive] = useState(false);
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -180,6 +184,61 @@ export default function ManualBillEntryPage() {
         setForm(prev => ({ ...prev, [field]: value }));
         setError(null);
         setSuccess(false);
+    };
+
+    const handleFileUpload = async (file: File) => {
+        setExtracting(true);
+        setError(null);
+        setExtractionConfidence(null);
+
+        try {
+            const formData = new window.FormData();
+            formData.append("file", file);
+
+            const res = await fetch("/api/extract-bill", {
+                method: "POST",
+                body: formData,
+            });
+
+            const result = await res.json();
+
+            if (!res.ok || !result.success) {
+                throw new Error(result.error || "Falha na extração");
+            }
+
+            const d = result.data;
+            const safeStr = (v: unknown) => (v != null && v !== "null" ? String(v) : "");
+            const safeNum = (v: unknown) => {
+                const n = Number(v);
+                return !isNaN(n) && n !== 0 ? String(n) : "";
+            };
+
+            setForm({
+                referenceMonth: safeStr(d.referenceMonth),
+                meterNumber: safeStr(d.meterNumber),
+                previousReading: safeNum(d.previousReading),
+                currentReading: safeNum(d.currentReading),
+                consumptionM3: safeNum(d.consumptionM3),
+                billedConsumptionM3: safeNum(d.billedConsumptionM3),
+                readingDate: safeStr(d.readingDate),
+                readingDateOrig: safeStr(d.readingDateOrig),
+                dueDate: safeStr(d.dueDate),
+                waterTariff: safeNum(d.waterTariff),
+                sewageTariff: safeNum(d.sewageTariff),
+                waterBasicFee: safeNum(d.waterBasicFee),
+                sewageBasicFee: safeNum(d.sewageBasicFee),
+                totalAmount: safeNum(d.totalAmount),
+                occurrenceCode: safeStr(d.occurrenceCode),
+                notes: "",
+            });
+
+            setExtractionConfidence(d.confidence ?? 0.9);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : "Erro desconhecido";
+            setError(`Falha ao extrair dados: ${message}`);
+        } finally {
+            setExtracting(false);
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -296,6 +355,88 @@ export default function ManualBillEntryPage() {
                 <div className="mb-6 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-xl p-4 flex items-center gap-3">
                     <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0" />
                     <p className="text-red-800 dark:text-red-300">{error}</p>
+                </div>
+            )}
+
+            {/* ── Upload / Drag-and-Drop Zone ───────────────── */}
+            {!isEditMode && (
+                <div
+                    onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+                    onDragLeave={() => setDragActive(false)}
+                    onDrop={async (e) => {
+                        e.preventDefault();
+                        setDragActive(false);
+                        const file = e.dataTransfer.files[0];
+                        if (file) await handleFileUpload(file);
+                    }}
+                    className={`mb-8 border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 cursor-pointer ${dragActive
+                            ? "border-primary bg-primary/5 scale-[1.01]"
+                            : extractionConfidence !== null
+                                ? "border-emerald-300 dark:border-emerald-700 bg-emerald-50/50 dark:bg-emerald-950/20"
+                                : "border-border hover:border-primary/50 hover:bg-muted/20"
+                        }`}
+                    onClick={() => fileInputRef.current?.click()}
+                >
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,application/pdf"
+                        className="hidden"
+                        onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) await handleFileUpload(file);
+                            e.target.value = "";
+                        }}
+                    />
+
+                    {extracting ? (
+                        <div className="flex flex-col items-center gap-3">
+                            <div className="relative">
+                                <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+                                <FileText className="w-5 h-5 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                            </div>
+                            <div>
+                                <p className="font-semibold text-foreground">Extraindo dados da conta...</p>
+                                <p className="text-sm text-muted-foreground mt-1">GPT-4o está analisando o documento</p>
+                            </div>
+                        </div>
+                    ) : extractionConfidence !== null ? (
+                        <div className="flex flex-col items-center gap-2">
+                            <CheckCircle2 className="w-10 h-10 text-emerald-500" />
+                            <p className="font-semibold text-emerald-700 dark:text-emerald-300">Dados extraídos com sucesso!</p>
+                            <p className="text-sm text-muted-foreground">
+                                Confiança: <span className={`font-bold ${extractionConfidence >= 0.85 ? "text-emerald-600" : extractionConfidence >= 0.7 ? "text-amber-600" : "text-red-600"}`}>
+                                    {Math.round(extractionConfidence * 100)}%
+                                </span>
+                                {" — "}Revise os campos abaixo antes de salvar
+                            </p>
+                            <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setExtractionConfidence(null); }}
+                                className="mt-1 text-xs text-muted-foreground hover:text-foreground underline"
+                            >
+                                Enviar outra conta
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center gap-3">
+                            <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
+                                <Upload className="w-7 h-7 text-primary" />
+                            </div>
+                            <div>
+                                <p className="font-semibold text-foreground">
+                                    Arraste a conta de água aqui
+                                </p>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                    ou clique para selecionar • PDF, JPG, PNG (máx 10MB)
+                                </p>
+                            </div>
+                            <span className="inline-flex items-center gap-1.5 mt-1 px-3 py-1 bg-primary/10 text-primary text-xs font-medium rounded-full">
+                                <FileText className="w-3 h-3" />
+                                Preenchimento automático com IA
+                            </span>
+                        </div>
+                    )}
                 </div>
             )}
 
