@@ -551,7 +551,7 @@ export default function ManualBillEntryPage() {
                                 <div>
                                     <p className="text-xs text-muted-foreground">Custo por Litro</p>
                                     <p className="text-lg font-bold text-foreground">
-                                        R$ {(parseFloat(form.totalAmount) / (parseFloat(form.consumptionM3) * 1000)).toFixed(4)}
+                                        R$ {(parseFloat(form.totalAmount) / (parseFloat(form.consumptionM3) * 1000)).toLocaleString("pt-BR", { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
                                     </p>
                                 </div>
                             )}

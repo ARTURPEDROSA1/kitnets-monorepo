@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { ArrowLeft, FileText, TrendingUp, DollarSign, Droplets, Calendar, ChevronDown, Eye, EyeOff, BadgeDollarSign, Plus } from "lucide-react";
+import { ArrowLeft, FileText, TrendingUp, DollarSign, Droplets, Calendar, ChevronDown, Eye, EyeOff, BadgeDollarSign, Plus, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { ConsumptionChart } from "@/components/dashboard/ConsumptionChart";
@@ -47,6 +47,10 @@ function formatCurrency(value: number): string {
     return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+function formatNumber(value: number, decimals = 1): string {
+    return value.toLocaleString("pt-BR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+}
+
 function formatDate(dateStr: string | null): string {
     if (!dateStr) return "-";
     const [y, m, d] = dateStr.substring(0, 10).split("-");
@@ -70,6 +74,7 @@ export default function BillingPage() {
     const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
     const [showAddress, setShowAddress] = useState(false);
     const [showValues, setShowValues] = useState(true);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -294,6 +299,7 @@ export default function BillingPage() {
                                 <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Taxa</th>
                                 <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">Leitura</th>
                                 <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">Vencimento</th>
+                                <th className="px-4 py-3 w-20"></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -312,26 +318,63 @@ export default function BillingPage() {
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 text-right text-foreground">
-                                                {Number(bill.consumption_m3)} m³
+                                                {formatNumber(Number(bill.consumption_m3))} m³
                                             </td>
                                             <td className="px-6 py-4 text-right font-semibold text-foreground">
                                                 {showValues ? formatCurrency(Number(bill.total_amount)) : MASK_CURRENCY}
                                             </td>
                                             <td className="px-6 py-4 text-right text-muted-foreground hidden md:table-cell">
-                                                {showValues ? `R$ ${Number(bill.effective_rate_per_m3).toFixed(2)}/m³` : MASK_CURRENCY}
+                                                {showValues ? `R$ ${formatNumber(Number(bill.effective_rate_per_m3), 2)}/m³` : MASK_CURRENCY}
                                             </td>
                                             <td className="px-6 py-4 text-right text-muted-foreground hidden lg:table-cell font-mono text-xs">
-                                                {Number(bill.previous_reading)} → {Number(bill.current_reading)}
+                                                {formatNumber(Number(bill.previous_reading), 0)} → {formatNumber(Number(bill.current_reading), 1)}
                                             </td>
                                             <td className="px-6 py-4 text-right text-muted-foreground hidden lg:table-cell">
                                                 {formatDate(bill.due_date)}
+                                            </td>
+                                            <td className="px-4 py-4 text-right">
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <Link
+                                                        href={`/${lang}/dashboard/billing/${propertyId}/new?gateway=${gatewayId || ""}&edit=${bill.reference_month}`}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="p-1.5 rounded-md hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
+                                                        title="Editar conta"
+                                                    >
+                                                        <Pencil className="w-3.5 h-3.5" />
+                                                    </Link>
+                                                    <button
+                                                        onClick={async (e) => {
+                                                            e.stopPropagation();
+                                                            if (!confirm(`Excluir conta de ${formatMonth(bill.reference_month)}?`)) return;
+                                                            setDeletingId(bill.id);
+                                                            const { error } = await supabase
+                                                                .from("water_bills")
+                                                                .delete()
+                                                                .eq("id", bill.id);
+                                                            if (!error) {
+                                                                setBills(prev => prev.filter(b => b.id !== bill.id));
+                                                                if (selectedBill?.id === bill.id) setSelectedBill(null);
+                                                            }
+                                                            setDeletingId(null);
+                                                        }}
+                                                        disabled={deletingId === bill.id}
+                                                        className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-950/30 text-muted-foreground hover:text-red-600 dark:hover:text-red-400 transition-colors disabled:opacity-50"
+                                                        title="Excluir conta"
+                                                    >
+                                                        {deletingId === bill.id ? (
+                                                            <div className="w-3.5 h-3.5 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin" />
+                                                        ) : (
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        )}
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
 
                                         {/* Inline expanded detail */}
                                         {isSelected && (
                                             <tr className="bg-muted/10">
-                                                <td colSpan={6} className="px-6 py-5">
+                                                <td colSpan={7} className="px-6 py-5">
                                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                                                         <div>
                                                             <p className="text-muted-foreground text-xs">Hidrômetro</p>
@@ -351,11 +394,11 @@ export default function BillingPage() {
                                                         </div>
                                                         <div>
                                                             <p className="text-muted-foreground text-xs">Cons. Real</p>
-                                                            <p className="font-medium">{Number(bill.consumption_m3)} m³</p>
+                                                            <p className="font-medium">{formatNumber(Number(bill.consumption_m3))} m³</p>
                                                         </div>
                                                         <div>
                                                             <p className="text-muted-foreground text-xs">Cons. Faturado</p>
-                                                            <p className="font-medium">{Number(bill.billed_consumption_m3)} m³</p>
+                                                            <p className="font-medium">{formatNumber(Number(bill.billed_consumption_m3))} m³</p>
                                                         </div>
                                                         <div>
                                                             <p className="text-muted-foreground text-xs">Vencimento</p>
