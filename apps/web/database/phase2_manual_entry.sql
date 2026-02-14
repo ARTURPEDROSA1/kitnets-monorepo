@@ -36,11 +36,11 @@ CREATE OR REPLACE FUNCTION upsert_water_bill(
     p_reading_date DATE,
     p_reading_date_orig DATE,
     p_due_date DATE,
+    p_total_amount NUMERIC,
     p_water_tariff NUMERIC DEFAULT 0,
     p_sewage_tariff NUMERIC DEFAULT 0,
     p_water_basic_fee NUMERIC DEFAULT 0,
     p_sewage_basic_fee NUMERIC DEFAULT 0,
-    p_total_amount NUMERIC,
     p_occurrence_code TEXT DEFAULT NULL,
     p_average_consumption_m3 NUMERIC DEFAULT NULL,
     p_notes TEXT DEFAULT NULL
