@@ -347,13 +347,17 @@ export default function BillingPage() {
                                                             e.stopPropagation();
                                                             if (!confirm(`Excluir conta de ${formatMonth(bill.reference_month)}?`)) return;
                                                             setDeletingId(bill.id);
-                                                            const { error } = await supabase
-                                                                .from("water_bills")
-                                                                .delete()
-                                                                .eq("id", bill.id);
-                                                            if (!error) {
+                                                            const res = await fetch("/api/delete-bill", {
+                                                                method: "POST",
+                                                                headers: { "Content-Type": "application/json" },
+                                                                body: JSON.stringify({ billId: bill.id }),
+                                                            });
+                                                            const result = await res.json();
+                                                            if (res.ok && result.success) {
                                                                 setBills(prev => prev.filter(b => b.id !== bill.id));
                                                                 if (selectedBill?.id === bill.id) setSelectedBill(null);
+                                                            } else {
+                                                                alert(result.error || "Erro ao excluir conta");
                                                             }
                                                             setDeletingId(null);
                                                         }}
