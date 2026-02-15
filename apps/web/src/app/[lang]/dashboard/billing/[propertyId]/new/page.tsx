@@ -197,7 +197,7 @@ export default function ManualBillEntryPage() {
             // If PDF, convert first page to PNG in the browser
             if (file.type === "application/pdf") {
                 const pdfjsLib = await import("pdfjs-dist");
-                pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+                pdfjsLib.GlobalWorkerOptions.workerSrc = "";
 
                 const arrayBuffer = await file.arrayBuffer();
                 const pdf = await pdfjsLib.getDocument(new Uint8Array(arrayBuffer)).promise;
