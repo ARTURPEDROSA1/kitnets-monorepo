@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 const EXTRACTION_PROMPT = `You are an expert at reading Brazilian water utility bills (contas de água).
-Analyze this bill image carefully and extract ALL data fields.
+Analyze this bill carefully and extract ALL data fields.
 
 Return ONLY a valid JSON object (no markdown, no explanation) with these exact keys:
 
@@ -25,29 +25,29 @@ Return ONLY a valid JSON object (no markdown, no explanation) with these exact k
 }
 
 Important rules:
-- "referenceMonth" is the billing period (mês de referência), format as YYYY-MM
+- "referenceMonth" is the billing period (mês de referência or MÊS/ANO), format as YYYY-MM
 - "meterNumber" is the hidrômetro number
-- "previousReading" is "leitura anterior"
-- "currentReading" is "leitura atual"
-- "consumptionM3" is "consumo medido" or "consumo real" in cubic meters
-- "billedConsumptionM3" is "consumo faturado" in cubic meters (may equal consumptionM3)
-- "readingDate" is the scheduled reading round date ("Data de Leitura")
-- "readingDateOrig" is the actual physical reading date ("Data Leitura Orig")
+- "previousReading" is "L. ANTERIOR" or "leitura anterior"
+- "currentReading" is "L. ATUAL" or "leitura atual"
+- "consumptionM3" is "CONS. REAL" or "consumo real" in cubic meters
+- "billedConsumptionM3" is "CONS. FATURADO" or "consumo faturado" in cubic meters
+- "readingDate" is "DATA DE LEITURA" (the scheduled reading date)
+- "readingDateOrig" is "DATA LEITURA ORIG" (the actual physical reading date)
   If only one reading date is visible, use it for both fields
-- "dueDate" is "vencimento"
-- "waterTariff" is the water consumption charge amount (tarifa de água)
-- "sewageTariff" is the sewage charge amount (tarifa de esgoto)
-- "waterBasicFee" is TBOA or "Taxa Básica Operacional de Água" or "Tar Básica Operac Água"
-- "sewageBasicFee" is TBOE or "Taxa Básica Operacional de Esgoto" or "Tar Básica Operac Esgoto"
-- "totalAmount" is the total amount due ("valor a pagar")
-- "occurrenceCode" is any occurrence/situation code on the bill (e.g. "33")
+- "dueDate" is "VENCIMENTO"
+- "waterTariff" is "TARIFA DE ÁGUA" value
+- "sewageTariff" is "TARIFA DE ESGOTO" value
+- "waterBasicFee" is "TBOA" or "TAR BÁSICA OPERAC ÁGUA" value
+- "sewageBasicFee" is "TBOE" or "TAR BÁSICA OPERAC ESGOTO" value
+- "totalAmount" is "VALOR A PAGAR" (the total amount due)
+- "occurrenceCode" is "OCORRÊNCIA" code number
 - "confidence" is your confidence level from 0 to 1 that the extraction is correct
 - All monetary values must be numbers (not strings), using dot as decimal separator
 - Brazilian bills use comma as decimal separator — convert "303,83" to 303.83
 - All dates must be in ISO format YYYY-MM-DD — convert "20/01/2026" to "2026-01-20"
 - If a field is not found on the bill, use null for strings and 0 for numbers
 - The bill may be from SAAE, CAESB, SABESP, COPASA, or any Brazilian water utility
-- CRITICAL: Extract the EXACT values printed on the bill. Do NOT guess or generate values.`;
+- CRITICAL: You MUST extract the EXACT values printed on the bill. Do NOT invent or guess values. If you cannot read a value, set confidence to 0.`;
 
 export async function POST(request: Request) {
     try {
@@ -93,37 +93,63 @@ export async function POST(request: Request) {
         const bytes = await file.arrayBuffer();
         const base64 = Buffer.from(bytes).toString("base64");
 
-        // Determine media type
         let mediaType = file.type;
         if (mediaType === "image/jpg") mediaType = "image/jpeg";
 
-        // Build the content parts for the API
-        // Use raw fetch to OpenAI API to avoid SDK type issues with PDFs
-        const contentParts: unknown[] = [
-            { type: "text", text: EXTRACTION_PROMPT },
-        ];
+        // Build content parts based on file type
+        let contentParts: unknown[];
 
         if (file.type === "application/pdf") {
-            // GPT-4o supports PDFs via the "file" content type
-            contentParts.push({
-                type: "file",
-                file: {
-                    filename: file.name || "bill.pdf",
-                    file_data: `data:application/pdf;base64,${base64}`,
+            // Step 1: Upload PDF to OpenAI Files API
+            const uploadForm = new FormData();
+            uploadForm.append("file", new Blob([bytes], { type: "application/pdf" }), file.name || "bill.pdf");
+            uploadForm.append("purpose", "user_data");
+
+            const uploadRes = await fetch("https://api.openai.com/v1/files", {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${apiKey}`,
                 },
+                body: uploadForm,
             });
+
+            if (!uploadRes.ok) {
+                const errText = await uploadRes.text();
+                console.error("OpenAI file upload error:", uploadRes.status, errText);
+                return NextResponse.json(
+                    { error: `Erro ao enviar PDF para análise. Tente enviar como imagem (JPG/PNG).` },
+                    { status: 500 }
+                );
+            }
+
+            const uploadData = await uploadRes.json();
+            const fileId = uploadData.id;
+
+            // Step 2: Reference the uploaded file in the message
+            contentParts = [
+                { type: "text", text: EXTRACTION_PROMPT },
+                {
+                    type: "file",
+                    file: {
+                        file_id: fileId,
+                    },
+                },
+            ];
         } else {
-            // Images use the standard image_url content type
-            contentParts.push({
-                type: "image_url",
-                image_url: {
-                    url: `data:${mediaType};base64,${base64}`,
-                    detail: "high",
+            // For images: use standard image_url with base64 (always works)
+            contentParts = [
+                { type: "text", text: EXTRACTION_PROMPT },
+                {
+                    type: "image_url",
+                    image_url: {
+                        url: `data:${mediaType};base64,${base64}`,
+                        detail: "high",
+                    },
                 },
-            });
+            ];
         }
 
-        // Call OpenAI API directly via fetch to avoid SDK serialization issues
+        // Call OpenAI Chat Completions API
         const apiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
             method: "POST",
             headers: {
@@ -138,7 +164,7 @@ export async function POST(request: Request) {
                         content: contentParts,
                     },
                 ],
-                max_tokens: 1000,
+                max_tokens: 1500,
                 temperature: 0,
             }),
         });
@@ -147,7 +173,7 @@ export async function POST(request: Request) {
             const errBody = await apiResponse.text();
             console.error("OpenAI API error:", apiResponse.status, errBody);
             return NextResponse.json(
-                { error: `OpenAI API error (${apiResponse.status}): ${errBody.substring(0, 200)}` },
+                { error: `OpenAI API error (${apiResponse.status}): ${errBody.substring(0, 300)}` },
                 { status: 500 }
             );
         }
