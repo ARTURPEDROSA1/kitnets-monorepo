@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { ArrowLeft, FileText, TrendingUp, DollarSign, Droplets, Calendar, ChevronDown, Eye, EyeOff, BadgeDollarSign, Plus, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, FileText, TrendingUp, DollarSign, Droplets, Calendar, ChevronDown, Eye, EyeOff, BadgeDollarSign, Plus, Pencil, Trash2, Filter } from "lucide-react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { ConsumptionChart } from "@/components/dashboard/ConsumptionChart";
@@ -37,6 +37,7 @@ interface Property {
 }
 
 const MONTH_NAMES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+const FILTER_OPTIONS = [12, 24, 36, 48, 60] as const;
 
 function formatMonth(ref: string): string {
     const [year, month] = ref.split("-");
@@ -75,6 +76,7 @@ export default function BillingPage() {
     const [showAddress, setShowAddress] = useState(false);
     const [showValues, setShowValues] = useState(true);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [monthsFilter, setMonthsFilter] = useState<number>(12);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -101,21 +103,29 @@ export default function BillingPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [propertyId]);
 
+    // ── Filter bills by month range ─────────────────────────────
+    const filteredBills = useMemo(() => {
+        const now = new Date();
+        const cutoff = new Date(now.getFullYear(), now.getMonth() - monthsFilter, 1);
+        const cutoffStr = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, "0")}`;
+        return bills.filter((b) => b.reference_month >= cutoffStr);
+    }, [bills, monthsFilter]);
+
     // ── Derived data ──────────────────────────────────────────
     const summaryStats = useMemo(() => {
-        if (bills.length === 0) return null;
-        const totalCost = bills.reduce((sum, b) => sum + Number(b.total_amount), 0);
-        const totalConsumption = bills.reduce((sum, b) => sum + Number(b.consumption_m3), 0);
-        const avgMonthlyCost = totalCost / bills.length;
-        const avgMonthlyConsumption = totalConsumption / bills.length;
-        const latestRate = Number(bills[0].effective_rate_per_m3);
-        const highestBill = bills.reduce((max, b) => Number(b.total_amount) > Number(max.total_amount) ? b : max, bills[0]);
+        if (filteredBills.length === 0) return null;
+        const totalCost = filteredBills.reduce((sum, b) => sum + Number(b.total_amount), 0);
+        const totalConsumption = filteredBills.reduce((sum, b) => sum + Number(b.consumption_m3), 0);
+        const avgMonthlyCost = totalCost / filteredBills.length;
+        const avgMonthlyConsumption = totalConsumption / filteredBills.length;
+        const latestRate = Number(filteredBills[0].effective_rate_per_m3);
+        const highestBill = filteredBills.reduce((max, b) => Number(b.total_amount) > Number(max.total_amount) ? b : max, filteredBills[0]);
         return { totalCost, totalConsumption, avgMonthlyCost, avgMonthlyConsumption, latestRate, highestBill };
-    }, [bills]);
+    }, [filteredBills]);
 
     // Chart data: consumption + cost by month (chronological)
     const chartData = useMemo(() => {
-        return [...bills]
+        return [...filteredBills]
             .sort((a, b) => a.reference_month.localeCompare(b.reference_month))
             .map((b) => ({
                 date_label: formatMonth(b.reference_month),
@@ -123,7 +133,7 @@ export default function BillingPage() {
                 cost: Number(b.total_amount),
                 rate: Number(b.effective_rate_per_m3),
             }));
-    }, [bills]);
+    }, [filteredBills]);
 
     // ── Loading state ─────────────────────────────────────────
     if (loading) {
@@ -202,9 +212,29 @@ export default function BillingPage() {
                             <Plus className="w-4 h-4" />
                             Nova Conta
                         </Link>
-                        <p className="text-sm text-muted-foreground">{bills.length} contas registradas</p>
+                        <p className="text-sm text-muted-foreground">{filteredBills.length} de {bills.length} contas</p>
                         {bills[0] && <p className="font-mono text-sm text-muted-foreground">Hidrômetro: {showAddress ? bills[0].meter_number : MASK}</p>}
                     </div>
+                </div>
+            </div>
+
+            {/* ── Month Filter ─────────────────────────────── */}
+            <div className="flex items-center gap-3 mb-6">
+                <Filter className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground font-medium">Período:</span>
+                <div className="flex gap-1.5">
+                    {FILTER_OPTIONS.map((months) => (
+                        <button
+                            key={months}
+                            onClick={() => setMonthsFilter(months)}
+                            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${monthsFilter === months
+                                ? "bg-primary text-primary-foreground shadow-sm"
+                                : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                }`}
+                        >
+                            {months === 12 ? "12 meses" : `${months / 12} anos`}
+                        </button>
+                    ))}
                 </div>
             </div>
 
@@ -214,7 +244,7 @@ export default function BillingPage() {
                     <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
                         <div className="flex items-center gap-2 text-muted-foreground mb-2">
                             <DollarSign className="w-4 h-4" />
-                            <span className="text-xs font-medium uppercase tracking-wide">Total ({bills.length} meses)</span>
+                            <span className="text-xs font-medium uppercase tracking-wide">Total ({filteredBills.length} meses)</span>
                         </div>
                         <p className="text-2xl font-bold text-foreground">
                             {showValues ? formatCurrency(summaryStats.totalCost) : MASK_CURRENCY}
@@ -259,7 +289,7 @@ export default function BillingPage() {
             {/* ── Consumption Chart ──────────────────────────── */}
             <div className="bg-card border border-border rounded-xl p-6 shadow-sm mb-10">
                 <h2 className="text-lg font-semibold text-foreground mb-1">Consumo Mensal (m³)</h2>
-                <p className="text-sm text-muted-foreground mb-6">Evolução do consumo da concessionária nos últimos {bills.length} meses</p>
+                <p className="text-sm text-muted-foreground mb-6">Evolução do consumo da concessionária nos últimos {filteredBills.length} meses</p>
                 <ConsumptionChart
                     data={chartData}
                     dataKey="consumption"
@@ -303,7 +333,7 @@ export default function BillingPage() {
                             </tr>
                         </thead>
                         <tbody>
-                            {bills.map((bill) => {
+                            {filteredBills.map((bill) => {
                                 const isSelected = selectedBill?.id === bill.id;
                                 return (
                                     <React.Fragment key={bill.id}>
