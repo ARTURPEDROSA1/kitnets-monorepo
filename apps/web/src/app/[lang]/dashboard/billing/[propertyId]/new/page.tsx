@@ -192,8 +192,40 @@ export default function ManualBillEntryPage() {
         setExtractionConfidence(null);
 
         try {
+            let uploadFile = file;
+
+            // If PDF, convert first page to PNG in the browser
+            if (file.type === "application/pdf") {
+                const pdfjsLib = await import("pdfjs-dist");
+                pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument(new Uint8Array(arrayBuffer)).promise;
+                const page = await pdf.getPage(1);
+
+                const scale = 2; // High-res for accurate OCR
+                const viewport = page.getViewport({ scale });
+                const canvas = document.createElement("canvas");
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+
+                const ctx = canvas.getContext("2d");
+                if (!ctx) throw new Error("Canvas context not available");
+
+                await page.render({ canvasContext: ctx, viewport }).promise;
+
+                const blob = await new Promise<Blob>((resolve, reject) => {
+                    canvas.toBlob(
+                        (b) => (b ? resolve(b) : reject(new Error("Failed to convert PDF page to image"))),
+                        "image/png"
+                    );
+                });
+
+                uploadFile = new File([blob], "bill-page1.png", { type: "image/png" });
+            }
+
             const formData = new window.FormData();
-            formData.append("file", file);
+            formData.append("file", uploadFile);
 
             const res = await fetch("/api/extract-bill", {
                 method: "POST",
@@ -370,10 +402,10 @@ export default function ManualBillEntryPage() {
                         if (file) await handleFileUpload(file);
                     }}
                     className={`mb-8 border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 cursor-pointer ${dragActive
-                            ? "border-primary bg-primary/5 scale-[1.01]"
-                            : extractionConfidence !== null
-                                ? "border-emerald-300 dark:border-emerald-700 bg-emerald-50/50 dark:bg-emerald-950/20"
-                                : "border-border hover:border-primary/50 hover:bg-muted/20"
+                        ? "border-primary bg-primary/5 scale-[1.01]"
+                        : extractionConfidence !== null
+                            ? "border-emerald-300 dark:border-emerald-700 bg-emerald-50/50 dark:bg-emerald-950/20"
+                            : "border-border hover:border-primary/50 hover:bg-muted/20"
                         }`}
                     onClick={() => fileInputRef.current?.click()}
                 >
