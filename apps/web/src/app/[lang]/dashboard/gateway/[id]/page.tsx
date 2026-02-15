@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { Button } from "@kitnets/ui";
-import { ArrowLeft, RefreshCw, Zap, Droplets, Flame, FileText } from "lucide-react";
+import { ArrowLeft, Zap, Droplets, Flame, FileText } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { KPICard } from "@/components/dashboard/KPICards";
@@ -214,13 +213,6 @@ export default function GatewayDetailPage() {
         setDateRange({ start, end, label });
     };
 
-    const handleRefresh = () => {
-        if (dateRange) {
-            // Force re-fetch by creating new Date objects with same values
-            setDateRange({ ...dateRange, start: new Date(dateRange.start), end: new Date(dateRange.end) });
-        }
-    };
-
     // ── Loading / empty states ────────────────────────────────
     if (!gateway && loading) {
         return <div className="p-8 text-center">Carregando dados do Gateway...</div>;
@@ -257,25 +249,19 @@ export default function GatewayDetailPage() {
                     <ArrowLeft className="w-4 h-4 mr-2" />
                     Voltar para Dashboard
                 </Link>
-                <div className="flex justify-between items-start">
-                    <div>
-                        <h1 className="text-3xl font-bold text-foreground">{gateway.label}</h1>
-                        <div className="flex items-center mt-2 space-x-4">
-                            <p className="font-mono text-sm text-muted-foreground">{gateway.serial_number}</p>
-                            <span
-                                className={`px-2 py-0.5 rounded-full text-xs font-medium ${gateway.status === "online"
-                                    ? "bg-green-100 text-green-700"
-                                    : "bg-gray-100 text-gray-600"
-                                    }`}
-                            >
-                                {gateway.status?.toUpperCase() || "OFFLINE"}
-                            </span>
-                        </div>
+                <div>
+                    <h1 className="text-3xl font-bold text-foreground">{gateway.label}</h1>
+                    <div className="flex items-center mt-2 space-x-4">
+                        <p className="font-mono text-sm text-muted-foreground">{gateway.serial_number}</p>
+                        <span
+                            className={`px-2 py-0.5 rounded-full text-xs font-medium ${gateway.status === "online"
+                                ? "bg-green-100 text-green-700"
+                                : "bg-gray-100 text-gray-600"
+                                }`}
+                        >
+                            {gateway.status?.toUpperCase() || "OFFLINE"}
+                        </span>
                     </div>
-                    <Button variant="outline" size="sm" onClick={handleRefresh}>
-                        <RefreshCw className="w-4 h-4 mr-2" />
-                        Atualizar
-                    </Button>
                 </div>
             </div>
 
