@@ -1,7 +1,137 @@
 import { NextResponse } from "next/server";
 import pdfParse from "pdf-parse";
 
-const EXTRACTION_PROMPT_IMAGE = `You are an expert at reading Brazilian water utility bills (contas de água).
+// ── Regex-based PDF parser (no API needed) ──────────────────────────
+
+function parseDateBR(dateStr: string): string | null {
+    // Convert "20/01/2026" → "2026-01-20"
+    const m = dateStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    if (!m) return null;
+    return `${m[3]}-${m[2]}-${m[1]}`;
+}
+
+function parseDecimalBR(value: string): number {
+    // Convert "303,83" or "303.83" → 303.83
+    return parseFloat(value.replace(/\./g, "").replace(",", "."));
+}
+
+function extractFirst(text: string, pattern: RegExp): string | null {
+    const m = text.match(pattern);
+    return m ? m[1].trim() : null;
+}
+
+interface ExtractedBill {
+    referenceMonth: string | null;
+    meterNumber: string | null;
+    previousReading: number | null;
+    currentReading: number | null;
+    consumptionM3: number | null;
+    billedConsumptionM3: number | null;
+    readingDate: string | null;
+    readingDateOrig: string | null;
+    dueDate: string | null;
+    waterTariff: number | null;
+    sewageTariff: number | null;
+    waterBasicFee: number | null;
+    sewageBasicFee: number | null;
+    totalAmount: number | null;
+    occurrenceCode: string | null;
+    confidence: number;
+}
+
+function parseBillText(text: string): ExtractedBill {
+    // Normalize whitespace
+    const t = text.replace(/\r\n/g, "\n").replace(/[ \t]+/g, " ");
+
+    // Reference month: "MÊS/ANO\n01/2026" or "MÊS/ANO 01/2026"
+    let referenceMonth: string | null = null;
+    const mesAno = extractFirst(t, /M[ÊE]S\s*\/?\s*ANO\s*[:\n]?\s*(\d{2}\/\d{4})/i);
+    if (mesAno) {
+        const [mm, yyyy] = mesAno.split("/");
+        referenceMonth = `${yyyy}-${mm}`;
+    }
+
+    // Meter number: "HIDRÔMETRO\nY21SG1602635" or similar
+    const meterNumber = extractFirst(t, /HIDR[ÔO]METRO\s*[:\n]?\s*([A-Z0-9]+)/i);
+
+    // Readings: "L. ANTERIOR\n520" and "L. ATUAL\n573"
+    const prevStr = extractFirst(t, /L\.?\s*ANTERIOR\s*[:\n]?\s*([\d.,]+)/i);
+    const currStr = extractFirst(t, /L\.?\s*ATUAL\s*[:\n]?\s*([\d.,]+)/i);
+    const previousReading = prevStr ? parseDecimalBR(prevStr) : null;
+    const currentReading = currStr ? parseDecimalBR(currStr) : null;
+
+    // Consumption: "CONS. REAL\n53m3" or "CONS. REAL 53m3"
+    const consRealStr = extractFirst(t, /CONS\.?\s*REAL\s*[:\n]?\s*([\d.,]+)\s*m/i);
+    const consumptionM3 = consRealStr ? parseDecimalBR(consRealStr) : null;
+
+    // Billed consumption: "CONS. FATURADO\n53m3"
+    const consFatStr = extractFirst(t, /CONS\.?\s*FATURADO\s*[:\n]?\s*([\d.,]+)\s*m/i);
+    const billedConsumptionM3 = consFatStr ? parseDecimalBR(consFatStr) : null;
+
+    // Reading date: "DATA DE LEITURA\n20/01/2026"
+    const readingDateRaw = extractFirst(t, /DATA\s+DE\s+LEITURA\s*[:\n]?\s*(\d{2}\/\d{2}\/\d{4})/i);
+    const readingDate = readingDateRaw ? parseDateBR(readingDateRaw) : null;
+
+    // Original reading date: "DATA LEITURA ORIG\n21/01/2026"
+    const readingDateOrigRaw = extractFirst(t, /DATA\s+LEITURA\s+ORIG\.?\s*[:\n]?\s*(\d{2}\/\d{2}\/\d{4})/i);
+    const readingDateOrig = readingDateOrigRaw ? parseDateBR(readingDateOrigRaw) : null;
+
+    // Due date: "VENCIMENTO\n18/02/2026"
+    const dueDateRaw = extractFirst(t, /VENCIMENTO\s*[:\n]?\s*(\d{2}\/\d{2}\/\d{4})/i);
+    const dueDate = dueDateRaw ? parseDateBR(dueDateRaw) : null;
+
+    // Tariffs: "TARIFA DE ÁGUA 303,83" (look for value at end of line)
+    const waterTariffStr = extractFirst(t, /TARIFA\s+DE\s+[ÁA]GUA\s*[:\n]?\s*([\d.,]+)/i);
+    const waterTariff = waterTariffStr ? parseDecimalBR(waterTariffStr) : null;
+
+    const sewageTariffStr = extractFirst(t, /TARIFA\s+DE\s+ESGOTO\s*[:\n]?\s*([\d.,]+)/i);
+    const sewageTariff = sewageTariffStr ? parseDecimalBR(sewageTariffStr) : null;
+
+    // Basic fees: "TBOA –TAR BÁSICA OPERAC ÁGUA 21,88"
+    const waterBasicFeeStr = extractFirst(t, /(?:TBOA|TAR\s*B[ÁA]SICA\s*OPERAC?\s*[ÁA]GUA)\s*[:\n]?\s*([\d.,]+)/i);
+    const waterBasicFee = waterBasicFeeStr ? parseDecimalBR(waterBasicFeeStr) : null;
+
+    const sewageBasicFeeStr = extractFirst(t, /(?:TBOE|TAR\s*B[ÁA]SICA\s*OPERAC?\s*ESGOTO)\s*[:\n]?\s*([\d.,]+)/i);
+    const sewageBasicFee = sewageBasicFeeStr ? parseDecimalBR(sewageBasicFeeStr) : null;
+
+    // Total amount: "VALOR A PAGAR\nR$521,14" or "R$ 521,14"
+    const totalStr = extractFirst(t, /VALOR\s+A\s+PAGAR\s*[:\n]?\s*R?\$?\s*([\d.,]+)/i);
+    const totalAmount = totalStr ? parseDecimalBR(totalStr) : null;
+
+    // Occurrence code: "OCORRÊNCIA\n33"
+    const occurrenceCode = extractFirst(t, /OCORR[ÊE]NCIA\s*[:\n]?\s*(\d+)/i);
+
+    // Calculate confidence based on how many fields were extracted
+    const fields = [
+        referenceMonth, meterNumber, previousReading, currentReading,
+        consumptionM3, readingDate, dueDate, totalAmount,
+    ];
+    const found = fields.filter(f => f !== null).length;
+    const confidence = Math.round((found / fields.length) * 100) / 100;
+
+    return {
+        referenceMonth,
+        meterNumber,
+        previousReading,
+        currentReading,
+        consumptionM3,
+        billedConsumptionM3: billedConsumptionM3 ?? consumptionM3,
+        readingDate,
+        readingDateOrig: readingDateOrig ?? readingDate,
+        dueDate,
+        waterTariff,
+        sewageTariff,
+        waterBasicFee,
+        sewageBasicFee,
+        totalAmount,
+        occurrenceCode,
+        confidence,
+    };
+}
+
+// ── GPT-4o Vision prompt (for images only) ──────────────────────────
+
+const IMAGE_PROMPT = `You are an expert at reading Brazilian water utility bills (contas de água).
 Analyze this bill image carefully and extract ALL data fields.
 
 Return ONLY a valid JSON object (no markdown, no explanation) with these exact keys:
@@ -25,92 +155,32 @@ Return ONLY a valid JSON object (no markdown, no explanation) with these exact k
   "confidence": number
 }
 
-Important rules:
-- "referenceMonth" is the billing period (mês de referência or MÊS/ANO), format as YYYY-MM
-- "meterNumber" is the hidrômetro number
-- "previousReading" is "L. ANTERIOR" or "leitura anterior"
-- "currentReading" is "L. ATUAL" or "leitura atual"
-- "consumptionM3" is "CONS. REAL" or "consumo real" in cubic meters
-- "billedConsumptionM3" is "CONS. FATURADO" or "consumo faturado" in cubic meters
-- "readingDate" is "DATA DE LEITURA" (the scheduled reading date)
-- "readingDateOrig" is "DATA LEITURA ORIG" (the actual physical reading date)
-  If only one reading date is visible, use it for both fields
-- "dueDate" is "VENCIMENTO"
-- "waterTariff" is "TARIFA DE ÁGUA" value
-- "sewageTariff" is "TARIFA DE ESGOTO" value
-- "waterBasicFee" is "TBOA" or "TAR BÁSICA OPERAC ÁGUA" value
-- "sewageBasicFee" is "TBOE" or "TAR BÁSICA OPERAC ESGOTO" value
-- "totalAmount" is "VALOR A PAGAR" (the total amount due)
-- "occurrenceCode" is "OCORRÊNCIA" code number
-- "confidence" is your confidence level from 0 to 1 that the extraction is correct
-- All monetary values must be numbers (not strings), using dot as decimal separator
-- Brazilian bills use comma as decimal separator — convert "303,83" to 303.83
-- All dates must be in ISO format YYYY-MM-DD — convert "20/01/2026" to "2026-01-20"
-- If a field is not found on the bill, use null for strings and 0 for numbers
-- The bill may be from SAAE, CAESB, SABESP, COPASA, or any Brazilian water utility
-- CRITICAL: You MUST extract the EXACT values printed on the bill. Do NOT invent or guess values.`;
+Rules:
+- "referenceMonth": MÊS/ANO as YYYY-MM
+- "meterNumber": HIDRÔMETRO
+- "previousReading": L. ANTERIOR
+- "currentReading": L. ATUAL
+- "consumptionM3": CONS. REAL in m³
+- "billedConsumptionM3": CONS. FATURADO in m³
+- "readingDate": DATA DE LEITURA → YYYY-MM-DD
+- "readingDateOrig": DATA LEITURA ORIG → YYYY-MM-DD (if only one, use for both)
+- "dueDate": VENCIMENTO → YYYY-MM-DD
+- "waterTariff": TARIFA DE ÁGUA value
+- "sewageTariff": TARIFA DE ESGOTO value
+- "waterBasicFee": TBOA value
+- "sewageBasicFee": TBOE value
+- "totalAmount": VALOR A PAGAR
+- "occurrenceCode": OCORRÊNCIA code
+- "confidence": 0–1
+- Convert Brazilian decimals: "303,83" → 303.83
+- Convert dates: "20/01/2026" → "2026-01-20"
+- If not found: null for strings, 0 for numbers
+- CRITICAL: Extract EXACT values. Do NOT invent values.`;
 
-function buildTextPrompt(pdfText: string): string {
-    return `You are an expert at reading Brazilian water utility bills (contas de água).
-Below is the extracted text from a water bill PDF. Extract ALL data fields from this text.
-
-Return ONLY a valid JSON object (no markdown, no explanation) with these exact keys:
-
-{
-  "referenceMonth": "YYYY-MM",
-  "meterNumber": "string",
-  "previousReading": number,
-  "currentReading": number,
-  "consumptionM3": number,
-  "billedConsumptionM3": number,
-  "readingDate": "YYYY-MM-DD",
-  "readingDateOrig": "YYYY-MM-DD",
-  "dueDate": "YYYY-MM-DD",
-  "waterTariff": number,
-  "sewageTariff": number,
-  "waterBasicFee": number,
-  "sewageBasicFee": number,
-  "totalAmount": number,
-  "occurrenceCode": "string or null",
-  "confidence": number
-}
-
-Important rules:
-- "referenceMonth" is the billing period (MÊS/ANO), format as YYYY-MM. Example: "01/2026" → "2026-01"
-- "meterNumber" is "HIDRÔMETRO" value
-- "previousReading" is "L. ANTERIOR" value
-- "currentReading" is "L. ATUAL" value
-- "consumptionM3" is "CONS. REAL" value (number before "m3")
-- "billedConsumptionM3" is "CONS. FATURADO" value (number before "m3")
-- "readingDate" is "DATA DE LEITURA" — convert "20/01/2026" to "2026-01-20"
-- "readingDateOrig" is "DATA LEITURA ORIG" — convert "21/01/2026" to "2026-01-21"
-  If only one date is found, use it for both
-- "dueDate" is "VENCIMENTO" date — convert to YYYY-MM-DD
-- "waterTariff" is "TARIFA DE ÁGUA" value — convert "303,83" to 303.83
-- "sewageTariff" is "TARIFA DE ESGOTO" value — convert "182,30" to 182.30
-- "waterBasicFee" is "TBOA" or "TAR BÁSICA OPERAC ÁGUA" value
-- "sewageBasicFee" is "TBOE" or "TAR BÁSICA OPERAC ESGOTO" value
-- "totalAmount" is "VALOR A PAGAR" (e.g. "R$521,14" → 521.14)
-- "occurrenceCode" is "OCORRÊNCIA" number
-- "confidence" is 0 to 1 based on how clearly the data was found in the text
-- All monetary values: numbers with dot decimal (not comma)
-- CRITICAL: Extract EXACT values from the text. Do NOT guess.
-
---- BEGIN BILL TEXT ---
-${pdfText}
---- END BILL TEXT ---`;
-}
+// ── API Route ───────────────────────────────────────────────────────
 
 export async function POST(request: Request) {
     try {
-        const apiKey = process.env.OPENAI_API_KEY;
-        if (!apiKey) {
-            return NextResponse.json(
-                { error: "OpenAI API key not configured" },
-                { status: 500 }
-            );
-        }
-
         const formData = await request.formData();
         const file = formData.get("file") as File | null;
 
@@ -121,7 +191,6 @@ export async function POST(request: Request) {
             );
         }
 
-        // Validate file type
         const allowedTypes = [
             "image/jpeg", "image/jpg", "image/png", "image/webp",
             "image/gif", "application/pdf"
@@ -133,7 +202,6 @@ export async function POST(request: Request) {
             );
         }
 
-        // Validate file size (max 10MB)
         if (file.size > 10 * 1024 * 1024) {
             return NextResponse.json(
                 { error: "Arquivo muito grande. Máximo: 10MB." },
@@ -144,10 +212,8 @@ export async function POST(request: Request) {
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
 
-        let messages: unknown[];
-
+        // ── PDF: regex parser (free, instant) ───────────────────────
         if (file.type === "application/pdf") {
-            // PDF: Extract text with pdf-parse, then send as text prompt
             const pdfData = await pdfParse(buffer);
             const pdfText = pdfData.text;
 
@@ -158,36 +224,29 @@ export async function POST(request: Request) {
                 );
             }
 
-            messages = [
-                {
-                    role: "user",
-                    content: buildTextPrompt(pdfText),
-                },
-            ];
-        } else {
-            // Image: use GPT-4o Vision
-            let mediaType = file.type;
-            if (mediaType === "image/jpg") mediaType = "image/jpeg";
-            const base64 = buffer.toString("base64");
+            const extracted = parseBillText(pdfText);
 
-            messages = [
-                {
-                    role: "user",
-                    content: [
-                        { type: "text", text: EXTRACTION_PROMPT_IMAGE },
-                        {
-                            type: "image_url",
-                            image_url: {
-                                url: `data:${mediaType};base64,${base64}`,
-                                detail: "high",
-                            },
-                        },
-                    ],
-                },
-            ];
+            return NextResponse.json({
+                success: true,
+                data: extracted,
+                method: "pdf-parse",
+                usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+            });
         }
 
-        // Call OpenAI API
+        // ── Image: GPT-4o Vision (requires API key) ────────────────
+        const apiKey = process.env.OPENAI_API_KEY;
+        if (!apiKey) {
+            return NextResponse.json(
+                { error: "OpenAI API key not configured. Para imagens, é necessário configurar a chave da API." },
+                { status: 500 }
+            );
+        }
+
+        let mediaType = file.type;
+        if (mediaType === "image/jpg") mediaType = "image/jpeg";
+        const base64 = buffer.toString("base64");
+
         const apiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
             method: "POST",
             headers: {
@@ -196,7 +255,21 @@ export async function POST(request: Request) {
             },
             body: JSON.stringify({
                 model: "gpt-4o",
-                messages,
+                messages: [
+                    {
+                        role: "user",
+                        content: [
+                            { type: "text", text: IMAGE_PROMPT },
+                            {
+                                type: "image_url",
+                                image_url: {
+                                    url: `data:${mediaType};base64,${base64}`,
+                                    detail: "high",
+                                },
+                            },
+                        ],
+                    },
+                ],
                 max_tokens: 1500,
                 temperature: 0,
             }),
@@ -221,7 +294,6 @@ export async function POST(request: Request) {
             );
         }
 
-        // Parse the JSON response (strip markdown code fences if present)
         let cleanContent = content.trim();
         if (cleanContent.startsWith("```")) {
             cleanContent = cleanContent.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
@@ -232,6 +304,7 @@ export async function POST(request: Request) {
         return NextResponse.json({
             success: true,
             data: extracted,
+            method: "gpt-4o-vision",
             usage: {
                 prompt_tokens: response.usage?.prompt_tokens,
                 completion_tokens: response.usage?.completion_tokens,
