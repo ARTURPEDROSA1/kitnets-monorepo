@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import pdfParse from "pdf-parse";
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pdfParse = require("pdf-parse");
 
 // ── Regex-based PDF parser (no API needed) ──────────────────────────
 
