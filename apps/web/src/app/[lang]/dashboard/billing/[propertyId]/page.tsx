@@ -236,15 +236,14 @@ export default function BillingPage() {
             {/* ── Month Filter ─────────────────────────────── */}
             <div className="flex flex-wrap items-center gap-3 mb-6">
                 <Filter className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground font-medium">Período:</span>
                 <div className="flex flex-wrap gap-1.5">
                     {FILTER_OPTIONS.map((months) => (
                         <button
                             key={months}
                             onClick={() => setMonthsFilter(months)}
                             className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${monthsFilter === months
-                                    ? "bg-primary text-primary-foreground shadow-sm"
-                                    : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                ? "bg-primary text-primary-foreground shadow-sm"
+                                : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
                                 }`}
                         >
                             {months === 12 ? "12 meses" : `${months / 12} anos`}
@@ -261,8 +260,8 @@ export default function BillingPage() {
                             }
                         }}
                         className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all inline-flex items-center gap-1.5 ${monthsFilter === "custom"
-                                ? "bg-primary text-primary-foreground shadow-sm"
-                                : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
+                            ? "bg-primary text-primary-foreground shadow-sm"
+                            : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
                             }`}
                     >
                         <CalendarRange className="w-3.5 h-3.5" />
