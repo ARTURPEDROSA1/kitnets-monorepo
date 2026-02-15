@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { ArrowLeft, FileText, TrendingUp, DollarSign, Droplets, Calendar, ChevronDown, Eye, EyeOff, BadgeDollarSign, Plus, Pencil, Trash2, Filter, CalendarRange } from "lucide-react";
+import { ArrowLeft, FileText, TrendingUp, DollarSign, Droplets, Calendar, ChevronDown, Eye, EyeOff, BadgeDollarSign, Plus, Pencil, Trash2, CalendarRange } from "lucide-react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { ConsumptionChart } from "@/components/dashboard/ConsumptionChart";
@@ -120,11 +120,6 @@ export default function BillingPage() {
         return bills.filter((b) => b.reference_month >= cutoffStr);
     }, [bills, monthsFilter, customStart, customEnd]);
 
-    // Available years from bill data (for the custom range selectors)
-    const availableYears = useMemo(() => {
-        const years = new Set(bills.map((b) => b.reference_month.substring(0, 4)));
-        return Array.from(years).sort();
-    }, [bills]);
 
     // ── Derived data ──────────────────────────────────────────
     const summaryStats = useMemo(() => {
@@ -234,16 +229,16 @@ export default function BillingPage() {
             </div>
 
             {/* ── Month Filter ─────────────────────────────── */}
-            <div className="flex flex-wrap items-center gap-3 mb-6">
-                <Filter className="w-4 h-4 text-muted-foreground" />
-                <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-col gap-2 mb-8">
+                {/* Preset buttons row */}
+                <div className="flex items-center gap-1 flex-wrap bg-background border border-border rounded-lg p-1">
                     {FILTER_OPTIONS.map((months) => (
                         <button
                             key={months}
                             onClick={() => setMonthsFilter(months)}
-                            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${monthsFilter === months
+                            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${monthsFilter === months
                                 ? "bg-primary text-primary-foreground shadow-sm"
-                                : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                : "text-muted-foreground hover:bg-muted hover:text-foreground"
                                 }`}
                         >
                             {months === 12 ? "12 meses" : `${months / 12} anos`}
@@ -252,16 +247,15 @@ export default function BillingPage() {
                     <button
                         onClick={() => {
                             setMonthsFilter("custom");
-                            // Initialize with oldest and newest bill dates if available
                             if (bills.length > 0 && !customStart) {
                                 const sorted = [...bills].sort((a, b) => a.reference_month.localeCompare(b.reference_month));
                                 setCustomStart(sorted[0].reference_month);
                                 setCustomEnd(sorted[sorted.length - 1].reference_month);
                             }
                         }}
-                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all inline-flex items-center gap-1.5 ${monthsFilter === "custom"
+                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors whitespace-nowrap flex items-center gap-1.5 ${monthsFilter === "custom"
                             ? "bg-primary text-primary-foreground shadow-sm"
-                            : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
                             }`}
                     >
                         <CalendarRange className="w-3.5 h-3.5" />
@@ -269,46 +263,29 @@ export default function BillingPage() {
                     </button>
                 </div>
 
-                {/* Custom range selectors */}
+                {/* Custom date inputs (shown when "Período" is selected) */}
                 {monthsFilter === "custom" && (
-                    <div className="flex items-center gap-2 ml-1">
-                        <select
-                            value={customStart.substring(5, 7)}
-                            onChange={(e) => setCustomStart(`${customStart.substring(0, 4)}-${e.target.value}`)}
-                            className="px-2 py-1.5 rounded-lg border border-border bg-card text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-                        >
-                            {MONTH_NAMES.map((name, i) => (
-                                <option key={i} value={String(i + 1).padStart(2, "0")}>{name}</option>
-                            ))}
-                        </select>
-                        <select
-                            value={customStart.substring(0, 4)}
-                            onChange={(e) => setCustomStart(`${e.target.value}-${customStart.substring(5, 7)}`)}
-                            className="px-2 py-1.5 rounded-lg border border-border bg-card text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-                        >
-                            {availableYears.map((y) => (
-                                <option key={y} value={y}>{y}</option>
-                            ))}
-                        </select>
-                        <span className="text-muted-foreground text-sm">até</span>
-                        <select
-                            value={customEnd.substring(5, 7)}
-                            onChange={(e) => setCustomEnd(`${customEnd.substring(0, 4)}-${e.target.value}`)}
-                            className="px-2 py-1.5 rounded-lg border border-border bg-card text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-                        >
-                            {MONTH_NAMES.map((name, i) => (
-                                <option key={i} value={String(i + 1).padStart(2, "0")}>{name}</option>
-                            ))}
-                        </select>
-                        <select
-                            value={customEnd.substring(0, 4)}
-                            onChange={(e) => setCustomEnd(`${e.target.value}-${customEnd.substring(5, 7)}`)}
-                            className="px-2 py-1.5 rounded-lg border border-border bg-card text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-                        >
-                            {availableYears.map((y) => (
-                                <option key={y} value={y}>{y}</option>
-                            ))}
-                        </select>
+                    <div className="flex flex-col gap-2 bg-background border border-border rounded-lg p-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                        <div className="flex items-center gap-2">
+                            <label className="text-sm text-muted-foreground w-10 shrink-0">De:</label>
+                            <input
+                                type="month"
+                                value={customStart}
+                                max={customEnd}
+                                onChange={(e) => setCustomStart(e.target.value)}
+                                className="flex-1 min-w-0 px-2.5 py-2 text-sm rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                            />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <label className="text-sm text-muted-foreground w-10 shrink-0">Até:</label>
+                            <input
+                                type="month"
+                                value={customEnd}
+                                min={customStart}
+                                onChange={(e) => setCustomEnd(e.target.value)}
+                                className="flex-1 min-w-0 px-2.5 py-2 text-sm rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                            />
+                        </div>
                     </div>
                 )}
             </div>
