@@ -1,75 +1,5 @@
 import { NextResponse } from "next/server";
-import { inflateSync } from "zlib";
-
-// ── Zero-dependency PDF text extractor ──────────────────────────────
-
-function extractTextFromPDF(buffer: Buffer): string {
-    const raw = buffer.toString("binary");
-    const textChunks: string[] = [];
-
-    // Find all stream...endstream sections
-    const streamRegex = /stream\r?\n([\s\S]*?)endstream/g;
-    let match;
-
-    while ((match = streamRegex.exec(raw)) !== null) {
-        let streamContent = match[1];
-
-        // Try to decompress FlateDecode streams
-        try {
-            const buf = Buffer.from(streamContent, "binary");
-            const decompressed = inflateSync(buf);
-            streamContent = decompressed.toString("binary");
-        } catch {
-            // Not compressed or different compression — use as-is
-        }
-
-        // Extract text from PDF text operators:
-        // (text) Tj  — show text
-        // (text) '   — move to next line and show text
-        // [(text)] TJ — show text with positioning
-        // Also handle escaped characters in PDF strings
-
-        // Match text within parentheses — PDF string literals
-        const textOpRegex = /\(([^)]*)\)\s*(?:Tj|'|TJ)/g;
-        let textMatch;
-        while ((textMatch = textOpRegex.exec(streamContent)) !== null) {
-            let text = textMatch[1];
-            // Unescape PDF string escapes
-            text = text
-                .replace(/\\n/g, "\n")
-                .replace(/\\r/g, "\r")
-                .replace(/\\t/g, "\t")
-                .replace(/\\\(/g, "(")
-                .replace(/\\\)/g, ")")
-                .replace(/\\\\/g, "\\");
-            if (text.trim()) textChunks.push(text);
-        }
-
-        // Handle TJ arrays: [(text1) -100 (text2)] TJ
-        const tjArrayRegex = /\[((?:\([^)]*\)|[^[\]])*)\]\s*TJ/g;
-        let tjMatch;
-        while ((tjMatch = tjArrayRegex.exec(streamContent)) !== null) {
-            const arrayContent = tjMatch[1];
-            const parts: string[] = [];
-            const partRegex = /\(([^)]*)\)/g;
-            let partMatch;
-            while ((partMatch = partRegex.exec(arrayContent)) !== null) {
-                let text = partMatch[1];
-                text = text
-                    .replace(/\\n/g, "\n")
-                    .replace(/\\r/g, "\r")
-                    .replace(/\\t/g, "\t")
-                    .replace(/\\\(/g, "(")
-                    .replace(/\\\)/g, ")")
-                    .replace(/\\\\/g, "\\");
-                parts.push(text);
-            }
-            if (parts.length > 0) textChunks.push(parts.join(""));
-        }
-    }
-
-    return textChunks.join("\n");
-}
+import { extractText, getDocumentProxy } from "unpdf";
 
 // ── Regex-based bill field parser ────────────────────────────────────
 
@@ -276,9 +206,10 @@ export async function POST(request: Request) {
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
 
-        // ── PDF: zero-dependency text extraction + regex parser ──────
+        // ── PDF: unpdf text extraction + regex parser (free, fast) ────
         if (file.type === "application/pdf") {
-            const pdfText = extractTextFromPDF(buffer);
+            const pdf = await getDocumentProxy(new Uint8Array(buffer));
+            const { text: pdfText } = await extractText(pdf, { mergePages: true });
 
             if (!pdfText || pdfText.trim().length < 20) {
                 return NextResponse.json(
