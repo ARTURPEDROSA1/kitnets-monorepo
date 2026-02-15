@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
+import pdfParse from "pdf-parse";
 
-const EXTRACTION_PROMPT = `You are an expert at reading Brazilian water utility bills (contas de água).
-Analyze this bill carefully and extract ALL data fields.
+const EXTRACTION_PROMPT_IMAGE = `You are an expert at reading Brazilian water utility bills (contas de água).
+Analyze this bill image carefully and extract ALL data fields.
 
 Return ONLY a valid JSON object (no markdown, no explanation) with these exact keys:
 
@@ -47,7 +48,58 @@ Important rules:
 - All dates must be in ISO format YYYY-MM-DD — convert "20/01/2026" to "2026-01-20"
 - If a field is not found on the bill, use null for strings and 0 for numbers
 - The bill may be from SAAE, CAESB, SABESP, COPASA, or any Brazilian water utility
-- CRITICAL: You MUST extract the EXACT values printed on the bill. Do NOT invent or guess values. If you cannot read a value, set confidence to 0.`;
+- CRITICAL: You MUST extract the EXACT values printed on the bill. Do NOT invent or guess values.`;
+
+function buildTextPrompt(pdfText: string): string {
+    return `You are an expert at reading Brazilian water utility bills (contas de água).
+Below is the extracted text from a water bill PDF. Extract ALL data fields from this text.
+
+Return ONLY a valid JSON object (no markdown, no explanation) with these exact keys:
+
+{
+  "referenceMonth": "YYYY-MM",
+  "meterNumber": "string",
+  "previousReading": number,
+  "currentReading": number,
+  "consumptionM3": number,
+  "billedConsumptionM3": number,
+  "readingDate": "YYYY-MM-DD",
+  "readingDateOrig": "YYYY-MM-DD",
+  "dueDate": "YYYY-MM-DD",
+  "waterTariff": number,
+  "sewageTariff": number,
+  "waterBasicFee": number,
+  "sewageBasicFee": number,
+  "totalAmount": number,
+  "occurrenceCode": "string or null",
+  "confidence": number
+}
+
+Important rules:
+- "referenceMonth" is the billing period (MÊS/ANO), format as YYYY-MM. Example: "01/2026" → "2026-01"
+- "meterNumber" is "HIDRÔMETRO" value
+- "previousReading" is "L. ANTERIOR" value
+- "currentReading" is "L. ATUAL" value
+- "consumptionM3" is "CONS. REAL" value (number before "m3")
+- "billedConsumptionM3" is "CONS. FATURADO" value (number before "m3")
+- "readingDate" is "DATA DE LEITURA" — convert "20/01/2026" to "2026-01-20"
+- "readingDateOrig" is "DATA LEITURA ORIG" — convert "21/01/2026" to "2026-01-21"
+  If only one date is found, use it for both
+- "dueDate" is "VENCIMENTO" date — convert to YYYY-MM-DD
+- "waterTariff" is "TARIFA DE ÁGUA" value — convert "303,83" to 303.83
+- "sewageTariff" is "TARIFA DE ESGOTO" value — convert "182,30" to 182.30
+- "waterBasicFee" is "TBOA" or "TAR BÁSICA OPERAC ÁGUA" value
+- "sewageBasicFee" is "TBOE" or "TAR BÁSICA OPERAC ESGOTO" value
+- "totalAmount" is "VALOR A PAGAR" (e.g. "R$521,14" → 521.14)
+- "occurrenceCode" is "OCORRÊNCIA" number
+- "confidence" is 0 to 1 based on how clearly the data was found in the text
+- All monetary values: numbers with dot decimal (not comma)
+- CRITICAL: Extract EXACT values from the text. Do NOT guess.
+
+--- BEGIN BILL TEXT ---
+${pdfText}
+--- END BILL TEXT ---`;
+}
 
 export async function POST(request: Request) {
     try {
@@ -89,67 +141,53 @@ export async function POST(request: Request) {
             );
         }
 
-        // Convert file to base64
         const bytes = await file.arrayBuffer();
-        const base64 = Buffer.from(bytes).toString("base64");
+        const buffer = Buffer.from(bytes);
 
-        let mediaType = file.type;
-        if (mediaType === "image/jpg") mediaType = "image/jpeg";
-
-        // Build content parts based on file type
-        let contentParts: unknown[];
+        let messages: unknown[];
 
         if (file.type === "application/pdf") {
-            // Step 1: Upload PDF to OpenAI Files API
-            const uploadForm = new FormData();
-            uploadForm.append("file", new Blob([bytes], { type: "application/pdf" }), file.name || "bill.pdf");
-            uploadForm.append("purpose", "user_data");
+            // PDF: Extract text with pdf-parse, then send as text prompt
+            const pdfData = await pdfParse(buffer);
+            const pdfText = pdfData.text;
 
-            const uploadRes = await fetch("https://api.openai.com/v1/files", {
-                method: "POST",
-                headers: {
-                    "Authorization": `Bearer ${apiKey}`,
-                },
-                body: uploadForm,
-            });
-
-            if (!uploadRes.ok) {
-                const errText = await uploadRes.text();
-                console.error("OpenAI file upload error:", uploadRes.status, errText);
+            if (!pdfText || pdfText.trim().length < 20) {
                 return NextResponse.json(
-                    { error: `Erro ao enviar PDF para análise. Tente enviar como imagem (JPG/PNG).` },
-                    { status: 500 }
+                    { error: "Não foi possível extrair texto do PDF. Tente enviar como imagem (JPG/PNG)." },
+                    { status: 400 }
                 );
             }
 
-            const uploadData = await uploadRes.json();
-            const fileId = uploadData.id;
-
-            // Step 2: Reference the uploaded file in the message
-            contentParts = [
-                { type: "text", text: EXTRACTION_PROMPT },
+            messages = [
                 {
-                    type: "file",
-                    file: {
-                        file_id: fileId,
-                    },
+                    role: "user",
+                    content: buildTextPrompt(pdfText),
                 },
             ];
         } else {
-            // For images: use standard image_url with base64 (always works)
-            contentParts = [
-                { type: "text", text: EXTRACTION_PROMPT },
+            // Image: use GPT-4o Vision
+            let mediaType = file.type;
+            if (mediaType === "image/jpg") mediaType = "image/jpeg";
+            const base64 = buffer.toString("base64");
+
+            messages = [
                 {
-                    type: "image_url",
-                    image_url: {
-                        url: `data:${mediaType};base64,${base64}`,
-                        detail: "high",
-                    },
+                    role: "user",
+                    content: [
+                        { type: "text", text: EXTRACTION_PROMPT_IMAGE },
+                        {
+                            type: "image_url",
+                            image_url: {
+                                url: `data:${mediaType};base64,${base64}`,
+                                detail: "high",
+                            },
+                        },
+                    ],
                 },
             ];
         }
 
-        // Call OpenAI Chat Completions API
+        // Call OpenAI API
         const apiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
             method: "POST",
             headers: {
@@ -158,12 +196,7 @@ export async function POST(request: Request) {
             },
             body: JSON.stringify({
                 model: "gpt-4o",
-                messages: [
-                    {
-                        role: "user",
-                        content: contentParts,
-                    },
-                ],
+                messages,
                 max_tokens: 1500,
                 temperature: 0,
             }),
