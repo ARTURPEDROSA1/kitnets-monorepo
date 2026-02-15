@@ -208,24 +208,46 @@ export async function POST(request: Request) {
 
         // ── PDF: unpdf text extraction + regex parser (free, fast) ────
         if (file.type === "application/pdf") {
-            const pdf = await getDocumentProxy(new Uint8Array(buffer));
-            const { text: pdfText } = await extractText(pdf, { mergePages: true });
+            let pdfText = "";
 
-            if (!pdfText || pdfText.trim().length < 20) {
+            try {
+                const pdf = await getDocumentProxy(new Uint8Array(buffer));
+                const result = await extractText(pdf, { mergePages: true });
+                pdfText = result.text || "";
+            } catch (pdfError) {
+                console.error("unpdf extraction error:", pdfError);
                 return NextResponse.json(
-                    { error: "Não foi possível extrair texto do PDF. Tente enviar como imagem (JPG/PNG)." },
+                    {
+                        error: `Erro ao processar PDF: ${pdfError instanceof Error ? pdfError.message : "erro desconhecido"}. Tente enviar como imagem (JPG/PNG).`,
+                    },
                     { status: 400 }
                 );
             }
 
-            const extracted = parseBillText(pdfText);
+            // Try regex parser even with short text
+            if (pdfText.trim().length > 0) {
+                const extracted = parseBillText(pdfText);
 
-            return NextResponse.json({
-                success: true,
-                data: extracted,
-                method: "regex",
-                usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
-            });
+                // If parser found at least some key fields, return the result
+                if (extracted.confidence > 0) {
+                    return NextResponse.json({
+                        success: true,
+                        data: extracted,
+                        method: "regex",
+                        debug: { textLength: pdfText.length, textPreview: pdfText.substring(0, 500) },
+                        usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+                    });
+                }
+            }
+
+            // If no usable text or zero confidence, return error with debug info
+            return NextResponse.json(
+                {
+                    error: `Não foi possível extrair dados do PDF (${pdfText.length} caracteres extraídos). Tente enviar como imagem (JPG/PNG).`,
+                    debug: { textLength: pdfText.length, textPreview: pdfText.substring(0, 500) },
+                },
+                { status: 400 }
+            );
         }
 
         // ── Image: GPT-4o Vision ────────────────────────────────────
