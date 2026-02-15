@@ -286,6 +286,12 @@ export default function BillingPage() {
                                 className="flex-1 min-w-0 px-2.5 py-2 text-sm rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                             />
                         </div>
+                        <button
+                            onClick={() => setMonthsFilter("custom")}
+                            className="w-full px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors"
+                        >
+                            Aplicar
+                        </button>
                     </div>
                 )}
             </div>
