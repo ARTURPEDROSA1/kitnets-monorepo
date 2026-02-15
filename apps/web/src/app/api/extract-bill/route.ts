@@ -1,18 +1,85 @@
 import { NextResponse } from "next/server";
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParse = require("pdf-parse");
+import { inflateSync } from "zlib";
 
-// ── Regex-based PDF parser (no API needed) ──────────────────────────
+// ── Zero-dependency PDF text extractor ──────────────────────────────
+
+function extractTextFromPDF(buffer: Buffer): string {
+    const raw = buffer.toString("binary");
+    const textChunks: string[] = [];
+
+    // Find all stream...endstream sections
+    const streamRegex = /stream\r?\n([\s\S]*?)endstream/g;
+    let match;
+
+    while ((match = streamRegex.exec(raw)) !== null) {
+        let streamContent = match[1];
+
+        // Try to decompress FlateDecode streams
+        try {
+            const buf = Buffer.from(streamContent, "binary");
+            const decompressed = inflateSync(buf);
+            streamContent = decompressed.toString("binary");
+        } catch {
+            // Not compressed or different compression — use as-is
+        }
+
+        // Extract text from PDF text operators:
+        // (text) Tj  — show text
+        // (text) '   — move to next line and show text
+        // [(text)] TJ — show text with positioning
+        // Also handle escaped characters in PDF strings
+
+        // Match text within parentheses — PDF string literals
+        const textOpRegex = /\(([^)]*)\)\s*(?:Tj|'|TJ)/g;
+        let textMatch;
+        while ((textMatch = textOpRegex.exec(streamContent)) !== null) {
+            let text = textMatch[1];
+            // Unescape PDF string escapes
+            text = text
+                .replace(/\\n/g, "\n")
+                .replace(/\\r/g, "\r")
+                .replace(/\\t/g, "\t")
+                .replace(/\\\(/g, "(")
+                .replace(/\\\)/g, ")")
+                .replace(/\\\\/g, "\\");
+            if (text.trim()) textChunks.push(text);
+        }
+
+        // Handle TJ arrays: [(text1) -100 (text2)] TJ
+        const tjArrayRegex = /\[((?:\([^)]*\)|[^[\]])*)\]\s*TJ/g;
+        let tjMatch;
+        while ((tjMatch = tjArrayRegex.exec(streamContent)) !== null) {
+            const arrayContent = tjMatch[1];
+            const parts: string[] = [];
+            const partRegex = /\(([^)]*)\)/g;
+            let partMatch;
+            while ((partMatch = partRegex.exec(arrayContent)) !== null) {
+                let text = partMatch[1];
+                text = text
+                    .replace(/\\n/g, "\n")
+                    .replace(/\\r/g, "\r")
+                    .replace(/\\t/g, "\t")
+                    .replace(/\\\(/g, "(")
+                    .replace(/\\\)/g, ")")
+                    .replace(/\\\\/g, "\\");
+                parts.push(text);
+            }
+            if (parts.length > 0) textChunks.push(parts.join(""));
+        }
+    }
+
+    return textChunks.join("\n");
+}
+
+// ── Regex-based bill field parser ────────────────────────────────────
 
 function parseDateBR(dateStr: string): string | null {
-    // Convert "20/01/2026" → "2026-01-20"
     const m = dateStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
     if (!m) return null;
     return `${m[3]}-${m[2]}-${m[1]}`;
 }
 
 function parseDecimalBR(value: string): number {
-    // Convert "303,83" or "303.83" → 303.83
     return parseFloat(value.replace(/\./g, "").replace(",", "."));
 }
 
@@ -41,10 +108,9 @@ interface ExtractedBill {
 }
 
 function parseBillText(text: string): ExtractedBill {
-    // Normalize whitespace
     const t = text.replace(/\r\n/g, "\n").replace(/[ \t]+/g, " ");
 
-    // Reference month: "MÊS/ANO\n01/2026" or "MÊS/ANO 01/2026"
+    // Reference month: "MÊS/ANO 01/2026" or "01/2026"
     let referenceMonth: string | null = null;
     const mesAno = extractFirst(t, /M[ÊE]S\s*\/?\s*ANO\s*[:\n]?\s*(\d{2}\/\d{4})/i);
     if (mesAno) {
@@ -52,57 +118,54 @@ function parseBillText(text: string): ExtractedBill {
         referenceMonth = `${yyyy}-${mm}`;
     }
 
-    // Meter number: "HIDRÔMETRO\nY21SG1602635" or similar
+    // Meter number
     const meterNumber = extractFirst(t, /HIDR[ÔO]METRO\s*[:\n]?\s*([A-Z0-9]+)/i);
 
-    // Readings: "L. ANTERIOR\n520" and "L. ATUAL\n573"
+    // Readings
     const prevStr = extractFirst(t, /L\.?\s*ANTERIOR\s*[:\n]?\s*([\d.,]+)/i);
     const currStr = extractFirst(t, /L\.?\s*ATUAL\s*[:\n]?\s*([\d.,]+)/i);
     const previousReading = prevStr ? parseDecimalBR(prevStr) : null;
     const currentReading = currStr ? parseDecimalBR(currStr) : null;
 
-    // Consumption: "CONS. REAL\n53m3" or "CONS. REAL 53m3"
+    // Consumption
     const consRealStr = extractFirst(t, /CONS\.?\s*REAL\s*[:\n]?\s*([\d.,]+)\s*m/i);
     const consumptionM3 = consRealStr ? parseDecimalBR(consRealStr) : null;
 
-    // Billed consumption: "CONS. FATURADO\n53m3"
     const consFatStr = extractFirst(t, /CONS\.?\s*FATURADO\s*[:\n]?\s*([\d.,]+)\s*m/i);
     const billedConsumptionM3 = consFatStr ? parseDecimalBR(consFatStr) : null;
 
-    // Reading date: "DATA DE LEITURA\n20/01/2026"
+    // Dates
     const readingDateRaw = extractFirst(t, /DATA\s+DE\s+LEITURA\s*[:\n]?\s*(\d{2}\/\d{2}\/\d{4})/i);
     const readingDate = readingDateRaw ? parseDateBR(readingDateRaw) : null;
 
-    // Original reading date: "DATA LEITURA ORIG\n21/01/2026"
     const readingDateOrigRaw = extractFirst(t, /DATA\s+LEITURA\s+ORIG\.?\s*[:\n]?\s*(\d{2}\/\d{2}\/\d{4})/i);
     const readingDateOrig = readingDateOrigRaw ? parseDateBR(readingDateOrigRaw) : null;
 
-    // Due date: "VENCIMENTO\n18/02/2026"
     const dueDateRaw = extractFirst(t, /VENCIMENTO\s*[:\n]?\s*(\d{2}\/\d{2}\/\d{4})/i);
     const dueDate = dueDateRaw ? parseDateBR(dueDateRaw) : null;
 
-    // Tariffs: "TARIFA DE ÁGUA 303,83" (look for value at end of line)
+    // Tariffs
     const waterTariffStr = extractFirst(t, /TARIFA\s+DE\s+[ÁA]GUA\s*[:\n]?\s*([\d.,]+)/i);
     const waterTariff = waterTariffStr ? parseDecimalBR(waterTariffStr) : null;
 
     const sewageTariffStr = extractFirst(t, /TARIFA\s+DE\s+ESGOTO\s*[:\n]?\s*([\d.,]+)/i);
     const sewageTariff = sewageTariffStr ? parseDecimalBR(sewageTariffStr) : null;
 
-    // Basic fees: "TBOA –TAR BÁSICA OPERAC ÁGUA 21,88"
+    // Basic fees
     const waterBasicFeeStr = extractFirst(t, /(?:TBOA|TAR\s*B[ÁA]SICA\s*OPERAC?\s*[ÁA]GUA)\s*[:\n]?\s*([\d.,]+)/i);
     const waterBasicFee = waterBasicFeeStr ? parseDecimalBR(waterBasicFeeStr) : null;
 
     const sewageBasicFeeStr = extractFirst(t, /(?:TBOE|TAR\s*B[ÁA]SICA\s*OPERAC?\s*ESGOTO)\s*[:\n]?\s*([\d.,]+)/i);
     const sewageBasicFee = sewageBasicFeeStr ? parseDecimalBR(sewageBasicFeeStr) : null;
 
-    // Total amount: "VALOR A PAGAR\nR$521,14" or "R$ 521,14"
+    // Total
     const totalStr = extractFirst(t, /VALOR\s+A\s+PAGAR\s*[:\n]?\s*R?\$?\s*([\d.,]+)/i);
     const totalAmount = totalStr ? parseDecimalBR(totalStr) : null;
 
-    // Occurrence code: "OCORRÊNCIA\n33"
+    // Occurrence
     const occurrenceCode = extractFirst(t, /OCORR[ÊE]NCIA\s*[:\n]?\s*(\d+)/i);
 
-    // Calculate confidence based on how many fields were extracted
+    // Confidence
     const fields = [
         referenceMonth, meterNumber, previousReading, currentReading,
         consumptionM3, readingDate, dueDate, totalAmount,
@@ -130,7 +193,7 @@ function parseBillText(text: string): ExtractedBill {
     };
 }
 
-// ── GPT-4o Vision prompt (for images only) ──────────────────────────
+// ── GPT-4o Vision prompt (images only) ──────────────────────────────
 
 const IMAGE_PROMPT = `You are an expert at reading Brazilian water utility bills (contas de água).
 Analyze this bill image carefully and extract ALL data fields.
@@ -213,10 +276,9 @@ export async function POST(request: Request) {
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
 
-        // ── PDF: regex parser (free, instant) ───────────────────────
+        // ── PDF: zero-dependency text extraction + regex parser ──────
         if (file.type === "application/pdf") {
-            const pdfData = await pdfParse(buffer);
-            const pdfText = pdfData.text;
+            const pdfText = extractTextFromPDF(buffer);
 
             if (!pdfText || pdfText.trim().length < 20) {
                 return NextResponse.json(
@@ -230,12 +292,12 @@ export async function POST(request: Request) {
             return NextResponse.json({
                 success: true,
                 data: extracted,
-                method: "pdf-parse",
+                method: "regex",
                 usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
             });
         }
 
-        // ── Image: GPT-4o Vision (requires API key) ────────────────
+        // ── Image: GPT-4o Vision ────────────────────────────────────
         const apiKey = process.env.OPENAI_API_KEY;
         if (!apiKey) {
             return NextResponse.json(
