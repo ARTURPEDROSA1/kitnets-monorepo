@@ -9,7 +9,7 @@ import { KPICard } from "@/components/dashboard/KPICards";
 import { ConsumptionChart } from "@/components/dashboard/ConsumptionChart";
 import { ConsumptionTabs, DailyTotal } from "@/components/dashboard/ConsumptionTabs";
 import { DateRangePicker } from "@/components/dashboard/DateRangePicker";
-import { format, differenceInDays, subDays, startOfMonth } from "date-fns";
+import { format, differenceInDays, subDays, startOfMonth, startOfYear, subMonths, endOfMonth } from "date-fns";
 
 interface DateRange {
     start: Date;
@@ -57,14 +57,14 @@ export default function GatewayDetailPage() {
     });
 
     // ── Billing cycle sync ────────────────────────────────────
-    interface BillingCycle { label: string; start: Date; end: Date; refMonth: string }
-    const [billCycles, setBillCycles] = useState<BillingCycle[]>([]);
+    const [syncBilling, setSyncBilling] = useState(false);
+    // Reading dates from bills, sorted newest first: ["2026-01-07", "2025-12-05", ...]
+    const [readingDates, setReadingDates] = useState<string[]>([]);
 
-    // Fetch bills once to compute billing cycles (independent of date range)
+    // Fetch bills once to get reading dates (independent of date range)
     useEffect(() => {
         let cancelled = false;
         (async () => {
-            // First get the gateway to know the property_id
             const { data: gw } = await supabase
                 .from("gateways")
                 .select("property_id")
@@ -78,35 +78,66 @@ export default function GatewayDetailPage() {
 
             if (cancelled || !billsData || billsData.length < 2) return;
 
-            // Use reading_date_orig preferentially, fallback to reading_date
-            const sorted = billsData
-                .filter((b: any) => b.reading_date_orig || b.reading_date)
-                .sort((a: any, b: any) => b.reference_month.localeCompare(a.reference_month));
+            // Extract reading dates sorted newest first (prefer reading_date_orig)
+            const dates = billsData
+                .map((b: any) => (b.reading_date_orig || b.reading_date) as string | null)
+                .filter(Boolean) as string[];
 
-            const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-            const cycles: BillingCycle[] = [];
-
-            for (let i = 0; i < sorted.length - 1 && cycles.length < 6; i++) {
-                const curr = sorted[i];
-                const prev = sorted[i + 1];
-                const currDate = curr.reading_date_orig || curr.reading_date;
-                const prevDate = prev.reading_date_orig || prev.reading_date;
-                if (!currDate || !prevDate) continue;
-
-                const [y, m] = curr.reference_month.split("-");
-                cycles.push({
-                    label: `${monthNames[parseInt(m) - 1]}/${y}`,
-                    start: new Date(prevDate + "T00:00:00"),
-                    end: new Date(currDate + "T00:00:00"),
-                    refMonth: curr.reference_month,
-                });
-            }
-
-            setBillCycles(cycles);
+            // Sort descending (newest first)
+            dates.sort((a, b) => b.localeCompare(a));
+            setReadingDates(dates);
         })();
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id]);
+
+    /** Compute billing-cycle-adjusted dates for a given preset label */
+    function getBillingSyncDates(label: string): { start: Date; end: Date } | null {
+        if (readingDates.length < 2) return null;
+        const today = new Date();
+
+        if (label === "Este Mês") {
+            // From the most recent reading date → today
+            return { start: new Date(readingDates[0] + "T00:00:00"), end: today };
+        }
+        if (label === "Mês Passado" && readingDates.length >= 2) {
+            // From 2nd most recent reading → most recent reading
+            return {
+                start: new Date(readingDates[1] + "T00:00:00"),
+                end: new Date(readingDates[0] + "T00:00:00"),
+            };
+        }
+        if (label === "Este Ano") {
+            // From earliest reading of the current year (or late Dec prev year) → today
+            const currentYear = today.getFullYear();
+            const yearDates = readingDates.filter(d => {
+                const yr = parseInt(d.substring(0, 4));
+                const mo = parseInt(d.substring(5, 7));
+                return yr === currentYear || (yr === currentYear - 1 && mo === 12);
+            });
+            if (yearDates.length === 0) return null;
+            const oldest = yearDates[yearDates.length - 1];
+            return { start: new Date(oldest + "T00:00:00"), end: today };
+        }
+        return null; // Other presets don't have a billing equivalent
+    }
+
+    /** Get calendar dates for a preset label (to restore when sync is turned off) */
+    function getCalendarDates(label: string): { start: Date; end: Date } {
+        const today = new Date();
+        switch (label) {
+            case "Este Mês":
+                return { start: startOfMonth(today), end: today };
+            case "Mês Passado": {
+                const prev = subMonths(today, 1);
+                return { start: startOfMonth(prev), end: endOfMonth(prev) };
+            }
+            case "Este Ano":
+                return { start: startOfYear(today), end: today };
+            default:
+                return { start: startOfMonth(today), end: today };
+        }
+    }
 
     // Track date range timestamps for stable effect deps
     const startMs = dateRange.start.getTime();
@@ -262,7 +293,30 @@ export default function GatewayDetailPage() {
 
     // ── Handlers ──────────────────────────────────────────────
     const handleDateRangeChange = (start: Date, end: Date, label: string) => {
+        if (syncBilling) {
+            const adjusted = getBillingSyncDates(label);
+            if (adjusted) {
+                setDateRange({ start: adjusted.start, end: adjusted.end, label });
+                return;
+            }
+        }
         setDateRange({ start, end, label });
+    };
+
+    const handleSyncToggle = () => {
+        const newSync = !syncBilling;
+        setSyncBilling(newSync);
+        if (newSync) {
+            // Adjust current preset to billing cycle dates
+            const adjusted = getBillingSyncDates(dateRange.label);
+            if (adjusted) {
+                setDateRange(prev => ({ ...prev, start: adjusted.start, end: adjusted.end }));
+            }
+        } else {
+            // Restore calendar dates for current preset
+            const cal = getCalendarDates(dateRange.label);
+            setDateRange(prev => ({ ...prev, start: cal.start, end: cal.end }));
+        }
     };
 
     // ── Loading / empty states ────────────────────────────────
@@ -321,33 +375,24 @@ export default function GatewayDetailPage() {
             <div className="mb-8">
                 <DateRangePicker onChange={handleDateRangeChange} defaultValue="thisMonth" />
 
-                {/* Billing cycle sync buttons */}
-                {billCycles.length > 0 && (
-                    <div className="flex items-center gap-2 flex-wrap mt-3">
-                        <span className="text-xs text-muted-foreground flex items-center gap-1.5 mr-1">
+                {/* Billing cycle sync toggle */}
+                {readingDates.length >= 2 && (
+                    <div className="flex items-center gap-2 mt-3">
+                        <button
+                            onClick={handleSyncToggle}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors border ${syncBilling
+                                ? "bg-primary text-primary-foreground shadow-sm border-primary"
+                                : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+                                }`}
+                        >
                             <CalendarSync className="w-3.5 h-3.5" />
-                            Ciclo de Leitura:
-                        </span>
-                        {billCycles.slice(0, 4).map((cycle) => {
-                            const sd = cycle.start;
-                            const ed = cycle.end;
-                            const shortStart = `${sd.getDate().toString().padStart(2, "0")}/${(sd.getMonth() + 1).toString().padStart(2, "0")}`;
-                            const shortEnd = `${ed.getDate().toString().padStart(2, "0")}/${(ed.getMonth() + 1).toString().padStart(2, "0")}`;
-                            const isActive = dateRange.label === `Leitura ${cycle.label}`;
-                            return (
-                                <button
-                                    key={cycle.refMonth}
-                                    onClick={() => setDateRange({ start: cycle.start, end: cycle.end, label: `Leitura ${cycle.label}` })}
-                                    className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap border ${isActive
-                                            ? "bg-primary text-primary-foreground shadow-sm border-primary"
-                                            : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
-                                        }`}
-                                >
-                                    {cycle.label}
-                                    <span className="ml-1 opacity-60">({shortStart} — {shortEnd})</span>
-                                </button>
-                            );
-                        })}
+                            Sincronizar Ciclo de Leitura
+                        </button>
+                        {syncBilling && (
+                            <span className="text-xs text-muted-foreground">
+                                {format(dateRange.start, "dd/MM")} — {format(dateRange.end, "dd/MM")}
+                            </span>
+                        )}
                     </div>
                 )}
             </div>
@@ -421,7 +466,12 @@ export default function GatewayDetailPage() {
 
             {/* ── Consolidated Chart with Tabs ────────────────── */}
             <div className="mb-12">
-                <ConsumptionTabs dailyData={dailyTotalsData} loading={loading} />
+                <ConsumptionTabs
+                    key={syncBilling && dateRange.label === "Este Ano" ? "monthly" : "daily"}
+                    dailyData={dailyTotalsData}
+                    loading={loading}
+                    initialTab={syncBilling && dateRange.label === "Este Ano" ? "monthly" : undefined}
+                />
             </div>
 
             {/* ── Per-meter detail cards ──────────────────────── */}
