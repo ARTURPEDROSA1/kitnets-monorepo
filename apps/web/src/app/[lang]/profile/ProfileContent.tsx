@@ -5,7 +5,7 @@ import { Button } from '@kitnets/ui';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Image from 'next/image';
-import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera, Sparkles, Save, UploadCloud, Home } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera, Sparkles, Save, UploadCloud, Home, Building2, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUser, useAuth } from '@clerk/nextjs';
 import { createBrowserClient } from '@supabase/ssr';
@@ -82,11 +82,19 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
     const [savedPhotos, setSavedPhotos] = useState<string[]>([]); // Saved URLs
     const [profileId, setProfileId] = useState<string | null>(null);
 
+    // Person type toggle: 'pf' = Pessoa Física, 'pj' = Pessoa Jurídica
+    const [personType, setPersonType] = useState<'pf' | 'pj'>('pf');
+
     const [formData, setFormData] = useState({
         name: '',
         phone: '',
         cpf: '',
         birthDate: '',
+        // PJ fields
+        cnpj: '',
+        businessName: '',   // Razão Social
+        tradeName: '',       // Nome Fantasia
+        registrationStatusDate: '', // Data da Situação Cadastral
         ownerAddress: {
             cep: '',
             street: '',
@@ -152,11 +160,16 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                 if (profile) {
                     console.log('[Profile] Loaded profile:', profile.id, 'clerk_id:', profile.clerk_id);
                     setProfileId(profile.id);
+                    if (profile.person_type) setPersonType(profile.person_type as 'pf' | 'pj');
                     setFormData({
                         name: profile.full_name || user.fullName || '',
                         phone: profile.phone || user.phoneNumbers[0]?.phoneNumber || '',
                         cpf: profile.cpf || '',
                         birthDate: profile.birth_date || '',
+                        cnpj: profile.cnpj || '',
+                        businessName: profile.business_name || '',
+                        tradeName: profile.trade_name || '',
+                        registrationStatusDate: profile.registration_status_date || '',
                         ownerAddress: profile.address || {
                             cep: '', street: '', number: '', city: '', state: '', neighborhood: '', complement: ''
                         },
@@ -215,6 +228,16 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
             .replace(/(-\d{2})\d+?$/, "$1");
     };
 
+    const formatCNPJ = (value: string) => {
+        return value
+            .replace(/\D/g, "")
+            .replace(/(\d{2})(\d)/, "$1.$2")
+            .replace(/(\d{3})(\d)/, "$1.$2")
+            .replace(/(\d{3})(\d)/, "$1/$2")
+            .replace(/(\d{4})(\d{1,2})/, "$1-$2")
+            .replace(/(-\d{2})\d+?$/, "$1");
+    };
+
     const formatCEP = (value: string) => {
         return value
             .replace(/\D/g, "")
@@ -235,6 +258,16 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
             // Trigger enrichment when CPF is complete
             if (plainCpf.length === 11 && plainCpf !== formData.cpf.replace(/\D/g, '')) {
                 fetchCpfData(plainCpf);
+            }
+        }
+
+        if (field === 'cnpj') {
+            formattedValue = formatCNPJ(value);
+            const plainCnpj = formattedValue.replace(/\D/g, '');
+
+            // Trigger CNPJ enrichment when complete (14 digits)
+            if (plainCnpj.length === 14 && plainCnpj !== formData.cnpj.replace(/\D/g, '')) {
+                fetchCnpjData(plainCnpj);
             }
         }
 
@@ -265,10 +298,54 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                     birthDate: prev.birthDate || data.data.birthDate,
                     phone: prev.phone || data.data.phone
                 }));
-                // Optional: Toast or visual indicator
             }
         } catch (error) {
             console.error("Enrichment failed", error);
+        } finally {
+            setIsLoadingEnrichment(false);
+        }
+    };
+
+    const fetchCnpjData = async (cnpj: string) => {
+        setIsLoadingEnrichment(true);
+        try {
+            // Using ReceitaWS public API for CNPJ lookup
+            const res = await fetch(`https://receitaws.com.br/v1/cnpj/${cnpj}`);
+            if (!res.ok) {
+                console.warn(`CNPJ enrichment failed: ${res.status}`);
+                return;
+            }
+            const data = await res.json();
+
+            if (data.status === 'OK') {
+                setFormData(prev => ({
+                    ...prev,
+                    businessName: prev.businessName || data.nome || '',
+                    tradeName: prev.tradeName || data.fantasia || '',
+                    name: prev.name || data.nome || '',
+                    registrationStatusDate: prev.registrationStatusDate || (data.data_situacao_cadastral ? data.data_situacao_cadastral.split('/').reverse().join('-') : ''),
+                    phone: prev.phone || (data.telefone ? formatPhone(data.telefone.replace(/[^\d]/g, '')) : prev.phone),
+                }));
+
+                // Auto-fill address if available
+                if (data.cep) {
+                    setFormData(prev => ({
+                        ...prev,
+                        ownerAddress: {
+                            ...prev.ownerAddress,
+                            cep: prev.ownerAddress.cep || formatCEP(data.cep.replace(/[^\d]/g, '')),
+                            street: prev.ownerAddress.street || data.logradouro || '',
+                            number: prev.ownerAddress.number || data.numero || '',
+                            neighborhood: prev.ownerAddress.neighborhood || data.bairro || '',
+                            city: prev.ownerAddress.city || data.municipio || '',
+                            state: prev.ownerAddress.state || data.uf || '',
+                            complement: prev.ownerAddress.complement || data.complemento || '',
+                        }
+                    }));
+                }
+            }
+        } catch (error) {
+            console.error('CNPJ enrichment failed', error);
         } finally {
             setIsLoadingEnrichment(false);
         }
@@ -410,21 +487,38 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
 
             // 1. Upsert Profile
 
-            const profilePayload = {
+            const profilePayload: Record<string, unknown> = {
                 clerk_id: user.id,
                 full_name: formData.name,
                 email: user.primaryEmailAddress?.emailAddress,
                 phone: formData.phone,
-                cpf: formData.cpf,
-                birth_date: formData.birthDate || null,
-                address: formData.ownerAddress, // Owner's Address
-                property_address: formData.propertyAddress, // Property Address
+                person_type: personType,
+                address: formData.ownerAddress,
+                property_address: formData.propertyAddress,
                 role: 'landlord'
             };
 
+            // Conditionally set PF or PJ fields
+            if (personType === 'pf') {
+                profilePayload.cpf = formData.cpf;
+                profilePayload.birth_date = formData.birthDate || null;
+                // Clear PJ fields
+                profilePayload.cnpj = null;
+                profilePayload.business_name = null;
+                profilePayload.trade_name = null;
+                profilePayload.registration_status_date = null;
+            } else {
+                profilePayload.cnpj = formData.cnpj;
+                profilePayload.business_name = formData.businessName;
+                profilePayload.trade_name = formData.tradeName;
+                profilePayload.registration_status_date = formData.registrationStatusDate || null;
+                // Clear PF fields
+                profilePayload.cpf = null;
+                profilePayload.birth_date = null;
+            }
+
             // Only generate new ID if we don't have one loaded
             if (!profileId) {
-                // @ts-expect-error ProfilePayload type mismatch
                 profilePayload.id = crypto.randomUUID();
             }
 
@@ -552,26 +646,26 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
     // Calculate progress
     const calculateProgress = () => {
         let completed = 0;
-        const total = 8; // Name, Phone, CPF, BirthDate, Address (CEP+City+State), Email, Photo, Documents
+        const total = 8;
 
-        // Fields that count
         if (formData.name) completed++;
         if (formData.phone) completed++;
-        if (formData.cpf) completed++;
-        if (formData.birthDate) completed++;
+        // CPF or CNPJ depending on person type
+        if (personType === 'pf') {
+            if (formData.cpf) completed++;
+            if (formData.birthDate) completed++;
+        } else {
+            if (formData.cnpj) completed++;
+            if (formData.businessName) completed++;
+        }
         if (formData.ownerAddress.cep && formData.ownerAddress.city && formData.ownerAddress.state) completed++;
         if (formData.propertyAddress.cep && formData.propertyAddress.city && formData.propertyAddress.state) completed++;
         if (user?.primaryEmailAddress?.emailAddress) completed++;
         if (user?.imageUrl) completed++;
         if (savedProofs.length > 0) completed++;
 
-        const isVerified = false; // Placeholder for Paid Verification status. Set to true when integrated.
-
+        const isVerified = false;
         const rawPercentage = Math.round((completed / total) * 100);
-
-        // If everything is filled but not verified, cap visual "green" completion or just generic %?
-        // User said: "Green only after paid verification".
-        // Use rawPercentage for width, but color depends on verified status.
         return { percentage: rawPercentage, isVerified };
     };
 
@@ -948,19 +1042,57 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                 )}
 
 
-                {/* BASICS TAB - Only Profile Info now */}
+                {/* BASICS TAB - Profile Info with PF/PJ Toggle */}
                 {activeTab === 'basics' && (
                     <div className="space-y-6">
-                        <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
-                            <h3 className="text-lg font-semibold mb-4">Seus Dados Pessoais</h3>
+                        <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-6">
+                            {/* PF/PJ Toggle Switch */}
+                            <div>
+                                <h3 className="text-lg font-semibold mb-4">Dados do Proprietário</h3>
+                                <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl w-fit">
+                                    <button
+                                        type="button"
+                                        onClick={() => setPersonType('pf')}
+                                        className={cn(
+                                            "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                                            personType === 'pf'
+                                                ? "bg-white dark:bg-slate-800 text-foreground shadow-sm"
+                                                : "text-muted-foreground hover:text-foreground"
+                                        )}
+                                    >
+                                        <User className="w-4 h-4" />
+                                        Pessoa Física
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setPersonType('pj')}
+                                        className={cn(
+                                            "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                                            personType === 'pj'
+                                                ? "bg-white dark:bg-slate-800 text-foreground shadow-sm"
+                                                : "text-muted-foreground hover:text-foreground"
+                                        )}
+                                    >
+                                        <Building2 className="w-4 h-4" />
+                                        Pessoa Jurídica
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Common Fields */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label className="text-foreground">{p.basics.fullName}</Label>
+                                    <Label className="text-foreground">
+                                        {personType === 'pj' ? 'Razão Social' : p.basics.fullName}
+                                    </Label>
                                     <Input
                                         value={formData.name || ''}
                                         onChange={(e) => handleInputChange('name', e.target.value)}
+                                        placeholder={personType === 'pj' ? 'Nome da empresa' : 'Seu nome completo'}
                                     />
-                                    <span className="text-xs text-muted-foreground">{p.basics.nameHelp}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                        {personType === 'pj' ? 'Nome registrado na Receita Federal' : p.basics.nameHelp}
+                                    </span>
                                 </div>
                                 <div className="space-y-2">
                                     <Label className="text-foreground">{p.basics.email}</Label>
@@ -974,22 +1106,78 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                         placeholder="(00) 00000-0000"
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <Label className="text-foreground">{p.basics.birthDate}</Label>
-                                    <Input
-                                        type="date"
-                                        value={formData.birthDate}
-                                        onChange={(e) => handleInputChange('birthDate', e.target.value)}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-foreground">{p.basics.cpf}</Label>
-                                    <Input
-                                        value={formData.cpf}
-                                        onChange={(e) => handleInputChange('cpf', e.target.value)}
-                                        placeholder="000.000.000-00"
-                                    />
-                                </div>
+
+                                {/* PF-specific fields */}
+                                {personType === 'pf' && (
+                                    <>
+                                        <div className="space-y-2">
+                                            <Label className="text-foreground">{p.basics.cpf}</Label>
+                                            <div className="relative">
+                                                <Input
+                                                    value={formData.cpf}
+                                                    onChange={(e) => handleInputChange('cpf', e.target.value)}
+                                                    placeholder="000.000.000-00"
+                                                />
+                                                {isLoadingEnrichment && <Loader2 className="absolute right-3 top-2.5 w-4 h-4 animate-spin text-muted-foreground" />}
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-foreground">{p.basics.birthDate}</Label>
+                                            <Input
+                                                type="date"
+                                                value={formData.birthDate}
+                                                onChange={(e) => handleInputChange('birthDate', e.target.value)}
+                                            />
+                                        </div>
+                                    </>
+                                )}
+
+                                {/* PJ-specific fields */}
+                                {personType === 'pj' && (
+                                    <>
+                                        <div className="space-y-2">
+                                            <Label className="text-foreground">CNPJ</Label>
+                                            <div className="relative">
+                                                <Input
+                                                    value={formData.cnpj}
+                                                    onChange={(e) => handleInputChange('cnpj', e.target.value)}
+                                                    placeholder="00.000.000/0000-00"
+                                                />
+                                                {isLoadingEnrichment && <Loader2 className="absolute right-3 top-2.5 w-4 h-4 animate-spin text-emerald-500" />}
+                                            </div>
+                                            <span className="text-xs text-muted-foreground">
+                                                Ao digitar o CNPJ completo, os dados serão preenchidos automaticamente via Receita Federal.
+                                            </span>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-foreground">Nome Fantasia</Label>
+                                            <Input
+                                                value={formData.tradeName}
+                                                onChange={(e) => handleInputChange('tradeName', e.target.value)}
+                                                placeholder="Nome comercial da empresa"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-foreground">Razão Social</Label>
+                                            <Input
+                                                value={formData.businessName}
+                                                onChange={(e) => handleInputChange('businessName', e.target.value)}
+                                                placeholder="Nome registrado na Receita"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-foreground">Data da Situação Cadastral</Label>
+                                            <Input
+                                                type="date"
+                                                value={formData.registrationStatusDate}
+                                                onChange={(e) => handleInputChange('registrationStatusDate', e.target.value)}
+                                            />
+                                            <span className="text-xs text-muted-foreground">
+                                                Data da última alteração cadastral na Receita Federal.
+                                            </span>
+                                        </div>
+                                    </>
+                                )}
                             </div>
 
                             {/* OWNER ADDRESS SECTION */}
