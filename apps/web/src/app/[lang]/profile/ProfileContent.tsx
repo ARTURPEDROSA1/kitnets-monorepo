@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Image from 'next/image';
 import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera, Sparkles, Save, UploadCloud, Home, Building2, User, ShieldCheck, Fingerprint, ChevronDown, ChevronUp } from 'lucide-react';
+import PropertyDetailsCard, { PropertyDetails, SubUnit } from '@/components/profile/PropertyDetailsCard';
 import { cn } from '@/lib/utils';
 import { useUser, useAuth } from '@clerk/nextjs';
 import { createClient } from '@supabase/supabase-js';
@@ -94,6 +95,22 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
 
     // Property type: single-family or multi-family
     const [propertyType, setPropertyType] = useState<'single' | 'multi'>('single');
+
+    // Property details & sub-units
+    const [propertyDetails, setPropertyDetails] = useState<PropertyDetails>({
+        numberOfUnits: 0,
+        totalSqMeters: '',
+        solarEnergy: false,
+        solarKwp: '',
+        mainMeters: { water: false, energy: false, gas: false },
+        internetBill: false,
+    });
+    const [subUnits, setSubUnits] = useState<SubUnit[]>([]);
+
+    // Collapsible section states for ownership tab
+    const [addressSectionOpen, setAddressSectionOpen] = useState(true);
+    const [photosSectionOpen, setPhotosSectionOpen] = useState(true);
+    const [descriptionSectionOpen, setDescriptionSectionOpen] = useState(true);
 
     // Administrator data (only for PJ)
     const [adminData, setAdminData] = useState({
@@ -217,6 +234,22 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                     // Load photos
                     if (profile.property_photos && Array.isArray(profile.property_photos)) {
                         setSavedPhotos(profile.property_photos);
+                    }
+
+                    // Load property details & sub-units
+                    if (profile.property_details) {
+                        const pd = profile.property_details as PropertyDetails;
+                        setPropertyDetails({
+                            numberOfUnits: pd.numberOfUnits || 0,
+                            totalSqMeters: pd.totalSqMeters || '',
+                            solarEnergy: pd.solarEnergy || false,
+                            solarKwp: pd.solarKwp || '',
+                            mainMeters: pd.mainMeters || { water: false, energy: false, gas: false },
+                            internetBill: pd.internetBill || false,
+                        });
+                    }
+                    if (profile.sub_units && Array.isArray(profile.sub_units)) {
+                        setSubUnits(profile.sub_units as SubUnit[]);
                     }
 
                     // Load proofs
@@ -680,6 +713,8 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                 address: formData.ownerAddress,
                 property_address: formData.propertyAddress,
                 property_type: propertyType,
+                property_details: propertyDetails,
+                sub_units: subUnits,
                 admin_data: personType === 'pj' ? adminData : null,
                 role: 'landlord'
             };
@@ -1186,124 +1221,171 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                             </div>
                         )}
 
-                        {/* 2. Address Section */}
+                        {/* 2. Address Section — Collapsible */}
                         <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
-                            <div className="flex items-center gap-2 mb-2">
-                                <div className="p-2 bg-emerald-100 dark:bg-emerald-900/50 rounded-lg text-emerald-600">
-                                    <MapPin className="w-5 h-5" />
-                                </div>
-                                <h3 className="text-lg font-semibold text-foreground">{p.basics.addressTitle}</h3>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                <div className="space-y-2">
-                                    <Label>{p.basics.cep}</Label>
-                                    <div className="relative">
-                                        <Input
-                                            value={formData.propertyAddress.cep}
-                                            onChange={(e) => handleAddressChange('propertyAddress', 'cep', e.target.value)}
-                                            placeholder="00000-000"
-                                            maxLength={9}
-                                        />
-                                        {isLoadingAddress && <Loader2 className="absolute right-3 top-2.5 w-4 h-4 animate-spin text-muted-foreground" />}
+                            <button
+                                type="button"
+                                onClick={() => setAddressSectionOpen(prev => !prev)}
+                                className="flex items-center justify-between w-full"
+                            >
+                                <div className="flex items-center gap-2">
+                                    <div className="p-2 bg-emerald-100 dark:bg-emerald-900/50 rounded-lg text-emerald-600">
+                                        <MapPin className="w-5 h-5" />
                                     </div>
-                                    {cepError && <p className="text-xs text-red-500">{cepError}</p>}
+                                    <h3 className="text-lg font-semibold text-foreground">{p.basics.addressTitle}</h3>
+                                    {!addressSectionOpen && formData.propertyAddress.street && (
+                                        <span className="ml-2 text-xs bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full">Preenchido ✓</span>
+                                    )}
                                 </div>
-                                <div className="md:col-span-3 space-y-2">
-                                    <Label>Cidade / UF</Label>
-                                    <div className="flex gap-2">
-                                        <Input value={formData.propertyAddress.city} onChange={(e) => handleAddressChange('propertyAddress', 'city', e.target.value)} placeholder="Cidade" />
-                                        <Input value={formData.propertyAddress.state} onChange={(e) => handleAddressChange('propertyAddress', 'state', e.target.value)} placeholder="UF" className="w-20" maxLength={2} />
+                                {addressSectionOpen ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
+                            </button>
+
+                            {addressSectionOpen && (
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                    <div className="space-y-2">
+                                        <Label>{p.basics.cep}</Label>
+                                        <div className="relative">
+                                            <Input
+                                                value={formData.propertyAddress.cep}
+                                                onChange={(e) => handleAddressChange('propertyAddress', 'cep', e.target.value)}
+                                                placeholder="00000-000"
+                                                maxLength={9}
+                                            />
+                                            {isLoadingAddress && <Loader2 className="absolute right-3 top-2.5 w-4 h-4 animate-spin text-muted-foreground" />}
+                                        </div>
+                                        {cepError && <p className="text-xs text-red-500">{cepError}</p>}
                                     </div>
-                                </div>
-                                <div className="md:col-span-3 space-y-2">
-                                    <Label>{p.basics.street}</Label>
-                                    <Input value={formData.propertyAddress.street} onChange={(e) => handleAddressChange('propertyAddress', 'street', e.target.value)} placeholder="Rua / Avenida" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>{p.basics.number}</Label>
-                                    <Input value={formData.propertyAddress.number} onChange={(e) => handleAddressChange('propertyAddress', 'number', e.target.value)} placeholder="123" />
-                                </div>
-                                <div className="md:col-span-2 space-y-2">
-                                    <Label>{p.basics.neighborhood}</Label>
-                                    <Input value={formData.propertyAddress.neighborhood} onChange={(e) => handleAddressChange('propertyAddress', 'neighborhood', e.target.value)} placeholder="Bairro" />
-                                </div>
-                                <div className="md:col-span-2 space-y-2">
-                                    <Label>{p.basics.complement}</Label>
-                                    <Input value={formData.propertyAddress.complement} onChange={(e) => handleAddressChange('propertyAddress', 'complement', e.target.value)} placeholder={p.basics.complement} />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* 3. Photos Section */}
-                        <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
-                            <div className="flex items-center gap-2 mb-2">
-                                <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded-lg text-amber-600">
-                                    <Camera className="w-5 h-5" />
-                                </div>
-                                <h3 className="text-lg font-semibold text-foreground">Fotos do Imóvel</h3>
-                            </div>
-
-                            <div className="bg-muted/30 p-4 rounded-lg border border-border flex gap-3 items-start">
-                                <Sparkles className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
-                                <div>
-                                    <p className="text-sm font-medium text-foreground mb-1">Dica Profissional</p>
-                                    <p className="text-sm text-muted-foreground">Imóveis com pelo menos 5 fotos recebem 4x mais visualizações! Capriche na iluminação.</p>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                                {/* Upload Button */}
-                                <div className="aspect-square rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors relative">
-                                    <input
-                                        type="file"
-                                        multiple
-                                        accept="image/*"
-                                        onChange={handlePhotoSelect}
-                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                    />
-                                    <Camera className="w-8 h-8 text-muted-foreground mb-2" />
-                                    <span className="text-xs text-muted-foreground">Adicionar Fotos</span>
-                                </div>
-
-                                {/* New Photos */}
-                                {propertyPhotos.map((file, idx) => (
-                                    <PhotoPreview key={`new-p-${idx}`} file={file} onRemove={() => removePhoto(idx)} />
-                                ))}
-
-                                {/* Saved Photos */}
-                                {savedPhotos.map((url, idx) => (
-                                    <div key={`saved-p-${idx}`} className="aspect-square rounded-lg border border-border relative group overflow-hidden">
-                                        <Image src={url} alt="Property" width={200} height={200} className="w-full h-full object-cover" />
-                                        <div className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <Button size="icon" variant="destructive" className="h-6 w-6" onClick={() => removeSavedPhoto(url)}>
-                                                <Trash2 className="w-3 h-3" />
-                                            </Button>
+                                    <div className="md:col-span-3 space-y-2">
+                                        <Label>Cidade / UF</Label>
+                                        <div className="flex gap-2">
+                                            <Input value={formData.propertyAddress.city} onChange={(e) => handleAddressChange('propertyAddress', 'city', e.target.value)} placeholder="Cidade" />
+                                            <Input value={formData.propertyAddress.state} onChange={(e) => handleAddressChange('propertyAddress', 'state', e.target.value)} placeholder="UF" className="w-20" maxLength={2} />
                                         </div>
                                     </div>
-                                ))}
-                            </div>
+                                    <div className="md:col-span-3 space-y-2">
+                                        <Label>{p.basics.street}</Label>
+                                        <Input value={formData.propertyAddress.street} onChange={(e) => handleAddressChange('propertyAddress', 'street', e.target.value)} placeholder="Rua / Avenida" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>{p.basics.number}</Label>
+                                        <Input value={formData.propertyAddress.number} onChange={(e) => handleAddressChange('propertyAddress', 'number', e.target.value)} placeholder="123" />
+                                    </div>
+                                    <div className="md:col-span-2 space-y-2">
+                                        <Label>{p.basics.neighborhood}</Label>
+                                        <Input value={formData.propertyAddress.neighborhood} onChange={(e) => handleAddressChange('propertyAddress', 'neighborhood', e.target.value)} placeholder="Bairro" />
+                                    </div>
+                                    <div className="md:col-span-2 space-y-2">
+                                        <Label>{p.basics.complement}</Label>
+                                        <Input value={formData.propertyAddress.complement} onChange={(e) => handleAddressChange('propertyAddress', 'complement', e.target.value)} placeholder={p.basics.complement} />
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
-                        {/* 4. Description Section */}
+                        {/* 3. Photos Section — Collapsible */}
                         <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
-                            <div className="flex items-center gap-2 mb-2">
-                                <div className="p-2 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg text-indigo-600">
-                                    <FileText className="w-5 h-5" />
+                            <button
+                                type="button"
+                                onClick={() => setPhotosSectionOpen(prev => !prev)}
+                                className="flex items-center justify-between w-full"
+                            >
+                                <div className="flex items-center gap-2">
+                                    <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded-lg text-amber-600">
+                                        <Camera className="w-5 h-5" />
+                                    </div>
+                                    <h3 className="text-lg font-semibold text-foreground">Fotos do Imóvel</h3>
+                                    {!photosSectionOpen && (savedPhotos.length > 0 || propertyPhotos.length > 0) && (
+                                        <span className="ml-2 text-xs bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full">{savedPhotos.length + propertyPhotos.length} fotos</span>
+                                    )}
                                 </div>
-                                <h3 className="text-lg font-semibold text-foreground">Descrição do Imóvel</h3>
-                            </div>
-                            <div className="space-y-2">
-                                <Label>Descreva seu imóvel em detalhes</Label>
-                                <textarea
-                                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[120px]"
-                                    placeholder="Ex: Excelente apartamento com varanda gourmet, vista livre, armários planejados na cozinha e banheiros..."
-                                    value={formData.propertyAddress.description || ''}
-                                    onChange={(e) => handleAddressChange('propertyAddress', 'description', e.target.value)}
-                                />
-                                <span className="text-xs text-muted-foreground">Esta descrição será exibida no anúncio do imóvel.</span>
-                            </div>
+                                {photosSectionOpen ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
+                            </button>
+
+                            {photosSectionOpen && (
+                                <>
+                                    <div className="bg-muted/30 p-4 rounded-lg border border-border flex gap-3 items-start">
+                                        <Sparkles className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
+                                        <div>
+                                            <p className="text-sm font-medium text-foreground mb-1">Dica Profissional</p>
+                                            <p className="text-sm text-muted-foreground">Imóveis com pelo menos 5 fotos recebem 4x mais visualizações! Capriche na iluminação.</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                                        {/* Upload Button */}
+                                        <div className="aspect-square rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors relative">
+                                            <input
+                                                type="file"
+                                                multiple
+                                                accept="image/*"
+                                                onChange={handlePhotoSelect}
+                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                            />
+                                            <Camera className="w-8 h-8 text-muted-foreground mb-2" />
+                                            <span className="text-xs text-muted-foreground">Adicionar Fotos</span>
+                                        </div>
+
+                                        {/* New Photos */}
+                                        {propertyPhotos.map((file, idx) => (
+                                            <PhotoPreview key={`new-p-${idx}`} file={file} onRemove={() => removePhoto(idx)} />
+                                        ))}
+
+                                        {/* Saved Photos */}
+                                        {savedPhotos.map((url, idx) => (
+                                            <div key={`saved-p-${idx}`} className="aspect-square rounded-lg border border-border relative group overflow-hidden">
+                                                <Image src={url} alt="Property" width={200} height={200} className="w-full h-full object-cover" />
+                                                <div className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <Button size="icon" variant="destructive" className="h-6 w-6" onClick={() => removeSavedPhoto(url)}>
+                                                        <Trash2 className="w-3 h-3" />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
                         </div>
+
+                        {/* 4. Description Section — Collapsible */}
+                        <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
+                            <button
+                                type="button"
+                                onClick={() => setDescriptionSectionOpen(prev => !prev)}
+                                className="flex items-center justify-between w-full"
+                            >
+                                <div className="flex items-center gap-2">
+                                    <div className="p-2 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg text-indigo-600">
+                                        <FileText className="w-5 h-5" />
+                                    </div>
+                                    <h3 className="text-lg font-semibold text-foreground">Descrição do Imóvel</h3>
+                                    {!descriptionSectionOpen && formData.propertyAddress.description && (
+                                        <span className="ml-2 text-xs bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full">Preenchido ✓</span>
+                                    )}
+                                </div>
+                                {descriptionSectionOpen ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
+                            </button>
+                            {descriptionSectionOpen && (
+                                <div className="space-y-2">
+                                    <Label>Descreva seu imóvel em detalhes</Label>
+                                    <textarea
+                                        className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[120px]"
+                                        placeholder="Ex: Excelente apartamento com varanda gourmet, vista livre, armários planejados na cozinha e banheiros..."
+                                        value={formData.propertyAddress.description || ''}
+                                        onChange={(e) => handleAddressChange('propertyAddress', 'description', e.target.value)}
+                                    />
+                                    <span className="text-xs text-muted-foreground">Esta descrição será exibida no anúncio do imóvel.</span>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* 5. Detalhes + Sub-Units Section */}
+                        <PropertyDetailsCard
+                            details={propertyDetails}
+                            units={subUnits}
+                            onDetailsChange={setPropertyDetails}
+                            onUnitsChange={setSubUnits}
+                            propertyType={propertyType}
+                        />
 
                         <div className="flex justify-end pt-4">
                             <Button size="lg" onClick={handleSave} disabled={isSaving} className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-lg shadow-emerald-900/20">
