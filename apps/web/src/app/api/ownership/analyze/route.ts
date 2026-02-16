@@ -4,8 +4,222 @@ import OpenAI from 'openai';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { DocumentExtractionResult } from '@/types/ownership';
 
-// --- CONFIGURATION ---
-const SYSTEM_PROMPT = `
+// ============================================================
+// STRATEGY 1: PDF text extraction + regex parsing (FREE, instant)
+// ============================================================
+
+async function extractPdfText(buffer: Buffer): Promise<string | null> {
+    try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const pdfParse = require('pdf-parse');
+        const data = await pdfParse(buffer);
+        const text = data.text?.trim();
+        if (!text || text.length < 50) return null;
+        return text;
+    } catch (err) {
+        console.warn('[Ownership] PDF text extraction failed:', err);
+        return null;
+    }
+}
+
+/**
+ * Classify document type based on keywords found in the text.
+ */
+function classifyDocumentFromText(text: string): string {
+    const t = text.toUpperCase();
+    if (t.includes('IPTU') || t.includes('IMPOSTO PREDIAL') || t.includes('IPTU/TSU')) return 'IPTU';
+    if (t.includes('MATRÍCULA') || t.includes('MATRICULA') || t.includes('REGISTRO DE IMÓVEIS')) return 'MATRICULA';
+    if (t.includes('ESCRITURA PÚBLICA') || t.includes('ESCRITURA PUBLICA')) return 'ESCRITURA';
+    if (t.includes('CONTRATO DE COMPRA E VENDA') || t.includes('COMPRA E VENDA')) return 'CONTRATO_COMPRA_VENDA';
+    if (t.includes('CONTRATO DE LOCAÇÃO') || t.includes('CONTRATO DE LOCACAO')) return 'CONTRATO_LOCACAO';
+    if (t.includes('CONTA DE ÁGUA') || t.includes('CONTA DE AGUA') || t.includes('COMPANHIA DE SANEAMENTO') || t.includes('COPASA') || t.includes('SABESP')) return 'CONTA_AGUA';
+    if (t.includes('CONTA DE LUZ') || t.includes('CONTA DE ENERGIA') || t.includes('CEMIG') || t.includes('CPFL') || t.includes('ENEL') || t.includes('ENERGISA')) return 'CONTA_LUZ';
+    if (t.includes('CONTA DE GÁS') || t.includes('CONTA DE GAS') || t.includes('COMGÁS') || t.includes('COMGAS')) return 'CONTA_GAS';
+    return 'OUTRO';
+}
+
+/**
+ * Extract structured address data from raw PDF text using regex patterns.
+ * Handles common Brazilian document formats: IPTU, utility bills, contracts, etc.
+ */
+function extractDataFromText(text: string): {
+    owner_name: string | null;
+    cpf: string | null;
+    address: {
+        street: string | null;
+        number: string | null;
+        neighborhood: string | null;
+        city: string | null;
+        state: string | null;
+        cep: string | null;
+    };
+} {
+    // Normalize: collapse multiple spaces/newlines, keep structure
+    const t = text.replace(/\r\n/g, '\n');
+
+    // ---- STREET + NUMBER ----
+    // Patterns like:
+    //   "Endereço:Rua CLAUDIONOR IDELFONSO BRAGA, 000035"
+    //   "Endereço do Imóvel: Rua CLAUDIONOR IDELFONSO BRAGA , 000035"
+    //   "Endereço: RUA JOSE GOIS, 45"
+    //   "End.: Av. Brasil, 1200"
+    let street: string | null = null;
+    let number: string | null = null;
+
+    // Try "Endereço" patterns (most common)
+    const addrPatterns = [
+        /Endere[çc]o\s*(?:do\s*Im[oó]vel)?\s*[:.]?\s*(.+?)(?:\n|$)/i,
+        /End\.?\s*[:.]?\s*(.+?)(?:\n|$)/i,
+        /Logradouro\s*[:.]?\s*(.+?)(?:\n|$)/i,
+    ];
+
+    for (const pattern of addrPatterns) {
+        const match = t.match(pattern);
+        if (match) {
+            const raw = match[1].trim();
+            // Try to split "Rua X, 123" or "Rua X , 000035" or "Rua X 123"
+            const streetNumMatch = raw.match(/^(.+?)\s*[,]\s*(\d+)\s*$/);
+            if (streetNumMatch) {
+                street = streetNumMatch[1].trim();
+                number = streetNumMatch[2].replace(/^0+/, '') || streetNumMatch[2]; // remove leading zeros
+            } else {
+                // Try "Rua X Nº 123" or "Rua X nro 123" or "Rua X Número 123"
+                const nroMatch = raw.match(/^(.+?)\s*(?:N[ºo°]\.?|nro\.?|N[uú]mero)\s*(\d+)/i);
+                if (nroMatch) {
+                    street = nroMatch[1].trim();
+                    number = nroMatch[2].replace(/^0+/, '') || nroMatch[2];
+                } else {
+                    // Try splitting last word if it's a number
+                    const lastNumMatch = raw.match(/^(.+?)\s+(\d{1,6})\s*$/);
+                    if (lastNumMatch) {
+                        street = lastNumMatch[1].trim();
+                        number = lastNumMatch[2].replace(/^0+/, '') || lastNumMatch[2];
+                    } else {
+                        street = raw;
+                    }
+                }
+            }
+            break;
+        }
+    }
+
+    // ---- NEIGHBORHOOD ----
+    let neighborhood: string | null = null;
+    const bairroPatterns = [
+        /Bairro\s*[:.]?\s*([^\n,]+)/i,
+        /Setor\s*[:.]?\s*([^\n,]+)/i,
+    ];
+    for (const pattern of bairroPatterns) {
+        const match = t.match(pattern);
+        if (match) {
+            neighborhood = match[1].trim();
+            break;
+        }
+    }
+
+    // ---- CITY ----
+    let city: string | null = null;
+    const cityPatterns = [
+        /Cidade\s*[:.]?\s*([^\n,]+)/i,
+        /Munic[ií]pio\s*(?:de\s+)?[:.]?\s*([^\n,\-]+)/i,
+        /PREFEITURA\s+MUNICIPAL\s+DE\s+([^\n,]+)/i,
+    ];
+    for (const pattern of cityPatterns) {
+        const match = t.match(pattern);
+        if (match) {
+            city = match[1].trim()
+                .replace(/\s*[-–]\s*CNPJ.*$/i, '') // remove "- CNPJ ..." suffix
+                .replace(/\s*[-–]\s*$/, '')
+                .trim();
+            break;
+        }
+    }
+
+    // ---- STATE ----
+    let state: string | null = null;
+    const statePatterns = [
+        /Estado\s*[:.]?\s*([^\n,]+)/i,
+        /UF\s*[:.]?\s*([A-Z]{2})/i,
+        // Try extracting from CEP pattern region
+    ];
+    for (const pattern of statePatterns) {
+        const match = t.match(pattern);
+        if (match) {
+            state = match[1].trim().substring(0, 2).toUpperCase();
+            break;
+        }
+    }
+
+    // ---- CEP ----
+    let cep: string | null = null;
+    const cepPatterns = [
+        /CEP\s*[:.]?\s*(\d{2}\.?\d{3}[-.]?\d{3})/i,
+        /Cep\s*[:.]?\s*(\d{2}\.?\d{3}[-.]?\d{3})/i,
+        /C\.?E\.?P\.?\s*[:.]?\s*(\d{2}\.?\d{3}[-.]?\d{3})/i,
+    ];
+    for (const pattern of cepPatterns) {
+        const match = t.match(pattern);
+        if (match) {
+            // Normalize to XXXXX-XXX
+            cep = match[1].replace(/\./g, '').replace(/^(\d{5})(\d{3})$/, '$1-$2');
+            break;
+        }
+    }
+
+    // ---- OWNER NAME ----
+    let owner_name: string | null = null;
+    const ownerPatterns = [
+        /Sacado\s*[:.]?\s*\d*\s*[-–]?\s*([^\n]+?)(?:\s+CPF|$)/i,
+        /Contribuinte\s*[:.]?\s*([^\n]+)/i,
+        /Propriet[aá]rio\s*[:.]?\s*([^\n]+)/i,
+        /Nome\s*[:.]?\s*([^\n]+)/i,
+        /Titular\s*[:.]?\s*([^\n]+)/i,
+    ];
+    for (const pattern of ownerPatterns) {
+        const match = t.match(pattern);
+        if (match) {
+            owner_name = match[1].trim().replace(/\s+/g, ' ');
+            break;
+        }
+    }
+
+    // ---- CPF / CNPJ ----
+    let cpf: string | null = null;
+    const cpfPatterns = [
+        /CPF\s*[/]?\s*CNPJ\s*[:.]?\s*([\d.\-\/]+)/i,
+        /CNPJ\s*[:.]?\s*([\d.\-\/]+)/i,
+        /CPF\s*[:.]?\s*([\d.\-]+)/i,
+    ];
+    for (const pattern of cpfPatterns) {
+        const match = t.match(pattern);
+        if (match) {
+            cpf = match[1].trim();
+            break;
+        }
+    }
+
+    return {
+        owner_name,
+        cpf,
+        address: { street, number, neighborhood, city, state, cep }
+    };
+}
+
+/**
+ * Check if the regex extraction was good enough (at least street + one more field).
+ */
+function isExtractionSufficient(data: ReturnType<typeof extractDataFromText>): boolean {
+    const addr = data.address;
+    const hasStreet = !!addr.street && addr.street.length > 3;
+    const extraFields = [addr.neighborhood, addr.city, addr.cep].filter(Boolean).length;
+    return hasStreet && extraFields >= 1;
+}
+
+// ============================================================
+// STRATEGY 2 & 3: AI Vision (Gemini free → OpenAI paid)
+// ============================================================
+
+const VISION_PROMPT = `
 You are an expert real estate document analyst. Your task is to extract structured ownership information from documents uploaded by landlords.
 
 Identify the document type from: 'MATRICULA', 'ESCRITURA', 'CONTRATO_COMPRA_VENDA', 'IPTU', 'CONTRATO_LOCACAO', 'CONTA_AGUA', 'CONTA_LUZ', 'CONTA_GAS', 'OUTRO'.
@@ -35,30 +249,13 @@ Return ONLY valid JSON matching this structure:
         "registry": { "matricula_number": "...", "cartorio_name": "..." },
         "dates": { "issue_date": "YYYY-MM-DD" }
     },
-    "instructions": "EXTRACT THE PROPERTY ADDRESS LISTED ON THE BILL/DOCUMENT. IGNORE IF NAME MATCHES OR NOT. FOCUS ON THE SERVICE ADDRESS.",
+    "instructions": "EXTRACT THE PROPERTY ADDRESS LISTED ON THE BILL/DOCUMENT. FOCUS ON THE SERVICE ADDRESS.",
     "field_confidence": { "field_name": number }
 }
 
 If a field is not found, exclude it or set to null.
 `;
 
-// --- PDF text extraction (no AI needed) ---
-async function extractPdfText(buffer: Buffer): Promise<string | null> {
-    try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const pdfParse = require('pdf-parse');
-        const data = await pdfParse(buffer);
-        const text = data.text?.trim();
-        // If text is too short, the PDF is likely image-based (scanned)
-        if (!text || text.length < 50) return null;
-        return text;
-    } catch (err) {
-        console.warn('[Ownership] PDF text extraction failed:', err);
-        return null;
-    }
-}
-
-// --- Helper: Clients ---
 const getOpenAIClient = () => {
     if (!process.env.OPENAI_API_KEY) return null;
     return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -69,14 +266,12 @@ const getGeminiClient = () => {
     return new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 };
 
-function parseJsonResponse(text: string): any {
+function parseJsonResponse(text: string) {
     const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
     return JSON.parse(cleaned);
 }
 
-// --- TEXT-BASED ANALYSIS (for PDFs with selectable text) ---
-
-async function analyzeTextWithGemini(text: string): Promise<any> {
+async function analyzeVisionWithGemini(base64: string, mimeType: string) {
     const client = getGeminiClient();
     if (!client) throw new Error("Gemini API Key missing");
 
@@ -86,77 +281,26 @@ async function analyzeTextWithGemini(text: string): Promise<any> {
     });
 
     const result = await model.generateContent([
-        SYSTEM_PROMPT,
-        `Here is the full text extracted from the document:\n\n${text}`
+        VISION_PROMPT,
+        { inlineData: { data: base64, mimeType } }
     ]);
 
-    const response = await result.response;
-    return parseJsonResponse(response.text());
+    return parseJsonResponse((await result.response).text());
 }
 
-async function analyzeTextWithOpenAI(text: string): Promise<any> {
-    const client = getOpenAIClient();
-    if (!client) throw new Error("OpenAI API Key missing");
-
-    const response = await client.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: `Here is the full text extracted from the document:\n\n${text}` }
-        ],
-        response_format: { type: "json_object" },
-        temperature: 0.1,
-    });
-
-    const content = response.choices[0].message.content;
-    if (!content) throw new Error("No content from OpenAI");
-    return parseJsonResponse(content);
-}
-
-// --- VISION-BASED ANALYSIS (for images / scanned PDFs) ---
-
-async function analyzeVisionWithGemini(base64Image: string, mimeType: string): Promise<any> {
-    const client = getGeminiClient();
-    if (!client) throw new Error("Gemini API Key missing");
-
-    const model = client.getGenerativeModel({
-        model: "gemini-1.5-flash",
-        generationConfig: { responseMimeType: "application/json" }
-    });
-
-    const result = await model.generateContent([
-        SYSTEM_PROMPT,
-        {
-            inlineData: {
-                data: base64Image,
-                mimeType: mimeType
-            }
-        }
-    ]);
-
-    const response = await result.response;
-    return parseJsonResponse(response.text());
-}
-
-async function analyzeVisionWithOpenAI(base64Image: string, mimeType: string): Promise<any> {
+async function analyzeVisionWithOpenAI(base64: string, mimeType: string) {
     const client = getOpenAIClient();
     if (!client) throw new Error("OpenAI API Key missing");
 
     const response = await client.chat.completions.create({
         model: "gpt-4o",
         messages: [
-            { role: "system", content: SYSTEM_PROMPT },
+            { role: "system", content: VISION_PROMPT },
             {
                 role: "user",
                 content: [
                     { type: "text", text: "Analyze this document." },
-                    {
-                        type: "image_url",
-                        image_url: {
-                            url: `data:${mimeType};base64,${base64Image}`,
-                            detail: "high"
-                        },
-                    },
+                    { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}`, detail: "high" } },
                 ],
             },
         ],
@@ -169,41 +313,9 @@ async function analyzeVisionWithOpenAI(base64Image: string, mimeType: string): P
     return parseJsonResponse(content);
 }
 
-// --- Combined helpers: try Gemini first, fallback to OpenAI ---
-
-async function analyzeText(text: string): Promise<{ result: any; provider: string }> {
-    // 1. Try Gemini
-    try {
-        console.log('[Ownership] Trying Gemini Text...');
-        const result = await analyzeTextWithGemini(text);
-        return { result, provider: 'gemini' };
-    } catch (err) {
-        console.warn('[Ownership] Gemini Text failed:', err);
-    }
-
-    // 2. Fallback to OpenAI
-    console.log('[Ownership] Falling back to OpenAI Text...');
-    const result = await analyzeTextWithOpenAI(text);
-    return { result, provider: 'openai' };
-}
-
-async function analyzeVision(base64: string, mimeType: string): Promise<{ result: any; provider: string }> {
-    // 1. Try Gemini
-    try {
-        console.log('[Ownership] Trying Gemini Vision...');
-        const result = await analyzeVisionWithGemini(base64, mimeType);
-        return { result, provider: 'gemini' };
-    } catch (err) {
-        console.warn('[Ownership] Gemini Vision failed:', err);
-    }
-
-    // 2. Fallback to OpenAI
-    console.log('[Ownership] Falling back to OpenAI Vision...');
-    const result = await analyzeVisionWithOpenAI(base64, mimeType);
-    return { result, provider: 'openai' };
-}
-
-// --- MAIN HANDLER ---
+// ============================================================
+// MAIN HANDLER — 3-tier pipeline
+// ============================================================
 
 export async function POST(request: NextRequest) {
     console.log("[API] /api/ownership/analyze called");
@@ -230,54 +342,86 @@ export async function POST(request: NextRequest) {
                 const mimeType = file.type || 'application/octet-stream';
                 const isPdf = mimeType === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
 
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 let resultRaw: any = null;
                 let extractionMethod = 'unknown';
 
-                // ===== STRATEGY 1: PDF Text Extraction + AI =====
+                // ===== STRATEGY 1: PDF Text → Regex (FREE, instant, no AI) =====
                 if (isPdf) {
-                    console.log('[Ownership] PDF detected — trying text extraction first...');
+                    console.log('[Ownership] PDF detected — trying text extraction + regex...');
                     methods_tried.push('pdf_text_extract');
 
                     const pdfText = await extractPdfText(buffer);
 
                     if (pdfText) {
                         console.log(`[Ownership] PDF text extracted: ${pdfText.length} chars`);
-                        methods_tried.push('pdf_text_ai');
+                        console.log(`[Ownership] First 500 chars: ${pdfText.substring(0, 500)}`);
+                        methods_tried.push('regex_parse');
 
-                        try {
-                            const { result, provider } = await analyzeText(pdfText);
-                            resultRaw = result;
-                            extractionMethod = `pdf_text_ai_${provider}`;
-                            console.log(`[Ownership] ✅ Text AI analysis successful (${provider})`);
-                        } catch (textAiErr) {
-                            console.warn('[Ownership] Text AI analysis failed:', textAiErr);
-                            methods_tried.push('pdf_text_ai_failed');
+                        const extracted = extractDataFromText(pdfText);
+                        const docType = classifyDocumentFromText(pdfText);
+
+                        if (isExtractionSufficient(extracted)) {
+                            console.log(`[Ownership] ✅ Regex extraction sufficient! Type: ${docType}`);
+                            console.log(`[Ownership] Extracted:`, JSON.stringify(extracted, null, 2));
+
+                            resultRaw = {
+                                classified_type: docType,
+                                type_confidence: 0.95,
+                                extracted_data: extracted,
+                                field_confidence: {
+                                    street: extracted.address.street ? 0.95 : 0,
+                                    number: extracted.address.number ? 0.95 : 0,
+                                    neighborhood: extracted.address.neighborhood ? 0.95 : 0,
+                                    city: extracted.address.city ? 0.95 : 0,
+                                    cep: extracted.address.cep ? 0.95 : 0,
+                                }
+                            };
+                            extractionMethod = 'pdf_regex';
+                        } else {
+                            console.log('[Ownership] Regex extraction insufficient — will fall through to Vision AI');
+                            console.log('[Ownership] Partial extraction:', JSON.stringify(extracted, null, 2));
+                            methods_tried.push('regex_insufficient');
                         }
                     } else {
-                        console.log('[Ownership] No selectable text found in PDF (likely scanned/image)');
+                        console.log('[Ownership] No selectable text in PDF (scanned/image)');
                         methods_tried.push('pdf_no_text');
                     }
                 }
 
-                // ===== STRATEGY 2: Vision AI (fallback for images / scanned PDFs) =====
+                // ===== STRATEGY 2: Gemini Vision (FREE) =====
                 if (!resultRaw) {
-                    console.log('[Ownership] Trying Vision AI analysis...');
-                    methods_tried.push('vision_ai');
+                    console.log('[Ownership] Trying Gemini Vision (free)...');
+                    methods_tried.push('gemini_vision');
 
                     try {
-                        const { result, provider } = await analyzeVision(base64, mimeType);
-                        resultRaw = result;
-                        extractionMethod = `vision_${provider}`;
-                        console.log(`[Ownership] ✅ Vision analysis successful (${provider})`);
-                    } catch (visionErr) {
-                        console.error('[Ownership] Vision AI also failed:', visionErr);
-                        methods_tried.push('vision_ai_failed');
+                        resultRaw = await analyzeVisionWithGemini(base64, mimeType);
+                        extractionMethod = 'vision_gemini';
+                        console.log(`[Ownership] ✅ Gemini Vision successful`);
+                    } catch (geminiErr) {
+                        console.warn('[Ownership] Gemini Vision failed:', geminiErr);
+                        methods_tried.push('gemini_vision_failed');
                     }
                 }
 
-                // ===== Result =====
+                // ===== STRATEGY 3: OpenAI Vision (PAID — last resort) =====
+                if (!resultRaw) {
+                    console.log('[Ownership] Trying OpenAI Vision (paid, last resort)...');
+                    methods_tried.push('openai_vision');
+
+                    try {
+                        resultRaw = await analyzeVisionWithOpenAI(base64, mimeType);
+                        extractionMethod = 'vision_openai';
+                        console.log(`[Ownership] ✅ OpenAI Vision successful`);
+                    } catch (openaiErr) {
+                        console.error('[Ownership] OpenAI Vision also failed:', openaiErr);
+                        methods_tried.push('openai_vision_failed');
+                    }
+                }
+
+                // ===== Build result =====
                 if (resultRaw) {
-                    console.log(`[Ownership] ✅ Final result for ${file.name}: method=${extractionMethod}, type=${resultRaw.classified_type}`);
+                    console.log(`[Ownership] ✅ Final: ${file.name} → method=${extractionMethod}, type=${resultRaw.classified_type}`);
                     results.push({
                         document_id: crypto.randomUUID(),
                         success: true,
@@ -289,7 +433,7 @@ export async function POST(request: NextRequest) {
                         methods_tried
                     });
                 } else {
-                    console.error(`[Ownership] ❌ All methods failed for ${file.name}. Tried: ${methods_tried.join(' → ')}`);
+                    console.error(`[Ownership] ❌ ALL methods failed for ${file.name}. Tried: ${methods_tried.join(' → ')}`);
                     results.push({
                         document_id: crypto.randomUUID(),
                         success: false,
