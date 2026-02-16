@@ -291,9 +291,22 @@ export default function GatewayDetailPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id, startMs, endMs]);
 
+    // Determine if the sync toggle should be visible
+    const SYNC_PRESETS = ["Este Mês", "Mês Passado", "Este Ano"];
+    const isLongCustomPeriod = !SYNC_PRESETS.includes(dateRange.label)
+        && !["Hoje", "Últimos 7 dias"].includes(dateRange.label)
+        && differenceInDays(dateRange.end, dateRange.start) > 60;
+    const showSyncButton = readingDates.length >= 2 && (SYNC_PRESETS.includes(dateRange.label) || isLongCustomPeriod);
+
     // ── Handlers ──────────────────────────────────────────────
     const handleDateRangeChange = (start: Date, end: Date, label: string) => {
-        if (syncBilling) {
+        // Turn off sync if switching to a non-syncable preset
+        const canSync = SYNC_PRESETS.includes(label)
+            || (!SYNC_PRESETS.includes(label) && !["Hoje", "Últimos 7 dias"].includes(label) && differenceInDays(end, start) > 60);
+        if (!canSync && syncBilling) {
+            setSyncBilling(false);
+        }
+        if (syncBilling && canSync) {
             const adjusted = getBillingSyncDates(label);
             if (adjusted) {
                 setDateRange({ start: adjusted.start, end: adjusted.end, label });
@@ -375,8 +388,8 @@ export default function GatewayDetailPage() {
             <div className="mb-8">
                 <DateRangePicker onChange={handleDateRangeChange} defaultValue="thisMonth" />
 
-                {/* Billing cycle sync toggle */}
-                {readingDates.length >= 2 && (
+                {/* Billing cycle sync toggle — only for month+ presets */}
+                {showSyncButton && (
                     <div className="flex items-center gap-2 mt-3">
                         <button
                             onClick={handleSyncToggle}
