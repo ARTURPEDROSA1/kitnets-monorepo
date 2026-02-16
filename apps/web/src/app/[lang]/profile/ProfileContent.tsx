@@ -8,7 +8,7 @@ import Image from 'next/image';
 import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera, Sparkles, Save, UploadCloud, Home, Building2, User, ShieldCheck, Fingerprint } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUser, useAuth } from '@clerk/nextjs';
-import { createBrowserClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 import { deleteAccount } from './actions';
 import { Dictionary } from '@/dictionaries';
 
@@ -127,7 +127,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
         if (!token) {
             console.warn('[Profile] Supabase JWT token is null — queries will fail silently under RLS.');
         }
-        return createBrowserClient(
+        return createClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
             {
