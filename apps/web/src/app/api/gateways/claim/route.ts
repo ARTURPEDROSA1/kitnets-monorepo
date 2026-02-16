@@ -63,6 +63,59 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Failed to claim gateway' }, { status: 500 });
     }
 
+    // 4. Auto-link gateway to a property
+    // Check if user already has a property
+    const { data: existingProperty } = await supabase
+        .from('properties')
+        .select('id')
+        .eq('owner_id', profile.id)
+        .limit(1)
+        .maybeSingle();
+
+    let propertyId = existingProperty?.id;
+
+    if (!propertyId) {
+        // Create a property from user's profile address data
+        const { data: userProfile } = await supabase
+            .from('profiles')
+            .select('property_address, full_name')
+            .eq('id', profile.id)
+            .single();
+
+        const addr = userProfile?.property_address as Record<string, string> | null;
+        const { data: newProperty, error: propError } = await supabase
+            .from('properties')
+            .insert({
+                owner_id: profile.id,
+                name: addr?.street ? `${addr.street}, ${addr.number || ''}`.trim() : (userProfile?.full_name || 'Meu Imóvel'),
+                address: addr?.street ? `${addr.street}, ${addr.number || ''} - ${addr.neighborhood || ''}`.trim() : null,
+                city: addr?.city || null,
+                state: addr?.state || null,
+                zip: addr?.cep || null,
+            })
+            .select('id')
+            .single();
+
+        if (propError) {
+            console.warn('[Claim] Property creation failed (non-critical):', propError.message);
+        } else {
+            propertyId = newProperty?.id;
+        }
+    }
+
+    if (propertyId) {
+        const { error: linkError } = await supabase
+            .from('gateways')
+            .update({ property_id: propertyId })
+            .eq('id', gateway.id);
+
+        if (linkError) {
+            console.warn('[Claim] Gateway→Property link failed (non-critical):', linkError.message);
+        } else {
+            console.log('[Claim] Gateway', code, 'linked to property', propertyId);
+        }
+    }
+
     console.log('[Claim] Gateway', code, 'claimed by profile', profile.id);
-    return NextResponse.json({ success: true, gateway: { ...gateway, owner_id: profile.id, status: 'online' } });
+    return NextResponse.json({ success: true, gateway: { ...gateway, owner_id: profile.id, status: 'online', property_id: propertyId } });
 }
