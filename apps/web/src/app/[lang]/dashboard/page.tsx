@@ -3,7 +3,7 @@ import { createAdminClient } from "../../../utils/supabase/admin";
 import { redirect } from "next/navigation";
 import { currentUser } from "@clerk/nextjs/server";
 import { Button } from "@kitnets/ui";
-import { Plus, Router as RouterIcon, Activity } from "lucide-react";
+import { Plus, Router as RouterIcon, Activity, Home, Building2 } from "lucide-react";
 import Link from "next/link";
 
 export default async function DashboardPage({ params }: { params: Promise<{ lang: "en" | "pt" | "es" }> }) {
@@ -19,7 +19,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ lang
     // Fetch user profile
     const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('id, full_name, property_address')
+        .select('id, full_name, property_address, property_type')
         .eq('clerk_id', user.id)
         .maybeSingle();
 
@@ -37,10 +37,20 @@ export default async function DashboardPage({ params }: { params: Promise<{ lang
         gateways = data || [];
     }
 
-    // Count properties: if profile has a property_address with a street, count as 1
-    const propertyAddress = profile?.property_address as Record<string, string> | null;
-    const propertyCount = propertyAddress?.street ? 1 : 0;
-    console.log('[Dashboard] property_address:', JSON.stringify(propertyAddress), 'count:', propertyCount);
+    // Fetch actual properties count
+    let propertyCount = 0;
+    if (profile) {
+        const { count } = await supabase
+            .from('properties')
+            .select('id', { count: 'exact', head: true })
+            .eq('owner_id', profile.id);
+        propertyCount = count || 0;
+    }
+
+    // Property type from profile
+    const propertyType = (profile as Record<string, unknown>)?.property_type as string || 'single';
+    const singleCount = propertyType === 'single' ? propertyCount : 0;
+    const multiCount = propertyType === 'multi' ? propertyCount : 0;
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -64,6 +74,22 @@ export default async function DashboardPage({ params }: { params: Promise<{ lang
                 <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
                     <h3 className="text-sm font-medium text-muted-foreground">Total de Imóveis</h3>
                     <p className="text-2xl font-bold text-foreground mt-2">{propertyCount}</p>
+                    <div className="mt-3 space-y-1.5">
+                        <div className="flex items-center justify-between text-sm">
+                            <span className="flex items-center gap-1.5 text-muted-foreground">
+                                <Home className="w-3.5 h-3.5" />
+                                Unifamiliar
+                            </span>
+                            <span className="font-medium text-foreground">{singleCount}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                            <span className="flex items-center gap-1.5 text-muted-foreground">
+                                <Building2 className="w-3.5 h-3.5" />
+                                Multifamiliar
+                            </span>
+                            <span className="font-medium text-foreground">{multiCount}</span>
+                        </div>
+                    </div>
                 </div>
                 <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
                     <h3 className="text-sm font-medium text-muted-foreground">Unidades Alugadas</h3>
