@@ -5,7 +5,7 @@ import { Button } from '@kitnets/ui';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Image from 'next/image';
-import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera, Sparkles, Save, UploadCloud, Home, Building2, User } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera, Sparkles, Save, UploadCloud, Home, Building2, User, ShieldCheck, Fingerprint } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUser, useAuth } from '@clerk/nextjs';
 import { createBrowserClient } from '@supabase/ssr';
@@ -81,6 +81,12 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
     const [savedProofs, setSavedProofs] = useState<ProofData[]>([]); // Saved in DB
     const [savedPhotos, setSavedPhotos] = useState<string[]>([]); // Saved URLs
     const [profileId, setProfileId] = useState<string | null>(null);
+
+    // Identity verification state
+    const [identityFile, setIdentityFile] = useState<File | null>(null);
+    const [isAnalyzingIdentity, setIsAnalyzingIdentity] = useState(false);
+    const [identityResult, setIdentityResult] = useState<Record<string, unknown> | null>(null);
+    const [identityError, setIdentityError] = useState<string | null>(null);
 
     // Person type toggle: 'pf' = Pessoa Física, 'pj' = Pessoa Jurídica
     const [personType, setPersonType] = useState<'pf' | 'pj'>('pf');
@@ -469,6 +475,76 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                 console.error("Erro ao atualizar foto", err);
                 alert(p.alerts.photoError);
             }
+        }
+    };
+
+    const handleIdentityAnalysis = async (file: File) => {
+        setIsAnalyzingIdentity(true);
+        setIdentityError(null);
+        setIdentityResult(null);
+
+        try {
+            const fd = new FormData();
+            fd.append('file', file);
+            fd.append('category', personType);
+
+            const res = await fetch('/api/identity/verify', {
+                method: 'POST',
+                body: fd,
+            });
+
+            const data = await res.json();
+
+            if (!res.ok || !data.success) {
+                setIdentityError(data.error || 'Não foi possível analisar o documento. Tente outro arquivo.');
+                return;
+            }
+
+            setIdentityResult(data);
+
+            // Auto-fill form fields from extracted data
+            if (data.extracted_data) {
+                const ext = data.extracted_data;
+                if (personType === 'pf') {
+                    setFormData(prev => ({
+                        ...prev,
+                        name: prev.name || ext.nome || '',
+                        cpf: prev.cpf || ext.cpf || '',
+                        birthDate: prev.birthDate || ext.data_nascimento || '',
+                    }));
+                } else {
+                    setFormData(prev => ({
+                        ...prev,
+                        cnpj: prev.cnpj || ext.cnpj || '',
+                        businessName: prev.businessName || ext.razao_social || '',
+                        tradeName: prev.tradeName || ext.nome_fantasia || '',
+                        registrationStatusDate: prev.registrationStatusDate || ext.data_situacao_cadastral || '',
+                        name: prev.name || ext.razao_social || '',
+                        phone: prev.phone || ext.telefone || '',
+                    }));
+                    // Auto-fill address if available
+                    if (ext.endereco) {
+                        setFormData(prev => ({
+                            ...prev,
+                            ownerAddress: {
+                                ...prev.ownerAddress,
+                                street: prev.ownerAddress.street || ext.endereco.logradouro || '',
+                                number: prev.ownerAddress.number || ext.endereco.numero || '',
+                                neighborhood: prev.ownerAddress.neighborhood || ext.endereco.bairro || '',
+                                city: prev.ownerAddress.city || ext.endereco.municipio || '',
+                                state: prev.ownerAddress.state || ext.endereco.uf || '',
+                                cep: prev.ownerAddress.cep || ext.endereco.cep || '',
+                                complement: prev.ownerAddress.complement || ext.endereco.complemento || '',
+                            }
+                        }));
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('Identity analysis error:', err);
+            setIdentityError('Erro de conexão ao analisar documento. Tente novamente.');
+        } finally {
+            setIsAnalyzingIdentity(false);
         }
     };
 
@@ -1184,7 +1260,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                             <div className="pt-6 border-t border-border mt-6">
                                 <h4 className="font-semibold mb-4 flex items-center gap-2">
                                     <MapPin className="w-4 h-4 text-emerald-600" />
-                                    Endereço do Proprietário (Residencial)
+                                    {personType === 'pj' ? 'Endereço' : 'Endereço do Proprietário (Residencial)'}
                                 </h4>
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                     <div className="space-y-2">
@@ -1223,6 +1299,137 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                         <Input value={formData.ownerAddress.complement} onChange={(e) => handleAddressChange('ownerAddress', 'complement', e.target.value)} placeholder="Apto 101" />
                                     </div>
                                 </div>
+                            </div>
+
+                            {/* IDENTITY VERIFICATION SECTION */}
+                            <div className="pt-6 border-t border-border mt-6">
+                                <h4 className="font-semibold mb-2 flex items-center gap-2">
+                                    <Fingerprint className="w-4 h-4 text-indigo-600" />
+                                    Verificação de Identidade
+                                </h4>
+                                <p className="text-sm text-muted-foreground mb-4">
+                                    {personType === 'pf'
+                                        ? 'Envie uma foto ou scan do seu documento de identidade (CNH ou RG) para verificação.'
+                                        : 'Envie o Comprovante de Inscrição e de Situação Cadastral do CNPJ (PDF disponível em gov.br).'}
+                                </p>
+
+                                {/* File upload area */}
+                                {!identityFile && !identityResult && (
+                                    <div className="border-2 border-dashed border-border rounded-lg p-8 flex flex-col items-center justify-center hover:bg-muted/50 transition-colors relative">
+                                        <input
+                                            type="file"
+                                            accept={personType === 'pf' ? 'image/*,.pdf' : '.pdf,image/*'}
+                                            onChange={(e) => {
+                                                const f = e.target.files?.[0];
+                                                if (f) {
+                                                    setIdentityFile(f);
+                                                    setIdentityError(null);
+                                                    setIdentityResult(null);
+                                                    handleIdentityAnalysis(f);
+                                                }
+                                            }}
+                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                        />
+                                        <div className="w-12 h-12 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 flex items-center justify-center mb-2">
+                                            <ShieldCheck className="w-6 h-6" />
+                                        </div>
+                                        <p className="font-medium text-foreground">
+                                            {personType === 'pf' ? 'Enviar CNH ou RG' : 'Enviar Comprovante CNPJ'}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            {personType === 'pf'
+                                                ? 'Formatos aceitos: JPG, PNG, PDF (frente do documento)'
+                                                : 'Formatos aceitos: PDF (Comprovante de Inscrição e Situação Cadastral)'}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Analyzing state */}
+                                {isAnalyzingIdentity && identityFile && (
+                                    <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-xl p-6 flex items-center gap-4">
+                                        <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
+                                        <div>
+                                            <p className="font-medium text-foreground">Analisando documento...</p>
+                                            <p className="text-sm text-muted-foreground">{identityFile.name}</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Success result */}
+                                {identityResult && identityResult.success && !isAnalyzingIdentity ? (() => {
+                                    const docType = String(identityResult.document_type || '');
+                                    const method = String(identityResult.extraction_method || '');
+                                    const ext = (identityResult.extracted_data || {}) as Record<string, unknown>;
+                                    return (
+                                        <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-6 space-y-4">
+                                            <div className="flex items-center gap-3">
+                                                <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+                                                <div>
+                                                    <p className="font-medium text-foreground">Documento verificado com sucesso</p>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Tipo: {docType} &bull; Método: {method === 'pdf_text_parse' ? 'Extração de texto (sem IA)' : method === 'pdf_text_ai' ? 'IA (texto)' : 'IA (visão)'}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {/* Extracted data preview */}
+                                            <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-border">
+                                                <p className="text-xs text-muted-foreground mb-2 font-semibold uppercase tracking-wider">Dados Extraídos</p>
+                                                <div className="grid grid-cols-2 gap-2 text-sm">
+                                                    {personType === 'pf' && (
+                                                        <>
+                                                            {ext.nome && (<><span className="text-muted-foreground">Nome:</span><span className="font-medium">{String(ext.nome)}</span></>)}
+                                                            {ext.cpf && (<><span className="text-muted-foreground">CPF:</span><span className="font-medium">{String(ext.cpf)}</span></>)}
+                                                            {ext.data_nascimento && (<><span className="text-muted-foreground">Nascimento:</span><span className="font-medium">{String(ext.data_nascimento)}</span></>)}
+                                                            {ext.rg && (<><span className="text-muted-foreground">RG:</span><span className="font-medium">{String(ext.rg)}</span></>)}
+                                                        </>
+                                                    )}
+                                                    {personType === 'pj' && (
+                                                        <>
+                                                            {ext.cnpj && (<><span className="text-muted-foreground">CNPJ:</span><span className="font-medium">{String(ext.cnpj)}</span></>)}
+                                                            {ext.razao_social && (<><span className="text-muted-foreground">Razão Social:</span><span className="font-medium">{String(ext.razao_social)}</span></>)}
+                                                            {ext.nome_fantasia && (<><span className="text-muted-foreground">Fantasia:</span><span className="font-medium">{String(ext.nome_fantasia)}</span></>)}
+                                                            {ext.situacao_cadastral && (<><span className="text-muted-foreground">Situação:</span><span className="font-medium">{String(ext.situacao_cadastral)}</span></>)}
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setIdentityFile(null);
+                                                    setIdentityResult(null);
+                                                    setIdentityError(null);
+                                                }}
+                                                className="text-sm text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 font-medium"
+                                            >
+                                                Substituir documento
+                                            </button>
+                                        </div>
+                                    );
+                                })() : null}
+
+                                {/* Error */}
+                                {identityError && (
+                                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 flex items-start gap-3">
+                                        <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+                                        <div>
+                                            <p className="text-sm font-medium text-red-700 dark:text-red-300">{identityError}</p>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setIdentityFile(null);
+                                                    setIdentityResult(null);
+                                                    setIdentityError(null);
+                                                }}
+                                                className="text-sm text-red-600 hover:underline mt-1"
+                                            >
+                                                Tentar novamente
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
