@@ -10,14 +10,21 @@ import { DocumentExtractionResult } from '@/types/ownership';
 
 async function extractPdfText(buffer: Buffer): Promise<string | null> {
     try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const pdfParse = require('pdf-parse');
-        const data = await pdfParse(buffer);
-        const text = data.text?.trim();
-        if (!text || text.length < 50) return null;
+        // pdf-parse v2 uses a class-based API
+        const { PDFParse } = await import('pdf-parse');
+        const parser = new PDFParse({ data: new Uint8Array(buffer) });
+        const result = await parser.getText();
+        const text = result.text?.trim();
+        console.log(`[Ownership] pdf-parse getText returned ${text?.length ?? 0} chars`);
+        if (!text || text.length < 50) {
+            console.log('[Ownership] Text too short, treating as image-based PDF');
+            await parser.destroy();
+            return null;
+        }
+        await parser.destroy();
         return text;
     } catch (err) {
-        console.warn('[Ownership] PDF text extraction failed:', err);
+        console.error('[Ownership] PDF text extraction error:', err);
         return null;
     }
 }
