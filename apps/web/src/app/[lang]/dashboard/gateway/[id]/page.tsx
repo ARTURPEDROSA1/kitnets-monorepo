@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { ArrowLeft, Zap, Droplets, Flame, FileText, CalendarSync } from "lucide-react";
+import { ArrowLeft, Zap, Droplets, Flame, FileText, CalendarSync, Settings } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { KPICard } from "@/components/dashboard/KPICards";
@@ -57,7 +57,7 @@ export default function GatewayDetailPage() {
     });
 
     // ── Billing cycle sync ────────────────────────────────────
-    const [syncBilling, setSyncBilling] = useState(false);
+    const [syncBilling, setSyncBilling] = useState(true);
     // Reading dates from bills, sorted newest first: ["2026-01-07", "2025-12-05", ...]
     const [readingDates, setReadingDates] = useState<string[]>([]);
 
@@ -86,6 +86,18 @@ export default function GatewayDetailPage() {
             // Sort descending (newest first)
             dates.sort((a, b) => b.localeCompare(a));
             setReadingDates(dates);
+
+            // Auto-apply billing cycle dates for "Este Mês" on initial load
+            if (dates.length >= 2) {
+                const syncStart = new Date(dates[0] + "T00:00:00");
+                const syncEnd = new Date();
+                setDateRange(prev => {
+                    if (prev.label === "Este Mês") {
+                        return { start: syncStart, end: syncEnd, label: prev.label };
+                    }
+                    return prev;
+                });
+            }
         })();
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -368,18 +380,32 @@ export default function GatewayDetailPage() {
                     <ArrowLeft className="w-4 h-4 mr-2" />
                     Voltar para Dashboard
                 </Link>
-                <div>
-                    <h1 className="text-3xl font-bold text-foreground">{gateway.label}</h1>
-                    <div className="flex items-center mt-2 space-x-4">
-                        <p className="font-mono text-sm text-muted-foreground">{gateway.serial_number}</p>
-                        <span
-                            className={`px-2 py-0.5 rounded-full text-xs font-medium ${gateway.status === "online"
-                                ? "bg-green-100 text-green-700"
-                                : "bg-gray-100 text-gray-600"
-                                }`}
+                <div className="flex-1">
+                    <div className="flex items-start justify-between">
+                        <div>
+                            <h1 className="text-3xl font-bold text-foreground">{gateway.label}</h1>
+                            <div className="flex items-center mt-2 space-x-4">
+                                <p className="font-mono text-sm text-muted-foreground">{gateway.serial_number}</p>
+                                <span
+                                    className={`px-2 py-0.5 rounded-full text-xs font-medium ${gateway.status === "online"
+                                        ? "bg-green-100 text-green-700"
+                                        : "bg-gray-100 text-gray-600"
+                                        }`}
+                                >
+                                    {gateway.status?.toUpperCase() || "OFFLINE"}
+                                </span>
+                            </div>
+                            {gateway.description && (
+                                <p className="text-sm text-muted-foreground mt-2 max-w-xl">{gateway.description}</p>
+                            )}
+                        </div>
+                        <Link
+                            href={`/${lang}/dashboard/gateway/${id}/edit`}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                         >
-                            {gateway.status?.toUpperCase() || "OFFLINE"}
-                        </span>
+                            <Settings className="w-4 h-4" />
+                            Gerenciar
+                        </Link>
                     </div>
                 </div>
             </div>
