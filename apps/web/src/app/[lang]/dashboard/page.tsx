@@ -1,11 +1,10 @@
 
-import { createClient } from "../../../utils/supabase/server";
+import { createAdminClient } from "../../../utils/supabase/admin";
 import { redirect } from "next/navigation";
 import { currentUser } from "@clerk/nextjs/server";
 import { Button } from "@kitnets/ui";
 import { Plus, Router as RouterIcon, Activity } from "lucide-react";
 import Link from "next/link";
-import { getDictionary } from "../../../dictionaries";
 
 export default async function DashboardPage({ params }: { params: Promise<{ lang: "en" | "pt" | "es" }> }) {
     const { lang } = await params;
@@ -14,7 +13,8 @@ export default async function DashboardPage({ params }: { params: Promise<{ lang
     const user = await currentUser();
     if (!user) redirect(`/${lang}/login/proprietario`);
 
-    const supabase = await createClient();
+    // Use admin client to bypass RLS (server component can't carry Clerk JWT for RLS)
+    const supabase = createAdminClient();
 
     // Fetch user profile
     const { data: profile, error: profileError } = await supabase
@@ -28,7 +28,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ lang
     }
 
     // Fetch gateways
-    let gateways: any[] = [];
+    let gateways: { id: string; label?: string; serial_number: string; status: string; last_seen_at?: string }[] = [];
     if (profile) {
         const { data } = await supabase
             .from('gateways')
