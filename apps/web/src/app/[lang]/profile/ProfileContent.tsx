@@ -56,12 +56,6 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
     const p = dict.profile;
     const { getToken } = useAuth();
 
-    // Tabs
-    const tabs = [
-        { id: 'ownership', label: p.tabs.ownership },
-        { id: 'basics', label: p.tabs.basics },
-        { id: 'security', label: p.tabs.security },
-    ];
     const [activeTab, setActiveTab] = useState<'basics' | 'ownership' | 'security'>('ownership');
 
     // UI state
@@ -90,6 +84,32 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
 
     // Person type toggle: 'pf' = Pessoa Física, 'pj' = Pessoa Jurídica
     const [personType, setPersonType] = useState<'pf' | 'pj'>('pf');
+
+    // Tabs (after personType so we can use it for dynamic labels)
+    const tabs = [
+        { id: 'ownership', label: p.tabs.ownership },
+        { id: 'basics', label: personType === 'pj' ? 'Dados da Holding' : p.tabs.basics },
+        { id: 'security', label: p.tabs.security },
+    ];
+
+    // Property type: single-family or multi-family
+    const [propertyType, setPropertyType] = useState<'single' | 'multi'>('single');
+
+    // Administrator data (only for PJ)
+    const [adminData, setAdminData] = useState({
+        name: '',
+        email: '',
+        phone: '',
+        address: {
+            cep: '',
+            street: '',
+            number: '',
+            city: '',
+            state: '',
+            neighborhood: '',
+            complement: ''
+        }
+    });
 
     const [formData, setFormData] = useState({
         name: '',
@@ -167,6 +187,16 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                     console.log('[Profile] Loaded profile:', profile.id, 'clerk_id:', profile.clerk_id);
                     setProfileId(profile.id);
                     if (profile.person_type) setPersonType(profile.person_type as 'pf' | 'pj');
+                    if (profile.property_type) setPropertyType(profile.property_type as 'single' | 'multi');
+                    if (profile.admin_data) {
+                        const ad = profile.admin_data as Record<string, unknown>;
+                        setAdminData({
+                            name: (ad.name as string) || '',
+                            email: (ad.email as string) || '',
+                            phone: (ad.phone as string) || '',
+                            address: (ad.address as typeof adminData.address) || { cep: '', street: '', number: '', city: '', state: '', neighborhood: '', complement: '' }
+                        });
+                    }
                     setFormData({
                         name: profile.full_name || user.fullName || '',
                         phone: profile.phone || user.phoneNumbers[0]?.phoneNumber || '',
@@ -365,21 +395,27 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
         }
     };
 
-    const handleAddressChange = (type: 'ownerAddress' | 'propertyAddress', field: string, value: string) => {
+    const handleAddressChange = (type: 'ownerAddress' | 'propertyAddress' | 'adminAddress', field: string, value: string) => {
         let formattedValue = value;
         if (field === 'cep') {
             formattedValue = formatCEP(value);
             if (formattedValue.length === 9) fetchAddress(type, formattedValue);
         }
 
-        setFormData(prev => ({
-            ...prev,
-            [type]: { ...prev[type], [field]: formattedValue }
-        }));
+        if (type === 'adminAddress') {
+            setAdminData(prev => ({
+                ...prev,
+                address: { ...prev.address, [field]: formattedValue }
+            }));
+        } else {
+            setFormData(prev => ({
+                ...prev,
+                [type]: { ...prev[type], [field]: formattedValue }
+            }));
+        }
     };
 
-    const fetchAddress = async (type: 'ownerAddress' | 'propertyAddress', cep: string) => {
-        // Can make separate loading states if needed, but shared is okay for now
+    const fetchAddress = async (type: 'ownerAddress' | 'propertyAddress' | 'adminAddress', cep: string) => {
         setIsLoadingAddress(true);
         setCepError("");
         const cleanCep = cep.replace(/\D/g, "");
@@ -390,6 +426,17 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
 
             if (data.erro) {
                 setCepError(p.basics.cepNotFound);
+            } else if (type === 'adminAddress') {
+                setAdminData(prev => ({
+                    ...prev,
+                    address: {
+                        ...prev.address,
+                        street: data.logradouro,
+                        neighborhood: data.bairro,
+                        city: data.localidade,
+                        state: data.uf
+                    }
+                }));
             } else {
                 setFormData(prev => ({
                     ...prev,
@@ -632,6 +679,8 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                 person_type: personType,
                 address: formData.ownerAddress,
                 property_address: formData.propertyAddress,
+                property_type: propertyType,
+                admin_data: personType === 'pj' ? adminData : null,
                 role: 'landlord'
             };
 
@@ -981,22 +1030,54 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                 {activeTab === 'ownership' && (
                     <div className="space-y-8 max-w-4xl">
 
+                        {/* Property Type Toggle: Unifamiliar / Multifamiliar */}
+                        <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl w-fit">
+                            <button
+                                type="button"
+                                onClick={() => setPropertyType('single')}
+                                className={cn(
+                                    "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                                    propertyType === 'single'
+                                        ? "bg-white dark:bg-slate-800 text-foreground shadow-sm"
+                                        : "text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                <Home className="w-4 h-4" />
+                                Unifamiliar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setPropertyType('multi')}
+                                className={cn(
+                                    "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                                    propertyType === 'multi'
+                                        ? "bg-white dark:bg-slate-800 text-foreground shadow-sm"
+                                        : "text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                <Building2 className="w-4 h-4" />
+                                Multifamiliar
+                            </button>
+                        </div>
+
                         {/* 1. Documentation Section (ownership verification — first!) */}
                         <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
                             <button
                                 type="button"
                                 onClick={() => setOwnershipSectionOpen(prev => !prev)}
-                                className="flex items-center justify-between w-full group"
+                                className="flex items-center justify-between w-full"
                             >
                                 <div className="flex items-center gap-2">
-                                    <div className={`p-2 rounded-lg ${extractedAddressInfo?.startsWith('✅')
+                                    <div className={`p-2 rounded-lg ${(extractedAddressInfo?.startsWith('✅') || (!ownershipSectionOpen && savedProofs.length > 0))
                                         ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600'
                                         : 'bg-blue-100 dark:bg-blue-900/50 text-blue-600'
                                         }`}>
-                                        {extractedAddressInfo?.startsWith('✅') ? <CheckCircle2 className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
+                                        {(extractedAddressInfo?.startsWith('✅') || (!ownershipSectionOpen && savedProofs.length > 0))
+                                            ? <CheckCircle2 className="w-5 h-5" />
+                                            : <FileText className="w-5 h-5" />}
                                     </div>
                                     <h3 className="text-lg font-semibold text-foreground">{p.ownership.title}</h3>
-                                    {!ownershipSectionOpen && extractedAddressInfo?.startsWith('✅') && (
+                                    {!ownershipSectionOpen && (extractedAddressInfo?.startsWith('✅') || savedProofs.length > 0) && (
                                         <span className="ml-2 text-xs bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full">Verificado ✓</span>
                                     )}
                                 </div>
@@ -1421,7 +1502,9 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                         </div>
 
                         <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-6">
-                            <h3 className="text-lg font-semibold">Dados do Proprietário</h3>
+                            <h3 className="text-lg font-semibold">
+                                {personType === 'pj' ? 'Dados da Holding Imobiliária' : 'Dados do Proprietário'}
+                            </h3>
 
                             {/* Common Fields */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1570,6 +1653,102 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                             </div>
 
                         </div>
+
+                        {/* ADMIN DATA CARD — Only for PJ */}
+                        {personType === 'pj' && (
+                            <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-6">
+                                <div className="flex items-center gap-2">
+                                    <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded-lg text-amber-600">
+                                        <User className="w-5 h-5" />
+                                    </div>
+                                    <h3 className="text-lg font-semibold">Dados do Administrador</h3>
+                                </div>
+                                <p className="text-sm text-muted-foreground">
+                                    Pessoa responsável pela gestão da holding imobiliária.
+                                </p>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label className="text-foreground">Nome Completo</Label>
+                                        <Input
+                                            value={adminData.name}
+                                            onChange={(e) => setAdminData(prev => ({ ...prev, name: e.target.value }))}
+                                            placeholder="Nome do administrador"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-foreground">Email</Label>
+                                        <Input
+                                            type="email"
+                                            value={adminData.email}
+                                            onChange={(e) => setAdminData(prev => ({ ...prev, email: e.target.value }))}
+                                            placeholder="admin@empresa.com"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-foreground">Telefone / WhatsApp</Label>
+                                        <Input
+                                            value={adminData.phone}
+                                            onChange={(e) => setAdminData(prev => ({ ...prev, phone: formatPhone(e.target.value) }))}
+                                            placeholder="(00) 00000-0000"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Admin Address with CEP auto-fetch */}
+                                <div className="pt-4 border-t border-border">
+                                    <h4 className="font-semibold mb-4 flex items-center gap-2">
+                                        <MapPin className="w-4 h-4 text-amber-600" />
+                                        Endereço do Administrador
+                                    </h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                        <div className="space-y-2">
+                                            <Label>CEP</Label>
+                                            <div className="relative">
+                                                <Input
+                                                    value={adminData.address.cep}
+                                                    onChange={(e) => handleAddressChange('adminAddress', 'cep', e.target.value)}
+                                                    placeholder="00000-000"
+                                                    maxLength={9}
+                                                />
+                                                {isLoadingAddress && <Loader2 className="absolute right-3 top-2.5 w-4 h-4 animate-spin text-muted-foreground" />}
+                                            </div>
+                                        </div>
+                                        <div className="md:col-span-3 space-y-2">
+                                            <Label>Cidade / UF</Label>
+                                            <div className="flex gap-2">
+                                                <Input value={adminData.address.city} readOnly className="bg-muted/50" placeholder="Cidade" />
+                                                <Input value={adminData.address.state} readOnly className="bg-muted/50 w-20" placeholder="UF" />
+                                            </div>
+                                        </div>
+                                        <div className="md:col-span-3 space-y-2">
+                                            <Label>Rua / Logradouro</Label>
+                                            <Input value={adminData.address.street} readOnly className="bg-muted/50" placeholder="Preenchido automaticamente pelo CEP" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Número</Label>
+                                            <Input
+                                                value={adminData.address.number}
+                                                onChange={(e) => handleAddressChange('adminAddress', 'number', e.target.value)}
+                                                placeholder="123"
+                                            />
+                                        </div>
+                                        <div className="md:col-span-2 space-y-2">
+                                            <Label>Bairro</Label>
+                                            <Input value={adminData.address.neighborhood} readOnly className="bg-muted/50" placeholder="Preenchido pelo CEP" />
+                                        </div>
+                                        <div className="md:col-span-2 space-y-2">
+                                            <Label>Complemento</Label>
+                                            <Input
+                                                value={adminData.address.complement}
+                                                onChange={(e) => handleAddressChange('adminAddress', 'complement', e.target.value)}
+                                                placeholder="Sala 101"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="flex justify-end pt-4">
                             <Button size="lg" onClick={handleSave} disabled={isSaving} className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-lg shadow-emerald-900/20">
