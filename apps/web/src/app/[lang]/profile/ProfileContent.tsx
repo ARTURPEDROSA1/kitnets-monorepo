@@ -5,7 +5,7 @@ import { Button } from '@kitnets/ui';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Image from 'next/image';
-import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera, Sparkles, Save, UploadCloud, Home, Building2, User, ShieldCheck, Fingerprint } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera, Sparkles, Save, UploadCloud, Home, Building2, User, ShieldCheck, Fingerprint, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUser, useAuth } from '@clerk/nextjs';
 import { createClient } from '@supabase/supabase-js';
@@ -404,6 +404,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
     const [analyzingFiles, setAnalyzingFiles] = useState<Set<string>>(new Set());
     const [extractedAddressInfo, setExtractedAddressInfo] = useState<string | null>(null);
     const [fileAnalysisStatus, setFileAnalysisStatus] = useState<Record<string, 'analyzing' | 'success' | 'error'>>({});
+    const [ownershipSectionOpen, setOwnershipSectionOpen] = useState(true);
 
     const removeFile = (index: number) => {
         setOwnershipFiles(prev => {
@@ -480,7 +481,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                     propertyAddress: {
                         ...prev.propertyAddress,
                         ...(addr.street ? { street: addr.street } : {}),
-                        ...(addr.number ? { number: addr.number } : {}),
+                        ...(addr.number ? { number: addr.number.replace(/^0+/, '') || addr.number } : {}),
                         ...(addr.neighborhood ? { neighborhood: addr.neighborhood } : {}),
                         ...(addr.city ? { city: addr.city } : {}),
                         ...(addr.state ? { state: addr.state } : {}),
@@ -496,6 +497,8 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                             : method;
                 setExtractedAddressInfo(`✅ ${docType} — Endereço extraído com sucesso (${methodLabel})`);
                 setFileAnalysisStatus(prev => ({ ...prev, [file.name]: 'success' }));
+                // Auto-collapse verification section after successful extraction
+                setOwnershipSectionOpen(false);
             } else {
                 const methodsTried = result?.methods_tried?.join(' → ') || 'nenhum';
                 setFileAnalysisStatus(prev => ({ ...prev, [file.name]: 'error' }));
@@ -969,94 +972,111 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
 
                         {/* 1. Documentation Section (ownership verification — first!) */}
                         <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
-                            <div className="flex items-center gap-2 mb-2">
-                                <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg text-blue-600">
-                                    <FileText className="w-5 h-5" />
+                            <button
+                                type="button"
+                                onClick={() => setOwnershipSectionOpen(prev => !prev)}
+                                className="flex items-center justify-between w-full group"
+                            >
+                                <div className="flex items-center gap-2">
+                                    <div className={`p-2 rounded-lg ${extractedAddressInfo?.startsWith('✅')
+                                            ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600'
+                                            : 'bg-blue-100 dark:bg-blue-900/50 text-blue-600'
+                                        }`}>
+                                        {extractedAddressInfo?.startsWith('✅') ? <CheckCircle2 className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
+                                    </div>
+                                    <h3 className="text-lg font-semibold text-foreground">{p.ownership.title}</h3>
+                                    {!ownershipSectionOpen && extractedAddressInfo?.startsWith('✅') && (
+                                        <span className="ml-2 text-xs bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full">Verificado ✓</span>
+                                    )}
                                 </div>
-                                <h3 className="text-lg font-semibold text-foreground">{p.ownership.title}</h3>
-                            </div>
+                                {ownershipSectionOpen ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
+                            </button>
 
-                            <div className="bg-muted/30 p-4 rounded-lg border border-border text-sm text-muted-foreground mb-4">
-                                <p className="font-medium text-foreground mb-2">{p.ownership.acceptedDocs}</p>
-                                <ul className="list-disc list-inside space-y-1 ml-1">
-                                    <li>{p.ownership.docs.iptu}</li>
-                                    <li>{p.ownership.docs.purchase}</li>
-                                    <li>{p.ownership.docs.registry}</li>
-                                    <li>{p.ownership.docs.deed}</li>
-                                </ul>
-                            </div>
+                            {ownershipSectionOpen && (
+                                <>
+                                    <div className="bg-muted/30 p-4 rounded-lg border border-border text-sm text-muted-foreground mb-4">
+                                        <p className="font-medium text-foreground mb-2">{p.ownership.acceptedDocs}</p>
+                                        <ul className="list-disc list-inside space-y-1 ml-1">
+                                            <li>{p.ownership.docs.iptu}</li>
+                                            <li>{p.ownership.docs.purchase}</li>
+                                            <li>{p.ownership.docs.registry}</li>
+                                            <li>{p.ownership.docs.deed}</li>
+                                        </ul>
+                                    </div>
 
-                            <div className="border-2 border-dashed border-border rounded-lg p-8 flex flex-col items-center justify-center hover:bg-muted/50 transition-colors relative">
-                                <input
-                                    type="file"
-                                    multiple
-                                    accept=".pdf,.jpg,.jpeg,.png"
-                                    onChange={handleFileUpload}
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                />
-                                <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 flex items-center justify-center mb-2">
-                                    <UploadCloud className="w-6 h-6" />
-                                </div>
-                                <p className="font-medium text-foreground">{p.ownership.uploadPlaceholder}</p>
-                                <p className="text-xs text-muted-foreground mt-1">{p.ownership.uploadDrop}</p>
-                            </div>
-
-                            {/* File List */}
-                            {(ownershipFiles.length > 0 || savedProofs.length > 0) && (
-                                <div className="space-y-2 mt-4">
-                                    {ownershipFiles.map((file, i) => {
-                                        const status = fileAnalysisStatus[file.name];
-                                        return (
-                                            <div key={`new-${i}`} className={`flex items-center justify-between p-3 rounded-lg border ${status === 'success' ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800' :
-                                                status === 'error' ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' :
-                                                    'bg-muted/30 border-border'
-                                                }`}>
-                                                <div className="flex items-center gap-3 overflow-hidden">
-                                                    <div className="w-10 h-10 rounded-lg bg-white dark:bg-slate-800 border flex items-center justify-center flex-shrink-0">
-                                                        {status === 'analyzing' ? (
-                                                            <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
-                                                        ) : status === 'success' ? (
-                                                            <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                                                        ) : status === 'error' ? (
-                                                            <AlertTriangle className="w-5 h-5 text-red-500" />
-                                                        ) : (
-                                                            <FileText className="w-5 h-5 text-blue-500" />
-                                                        )}
-                                                    </div>
-                                                    <div className="flex flex-col min-w-0">
-                                                        <p className="text-sm font-medium truncate pr-4">{file.name}</p>
-                                                        <span className="text-xs text-muted-foreground">
-                                                            {(file.size / 1024 / 1024).toFixed(2)} MB •{' '}
-                                                            {status === 'analyzing' ? (
-                                                                <span className="text-blue-600 dark:text-blue-400 font-medium">Analisando com IA...</span>
-                                                            ) : status === 'success' ? (
-                                                                <span className="text-emerald-600 dark:text-emerald-400 font-medium">Endereço extraído ✓</span>
-                                                            ) : status === 'error' ? (
-                                                                <span className="text-red-600 dark:text-red-400 font-medium">Falha na extração</span>
-                                                            ) : (
-                                                                'Pronto para enviar'
-                                                            )}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <Button variant="ghost" size="sm" onClick={() => removeFile(i)} className="text-destructive">
-                                                    <Trash2 className="w-4 h-4" />
-                                                </Button>
-                                            </div>
-                                        );
-                                    })}
-                                    {savedProofs.map((proof) => (
-                                        <div key={proof.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border opacity-75">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded bg-muted flex items-center justify-center"><CheckCircle2 className="w-4 h-4 text-emerald-500" /></div>
-                                                <div>
-                                                    <p className="text-sm font-medium text-foreground">{proof.original_name}</p>
-                                                    <p className="text-xs text-muted-foreground">Enviado em {new Date(proof.created_at).toLocaleDateString()}</p>
-                                                </div>
-                                            </div>
+                                    <div className="border-2 border-dashed border-border rounded-lg p-8 flex flex-col items-center justify-center hover:bg-muted/50 transition-colors relative">
+                                        <input
+                                            type="file"
+                                            multiple
+                                            accept=".pdf,.jpg,.jpeg,.png"
+                                            onChange={handleFileUpload}
+                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                        />
+                                        <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 flex items-center justify-center mb-2">
+                                            <UploadCloud className="w-6 h-6" />
                                         </div>
-                                    ))}
-                                </div>
+                                        <p className="font-medium text-foreground">{p.ownership.uploadPlaceholder}</p>
+                                        <p className="text-xs text-muted-foreground mt-1">{p.ownership.uploadDrop}</p>
+                                    </div>
+
+                                    {/* File List */}
+                                    {(ownershipFiles.length > 0 || savedProofs.length > 0) && (
+                                        <div className="space-y-2 mt-4">
+                                            {ownershipFiles.map((file, i) => {
+                                                const status = fileAnalysisStatus[file.name];
+                                                return (
+                                                    <div key={`new-${i}`} className={`flex items-center justify-between p-3 rounded-lg border ${status === 'success' ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800' :
+                                                        status === 'error' ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' :
+                                                            'bg-muted/30 border-border'
+                                                        }`}>
+                                                        <div className="flex items-center gap-3 overflow-hidden">
+                                                            <div className="w-10 h-10 rounded-lg bg-white dark:bg-slate-800 border flex items-center justify-center flex-shrink-0">
+                                                                {status === 'analyzing' ? (
+                                                                    <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                                                                ) : status === 'success' ? (
+                                                                    <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                                                                ) : status === 'error' ? (
+                                                                    <AlertTriangle className="w-5 h-5 text-red-500" />
+                                                                ) : (
+                                                                    <FileText className="w-5 h-5 text-blue-500" />
+                                                                )}
+                                                            </div>
+                                                            <div className="flex flex-col min-w-0">
+                                                                <p className="text-sm font-medium truncate pr-4">{file.name}</p>
+                                                                <span className="text-xs text-muted-foreground">
+                                                                    {(file.size / 1024 / 1024).toFixed(2)} MB •{' '}
+                                                                    {status === 'analyzing' ? (
+                                                                        <span className="text-blue-600 dark:text-blue-400 font-medium">Analisando com IA...</span>
+                                                                    ) : status === 'success' ? (
+                                                                        <span className="text-emerald-600 dark:text-emerald-400 font-medium">Endereço extraído ✓</span>
+                                                                    ) : status === 'error' ? (
+                                                                        <span className="text-red-600 dark:text-red-400 font-medium">Falha na extração</span>
+                                                                    ) : (
+                                                                        'Pronto para enviar'
+                                                                    )}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <Button variant="ghost" size="sm" onClick={() => removeFile(i)} className="text-destructive">
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </Button>
+                                                    </div>
+                                                );
+                                            })}
+                                            {savedProofs.map((proof) => (
+                                                <div key={proof.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border opacity-75">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded bg-muted flex items-center justify-center"><CheckCircle2 className="w-4 h-4 text-emerald-500" /></div>
+                                                        <div>
+                                                            <p className="text-sm font-medium text-foreground">{proof.original_name}</p>
+                                                            <p className="text-xs text-muted-foreground">Enviado em {new Date(proof.created_at).toLocaleDateString()}</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </div>
 

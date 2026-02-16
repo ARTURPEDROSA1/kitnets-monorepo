@@ -19,7 +19,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ lang
     // Fetch user profile
     const { data: profile } = await supabase
         .from('profiles')
-        .select('id, full_name')
+        .select('id, full_name, property_address')
         .eq('clerk_id', user.id)
         .single();
 
@@ -32,6 +32,10 @@ export default async function DashboardPage({ params }: { params: Promise<{ lang
             .eq('owner_id', profile.id);
         gateways = data || [];
     }
+
+    // Count properties: if profile has a property_address with a street, count as 1
+    const propertyAddress = profile?.property_address as Record<string, string> | null;
+    const propertyCount = propertyAddress?.street ? 1 : 0;
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -54,7 +58,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ lang
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
                     <h3 className="text-sm font-medium text-muted-foreground">Total de Imóveis</h3>
-                    <p className="text-2xl font-bold text-foreground mt-2">0</p>
+                    <p className="text-2xl font-bold text-foreground mt-2">{propertyCount}</p>
                 </div>
                 <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
                     <h3 className="text-sm font-medium text-muted-foreground">Unidades Alugadas</h3>
