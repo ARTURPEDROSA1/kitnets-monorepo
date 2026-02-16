@@ -197,32 +197,36 @@ async function analyzeWithOpenAIText(text: string, prompt: string): Promise<Extr
 }
 
 // --- Combined: Try Gemini first, then OpenAI ---
-async function analyzeVision(base64: string, mimeType: string, prompt: string): Promise<ExtractionResult> {
+async function analyzeVision(base64: string, mimeType: string, prompt: string): Promise<ExtractionResult & { _provider: string }> {
     // 1. Try Gemini (primary — free/cheaper)
     try {
         console.log('[Identity] Trying Gemini Vision...');
-        return await analyzeWithGeminiVision(base64, mimeType, prompt);
+        const result = await analyzeWithGeminiVision(base64, mimeType, prompt);
+        return { ...result, _provider: 'gemini' };
     } catch (geminiErr) {
         console.warn('[Identity] Gemini Vision failed:', geminiErr);
     }
 
     // 2. Fallback to OpenAI
     console.log('[Identity] Falling back to OpenAI Vision...');
-    return await analyzeWithOpenAIVision(base64, mimeType, prompt);
+    const result = await analyzeWithOpenAIVision(base64, mimeType, prompt);
+    return { ...result, _provider: 'openai' };
 }
 
-async function analyzeText(text: string, prompt: string): Promise<ExtractionResult> {
+async function analyzeText(text: string, prompt: string): Promise<ExtractionResult & { _provider: string }> {
     // 1. Try Gemini (primary)
     try {
         console.log('[Identity] Trying Gemini Text...');
-        return await analyzeWithGeminiText(text, prompt);
+        const result = await analyzeWithGeminiText(text, prompt);
+        return { ...result, _provider: 'gemini' };
     } catch (geminiErr) {
         console.warn('[Identity] Gemini Text failed:', geminiErr);
     }
 
     // 2. Fallback to OpenAI
     console.log('[Identity] Falling back to OpenAI Text...');
-    return await analyzeWithOpenAIText(text, prompt);
+    const result = await analyzeWithOpenAIText(text, prompt);
+    return { ...result, _provider: 'openai' };
 }
 
 // --- Parse CNPJ text without AI (regex-based) ---
@@ -376,7 +380,7 @@ export async function POST(request: NextRequest) {
                         const aiResult = await analyzeText(pdfText, CNPJ_PROMPT);
                         return NextResponse.json({
                             ...aiResult,
-                            extraction_method: 'pdf_text_ai',
+                            extraction_method: `pdf_text_ai_${aiResult._provider}`,
                         });
                     } catch (aiErr) {
                         console.warn('[Identity] AI text analysis failed:', aiErr);
@@ -401,7 +405,7 @@ export async function POST(request: NextRequest) {
             const visionResult = await analyzeVision(base64, mimeType, prompt);
             return NextResponse.json({
                 ...visionResult,
-                extraction_method: 'vision_api',
+                extraction_method: `vision_${visionResult._provider}`,
             });
         } catch (visionErr) {
             console.error('[Identity] Vision API failed:', visionErr);

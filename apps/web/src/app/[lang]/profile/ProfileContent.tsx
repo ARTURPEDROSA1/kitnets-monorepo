@@ -920,56 +920,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                 {activeTab === 'ownership' && (
                     <div className="space-y-8 max-w-4xl">
 
-                        {/* 1. Address Section */}
-                        <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
-                            <div className="flex items-center gap-2 mb-2">
-                                <div className="p-2 bg-emerald-100 dark:bg-emerald-900/50 rounded-lg text-emerald-600">
-                                    <MapPin className="w-5 h-5" />
-                                </div>
-                                <h3 className="text-lg font-semibold text-foreground">{p.basics.addressTitle}</h3>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                <div className="space-y-2">
-                                    <Label>{p.basics.cep}</Label>
-                                    <div className="relative">
-                                        <Input
-                                            value={formData.propertyAddress.cep}
-                                            onChange={(e) => handleAddressChange('propertyAddress', 'cep', e.target.value)}
-                                            placeholder="00000-000"
-                                            maxLength={9}
-                                        />
-                                        {isLoadingAddress && <Loader2 className="absolute right-3 top-2.5 w-4 h-4 animate-spin text-muted-foreground" />}
-                                    </div>
-                                    {cepError && <p className="text-xs text-red-500">{cepError}</p>}
-                                </div>
-                                <div className="md:col-span-3 space-y-2">
-                                    <Label>Cidade / UF</Label>
-                                    <div className="flex gap-2">
-                                        <Input value={formData.propertyAddress.city} onChange={(e) => handleAddressChange('propertyAddress', 'city', e.target.value)} placeholder="Cidade" />
-                                        <Input value={formData.propertyAddress.state} onChange={(e) => handleAddressChange('propertyAddress', 'state', e.target.value)} placeholder="UF" className="w-20" maxLength={2} />
-                                    </div>
-                                </div>
-                                <div className="md:col-span-3 space-y-2">
-                                    <Label>{p.basics.street}</Label>
-                                    <Input value={formData.propertyAddress.street} onChange={(e) => handleAddressChange('propertyAddress', 'street', e.target.value)} placeholder="Rua / Avenida" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>{p.basics.number}</Label>
-                                    <Input value={formData.propertyAddress.number} onChange={(e) => handleAddressChange('propertyAddress', 'number', e.target.value)} placeholder="123" />
-                                </div>
-                                <div className="md:col-span-2 space-y-2">
-                                    <Label>{p.basics.neighborhood}</Label>
-                                    <Input value={formData.propertyAddress.neighborhood} onChange={(e) => handleAddressChange('propertyAddress', 'neighborhood', e.target.value)} placeholder="Bairro" />
-                                </div>
-                                <div className="md:col-span-2 space-y-2">
-                                    <Label>{p.basics.complement}</Label>
-                                    <Input value={formData.propertyAddress.complement} onChange={(e) => handleAddressChange('propertyAddress', 'complement', e.target.value)} placeholder={p.basics.complement} />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* 2. Documentation Section */}
+                        {/* 1. Documentation Section (ownership verification — first!) */}
                         <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
                             <div className="flex items-center gap-2 mb-2">
                                 <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg text-blue-600">
@@ -1036,6 +987,55 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                     ))}
                                 </div>
                             )}
+                        </div>
+
+                        {/* 2. Address Section */}
+                        <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
+                            <div className="flex items-center gap-2 mb-2">
+                                <div className="p-2 bg-emerald-100 dark:bg-emerald-900/50 rounded-lg text-emerald-600">
+                                    <MapPin className="w-5 h-5" />
+                                </div>
+                                <h3 className="text-lg font-semibold text-foreground">{p.basics.addressTitle}</h3>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div className="space-y-2">
+                                    <Label>{p.basics.cep}</Label>
+                                    <div className="relative">
+                                        <Input
+                                            value={formData.propertyAddress.cep}
+                                            onChange={(e) => handleAddressChange('propertyAddress', 'cep', e.target.value)}
+                                            placeholder="00000-000"
+                                            maxLength={9}
+                                        />
+                                        {isLoadingAddress && <Loader2 className="absolute right-3 top-2.5 w-4 h-4 animate-spin text-muted-foreground" />}
+                                    </div>
+                                    {cepError && <p className="text-xs text-red-500">{cepError}</p>}
+                                </div>
+                                <div className="md:col-span-3 space-y-2">
+                                    <Label>Cidade / UF</Label>
+                                    <div className="flex gap-2">
+                                        <Input value={formData.propertyAddress.city} onChange={(e) => handleAddressChange('propertyAddress', 'city', e.target.value)} placeholder="Cidade" />
+                                        <Input value={formData.propertyAddress.state} onChange={(e) => handleAddressChange('propertyAddress', 'state', e.target.value)} placeholder="UF" className="w-20" maxLength={2} />
+                                    </div>
+                                </div>
+                                <div className="md:col-span-3 space-y-2">
+                                    <Label>{p.basics.street}</Label>
+                                    <Input value={formData.propertyAddress.street} onChange={(e) => handleAddressChange('propertyAddress', 'street', e.target.value)} placeholder="Rua / Avenida" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>{p.basics.number}</Label>
+                                    <Input value={formData.propertyAddress.number} onChange={(e) => handleAddressChange('propertyAddress', 'number', e.target.value)} placeholder="123" />
+                                </div>
+                                <div className="md:col-span-2 space-y-2">
+                                    <Label>{p.basics.neighborhood}</Label>
+                                    <Input value={formData.propertyAddress.neighborhood} onChange={(e) => handleAddressChange('propertyAddress', 'neighborhood', e.target.value)} placeholder="Bairro" />
+                                </div>
+                                <div className="md:col-span-2 space-y-2">
+                                    <Label>{p.basics.complement}</Label>
+                                    <Input value={formData.propertyAddress.complement} onChange={(e) => handleAddressChange('propertyAddress', 'complement', e.target.value)} placeholder={p.basics.complement} />
+                                </div>
+                            </div>
                         </div>
 
                         {/* 3. Photos Section */}
@@ -1219,7 +1219,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                             <div>
                                                 <p className="font-medium text-foreground">Documento verificado com sucesso</p>
                                                 <p className="text-xs text-muted-foreground">
-                                                    Tipo: {docType} &bull; Método: {method === 'pdf_text_parse' ? 'Extração de texto (sem IA)' : method === 'pdf_text_ai' ? 'IA (texto)' : 'IA (visão)'}
+                                                    Tipo: {docType} &bull; Método: {method === 'pdf_text_parse' ? 'Extração de texto (sem IA)' : method.startsWith('pdf_text_ai') ? `IA texto (${method.includes('gemini') ? 'Gemini' : 'GPT'})` : method.includes('gemini') ? 'IA visão (Gemini)' : 'IA visão (GPT)'}
                                                 </p>
                                             </div>
                                         </div>
