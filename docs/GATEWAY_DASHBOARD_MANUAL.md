@@ -1,7 +1,7 @@
 # Kitnets Gateway Dashboard — Software Manual
 
-**Version:** 2.0  
-**Last updated:** 2026-02-14  
+**Version:** 2.1  
+**Last updated:** 2026-02-16  
 **Author:** Kitnets Engineering
 
 ---
@@ -534,15 +534,16 @@ This is the **main consumption analytics dashboard**.
 
 #### Features
 
-| Feature                | Description                                                     |
-|------------------------|-----------------------------------------------------------------|
-| **Header**             | Gateway label, serial number, status badge (ONLINE/OFFLINE)     |
-| **Date Range Picker**  | Preset ranges: Hoje, Últimos 7 dias, Este Mês, Mês Passado, Este Ano, Período (custom) |
-| **KPI Cards (5)**      | Consumo Total (L), Média Diária (L/dia), Dia de Pico, vs Período Anterior (%), Custo Estimado (R$) |
-| **Consumption Charts** | Tabbed view: Diário (L), Mensal (m³), Anual (m³) with bar charts |
-| **Per-Meter Detail**   | Individual cards for each meter with mini charts                |
-| **Cost Allocation**    | Equal split + proportional split per meter                      |
-| **Billing Link**       | Link to utility bill history for the linked property            |
+| Feature                     | Description                                                     |
+|-----------------------------|-----------------------------------------------------------------|
+| **Header**                  | Gateway label, serial number, status badge (ONLINE/OFFLINE)     |
+| **Date Range Picker**       | Preset ranges: Hoje, Últimos 7 dias, Este Mês, Mês Passado, Este Ano, Período (custom) |
+| **Billing Cycle Sync**      | Toggle button to align date ranges with utility reading dates (see below) |
+| **KPI Cards (5)**           | Consumo Total (L), Média Diária (L/dia), Dia de Pico, vs Período Anterior (%), Custo Estimado (R$) |
+| **Consumption Charts**      | Tabbed view: Diário (L), Mensal (m³), Anual (m³) with bar charts |
+| **Per-Meter Detail**        | Individual cards for each meter with mini charts                |
+| **Cost Allocation**         | Equal split + proportional split per meter                      |
+| **Billing Link**            | Link to utility bill history for the linked property            |
 
 #### Data Flow
 
@@ -567,6 +568,7 @@ Pill-style preset buttons in a bordered container with an expandable custom date
 ┌──────────────────────────────────────────────────────────┐
 │ Hoje │ Últimos 7 dias │ Este Mês │ Mês Passado │ Este Ano │ 📅 Período │
 └──────────────────────────────────────────────────────────┘
+  📅 Sincronizar Ciclo de Leitura    07/01 — 16/02
 
 (when Período is selected)
 ┌──────────────────────────────────────────────────────────┐
@@ -577,6 +579,44 @@ Pill-style preset buttons in a bordered container with an expandable custom date
 │  └──────────────────────────────────────┘                │
 └──────────────────────────────────────────────────────────┘
 ```
+
+#### Billing Cycle Sync
+
+**Icon:** `CalendarSync` (from `lucide-react`)  
+**State:** `syncBilling: boolean`, `readingDates: string[]`
+
+A single toggle button that aligns the selected date range with the utility company's actual meter reading dates (`reading_date_orig` from `property_bills`).
+
+##### Visibility Rules
+
+The sync button only appears when **all** of these are true:
+
+1. The gateway is linked to a property with at least **2 bills** containing reading dates
+2. The selected preset is one of:
+   - **Este Mês**, **Mês Passado**, **Este Ano** — always shown
+   - **Período** (custom) — only if the date range spans **more than 60 days**
+3. Hidden for: **Hoje**, **Últimos 7 dias**, and custom periods ≤ 60 days
+
+##### Behavior Per Preset
+
+| Preset         | Sync OFF (calendar dates)      | Sync ON (billing cycle dates)                |
+|----------------|--------------------------------|----------------------------------------------|
+| **Este Mês**   | 1st of month → today           | Most recent reading date → today             |
+| **Mês Passado**| 1st of prev month → end of prev month | 2nd most recent reading → most recent reading |
+| **Este Ano**   | Jan 1 → today                  | Earliest reading of year → today + **chart auto-switches to Mensal** |
+| **Período**    | Custom start → custom end      | Custom start → custom end (sync has no billing equivalent for custom) |
+
+##### Auto-Disable
+
+When the user switches to a non-syncable preset (e.g., "Hoje") while sync is ON, the sync automatically turns OFF.
+
+##### Data Source
+
+On page load, a separate `useEffect` (independent of the date range) fetches all bills via the `get_property_bills` RPC and extracts `reading_date_orig` (with fallback to `reading_date`). These dates are stored in `readingDates[]` sorted newest-first.
+
+##### "Este Ano" + Monthly Chart
+
+When sync is ON and "Este Ano" is selected, the `ConsumptionTabs` component receives `initialTab="monthly"` and is keyed with `key="monthly"` to force a remount with the Mensal tab active.
 
 ### 6.3 Billing History Page
 
@@ -694,6 +734,16 @@ Tabbed wrapper around `ConsumptionChart` with three views:
 | Diário   | Daily totals   | L    | Blue    | Raw daily data      |
 | Mensal   | Monthly totals | m³   | Indigo  | Sum daily → month   |
 | Anual    | Yearly by month| m³   | Violet  | Sum daily → month   |
+
+**Exports:** `DailyTotal` (interface), `TabKey` (type: `"daily" | "monthly" | "yearly"`)
+
+**Props:**
+
+| Prop         | Type      | Default    | Description                                    |
+|--------------|-----------|------------|------------------------------------------------|
+| `dailyData`  | `DailyTotal[]` | required | Array of `{ date, total }` daily consumption  |
+| `loading`    | `boolean` | `false`    | Show loading skeleton                          |
+| `initialTab` | `TabKey`  | `undefined`| Override the default active tab on mount. Used by billing cycle sync to force "monthly" when "Este Ano" + sync ON. Parent should pass a `key` prop to force remount when this changes. |
 
 ### `KPICards.tsx`
 
