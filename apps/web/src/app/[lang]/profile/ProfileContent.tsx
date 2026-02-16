@@ -403,10 +403,20 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
 
     const [analyzingFiles, setAnalyzingFiles] = useState<Set<string>>(new Set());
     const [extractedAddressInfo, setExtractedAddressInfo] = useState<string | null>(null);
-    const [fileAnalysisStatus, setFileAnalysisStatus] = useState<Record<string, 'pending' | 'approved' | 'rejected'>>({});
+    const [fileAnalysisStatus, setFileAnalysisStatus] = useState<Record<string, 'analyzing' | 'success' | 'error'>>({});
 
     const removeFile = (index: number) => {
-        setOwnershipFiles(prev => prev.filter((_, i) => i !== index));
+        setOwnershipFiles(prev => {
+            const removed = prev[index];
+            if (removed) {
+                setFileAnalysisStatus(s => {
+                    const next = { ...s };
+                    delete next[removed.name];
+                    return next;
+                });
+            }
+            return prev.filter((_, i) => i !== index);
+        });
     };
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -414,7 +424,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
             const newFiles = Array.from(e.target.files);
             setOwnershipFiles(prev => [...prev, ...newFiles]);
 
-            // Trigger analysis for new files
+            // Trigger analysis for each new file immediately
             for (const file of newFiles) {
                 analyzeDocument(file);
             }
@@ -433,9 +443,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
     };
 
     const removeSavedPhoto = async (url: string) => {
-        // Optimistic remove from UI, maybe delete from storage later or just update profile array
         setSavedPhotos(prev => prev.filter(u => u !== url));
-        // We will update the DB on Save
     };
 
     const analyzeDocument = async (file: File) => {
@@ -444,19 +452,52 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
             next.add(file.name);
             return next;
         });
+        setFileAnalysisStatus(prev => ({ ...prev, [file.name]: 'analyzing' }));
 
         try {
-            const formData = new FormData();
-            formData.append('file', file);
+            const fd = new FormData();
+            fd.append('file', file);
 
             const res = await fetch('/api/ownership/analyze', {
                 method: 'POST',
-                body: formData
+                body: fd
             });
-            // We don't really do anything with the result in manual mode anymore, 
-            // except maybe clear the "analyzing" state.
+
+            if (!res.ok) {
+                console.error('[Ownership] API error', res.status);
+                setFileAnalysisStatus(prev => ({ ...prev, [file.name]: 'error' }));
+                return;
+            }
+
+            const data = await res.json();
+            const result = data?.results?.[0];
+
+            if (result?.success && result.extracted_data?.address) {
+                const addr = result.extracted_data.address;
+                // Auto-fill property address from extracted data
+                setFormData(prev => ({
+                    ...prev,
+                    propertyAddress: {
+                        ...prev.propertyAddress,
+                        ...(addr.street ? { street: addr.street } : {}),
+                        ...(addr.number ? { number: addr.number } : {}),
+                        ...(addr.neighborhood ? { neighborhood: addr.neighborhood } : {}),
+                        ...(addr.city ? { city: addr.city } : {}),
+                        ...(addr.state ? { state: addr.state } : {}),
+                        ...(addr.cep ? { cep: addr.cep } : {}),
+                    }
+                }));
+
+                const docType = result.classified_type || 'Documento';
+                setExtractedAddressInfo(`✅ ${docType} — Endereço extraído com sucesso`);
+                setFileAnalysisStatus(prev => ({ ...prev, [file.name]: 'success' }));
+            } else {
+                setFileAnalysisStatus(prev => ({ ...prev, [file.name]: 'error' }));
+                setExtractedAddressInfo('⚠️ Não foi possível extrair endereço deste documento.');
+            }
         } catch (error) {
-            console.error("Analysis failed", error);
+            console.error('[Ownership] Analysis failed', error);
+            setFileAnalysisStatus(prev => ({ ...prev, [file.name]: 'error' }));
         } finally {
             setAnalyzingFiles(prev => {
                 const next = new Set(prev);
@@ -932,7 +973,6 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                             <div className="bg-muted/30 p-4 rounded-lg border border-border text-sm text-muted-foreground mb-4">
                                 <p className="font-medium text-foreground mb-2">{p.ownership.acceptedDocs}</p>
                                 <ul className="list-disc list-inside space-y-1 ml-1">
-                                    <li>{p.ownership.docs.utility}</li>
                                     <li>{p.ownership.docs.iptu}</li>
                                     <li>{p.ownership.docs.purchase}</li>
                                     <li>{p.ownership.docs.registry}</li>
@@ -958,22 +998,47 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                             {/* File List */}
                             {(ownershipFiles.length > 0 || savedProofs.length > 0) && (
                                 <div className="space-y-2 mt-4">
-                                    {ownershipFiles.map((file, i) => (
-                                        <div key={`new-${i}`} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border">
-                                            <div className="flex items-center gap-3 overflow-hidden">
-                                                <div className="w-10 h-10 rounded-lg bg-white dark:bg-slate-800 border flex items-center justify-center flex-shrink-0">
-                                                    <FileText className="w-5 h-5 text-blue-500" />
+                                    {ownershipFiles.map((file, i) => {
+                                        const status = fileAnalysisStatus[file.name];
+                                        return (
+                                            <div key={`new-${i}`} className={`flex items-center justify-between p-3 rounded-lg border ${status === 'success' ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800' :
+                                                status === 'error' ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' :
+                                                    'bg-muted/30 border-border'
+                                                }`}>
+                                                <div className="flex items-center gap-3 overflow-hidden">
+                                                    <div className="w-10 h-10 rounded-lg bg-white dark:bg-slate-800 border flex items-center justify-center flex-shrink-0">
+                                                        {status === 'analyzing' ? (
+                                                            <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                                                        ) : status === 'success' ? (
+                                                            <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                                                        ) : status === 'error' ? (
+                                                            <AlertTriangle className="w-5 h-5 text-red-500" />
+                                                        ) : (
+                                                            <FileText className="w-5 h-5 text-blue-500" />
+                                                        )}
+                                                    </div>
+                                                    <div className="flex flex-col min-w-0">
+                                                        <p className="text-sm font-medium truncate pr-4">{file.name}</p>
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {(file.size / 1024 / 1024).toFixed(2)} MB •{' '}
+                                                            {status === 'analyzing' ? (
+                                                                <span className="text-blue-600 dark:text-blue-400 font-medium">Analisando com IA...</span>
+                                                            ) : status === 'success' ? (
+                                                                <span className="text-emerald-600 dark:text-emerald-400 font-medium">Endereço extraído ✓</span>
+                                                            ) : status === 'error' ? (
+                                                                <span className="text-red-600 dark:text-red-400 font-medium">Falha na extração</span>
+                                                            ) : (
+                                                                'Pronto para enviar'
+                                                            )}
+                                                        </span>
+                                                    </div>
                                                 </div>
-                                                <div className="flex flex-col min-w-0">
-                                                    <p className="text-sm font-medium truncate pr-4">{file.name}</p>
-                                                    <span className="text-xs text-muted-foreground">{(file.size / 1024 / 1024).toFixed(2)} MB • Pronto para enviar</span>
-                                                </div>
+                                                <Button variant="ghost" size="sm" onClick={() => removeFile(i)} className="text-destructive">
+                                                    <Trash2 className="w-4 h-4" />
+                                                </Button>
                                             </div>
-                                            <Button variant="ghost" size="sm" onClick={() => removeFile(i)} className="text-destructive">
-                                                <Trash2 className="w-4 h-4" />
-                                            </Button>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                     {savedProofs.map((proof) => (
                                         <div key={proof.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border opacity-75">
                                             <div className="flex items-center gap-3">
@@ -988,6 +1053,20 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                 </div>
                             )}
                         </div>
+
+                        {/* Extraction feedback banner */}
+                        {extractedAddressInfo && (
+                            <div className={`flex items-center gap-3 p-4 rounded-xl border text-sm font-medium ${extractedAddressInfo.startsWith('✅')
+                                    ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
+                                    : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300'
+                                }`}>
+                                {extractedAddressInfo.startsWith('✅')
+                                    ? <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+                                    : <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+                                }
+                                <span>{extractedAddressInfo}</span>
+                            </div>
+                        )}
 
                         {/* 2. Address Section */}
                         <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">

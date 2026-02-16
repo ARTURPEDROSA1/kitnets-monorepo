@@ -923,9 +923,7 @@
             "description": "Para garantir a segurança da plataforma, solicitamos comprovantes de propriedade dos imóveis. Nossa IA analisará os documentos para extrair endereços e confirmar a titularidade.",
             "acceptedDocs": "Documentos aceitos:",
             "docs": {
-                "utility": "Conta de consumo (Água, Luz, Gás)",
-                "common": "Mais comum",
-                "iptu": "Carnê do IPTU",
+                "iptu": "IPTU",
                 "purchase": "Contrato de Compra e Venda",
                 "registry": "Matrícula do Imóvel (Registro no Cartório)",
                 "deed": "Escritura Pública",
