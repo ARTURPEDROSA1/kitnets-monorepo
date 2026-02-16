@@ -16,16 +16,18 @@ const TABS = [
     { key: "yearly" as const, label: "Anual" },
 ];
 
-type TabKey = (typeof TABS)[number]["key"];
+export type TabKey = (typeof TABS)[number]["key"];
 
 export function ConsumptionTabs({
     dailyData,
     loading = false,
+    initialTab,
 }: {
     dailyData: DailyTotal[];
     loading?: boolean;
+    initialTab?: TabKey;
 }) {
-    const [activeTab, setActiveTab] = useState<TabKey>("daily");
+    const [activeTab, setActiveTab] = useState<TabKey>(initialTab || "daily");
 
     const { chartData, unit, color } = useMemo(() => {
         switch (activeTab) {
@@ -92,8 +94,8 @@ export function ConsumptionTabs({
                             key={tab.key}
                             onClick={() => setActiveTab(tab.key)}
                             className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${activeTab === tab.key
-                                    ? "bg-background text-foreground shadow-sm"
-                                    : "text-muted-foreground hover:text-foreground"
+                                ? "bg-background text-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
                                 }`}
                         >
                             {tab.label}
