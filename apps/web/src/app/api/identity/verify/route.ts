@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Type for the extraction result
 interface ExtractionResult {
@@ -8,6 +9,12 @@ interface ExtractionResult {
     extraction_method?: string;
     extracted_data: Record<string, unknown>;
     [key: string]: unknown;
+}
+
+// --- Helpers ---
+function parseJsonResponse(text: string): ExtractionResult {
+    const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    return JSON.parse(cleaned);
 }
 
 // --- PDF text extraction (no AI needed) ---
@@ -86,8 +93,57 @@ Analyze the uploaded document image and extract the following data. Return ONLY 
 If a field is not found, set to null.
 `;
 
-// --- OpenAI Vision for image-based documents ---
-async function analyzeWithVision(base64: string, mimeType: string, prompt: string): Promise<ExtractionResult> {
+// ============================================================
+// AI STRATEGIES: Gemini (primary) → OpenAI (fallback)
+// ============================================================
+
+// --- Gemini Vision ---
+async function analyzeWithGeminiVision(base64: string, mimeType: string, prompt: string): Promise<ExtractionResult> {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new Error('GEMINI_API_KEY not set');
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({
+        model: 'gemini-1.5-flash',
+        generationConfig: { responseMimeType: 'application/json' },
+    });
+
+    const result = await model.generateContent([
+        prompt,
+        {
+            inlineData: {
+                data: base64,
+                mimeType: mimeType,
+            },
+        },
+    ]);
+
+    const response = await result.response;
+    return parseJsonResponse(response.text());
+}
+
+// --- Gemini Text ---
+async function analyzeWithGeminiText(text: string, prompt: string): Promise<ExtractionResult> {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new Error('GEMINI_API_KEY not set');
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({
+        model: 'gemini-1.5-flash',
+        generationConfig: { responseMimeType: 'application/json' },
+    });
+
+    const result = await model.generateContent([
+        prompt,
+        `Here is the document text:\n\n${text}`,
+    ]);
+
+    const response = await result.response;
+    return parseJsonResponse(response.text());
+}
+
+// --- OpenAI Vision (fallback) ---
+async function analyzeWithOpenAIVision(base64: string, mimeType: string, prompt: string): Promise<ExtractionResult> {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) throw new Error('OPENAI_API_KEY not set');
 
@@ -116,17 +172,17 @@ async function analyzeWithVision(base64: string, mimeType: string, prompt: strin
 
     const content = response.choices[0].message.content;
     if (!content) throw new Error('No content from OpenAI Vision');
-    return JSON.parse(content.replace(/```json/g, '').replace(/```/g, '').trim());
+    return parseJsonResponse(content);
 }
 
-// --- OpenAI text completion for extracted PDF text ---
-async function analyzeTextWithAI(text: string, prompt: string): Promise<ExtractionResult> {
+// --- OpenAI Text (fallback) ---
+async function analyzeWithOpenAIText(text: string, prompt: string): Promise<ExtractionResult> {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) throw new Error('OPENAI_API_KEY not set');
 
     const client = new OpenAI({ apiKey });
     const response = await client.chat.completions.create({
-        model: 'gpt-4o-mini', // Cheaper/faster for text-only
+        model: 'gpt-4o-mini',
         messages: [
             { role: 'system', content: prompt },
             { role: 'user', content: `Here is the document text:\n\n${text}` },
@@ -137,7 +193,36 @@ async function analyzeTextWithAI(text: string, prompt: string): Promise<Extracti
 
     const content = response.choices[0].message.content;
     if (!content) throw new Error('No content from OpenAI');
-    return JSON.parse(content.replace(/```json/g, '').replace(/```/g, '').trim());
+    return parseJsonResponse(content);
+}
+
+// --- Combined: Try Gemini first, then OpenAI ---
+async function analyzeVision(base64: string, mimeType: string, prompt: string): Promise<ExtractionResult> {
+    // 1. Try Gemini (primary — free/cheaper)
+    try {
+        console.log('[Identity] Trying Gemini Vision...');
+        return await analyzeWithGeminiVision(base64, mimeType, prompt);
+    } catch (geminiErr) {
+        console.warn('[Identity] Gemini Vision failed:', geminiErr);
+    }
+
+    // 2. Fallback to OpenAI
+    console.log('[Identity] Falling back to OpenAI Vision...');
+    return await analyzeWithOpenAIVision(base64, mimeType, prompt);
+}
+
+async function analyzeText(text: string, prompt: string): Promise<ExtractionResult> {
+    // 1. Try Gemini (primary)
+    try {
+        console.log('[Identity] Trying Gemini Text...');
+        return await analyzeWithGeminiText(text, prompt);
+    } catch (geminiErr) {
+        console.warn('[Identity] Gemini Text failed:', geminiErr);
+    }
+
+    // 2. Fallback to OpenAI
+    console.log('[Identity] Falling back to OpenAI Text...');
+    return await analyzeWithOpenAIText(text, prompt);
 }
 
 // --- Parse CNPJ text without AI (regex-based) ---
@@ -288,7 +373,7 @@ export async function POST(request: NextRequest) {
                     // Regex didn't work well — use AI on the text
                     console.log('[Identity] Regex incomplete, using AI on extracted text...');
                     try {
-                        const aiResult = await analyzeTextWithAI(pdfText, CNPJ_PROMPT);
+                        const aiResult = await analyzeText(pdfText, CNPJ_PROMPT);
                         return NextResponse.json({
                             ...aiResult,
                             extraction_method: 'pdf_text_ai',
@@ -313,7 +398,7 @@ export async function POST(request: NextRequest) {
         console.log(`[Identity] Using GPT Vision for ${documentCategory === 'pj' ? 'CNPJ' : 'CNH/RG'}...`);
 
         try {
-            const visionResult = await analyzeWithVision(base64, mimeType, prompt);
+            const visionResult = await analyzeVision(base64, mimeType, prompt);
             return NextResponse.json({
                 ...visionResult,
                 extraction_method: 'vision_api',
