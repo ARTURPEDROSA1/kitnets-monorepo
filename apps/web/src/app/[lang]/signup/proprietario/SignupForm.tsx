@@ -6,12 +6,10 @@ import { useSignUp } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { Button } from "@kitnets/ui";
 import { Eye, EyeOff } from "lucide-react";
-import { createClient } from "@/utils/supabase/client";
 
 export default function OwnerSignupPage({ lang }: { lang: "en" | "pt" | "es" }) {
     const { isLoaded, signUp, setActive } = useSignUp();
     const router = useRouter();
-    const supabase = createClient();
 
     const [emailAddress, setEmailAddress] = useState("");
     const [password, setPassword] = useState("");
@@ -72,23 +70,42 @@ export default function OwnerSignupPage({ lang }: { lang: "en" | "pt" | "es" }) 
             if (completeSignUp.status === "complete") {
                 await setActive({ session: completeSignUp.createdSessionId });
 
-                // Create profile in Supabase
-                const { error: dbError } = await supabase.from('profiles').insert({
-                    id: crypto.randomUUID(),
-                    clerk_id: completeSignUp.createdUserId,
-                    role: 'landlord',
-                    full_name: name,
-                    email: emailAddress
-                });
-
-                if (dbError) console.error("Error creating profile:", dbError);
-
-                // If gateway code is provided, try to claim it (Logic to be implemented in API)
-                if (gatewayCode) {
-                    await fetch('/api/gateways/claim', {
+                // Create profile via server-side API (bypasses RLS issues with anon key)
+                try {
+                    const profileRes = await fetch('/api/profiles/create', {
                         method: 'POST',
-                        body: JSON.stringify({ code: gatewayCode, userId: completeSignUp.createdUserId })
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            clerkId: completeSignUp.createdUserId,
+                            fullName: name,
+                            email: emailAddress
+                        })
                     });
+                    if (!profileRes.ok) {
+                        const errData = await profileRes.json().catch(() => ({}));
+                        console.error("Error creating profile:", errData);
+                    }
+                } catch (profileErr) {
+                    console.error("Profile creation request failed:", profileErr);
+                }
+
+                // If gateway code is provided, claim it (profile must exist first)
+                if (gatewayCode) {
+                    try {
+                        const claimRes = await fetch('/api/gateways/claim', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ code: gatewayCode, userId: completeSignUp.createdUserId })
+                        });
+                        const claimData = await claimRes.json();
+                        if (!claimRes.ok) {
+                            console.error("Gateway claim failed:", claimData);
+                        } else {
+                            console.log("Gateway claimed successfully:", claimData);
+                        }
+                    } catch (claimErr) {
+                        console.error("Gateway claim request failed:", claimErr);
+                    }
                 }
 
                 router.push("/dashboard");
@@ -100,6 +117,7 @@ export default function OwnerSignupPage({ lang }: { lang: "en" | "pt" | "es" }) 
             setError(err.errors?.[0]?.message || "Invalid verification code");
         }
     };
+
 
     // Dictionary (mock for client component usage or pass as prop)
     const dict = {

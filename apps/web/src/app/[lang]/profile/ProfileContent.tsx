@@ -70,6 +70,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
     const [cepError, setCepError] = useState("");
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [profileLoadError, setProfileLoadError] = useState<string | null>(null);
 
     // Success State
     const [showSuccess, setShowSuccess] = useState(false);
@@ -109,6 +110,9 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
 
     const getSupabase = useCallback(async () => {
         const token = await getToken({ template: 'supabase' });
+        if (!token) {
+            console.warn('[Profile] Supabase JWT token is null — queries will fail silently under RLS.');
+        }
         return createBrowserClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -122,15 +126,31 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
     useEffect(() => {
         const loadProfile = async () => {
             if (!user) return;
+            setProfileLoadError(null);
             try {
                 const sb = await getSupabase();
-                const { data: profile } = await sb
+
+                // Use .maybeSingle() instead of .single() — returns null (no error) when 0 rows found
+                const { data: profile, error: fetchError } = await sb
                     .from('profiles')
                     .select('*')
                     .eq('clerk_id', user.id)
-                    .single();
+                    .maybeSingle();
+
+                if (fetchError) {
+                    console.error('[Profile] Supabase fetch error:', fetchError.code, fetchError.message, fetchError.details);
+                    setProfileLoadError(`Erro ao carregar perfil: ${fetchError.message} (${fetchError.code})`);
+                    // Still try to populate from Clerk defaults
+                    setFormData(prev => ({
+                        ...prev,
+                        name: user.fullName || '',
+                        phone: user.phoneNumbers[0]?.phoneNumber || '',
+                    }));
+                    return;
+                }
 
                 if (profile) {
+                    console.log('[Profile] Loaded profile:', profile.id, 'clerk_id:', profile.clerk_id);
                     setProfileId(profile.id);
                     setFormData({
                         name: profile.full_name || user.fullName || '',
@@ -159,7 +179,8 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
 
                     if (proofs) setSavedProofs(proofs as ProofData[]);
                 } else {
-                    // Default for new users
+                    // No profile exists in DB — new user, populate from Clerk
+                    console.log('[Profile] No Supabase profile found for clerk_id:', user.id, '— showing Clerk defaults');
                     setFormData(prev => ({
                         ...prev,
                         name: user.fullName || '',
@@ -167,7 +188,8 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                     }));
                 }
             } catch (err) {
-                console.error("Error loading profile:", err);
+                console.error('[Profile] Unexpected error loading profile:', err);
+                setProfileLoadError('Erro inesperado ao carregar perfil. Verifique o console.');
             }
         };
 
@@ -632,6 +654,18 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
 
     return (
         <div className="max-w-5xl mx-auto p-6 space-y-8">
+            {/* Profile Load Error Banner */}
+            {profileLoadError && (
+                <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 px-6 py-4 rounded-xl shadow flex items-center gap-3">
+                    <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                    <div>
+                        <h4 className="font-bold text-sm">Erro ao carregar perfil</h4>
+                        <p className="text-xs mt-0.5">{profileLoadError}</p>
+                        <p className="text-xs mt-1 text-red-600 dark:text-red-400">Verifique se o JWT template &quot;supabase&quot; está configurado no Clerk. Abra o console do navegador (F12) para mais detalhes.</p>
+                    </div>
+                </div>
+            )}
+
             {showSuccess && (
                 <div className="fixed top-6 right-6 z-50 bg-emerald-100 border border-emerald-300 text-emerald-800 px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300">
                     <CheckCircle2 className="w-6 h-6 text-emerald-600" />
