@@ -709,9 +709,7 @@
             "description": "To ensure platform security, we request proof of property ownership. Our AI will analyze documents to extract addresses and confirm ownership.",
             "acceptedDocs": "Accepted documents:",
             "docs": {
-                "utility": "Utility Bill (Water, electricity, gas)",
-                "common": "Most common",
-                "iptu": "Property Tax Bill",
+                "iptu": "Property Tax (IPTU)",
                 "purchase": "Purchase Agreement",
                 "registry": "Property Registration",
                 "deed": "Public Deed",

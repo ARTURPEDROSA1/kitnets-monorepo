@@ -687,8 +687,6 @@
             "description": "Para garantizar la seguridad de la plataforma, solicitamos comprobantes de propiedad de los inmuebles. Nuestra IA analizará los documentos para extraer direcciones y confirmar la titularidad.",
             "acceptedDocs": "Documentos aceptados:",
             "docs": {
-                "utility": "Factura de servicios (Agua, Luz, Gas)",
-                "common": "Más común",
                 "iptu": "Impuesto Predial (IPTU)",
                 "purchase": "Contrato de Compraventa",
                 "registry": "Registro de Propiedad",
