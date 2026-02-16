@@ -52,6 +52,8 @@ export interface DocumentExtractionResult {
     type_confidence: number;
     extracted_data: ExtractedData;
     field_confidence: Record<string, number>; // key: value (0-1)
+    extraction_method?: string; // e.g. 'pdf_text_ai_gemini', 'vision_openai'
+    methods_tried?: string[]; // ordered list of strategies attempted
 }
 
 export interface OwnershipClaim {

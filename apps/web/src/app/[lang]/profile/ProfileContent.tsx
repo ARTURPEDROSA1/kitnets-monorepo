@@ -489,11 +489,15 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                 }));
 
                 const docType = result.classified_type || 'Documento';
-                setExtractedAddressInfo(`✅ ${docType} — Endereço extraído com sucesso`);
+                const method = result.extraction_method || 'unknown';
+                const methodLabel = method.includes('pdf_text') ? 'Texto do PDF' : method.includes('vision') ? 'Visão IA' : method;
+                const providerLabel = method.includes('gemini') ? 'Gemini' : method.includes('openai') ? 'GPT' : '';
+                setExtractedAddressInfo(`✅ ${docType} — Endereço extraído com sucesso (${methodLabel}${providerLabel ? ` • ${providerLabel}` : ''})`);
                 setFileAnalysisStatus(prev => ({ ...prev, [file.name]: 'success' }));
             } else {
+                const methodsTried = result?.methods_tried?.join(' → ') || 'nenhum';
                 setFileAnalysisStatus(prev => ({ ...prev, [file.name]: 'error' }));
-                setExtractedAddressInfo('⚠️ Não foi possível extrair endereço deste documento.');
+                setExtractedAddressInfo(`⚠️ Não foi possível extrair endereço. Métodos tentados: ${methodsTried}`);
             }
         } catch (error) {
             console.error('[Ownership] Analysis failed', error);
@@ -1057,8 +1061,8 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                         {/* Extraction feedback banner */}
                         {extractedAddressInfo && (
                             <div className={`flex items-center gap-3 p-4 rounded-xl border text-sm font-medium ${extractedAddressInfo.startsWith('✅')
-                                    ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
-                                    : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300'
+                                ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
+                                : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300'
                                 }`}>
                                 {extractedAddressInfo.startsWith('✅')
                                     ? <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
