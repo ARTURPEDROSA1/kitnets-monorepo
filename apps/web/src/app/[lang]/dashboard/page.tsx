@@ -17,11 +17,15 @@ export default async function DashboardPage({ params }: { params: Promise<{ lang
     const supabase = await createClient();
 
     // Fetch user profile
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('id, full_name, property_address')
         .eq('clerk_id', user.id)
-        .single();
+        .maybeSingle();
+
+    if (profileError) {
+        console.error('[Dashboard] Profile fetch error:', profileError);
+    }
 
     // Fetch gateways
     let gateways: any[] = [];
@@ -36,6 +40,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ lang
     // Count properties: if profile has a property_address with a street, count as 1
     const propertyAddress = profile?.property_address as Record<string, string> | null;
     const propertyCount = propertyAddress?.street ? 1 : 0;
+    console.log('[Dashboard] property_address:', JSON.stringify(propertyAddress), 'count:', propertyCount);
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

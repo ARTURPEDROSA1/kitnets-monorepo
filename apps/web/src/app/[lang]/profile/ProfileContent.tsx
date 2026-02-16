@@ -196,7 +196,15 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                         .eq('profile_id', profile.id)
                         .order('created_at', { ascending: false });
 
-                    if (proofs) setSavedProofs(proofs as ProofData[]);
+                    if (proofs) {
+                        setSavedProofs(proofs as ProofData[]);
+                        // Auto-collapse ownership section if proofs exist
+                        if (proofs.length > 0) setOwnershipSectionOpen(false);
+                    }
+                    // Auto-collapse identity section if identity verification data exists
+                    if (profile.cpf || profile.cnpj || profile.business_name) {
+                        setIdentitySectionOpen(false);
+                    }
                 } else {
                     // No profile exists in DB — new user, populate from Clerk
                     console.log('[Profile] No Supabase profile found for clerk_id:', user.id, '— showing Clerk defaults');
@@ -405,6 +413,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
     const [extractedAddressInfo, setExtractedAddressInfo] = useState<string | null>(null);
     const [fileAnalysisStatus, setFileAnalysisStatus] = useState<Record<string, 'analyzing' | 'success' | 'error'>>({});
     const [ownershipSectionOpen, setOwnershipSectionOpen] = useState(true);
+    const [identitySectionOpen, setIdentitySectionOpen] = useState(true);
 
     const removeFile = (index: number) => {
         setOwnershipFiles(prev => {
@@ -551,6 +560,8 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
             }
 
             setIdentityResult(data);
+            // Auto-collapse identity section after successful extraction
+            setIdentitySectionOpen(false);
 
             // Auto-fill form fields from extracted data
             if (data.extracted_data) {
@@ -979,8 +990,8 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                             >
                                 <div className="flex items-center gap-2">
                                     <div className={`p-2 rounded-lg ${extractedAddressInfo?.startsWith('✅')
-                                            ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600'
-                                            : 'bg-blue-100 dark:bg-blue-900/50 text-blue-600'
+                                        ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600'
+                                        : 'bg-blue-100 dark:bg-blue-900/50 text-blue-600'
                                         }`}>
                                         {extractedAddressInfo?.startsWith('✅') ? <CheckCircle2 className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
                                     </div>
@@ -1226,201 +1237,191 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                 {/* BASICS TAB - Profile Info with PF/PJ Toggle */}
                 {activeTab === 'basics' && (
                     <div className="space-y-6">
-                        {/* IDENTITY VERIFICATION — First, so user doesn't type manually */}
+
+                        {/* PF/PJ Toggle — Single source of truth at the top */}
+                        <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl w-fit">
+                            <button
+                                type="button"
+                                onClick={() => setPersonType('pf')}
+                                className={cn(
+                                    "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                                    personType === 'pf'
+                                        ? "bg-white dark:bg-slate-800 text-foreground shadow-sm"
+                                        : "text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                <User className="w-4 h-4" />
+                                Pessoa Física
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setPersonType('pj')}
+                                className={cn(
+                                    "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                                    personType === 'pj'
+                                        ? "bg-white dark:bg-slate-800 text-foreground shadow-sm"
+                                        : "text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                <Building2 className="w-4 h-4" />
+                                Pessoa Jurídica
+                            </button>
+                        </div>
+
+                        {/* IDENTITY VERIFICATION — Collapsible */}
                         <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
-                            <div className="flex items-center gap-2 mb-1">
-                                <div className="p-2 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg text-indigo-600">
-                                    <Fingerprint className="w-5 h-5" />
-                                </div>
-                                <h3 className="text-lg font-semibold text-foreground">Verificação de Identidade</h3>
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                                {personType === 'pf'
-                                    ? 'Envie uma foto ou scan do seu documento de identidade (CNH ou RG). Os dados serão preenchidos automaticamente.'
-                                    : 'Envie o Comprovante de Inscrição e de Situação Cadastral do CNPJ (PDF disponível em gov.br). Os dados serão preenchidos automaticamente.'}
-                            </p>
-
-                            {/* PF/PJ quick toggle for identity */}
-                            <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl w-fit">
-                                <button
-                                    type="button"
-                                    onClick={() => setPersonType('pf')}
-                                    className={cn(
-                                        "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200",
-                                        personType === 'pf'
-                                            ? "bg-white dark:bg-slate-800 text-foreground shadow-sm"
-                                            : "text-muted-foreground hover:text-foreground"
-                                    )}
-                                >
-                                    <User className="w-4 h-4" />
-                                    Pessoa Física
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setPersonType('pj')}
-                                    className={cn(
-                                        "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200",
-                                        personType === 'pj'
-                                            ? "bg-white dark:bg-slate-800 text-foreground shadow-sm"
-                                            : "text-muted-foreground hover:text-foreground"
-                                    )}
-                                >
-                                    <Building2 className="w-4 h-4" />
-                                    Pessoa Jurídica
-                                </button>
-                            </div>
-
-                            {/* File upload area */}
-                            {!identityFile && !identityResult && (
-                                <div className="border-2 border-dashed border-border rounded-lg p-8 flex flex-col items-center justify-center hover:bg-muted/50 transition-colors relative">
-                                    <input
-                                        type="file"
-                                        accept={personType === 'pf' ? 'image/*,.pdf' : '.pdf,image/*'}
-                                        onChange={(e) => {
-                                            const f = e.target.files?.[0];
-                                            if (f) {
-                                                setIdentityFile(f);
-                                                setIdentityError(null);
-                                                setIdentityResult(null);
-                                                handleIdentityAnalysis(f);
-                                            }
-                                        }}
-                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                    />
-                                    <div className="w-12 h-12 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 flex items-center justify-center mb-2">
-                                        <ShieldCheck className="w-6 h-6" />
+                            <button
+                                type="button"
+                                onClick={() => setIdentitySectionOpen(prev => !prev)}
+                                className="flex items-center justify-between w-full"
+                            >
+                                <div className="flex items-center gap-2">
+                                    <div className={`p-2 rounded-lg ${(identityResult?.success || (!identitySectionOpen && (formData.cpf || formData.cnpj)))
+                                        ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600'
+                                        : 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600'
+                                        }`}>
+                                        {(identityResult?.success || (!identitySectionOpen && (formData.cpf || formData.cnpj)))
+                                            ? <CheckCircle2 className="w-5 h-5" />
+                                            : <Fingerprint className="w-5 h-5" />}
                                     </div>
-                                    <p className="font-medium text-foreground">
-                                        {personType === 'pf' ? 'Enviar CNH ou RG' : 'Enviar Comprovante CNPJ'}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground mt-1">
+                                    <h3 className="text-lg font-semibold text-foreground">Verificação de Identidade</h3>
+                                    {!identitySectionOpen && (identityResult?.success || formData.cpf || formData.cnpj) && (
+                                        <span className="ml-2 text-xs bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full">Verificado ✓</span>
+                                    )}
+                                </div>
+                                {identitySectionOpen ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
+                            </button>
+
+                            {identitySectionOpen && (
+                                <>
+                                    <p className="text-sm text-muted-foreground">
                                         {personType === 'pf'
-                                            ? 'Formatos aceitos: JPG, PNG, PDF (frente do documento)'
-                                            : 'Formatos aceitos: PDF (Comprovante de Inscrição e Situação Cadastral)'}
+                                            ? 'Envie uma foto ou scan do seu documento de identidade (CNH ou RG). Os dados serão preenchidos automaticamente.'
+                                            : 'Envie o Comprovante de Inscrição e de Situação Cadastral do CNPJ (PDF disponível em gov.br). Os dados serão preenchidos automaticamente.'}
                                     </p>
-                                </div>
-                            )}
 
-                            {/* Analyzing state */}
-                            {isAnalyzingIdentity && identityFile && (
-                                <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-xl p-6 flex items-center gap-4">
-                                    <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
-                                    <div>
-                                        <p className="font-medium text-foreground">Analisando documento...</p>
-                                        <p className="text-sm text-muted-foreground">{identityFile.name}</p>
-                                    </div>
-                                </div>
-                            )}
+                                    {/* File upload area */}
+                                    {!identityFile && !identityResult && (
+                                        <div className="border-2 border-dashed border-border rounded-lg p-8 flex flex-col items-center justify-center hover:bg-muted/50 transition-colors relative">
+                                            <input
+                                                type="file"
+                                                accept={personType === 'pf' ? 'image/*,.pdf' : '.pdf,image/*'}
+                                                onChange={(e) => {
+                                                    const f = e.target.files?.[0];
+                                                    if (f) {
+                                                        setIdentityFile(f);
+                                                        setIdentityError(null);
+                                                        setIdentityResult(null);
+                                                        handleIdentityAnalysis(f);
+                                                    }
+                                                }}
+                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                            />
+                                            <div className="w-12 h-12 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 flex items-center justify-center mb-2">
+                                                <ShieldCheck className="w-6 h-6" />
+                                            </div>
+                                            <p className="font-medium text-foreground">
+                                                {personType === 'pf' ? 'Enviar CNH ou RG' : 'Enviar Comprovante CNPJ'}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                                {personType === 'pf'
+                                                    ? 'Formatos aceitos: JPG, PNG, PDF (frente do documento)'
+                                                    : 'Formatos aceitos: PDF (Comprovante de Inscrição e Situação Cadastral)'}
+                                            </p>
+                                        </div>
+                                    )}
 
-                            {/* Success result */}
-                            {identityResult && identityResult.success && !isAnalyzingIdentity ? (() => {
-                                const docType = String(identityResult.document_type || '');
-                                const method = String(identityResult.extraction_method || '');
-                                const ext = (identityResult.extracted_data || {}) as Record<string, unknown>;
-                                return (
-                                    <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-6 space-y-4">
-                                        <div className="flex items-center gap-3">
-                                            <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+                                    {/* Analyzing state */}
+                                    {isAnalyzingIdentity && identityFile && (
+                                        <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-xl p-6 flex items-center gap-4">
+                                            <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
                                             <div>
-                                                <p className="font-medium text-foreground">Documento verificado com sucesso</p>
-                                                <p className="text-xs text-muted-foreground">
-                                                    Tipo: {docType} &bull; Método: {method === 'pdf_text_parse' ? 'Extração de texto (sem IA)' : method.startsWith('pdf_text_ai') ? `IA texto (${method.includes('gemini') ? 'Gemini' : 'GPT'})` : method.includes('gemini') ? 'IA visão (Gemini)' : 'IA visão (GPT)'}
-                                                </p>
+                                                <p className="font-medium text-foreground">Analisando documento...</p>
+                                                <p className="text-sm text-muted-foreground">{identityFile.name}</p>
                                             </div>
                                         </div>
+                                    )}
 
-                                        <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-border">
-                                            <p className="text-xs text-muted-foreground mb-2 font-semibold uppercase tracking-wider">Dados Extraídos</p>
-                                            <div className="grid grid-cols-2 gap-2 text-sm">
-                                                {personType === 'pf' && (
-                                                    <>
-                                                        {ext.nome && (<><span className="text-muted-foreground">Nome:</span><span className="font-medium">{String(ext.nome)}</span></>)}
-                                                        {ext.cpf && (<><span className="text-muted-foreground">CPF:</span><span className="font-medium">{String(ext.cpf)}</span></>)}
-                                                        {ext.data_nascimento && (<><span className="text-muted-foreground">Nascimento:</span><span className="font-medium">{String(ext.data_nascimento)}</span></>)}
-                                                        {ext.rg && (<><span className="text-muted-foreground">RG:</span><span className="font-medium">{String(ext.rg)}</span></>)}
-                                                    </>
-                                                )}
-                                                {personType === 'pj' && (
-                                                    <>
-                                                        {ext.cnpj && (<><span className="text-muted-foreground">CNPJ:</span><span className="font-medium">{String(ext.cnpj)}</span></>)}
-                                                        {ext.razao_social && (<><span className="text-muted-foreground">Razão Social:</span><span className="font-medium">{String(ext.razao_social)}</span></>)}
-                                                        {ext.nome_fantasia && (<><span className="text-muted-foreground">Fantasia:</span><span className="font-medium">{String(ext.nome_fantasia)}</span></>)}
-                                                        {ext.situacao_cadastral && (<><span className="text-muted-foreground">Situação:</span><span className="font-medium">{String(ext.situacao_cadastral)}</span></>)}
-                                                    </>
-                                                )}
+                                    {/* Success result */}
+                                    {identityResult && identityResult.success && !isAnalyzingIdentity ? (() => {
+                                        const docType = String(identityResult.document_type || '');
+                                        const method = String(identityResult.extraction_method || '');
+                                        const ext = (identityResult.extracted_data || {}) as Record<string, unknown>;
+                                        return (
+                                            <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-6 space-y-4">
+                                                <div className="flex items-center gap-3">
+                                                    <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+                                                    <div>
+                                                        <p className="font-medium text-foreground">Documento verificado com sucesso</p>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            Tipo: {docType} &bull; Método: {method === 'pdf_text_parse' ? 'Extração de texto (sem IA)' : method.startsWith('pdf_text_ai') ? `IA texto (${method.includes('gemini') ? 'Gemini' : 'GPT'})` : method.includes('gemini') ? 'IA visão (Gemini)' : 'IA visão (GPT)'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-border">
+                                                    <p className="text-xs text-muted-foreground mb-2 font-semibold uppercase tracking-wider">Dados Extraídos</p>
+                                                    <div className="grid grid-cols-2 gap-2 text-sm">
+                                                        {personType === 'pf' && (
+                                                            <>
+                                                                {ext.nome && (<><span className="text-muted-foreground">Nome:</span><span className="font-medium">{String(ext.nome)}</span></>)}
+                                                                {ext.cpf && (<><span className="text-muted-foreground">CPF:</span><span className="font-medium">{String(ext.cpf)}</span></>)}
+                                                                {ext.data_nascimento && (<><span className="text-muted-foreground">Nascimento:</span><span className="font-medium">{String(ext.data_nascimento)}</span></>)}
+                                                                {ext.rg && (<><span className="text-muted-foreground">RG:</span><span className="font-medium">{String(ext.rg)}</span></>)}
+                                                            </>
+                                                        )}
+                                                        {personType === 'pj' && (
+                                                            <>
+                                                                {ext.cnpj && (<><span className="text-muted-foreground">CNPJ:</span><span className="font-medium">{String(ext.cnpj)}</span></>)}
+                                                                {ext.razao_social && (<><span className="text-muted-foreground">Razão Social:</span><span className="font-medium">{String(ext.razao_social)}</span></>)}
+                                                                {ext.nome_fantasia && (<><span className="text-muted-foreground">Fantasia:</span><span className="font-medium">{String(ext.nome_fantasia)}</span></>)}
+                                                                {ext.situacao_cadastral && (<><span className="text-muted-foreground">Situação:</span><span className="font-medium">{String(ext.situacao_cadastral)}</span></>)}
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setIdentityFile(null);
+                                                        setIdentityResult(null);
+                                                        setIdentityError(null);
+                                                    }}
+                                                    className="text-sm text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 font-medium"
+                                                >
+                                                    Substituir documento
+                                                </button>
+                                            </div>
+                                        );
+                                    })() : null}
+
+                                    {/* Error */}
+                                    {identityError && (
+                                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 flex items-start gap-3">
+                                            <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+                                            <div>
+                                                <p className="text-sm font-medium text-red-700 dark:text-red-300">{identityError}</p>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setIdentityFile(null);
+                                                        setIdentityResult(null);
+                                                        setIdentityError(null);
+                                                    }}
+                                                    className="text-sm text-red-600 hover:underline mt-1"
+                                                >
+                                                    Tentar novamente
+                                                </button>
                                             </div>
                                         </div>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setIdentityFile(null);
-                                                setIdentityResult(null);
-                                                setIdentityError(null);
-                                            }}
-                                            className="text-sm text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 font-medium"
-                                        >
-                                            Substituir documento
-                                        </button>
-                                    </div>
-                                );
-                            })() : null}
-
-                            {/* Error */}
-                            {identityError && (
-                                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 flex items-start gap-3">
-                                    <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
-                                    <div>
-                                        <p className="text-sm font-medium text-red-700 dark:text-red-300">{identityError}</p>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setIdentityFile(null);
-                                                setIdentityResult(null);
-                                                setIdentityError(null);
-                                            }}
-                                            className="text-sm text-red-600 hover:underline mt-1"
-                                        >
-                                            Tentar novamente
-                                        </button>
-                                    </div>
-                                </div>
+                                    )}
+                                </>
                             )}
                         </div>
 
                         <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-6">
-                            {/* PF/PJ Toggle Switch */}
-                            <div>
-                                <h3 className="text-lg font-semibold mb-4">Dados do Proprietário</h3>
-                                <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl w-fit">
-                                    <button
-                                        type="button"
-                                        onClick={() => setPersonType('pf')}
-                                        className={cn(
-                                            "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
-                                            personType === 'pf'
-                                                ? "bg-white dark:bg-slate-800 text-foreground shadow-sm"
-                                                : "text-muted-foreground hover:text-foreground"
-                                        )}
-                                    >
-                                        <User className="w-4 h-4" />
-                                        Pessoa Física
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setPersonType('pj')}
-                                        className={cn(
-                                            "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
-                                            personType === 'pj'
-                                                ? "bg-white dark:bg-slate-800 text-foreground shadow-sm"
-                                                : "text-muted-foreground hover:text-foreground"
-                                        )}
-                                    >
-                                        <Building2 className="w-4 h-4" />
-                                        Pessoa Jurídica
-                                    </button>
-                                </div>
-                            </div>
+                            <h3 className="text-lg font-semibold">Dados do Proprietário</h3>
 
                             {/* Common Fields */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
