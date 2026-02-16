@@ -490,9 +490,11 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
 
                 const docType = result.classified_type || 'Documento';
                 const method = result.extraction_method || 'unknown';
-                const methodLabel = method.includes('pdf_text') ? 'Texto do PDF' : method.includes('vision') ? 'Visão IA' : method;
-                const providerLabel = method.includes('gemini') ? 'Gemini' : method.includes('openai') ? 'GPT' : '';
-                setExtractedAddressInfo(`✅ ${docType} — Endereço extraído com sucesso (${methodLabel}${providerLabel ? ` • ${providerLabel}` : ''})`);
+                const methodLabel = method === 'pdf_regex' ? 'Regex (sem IA 💰)'
+                    : method === 'vision_gemini' ? 'Visão Gemini'
+                        : method === 'vision_openai' ? 'Visão GPT'
+                            : method;
+                setExtractedAddressInfo(`✅ ${docType} — Endereço extraído com sucesso (${methodLabel})`);
                 setFileAnalysisStatus(prev => ({ ...prev, [file.name]: 'success' }));
             } else {
                 const methodsTried = result?.methods_tried?.join(' → ') || 'nenhum';
