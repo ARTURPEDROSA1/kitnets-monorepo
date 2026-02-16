@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { ArrowLeft, Zap, Droplets, Flame, FileText } from "lucide-react";
+import { ArrowLeft, Zap, Droplets, Flame, FileText, CalendarSync } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { KPICard } from "@/components/dashboard/KPICards";
@@ -55,6 +55,58 @@ export default function GatewayDetailPage() {
         estimatedCost: null,
         rateInfo: null,
     });
+
+    // ── Billing cycle sync ────────────────────────────────────
+    interface BillingCycle { label: string; start: Date; end: Date; refMonth: string }
+    const [billCycles, setBillCycles] = useState<BillingCycle[]>([]);
+
+    // Fetch bills once to compute billing cycles (independent of date range)
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            // First get the gateway to know the property_id
+            const { data: gw } = await supabase
+                .from("gateways")
+                .select("property_id")
+                .eq("id", id)
+                .single();
+
+            if (cancelled || !gw?.property_id) return;
+
+            const { data: billsData } = await supabase
+                .rpc("get_property_bills", { p_property_id: gw.property_id });
+
+            if (cancelled || !billsData || billsData.length < 2) return;
+
+            // Use reading_date_orig preferentially, fallback to reading_date
+            const sorted = billsData
+                .filter((b: any) => b.reading_date_orig || b.reading_date)
+                .sort((a: any, b: any) => b.reference_month.localeCompare(a.reference_month));
+
+            const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+            const cycles: BillingCycle[] = [];
+
+            for (let i = 0; i < sorted.length - 1 && cycles.length < 6; i++) {
+                const curr = sorted[i];
+                const prev = sorted[i + 1];
+                const currDate = curr.reading_date_orig || curr.reading_date;
+                const prevDate = prev.reading_date_orig || prev.reading_date;
+                if (!currDate || !prevDate) continue;
+
+                const [y, m] = curr.reference_month.split("-");
+                cycles.push({
+                    label: `${monthNames[parseInt(m) - 1]}/${y}`,
+                    start: new Date(prevDate + "T00:00:00"),
+                    end: new Date(currDate + "T00:00:00"),
+                    refMonth: curr.reference_month,
+                });
+            }
+
+            setBillCycles(cycles);
+        })();
+        return () => { cancelled = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [id]);
 
     // Track date range timestamps for stable effect deps
     const startMs = dateRange.start.getTime();
@@ -268,6 +320,36 @@ export default function GatewayDetailPage() {
             {/* ── Date Range Picker ──────────────────────────── */}
             <div className="mb-8">
                 <DateRangePicker onChange={handleDateRangeChange} defaultValue="thisMonth" />
+
+                {/* Billing cycle sync buttons */}
+                {billCycles.length > 0 && (
+                    <div className="flex items-center gap-2 flex-wrap mt-3">
+                        <span className="text-xs text-muted-foreground flex items-center gap-1.5 mr-1">
+                            <CalendarSync className="w-3.5 h-3.5" />
+                            Ciclo de Leitura:
+                        </span>
+                        {billCycles.slice(0, 4).map((cycle) => {
+                            const sd = cycle.start;
+                            const ed = cycle.end;
+                            const shortStart = `${sd.getDate().toString().padStart(2, "0")}/${(sd.getMonth() + 1).toString().padStart(2, "0")}`;
+                            const shortEnd = `${ed.getDate().toString().padStart(2, "0")}/${(ed.getMonth() + 1).toString().padStart(2, "0")}`;
+                            const isActive = dateRange.label === `Leitura ${cycle.label}`;
+                            return (
+                                <button
+                                    key={cycle.refMonth}
+                                    onClick={() => setDateRange({ start: cycle.start, end: cycle.end, label: `Leitura ${cycle.label}` })}
+                                    className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap border ${isActive
+                                            ? "bg-primary text-primary-foreground shadow-sm border-primary"
+                                            : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+                                        }`}
+                                >
+                                    {cycle.label}
+                                    <span className="ml-1 opacity-60">({shortStart} — {shortEnd})</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
 
             {/* ── KPI Cards ──────────────────────────────────── */}
