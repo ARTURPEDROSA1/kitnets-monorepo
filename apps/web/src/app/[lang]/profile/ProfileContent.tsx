@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Image from 'next/image';
 import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera, Video, Sparkles, Save, UploadCloud, Home, Building2, User, ShieldCheck, Fingerprint, ChevronDown, ChevronUp, Wand2 } from 'lucide-react';
-import PropertyDetailsCard, { PropertyDetails, SubUnit, SubUnitsSection } from '@/components/profile/PropertyDetailsCard';
+import PropertyDetailsCard, { PropertyDetails, SubUnit, SubUnitsSection, Checkbox as DetailCheckbox } from '@/components/profile/PropertyDetailsCard';
 import { cn } from '@/lib/utils';
 import { useUser, useAuth } from '@clerk/nextjs';
 import { createClient } from '@supabase/supabase-js';
@@ -117,6 +117,8 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
     // AI description generation states
     const [generatingMainDescription, setGeneratingMainDescription] = useState(false);
     const [generatingUnitDescriptionIdx, setGeneratingUnitDescriptionIdx] = useState<number | null>(null);
+    const [descriptionPurpose, setDescriptionPurpose] = useState<{ venda: boolean; aluguel: boolean }>({ venda: false, aluguel: true });
+    const [importingContractIdx, setImportingContractIdx] = useState<number | null>(null);
 
     // Administrator data (only for PJ)
     const [adminData, setAdminData] = useState({
@@ -589,11 +591,14 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
     const generateMainDescription = async () => {
         setGeneratingMainDescription(true);
         try {
+            const purpose = descriptionPurpose.venda && descriptionPurpose.aluguel ? 'both'
+                : descriptionPurpose.venda ? 'venda' : 'aluguel';
             const res = await fetch('/api/property/generate-description', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     type: 'main',
+                    purpose,
                     propertyData: {
                         address: formData.propertyAddress,
                         totalSqMeters: propertyDetails.totalSqMeters,
@@ -661,6 +666,50 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
             alert('Erro ao gerar descrição com IA.');
         } finally {
             setGeneratingUnitDescriptionIdx(null);
+        }
+    };
+
+    // ── Contract Import ────────────────────────────────────────────
+    const importContract = async (unitIndex: number, file: File) => {
+        setImportingContractIdx(unitIndex);
+        try {
+            const formDataUpload = new FormData();
+            formDataUpload.append('file', file);
+            const res = await fetch('/api/property/extract-contract', {
+                method: 'POST',
+                body: formDataUpload,
+            });
+            const result = await res.json();
+            if (result.success && result.data) {
+                const d = result.data;
+                const updated = [...subUnits];
+                const unit = { ...updated[unitIndex] };
+                if (d.name) unit.name = d.name;
+                if (d.unitType) unit.unitType = d.unitType;
+                if (d.sqMeters) unit.sqMeters = d.sqMeters;
+                if (d.rooms) unit.rooms = d.rooms;
+                if (d.bedrooms) unit.bedrooms = d.bedrooms;
+                if (d.bathrooms) unit.bathrooms = d.bathrooms;
+                if (d.garage !== undefined) unit.garage = d.garage;
+                if (d.description) unit.description = d.description;
+                if (d.condominium !== undefined) unit.condominium = d.condominium;
+                if (d.condominiumValue) unit.condominiumValue = d.condominiumValue;
+                if (d.condominiumIncludes) {
+                    unit.condominiumIncludes = {
+                        ...unit.condominiumIncludes,
+                        ...d.condominiumIncludes,
+                    };
+                }
+                updated[unitIndex] = unit;
+                setSubUnits(updated);
+                alert(`Dados extraídos com sucesso! Confira e ajuste os campos preenchidos.${d.tenantName ? '\nInquilino: ' + d.tenantName : ''}${d.startDate ? '\nInício: ' + d.startDate : ''}${d.endDate ? '\nTérmino: ' + d.endDate : ''}${d.rentValue ? '\nAluguel: R$ ' + d.rentValue : ''}`);
+            } else {
+                alert(result.error || 'Não foi possível extrair dados do contrato.');
+            }
+        } catch {
+            alert('Erro ao processar contrato.');
+        } finally {
+            setImportingContractIdx(null);
         }
     };
 
@@ -1639,15 +1688,28 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                 {descriptionSectionOpen ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
                             </button>
                             {descriptionSectionOpen && (
-                                <div className="space-y-2">
+                                <div className="space-y-3">
                                     <div className="flex items-center justify-between">
                                         <Label>Descreva seu imóvel em detalhes <span className="text-red-500">*</span></Label>
+                                    </div>
+                                    <div className="flex items-center gap-4 flex-wrap">
+                                        <span className="text-sm font-medium text-foreground">Finalidade da descrição:</span>
+                                        <DetailCheckbox
+                                            checked={descriptionPurpose.aluguel}
+                                            onChange={(val) => setDescriptionPurpose(prev => ({ ...prev, aluguel: val }))}
+                                            label="Aluguel"
+                                        />
+                                        <DetailCheckbox
+                                            checked={descriptionPurpose.venda}
+                                            onChange={(val) => setDescriptionPurpose(prev => ({ ...prev, venda: val }))}
+                                            label="Venda"
+                                        />
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            className="h-7 text-xs gap-1 text-violet-600 border-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/20"
+                                            className="h-7 text-xs gap-1 text-violet-600 border-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/20 ml-auto"
                                             onClick={generateMainDescription}
-                                            disabled={generatingMainDescription}
+                                            disabled={generatingMainDescription || (!descriptionPurpose.venda && !descriptionPurpose.aluguel)}
                                         >
                                             {generatingMainDescription ? (
                                                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -1677,6 +1739,8 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                 onUnitsChange={setSubUnits}
                                 onGenerateDescription={generateUnitDescription}
                                 generatingDescriptionIdx={generatingUnitDescriptionIdx}
+                                onImportContract={importContract}
+                                importingContractIdx={importingContractIdx}
                             />
                         )}
 
