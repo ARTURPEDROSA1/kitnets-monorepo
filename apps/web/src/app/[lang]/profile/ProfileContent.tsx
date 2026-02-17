@@ -224,51 +224,9 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
         });
     };
 
-    // Main property videos (kept for legacy compat but now alias properties[0])
-
-    // Collapsible section states for ownership tab (legacy — now per-property)
-    const addressSectionOpen = properties[0]?.addressSectionOpen ?? true;
-    const setAddressSectionOpen = (val: boolean | ((prev: boolean) => boolean)) => {
-        setProperties(prev => {
-            if (prev.length === 0) return prev;
-            const newVal = typeof val === 'function' ? val(prev[0].addressSectionOpen) : val;
-            return prev.map((p, i) => i === 0 ? { ...p, addressSectionOpen: newVal } : p);
-        });
-    };
-    const photosSectionOpen = properties[0]?.photosSectionOpen ?? true;
-    const setPhotosSectionOpen = (val: boolean | ((prev: boolean) => boolean)) => {
-        setProperties(prev => {
-            if (prev.length === 0) return prev;
-            const newVal = typeof val === 'function' ? val(prev[0].photosSectionOpen) : val;
-            return prev.map((p, i) => i === 0 ? { ...p, photosSectionOpen: newVal } : p);
-        });
-    };
-    const descriptionSectionOpen = properties[0]?.descriptionSectionOpen ?? true;
-    const setDescriptionSectionOpen = (val: boolean | ((prev: boolean) => boolean)) => {
-        setProperties(prev => {
-            if (prev.length === 0) return prev;
-            const newVal = typeof val === 'function' ? val(prev[0].descriptionSectionOpen) : val;
-            return prev.map((p, i) => i === 0 ? { ...p, descriptionSectionOpen: newVal } : p);
-        });
-    };
-    const detailsInitialOpen = properties[0]?.detailsInitialOpen ?? true;
-    const setDetailsInitialOpen = (val: boolean | ((prev: boolean) => boolean)) => {
-        setProperties(prev => {
-            if (prev.length === 0) return prev;
-            const newVal = typeof val === 'function' ? val(prev[0].detailsInitialOpen) : val;
-            return prev.map((p, i) => i === 0 ? { ...p, detailsInitialOpen: newVal } : p);
-        });
-    };
-    const ownershipSectionOpen = properties[0]?.ownershipSectionOpen ?? true;
-    const setOwnershipSectionOpen = (val: boolean | ((prev: boolean) => boolean)) => {
-        setProperties(prev => {
-            if (prev.length === 0) return prev;
-            const newVal = typeof val === 'function' ? val(prev[0].ownershipSectionOpen) : val;
-            return prev.map((p, i) => i === 0 ? { ...p, ownershipSectionOpen: newVal } : p);
-        });
-    };
 
     // Add Property modal + wizard
+    const MAX_PROPERTIES = 30;
     const [showAddPropertyModal, setShowAddPropertyModal] = useState(false);
     const propertyCreated = properties.length > 0;
 
@@ -757,72 +715,12 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
     const [fileAnalysisStatus, setFileAnalysisStatus] = useState<Record<string, 'analyzing' | 'success' | 'error'>>({});
     const [identitySectionOpen, setIdentitySectionOpen] = useState(true);
 
-    const removeFile = (index: number) => {
-        setOwnershipFiles(prev => {
-            const removed = prev[index];
-            if (removed) {
-                setFileAnalysisStatus(s => {
-                    const next = { ...s };
-                    delete next[removed.name];
-                    return next;
-                });
-            }
-            return prev.filter((_, i) => i !== index);
-        });
-    };
-
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files.length > 0) {
-            const newFiles = Array.from(e.target.files);
-            setOwnershipFiles(prev => [...prev, ...newFiles]);
-
-            // Trigger analysis for each new file immediately
-            for (const file of newFiles) {
-                analyzeDocument(file);
-            }
-        }
-    };
-
-    const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files.length > 0) {
-            const totalPhotos = savedPhotos.length + propertyPhotos.length;
-            const remaining = 10 - totalPhotos;
-            if (remaining <= 0) { alert('Máximo de 10 fotos para o imóvel principal.'); return; }
-            const newPhotos = Array.from(e.target.files).slice(0, remaining);
-            setPropertyPhotos(prev => [...prev, ...newPhotos]);
-        }
-    };
-
-    const removePhoto = (index: number) => {
-        setPropertyPhotos(prev => prev.filter((_, i) => i !== index));
-    };
-
-    const removeSavedPhoto = async (url: string) => {
-        setSavedPhotos(prev => prev.filter(u => u !== url));
-    };
-
-    const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files.length > 0) {
-            const totalVideos = savedVideos.length + propertyVideos.length;
-            const remaining = 2 - totalVideos;
-            if (remaining <= 0) { alert('Máximo de 2 vídeos para o imóvel principal.'); return; }
-            const newVideos = Array.from(e.target.files).slice(0, remaining);
-            setPropertyVideos(prev => [...prev, ...newVideos]);
-        }
-    };
-
-    const removePropertyVideo = (index: number) => {
-        setPropertyVideos(prev => prev.filter((_, i) => i !== index));
-    };
-
-    const removeSavedVideo = async (url: string) => {
-        setSavedVideos(prev => prev.filter(u => u !== url));
-    };
-
     // ── AI Description Generation ──────────────────────────────────
-    const generateMainDescription = async () => {
+    const generateMainDescription = async (propIdx: number) => {
         setGeneratingMainDescription(true);
         try {
+            const prop = properties[propIdx];
+            if (!prop) return;
             const purpose = descriptionPurpose.venda && descriptionPurpose.aluguel ? 'both'
                 : descriptionPurpose.venda ? 'venda' : 'aluguel';
             const res = await fetch('/api/property/generate-description', {
@@ -832,18 +730,18 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                     type: 'main',
                     purpose,
                     propertyData: {
-                        address: formData.propertyAddress,
-                        totalSqMeters: propertyDetails.totalSqMeters,
-                        solarEnergy: propertyDetails.solarEnergy,
-                        solarKwp: propertyDetails.solarKwp,
-                        propertyType,
-                        numberOfUnits: propertyDetails.numberOfUnits,
+                        address: prop.address,
+                        totalSqMeters: prop.details.totalSqMeters,
+                        solarEnergy: prop.details.solarEnergy,
+                        solarKwp: prop.details.solarKwp,
+                        propertyType: prop.propertyType,
+                        numberOfUnits: prop.details.numberOfUnits,
                     },
                 }),
             });
             const data = await res.json();
             if (data.description) {
-                handleAddressChange('propertyAddress', 'description', data.description);
+                updateProperty(propIdx, prev => ({ ...prev, address: { ...prev.address, description: data.description } }));
             } else {
                 alert('Não foi possível gerar a descrição. Tente novamente.');
             }
@@ -854,10 +752,12 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
         }
     };
 
-    const generateUnitDescription = async (unitIndex: number) => {
+    const generateUnitDescription = async (propIdx: number, unitIndex: number) => {
         setGeneratingUnitDescriptionIdx(unitIndex);
         try {
-            const unit = subUnits[unitIndex];
+            const prop = properties[propIdx];
+            if (!prop) return;
+            const unit = prop.subUnits[unitIndex];
             const res = await fetch('/api/property/generate-description', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -879,18 +779,20 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                         condominiumIncludes: unit.condominiumIncludes,
                     },
                     propertyData: {
-                        address: formData.propertyAddress,
-                        totalSqMeters: propertyDetails.totalSqMeters,
-                        propertyType,
-                        numberOfUnits: propertyDetails.numberOfUnits,
+                        address: prop.address,
+                        totalSqMeters: prop.details.totalSqMeters,
+                        propertyType: prop.propertyType,
+                        numberOfUnits: prop.details.numberOfUnits,
                     },
                 }),
             });
             const data = await res.json();
             if (data.description) {
-                const updated = [...subUnits];
-                updated[unitIndex] = { ...updated[unitIndex], description: data.description };
-                setSubUnits(updated);
+                updateProperty(propIdx, prev => {
+                    const updated = [...prev.subUnits];
+                    updated[unitIndex] = { ...updated[unitIndex], description: data.description };
+                    return { ...prev, subUnits: updated };
+                });
             } else {
                 alert('Não foi possível gerar a descrição. Tente novamente.');
             }
@@ -902,7 +804,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
     };
 
     // ── Contract Import ────────────────────────────────────────────
-    const importContract = async (unitIndex: number, file: File) => {
+    const importContract = async (propIdx: number, unitIndex: number, file: File) => {
         setImportingContractIdx(unitIndex);
         try {
             const formDataUpload = new FormData();
@@ -914,26 +816,28 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
             const result = await res.json();
             if (result.success && result.data) {
                 const d = result.data;
-                const updated = [...subUnits];
-                const unit = { ...updated[unitIndex] };
-                if (d.name) unit.name = d.name;
-                if (d.unitType) unit.unitType = d.unitType;
-                if (d.sqMeters) unit.sqMeters = d.sqMeters;
-                if (d.rooms) unit.rooms = d.rooms;
-                if (d.bedrooms) unit.bedrooms = d.bedrooms;
-                if (d.bathrooms) unit.bathrooms = d.bathrooms;
-                if (d.garage !== undefined) unit.garage = d.garage;
-                if (d.description) unit.description = d.description;
-                if (d.condominium !== undefined) unit.condominium = d.condominium;
-                if (d.condominiumValue) unit.condominiumValue = d.condominiumValue;
-                if (d.condominiumIncludes) {
-                    unit.condominiumIncludes = {
-                        ...unit.condominiumIncludes,
-                        ...d.condominiumIncludes,
-                    };
-                }
-                updated[unitIndex] = unit;
-                setSubUnits(updated);
+                updateProperty(propIdx, prev => {
+                    const updated = [...prev.subUnits];
+                    const unit = { ...updated[unitIndex] };
+                    if (d.name) unit.name = d.name;
+                    if (d.unitType) unit.unitType = d.unitType;
+                    if (d.sqMeters) unit.sqMeters = d.sqMeters;
+                    if (d.rooms) unit.rooms = d.rooms;
+                    if (d.bedrooms) unit.bedrooms = d.bedrooms;
+                    if (d.bathrooms) unit.bathrooms = d.bathrooms;
+                    if (d.garage !== undefined) unit.garage = d.garage;
+                    if (d.description) unit.description = d.description;
+                    if (d.condominium !== undefined) unit.condominium = d.condominium;
+                    if (d.condominiumValue) unit.condominiumValue = d.condominiumValue;
+                    if (d.condominiumIncludes) {
+                        unit.condominiumIncludes = {
+                            ...unit.condominiumIncludes,
+                            ...d.condominiumIncludes,
+                        };
+                    }
+                    updated[unitIndex] = unit;
+                    return { ...prev, subUnits: updated };
+                });
                 alert(`Dados extraídos com sucesso! Confira e ajuste os campos preenchidos.${d.tenantName ? '\nInquilino: ' + d.tenantName : ''}${d.startDate ? '\nInício: ' + d.startDate : ''}${d.endDate ? '\nTérmino: ' + d.endDate : ''}${d.rentValue ? '\nAluguel: R$ ' + d.rentValue : ''}`);
             } else {
                 alert(result.error || 'Não foi possível extrair dados do contrato.');
@@ -996,7 +900,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                 setExtractedAddressInfo(`✅ ${docType} — Endereço extraído com sucesso (${methodLabel})`);
                 setFileAnalysisStatus(prev => ({ ...prev, [file.name]: 'success' }));
                 // Auto-collapse verification section after successful extraction
-                setOwnershipSectionOpen(false);
+                updateProperty(expandedPropertyIdx ?? 0, prev => ({ ...prev, ownershipSectionOpen: false }));
             } else {
                 const methodsTried = result?.methods_tried?.join(' → ') || 'nenhum';
                 setFileAnalysisStatus(prev => ({ ...prev, [file.name]: 'error' }));
@@ -1587,6 +1491,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                 <Button
                                     size="sm"
                                     variant="outline"
+                                    disabled={properties.length >= MAX_PROPERTIES}
                                     className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
                                     onClick={() => setShowAddPropertyModal(true)}
                                 >
@@ -1622,8 +1527,99 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                             const propIcon = prop.propertyType === 'single' ? <Home className="w-4 h-4" /> : <Building2 className="w-4 h-4" />;
                             const propTypeName = prop.propertyType === 'single' ? 'Unifamiliar' : 'Multifamiliar';
 
-                            // For the first property (idx 0), we use the existing wizard content
-                            // For additional properties (idx 1+) we show a simplified view for now
+                            // ── Per-property local aliases ──
+                            const pAddr = prop.address;
+                            const pDetails = prop.details;
+                            const pSubUnits = prop.subUnits;
+                            const pType = prop.propertyType;
+                            const pPhotos = prop.photos;
+                            const pSavedPhotos = prop.savedPhotos;
+                            const pVideos = prop.videos;
+                            const pSavedVideos = prop.savedVideos;
+                            const pOwnershipFiles = prop.ownershipFiles;
+                            const pSavedProofs = prop.savedProofs;
+                            const pOwnershipOpen = prop.ownershipSectionOpen;
+                            const pAddressOpen = prop.addressSectionOpen;
+                            const pPhotosOpen = prop.photosSectionOpen;
+                            const pDescOpen = prop.descriptionSectionOpen;
+                            const pDetailsOpen = prop.detailsInitialOpen;
+
+                            // ── Per-property setter factories ──
+                            const setPropField = <K extends keyof PropertyState>(field: K, val: PropertyState[K] | ((prev: PropertyState[K]) => PropertyState[K])) => {
+                                updateProperty(propIdx, prev => ({
+                                    ...prev,
+                                    [field]: typeof val === 'function' ? (val as (prev: PropertyState[K]) => PropertyState[K])(prev[field]) : val
+                                }));
+                            };
+                            const setPOwnershipOpen = (v: boolean | ((p: boolean) => boolean)) => setPropField('ownershipSectionOpen', v);
+                            const setPAddressOpen = (v: boolean | ((p: boolean) => boolean)) => setPropField('addressSectionOpen', v);
+                            const setPPhotosOpen = (v: boolean | ((p: boolean) => boolean)) => setPropField('photosSectionOpen', v);
+                            const setPDescOpen = (v: boolean | ((p: boolean) => boolean)) => setPropField('descriptionSectionOpen', v);
+                            const setPDetailsOpen = (v: boolean | ((p: boolean) => boolean)) => setPropField('detailsInitialOpen', v);
+                            const setPDetails = (v: PropertyDetails | ((p: PropertyDetails) => PropertyDetails)) => setPropField('details', v);
+                            const setPSubUnits = (v: SubUnit[] | ((p: SubUnit[]) => SubUnit[])) => setPropField('subUnits', v);
+                            const setPPhotos = (v: File[] | ((p: File[]) => File[])) => setPropField('photos', v);
+                            const setPSavedPhotos = (v: string[] | ((p: string[]) => string[])) => setPropField('savedPhotos', v);
+                            const setPVideos = (v: File[] | ((p: File[]) => File[])) => setPropField('videos', v);
+                            const setPSavedVideos = (v: string[] | ((p: string[]) => string[])) => setPropField('savedVideos', v);
+                            const setPOwnershipFiles = (v: File[] | ((p: File[]) => File[])) => setPropField('ownershipFiles', v);
+                            const handlePropAddrChange = (field: string, value: string) => {
+                                if (field === 'cep') {
+                                    const formatted = value.replace(/\D/g, '').replace(/(\d{5})(\d)/, '$1-$2').slice(0, 9);
+                                    updateProperty(propIdx, prev => ({ ...prev, address: { ...prev.address, cep: formatted } }));
+                                    if (formatted.replace(/\D/g, '').length === 8) {
+                                        fetchAddress('propertyAddress', formatted);
+                                    }
+                                } else {
+                                    updateProperty(propIdx, prev => ({ ...prev, address: { ...prev.address, [field]: value } }));
+                                }
+                            };
+                            // File upload for this property
+                            const handlePropFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+                                if (e.target.files && e.target.files.length > 0) {
+                                    const newFiles = Array.from(e.target.files);
+                                    setPOwnershipFiles(prev => [...prev, ...newFiles]);
+                                    for (const file of newFiles) { analyzeDocument(file); }
+                                }
+                            };
+                            const handlePropPhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+                                if (e.target.files && e.target.files.length > 0) {
+                                    const total = pSavedPhotos.length + pPhotos.length;
+                                    const remaining = 10 - total;
+                                    if (remaining <= 0) { alert('Máximo de 10 fotos por propriedade.'); return; }
+                                    const newPhotos = Array.from(e.target.files).slice(0, remaining);
+                                    setPPhotos(prev => [...prev, ...newPhotos]);
+                                }
+                            };
+                            const removePropPhoto = (idx: number) => setPPhotos(prev => prev.filter((_, i) => i !== idx));
+                            const handlePropVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+                                if (e.target.files && e.target.files.length > 0) {
+                                    const total = pSavedVideos.length + pVideos.length;
+                                    if (total >= 2) { alert('Máximo de 2 vídeos por propriedade.'); return; }
+                                    setPVideos(prev => [...prev, Array.from(e.target.files!)[0]]);
+                                }
+                            };
+                            const removePropVideo = (idx: number) => setPVideos(prev => prev.filter((_, i) => i !== idx));
+                            const removePropSavedPhoto = async (url: string) => {
+                                setPSavedPhotos(prev => prev.filter(u => u !== url));
+                            };
+                            const removePropSavedVideo = (url: string) => {
+                                setPSavedVideos(prev => prev.filter(u => u !== url));
+                            };
+                            const removePropFile = (idx: number) => {
+                                setPOwnershipFiles(prev => {
+                                    const removed = prev[idx];
+                                    if (removed) {
+                                        setFileAnalysisStatus(s => {
+                                            const next = { ...s };
+                                            delete next[removed.name];
+                                            return next;
+                                        });
+                                    }
+                                    return prev.filter((_, i) => i !== idx);
+                                });
+                            };
+
                             return (
                                 <div key={propIdx} className="border border-border rounded-xl shadow-sm overflow-hidden transition-all duration-200">
                                     {/* Collapsible header */}
@@ -1681,35 +1677,35 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                         </div>
                                     </button>
 
-                                    {/* Expanded content — only for property index 0 (primary), others get a simpler editor */}
-                                    {isExpanded && propIdx === 0 && (
+                                    {/* Expanded wizard content for any property */}
+                                    {isExpanded && (
                                         <div className="p-6 space-y-6 border-t border-border bg-card">
 
                                             {/* 1. Documentation Section (ownership verification — first!) */}
                                             <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
                                                 <button
                                                     type="button"
-                                                    onClick={() => setOwnershipSectionOpen(prev => !prev)}
+                                                    onClick={() => setPOwnershipOpen(prev => !prev)}
                                                     className="flex items-center justify-between w-full"
                                                 >
                                                     <div className="flex items-center gap-2">
-                                                        <div className={`p-2 rounded-lg ${(extractedAddressInfo?.startsWith('✅') || (!ownershipSectionOpen && savedProofs.length > 0))
+                                                        <div className={`p-2 rounded-lg ${(extractedAddressInfo?.startsWith('✅') || (!pOwnershipOpen && pSavedProofs.length > 0))
                                                             ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600'
                                                             : 'bg-blue-100 dark:bg-blue-900/50 text-blue-600'
                                                             }`}>
-                                                            {(extractedAddressInfo?.startsWith('✅') || (!ownershipSectionOpen && savedProofs.length > 0))
+                                                            {(extractedAddressInfo?.startsWith('✅') || (!pOwnershipOpen && pSavedProofs.length > 0))
                                                                 ? <CheckCircle2 className="w-5 h-5" />
                                                                 : <FileText className="w-5 h-5" />}
                                                         </div>
                                                         <h3 className="text-lg font-semibold text-foreground">{p.ownership.title}</h3>
-                                                        {!ownershipSectionOpen && (extractedAddressInfo?.startsWith('✅') || savedProofs.length > 0) && (
+                                                        {!pOwnershipOpen && (extractedAddressInfo?.startsWith('✅') || pSavedProofs.length > 0) && (
                                                             <span className="ml-2 text-xs bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full">Verificado ✓</span>
                                                         )}
                                                     </div>
-                                                    {ownershipSectionOpen ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
+                                                    {pOwnershipOpen ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
                                                 </button>
 
-                                                {ownershipSectionOpen && (
+                                                {pOwnershipOpen && (
                                                     <>
                                                         <div className="bg-muted/30 p-4 rounded-lg border border-border text-sm text-muted-foreground mb-4">
                                                             <p className="font-medium text-foreground mb-2">{p.ownership.acceptedDocs}</p>
@@ -1726,7 +1722,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                                 type="file"
                                                                 multiple
                                                                 accept=".pdf,.jpg,.jpeg,.png"
-                                                                onChange={handleFileUpload}
+                                                                onChange={handlePropFileUpload}
                                                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                                             />
                                                             <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 flex items-center justify-center mb-2">
@@ -1737,9 +1733,9 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                         </div>
 
                                                         {/* File List */}
-                                                        {(ownershipFiles.length > 0 || savedProofs.length > 0) && (
+                                                        {(pOwnershipFiles.length > 0 || pSavedProofs.length > 0) && (
                                                             <div className="space-y-2 mt-4">
-                                                                {ownershipFiles.map((file, i) => {
+                                                                {pOwnershipFiles.map((file, i) => {
                                                                     const status = fileAnalysisStatus[file.name];
                                                                     return (
                                                                         <div key={`new-${i}`} className={`flex items-center justify-between p-3 rounded-lg border ${status === 'success' ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800' :
@@ -1774,13 +1770,13 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                                                     </span>
                                                                                 </div>
                                                                             </div>
-                                                                            <Button variant="ghost" size="sm" onClick={() => removeFile(i)} className="text-destructive">
+                                                                            <Button variant="ghost" size="sm" onClick={() => removePropFile(i)} className="text-destructive">
                                                                                 <Trash2 className="w-4 h-4" />
                                                                             </Button>
                                                                         </div>
                                                                     );
                                                                 })}
-                                                                {savedProofs.map((proof) => (
+                                                                {pSavedProofs.map((proof) => (
                                                                     <div key={proof.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border opacity-75">
                                                                         <div className="flex items-center gap-3">
                                                                             <div className="w-8 h-8 rounded bg-muted flex items-center justify-center"><CheckCircle2 className="w-4 h-4 text-emerald-500" /></div>
@@ -1794,13 +1790,13 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                             </div>
                                                         )}
                                                         {/* Continuar button for Documentation → Address */}
-                                                        {(savedProofs.length > 0 || ownershipFiles.length > 0) && (
+                                                        {(pSavedProofs.length > 0 || pOwnershipFiles.length > 0) && (
                                                             <div className="flex justify-end pt-2">
                                                                 <Button
                                                                     variant="outline"
                                                                     size="sm"
                                                                     className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                                                    onClick={() => { setOwnershipSectionOpen(false); setAddressSectionOpen(true); }}
+                                                                    onClick={() => { setPOwnershipOpen(false); setPAddressOpen(true); }}
                                                                 >
                                                                     Continuar <ArrowRight className="w-4 h-4" />
                                                                 </Button>
@@ -1828,7 +1824,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                             <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
                                                 <button
                                                     type="button"
-                                                    onClick={() => setAddressSectionOpen(prev => !prev)}
+                                                    onClick={() => setPAddressOpen(prev => !prev)}
                                                     className="flex items-center justify-between w-full"
                                                 >
                                                     <div className="flex items-center gap-2">
@@ -1836,21 +1832,21 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                             <MapPin className="w-5 h-5" />
                                                         </div>
                                                         <h3 className="text-lg font-semibold text-foreground">{p.basics.addressTitle}</h3>
-                                                        {!addressSectionOpen && formData.propertyAddress.street && (
+                                                        {!pAddressOpen && pAddr.street && (
                                                             <span className="ml-2 text-xs bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full">Preenchido ✓</span>
                                                         )}
                                                     </div>
-                                                    {addressSectionOpen ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
+                                                    {pAddressOpen ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
                                                 </button>
 
-                                                {addressSectionOpen && (
+                                                {pAddressOpen && (
                                                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                                         <div className="space-y-2">
                                                             <Label>{p.basics.cep}</Label>
                                                             <div className="relative">
                                                                 <Input
-                                                                    value={properties[0]?.address.cep || ''}
-                                                                    onChange={(e) => handleAddressChange('propertyAddress', 'cep', e.target.value)}
+                                                                    value={pAddr.cep || ''}
+                                                                    onChange={(e) => handlePropAddrChange('cep', e.target.value)}
                                                                     placeholder="00000-000"
                                                                     maxLength={9}
                                                                 />
@@ -1861,37 +1857,37 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                         <div className="md:col-span-3 space-y-2">
                                                             <Label>Cidade / UF</Label>
                                                             <div className="flex gap-2">
-                                                                <Input value={properties[0]?.address.city || ''} onChange={(e) => handleAddressChange('propertyAddress', 'city', e.target.value)} placeholder="Cidade" />
-                                                                <Input value={properties[0]?.address.state || ''} onChange={(e) => handleAddressChange('propertyAddress', 'state', e.target.value)} placeholder="UF" className="w-20" maxLength={2} />
+                                                                <Input value={pAddr.city || ''} onChange={(e) => handlePropAddrChange('city', e.target.value)} placeholder="Cidade" />
+                                                                <Input value={pAddr.state || ''} onChange={(e) => handlePropAddrChange('state', e.target.value)} placeholder="UF" className="w-20" maxLength={2} />
                                                             </div>
                                                         </div>
                                                         <div className="md:col-span-3 space-y-2">
                                                             <Label>{p.basics.street}</Label>
-                                                            <Input value={properties[0]?.address.street || ''} onChange={(e) => handleAddressChange('propertyAddress', 'street', e.target.value)} placeholder="Rua / Avenida" />
+                                                            <Input value={pAddr.street || ''} onChange={(e) => handlePropAddrChange('street', e.target.value)} placeholder="Rua / Avenida" />
                                                         </div>
                                                         <div className="space-y-2">
                                                             <Label>{p.basics.number}</Label>
-                                                            <Input value={properties[0]?.address.number || ''} onChange={(e) => handleAddressChange('propertyAddress', 'number', e.target.value)} placeholder="123" />
+                                                            <Input value={pAddr.number || ''} onChange={(e) => handlePropAddrChange('number', e.target.value)} placeholder="123" />
                                                         </div>
                                                         <div className="md:col-span-2 space-y-2">
                                                             <Label>{p.basics.neighborhood}</Label>
-                                                            <Input value={properties[0]?.address.neighborhood || ''} onChange={(e) => handleAddressChange('propertyAddress', 'neighborhood', e.target.value)} placeholder="Bairro" />
+                                                            <Input value={pAddr.neighborhood || ''} onChange={(e) => handlePropAddrChange('neighborhood', e.target.value)} placeholder="Bairro" />
                                                         </div>
                                                         <div className="md:col-span-2 space-y-2">
                                                             <Label>{p.basics.complement}</Label>
-                                                            <Input value={properties[0]?.address.complement || ''} onChange={(e) => handleAddressChange('propertyAddress', 'complement', e.target.value)} placeholder={p.basics.complement} />
+                                                            <Input value={pAddr.complement || ''} onChange={(e) => handlePropAddrChange('complement', e.target.value)} placeholder={p.basics.complement} />
                                                         </div>
                                                     </div>
                                                 )}
 
                                                 {/* Continuar button for Address → Details */}
-                                                {addressSectionOpen && formData.propertyAddress.cep && formData.propertyAddress.city && (
+                                                {pAddressOpen && pAddr.cep && pAddr.city && (
                                                     <div className="flex justify-end pt-2">
                                                         <Button
                                                             variant="outline"
                                                             size="sm"
                                                             className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                                            onClick={() => { setAddressSectionOpen(false); setDetailsInitialOpen(true); }}
+                                                            onClick={() => { setPAddressOpen(false); setPDetailsOpen(true); }}
                                                         >
                                                             Continuar <ArrowRight className="w-4 h-4" />
                                                         </Button>
@@ -1901,22 +1897,22 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
 
                                             {/* 3. Detalhes Section */}
                                             <PropertyDetailsCard
-                                                key={`details-${detailsInitialOpen}`}
-                                                details={propertyDetails}
-                                                units={subUnits}
-                                                onDetailsChange={setPropertyDetails}
-                                                onUnitsChange={setSubUnits}
-                                                propertyType={propertyType}
-                                                initialOpen={detailsInitialOpen}
+                                                key={`details-${propIdx}-${pDetailsOpen}`}
+                                                details={pDetails}
+                                                units={pSubUnits}
+                                                onDetailsChange={setPDetails}
+                                                onUnitsChange={setPSubUnits}
+                                                propertyType={pType}
+                                                initialOpen={pDetailsOpen}
                                             />
                                             {/* Continuar button for Details → Photos */}
-                                            {detailsInitialOpen && propertyDetails.propertyName && propertyDetails.totalSqMeters && (
+                                            {pDetailsOpen && pDetails.propertyName && pDetails.totalSqMeters && (
                                                 <div className="flex justify-end -mt-4">
                                                     <Button
                                                         variant="outline"
                                                         size="sm"
                                                         className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                                        onClick={() => { setDetailsInitialOpen(false); setPhotosSectionOpen(true); }}
+                                                        onClick={() => { setPDetailsOpen(false); setPPhotosOpen(true); }}
                                                     >
                                                         Continuar <ArrowRight className="w-4 h-4" />
                                                     </Button>
@@ -1927,7 +1923,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                             <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
                                                 <button
                                                     type="button"
-                                                    onClick={() => setPhotosSectionOpen(prev => !prev)}
+                                                    onClick={() => setPPhotosOpen(prev => !prev)}
                                                     className="flex items-center justify-between w-full"
                                                 >
                                                     <div className="flex items-center gap-2">
@@ -1935,22 +1931,22 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                             <Camera className="w-5 h-5" />
                                                         </div>
                                                         <h3 className="text-lg font-semibold text-foreground">Fotos e Vídeos do Imóvel</h3>
-                                                        {!photosSectionOpen && (savedPhotos.length > 0 || propertyPhotos.length > 0 || savedVideos.length > 0 || propertyVideos.length > 0) && (
+                                                        {!pPhotosOpen && (pSavedPhotos.length > 0 || pPhotos.length > 0 || pSavedVideos.length > 0 || pVideos.length > 0) && (
                                                             <span className="ml-2 text-xs bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full">
-                                                                {savedPhotos.length + propertyPhotos.length} fotos · {savedVideos.length + propertyVideos.length} vídeos
+                                                                {pSavedPhotos.length + pPhotos.length} fotos · {pSavedVideos.length + pVideos.length} vídeos
                                                             </span>
                                                         )}
                                                     </div>
-                                                    {photosSectionOpen ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
+                                                    {pPhotosOpen ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
                                                 </button>
 
-                                                {photosSectionOpen && (
+                                                {pPhotosOpen && (
                                                     <>
                                                         <div className="bg-muted/30 p-4 rounded-lg border border-border flex gap-3 items-start">
                                                             <Sparkles className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
                                                             <div>
                                                                 <p className="text-sm font-medium text-foreground mb-1">Dica Profissional</p>
-                                                                <p className="text-sm text-muted-foreground">Imóveis com pelo menos 5 fotos recebem 4x mais visualizações! Capriche na iluminação. Essas mídias são da <strong>propriedade principal</strong> (área comum e fachada).</p>
+                                                                <p className="text-sm text-muted-foreground">Imóveis com pelo menos 5 fotos recebem 4x mais visualizações! Capriche na iluminação.</p>
                                                             </div>
                                                         </div>
 
@@ -1961,17 +1957,17 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                                     <Camera className="w-4 h-4 text-muted-foreground" />
                                                                     Fotos
                                                                 </p>
-                                                                <span className="text-xs text-muted-foreground">{savedPhotos.length + propertyPhotos.length}/10</span>
+                                                                <span className="text-xs text-muted-foreground">{pSavedPhotos.length + pPhotos.length}/10</span>
                                                             </div>
                                                             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                                                                 {/* Upload Button */}
-                                                                {savedPhotos.length + propertyPhotos.length < 10 && (
+                                                                {pSavedPhotos.length + pPhotos.length < 10 && (
                                                                     <div className="aspect-square rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors relative">
                                                                         <input
                                                                             type="file"
                                                                             multiple
                                                                             accept="image/*"
-                                                                            onChange={handlePhotoSelect}
+                                                                            onChange={handlePropPhotoSelect}
                                                                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                                                         />
                                                                         <Camera className="w-8 h-8 text-muted-foreground mb-2" />
@@ -1980,16 +1976,16 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                                 )}
 
                                                                 {/* New Photos */}
-                                                                {propertyPhotos.map((file, idx) => (
-                                                                    <PhotoPreview key={`new-p-${idx}`} file={file} onRemove={() => removePhoto(idx)} />
+                                                                {pPhotos.map((file, idx) => (
+                                                                    <PhotoPreview key={`new-p-${idx}`} file={file} onRemove={() => removePropPhoto(idx)} />
                                                                 ))}
 
                                                                 {/* Saved Photos */}
-                                                                {savedPhotos.map((url, idx) => (
+                                                                {pSavedPhotos.map((url, idx) => (
                                                                     <div key={`saved-p-${idx}`} className="aspect-square rounded-lg border border-border relative group overflow-hidden">
                                                                         <Image src={url} alt="Property" width={200} height={200} className="w-full h-full object-cover" />
                                                                         <div className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                            <Button size="icon" variant="destructive" className="h-6 w-6" onClick={() => removeSavedPhoto(url)}>
+                                                                            <Button size="icon" variant="destructive" className="h-6 w-6" onClick={() => removePropSavedPhoto(url)}>
                                                                                 <Trash2 className="w-3 h-3" />
                                                                             </Button>
                                                                         </div>
@@ -2005,15 +2001,15 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                                     <Video className="w-4 h-4 text-muted-foreground" />
                                                                     Vídeos
                                                                 </p>
-                                                                <span className="text-xs text-muted-foreground">{savedVideos.length + propertyVideos.length}/2</span>
+                                                                <span className="text-xs text-muted-foreground">{pSavedVideos.length + pVideos.length}/2</span>
                                                             </div>
                                                             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                                                                {savedVideos.length + propertyVideos.length < 2 && (
+                                                                {pSavedVideos.length + pVideos.length < 2 && (
                                                                     <div className="aspect-square rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors relative">
                                                                         <input
                                                                             type="file"
                                                                             accept="video/*"
-                                                                            onChange={handleVideoSelect}
+                                                                            onChange={handlePropVideoSelect}
                                                                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                                                         />
                                                                         <Video className="w-8 h-8 text-muted-foreground mb-2" />
@@ -2022,11 +2018,11 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                                 )}
 
                                                                 {/* New Videos */}
-                                                                {propertyVideos.map((file, idx) => (
+                                                                {pVideos.map((file, idx) => (
                                                                     <div key={`new-v-${idx}`} className="aspect-square rounded-lg border border-border relative group overflow-hidden bg-muted">
                                                                         <video src={URL.createObjectURL(file)} className="w-full h-full object-cover" muted />
                                                                         <div className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                            <Button size="icon" variant="destructive" className="h-6 w-6" onClick={() => removePropertyVideo(idx)}>
+                                                                            <Button size="icon" variant="destructive" className="h-6 w-6" onClick={() => removePropVideo(idx)}>
                                                                                 <Trash2 className="w-3 h-3" />
                                                                             </Button>
                                                                         </div>
@@ -2037,11 +2033,11 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                                 ))}
 
                                                                 {/* Saved Videos */}
-                                                                {savedVideos.map((url, idx) => (
+                                                                {pSavedVideos.map((url, idx) => (
                                                                     <div key={`saved-v-${idx}`} className="aspect-square rounded-lg border border-border relative group overflow-hidden">
                                                                         <video src={url} className="w-full h-full object-cover" muted />
                                                                         <div className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                            <Button size="icon" variant="destructive" className="h-6 w-6" onClick={() => removeSavedVideo(url)}>
+                                                                            <Button size="icon" variant="destructive" className="h-6 w-6" onClick={() => removePropSavedVideo(url)}>
                                                                                 <Trash2 className="w-3 h-3" />
                                                                             </Button>
                                                                         </div>
@@ -2060,7 +2056,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                             <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
                                                 <button
                                                     type="button"
-                                                    onClick={() => setDescriptionSectionOpen(prev => !prev)}
+                                                    onClick={() => setPDescOpen(prev => !prev)}
                                                     className="flex items-center justify-between w-full"
                                                 >
                                                     <div className="flex items-center gap-2">
@@ -2068,13 +2064,13 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                             <FileText className="w-5 h-5" />
                                                         </div>
                                                         <h3 className="text-lg font-semibold text-foreground">Descrição do Imóvel</h3>
-                                                        {!descriptionSectionOpen && formData.propertyAddress.description && (
+                                                        {!pDescOpen && pAddr.description && (
                                                             <span className="ml-2 text-xs bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full">Preenchido ✓</span>
                                                         )}
                                                     </div>
-                                                    {descriptionSectionOpen ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
+                                                    {pDescOpen ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
                                                 </button>
-                                                {descriptionSectionOpen && (
+                                                {pDescOpen && (
                                                     <div className="space-y-3">
                                                         <div className="flex items-center justify-between">
                                                             <Label>Descreva seu imóvel em detalhes <span className="text-red-500">*</span></Label>
@@ -2095,7 +2091,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                                 variant="outline"
                                                                 size="sm"
                                                                 className="h-7 text-xs gap-1 text-violet-600 border-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/20 ml-auto"
-                                                                onClick={generateMainDescription}
+                                                                onClick={() => generateMainDescription(propIdx)}
                                                                 disabled={generatingMainDescription || (!descriptionPurpose.venda && !descriptionPurpose.aluguel)}
                                                             >
                                                                 {generatingMainDescription ? (
@@ -2109,31 +2105,31 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                         <textarea
                                                             className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[120px]"
                                                             placeholder="Ex: Excelente apartamento com varanda gourmet, vista livre, armários planejados na cozinha e banheiros..."
-                                                            value={formData.propertyAddress.description || ''}
-                                                            onChange={(e) => handleAddressChange('propertyAddress', 'description', e.target.value)}
+                                                            value={pAddr.description || ''}
+                                                            onChange={(e) => handlePropAddrChange('description', e.target.value)}
                                                         />
                                                         <span className="text-xs text-muted-foreground">Esta descrição será exibida no anúncio do imóvel principal.</span>
                                                     </div>
                                                 )}
 
                                                 {/* Continuar button for Description → Sub-units (or save) */}
-                                                {descriptionSectionOpen && formData.propertyAddress.description?.trim() && (
+                                                {pDescOpen && pAddr.description?.trim() && (
                                                     <div className="flex justify-end pt-2">
                                                         <Button
                                                             variant="outline"
                                                             size="sm"
                                                             className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
                                                             onClick={() => {
-                                                                setDescriptionSectionOpen(false);
+                                                                setPDescOpen(false);
                                                                 // If multi with units, the sub-units section shows itself
                                                                 // Otherwise, navigate to Basics tab
-                                                                if (propertyType !== 'multi' || propertyDetails.numberOfUnits === 0) {
+                                                                if (pType !== 'multi' || pDetails.numberOfUnits === 0) {
                                                                     handleSave();
                                                                     setActiveTab('basics');
                                                                 }
                                                             }}
                                                         >
-                                                            {propertyType === 'multi' && propertyDetails.numberOfUnits > 0
+                                                            {pType === 'multi' && pDetails.numberOfUnits > 0
                                                                 ? <>Continuar <ArrowRight className="w-4 h-4" /></>
                                                                 : <>Salvar e Continuar <ArrowRight className="w-4 h-4" /></>}
                                                         </Button>
@@ -2142,15 +2138,15 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                             </div>
 
                                             {/* 6. Sub-unidades Section (at the bottom, only for multi) */}
-                                            {propertyType === 'multi' && propertyDetails.numberOfUnits > 0 && (
+                                            {pType === 'multi' && pDetails.numberOfUnits > 0 && (
                                                 <SubUnitsSection
-                                                    details={propertyDetails}
-                                                    units={subUnits}
-                                                    onDetailsChange={setPropertyDetails}
-                                                    onUnitsChange={setSubUnits}
-                                                    onGenerateDescription={generateUnitDescription}
+                                                    details={pDetails}
+                                                    units={pSubUnits}
+                                                    onDetailsChange={setPDetails}
+                                                    onUnitsChange={setPSubUnits}
+                                                    onGenerateDescription={(unitIdx) => generateUnitDescription(propIdx, unitIdx)}
                                                     generatingDescriptionIdx={generatingUnitDescriptionIdx}
-                                                    onImportContract={importContract}
+                                                    onImportContract={(unitIdx, file) => importContract(propIdx, unitIdx, file)}
                                                     importingContractIdx={importingContractIdx}
                                                 />
                                             )}
@@ -2158,14 +2154,6 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                         </div>
                                     )}
 
-                                    {/* Expanded content for additional properties (index 1+) */}
-                                    {isExpanded && propIdx > 0 && (
-                                        <div className="p-6 space-y-4 border-t border-border bg-card">
-                                            <p className="text-sm text-muted-foreground italic">
-                                                Editor completo para propriedades adicionais em breve. Use a propriedade principal como referência.
-                                            </p>
-                                        </div>
-                                    )}
                                 </div>
                             );
                         })}
