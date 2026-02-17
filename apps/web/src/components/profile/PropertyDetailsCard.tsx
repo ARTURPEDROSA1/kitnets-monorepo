@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
     ChevronDown, ChevronUp, Settings2, Sun, Droplets, Zap, Flame,
-    Wifi, Plus, Trash2, Home, BedDouble, Car, Shirt, Wind, CookingPot,
+    Landmark, Wifi, Plus, Trash2, Home, BedDouble, Car, Shirt, Wind, CookingPot,
     DoorOpen, Building2, Camera, Video, Bath, FileText, Wand2, Loader2, UploadCloud
 } from "lucide-react";
 import { Button } from "@kitnets/ui";
@@ -14,6 +14,12 @@ import { cn } from "@/lib/utils";
 
 // ── Types ──────────────────────────────────────────────────────────
 export interface PropertyDetails {
+    propertyName: string;
+    cadastroImobiliario: string;
+    inscricaoImobiliaria: string;
+    matricula: string;
+    areaLote: string;
+    areaEdificada: string;
     numberOfUnits: number;
     totalSqMeters: string;
     solarEnergy: boolean;
@@ -244,9 +250,9 @@ export default function PropertyDetailsCard({
                         <Settings2 className="w-5 h-5" />
                     </div>
                     <h3 className="text-lg font-semibold text-foreground">Detalhes</h3>
-                    {!isOpen && details.totalSqMeters && (
+                    {!isOpen && (details.propertyName || details.totalSqMeters) && (
                         <span className="ml-2 text-xs bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 px-2 py-0.5 rounded-full">
-                            {details.totalSqMeters} m²{propertyType === 'multi' && details.numberOfUnits > 0 ? ` · ${details.numberOfUnits} unidades` : ''} ✓
+                            {details.propertyName ? `${details.propertyName} · ` : ''}{details.totalSqMeters ? `${details.totalSqMeters} m²` : ''}{propertyType === 'multi' && details.numberOfUnits > 0 ? ` · ${details.numberOfUnits} unidades` : ''} ✓
                         </span>
                     )}
                 </div>
@@ -259,6 +265,74 @@ export default function PropertyDetailsCard({
 
             {isOpen && (
                 <div className="space-y-6 pt-2">
+                    {/* Property Name */}
+                    <div className="space-y-1.5">
+                        <Label className="flex items-center gap-1.5">
+                            <Building2 className="w-4 h-4 text-muted-foreground" />
+                            Nome da Propriedade <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                            value={details.propertyName || ''}
+                            onChange={(e) => updateDetail("propertyName", e.target.value)}
+                            placeholder="ex: Casa Principal, Edifício Aurora"
+                        />
+                    </div>
+
+                    {/* IPTU Fields */}
+                    <div className="space-y-2">
+                        <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                            <Landmark className="w-4 h-4 text-muted-foreground" />
+                            Dados do IPTU / Registro
+                        </p>
+                        <p className="text-xs text-muted-foreground">Estes dados podem ser extraídos automaticamente do IPTU ou digitados manualmente.</p>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-1.5">
+                                <Label>Cadastro Imobiliário</Label>
+                                <Input
+                                    value={details.cadastroImobiliario || ''}
+                                    onChange={(e) => updateDetail("cadastroImobiliario", e.target.value)}
+                                    placeholder="Nº do cadastro"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label>Inscrição Imobiliária</Label>
+                                <Input
+                                    value={details.inscricaoImobiliaria || ''}
+                                    onChange={(e) => updateDetail("inscricaoImobiliaria", e.target.value)}
+                                    placeholder="Nº da inscrição"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label>Matrícula</Label>
+                                <Input
+                                    value={details.matricula || ''}
+                                    onChange={(e) => updateDetail("matricula", e.target.value)}
+                                    placeholder="Nº da matrícula"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label>Área Lote (m²)</Label>
+                                <Input
+                                    type="number"
+                                    min={0}
+                                    value={details.areaLote || ''}
+                                    onChange={(e) => updateDetail("areaLote", e.target.value)}
+                                    placeholder="ex: 500"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label>Área Edif. (m²)</Label>
+                                <Input
+                                    type="number"
+                                    min={0}
+                                    value={details.areaEdificada || ''}
+                                    onChange={(e) => updateDetail("areaEdificada", e.target.value)}
+                                    placeholder="ex: 350"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Number of Units + Total sqm */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {propertyType === "multi" && (
