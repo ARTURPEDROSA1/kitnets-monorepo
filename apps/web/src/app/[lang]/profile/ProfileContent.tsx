@@ -5,7 +5,7 @@ import { Button } from '@kitnets/ui';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Image from 'next/image';
-import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera, Video, Sparkles, Save, UploadCloud, Home, Building2, User, ShieldCheck, Fingerprint, ChevronDown, ChevronUp } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera, Video, Sparkles, Save, UploadCloud, Home, Building2, User, ShieldCheck, Fingerprint, ChevronDown, ChevronUp, Wand2 } from 'lucide-react';
 import PropertyDetailsCard, { PropertyDetails, SubUnit, SubUnitsSection } from '@/components/profile/PropertyDetailsCard';
 import { cn } from '@/lib/utils';
 import { useUser, useAuth } from '@clerk/nextjs';
@@ -112,6 +112,11 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
     const [addressSectionOpen, setAddressSectionOpen] = useState(true);
     const [photosSectionOpen, setPhotosSectionOpen] = useState(true);
     const [descriptionSectionOpen, setDescriptionSectionOpen] = useState(true);
+    const [detailsInitialOpen, setDetailsInitialOpen] = useState(true);
+
+    // AI description generation states
+    const [generatingMainDescription, setGeneratingMainDescription] = useState(false);
+    const [generatingUnitDescriptionIdx, setGeneratingUnitDescriptionIdx] = useState<number | null>(null);
 
     // Administrator data (only for PJ)
     const [adminData, setAdminData] = useState({
@@ -256,9 +261,23 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                             mainMeters: pd.mainMeters || { water: false, energy: false, gas: false },
                             internetBill: pd.internetBill || false,
                         });
+                        // Auto-collapse Detalhes if area is filled (and numberOfUnits for multi)
+                        if (pd.totalSqMeters) {
+                            setDetailsInitialOpen(false);
+                        }
                     }
                     if (profile.sub_units && Array.isArray(profile.sub_units)) {
                         setSubUnits(profile.sub_units as SubUnit[]);
+                    }
+
+                    // Auto-collapse Photos if 2+ photos already saved
+                    if (profile.property_photos && Array.isArray(profile.property_photos) && profile.property_photos.length >= 2) {
+                        setPhotosSectionOpen(false);
+                    }
+
+                    // Auto-collapse Description if already filled
+                    if (profile.property_address?.description) {
+                        setDescriptionSectionOpen(false);
                     }
 
                     // Load proofs
@@ -564,6 +583,85 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
 
     const removeSavedVideo = async (url: string) => {
         setSavedVideos(prev => prev.filter(u => u !== url));
+    };
+
+    // ── AI Description Generation ──────────────────────────────────
+    const generateMainDescription = async () => {
+        setGeneratingMainDescription(true);
+        try {
+            const res = await fetch('/api/property/generate-description', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'main',
+                    propertyData: {
+                        address: formData.propertyAddress,
+                        totalSqMeters: propertyDetails.totalSqMeters,
+                        solarEnergy: propertyDetails.solarEnergy,
+                        solarKwp: propertyDetails.solarKwp,
+                        propertyType,
+                        numberOfUnits: propertyDetails.numberOfUnits,
+                    },
+                }),
+            });
+            const data = await res.json();
+            if (data.description) {
+                handleAddressChange('propertyAddress', 'description', data.description);
+            } else {
+                alert('Não foi possível gerar a descrição. Tente novamente.');
+            }
+        } catch {
+            alert('Erro ao gerar descrição com IA.');
+        } finally {
+            setGeneratingMainDescription(false);
+        }
+    };
+
+    const generateUnitDescription = async (unitIndex: number) => {
+        setGeneratingUnitDescriptionIdx(unitIndex);
+        try {
+            const unit = subUnits[unitIndex];
+            const res = await fetch('/api/property/generate-description', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'unit',
+                    unitData: {
+                        name: unit.name,
+                        sqMeters: unit.sqMeters,
+                        rooms: unit.rooms,
+                        bedrooms: unit.bedrooms,
+                        bathrooms: unit.bathrooms,
+                        garage: unit.garage,
+                        kitchenCabinets: unit.kitchenCabinets,
+                        laundry: unit.laundry,
+                        ac: unit.ac,
+                        cooktop: unit.cooktop,
+                        condominium: unit.condominium,
+                        condominiumValue: unit.condominiumValue,
+                        condominiumIncludes: unit.condominiumIncludes,
+                    },
+                    propertyData: {
+                        address: formData.propertyAddress,
+                        totalSqMeters: propertyDetails.totalSqMeters,
+                        propertyType,
+                        numberOfUnits: propertyDetails.numberOfUnits,
+                    },
+                }),
+            });
+            const data = await res.json();
+            if (data.description) {
+                const updated = [...subUnits];
+                updated[unitIndex] = { ...updated[unitIndex], description: data.description };
+                setSubUnits(updated);
+            } else {
+                alert('Não foi possível gerar a descrição. Tente novamente.');
+            }
+        } catch {
+            alert('Erro ao gerar descrição com IA.');
+        } finally {
+            setGeneratingUnitDescriptionIdx(null);
+        }
     };
 
     const analyzeDocument = async (file: File) => {
@@ -1386,6 +1484,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                             onDetailsChange={setPropertyDetails}
                             onUnitsChange={setSubUnits}
                             propertyType={propertyType}
+                            initialOpen={detailsInitialOpen}
                         />
 
                         {/* 4. Photos & Videos Section — Main Property — Collapsible */}
@@ -1541,7 +1640,23 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                             </button>
                             {descriptionSectionOpen && (
                                 <div className="space-y-2">
-                                    <Label>Descreva seu imóvel em detalhes</Label>
+                                    <div className="flex items-center justify-between">
+                                        <Label>Descreva seu imóvel em detalhes <span className="text-red-500">*</span></Label>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-7 text-xs gap-1 text-violet-600 border-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/20"
+                                            onClick={generateMainDescription}
+                                            disabled={generatingMainDescription}
+                                        >
+                                            {generatingMainDescription ? (
+                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                            ) : (
+                                                <Wand2 className="w-3.5 h-3.5" />
+                                            )}
+                                            {generatingMainDescription ? 'Gerando...' : 'Gerar com IA'}
+                                        </Button>
+                                    </div>
                                     <textarea
                                         className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[120px]"
                                         placeholder="Ex: Excelente apartamento com varanda gourmet, vista livre, armários planejados na cozinha e banheiros..."
@@ -1560,6 +1675,8 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                 units={subUnits}
                                 onDetailsChange={setPropertyDetails}
                                 onUnitsChange={setSubUnits}
+                                onGenerateDescription={generateUnitDescription}
+                                generatingDescriptionIdx={generatingUnitDescriptionIdx}
                             />
                         )}
 
