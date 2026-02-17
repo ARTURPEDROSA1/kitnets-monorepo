@@ -232,6 +232,11 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                         }
                     });
 
+                    // Auto-collapse address section if already filled
+                    if (profile.property_address?.street) {
+                        setAddressSectionOpen(false);
+                    }
+
                     // Load photos & videos
                     if (profile.property_photos && Array.isArray(profile.property_photos)) {
                         setSavedPhotos(profile.property_photos);
@@ -1374,15 +1379,14 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                             )}
                         </div>
 
-                        {/* 3. Sub-unidades Section (below Address, only for multi) */}
-                        {propertyType === 'multi' && propertyDetails.numberOfUnits > 0 && (
-                            <SubUnitsSection
-                                details={propertyDetails}
-                                units={subUnits}
-                                onDetailsChange={setPropertyDetails}
-                                onUnitsChange={setSubUnits}
-                            />
-                        )}
+                        {/* 3. Detalhes Section */}
+                        <PropertyDetailsCard
+                            details={propertyDetails}
+                            units={subUnits}
+                            onDetailsChange={setPropertyDetails}
+                            onUnitsChange={setSubUnits}
+                            propertyType={propertyType}
+                        />
 
                         {/* 4. Photos & Videos Section — Main Property — Collapsible */}
                         <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
@@ -1549,14 +1553,15 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                             )}
                         </div>
 
-                        {/* 6. Detalhes Section */}
-                        <PropertyDetailsCard
-                            details={propertyDetails}
-                            units={subUnits}
-                            onDetailsChange={setPropertyDetails}
-                            onUnitsChange={setSubUnits}
-                            propertyType={propertyType}
-                        />
+                        {/* 6. Sub-unidades Section (at the bottom, only for multi) */}
+                        {propertyType === 'multi' && propertyDetails.numberOfUnits > 0 && (
+                            <SubUnitsSection
+                                details={propertyDetails}
+                                units={subUnits}
+                                onDetailsChange={setPropertyDetails}
+                                onUnitsChange={setSubUnits}
+                            />
+                        )}
 
                         <div className="flex justify-end pt-4">
                             <Button size="lg" onClick={handleSave} disabled={isSaving} className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-lg shadow-emerald-900/20">
