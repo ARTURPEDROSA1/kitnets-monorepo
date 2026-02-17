@@ -205,6 +205,11 @@ export default function PropertyDetailsCard({
 }: DetailsProps) {
     const [isOpen, setIsOpen] = useState(initialOpen);
 
+    // Sync collapse when parent sets initialOpen to false after async load
+    useEffect(() => {
+        if (!initialOpen) setIsOpen(false);
+    }, [initialOpen]);
+
     const updateDetail = <K extends keyof PropertyDetails>(key: K, val: PropertyDetails[K]) => {
         const updated = { ...details, [key]: val };
 
