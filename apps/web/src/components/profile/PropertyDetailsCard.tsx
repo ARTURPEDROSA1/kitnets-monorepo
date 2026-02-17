@@ -205,11 +205,6 @@ export default function PropertyDetailsCard({
 }: DetailsProps) {
     const [isOpen, setIsOpen] = useState(initialOpen);
 
-    // Sync collapse when parent sets initialOpen to false after async load
-    useEffect(() => {
-        if (!initialOpen) setIsOpen(false);
-    }, [initialOpen]);
-
     const updateDetail = <K extends keyof PropertyDetails>(key: K, val: PropertyDetails[K]) => {
         const updated = { ...details, [key]: val };
 
@@ -371,6 +366,7 @@ interface SubUnitsSectionProps {
     generatingDescriptionIdx?: number | null;
     onImportContract?: (unitIndex: number, file: File) => void;
     importingContractIdx?: number | null;
+    initialOpenIdx?: number | null;
 }
 
 const UNIT_TYPE_OPTIONS = [
@@ -394,8 +390,36 @@ export function SubUnitsSection({
     generatingDescriptionIdx,
     onImportContract,
     importingContractIdx,
+    initialOpenIdx,
 }: SubUnitsSectionProps) {
-    const [openUnitIndex, setOpenUnitIndex] = useState<number | null>(0);
+    // A unit is "complete" when all mandatory fields are filled
+    const isUnitComplete = (unit: SubUnit): boolean => {
+        const totalPhotos = (unit.photos?.length || 0) + (unit.newPhotos?.length || 0);
+        return !!(
+            unit.unitType &&
+            unit.name?.trim() &&
+            unit.sqMeters?.trim() &&
+            unit.rooms?.trim() &&
+            unit.bedrooms?.trim() &&
+            unit.bathrooms?.trim() &&
+            unit.description?.trim() &&
+            totalPhotos >= 2
+        );
+    };
+
+    // Compute a stable key representing unit completion states
+    const allComplete = useMemo(() =>
+        units.length > 0 && units.every(u => isUnitComplete(u)),
+        [units]
+    );
+
+    // Use initialOpenIdx from parent if provided, otherwise open first incomplete unit
+    const [openUnitIndex, setOpenUnitIndex] = useState<number | null>(() => {
+        if (initialOpenIdx !== undefined) return initialOpenIdx;
+        if (allComplete) return null;
+        const firstIncomplete = units.findIndex(u => !isUnitComplete(u));
+        return firstIncomplete >= 0 ? firstIncomplete : 0;
+    });
 
     const updateUnit = (index: number, partial: Partial<SubUnit>) => {
         const updated = [...units];
@@ -500,7 +524,14 @@ export function SubUnitsSection({
                                 <Home className="w-4 h-4 text-primary" />
                             </div>
                             <div className="text-left">
-                                <p className="text-sm font-semibold text-foreground">{unit.name || `Unidade ${idx + 1}`}</p>
+                                <div className="flex items-center gap-2">
+                                    <p className="text-sm font-semibold text-foreground">{unit.name || `Unidade ${idx + 1}`}</p>
+                                    {openUnitIndex !== idx && isUnitComplete(unit) && (
+                                        <span className="text-xs bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full">
+                                            Preenchido ✓
+                                        </span>
+                                    )}
+                                </div>
                                 <p className="text-xs text-muted-foreground">
                                     {unit.sqMeters ? `${unit.sqMeters} m²` : "Sem dados"}
                                     {unit.bedrooms ? ` · ${unit.bedrooms} quartos` : ""}

@@ -1528,6 +1528,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
 
                         {/* 3. Detalhes Section */}
                         <PropertyDetailsCard
+                            key={`details-${detailsInitialOpen}`}
                             details={propertyDetails}
                             units={subUnits}
                             onDetailsChange={setPropertyDetails}
