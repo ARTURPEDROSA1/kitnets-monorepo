@@ -13,7 +13,7 @@ const getOpenAIClient = () => {
 };
 
 const SYSTEM_PROMPT = `Você é um especialista em marketing imobiliário brasileiro. 
-Gere uma descrição atrativa e profissional em português para um imóvel ou unidade de aluguel.
+Gere uma descrição atrativa e profissional em português para um imóvel ou unidade.
 
 Regras:
 - Use linguagem persuasiva e positiva
@@ -23,22 +23,28 @@ Regras:
 - NÃO invente informações não fornecidas
 - NÃO use emojis
 - Use formatação de texto simples, sem markdown
-- Se for uma unidade/kitnet, foque nos detalhes específicos daquela unidade`;
+- Se for uma unidade/kitnet, foque nos detalhes específicos daquela unidade
+- Quando a finalidade for "aluguel", use termos como "disponível para locação", "ideal para inquilinos", valor de aluguel
+- Quando a finalidade for "venda", use termos como "oportunidade de investimento", "excelente para compra", valorização
+- Se a finalidade for "ambos", gere duas seções claramente separadas: uma para VENDA e outra para ALUGUEL`;
 
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { propertyData, unitData, type } = body;
+        const { propertyData, unitData, type, purpose } = body;
 
         if (!propertyData && !unitData) {
             return NextResponse.json({ error: 'No data provided' }, { status: 400 });
         }
 
+        // Determine description purpose
+        const purposeLabel = purpose === 'both' ? 'VENDA e ALUGUEL' : purpose === 'venda' ? 'VENDA' : 'ALUGUEL';
+
         // Build context from available data
         let context = '';
 
         if (type === 'unit' && unitData) {
-            context = `Gere uma descrição para esta UNIDADE de aluguel:\n`;
+            context = `Gere uma descrição para esta UNIDADE para ${purposeLabel}:\n`;
             if (unitData.name) context += `- Nome: ${unitData.name}\n`;
             if (unitData.sqMeters) context += `- Área: ${unitData.sqMeters} m²\n`;
             if (unitData.rooms) context += `- Cômodos: ${unitData.rooms}\n`;
@@ -63,7 +69,7 @@ export async function POST(request: NextRequest) {
 
         if (propertyData) {
             if (type === 'main') {
-                context = `Gere uma descrição para este IMÓVEL PRINCIPAL (área comum e fachada):\n`;
+                context = `Gere uma descrição para este IMÓVEL PRINCIPAL para ${purposeLabel} (área comum e fachada):\n`;
             } else {
                 context += `\nDados da propriedade principal:\n`;
             }

@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import {
     ChevronDown, ChevronUp, Settings2, Sun, Droplets, Zap, Flame,
     Wifi, Plus, Trash2, Home, BedDouble, Car, Shirt, Wind, CookingPot,
-    DoorOpen, Building2, Camera, Video, Bath, FileText, Wand2, Loader2
+    DoorOpen, Building2, Camera, Video, Bath, FileText, Wand2, Loader2, UploadCloud
 } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { cn } from "@/lib/utils";
@@ -26,8 +26,11 @@ export interface PropertyDetails {
     internetBill: boolean;
 }
 
+export type UnitType = 'kitnet' | 'studio' | 'apartment' | 'house' | 'bedroom' | 'commercial_room' | 'garage' | 'other' | '';
+
 export interface SubUnit {
     name: string;
+    unitType: UnitType;
     sqMeters: string;
     rooms: string;
     bedrooms: string;
@@ -55,6 +58,7 @@ export interface SubUnit {
 
 export const defaultSubUnit = (index: number): SubUnit => ({
     name: `Unidade ${index + 1}`,
+    unitType: '',
     sqMeters: "",
     rooms: "",
     bedrooms: "",
@@ -360,7 +364,21 @@ interface SubUnitsSectionProps {
     onUnitsChange: (units: SubUnit[]) => void;
     onGenerateDescription?: (unitIndex: number) => void;
     generatingDescriptionIdx?: number | null;
+    onImportContract?: (unitIndex: number, file: File) => void;
+    importingContractIdx?: number | null;
 }
+
+const UNIT_TYPE_OPTIONS = [
+    { value: '', label: 'Selecione o tipo' },
+    { value: 'kitnet', label: 'Kitnet' },
+    { value: 'studio', label: 'Studio' },
+    { value: 'apartment', label: 'Apartamento' },
+    { value: 'house', label: 'Casa' },
+    { value: 'bedroom', label: 'Quarto' },
+    { value: 'commercial_room', label: 'Sala Comercial' },
+    { value: 'garage', label: 'Garagem' },
+    { value: 'other', label: 'Outro' },
+];
 
 export function SubUnitsSection({
     details,
@@ -369,6 +387,8 @@ export function SubUnitsSection({
     onUnitsChange,
     onGenerateDescription,
     generatingDescriptionIdx,
+    onImportContract,
+    importingContractIdx,
 }: SubUnitsSectionProps) {
     const [openUnitIndex, setOpenUnitIndex] = useState<number | null>(0);
 
@@ -507,6 +527,61 @@ export function SubUnitsSection({
                     {/* Unit Content */}
                     {openUnitIndex === idx && (
                         <div className="px-5 pb-5 space-y-5 border-t border-border pt-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                            {/* Import Contract Button — at very top */}
+                            {onImportContract && (
+                                <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                                    <UploadCloud className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                                    <div className="flex-1">
+                                        <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Importar Contrato de Aluguel</p>
+                                        <p className="text-xs text-blue-600 dark:text-blue-400">Envie um PDF ou imagem do contrato — a IA extrairá os dados automaticamente</p>
+                                    </div>
+                                    <div className="relative">
+                                        <input
+                                            type="file"
+                                            accept="application/pdf,image/jpeg,image/png,image/webp"
+                                            onChange={(e) => {
+                                                const f = e.target.files?.[0];
+                                                if (f) onImportContract(idx, f);
+                                                e.target.value = '';
+                                            }}
+                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                            disabled={importingContractIdx === idx}
+                                        />
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-blue-600 border-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30 gap-1"
+                                            disabled={importingContractIdx === idx}
+                                        >
+                                            {importingContractIdx === idx ? (
+                                                <><Loader2 className="w-4 h-4 animate-spin" /> Extraindo...</>
+                                            ) : (
+                                                <><UploadCloud className="w-4 h-4" /> Enviar Contrato</>
+                                            )}
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Unit Type Dropdown */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="space-y-1.5">
+                                    <Label className="flex items-center gap-1.5">
+                                        <Home className="w-4 h-4 text-muted-foreground" />
+                                        Tipo da Unidade
+                                    </Label>
+                                    <select
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                        value={unit.unitType || ''}
+                                        onChange={(e) => updateUnit(idx, { unitType: e.target.value as SubUnit['unitType'] })}
+                                    >
+                                        {UNIT_TYPE_OPTIONS.map(opt => (
+                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
                             {/* Unit Name + SqM */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div className="space-y-1.5">
