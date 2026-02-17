@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import Image from "next/image";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
     ChevronDown, ChevronUp, Settings2, Sun, Droplets, Zap, Flame,
     Wifi, Plus, Trash2, Home, BedDouble, Car, Shirt, Wind, CookingPot,
-    DoorOpen, Building2
+    DoorOpen, Building2, Camera, Video, Bath, FileText
 } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,8 @@ export interface SubUnit {
     sqMeters: string;
     rooms: string;
     bedrooms: string;
+    bathrooms: string;
+    description: string;
     garage: boolean;
     laundry: "none" | "individual" | "shared";
     ac: "none" | "cold" | "cold_hot";
@@ -44,13 +47,19 @@ export interface SubUnit {
         iptu: boolean;
         gas: boolean;
     };
+    photos: string[];      // URLs of saved photos (max 10)
+    videos: string[];      // URLs of saved videos (max 2)
+    newPhotos: File[];     // New photos pending upload
+    newVideos: File[];     // New videos pending upload
 }
 
-const defaultSubUnit = (index: number): SubUnit => ({
+export const defaultSubUnit = (index: number): SubUnit => ({
     name: `Unidade ${index + 1}`,
     sqMeters: "",
     rooms: "",
     bedrooms: "",
+    bathrooms: "",
+    description: "",
     garage: false,
     laundry: "none",
     ac: "none",
@@ -65,19 +74,14 @@ const defaultSubUnit = (index: number): SubUnit => ({
         iptu: false,
         gas: false,
     },
+    photos: [],
+    videos: [],
+    newPhotos: [],
+    newVideos: [],
 });
 
-// ── Props ──────────────────────────────────────────────────────────
-interface Props {
-    details: PropertyDetails;
-    units: SubUnit[];
-    onDetailsChange: (details: PropertyDetails) => void;
-    onUnitsChange: (units: SubUnit[]) => void;
-    propertyType: "single" | "multi";
-}
-
 // ── Checkbox Component ─────────────────────────────────────────────
-function Checkbox({
+export function Checkbox({
     checked,
     onChange,
     label,
@@ -146,16 +150,54 @@ function SelectField({
     );
 }
 
-// ── Main Component ─────────────────────────────────────────────────
+// ── File Preview Component ─────────────────────────────────────────
+function FilePreview({ file, onRemove, isVideo }: { file: File; onRemove: () => void; isVideo?: boolean }) {
+    const preview = useMemo(() => URL.createObjectURL(file), [file]);
+
+    useEffect(() => {
+        return () => URL.revokeObjectURL(preview);
+    }, [preview]);
+
+    return (
+        <div className="aspect-square rounded-lg border border-border relative group overflow-hidden bg-muted">
+            {isVideo ? (
+                <video src={preview} className="w-full h-full object-cover" muted />
+            ) : (
+                <Image src={preview} alt="Preview" width={200} height={200} className="w-full h-full object-cover" />
+            )}
+            <div className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button size="icon" variant="destructive" className="h-6 w-6" onClick={onRemove}>
+                    <Trash2 className="w-3 h-3" />
+                </Button>
+            </div>
+            <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[10px] p-1 truncate text-center">
+                {isVideo && <Video className="w-3 h-3 inline mr-1" />}
+                {file.name}
+            </div>
+        </div>
+    );
+}
+
+
+// ══════════════════════════════════════════════════════════════════
+//  PropertyDetailsCard — Only the "Detalhes" section
+// ══════════════════════════════════════════════════════════════════
+interface DetailsProps {
+    details: PropertyDetails;
+    units: SubUnit[];
+    onDetailsChange: (details: PropertyDetails) => void;
+    onUnitsChange: (units: SubUnit[]) => void;
+    propertyType: "single" | "multi";
+}
+
 export default function PropertyDetailsCard({
     details,
     units,
     onDetailsChange,
     onUnitsChange,
     propertyType,
-}: Props) {
+}: DetailsProps) {
     const [isOpen, setIsOpen] = useState(true);
-    const [openUnitIndex, setOpenUnitIndex] = useState<number | null>(0);
 
     const updateDetail = <K extends keyof PropertyDetails>(key: K, val: PropertyDetails[K]) => {
         const updated = { ...details, [key]: val };
@@ -184,6 +226,141 @@ export default function PropertyDetailsCard({
         });
     };
 
+    return (
+        <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
+            <button
+                type="button"
+                onClick={() => setIsOpen((p) => !p)}
+                className="flex items-center justify-between w-full"
+            >
+                <div className="flex items-center gap-2">
+                    <div className="p-2 bg-violet-100 dark:bg-violet-900/50 rounded-lg text-violet-600">
+                        <Settings2 className="w-5 h-5" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-foreground">Detalhes</h3>
+                </div>
+                {isOpen ? (
+                    <ChevronUp className="w-5 h-5 text-muted-foreground" />
+                ) : (
+                    <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                )}
+            </button>
+
+            {isOpen && (
+                <div className="space-y-6 pt-2">
+                    {/* Number of Units + Total sqm */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {propertyType === "multi" && (
+                            <div className="space-y-1.5">
+                                <Label className="flex items-center gap-1.5">
+                                    <Building2 className="w-4 h-4 text-muted-foreground" />
+                                    Número de Unidades
+                                </Label>
+                                <Input
+                                    type="number"
+                                    min={0}
+                                    max={50}
+                                    value={details.numberOfUnits || ""}
+                                    onChange={(e) => updateDetail("numberOfUnits", Math.max(0, parseInt(e.target.value) || 0))}
+                                    placeholder="ex: 5"
+                                />
+                            </div>
+                        )}
+                        <div className="space-y-1.5">
+                            <Label className="flex items-center gap-1.5">
+                                <DoorOpen className="w-4 h-4 text-muted-foreground" />
+                                Área Total (m²)
+                            </Label>
+                            <Input
+                                type="number"
+                                min={0}
+                                value={details.totalSqMeters}
+                                onChange={(e) => updateDetail("totalSqMeters", e.target.value)}
+                                placeholder="ex: 250"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Solar Energy */}
+                    <div className="space-y-3">
+                        <Checkbox
+                            checked={details.solarEnergy}
+                            onChange={(val) => updateDetail("solarEnergy", val)}
+                            label="Energia Solar"
+                            icon={<Sun className="w-4 h-4" />}
+                        />
+                        {details.solarEnergy && (
+                            <div className="ml-9 space-y-1.5 max-w-xs animate-in fade-in slide-in-from-top-1 duration-200">
+                                <Label>Capacidade de Geração (kWp)</Label>
+                                <Input
+                                    type="number"
+                                    min={0}
+                                    step={0.1}
+                                    value={details.solarKwp}
+                                    onChange={(e) => updateDetail("solarKwp", e.target.value)}
+                                    placeholder="ex: 5.5"
+                                />
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Main Meters */}
+                    <div className="space-y-2">
+                        <p className="text-sm font-semibold text-foreground">Medidores Principais do Imóvel</p>
+                        <div className="flex flex-wrap gap-4">
+                            <Checkbox
+                                checked={details.mainMeters.water}
+                                onChange={(val) => updateMainMeter("water", val)}
+                                label="Água"
+                                icon={<Droplets className="w-4 h-4" />}
+                            />
+                            <Checkbox
+                                checked={details.mainMeters.energy}
+                                onChange={(val) => updateMainMeter("energy", val)}
+                                label="Energia"
+                                icon={<Zap className="w-4 h-4" />}
+                            />
+                            <Checkbox
+                                checked={details.mainMeters.gas}
+                                onChange={(val) => updateMainMeter("gas", val)}
+                                label="Gás"
+                                icon={<Flame className="w-4 h-4" />}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Internet Bill */}
+                    <Checkbox
+                        checked={details.internetBill}
+                        onChange={(val) => updateDetail("internetBill", val)}
+                        label="Conta de Internet"
+                        icon={<Wifi className="w-4 h-4" />}
+                    />
+                </div>
+            )}
+        </div>
+    );
+}
+
+
+// ══════════════════════════════════════════════════════════════════
+//  SubUnitsSection — Rendered separately in profile page
+// ══════════════════════════════════════════════════════════════════
+interface SubUnitsSectionProps {
+    details: PropertyDetails;
+    units: SubUnit[];
+    onDetailsChange: (details: PropertyDetails) => void;
+    onUnitsChange: (units: SubUnit[]) => void;
+}
+
+export function SubUnitsSection({
+    details,
+    units,
+    onDetailsChange,
+    onUnitsChange,
+}: SubUnitsSectionProps) {
+    const [openUnitIndex, setOpenUnitIndex] = useState<number | null>(0);
+
     const updateUnit = (index: number, partial: Partial<SubUnit>) => {
         const updated = [...units];
         updated[index] = { ...updated[index], ...partial };
@@ -201,369 +378,409 @@ export default function PropertyDetailsCard({
 
     const removeUnit = (index: number) => {
         const updated = units.filter((_, i) => i !== index);
-        updateDetail("numberOfUnits", updated.length);
+        onDetailsChange({ ...details, numberOfUnits: updated.length });
         onUnitsChange(updated);
     };
 
-    return (
-        <div className="space-y-4">
-            {/* ── Detalhes Card ──────────────────────────────────────── */}
-            <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
-                <button
-                    type="button"
-                    onClick={() => setIsOpen((p) => !p)}
-                    className="flex items-center justify-between w-full"
-                >
-                    <div className="flex items-center gap-2">
-                        <div className="p-2 bg-violet-100 dark:bg-violet-900/50 rounded-lg text-violet-600">
-                            <Settings2 className="w-5 h-5" />
-                        </div>
-                        <h3 className="text-lg font-semibold text-foreground">Detalhes</h3>
-                    </div>
-                    {isOpen ? (
-                        <ChevronUp className="w-5 h-5 text-muted-foreground" />
-                    ) : (
-                        <ChevronDown className="w-5 h-5 text-muted-foreground" />
-                    )}
-                </button>
+    const handleUnitPhotoSelect = (idx: number, e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0) return;
+        const unit = units[idx];
+        const totalPhotos = (unit.photos?.length || 0) + (unit.newPhotos?.length || 0);
+        const remaining = 10 - totalPhotos;
+        if (remaining <= 0) { alert("Máximo de 10 fotos por unidade."); return; }
+        const newFiles = Array.from(e.target.files).slice(0, remaining);
+        updateUnit(idx, { newPhotos: [...(unit.newPhotos || []), ...newFiles] });
+        e.target.value = '';
+    };
 
-                {isOpen && (
-                    <div className="space-y-6 pt-2">
-                        {/* Number of Units + Total sqm */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {propertyType === "multi" && (
+    const handleUnitVideoSelect = (idx: number, e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0) return;
+        const unit = units[idx];
+        const totalVideos = (unit.videos?.length || 0) + (unit.newVideos?.length || 0);
+        const remaining = 2 - totalVideos;
+        if (remaining <= 0) { alert("Máximo de 2 vídeos por unidade."); return; }
+        const newFiles = Array.from(e.target.files).slice(0, remaining);
+        updateUnit(idx, { newVideos: [...(unit.newVideos || []), ...newFiles] });
+        e.target.value = '';
+    };
+
+    const removeUnitNewPhoto = (unitIdx: number, photoIdx: number) => {
+        const unit = units[unitIdx];
+        updateUnit(unitIdx, { newPhotos: (unit.newPhotos || []).filter((_, i) => i !== photoIdx) });
+    };
+
+    const removeUnitNewVideo = (unitIdx: number, videoIdx: number) => {
+        const unit = units[unitIdx];
+        updateUnit(unitIdx, { newVideos: (unit.newVideos || []).filter((_, i) => i !== videoIdx) });
+    };
+
+    const removeUnitSavedPhoto = (unitIdx: number, url: string) => {
+        const unit = units[unitIdx];
+        updateUnit(unitIdx, { photos: (unit.photos || []).filter(u => u !== url) });
+    };
+
+    const removeUnitSavedVideo = (unitIdx: number, url: string) => {
+        const unit = units[unitIdx];
+        updateUnit(unitIdx, { videos: (unit.videos || []).filter(u => u !== url) });
+    };
+
+    if (details.numberOfUnits <= 0) return null;
+
+    return (
+        <div className="space-y-3">
+            <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                    <Home className="w-5 h-5 text-primary" />
+                    Sub-unidades ({units.length})
+                </h3>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                        const newUnits = [...units, defaultSubUnit(units.length)];
+                        onUnitsChange(newUnits);
+                        onDetailsChange({ ...details, numberOfUnits: newUnits.length });
+                        setOpenUnitIndex(newUnits.length - 1);
+                    }}
+                >
+                    <Plus className="w-4 h-4 mr-1" />
+                    Adicionar
+                </Button>
+            </div>
+
+            {units.map((unit, idx) => (
+                <div
+                    key={idx}
+                    className="bg-card border border-border rounded-xl shadow-sm overflow-hidden"
+                >
+                    {/* Unit Header */}
+                    <button
+                        type="button"
+                        onClick={() => setOpenUnitIndex(openUnitIndex === idx ? null : idx)}
+                        className="flex items-center justify-between w-full px-5 py-4 hover:bg-muted/30 transition-colors"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="p-1.5 bg-primary/10 rounded-lg">
+                                <Home className="w-4 h-4 text-primary" />
+                            </div>
+                            <div className="text-left">
+                                <p className="text-sm font-semibold text-foreground">{unit.name || `Unidade ${idx + 1}`}</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {unit.sqMeters ? `${unit.sqMeters} m²` : "Sem dados"}
+                                    {unit.bedrooms ? ` · ${unit.bedrooms} quartos` : ""}
+                                    {unit.bathrooms ? ` · ${unit.bathrooms} banheiros` : ""}
+                                    {(unit.photos?.length || 0) + (unit.newPhotos?.length || 0) > 0 ? ` · ${(unit.photos?.length || 0) + (unit.newPhotos?.length || 0)} fotos` : ""}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive hover:text-destructive h-8 w-8 p-0"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    removeUnit(idx);
+                                }}
+                            >
+                                <Trash2 className="w-4 h-4" />
+                            </Button>
+                            {openUnitIndex === idx ? (
+                                <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                            ) : (
+                                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                            )}
+                        </div>
+                    </button>
+
+                    {/* Unit Content */}
+                    {openUnitIndex === idx && (
+                        <div className="px-5 pb-5 space-y-5 border-t border-border pt-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                            {/* Unit Name + SqM */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="space-y-1.5">
+                                    <Label>Nome da Unidade</Label>
+                                    <Input
+                                        value={unit.name}
+                                        onChange={(e) => updateUnit(idx, { name: e.target.value })}
+                                        placeholder="ex: Kitnet 35A"
+                                    />
+                                </div>
                                 <div className="space-y-1.5">
                                     <Label className="flex items-center gap-1.5">
-                                        <Building2 className="w-4 h-4 text-muted-foreground" />
-                                        Número de Unidades
+                                        <DoorOpen className="w-4 h-4 text-muted-foreground" />
+                                        Área (m²)
                                     </Label>
                                     <Input
                                         type="number"
                                         min={0}
-                                        max={50}
-                                        value={details.numberOfUnits || ""}
-                                        onChange={(e) => updateDetail("numberOfUnits", Math.max(0, parseInt(e.target.value) || 0))}
-                                        placeholder="ex: 5"
+                                        value={unit.sqMeters}
+                                        onChange={(e) => updateUnit(idx, { sqMeters: e.target.value })}
+                                        placeholder="ex: 30"
                                     />
                                 </div>
-                            )}
-                            <div className="space-y-1.5">
-                                <Label className="flex items-center gap-1.5">
-                                    <DoorOpen className="w-4 h-4 text-muted-foreground" />
-                                    Área Total (m²)
-                                </Label>
-                                <Input
-                                    type="number"
-                                    min={0}
-                                    value={details.totalSqMeters}
-                                    onChange={(e) => updateDetail("totalSqMeters", e.target.value)}
-                                    placeholder="ex: 250"
-                                />
                             </div>
-                        </div>
 
-                        {/* Solar Energy */}
-                        <div className="space-y-3">
-                            <Checkbox
-                                checked={details.solarEnergy}
-                                onChange={(val) => updateDetail("solarEnergy", val)}
-                                label="Energia Solar"
-                                icon={<Sun className="w-4 h-4" />}
-                            />
-                            {details.solarEnergy && (
-                                <div className="ml-9 space-y-1.5 max-w-xs animate-in fade-in slide-in-from-top-1 duration-200">
-                                    <Label>Capacidade de Geração (kWp)</Label>
+                            {/* Rooms + Bedrooms + Bathrooms */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div className="space-y-1.5">
+                                    <Label className="flex items-center gap-1.5">
+                                        <DoorOpen className="w-4 h-4 text-muted-foreground" />
+                                        Cômodos
+                                    </Label>
                                     <Input
                                         type="number"
                                         min={0}
-                                        step={0.1}
-                                        value={details.solarKwp}
-                                        onChange={(e) => updateDetail("solarKwp", e.target.value)}
-                                        placeholder="ex: 5.5"
+                                        value={unit.rooms}
+                                        onChange={(e) => updateUnit(idx, { rooms: e.target.value })}
+                                        placeholder="ex: 4"
                                     />
                                 </div>
-                            )}
-                        </div>
+                                <div className="space-y-1.5">
+                                    <Label className="flex items-center gap-1.5">
+                                        <BedDouble className="w-4 h-4 text-muted-foreground" />
+                                        Quartos
+                                    </Label>
+                                    <Input
+                                        type="number"
+                                        min={0}
+                                        value={unit.bedrooms}
+                                        onChange={(e) => updateUnit(idx, { bedrooms: e.target.value })}
+                                        placeholder="ex: 1"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="flex items-center gap-1.5">
+                                        <Bath className="w-4 h-4 text-muted-foreground" />
+                                        Banheiros
+                                    </Label>
+                                    <Input
+                                        type="number"
+                                        min={0}
+                                        value={unit.bathrooms}
+                                        onChange={(e) => updateUnit(idx, { bathrooms: e.target.value })}
+                                        placeholder="ex: 1"
+                                    />
+                                </div>
+                            </div>
 
-                        {/* Main Meters */}
-                        <div className="space-y-2">
-                            <p className="text-sm font-semibold text-foreground">Medidores Principais do Imóvel</p>
-                            <div className="flex flex-wrap gap-4">
+                            {/* Garage + Kitchen Cabinets */}
+                            <div className="flex flex-wrap gap-5">
                                 <Checkbox
-                                    checked={details.mainMeters.water}
-                                    onChange={(val) => updateMainMeter("water", val)}
-                                    label="Água"
-                                    icon={<Droplets className="w-4 h-4" />}
+                                    checked={unit.garage}
+                                    onChange={(val) => updateUnit(idx, { garage: val })}
+                                    label="Garagem"
+                                    icon={<Car className="w-4 h-4" />}
                                 />
                                 <Checkbox
-                                    checked={details.mainMeters.energy}
-                                    onChange={(val) => updateMainMeter("energy", val)}
-                                    label="Energia"
-                                    icon={<Zap className="w-4 h-4" />}
-                                />
-                                <Checkbox
-                                    checked={details.mainMeters.gas}
-                                    onChange={(val) => updateMainMeter("gas", val)}
-                                    label="Gás"
-                                    icon={<Flame className="w-4 h-4" />}
+                                    checked={unit.kitchenCabinets}
+                                    onChange={(val) => updateUnit(idx, { kitchenCabinets: val })}
+                                    label="Armários de Cozinha"
+                                    icon={<CookingPot className="w-4 h-4" />}
                                 />
                             </div>
-                        </div>
 
-                        {/* Internet Bill */}
-                        <Checkbox
-                            checked={details.internetBill}
-                            onChange={(val) => updateDetail("internetBill", val)}
-                            label="Conta de Internet"
-                            icon={<Wifi className="w-4 h-4" />}
-                        />
-                    </div>
-                )}
-            </div>
+                            {/* Selects: Laundry, AC, Cooktop */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <SelectField
+                                    label="Lavanderia"
+                                    value={unit.laundry}
+                                    onChange={(val) => updateUnit(idx, { laundry: val as SubUnit["laundry"] })}
+                                    icon={<Shirt className="w-4 h-4 text-muted-foreground" />}
+                                    options={[
+                                        { value: "none", label: "Não possui" },
+                                        { value: "individual", label: "Individual" },
+                                        { value: "shared", label: "Compartilhada" },
+                                    ]}
+                                />
+                                <SelectField
+                                    label="Ar-Condicionado"
+                                    value={unit.ac}
+                                    onChange={(val) => updateUnit(idx, { ac: val as SubUnit["ac"] })}
+                                    icon={<Wind className="w-4 h-4 text-muted-foreground" />}
+                                    options={[
+                                        { value: "none", label: "Não possui" },
+                                        { value: "cold", label: "Frio" },
+                                        { value: "cold_hot", label: "Quente e Frio" },
+                                    ]}
+                                />
+                                <SelectField
+                                    label="Cooktop"
+                                    value={unit.cooktop}
+                                    onChange={(val) => updateUnit(idx, { cooktop: val as SubUnit["cooktop"] })}
+                                    icon={<CookingPot className="w-4 h-4 text-muted-foreground" />}
+                                    options={[
+                                        { value: "none", label: "Não possui" },
+                                        { value: "gas", label: "Gás" },
+                                        { value: "electric", label: "Elétrico" },
+                                        { value: "induction", label: "Indução" },
+                                    ]}
+                                />
+                            </div>
 
-            {/* ── Sub-Unit Cards ─────────────────────────────────────── */}
-            {propertyType === "multi" && details.numberOfUnits > 0 && (
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                        <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                            <Home className="w-5 h-5 text-primary" />
-                            Sub-unidades ({units.length})
-                        </h3>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                                const newUnits = [...units, defaultSubUnit(units.length)];
-                                onUnitsChange(newUnits);
-                                updateDetail("numberOfUnits", newUnits.length);
-                                setOpenUnitIndex(newUnits.length - 1);
-                            }}
-                        >
-                            <Plus className="w-4 h-4 mr-1" />
-                            Adicionar
-                        </Button>
-                    </div>
+                            {/* Description */}
+                            <div className="space-y-2 pt-2 border-t border-border">
+                                <Label className="flex items-center gap-1.5">
+                                    <FileText className="w-4 h-4 text-muted-foreground" />
+                                    Descrição da Unidade
+                                </Label>
+                                <textarea
+                                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[80px]"
+                                    placeholder="Ex: Kitnet com vista para o jardim, piso laminado, banheiro com box..."
+                                    value={unit.description || ''}
+                                    onChange={(e) => updateUnit(idx, { description: e.target.value })}
+                                />
+                            </div>
 
-                    {units.map((unit, idx) => (
-                        <div
-                            key={idx}
-                            className="bg-card border border-border rounded-xl shadow-sm overflow-hidden"
-                        >
-                            {/* Unit Header */}
-                            <button
-                                type="button"
-                                onClick={() => setOpenUnitIndex(openUnitIndex === idx ? null : idx)}
-                                className="flex items-center justify-between w-full px-5 py-4 hover:bg-muted/30 transition-colors"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className="p-1.5 bg-primary/10 rounded-lg">
-                                        <Home className="w-4 h-4 text-primary" />
-                                    </div>
-                                    <div className="text-left">
-                                        <p className="text-sm font-semibold text-foreground">{unit.name || `Unidade ${idx + 1}`}</p>
-                                        <p className="text-xs text-muted-foreground">
-                                            {unit.sqMeters ? `${unit.sqMeters} m²` : "Sem dados"}
-                                            {unit.bedrooms ? ` · ${unit.bedrooms} quartos` : ""}
-                                            {unit.condominium ? ` · Condomínio R$ ${unit.condominiumValue || "–"}` : ""}
-                                        </p>
-                                    </div>
+                            {/* Photos (up to 10) */}
+                            <div className="space-y-2 pt-2 border-t border-border">
+                                <div className="flex items-center justify-between">
+                                    <Label className="flex items-center gap-1.5">
+                                        <Camera className="w-4 h-4 text-muted-foreground" />
+                                        Fotos da Unidade
+                                    </Label>
+                                    <span className="text-xs text-muted-foreground">
+                                        {(unit.photos?.length || 0) + (unit.newPhotos?.length || 0)}/10
+                                    </span>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="text-destructive hover:text-destructive h-8 w-8 p-0"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            removeUnit(idx);
-                                        }}
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </Button>
-                                    {openUnitIndex === idx ? (
-                                        <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                                    ) : (
-                                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                                <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
+                                    {/* Upload button */}
+                                    {(unit.photos?.length || 0) + (unit.newPhotos?.length || 0) < 10 && (
+                                        <div className="aspect-square rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors relative">
+                                            <input
+                                                type="file"
+                                                multiple
+                                                accept="image/*"
+                                                onChange={(e) => handleUnitPhotoSelect(idx, e)}
+                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                            />
+                                            <Camera className="w-6 h-6 text-muted-foreground mb-1" />
+                                            <span className="text-[10px] text-muted-foreground">Adicionar</span>
+                                        </div>
                                     )}
-                                </div>
-                            </button>
-
-                            {/* Unit Content */}
-                            {openUnitIndex === idx && (
-                                <div className="px-5 pb-5 space-y-5 border-t border-border pt-4 animate-in fade-in slide-in-from-top-1 duration-200">
-                                    {/* Unit Name + SqM */}
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div className="space-y-1.5">
-                                            <Label>Nome da Unidade</Label>
-                                            <Input
-                                                value={unit.name}
-                                                onChange={(e) => updateUnit(idx, { name: e.target.value })}
-                                                placeholder="ex: Kitnet 35A"
-                                            />
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <Label className="flex items-center gap-1.5">
-                                                <DoorOpen className="w-4 h-4 text-muted-foreground" />
-                                                Área (m²)
-                                            </Label>
-                                            <Input
-                                                type="number"
-                                                min={0}
-                                                value={unit.sqMeters}
-                                                onChange={(e) => updateUnit(idx, { sqMeters: e.target.value })}
-                                                placeholder="ex: 30"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* Rooms + Bedrooms */}
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                        <div className="space-y-1.5">
-                                            <Label className="flex items-center gap-1.5">
-                                                <DoorOpen className="w-4 h-4 text-muted-foreground" />
-                                                Cômodos
-                                            </Label>
-                                            <Input
-                                                type="number"
-                                                min={0}
-                                                value={unit.rooms}
-                                                onChange={(e) => updateUnit(idx, { rooms: e.target.value })}
-                                                placeholder="ex: 4"
-                                            />
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <Label className="flex items-center gap-1.5">
-                                                <BedDouble className="w-4 h-4 text-muted-foreground" />
-                                                Quartos
-                                            </Label>
-                                            <Input
-                                                type="number"
-                                                min={0}
-                                                value={unit.bedrooms}
-                                                onChange={(e) => updateUnit(idx, { bedrooms: e.target.value })}
-                                                placeholder="ex: 1"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* Garage + Kitchen Cabinets */}
-                                    <div className="flex flex-wrap gap-5">
-                                        <Checkbox
-                                            checked={unit.garage}
-                                            onChange={(val) => updateUnit(idx, { garage: val })}
-                                            label="Garagem"
-                                            icon={<Car className="w-4 h-4" />}
-                                        />
-                                        <Checkbox
-                                            checked={unit.kitchenCabinets}
-                                            onChange={(val) => updateUnit(idx, { kitchenCabinets: val })}
-                                            label="Armários de Cozinha"
-                                            icon={<CookingPot className="w-4 h-4" />}
-                                        />
-                                    </div>
-
-                                    {/* Selects: Laundry, AC, Cooktop */}
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <SelectField
-                                            label="Lavanderia"
-                                            value={unit.laundry}
-                                            onChange={(val) => updateUnit(idx, { laundry: val as SubUnit["laundry"] })}
-                                            icon={<Shirt className="w-4 h-4 text-muted-foreground" />}
-                                            options={[
-                                                { value: "none", label: "Não possui" },
-                                                { value: "individual", label: "Individual" },
-                                                { value: "shared", label: "Compartilhada" },
-                                            ]}
-                                        />
-                                        <SelectField
-                                            label="Ar-Condicionado"
-                                            value={unit.ac}
-                                            onChange={(val) => updateUnit(idx, { ac: val as SubUnit["ac"] })}
-                                            icon={<Wind className="w-4 h-4 text-muted-foreground" />}
-                                            options={[
-                                                { value: "none", label: "Não possui" },
-                                                { value: "cold", label: "Frio" },
-                                                { value: "cold_hot", label: "Quente e Frio" },
-                                            ]}
-                                        />
-                                        <SelectField
-                                            label="Cooktop"
-                                            value={unit.cooktop}
-                                            onChange={(val) => updateUnit(idx, { cooktop: val as SubUnit["cooktop"] })}
-                                            icon={<CookingPot className="w-4 h-4 text-muted-foreground" />}
-                                            options={[
-                                                { value: "none", label: "Não possui" },
-                                                { value: "gas", label: "Gás" },
-                                                { value: "electric", label: "Elétrico" },
-                                                { value: "induction", label: "Indução" },
-                                            ]}
-                                        />
-                                    </div>
-
-                                    {/* Condominium */}
-                                    <div className="space-y-3 pt-2 border-t border-border">
-                                        <Checkbox
-                                            checked={unit.condominium}
-                                            onChange={(val) => updateUnit(idx, { condominium: val })}
-                                            label="Condomínio"
-                                            icon={<Building2 className="w-4 h-4" />}
-                                        />
-                                        {unit.condominium && (
-                                            <div className="ml-9 space-y-4 animate-in fade-in slide-in-from-top-1 duration-200">
-                                                <div className="space-y-1.5 max-w-xs">
-                                                    <Label>Valor do Condomínio (R$)</Label>
-                                                    <Input
-                                                        type="number"
-                                                        min={0}
-                                                        step={0.01}
-                                                        value={unit.condominiumValue}
-                                                        onChange={(e) => updateUnit(idx, { condominiumValue: e.target.value })}
-                                                        placeholder="ex: 350.00"
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <p className="text-sm font-medium text-foreground">Incluso no condomínio:</p>
-                                                    <div className="flex flex-wrap gap-4">
-                                                        <Checkbox
-                                                            checked={unit.condominiumIncludes.energy}
-                                                            onChange={(val) => updateUnitCondo(idx, "energy", val)}
-                                                            label="Energia"
-                                                            icon={<Zap className="w-3.5 h-3.5" />}
-                                                        />
-                                                        <Checkbox
-                                                            checked={unit.condominiumIncludes.water}
-                                                            onChange={(val) => updateUnitCondo(idx, "water", val)}
-                                                            label="Água"
-                                                            icon={<Droplets className="w-3.5 h-3.5" />}
-                                                        />
-                                                        <Checkbox
-                                                            checked={unit.condominiumIncludes.internet}
-                                                            onChange={(val) => updateUnitCondo(idx, "internet", val)}
-                                                            label="Internet"
-                                                            icon={<Wifi className="w-3.5 h-3.5" />}
-                                                        />
-                                                        <Checkbox
-                                                            checked={unit.condominiumIncludes.iptu}
-                                                            onChange={(val) => updateUnitCondo(idx, "iptu", val)}
-                                                            label="IPTU"
-                                                        />
-                                                        <Checkbox
-                                                            checked={unit.condominiumIncludes.gas}
-                                                            onChange={(val) => updateUnitCondo(idx, "gas", val)}
-                                                            label="Gás"
-                                                            icon={<Flame className="w-3.5 h-3.5" />}
-                                                        />
-                                                    </div>
-                                                </div>
+                                    {/* New photos */}
+                                    {(unit.newPhotos || []).map((file, pi) => (
+                                        <FilePreview key={`np-${pi}`} file={file} onRemove={() => removeUnitNewPhoto(idx, pi)} />
+                                    ))}
+                                    {/* Saved photos */}
+                                    {(unit.photos || []).map((url, pi) => (
+                                        <div key={`sp-${pi}`} className="aspect-square rounded-lg border border-border relative group overflow-hidden">
+                                            <Image src={url} alt="Unit" width={200} height={200} className="w-full h-full object-cover" />
+                                            <div className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <Button size="icon" variant="destructive" className="h-5 w-5" onClick={() => removeUnitSavedPhoto(idx, url)}>
+                                                    <Trash2 className="w-2.5 h-2.5" />
+                                                </Button>
                                             </div>
-                                        )}
-                                    </div>
+                                        </div>
+                                    ))}
                                 </div>
-                            )}
+                            </div>
+
+                            {/* Videos (up to 2) */}
+                            <div className="space-y-2 pt-2 border-t border-border">
+                                <div className="flex items-center justify-between">
+                                    <Label className="flex items-center gap-1.5">
+                                        <Video className="w-4 h-4 text-muted-foreground" />
+                                        Vídeos da Unidade
+                                    </Label>
+                                    <span className="text-xs text-muted-foreground">
+                                        {(unit.videos?.length || 0) + (unit.newVideos?.length || 0)}/2
+                                    </span>
+                                </div>
+                                <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
+                                    {(unit.videos?.length || 0) + (unit.newVideos?.length || 0) < 2 && (
+                                        <div className="aspect-square rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors relative">
+                                            <input
+                                                type="file"
+                                                accept="video/*"
+                                                onChange={(e) => handleUnitVideoSelect(idx, e)}
+                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                            />
+                                            <Video className="w-6 h-6 text-muted-foreground mb-1" />
+                                            <span className="text-[10px] text-muted-foreground">Adicionar</span>
+                                        </div>
+                                    )}
+                                    {(unit.newVideos || []).map((file, vi) => (
+                                        <FilePreview key={`nv-${vi}`} file={file} onRemove={() => removeUnitNewVideo(idx, vi)} isVideo />
+                                    ))}
+                                    {(unit.videos || []).map((url, vi) => (
+                                        <div key={`sv-${vi}`} className="aspect-square rounded-lg border border-border relative group overflow-hidden">
+                                            <video src={url} className="w-full h-full object-cover" muted />
+                                            <div className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <Button size="icon" variant="destructive" className="h-5 w-5" onClick={() => removeUnitSavedVideo(idx, url)}>
+                                                    <Trash2 className="w-2.5 h-2.5" />
+                                                </Button>
+                                            </div>
+                                            <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[10px] p-1 text-center flex items-center justify-center gap-1">
+                                                <Video className="w-3 h-3" /> Vídeo
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Condominium */}
+                            <div className="space-y-3 pt-2 border-t border-border">
+                                <Checkbox
+                                    checked={unit.condominium}
+                                    onChange={(val) => updateUnit(idx, { condominium: val })}
+                                    label="Condomínio"
+                                    icon={<Building2 className="w-4 h-4" />}
+                                />
+                                {unit.condominium && (
+                                    <div className="ml-9 space-y-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                                        <div className="space-y-1.5 max-w-xs">
+                                            <Label>Valor do Condomínio (R$)</Label>
+                                            <Input
+                                                type="number"
+                                                min={0}
+                                                step={0.01}
+                                                value={unit.condominiumValue}
+                                                onChange={(e) => updateUnit(idx, { condominiumValue: e.target.value })}
+                                                placeholder="ex: 350.00"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <p className="text-sm font-medium text-foreground">Incluso no condomínio:</p>
+                                            <div className="flex flex-wrap gap-4">
+                                                <Checkbox
+                                                    checked={unit.condominiumIncludes.energy}
+                                                    onChange={(val) => updateUnitCondo(idx, "energy", val)}
+                                                    label="Energia"
+                                                    icon={<Zap className="w-3.5 h-3.5" />}
+                                                />
+                                                <Checkbox
+                                                    checked={unit.condominiumIncludes.water}
+                                                    onChange={(val) => updateUnitCondo(idx, "water", val)}
+                                                    label="Água"
+                                                    icon={<Droplets className="w-3.5 h-3.5" />}
+                                                />
+                                                <Checkbox
+                                                    checked={unit.condominiumIncludes.internet}
+                                                    onChange={(val) => updateUnitCondo(idx, "internet", val)}
+                                                    label="Internet"
+                                                    icon={<Wifi className="w-3.5 h-3.5" />}
+                                                />
+                                                <Checkbox
+                                                    checked={unit.condominiumIncludes.iptu}
+                                                    onChange={(val) => updateUnitCondo(idx, "iptu", val)}
+                                                    label="IPTU"
+                                                />
+                                                <Checkbox
+                                                    checked={unit.condominiumIncludes.gas}
+                                                    onChange={(val) => updateUnitCondo(idx, "gas", val)}
+                                                    label="Gás"
+                                                    icon={<Flame className="w-3.5 h-3.5" />}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    ))}
+                    )}
                 </div>
-            )}
+            ))}
         </div>
     );
 }

@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Button } from '@kitnets/ui';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Image from 'next/image';
-import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera, Sparkles, Save, UploadCloud, Home, Building2, User, ShieldCheck, Fingerprint, ChevronDown, ChevronUp } from 'lucide-react';
-import PropertyDetailsCard, { PropertyDetails, SubUnit } from '@/components/profile/PropertyDetailsCard';
+import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera, Video, Sparkles, Save, UploadCloud, Home, Building2, User, ShieldCheck, Fingerprint, ChevronDown, ChevronUp } from 'lucide-react';
+import PropertyDetailsCard, { PropertyDetails, SubUnit, SubUnitsSection } from '@/components/profile/PropertyDetailsCard';
 import { cn } from '@/lib/utils';
 import { useUser, useAuth } from '@clerk/nextjs';
 import { createClient } from '@supabase/supabase-js';
@@ -27,15 +27,12 @@ interface ProfileContentProps {
 
 // Helper component for photo preview
 const PhotoPreview = ({ file, onRemove }: { file: File, onRemove: () => void }) => {
-    const [preview, setPreview] = useState<string | null>(null);
+    const preview = useMemo(() => URL.createObjectURL(file), [file]);
 
     useEffect(() => {
-        const objectUrl = URL.createObjectURL(file);
-        setPreview(objectUrl);
-        return () => URL.revokeObjectURL(objectUrl);
-    }, [file]);
+        return () => URL.revokeObjectURL(preview);
+    }, [preview]);
 
-    if (!preview) return <div className="aspect-square bg-muted rounded-lg animate-pulse" />;
 
     return (
         <div className="aspect-square rounded-lg border border-border relative group overflow-hidden bg-muted">
@@ -106,6 +103,10 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
         internetBill: false,
     });
     const [subUnits, setSubUnits] = useState<SubUnit[]>([]);
+
+    // Main property videos
+    const [propertyVideos, setPropertyVideos] = useState<File[]>([]);
+    const [savedVideos, setSavedVideos] = useState<string[]>([]);
 
     // Collapsible section states for ownership tab
     const [addressSectionOpen, setAddressSectionOpen] = useState(true);
@@ -231,9 +232,12 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                         }
                     });
 
-                    // Load photos
+                    // Load photos & videos
                     if (profile.property_photos && Array.isArray(profile.property_photos)) {
                         setSavedPhotos(profile.property_photos);
+                    }
+                    if (profile.property_videos && Array.isArray(profile.property_videos)) {
+                        setSavedVideos(profile.property_videos);
                     }
 
                     // Load property details & sub-units
@@ -523,7 +527,10 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
 
     const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
-            const newPhotos = Array.from(e.target.files);
+            const totalPhotos = savedPhotos.length + propertyPhotos.length;
+            const remaining = 10 - totalPhotos;
+            if (remaining <= 0) { alert('Máximo de 10 fotos para o imóvel principal.'); return; }
+            const newPhotos = Array.from(e.target.files).slice(0, remaining);
             setPropertyPhotos(prev => [...prev, ...newPhotos]);
         }
     };
@@ -534,6 +541,24 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
 
     const removeSavedPhoto = async (url: string) => {
         setSavedPhotos(prev => prev.filter(u => u !== url));
+    };
+
+    const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files.length > 0) {
+            const totalVideos = savedVideos.length + propertyVideos.length;
+            const remaining = 2 - totalVideos;
+            if (remaining <= 0) { alert('Máximo de 2 vídeos para o imóvel principal.'); return; }
+            const newVideos = Array.from(e.target.files).slice(0, remaining);
+            setPropertyVideos(prev => [...prev, ...newVideos]);
+        }
+    };
+
+    const removePropertyVideo = (index: number) => {
+        setPropertyVideos(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const removeSavedVideo = async (url: string) => {
+        setSavedVideos(prev => prev.filter(u => u !== url));
     };
 
     const analyzeDocument = async (file: File) => {
@@ -801,8 +826,8 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                     const fileExt = file.name.split('.').pop();
                     const fileName = `photos/${profile.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
-                    const { error: uploadError, data: uploadData } = await sbUpload.storage
-                        .from('documents') // Using documents bucket for simplified setup
+                    const { error: uploadError } = await sbUpload.storage
+                        .from('documents')
                         .upload(fileName, file);
 
                     if (uploadError) {
@@ -810,19 +835,86 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                         continue;
                     }
 
-                    // Get Public URL
                     const { data: { publicUrl } } = sbUpload.storage.from('documents').getPublicUrl(fileName);
                     updatedPhotoUrls.push(publicUrl);
                 }
                 setPropertyPhotos([]);
             }
 
-            // Sync Photos Array to Profile
+            // 4. Upload Videos
+            const updatedVideoUrls = [...savedVideos];
+            if (propertyVideos.length > 0 && profile) {
+                const sbUpload = await getSupabase();
+                for (const file of propertyVideos) {
+                    const fileExt = file.name.split('.').pop();
+                    const fileName = `videos/${profile.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+                    const { error: uploadError } = await sbUpload.storage
+                        .from('documents')
+                        .upload(fileName, file);
+
+                    if (uploadError) {
+                        console.error('Video upload error:', uploadError);
+                        continue;
+                    }
+
+                    const { data: { publicUrl } } = sbUpload.storage.from('documents').getPublicUrl(fileName);
+                    updatedVideoUrls.push(publicUrl);
+                }
+                setPropertyVideos([]);
+            }
+
+            // 5. Upload Sub-Unit Photos & Videos
+            const updatedSubUnits = [...subUnits];
+            if (profile) {
+                const sbUpload = await getSupabase();
+                for (let si = 0; si < updatedSubUnits.length; si++) {
+                    const unit = updatedSubUnits[si];
+                    // Upload new photos
+                    if (unit.newPhotos && unit.newPhotos.length > 0) {
+                        const unitPhotos = [...(unit.photos || [])];
+                        for (const file of unit.newPhotos) {
+                            const fileExt = file.name.split('.').pop();
+                            const fileName = `photos/${profile.id}/unit-${si}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+                            const { error: uploadError } = await sbUpload.storage.from('documents').upload(fileName, file);
+                            if (uploadError) { console.error('Unit photo upload error:', uploadError); continue; }
+                            const { data: { publicUrl } } = sbUpload.storage.from('documents').getPublicUrl(fileName);
+                            unitPhotos.push(publicUrl);
+                        }
+                        updatedSubUnits[si] = { ...unit, photos: unitPhotos, newPhotos: [] };
+                    }
+                    // Upload new videos
+                    if (unit.newVideos && unit.newVideos.length > 0) {
+                        const unitVideos = [...(unit.videos || [])];
+                        for (const file of unit.newVideos) {
+                            const fileExt = file.name.split('.').pop();
+                            const fileName = `videos/${profile.id}/unit-${si}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+                            const { error: uploadError } = await sbUpload.storage.from('documents').upload(fileName, file);
+                            if (uploadError) { console.error('Unit video upload error:', uploadError); continue; }
+                            const { data: { publicUrl } } = sbUpload.storage.from('documents').getPublicUrl(fileName);
+                            unitVideos.push(publicUrl);
+                        }
+                        updatedSubUnits[si] = { ...updatedSubUnits[si], videos: unitVideos, newVideos: [] };
+                    }
+                }
+                setSubUnits(updatedSubUnits);
+            }
+
+            // Serialize sub-units for DB (strip File objects)
+            const subUnitsForDB = updatedSubUnits.map(u => {
+                const { newPhotos: _np, newVideos: _nv, ...rest } = u;
+                return rest;
+            });
+
+            // Sync Photos/Videos/SubUnits to Profile
             if (profile) {
                 await sb.from('profiles').update({
                     property_photos: updatedPhotoUrls,
+                    property_videos: updatedVideoUrls,
+                    sub_units: subUnitsForDB,
                 }).eq('id', profile.id);
                 setSavedPhotos(updatedPhotoUrls);
+                setSavedVideos(updatedVideoUrls);
             }
 
             // Update Clerk Name
@@ -1282,7 +1374,17 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                             )}
                         </div>
 
-                        {/* 3. Photos Section — Collapsible */}
+                        {/* 3. Sub-unidades Section (below Address, only for multi) */}
+                        {propertyType === 'multi' && propertyDetails.numberOfUnits > 0 && (
+                            <SubUnitsSection
+                                details={propertyDetails}
+                                units={subUnits}
+                                onDetailsChange={setPropertyDetails}
+                                onUnitsChange={setSubUnits}
+                            />
+                        )}
+
+                        {/* 4. Photos & Videos Section — Main Property — Collapsible */}
                         <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
                             <button
                                 type="button"
@@ -1293,9 +1395,11 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                     <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded-lg text-amber-600">
                                         <Camera className="w-5 h-5" />
                                     </div>
-                                    <h3 className="text-lg font-semibold text-foreground">Fotos do Imóvel</h3>
-                                    {!photosSectionOpen && (savedPhotos.length > 0 || propertyPhotos.length > 0) && (
-                                        <span className="ml-2 text-xs bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full">{savedPhotos.length + propertyPhotos.length} fotos</span>
+                                    <h3 className="text-lg font-semibold text-foreground">Fotos e Vídeos do Imóvel</h3>
+                                    {!photosSectionOpen && (savedPhotos.length > 0 || propertyPhotos.length > 0 || savedVideos.length > 0 || propertyVideos.length > 0) && (
+                                        <span className="ml-2 text-xs bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full">
+                                            {savedPhotos.length + propertyPhotos.length} fotos · {savedVideos.length + propertyVideos.length} vídeos
+                                        </span>
                                     )}
                                 </div>
                                 {photosSectionOpen ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
@@ -1307,46 +1411,113 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                         <Sparkles className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
                                         <div>
                                             <p className="text-sm font-medium text-foreground mb-1">Dica Profissional</p>
-                                            <p className="text-sm text-muted-foreground">Imóveis com pelo menos 5 fotos recebem 4x mais visualizações! Capriche na iluminação.</p>
+                                            <p className="text-sm text-muted-foreground">Imóveis com pelo menos 5 fotos recebem 4x mais visualizações! Capriche na iluminação. Essas mídias são da <strong>propriedade principal</strong> (área comum e fachada).</p>
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                                        {/* Upload Button */}
-                                        <div className="aspect-square rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors relative">
-                                            <input
-                                                type="file"
-                                                multiple
-                                                accept="image/*"
-                                                onChange={handlePhotoSelect}
-                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                            />
-                                            <Camera className="w-8 h-8 text-muted-foreground mb-2" />
-                                            <span className="text-xs text-muted-foreground">Adicionar Fotos</span>
+                                    {/* Photos (up to 10) */}
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                                                <Camera className="w-4 h-4 text-muted-foreground" />
+                                                Fotos
+                                            </p>
+                                            <span className="text-xs text-muted-foreground">{savedPhotos.length + propertyPhotos.length}/10</span>
                                         </div>
-
-                                        {/* New Photos */}
-                                        {propertyPhotos.map((file, idx) => (
-                                            <PhotoPreview key={`new-p-${idx}`} file={file} onRemove={() => removePhoto(idx)} />
-                                        ))}
-
-                                        {/* Saved Photos */}
-                                        {savedPhotos.map((url, idx) => (
-                                            <div key={`saved-p-${idx}`} className="aspect-square rounded-lg border border-border relative group overflow-hidden">
-                                                <Image src={url} alt="Property" width={200} height={200} className="w-full h-full object-cover" />
-                                                <div className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <Button size="icon" variant="destructive" className="h-6 w-6" onClick={() => removeSavedPhoto(url)}>
-                                                        <Trash2 className="w-3 h-3" />
-                                                    </Button>
+                                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                            {/* Upload Button */}
+                                            {savedPhotos.length + propertyPhotos.length < 10 && (
+                                                <div className="aspect-square rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors relative">
+                                                    <input
+                                                        type="file"
+                                                        multiple
+                                                        accept="image/*"
+                                                        onChange={handlePhotoSelect}
+                                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                                    />
+                                                    <Camera className="w-8 h-8 text-muted-foreground mb-2" />
+                                                    <span className="text-xs text-muted-foreground">Adicionar Fotos</span>
                                                 </div>
-                                            </div>
-                                        ))}
+                                            )}
+
+                                            {/* New Photos */}
+                                            {propertyPhotos.map((file, idx) => (
+                                                <PhotoPreview key={`new-p-${idx}`} file={file} onRemove={() => removePhoto(idx)} />
+                                            ))}
+
+                                            {/* Saved Photos */}
+                                            {savedPhotos.map((url, idx) => (
+                                                <div key={`saved-p-${idx}`} className="aspect-square rounded-lg border border-border relative group overflow-hidden">
+                                                    <Image src={url} alt="Property" width={200} height={200} className="w-full h-full object-cover" />
+                                                    <div className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <Button size="icon" variant="destructive" className="h-6 w-6" onClick={() => removeSavedPhoto(url)}>
+                                                            <Trash2 className="w-3 h-3" />
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Videos (up to 2) */}
+                                    <div className="space-y-2 pt-3 border-t border-border">
+                                        <div className="flex items-center justify-between">
+                                            <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                                                <Video className="w-4 h-4 text-muted-foreground" />
+                                                Vídeos
+                                            </p>
+                                            <span className="text-xs text-muted-foreground">{savedVideos.length + propertyVideos.length}/2</span>
+                                        </div>
+                                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                            {savedVideos.length + propertyVideos.length < 2 && (
+                                                <div className="aspect-square rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors relative">
+                                                    <input
+                                                        type="file"
+                                                        accept="video/*"
+                                                        onChange={handleVideoSelect}
+                                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                                    />
+                                                    <Video className="w-8 h-8 text-muted-foreground mb-2" />
+                                                    <span className="text-xs text-muted-foreground">Adicionar Vídeo</span>
+                                                </div>
+                                            )}
+
+                                            {/* New Videos */}
+                                            {propertyVideos.map((file, idx) => (
+                                                <div key={`new-v-${idx}`} className="aspect-square rounded-lg border border-border relative group overflow-hidden bg-muted">
+                                                    <video src={URL.createObjectURL(file)} className="w-full h-full object-cover" muted />
+                                                    <div className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <Button size="icon" variant="destructive" className="h-6 w-6" onClick={() => removePropertyVideo(idx)}>
+                                                            <Trash2 className="w-3 h-3" />
+                                                        </Button>
+                                                    </div>
+                                                    <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[10px] p-1 text-center flex items-center justify-center gap-1">
+                                                        <Video className="w-3 h-3" /> {file.name}
+                                                    </div>
+                                                </div>
+                                            ))}
+
+                                            {/* Saved Videos */}
+                                            {savedVideos.map((url, idx) => (
+                                                <div key={`saved-v-${idx}`} className="aspect-square rounded-lg border border-border relative group overflow-hidden">
+                                                    <video src={url} className="w-full h-full object-cover" muted />
+                                                    <div className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <Button size="icon" variant="destructive" className="h-6 w-6" onClick={() => removeSavedVideo(url)}>
+                                                            <Trash2 className="w-3 h-3" />
+                                                        </Button>
+                                                    </div>
+                                                    <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[10px] p-1 text-center flex items-center justify-center gap-1">
+                                                        <Video className="w-3 h-3" /> Vídeo
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 </>
                             )}
                         </div>
 
-                        {/* 4. Description Section — Collapsible */}
+                        {/* 5. Description Section — Main Property — Collapsible */}
                         <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
                             <button
                                 type="button"
@@ -1373,12 +1544,12 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                         value={formData.propertyAddress.description || ''}
                                         onChange={(e) => handleAddressChange('propertyAddress', 'description', e.target.value)}
                                     />
-                                    <span className="text-xs text-muted-foreground">Esta descrição será exibida no anúncio do imóvel.</span>
+                                    <span className="text-xs text-muted-foreground">Esta descrição será exibida no anúncio do imóvel principal.</span>
                                 </div>
                             )}
                         </div>
 
-                        {/* 5. Detalhes + Sub-Units Section */}
+                        {/* 6. Detalhes Section */}
                         <PropertyDetailsCard
                             details={propertyDetails}
                             units={subUnits}
