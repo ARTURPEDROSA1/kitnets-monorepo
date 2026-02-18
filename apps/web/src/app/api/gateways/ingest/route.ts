@@ -39,6 +39,17 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Database error', details: error.message, hint: error.hint }, { status: 500 });
         }
 
+        // 3. Update gateway last_seen_at for all gateways (lightweight — shared token means we update all)
+        const { error: gwError } = await supabase
+            .from('gateways')
+            .update({ last_seen_at: new Date().toISOString(), status: 'online' })
+            .not('id', 'is', null); // Update all gateways (single-token auth)
+
+        if (gwError) {
+            console.warn('[Ingest] Failed to update gateway last_seen_at:', gwError.message);
+            // Non-fatal — readings were already saved
+        }
+
         return NextResponse.json({ success: true, count: readings.length });
 
     } catch (e) {
