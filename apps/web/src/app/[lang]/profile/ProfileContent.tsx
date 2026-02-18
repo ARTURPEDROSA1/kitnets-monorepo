@@ -1144,142 +1144,166 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                 throw new Error(`${p.alerts.saveError}: ${profileError.message} (${profileError.code})`);
             }
 
-            // 2. Upload Files
-            if (ownershipFiles.length > 0 && profile) {
-                const sbUpload = await getSupabase();
-
-                for (const file of ownershipFiles) {
-                    const fileExt = file.name.split('.').pop();
-                    const fileName = `${profile.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-
-                    const { error: uploadError } = await sbUpload.storage
-                        .from('documents')
-                        .upload(fileName, file);
-
-                    if (uploadError) {
-                        alert(`${p.alerts.uploadError} ${file.name}: ${uploadError.message}`);
-                        continue;
-                    }
-
-                    const { error: proofError } = await sbUpload.from('ownership_proofs').insert({
-                        profile_id: profile.id,
-                        file_url: fileName,
-                        original_name: file.name,
-                        file_size: file.size,
-                        mime_type: file.type,
-                        status: 'pending'
-                    });
-
-                    if (proofError) console.error(proofError);
-                }
-                setOwnershipFiles([]);
-
-                // Refresh
-                const { data: proofs } = await sb
-                    .from('ownership_proofs')
-                    .select('*')
-                    .eq('profile_id', profile.id)
-                    .order('created_at', { ascending: false });
-                if (proofs) setSavedProofs(proofs as ProofData[]);
-            }
-
-            // 3. Upload Photos
-            const updatedPhotoUrls = [...savedPhotos];
-            if (propertyPhotos.length > 0 && profile) {
-                const sbUpload = await getSupabase();
-                for (const file of propertyPhotos) {
-                    const fileExt = file.name.split('.').pop();
-                    const fileName = `photos/${profile.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-
-                    const { error: uploadError } = await sbUpload.storage
-                        .from('documents')
-                        .upload(fileName, file);
-
-                    if (uploadError) {
-                        console.error('Photo upload error:', uploadError);
-                        continue;
-                    }
-
-                    const { data: { publicUrl } } = sbUpload.storage.from('documents').getPublicUrl(fileName);
-                    updatedPhotoUrls.push(publicUrl);
-                }
-                setPropertyPhotos([]);
-            }
-
-            // 4. Upload Videos
-            const updatedVideoUrls = [...savedVideos];
-            if (propertyVideos.length > 0 && profile) {
-                const sbUpload = await getSupabase();
-                for (const file of propertyVideos) {
-                    const fileExt = file.name.split('.').pop();
-                    const fileName = `videos/${profile.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-
-                    const { error: uploadError } = await sbUpload.storage
-                        .from('documents')
-                        .upload(fileName, file);
-
-                    if (uploadError) {
-                        console.error('Video upload error:', uploadError);
-                        continue;
-                    }
-
-                    const { data: { publicUrl } } = sbUpload.storage.from('documents').getPublicUrl(fileName);
-                    updatedVideoUrls.push(publicUrl);
-                }
-                setPropertyVideos([]);
-            }
-
-            // 5. Upload Sub-Unit Photos & Videos
-            const updatedSubUnits = [...subUnits];
+            // ── Upload files for ALL properties ──────────────────────────
             if (profile) {
                 const sbUpload = await getSupabase();
-                for (let si = 0; si < updatedSubUnits.length; si++) {
-                    const unit = updatedSubUnits[si];
-                    // Upload new photos
-                    if (unit.newPhotos && unit.newPhotos.length > 0) {
-                        const unitPhotos = [...(unit.photos || [])];
-                        for (const file of unit.newPhotos) {
+                const updatedProperties = [...properties];
+
+                for (let propIdx = 0; propIdx < updatedProperties.length; propIdx++) {
+                    const prop = updatedProperties[propIdx];
+                    const propStoragePrefix = propIdx === 0 ? profile.id : `${profile.id}/prop-${propIdx}`;
+
+                    // 2. Upload Ownership Proof Files
+                    if (prop.ownershipFiles.length > 0) {
+                        for (const file of prop.ownershipFiles) {
                             const fileExt = file.name.split('.').pop();
-                            const fileName = `photos/${profile.id}/unit-${si}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-                            const { error: uploadError } = await sbUpload.storage.from('documents').upload(fileName, file);
-                            if (uploadError) { console.error('Unit photo upload error:', uploadError); continue; }
-                            const { data: { publicUrl } } = sbUpload.storage.from('documents').getPublicUrl(fileName);
-                            unitPhotos.push(publicUrl);
+                            const fileName = `${propStoragePrefix}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+                            const { error: uploadError } = await sbUpload.storage
+                                .from('documents')
+                                .upload(fileName, file);
+
+                            if (uploadError) {
+                                alert(`${p.alerts.uploadError} ${file.name}: ${uploadError.message}`);
+                                continue;
+                            }
+
+                            const { error: proofError } = await sbUpload.from('ownership_proofs').insert({
+                                profile_id: profile.id,
+                                file_url: fileName,
+                                original_name: file.name,
+                                file_size: file.size,
+                                mime_type: file.type,
+                                status: 'pending',
+                            });
+
+                            if (proofError) console.error(proofError);
                         }
-                        updatedSubUnits[si] = { ...unit, photos: unitPhotos, newPhotos: [] };
+                        updatedProperties[propIdx] = { ...prop, ownershipFiles: [] };
+
+                        // Refresh proofs for property[0] (legacy savedProofs)
+                        if (propIdx === 0) {
+                            const { data: proofs } = await sb
+                                .from('ownership_proofs')
+                                .select('*')
+                                .eq('profile_id', profile.id)
+                                .order('created_at', { ascending: false });
+                            if (proofs) {
+                                updatedProperties[0] = { ...updatedProperties[0], savedProofs: proofs as ProofData[] };
+                            }
+                        }
                     }
-                    // Upload new videos
-                    if (unit.newVideos && unit.newVideos.length > 0) {
-                        const unitVideos = [...(unit.videos || [])];
-                        for (const file of unit.newVideos) {
+
+                    // 3. Upload Property Photos
+                    const updatedPhotoUrls = [...prop.savedPhotos];
+                    if (prop.photos.length > 0) {
+                        for (const file of prop.photos) {
                             const fileExt = file.name.split('.').pop();
-                            const fileName = `videos/${profile.id}/unit-${si}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-                            const { error: uploadError } = await sbUpload.storage.from('documents').upload(fileName, file);
-                            if (uploadError) { console.error('Unit video upload error:', uploadError); continue; }
+                            const fileName = `photos/${propStoragePrefix}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+                            const { error: uploadError } = await sbUpload.storage
+                                .from('documents')
+                                .upload(fileName, file);
+
+                            if (uploadError) {
+                                console.error('Photo upload error:', uploadError);
+                                continue;
+                            }
+
                             const { data: { publicUrl } } = sbUpload.storage.from('documents').getPublicUrl(fileName);
-                            unitVideos.push(publicUrl);
+                            updatedPhotoUrls.push(publicUrl);
                         }
-                        updatedSubUnits[si] = { ...updatedSubUnits[si], videos: unitVideos, newVideos: [] };
                     }
+
+                    // 4. Upload Property Videos
+                    const updatedVideoUrls = [...prop.savedVideos];
+                    if (prop.videos.length > 0) {
+                        for (const file of prop.videos) {
+                            const fileExt = file.name.split('.').pop();
+                            const fileName = `videos/${propStoragePrefix}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+                            const { error: uploadError } = await sbUpload.storage
+                                .from('documents')
+                                .upload(fileName, file);
+
+                            if (uploadError) {
+                                console.error('Video upload error:', uploadError);
+                                continue;
+                            }
+
+                            const { data: { publicUrl } } = sbUpload.storage.from('documents').getPublicUrl(fileName);
+                            updatedVideoUrls.push(publicUrl);
+                        }
+                    }
+
+                    // 5. Upload Sub-Unit Photos & Videos
+                    const updatedSubUnits = [...prop.subUnits];
+                    for (let si = 0; si < updatedSubUnits.length; si++) {
+                        const unit = updatedSubUnits[si];
+                        if (unit.newPhotos && unit.newPhotos.length > 0) {
+                            const unitPhotos = [...(unit.photos || [])];
+                            for (const file of unit.newPhotos) {
+                                const fileExt = file.name.split('.').pop();
+                                const fileName = `photos/${propStoragePrefix}/unit-${si}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+                                const { error: uploadError } = await sbUpload.storage.from('documents').upload(fileName, file);
+                                if (uploadError) { console.error('Unit photo upload error:', uploadError); continue; }
+                                const { data: { publicUrl } } = sbUpload.storage.from('documents').getPublicUrl(fileName);
+                                unitPhotos.push(publicUrl);
+                            }
+                            updatedSubUnits[si] = { ...unit, photos: unitPhotos, newPhotos: [] };
+                        }
+                        if (unit.newVideos && unit.newVideos.length > 0) {
+                            const unitVideos = [...(unit.videos || [])];
+                            for (const file of unit.newVideos) {
+                                const fileExt = file.name.split('.').pop();
+                                const fileName = `videos/${propStoragePrefix}/unit-${si}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+                                const { error: uploadError } = await sbUpload.storage.from('documents').upload(fileName, file);
+                                if (uploadError) { console.error('Unit video upload error:', uploadError); continue; }
+                                const { data: { publicUrl } } = sbUpload.storage.from('documents').getPublicUrl(fileName);
+                                unitVideos.push(publicUrl);
+                            }
+                            updatedSubUnits[si] = { ...updatedSubUnits[si], videos: unitVideos, newVideos: [] };
+                        }
+                    }
+
+                    // Update the property in our working copy
+                    updatedProperties[propIdx] = {
+                        ...updatedProperties[propIdx],
+                        photos: [],
+                        videos: [],
+                        savedPhotos: updatedPhotoUrls,
+                        savedVideos: updatedVideoUrls,
+                        subUnits: updatedSubUnits,
+                    };
                 }
-                setSubUnits(updatedSubUnits);
-            }
 
-            // Serialize sub-units for DB (strip File objects)
-            const subUnitsForDB = updatedSubUnits.map(u => {
-                const { newPhotos: _np, newVideos: _nv, ...rest } = u;
-                return rest;
-            });
+                // Commit updated properties to state
+                setProperties(updatedProperties);
 
-            // Sync Photos/Videos/SubUnits to Profile
-            if (profile) {
+                // Serialize sub-units for DB (strip File objects) — for property[0]
+                const subUnitsForDB = updatedProperties[0].subUnits.map(u => {
+                    const { newPhotos: _np, newVideos: _nv, ...rest } = u;
+                    return rest;
+                });
+
+                // Sync primary property's Photos/Videos/SubUnits to Profile columns
                 await sb.from('profiles').update({
-                    property_photos: updatedPhotoUrls,
-                    property_videos: updatedVideoUrls,
+                    property_photos: updatedProperties[0].savedPhotos,
+                    property_videos: updatedProperties[0].savedVideos,
                     sub_units: subUnitsForDB,
+                    // Also update additional_properties with uploaded URLs
+                    additional_properties: updatedProperties.slice(1).map(prop => ({
+                        propertyType: prop.propertyType,
+                        details: prop.details,
+                        subUnits: prop.subUnits.map(u => {
+                            const { newPhotos: _np2, newVideos: _nv2, ...rest2 } = u;
+                            return rest2;
+                        }),
+                        address: prop.address,
+                        savedPhotos: prop.savedPhotos,
+                        savedVideos: prop.savedVideos,
+                    })),
                 }).eq('id', profile.id);
-                setSavedPhotos(updatedPhotoUrls);
-                setSavedVideos(updatedVideoUrls);
             }
 
             // Update Clerk Name
