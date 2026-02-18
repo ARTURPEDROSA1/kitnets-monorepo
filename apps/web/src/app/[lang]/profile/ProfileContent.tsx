@@ -451,17 +451,13 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                         setProperties(allProps);
 
                         // Decide which to expand
-                        if (allProps.length === 1) {
-                            setExpandedPropertyIdx(0);
+                        // All collapsed if ALL are complete, else expand first incomplete
+                        const allComplete = allProps.every(isPropertyComplete);
+                        if (allComplete) {
+                            setExpandedPropertyIdx(null);
                         } else {
-                            // All collapsed if ALL are complete, else expand first incomplete
-                            const allComplete = allProps.every(isPropertyComplete);
-                            if (allComplete) {
-                                setExpandedPropertyIdx(null);
-                            } else {
-                                const firstIncomplete = allProps.findIndex(p2 => !isPropertyComplete(p2));
-                                setExpandedPropertyIdx(firstIncomplete >= 0 ? firstIncomplete : null);
-                            }
+                            const firstIncomplete = allProps.findIndex(p2 => !isPropertyComplete(p2));
+                            setExpandedPropertyIdx(firstIncomplete >= 0 ? firstIncomplete : 0);
                         }
                     }
                     // Auto-collapse identity section if identity verification data exists
