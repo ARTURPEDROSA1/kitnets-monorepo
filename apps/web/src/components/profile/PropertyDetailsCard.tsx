@@ -200,6 +200,7 @@ interface DetailsProps {
     propertyType: "single" | "multi";
     initialOpen?: boolean;
     onOpenChange?: (open: boolean) => void;
+    onContinue?: () => void;
 }
 
 export default function PropertyDetailsCard({
@@ -210,6 +211,7 @@ export default function PropertyDetailsCard({
     propertyType,
     initialOpen = true,
     onOpenChange,
+    onContinue,
 }: DetailsProps) {
     const [isOpen, setIsOpen] = useState(initialOpen);
 
@@ -399,7 +401,7 @@ export default function PropertyDetailsCard({
 
                     {/* Main Meters */}
                     <div className="space-y-2">
-                        <p className="text-sm font-semibold text-foreground">Medidores Principais do Imóvel</p>
+                        <p className="text-sm font-semibold text-foreground">Medidores Principais do Imóvel <span className="font-normal text-muted-foreground">(pagos pelo Proprietário)</span></p>
                         <div className="flex flex-wrap gap-4">
                             <Checkbox
                                 checked={details.mainMeters.water}
@@ -429,6 +431,18 @@ export default function PropertyDetailsCard({
                         label="Conta de Internet"
                         icon={<Wifi className="w-4 h-4" />}
                     />
+                    {onContinue && (
+                        <div className="flex justify-end pt-4">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                                onClick={onContinue}
+                            >
+                                Continuar <ArrowRight className="w-4 h-4" />
+                            </Button>
+                        </div>
+                    )}
                 </div>
             )}
         </div>
