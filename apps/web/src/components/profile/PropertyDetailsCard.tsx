@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import {
     ChevronDown, ChevronUp, Settings2, Sun, Droplets, Zap, Flame,
     Landmark, Wifi, Plus, Trash2, Home, BedDouble, Car, Shirt, Wind, CookingPot,
-    DoorOpen, Building2, Camera, Video, Bath, FileText, Wand2, Loader2, UploadCloud
+    DoorOpen, Building2, Camera, Video, Bath, FileText, Wand2, Loader2, UploadCloud, ArrowRight
 } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { cn } from "@/lib/utils";
@@ -199,6 +199,7 @@ interface DetailsProps {
     onUnitsChange: (units: SubUnit[]) => void;
     propertyType: "single" | "multi";
     initialOpen?: boolean;
+    onOpenChange?: (open: boolean) => void;
 }
 
 export default function PropertyDetailsCard({
@@ -208,8 +209,15 @@ export default function PropertyDetailsCard({
     onUnitsChange,
     propertyType,
     initialOpen = true,
+    onOpenChange,
 }: DetailsProps) {
     const [isOpen, setIsOpen] = useState(initialOpen);
+
+    const toggleOpen = () => {
+        const next = !isOpen;
+        setIsOpen(next);
+        onOpenChange?.(next);
+    };
 
     const updateDetail = <K extends keyof PropertyDetails>(key: K, val: PropertyDetails[K]) => {
         const updated = { ...details, [key]: val };
@@ -242,7 +250,7 @@ export default function PropertyDetailsCard({
         <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
             <button
                 type="button"
-                onClick={() => setIsOpen((p) => !p)}
+                onClick={toggleOpen}
                 className="flex items-center justify-between w-full"
             >
                 <div className="flex items-center gap-2">
@@ -991,6 +999,20 @@ export function SubUnitsSection({
                                     onChange={(e) => updateUnit(idx, { description: e.target.value })}
                                 />
                             </div>
+
+                            {/* Continuar → next sub-unit */}
+                            {idx < units.length - 1 && (
+                                <div className="flex justify-end pt-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                                        onClick={() => setOpenUnitIndex(idx + 1)}
+                                    >
+                                        Próxima Unidade <ArrowRight className="w-4 h-4" />
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
