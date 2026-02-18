@@ -9,6 +9,7 @@ import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera,
 import PropertyDetailsCard, { PropertyDetails, SubUnit, SubUnitsSection, Checkbox as DetailCheckbox } from '@/components/profile/PropertyDetailsCard';
 import { cn } from '@/lib/utils';
 import { useUser, useAuth } from '@clerk/nextjs';
+import { useSearchParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { deleteAccount } from './actions';
 import { Dictionary } from '@/dictionaries';
@@ -230,6 +231,16 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
     // Add Property modal + wizard
     const MAX_PROPERTIES = 30;
     const [showAddPropertyModal, setShowAddPropertyModal] = useState(false);
+
+    // Auto-open add property modal when ?add=true is in the URL (from dashboard "Novo Imóvel" button)
+    const searchParams = useSearchParams();
+    useEffect(() => {
+        if (searchParams.get('add') === 'true') {
+            setActiveTab('ownership');
+            // Small delay to let the tab switch render, then show modal
+            setTimeout(() => setShowAddPropertyModal(true), 100);
+        }
+    }, [searchParams]);
     const propertyCreated = properties.length > 0;
 
     // Dynamic tab labels
