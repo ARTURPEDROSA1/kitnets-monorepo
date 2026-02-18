@@ -862,8 +862,47 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
         setFileAnalysisStatus(prev => ({ ...prev, [file.name]: 'analyzing' }));
 
         try {
+            let uploadFile = file;
+
+            // If PDF, convert first page to PNG in the browser for reliable Vision AI
+            if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+                try {
+                    const pdfjsLib = await import('pdfjs-dist');
+                    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+
+                    const arrayBuffer = await file.arrayBuffer();
+                    const pdf = await pdfjsLib.getDocument(new Uint8Array(arrayBuffer)).promise;
+                    const page = await pdf.getPage(1);
+
+                    const scale = 2; // High-res for accurate OCR
+                    const viewport = page.getViewport({ scale });
+                    const canvas = document.createElement('canvas');
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx) throw new Error('Canvas context not available');
+
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    await page.render({ canvasContext: ctx, viewport, canvas } as any).promise;
+
+                    const blob = await new Promise<Blob>((resolve, reject) => {
+                        canvas.toBlob(
+                            (b) => (b ? resolve(b) : reject(new Error('Failed to convert PDF to image'))),
+                            'image/png'
+                        );
+                    });
+
+                    uploadFile = new File([blob], file.name.replace(/\.pdf$/i, '.png'), { type: 'image/png' });
+                    console.log('[Ownership] PDF converted to PNG for Vision AI');
+                } catch (pdfConvertErr) {
+                    console.warn('[Ownership] PDF→PNG conversion failed, sending raw file:', pdfConvertErr);
+                    // Fall through: send the original PDF, the API will try regex + vision on raw bytes
+                }
+            }
+
             const fd = new FormData();
-            fd.append('file', file);
+            fd.append('file', uploadFile);
 
             const res = await fetch('/api/ownership/analyze', {
                 method: 'POST',
@@ -881,19 +920,37 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
 
             if (result?.success && result.extracted_data?.address) {
                 const addr = result.extracted_data.address;
-                // Auto-fill property address from extracted data
-                setFormData(prev => ({
+                const propIdx = expandedPropertyIdx ?? 0;
+
+                // Auto-fill per-property address from extracted data
+                updateProperty(propIdx, prev => ({
                     ...prev,
-                    propertyAddress: {
-                        ...prev.propertyAddress,
+                    address: {
+                        ...prev.address,
                         ...(addr.street ? { street: addr.street } : {}),
-                        ...(addr.number ? { number: addr.number.replace(/^0+/, '') || addr.number } : {}),
+                        ...(addr.number ? { number: String(addr.number).replace(/^0+/, '') || addr.number } : {}),
                         ...(addr.neighborhood ? { neighborhood: addr.neighborhood } : {}),
                         ...(addr.city ? { city: addr.city } : {}),
                         ...(addr.state ? { state: addr.state } : {}),
                         ...(addr.cep ? { cep: addr.cep } : {}),
                     }
                 }));
+
+                // Auto-fill IPTU-specific property details if present
+                const iptu = result.extracted_data.iptu_data;
+                if (iptu) {
+                    updateProperty(propIdx, prev => ({
+                        ...prev,
+                        details: {
+                            ...prev.details,
+                            ...(iptu.cadastro_imobiliario ? { cadastroImobiliario: iptu.cadastro_imobiliario } : {}),
+                            ...(iptu.inscricao_imobiliaria ? { inscricaoImobiliaria: iptu.inscricao_imobiliaria } : {}),
+                            ...(iptu.matricula ? { matricula: iptu.matricula } : {}),
+                            ...(iptu.area_lote ? { areaLote: iptu.area_lote } : {}),
+                            ...(iptu.area_edificada ? { areaEdificada: iptu.area_edificada } : {}),
+                        }
+                    }));
+                }
 
                 const docType = result.classified_type || 'Documento';
                 const method = result.extraction_method || 'unknown';
@@ -904,7 +961,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                 setExtractedAddressInfo(`✅ ${docType} — Endereço extraído com sucesso (${methodLabel})`);
                 setFileAnalysisStatus(prev => ({ ...prev, [file.name]: 'success' }));
                 // Auto-collapse verification section after successful extraction
-                updateProperty(expandedPropertyIdx ?? 0, prev => ({ ...prev, ownershipSectionOpen: false }));
+                updateProperty(propIdx, prev => ({ ...prev, ownershipSectionOpen: false }));
             } else {
                 const methodsTried = result?.methods_tried?.join(' → ') || 'nenhum';
                 setFileAnalysisStatus(prev => ({ ...prev, [file.name]: 'error' }));

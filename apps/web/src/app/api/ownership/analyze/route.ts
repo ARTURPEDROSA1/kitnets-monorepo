@@ -60,6 +60,13 @@ function extractDataFromText(text: string): {
         state: string | null;
         cep: string | null;
     };
+    iptu_data: {
+        cadastro_imobiliario: string | null;
+        inscricao_imobiliaria: string | null;
+        matricula: string | null;
+        area_lote: string | null;
+        area_edificada: string | null;
+    } | null;
 } {
     // Normalize: collapse multiple spaces/newlines, keep structure
     const t = text.replace(/\r\n/g, '\n');
@@ -205,10 +212,75 @@ function extractDataFromText(text: string): {
         }
     }
 
+    // ---- IPTU-SPECIFIC DATA ----
+    let cadastro_imobiliario: string | null = null;
+    let inscricao_imobiliaria: string | null = null;
+    let matricula: string | null = null;
+    let area_lote: string | null = null;
+    let area_edificada: string | null = null;
+
+    // Cadastro Imobiliário
+    const cadastroPatterns = [
+        /Cadastro\s*Imobili[aá]rio\s*[:.]?\s*([\d.\-\/]+)/i,
+        /N[°º]?\s*(?:do\s+)?cadastro\s*[:.]?\s*([\d.\-\/]+)/i,
+    ];
+    for (const pattern of cadastroPatterns) {
+        const match = t.match(pattern);
+        if (match) { cadastro_imobiliario = match[1].trim(); break; }
+    }
+
+    // Inscrição Imobiliária / C.M.C.
+    const inscricaoPatterns = [
+        /Inscri[çc][aã]o\s*(?:\/\s*C\.?M\.?C\.?)?\s*[:.]?\s*([\d\/.\-]+)/i,
+        /C\.?M\.?C\.?\s*[:.]?\s*([\d\/.\-]+)/i,
+        /Inscri[çc][aã]o\s*Imobili[aá]ria\s*[:.]?\s*([\d\/.\-]+)/i,
+        /Inscri[çc][aã]o\s*Anterior\s*[:.]?\s*([\d\/.\-]+)/i,
+    ];
+    for (const pattern of inscricaoPatterns) {
+        const match = t.match(pattern);
+        if (match) { inscricao_imobiliaria = match[1].trim(); break; }
+    }
+
+    // Matrícula
+    const matriculaPatterns = [
+        /Matr[ií]cula\s*[:.]?\s*([\d.\-\/]+)/i,
+    ];
+    for (const pattern of matriculaPatterns) {
+        const match = t.match(pattern);
+        if (match) { matricula = match[1].trim(); break; }
+    }
+
+    // Área Terreno / Lote
+    const areaLotePatterns = [
+        /[Áá]rea\s*(?:do\s+)?Terreno\s*[:.]?\s*([\d.,]+)/i,
+        /[Áá]rea\s*(?:do\s+)?Lote\s*[:.]?\s*([\d.,]+)/i,
+        /Fra[çc][aã]o\s*de\s*Terreno\s*m[²2]\s*[:.]?\s*([\d.,]+)/i,
+    ];
+    for (const pattern of areaLotePatterns) {
+        const match = t.match(pattern);
+        if (match) { area_lote = match[1].trim().replace(',', '.'); break; }
+    }
+
+    // Área Edificada / Construída
+    const areaEdifPatterns = [
+        /[Áá]rea\s*Constru[ií]da\s*[:.]?\s*([\d.,]+)/i,
+        /[Áá]rea\s*(?:da\s+)?Edifica[çc][aã]o\s*[:.]?\s*([\d.,]+)/i,
+        /[Áá]rea\s*Edif(?:icada)?\.?\s*[:.]?\s*([\d.,]+)/i,
+    ];
+    for (const pattern of areaEdifPatterns) {
+        const match = t.match(pattern);
+        if (match) { area_edificada = match[1].trim().replace(',', '.'); break; }
+    }
+
+    const iptu_data = (cadastro_imobiliario || inscricao_imobiliaria || matricula || area_lote || area_edificada)
+        ? { cadastro_imobiliario, inscricao_imobiliaria, matricula, area_lote, area_edificada }
+        : null;
+
     return {
         owner_name,
         cpf,
-        address: { street, number, neighborhood, city, state, cep }
+        address: { street, number, neighborhood, city, state, cep },
+        iptu_data
     };
 }
 
@@ -232,11 +304,17 @@ You are an expert real estate document analyst. Your task is to extract structur
 Identify the document type from: 'MATRICULA', 'ESCRITURA', 'CONTRATO_COMPRA_VENDA', 'IPTU', 'CONTRATO_LOCACAO', 'CONTA_AGUA', 'CONTA_LUZ', 'CONTA_GAS', 'OUTRO'.
 
 Extract the following fields if present:
-- owner_name (Full name of the owner/landlord)
-- cpf (Owner's CPF)
-- address (street, number, city, state, cep)
+- owner_name (Full name of the owner/landlord or "Contribuinte")
+- cpf (Owner's CPF or CNPJ)
+- address (street/logradouro, number, neighborhood/bairro, city, state, cep)
 - registry (matricula_number, cartorio_name) needed if type is MATRICULA/ESCRITURA
 - dates (issue_date, registration_date)
+- iptu_data: ONLY for IPTU documents, extract:
+  - cadastro_imobiliario (Cadastro Imobiliário / N° do cadastro)
+  - inscricao_imobiliaria (Inscrição / C.M.C. / Inscrição Imobiliária)
+  - matricula (Matrícula number if present)
+  - area_lote (Área Terreno / Área do Lote in m²)
+  - area_edificada (Área Construída / Área Edificação in m²)
 
 Return ONLY valid JSON matching this structure:
 {
@@ -246,22 +324,30 @@ Return ONLY valid JSON matching this structure:
         "owner_name": "string",
         "cpf": "string",
         "address": { 
-             "street": "string (Extract full street name, e.g. RUA JOSE GOIS)", 
-             "number": "string (e.g. 45)", 
-             "neighborhood": "string (e.g. SANTO ANTONIO)", 
-             "city": "string (e.g. ITABIRITO)", 
+             "street": "string (Extract full street name, e.g. RUA ATLAS-0040)", 
+             "number": "string (e.g. 50, remove leading zeros from 000050)", 
+             "neighborhood": "string (e.g. VALE DO SOL)", 
+             "city": "string (e.g. NOVA LIMA)", 
              "state": "string (e.g. MG)", 
-             "cep": "string (e.g. 35450-264)" 
+             "cep": "string (e.g. 34011-111)" 
+        },
+        "iptu_data": {
+             "cadastro_imobiliario": "string",
+             "inscricao_imobiliaria": "string (e.g. 01/07/029/0055-001)",
+             "matricula": "string",
+             "area_lote": "string (e.g. 360.00)",
+             "area_edificada": "string (e.g. 112.42)"
         },
         "registry": { "matricula_number": "...", "cartorio_name": "..." },
         "dates": { "issue_date": "YYYY-MM-DD" }
     },
-    "instructions": "EXTRACT THE PROPERTY ADDRESS LISTED ON THE BILL/DOCUMENT. FOCUS ON THE SERVICE ADDRESS.",
+    "instructions": "EXTRACT THE PROPERTY ADDRESS LISTED ON THE BILL/DOCUMENT. FOCUS ON THE SERVICE ADDRESS / Endereço de Localização. For IPTU, also extract all cadastral and area data.",
     "field_confidence": { "field_name": number }
 }
 
 If a field is not found, exclude it or set to null.
 `;
+
 
 const getOpenAIClient = () => {
     if (!process.env.OPENAI_API_KEY) return null;
