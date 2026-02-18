@@ -1091,15 +1091,6 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                 sub_units: subUnits,
                 admin_data: personType === 'pj' ? adminData : null,
                 role: 'landlord',
-                // Persist additional properties (index 1+) as JSON
-                additional_properties: properties.slice(1).map(prop => ({
-                    propertyType: prop.propertyType,
-                    details: prop.details,
-                    subUnits: prop.subUnits,
-                    address: prop.address,
-                    savedPhotos: prop.savedPhotos,
-                    savedVideos: prop.savedVideos,
-                })),
             };
 
             // Conditionally set PF or PJ fields
@@ -1866,7 +1857,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                                     variant="outline"
                                                                     size="sm"
                                                                     className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                                                    onClick={() => { setPOwnershipOpen(false); setPAddressOpen(true); setTimeout(() => document.getElementById(`prop-${propIdx}-address`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }}
+                                                                    onClick={() => { handleSave(); setPOwnershipOpen(false); setPAddressOpen(true); setTimeout(() => document.getElementById(`prop-${propIdx}-address`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }}
                                                                 >
                                                                     Continuar <ArrowRight className="w-4 h-4" />
                                                                 </Button>
@@ -1957,7 +1948,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                             variant="outline"
                                                             size="sm"
                                                             className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                                            onClick={() => { setPAddressOpen(false); setPDetailsOpen(true); setTimeout(() => document.getElementById(`prop-${propIdx}-details`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }}
+                                                            onClick={() => { handleSave(); setPAddressOpen(false); setPDetailsOpen(true); setTimeout(() => document.getElementById(`prop-${propIdx}-details`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }}
                                                         >
                                                             Continuar <ArrowRight className="w-4 h-4" />
                                                         </Button>
@@ -1976,20 +1967,11 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                 propertyType={pType}
                                                 initialOpen={pDetailsOpen}
                                                 onOpenChange={(open) => setPDetailsOpen(open)}
+                                                onContinue={pDetails.propertyName && pDetails.totalSqMeters && (pType === 'single' || pDetails.numberOfUnits > 0)
+                                                    ? () => { handleSave(); setPDetailsOpen(false); setPPhotosOpen(true); setTimeout(() => document.getElementById(`prop-${propIdx}-photos`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }
+                                                    : undefined
+                                                }
                                             />
-                                            {/* Continuar button for Details → Photos */}
-                                            {pDetailsOpen && pDetails.propertyName && pDetails.totalSqMeters && (pType === 'single' || pDetails.numberOfUnits > 0) && (
-                                                <div className="flex justify-end -mt-4">
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                                        onClick={() => { setPDetailsOpen(false); setPPhotosOpen(true); setTimeout(() => document.getElementById(`prop-${propIdx}-photos`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }}
-                                                    >
-                                                        Continuar <ArrowRight className="w-4 h-4" />
-                                                    </Button>
-                                                </div>
-                                            )}
 
                                             {/* 4. Photos & Videos Section — Main Property — Collapsible */}
                                             <div id={`prop-${propIdx}-photos`} className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
@@ -2120,22 +2102,22 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                                 ))}
                                                             </div>
                                                         </div>
+                                                        {/* Continuar button for Photos → Description */}
+                                                        {((pPhotos.length + pSavedPhotos.length) > 0 || (pVideos.length + pSavedVideos.length) > 0) && (
+                                                            <div className="flex justify-end pt-4">
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                                                                    onClick={() => { handleSave(); setPPhotosOpen(false); setPDescOpen(true); setTimeout(() => document.getElementById(`prop-${propIdx}-description`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }}
+                                                                >
+                                                                    Continuar <ArrowRight className="w-4 h-4" />
+                                                                </Button>
+                                                            </div>
+                                                        )}
                                                     </>
                                                 )}
                                             </div>
-                                            {/* Continuar button for Photos → Description */}
-                                            {pPhotosOpen && ((pPhotos.length + pSavedPhotos.length) > 0 || (pVideos.length + pSavedVideos.length) > 0) && (
-                                                <div className="flex justify-end -mt-4">
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                                        onClick={() => { setPPhotosOpen(false); setPDescOpen(true); setTimeout(() => document.getElementById(`prop-${propIdx}-description`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }}
-                                                    >
-                                                        Continuar <ArrowRight className="w-4 h-4" />
-                                                    </Button>
-                                                </div>
-                                            )}
 
                                             {/* 5. Description Section — Main Property — Collapsible */}
                                             <div id={`prop-${propIdx}-description`} className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
