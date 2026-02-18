@@ -3,8 +3,18 @@ import { createAdminClient } from "../../../utils/supabase/admin";
 import { redirect } from "next/navigation";
 import { currentUser } from "@clerk/nextjs/server";
 import { Button } from "@kitnets/ui";
-import { Plus, Router as RouterIcon, Activity, Home, Building2 } from "lucide-react";
+import { Plus, Router as RouterIcon, Activity, Home, Building2, Users } from "lucide-react";
 import Link from "next/link";
+
+interface PropertyDetails {
+    numberOfUnits?: number;
+    propertyName?: string;
+}
+
+interface AdditionalProperty {
+    propertyType: 'single' | 'multi';
+    details?: PropertyDetails;
+}
 
 export default async function DashboardPage({ params }: { params: Promise<{ lang: "en" | "pt" | "es" }> }) {
     const { lang } = await params;
@@ -16,10 +26,10 @@ export default async function DashboardPage({ params }: { params: Promise<{ lang
     // Use admin client to bypass RLS (server component can't carry Clerk JWT for RLS)
     const supabase = createAdminClient();
 
-    // Fetch user profile
+    // Fetch user profile with all property-related fields
     const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('id, full_name, property_address, property_type')
+        .select('id, full_name, property_type, property_details, additional_properties')
         .eq('clerk_id', user.id)
         .maybeSingle();
 
@@ -37,20 +47,35 @@ export default async function DashboardPage({ params }: { params: Promise<{ lang
         gateways = data || [];
     }
 
-    // Fetch actual properties count
-    let propertyCount = 0;
-    if (profile) {
-        const { count } = await supabase
-            .from('properties')
-            .select('id', { count: 'exact', head: true })
-            .eq('owner_id', profile.id);
-        propertyCount = count || 0;
+    // ── Compute property counts from profile data ────────────────────
+    const primaryType = (profile?.property_type as string) || null;
+    const primaryDetails = (profile?.property_details as PropertyDetails) || {};
+    const additionalProps = (Array.isArray(profile?.additional_properties) ? profile.additional_properties : []) as AdditionalProperty[];
+
+    // Count all properties (primary + additional)
+    let singleCount = 0;
+    let multiCount = 0;
+    let totalUnits = 0;
+
+    if (primaryType) {
+        if (primaryType === 'single') {
+            singleCount++;
+        } else if (primaryType === 'multi') {
+            multiCount++;
+            totalUnits += primaryDetails.numberOfUnits || 0;
+        }
     }
 
-    // Property type from profile
-    const propertyType = (profile as Record<string, unknown>)?.property_type as string || 'single';
-    const singleCount = propertyType === 'single' ? propertyCount : 0;
-    const multiCount = propertyType === 'multi' ? propertyCount : 0;
+    for (const ap of additionalProps) {
+        if (ap.propertyType === 'single') {
+            singleCount++;
+        } else if (ap.propertyType === 'multi') {
+            multiCount++;
+            totalUnits += ap.details?.numberOfUnits || 0;
+        }
+    }
+
+    const propertyCount = singleCount + multiCount;
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -61,7 +86,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ lang
                         Bem vindo de volta, {profile?.full_name || user.firstName}.
                     </p>
                 </div>
-                <Link href={`/${lang}/anunciar`}>
+                <Link href={`/${lang}/profile?add=true`}>
                     <Button>
                         <Plus className="w-4 h-4 mr-2" />
                         Novo Imóvel
@@ -89,6 +114,15 @@ export default async function DashboardPage({ params }: { params: Promise<{ lang
                             </span>
                             <span className="font-medium text-foreground">{multiCount}</span>
                         </div>
+                        {totalUnits > 0 && (
+                            <div className="flex items-center justify-between text-sm pt-1 border-t border-border">
+                                <span className="flex items-center gap-1.5 text-muted-foreground">
+                                    <Users className="w-3.5 h-3.5" />
+                                    Total de Unidades
+                                </span>
+                                <span className="font-medium text-foreground">{totalUnits}</span>
+                            </div>
+                        )}
                     </div>
                 </div>
                 <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
@@ -161,9 +195,22 @@ export default async function DashboardPage({ params }: { params: Promise<{ lang
             {/* Properties Placeholder */}
             <div>
                 <h2 className="text-xl font-semibold text-foreground mb-4">Meus Imóveis</h2>
-                <div className="bg-card border border-dashed border-border rounded-xl p-12 text-center">
-                    <p className="text-muted-foreground">Você ainda não cadastrou nenhum imóvel.</p>
-                </div>
+                {propertyCount === 0 ? (
+                    <div className="bg-card border border-dashed border-border rounded-xl p-12 text-center">
+                        <Home className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                        <p className="text-muted-foreground">Você ainda não cadastrou nenhum imóvel.</p>
+                        <Link href={`/${lang}/profile?add=true`}>
+                            <Button variant="link" className="mt-4 text-primary">Cadastrar agora</Button>
+                        </Link>
+                    </div>
+                ) : (
+                    <div className="bg-card border border-dashed border-border rounded-xl p-12 text-center">
+                        <p className="text-muted-foreground">
+                            {propertyCount} {propertyCount === 1 ? 'imóvel cadastrado' : 'imóveis cadastrados'}.
+                            {totalUnits > 0 && ` ${totalUnits} unidades no total.`}
+                        </p>
+                    </div>
+                )}
             </div>
         </div>
     );
