@@ -153,119 +153,123 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                             </div>
                             <ul className="space-y-2 font-medium">
 
-                                {FLAGS.SHOW_MARKETPLACE && (
+                                {!isSignedIn && (
                                     <>
+                                        {FLAGS.SHOW_MARKETPLACE && (
+                                            <>
+                                                <li>
+                                                    <Link
+                                                        href={lang === 'pt' ? '/anunciar' : `/${lang}/anunciar`}
+                                                        aria-current={isActive(lang === 'pt' ? '/anunciar' : `/${lang}/anunciar`) ? "page" : undefined}
+                                                        className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/anunciar' : `/${lang}/anunciar`) ? 'bg-accent' : ''}`}
+                                                    >
+                                                        <Megaphone className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                        <span className="ms-3">{dict.menu.advertise}</span>
+                                                    </Link>
+                                                </li>
+                                                <li>
+                                                    <Link
+                                                        href={lang === 'pt' ? '/alugar' : `/${lang}/alugar`}
+                                                        onClick={() => setSidebarView('rent-filters')}
+                                                        aria-current={isActive(lang === 'pt' ? '/alugar' : `/${lang}/alugar`) ? "page" : undefined}
+                                                        className={`w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/alugar' : `/${lang}/alugar`) ? 'bg-accent' : ''}`}
+                                                    >
+                                                        <Key className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                        <span className="ms-3">{dict.menu.rent}</span>
+                                                    </Link>
+                                                </li>
+                                                <li>
+                                                    <Link
+                                                        href={lang === 'pt' ? '/comprar' : `/${lang}/comprar`}
+                                                        onClick={() => setSidebarView('buy-filters')}
+                                                        aria-current={isActive(lang === 'pt' ? '/comprar' : `/${lang}/comprar`) ? "page" : undefined}
+                                                        className={`w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/comprar' : `/${lang}/comprar`) ? 'bg-accent' : ''}`}
+                                                    >
+                                                        <Home className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                        <span className="ms-3">{dict.menu.buy}</span>
+                                                    </Link>
+                                                </li>
+                                                <li>
+                                                    <Link
+                                                        href={lang === 'pt' ? '/lancamentos' : `/${lang}/lancamentos`}
+                                                        onClick={() => setSidebarView('launches-filters')}
+                                                        aria-current={isActive(lang === 'pt' ? '/lancamentos' : `/${lang}/lancamentos`) ? "page" : undefined}
+                                                        className={`w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/lancamentos' : `/${lang}/lancamentos`) ? 'bg-accent' : ''}`}
+                                                    >
+                                                        <Rocket className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                        <span className="ms-3">{dict.menu.launches}</span>
+                                                    </Link>
+                                                </li>
+                                            </>
+                                        )}
+
+                                        {FLAGS.SHOW_CALCULATORS && (
+                                            <li>
+                                                <Link
+                                                    href={lang === 'pt' ? '/calculadoras' : `/${lang}/calculadoras`}
+                                                    onClick={() => setSidebarView('calculators-menu')}
+                                                    aria-current={isActive(lang === 'pt' ? '/calculadoras' : `/${lang}/calculadoras`) ? "page" : undefined}
+                                                    className={`w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/calculadoras' : `/${lang}/calculadoras`) ? 'bg-accent' : ''}`}
+                                                >
+                                                    <Calculator className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3">{dict.menu.calculators}</span>
+                                                </Link>
+                                            </li>
+                                        )}
+
                                         <li>
                                             <Link
-                                                href={lang === 'pt' ? '/anunciar' : `/${lang}/anunciar`}
-                                                aria-current={isActive(lang === 'pt' ? '/anunciar' : `/${lang}/anunciar`) ? "page" : undefined}
-                                                className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/anunciar' : `/${lang}/anunciar`) ? 'bg-accent' : ''}`}
+                                                href={lang === 'pt' ? '/indices/panorama' : `/${lang}/indices/panorama`}
+                                                onClick={() => setSidebarView('indices-menu')}
+                                                aria-current={isActive(lang === 'pt' ? '/indices/panorama' : `/${lang}/indices/panorama`) ? "page" : undefined}
+                                                className={`w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/indices/panorama' : `/${lang}/indices/panorama`) ? 'bg-accent' : ''}`}
                                             >
-                                                <Megaphone className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                <span className="ms-3">{dict.menu.advertise}</span>
+                                                <LineChart className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                <span className="ms-3">Indicadores</span>
                                             </Link>
                                         </li>
+
                                         <li>
                                             <Link
-                                                href={lang === 'pt' ? '/alugar' : `/${lang}/alugar`}
-                                                onClick={() => setSidebarView('rent-filters')}
-                                                aria-current={isActive(lang === 'pt' ? '/alugar' : `/${lang}/alugar`) ? "page" : undefined}
-                                                className={`w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/alugar' : `/${lang}/alugar`) ? 'bg-accent' : ''}`}
+                                                href={lang === 'pt' ? '/conteudos' : `/${lang}/conteudos`}
+                                                onClick={() => setSidebarView('contents-menu')}
+                                                aria-current={isActive(lang === 'pt' ? '/conteudos' : `/${lang}/conteudos`) ? "page" : undefined}
+                                                className={`w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/conteudos' : `/${lang}/conteudos`) ? 'bg-accent' : ''}`}
                                             >
-                                                <Key className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                <span className="ms-3">{dict.menu.rent}</span>
+                                                <FileText className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                <span className="ms-3">{dict.menu.contents}</span>
                                             </Link>
                                         </li>
-                                        <li>
-                                            <Link
-                                                href={lang === 'pt' ? '/comprar' : `/${lang}/comprar`}
-                                                onClick={() => setSidebarView('buy-filters')}
-                                                aria-current={isActive(lang === 'pt' ? '/comprar' : `/${lang}/comprar`) ? "page" : undefined}
-                                                className={`w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/comprar' : `/${lang}/comprar`) ? 'bg-accent' : ''}`}
-                                            >
-                                                <Home className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                <span className="ms-3">{dict.menu.buy}</span>
-                                            </Link>
-                                        </li>
-                                        <li>
-                                            <Link
-                                                href={lang === 'pt' ? '/lancamentos' : `/${lang}/lancamentos`}
-                                                onClick={() => setSidebarView('launches-filters')}
-                                                aria-current={isActive(lang === 'pt' ? '/lancamentos' : `/${lang}/lancamentos`) ? "page" : undefined}
-                                                className={`w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/lancamentos' : `/${lang}/lancamentos`) ? 'bg-accent' : ''}`}
-                                            >
-                                                <Rocket className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                <span className="ms-3">{dict.menu.launches}</span>
-                                            </Link>
-                                        </li>
+
+                                        {FLAGS.SHOW_USEFUL_LINKS && (
+                                            <li>
+                                                <Link
+                                                    href={lang === 'pt' ? '/links-uteis' : `/${lang}/links-uteis`}
+                                                    aria-current={isActive(lang === 'pt' ? '/links-uteis' : `/${lang}/links-uteis`) ? "page" : undefined}
+                                                    className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/links-uteis' : `/${lang}/links-uteis`) ? 'bg-accent' : ''}`}
+                                                >
+                                                    <LinkIcon className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3">{dict.menu.usefulLinks}</span>
+                                                </Link>
+                                            </li>
+                                        )}
+
+                                        {FLAGS.SHOW_FAQ && (
+                                            <li>
+                                                <Link
+                                                    href={lang === 'pt' ? '/perguntas-frequentes' : `/${lang}/perguntas-frequentes`}
+                                                    aria-current={isActive(lang === 'pt' ? '/perguntas-frequentes' : `/${lang}/perguntas-frequentes`) ? "page" : undefined}
+                                                    className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/perguntas-frequentes' : `/${lang}/perguntas-frequentes`) ? 'bg-accent' : ''}`}
+                                                >
+                                                    <HelpCircle className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3">{dict.menu.faq}</span>
+                                                </Link>
+                                            </li>
+                                        )}
+
+                                        <li className="my-2 border-t border-border" />
                                     </>
                                 )}
-
-                                {FLAGS.SHOW_CALCULATORS && (
-                                    <li>
-                                        <Link
-                                            href={lang === 'pt' ? '/calculadoras' : `/${lang}/calculadoras`}
-                                            onClick={() => setSidebarView('calculators-menu')}
-                                            aria-current={isActive(lang === 'pt' ? '/calculadoras' : `/${lang}/calculadoras`) ? "page" : undefined}
-                                            className={`w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/calculadoras' : `/${lang}/calculadoras`) ? 'bg-accent' : ''}`}
-                                        >
-                                            <Calculator className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                            <span className="ms-3">{dict.menu.calculators}</span>
-                                        </Link>
-                                    </li>
-                                )}
-
-                                <li>
-                                    <Link
-                                        href={lang === 'pt' ? '/indices/panorama' : `/${lang}/indices/panorama`}
-                                        onClick={() => setSidebarView('indices-menu')}
-                                        aria-current={isActive(lang === 'pt' ? '/indices/panorama' : `/${lang}/indices/panorama`) ? "page" : undefined}
-                                        className={`w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/indices/panorama' : `/${lang}/indices/panorama`) ? 'bg-accent' : ''}`}
-                                    >
-                                        <LineChart className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                        <span className="ms-3">Indicadores</span>
-                                    </Link>
-                                </li>
-
-                                <li>
-                                    <Link
-                                        href={lang === 'pt' ? '/conteudos' : `/${lang}/conteudos`}
-                                        onClick={() => setSidebarView('contents-menu')}
-                                        aria-current={isActive(lang === 'pt' ? '/conteudos' : `/${lang}/conteudos`) ? "page" : undefined}
-                                        className={`w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/conteudos' : `/${lang}/conteudos`) ? 'bg-accent' : ''}`}
-                                    >
-                                        <FileText className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                        <span className="ms-3">{dict.menu.contents}</span>
-                                    </Link>
-                                </li>
-
-                                {FLAGS.SHOW_USEFUL_LINKS && (
-                                    <li>
-                                        <Link
-                                            href={lang === 'pt' ? '/links-uteis' : `/${lang}/links-uteis`}
-                                            aria-current={isActive(lang === 'pt' ? '/links-uteis' : `/${lang}/links-uteis`) ? "page" : undefined}
-                                            className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/links-uteis' : `/${lang}/links-uteis`) ? 'bg-accent' : ''}`}
-                                        >
-                                            <LinkIcon className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                            <span className="ms-3">{dict.menu.usefulLinks}</span>
-                                        </Link>
-                                    </li>
-                                )}
-
-                                {FLAGS.SHOW_FAQ && (
-                                    <li>
-                                        <Link
-                                            href={lang === 'pt' ? '/perguntas-frequentes' : `/${lang}/perguntas-frequentes`}
-                                            aria-current={isActive(lang === 'pt' ? '/perguntas-frequentes' : `/${lang}/perguntas-frequentes`) ? "page" : undefined}
-                                            className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/perguntas-frequentes' : `/${lang}/perguntas-frequentes`) ? 'bg-accent' : ''}`}
-                                        >
-                                            <HelpCircle className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                            <span className="ms-3">{dict.menu.faq}</span>
-                                        </Link>
-                                    </li>
-                                )}
-
-                                <li className="my-2 border-t border-border" />
                                 {isSignedIn ? (
                                     FLAGS.SHOW_DASHBOARD_LINKS && (
                                         <>
