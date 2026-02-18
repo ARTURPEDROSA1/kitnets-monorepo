@@ -1688,7 +1688,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                         <div className="p-6 space-y-6 border-t border-border bg-card">
 
                                             {/* 1. Documentation Section (ownership verification — first!) */}
-                                            <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
+                                            <div id={`prop-${propIdx}-ownership`} className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
                                                 <button
                                                     type="button"
                                                     onClick={() => setPOwnershipOpen(prev => !prev)}
@@ -1805,7 +1805,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                                     variant="outline"
                                                                     size="sm"
                                                                     className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                                                    onClick={() => { setPOwnershipOpen(false); setPAddressOpen(true); }}
+                                                                    onClick={() => { setPOwnershipOpen(false); setPAddressOpen(true); setTimeout(() => document.getElementById(`prop-${propIdx}-address`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }}
                                                                 >
                                                                     Continuar <ArrowRight className="w-4 h-4" />
                                                                 </Button>
@@ -1830,7 +1830,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                             )}
 
                                             {/* 2. Address Section — Collapsible */}
-                                            <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
+                                            <div id={`prop-${propIdx}-address`} className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
                                                 <button
                                                     type="button"
                                                     onClick={() => setPAddressOpen(prev => !prev)}
@@ -1896,7 +1896,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                             variant="outline"
                                                             size="sm"
                                                             className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                                            onClick={() => { setPAddressOpen(false); setPDetailsOpen(true); }}
+                                                            onClick={() => { setPAddressOpen(false); setPDetailsOpen(true); setTimeout(() => document.getElementById(`prop-${propIdx}-details`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }}
                                                         >
                                                             Continuar <ArrowRight className="w-4 h-4" />
                                                         </Button>
@@ -1905,6 +1905,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                             </div>
 
                                             {/* 3. Detalhes Section */}
+                                            <div id={`prop-${propIdx}-details`} />
                                             <PropertyDetailsCard
                                                 key={`details-${propIdx}-${pDetailsOpen}`}
                                                 details={pDetails}
@@ -1922,7 +1923,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                         variant="outline"
                                                         size="sm"
                                                         className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                                        onClick={() => { setPDetailsOpen(false); setPPhotosOpen(true); }}
+                                                        onClick={() => { setPDetailsOpen(false); setPPhotosOpen(true); setTimeout(() => document.getElementById(`prop-${propIdx}-photos`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }}
                                                     >
                                                         Continuar <ArrowRight className="w-4 h-4" />
                                                     </Button>
@@ -1930,7 +1931,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                             )}
 
                                             {/* 4. Photos & Videos Section — Main Property — Collapsible */}
-                                            <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
+                                            <div id={`prop-${propIdx}-photos`} className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
                                                 <button
                                                     type="button"
                                                     onClick={() => setPPhotosOpen(prev => !prev)}
@@ -2068,7 +2069,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                         variant="outline"
                                                         size="sm"
                                                         className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                                        onClick={() => { setPPhotosOpen(false); setPDescOpen(true); }}
+                                                        onClick={() => { setPPhotosOpen(false); setPDescOpen(true); setTimeout(() => document.getElementById(`prop-${propIdx}-description`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }}
                                                     >
                                                         Continuar <ArrowRight className="w-4 h-4" />
                                                     </Button>
@@ -2076,7 +2077,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                             )}
 
                                             {/* 5. Description Section — Main Property — Collapsible */}
-                                            <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
+                                            <div id={`prop-${propIdx}-description`} className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
                                                 <button
                                                     type="button"
                                                     onClick={() => setPDescOpen(prev => !prev)}
@@ -2149,6 +2150,8 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                                 if (pType !== 'multi' || pDetails.numberOfUnits === 0) {
                                                                     handleSave();
                                                                     setActiveTab('basics');
+                                                                } else {
+                                                                    setTimeout(() => document.getElementById(`prop-${propIdx}-subunits`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
                                                                 }
                                                             }}
                                                         >
@@ -2162,16 +2165,19 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
 
                                             {/* 6. Sub-unidades Section (at the bottom, only for multi) */}
                                             {pType === 'multi' && pDetails.numberOfUnits > 0 && (
-                                                <SubUnitsSection
-                                                    details={pDetails}
-                                                    units={pSubUnits}
-                                                    onDetailsChange={setPDetails}
-                                                    onUnitsChange={setPSubUnits}
-                                                    onGenerateDescription={(unitIdx) => generateUnitDescription(propIdx, unitIdx)}
-                                                    generatingDescriptionIdx={generatingUnitDescriptionIdx}
-                                                    onImportContract={(unitIdx, file) => importContract(propIdx, unitIdx, file)}
-                                                    importingContractIdx={importingContractIdx}
-                                                />
+                                                <>
+                                                    <div id={`prop-${propIdx}-subunits`} />
+                                                    <SubUnitsSection
+                                                        details={pDetails}
+                                                        units={pSubUnits}
+                                                        onDetailsChange={setPDetails}
+                                                        onUnitsChange={setPSubUnits}
+                                                        onGenerateDescription={(unitIdx) => generateUnitDescription(propIdx, unitIdx)}
+                                                        generatingDescriptionIdx={generatingUnitDescriptionIdx}
+                                                        onImportContract={(unitIdx, file) => importContract(propIdx, unitIdx, file)}
+                                                        importingContractIdx={importingContractIdx}
+                                                    />
+                                                </>
                                             )}
 
                                         </div>
