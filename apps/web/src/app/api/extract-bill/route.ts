@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { extractText, getDocumentProxy } from "unpdf";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // ── Regex-based bill field parser ────────────────────────────────────
 
@@ -123,7 +124,7 @@ function parseBillText(text: string): ExtractedBill {
     };
 }
 
-// ── GPT-4o Vision prompt (images only) ──────────────────────────────
+// ── Vision prompt for AI extraction (Gemini + OpenAI) ────────────────
 
 const IMAGE_PROMPT = `You are an expert at reading Brazilian water utility bills (contas de água).
 Analyze this bill image carefully and extract ALL data fields.
@@ -171,7 +172,85 @@ Rules:
 - If not found: null for strings, 0 for numbers
 - CRITICAL: Extract EXACT values. Do NOT invent values.`;
 
-// ── API Route ───────────────────────────────────────────────────────
+function parseJsonContent(content: string): ExtractedBill {
+    let cleaned = content.trim();
+    if (cleaned.startsWith("```")) {
+        cleaned = cleaned.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
+    }
+    return JSON.parse(cleaned);
+}
+
+// ── STRATEGY 2: Gemini Vision (FREE) ─────────────────────────────────
+
+async function extractWithGemini(base64: string, mimeType: string): Promise<ExtractedBill> {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new Error("GEMINI_API_KEY not configured");
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({
+        model: "gemini-1.5-flash",
+        generationConfig: { responseMimeType: "application/json" },
+    });
+
+    const result = await model.generateContent([
+        IMAGE_PROMPT,
+        { inlineData: { data: base64, mimeType } },
+    ]);
+
+    const text = (await result.response).text();
+    return parseJsonContent(text);
+}
+
+// ── STRATEGY 3: OpenAI Vision (PAID — last resort) ───────────────────
+
+async function extractWithOpenAI(base64: string, mimeType: string): Promise<ExtractedBill> {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) throw new Error("OPENAI_API_KEY not configured");
+
+    const apiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+            model: "gpt-4o",
+            messages: [
+                {
+                    role: "user",
+                    content: [
+                        { type: "text", text: IMAGE_PROMPT },
+                        {
+                            type: "image_url",
+                            image_url: {
+                                url: `data:${mimeType};base64,${base64}`,
+                                detail: "high",
+                            },
+                        },
+                    ],
+                },
+            ],
+            max_tokens: 1500,
+            temperature: 0,
+        }),
+    });
+
+    if (!apiResponse.ok) {
+        const errBody = await apiResponse.text();
+        throw new Error(`OpenAI API error (${apiResponse.status}): ${errBody.substring(0, 300)}`);
+    }
+
+    const response = await apiResponse.json();
+    const content = response.choices?.[0]?.message?.content;
+    if (!content) throw new Error("GPT-4o returned empty response");
+
+    return parseJsonContent(content);
+}
+
+// ── API Route — 3-tier pipeline ─────────────────────────────────────
+// 1. PDF text → regex (FREE, instant)
+// 2. Gemini Vision (FREE)
+// 3. OpenAI GPT-4o Vision (PAID, last resort)
 
 export async function POST(request: Request) {
     try {
@@ -206,7 +285,7 @@ export async function POST(request: Request) {
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
 
-        // ── PDF: unpdf text extraction + regex parser (free, fast) ────
+        // ── STRATEGY 1: PDF text extraction + regex parser (free, fast) ──
         if (file.type === "application/pdf") {
             let pdfText = "";
 
@@ -215,21 +294,17 @@ export async function POST(request: Request) {
                 const result = await extractText(pdf, { mergePages: true });
                 pdfText = result.text || "";
             } catch (pdfError) {
-                console.error("unpdf extraction error:", pdfError);
-                return NextResponse.json(
-                    {
-                        error: `Erro ao processar PDF: ${pdfError instanceof Error ? pdfError.message : "erro desconhecido"}. Tente enviar como imagem (JPG/PNG).`,
-                    },
-                    { status: 400 }
-                );
+                console.error("[extract-bill] unpdf extraction error:", pdfError);
+                // Don't return error — fall through to Vision AI
             }
 
-            // Try regex parser even with short text
+            // Try regex parser if we got text
             if (pdfText.trim().length > 0) {
                 const extracted = parseBillText(pdfText);
 
                 // If parser found at least some key fields, return the result
                 if (extracted.confidence > 0) {
+                    console.log(`[extract-bill] ✅ PDF regex extraction successful (confidence: ${extracted.confidence})`);
                     return NextResponse.json({
                         success: true,
                         data: extracted,
@@ -240,99 +315,54 @@ export async function POST(request: Request) {
                 }
             }
 
-            // If no usable text or zero confidence, return error with debug info
-            return NextResponse.json(
-                {
-                    error: `Não foi possível extrair dados do PDF (${pdfText.length} caracteres extraídos). Tente enviar como imagem (JPG/PNG).`,
-                    debug: { textLength: pdfText.length, textPreview: pdfText.substring(0, 500) },
-                },
-                { status: 400 }
-            );
+            // PDF regex failed — fall through to Vision AI below
+            console.log(`[extract-bill] PDF regex failed (${pdfText.length} chars, 0 confidence). Trying Vision AI...`);
         }
 
-        // ── Image: GPT-4o Vision ────────────────────────────────────
-        const apiKey = process.env.OPENAI_API_KEY;
-        if (!apiKey) {
-            return NextResponse.json(
-                { error: "OpenAI API key not configured. Para imagens, é necessário configurar a chave da API." },
-                { status: 500 }
-            );
-        }
-
+        // ── STRATEGY 2: Gemini Vision (FREE) ────────────────────────────
         let mediaType = file.type;
         if (mediaType === "image/jpg") mediaType = "image/jpeg";
         const base64 = buffer.toString("base64");
 
-        const apiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${apiKey}`,
-            },
-            body: JSON.stringify({
-                model: "gpt-4o",
-                messages: [
-                    {
-                        role: "user",
-                        content: [
-                            { type: "text", text: IMAGE_PROMPT },
-                            {
-                                type: "image_url",
-                                image_url: {
-                                    url: `data:${mediaType};base64,${base64}`,
-                                    detail: "high",
-                                },
-                            },
-                        ],
-                    },
-                ],
-                max_tokens: 1500,
-                temperature: 0,
-            }),
-        });
+        try {
+            console.log("[extract-bill] Trying Gemini Vision (free)...");
+            const extracted = await extractWithGemini(base64, mediaType);
+            console.log("[extract-bill] ✅ Gemini Vision succeeded");
+            return NextResponse.json({
+                success: true,
+                data: extracted,
+                method: "gemini-vision",
+                usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+            });
+        } catch (geminiError) {
+            console.warn("[extract-bill] Gemini Vision failed:", geminiError);
+        }
 
-        if (!apiResponse.ok) {
-            const errBody = await apiResponse.text();
-            console.error("OpenAI API error:", apiResponse.status, errBody);
+        // ── STRATEGY 3: OpenAI GPT-4o Vision (PAID — last resort) ───────
+        try {
+            console.log("[extract-bill] Trying OpenAI Vision (paid, fallback)...");
+            const extracted = await extractWithOpenAI(base64, mediaType);
+            console.log("[extract-bill] ✅ OpenAI Vision succeeded");
+            return NextResponse.json({
+                success: true,
+                data: extracted,
+                method: "gpt-4o-vision",
+                usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+            });
+        } catch (openaiError) {
+            console.error("[extract-bill] OpenAI Vision also failed:", openaiError);
+            const message = openaiError instanceof Error ? openaiError.message : "Unknown error";
             return NextResponse.json(
-                { error: `OpenAI API error (${apiResponse.status}): ${errBody.substring(0, 300)}` },
+                { error: `Falha na extração. Gemini e OpenAI falharam. Último erro: ${message}` },
                 { status: 500 }
             );
         }
-
-        const response = await apiResponse.json();
-        const content = response.choices?.[0]?.message?.content;
-
-        if (!content) {
-            return NextResponse.json(
-                { error: "GPT-4o returned empty response" },
-                { status: 500 }
-            );
-        }
-
-        let cleanContent = content.trim();
-        if (cleanContent.startsWith("```")) {
-            cleanContent = cleanContent.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
-        }
-
-        const extracted = JSON.parse(cleanContent);
-
-        return NextResponse.json({
-            success: true,
-            data: extracted,
-            method: "gpt-4o-vision",
-            usage: {
-                prompt_tokens: response.usage?.prompt_tokens,
-                completion_tokens: response.usage?.completion_tokens,
-                total_tokens: response.usage?.total_tokens,
-            },
-        });
     } catch (error) {
-        console.error("Bill extraction error:", error);
+        console.error("[extract-bill] Critical error:", error);
 
         if (error instanceof SyntaxError) {
             return NextResponse.json(
-                { error: "Failed to parse GPT response as JSON. Please try again." },
+                { error: "Failed to parse AI response as JSON. Please try again." },
                 { status: 500 }
             );
         }
