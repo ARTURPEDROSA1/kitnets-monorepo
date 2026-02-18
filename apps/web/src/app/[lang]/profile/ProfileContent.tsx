@@ -1063,7 +1063,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
         }
     };
 
-    const handleSave = async () => {
+    const handleSave = async (silent = false) => {
         if (!user) return;
         setIsSaving(true);
         try {
@@ -1274,14 +1274,16 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                 });
             }
 
-            setShowSuccess(true);
-            setTimeout(() => {
-                setShowSuccess(false);
-                if (activeTab === 'ownership') {
-                    setActiveTab('basics');
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                }
-            }, 2000);
+            if (!silent) {
+                setShowSuccess(true);
+                setTimeout(() => {
+                    setShowSuccess(false);
+                    if (activeTab === 'ownership') {
+                        setActiveTab('basics');
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                }, 2000);
+            }
 
         } catch (err: unknown) {
             console.error('Error saving profile:', err);
@@ -1857,7 +1859,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                                     variant="outline"
                                                                     size="sm"
                                                                     className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                                                    onClick={() => { handleSave(); setPOwnershipOpen(false); setPAddressOpen(true); setTimeout(() => document.getElementById(`prop-${propIdx}-address`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }}
+                                                                    onClick={() => { handleSave(true); setPOwnershipOpen(false); setPAddressOpen(true); setTimeout(() => document.getElementById(`prop-${propIdx}-address`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }}
                                                                 >
                                                                     Continuar <ArrowRight className="w-4 h-4" />
                                                                 </Button>
@@ -1948,7 +1950,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                             variant="outline"
                                                             size="sm"
                                                             className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                                            onClick={() => { handleSave(); setPAddressOpen(false); setPDetailsOpen(true); setTimeout(() => document.getElementById(`prop-${propIdx}-details`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }}
+                                                            onClick={() => { handleSave(true); setPAddressOpen(false); setPDetailsOpen(true); setTimeout(() => document.getElementById(`prop-${propIdx}-details`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }}
                                                         >
                                                             Continuar <ArrowRight className="w-4 h-4" />
                                                         </Button>
@@ -1968,7 +1970,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                 initialOpen={pDetailsOpen}
                                                 onOpenChange={(open) => setPDetailsOpen(open)}
                                                 onContinue={pDetails.propertyName && pDetails.totalSqMeters && (pType === 'single' || pDetails.numberOfUnits > 0)
-                                                    ? () => { handleSave(); setPDetailsOpen(false); setPPhotosOpen(true); setTimeout(() => document.getElementById(`prop-${propIdx}-photos`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }
+                                                    ? () => { handleSave(true); setPDetailsOpen(false); setPPhotosOpen(true); setTimeout(() => document.getElementById(`prop-${propIdx}-photos`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }
                                                     : undefined
                                                 }
                                             />
@@ -2109,7 +2111,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                                     variant="outline"
                                                                     size="sm"
                                                                     className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                                                    onClick={() => { handleSave(); setPPhotosOpen(false); setPDescOpen(true); setTimeout(() => document.getElementById(`prop-${propIdx}-description`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }}
+                                                                    onClick={() => { handleSave(true); setPPhotosOpen(false); setPDescOpen(true); setTimeout(() => document.getElementById(`prop-${propIdx}-description`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }}
                                                                 >
                                                                     Continuar <ArrowRight className="w-4 h-4" />
                                                                 </Button>
@@ -2194,6 +2196,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                                     handleSave();
                                                                     setActiveTab('basics');
                                                                 } else {
+                                                                    handleSave(true);
                                                                     setPropField('subUnitOpenIdx', 0);
                                                                     setTimeout(() => document.getElementById(`prop-${propIdx}-subunits`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
                                                                 }
@@ -2236,7 +2239,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                         })}
 
                         <div className="flex justify-end pt-4">
-                            <Button size="lg" onClick={handleSave} disabled={isSaving} className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-lg shadow-emerald-900/20">
+                            <Button size="lg" onClick={() => handleSave()} disabled={isSaving} className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-lg shadow-emerald-900/20">
                                 {isSaving ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Save className="w-5 h-5 mr-2" />}
                                 Salvar Imóvel e Documentos
                             </Button>
@@ -2749,7 +2752,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                         )}
 
                         <div className="flex justify-end pt-4">
-                            <Button size="lg" onClick={handleSave} disabled={isSaving} className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-lg shadow-emerald-900/20">
+                            <Button size="lg" onClick={() => handleSave()} disabled={isSaving} className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-lg shadow-emerald-900/20">
                                 {isSaving ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Save className="w-5 h-5 mr-2" />}
                                 {p.basics.save}
                             </Button>
