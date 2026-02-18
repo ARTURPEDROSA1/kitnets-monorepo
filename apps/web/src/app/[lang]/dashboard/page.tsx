@@ -16,6 +16,37 @@ interface AdditionalProperty {
     details?: PropertyDetails;
 }
 
+// ── Helpers ──────────────────────────────────────────────────────────
+
+function timeAgo(dateStr: string): string {
+    const now = new Date();
+    const then = new Date(dateStr);
+    const diffMs = now.getTime() - then.getTime();
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHour = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHour / 24);
+
+    if (diffSec < 60) return 'agora mesmo';
+    if (diffMin === 1) return 'há 1 min';
+    if (diffMin < 60) return `há ${diffMin} min`;
+    if (diffHour === 1) return 'há 1 hora';
+    if (diffHour < 24) return `há ${diffHour} horas`;
+    if (diffDay === 1) return 'há 1 dia';
+    return `há ${diffDay} dias`;
+}
+
+function isOnline(lastSeenAt: string | null): boolean {
+    if (!lastSeenAt) return false;
+    const diff = Date.now() - new Date(lastSeenAt).getTime();
+    return diff < 10 * 60 * 1000; // 10 minutes
+}
+
+// ── Page Component ───────────────────────────────────────────────────
+
+export const dynamic = 'force-dynamic'; // Always fresh data on every load
+export const revalidate = 0;
+
 export default async function DashboardPage({ params }: { params: Promise<{ lang: "en" | "pt" | "es" }> }) {
     const { lang } = await params;
 
@@ -45,6 +76,25 @@ export default async function DashboardPage({ params }: { params: Promise<{ lang
             .select('*')
             .eq('owner_id', profile.id);
         gateways = data || [];
+    }
+
+    // For each gateway, also fetch the latest synced_at from meter_readings as a fallback
+    // (in case last_seen_at hasn't been updated yet)
+    const gatewayLastSeen: Record<string, string | null> = {};
+    for (const gw of gateways) {
+        // Prefer gateway's own last_seen_at (updated by ingest API)
+        if (gw.last_seen_at) {
+            gatewayLastSeen[gw.id] = gw.last_seen_at;
+        } else {
+            // Fallback: query latest synced_at from meter_readings
+            const { data: latestReading } = await supabase
+                .from('meter_readings')
+                .select('synced_at')
+                .order('synced_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+            gatewayLastSeen[gw.id] = latestReading?.synced_at || null;
+        }
     }
 
     // ── Compute property counts from profile data ────────────────────
@@ -79,6 +129,18 @@ export default async function DashboardPage({ params }: { params: Promise<{ lang
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            {/* Pulse animation for online status */}
+            <style dangerouslySetInnerHTML={{
+                __html: `
+                @keyframes pulse-dot {
+                    0%, 100% { opacity: 1; transform: scale(1); }
+                    50% { opacity: 0.4; transform: scale(1.5); }
+                }
+                .animate-pulse-dot {
+                    animation: pulse-dot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+                }
+            ` }} />
+
             <div className="flex justify-between items-center mb-8">
                 <div>
                     <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
@@ -131,7 +193,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ lang
                 </div>
                 <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
                     <h3 className="text-sm font-medium text-muted-foreground">Gateways Ativos</h3>
-                    <p className="text-2xl font-bold text-foreground mt-2">{gateways.length}</p>
+                    <p className="text-2xl font-bold text-foreground mt-2">{gateways.filter(g => isOnline(gatewayLastSeen[g.id])).length}</p>
                 </div>
             </div>
 
@@ -158,36 +220,52 @@ export default async function DashboardPage({ params }: { params: Promise<{ lang
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {gateways.map((gw) => (
-                            <div key={gw.id} className="bg-card border border-border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className="flex items-center space-x-3">
-                                        <div className="bg-primary/10 p-2 rounded-lg">
-                                            <RouterIcon className="w-6 h-6 text-primary" />
+                        {gateways.map((gw) => {
+                            const lastSeen = gatewayLastSeen[gw.id];
+                            const online = isOnline(lastSeen);
+                            const lastSeenText = lastSeen ? timeAgo(lastSeen) : 'Nunca';
+
+                            return (
+                                <div key={gw.id} className="bg-card border border-border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div className="flex items-center space-x-3">
+                                            <div className={`p-2 rounded-lg ${online ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>
+                                                <RouterIcon className={`w-6 h-6 ${online ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`} />
+                                            </div>
+                                            <div>
+                                                <h4 className="font-semibold text-foreground">{gw.label || 'Gateway Sem Nome'}</h4>
+                                                <p className="text-xs text-muted-foreground font-mono">{gw.serial_number}</p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <h4 className="font-semibold text-foreground">{gw.label || 'Gateway Sem Nome'}</h4>
-                                            <p className="text-xs text-muted-foreground font-mono">{gw.serial_number}</p>
+                                        {/* Status badge with animated pulse dot */}
+                                        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${online
+                                                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                                : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                            }`}>
+                                            <span className={`inline-block w-2 h-2 rounded-full ${online
+                                                    ? 'bg-green-500 animate-pulse-dot'
+                                                    : 'bg-red-500'
+                                                }`} />
+                                            {online ? 'Online' : 'Offline'}
                                         </div>
                                     </div>
-                                    <div className={`px-2 py-1 rounded-full text-xs font-medium ${gw.status === 'online' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-600'}`}>
-                                        {gw.status === 'online' ? 'Online' : 'Offline'}
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-muted-foreground">Última atualização</span>
+                                            <span className={`font-medium ${online ? 'text-foreground' : 'text-red-500 dark:text-red-400'}`}>
+                                                {lastSeenText}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="mt-6 pt-4 border-t border-border">
+                                        <Link href={`/${lang}/dashboard/gateway/${gw.id}`} className="text-primary text-sm font-medium hover:underline flex items-center">
+                                            <Activity className="w-4 h-4 mr-2" />
+                                            Ver Consumo em Tempo Real
+                                        </Link>
                                     </div>
                                 </div>
-                                <div className="space-y-2">
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-muted-foreground">Última atualização</span>
-                                        <span className="text-foreground">{gw.last_seen_at ? new Date(gw.last_seen_at).toLocaleTimeString() : '-'}</span>
-                                    </div>
-                                </div>
-                                <div className="mt-6 pt-4 border-t border-border">
-                                    <Link href={`/${lang}/dashboard/gateway/${gw.id}`} className="text-primary text-sm font-medium hover:underline flex items-center">
-                                        <Activity className="w-4 h-4 mr-2" />
-                                        Ver Consumo em Tempo Real
-                                    </Link>
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>
