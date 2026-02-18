@@ -48,6 +48,7 @@ interface PropertyState {
     photosSectionOpen: boolean;
     descriptionSectionOpen: boolean;
     detailsInitialOpen: boolean;
+    subUnitOpenIdx: number | null;
 }
 
 interface ProfileContentProps {
@@ -136,6 +137,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
         photosSectionOpen: true,
         descriptionSectionOpen: true,
         detailsInitialOpen: true,
+        subUnitOpenIdx: null,
     });
 
     const [properties, setProperties] = useState<PropertyState[]>([]);
@@ -414,6 +416,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                         photosSectionOpen: primaryPhotos.length < 2,
                         descriptionSectionOpen: !primaryPropAddr.description,
                         detailsInitialOpen: !primaryPropDetails?.totalSqMeters,
+                        subUnitOpenIdx: null,
                     };
 
                     // Load additional properties from JSON column
@@ -437,6 +440,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                 photosSectionOpen: true,
                                 descriptionSectionOpen: true,
                                 detailsInitialOpen: true,
+                                subUnitOpenIdx: null,
                             });
                         }
                     }
@@ -1659,7 +1663,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            {properties.length > 1 && (
+                                            {(
                                                 <span
                                                     role="button"
                                                     tabIndex={0}
@@ -2151,6 +2155,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                                     handleSave();
                                                                     setActiveTab('basics');
                                                                 } else {
+                                                                    setPropField('subUnitOpenIdx', 0);
                                                                     setTimeout(() => document.getElementById(`prop-${propIdx}-subunits`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
                                                                 }
                                                             }}
@@ -2168,6 +2173,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                 <>
                                                     <div id={`prop-${propIdx}-subunits`} />
                                                     <SubUnitsSection
+                                                        key={`subunits-${propIdx}-${prop.subUnitOpenIdx}`}
                                                         details={pDetails}
                                                         units={pSubUnits}
                                                         onDetailsChange={setPDetails}
@@ -2176,12 +2182,15 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                         generatingDescriptionIdx={generatingUnitDescriptionIdx}
                                                         onImportContract={(unitIdx, file) => importContract(propIdx, unitIdx, file)}
                                                         importingContractIdx={importingContractIdx}
+                                                        initialOpenIdx={prop.subUnitOpenIdx ?? undefined}
+                                                        propertyIndex={propIdx}
                                                     />
                                                 </>
                                             )}
 
                                         </div>
-                                    )}
+                                    )
+                                    }
 
                                 </div>
                             );
@@ -2744,81 +2753,85 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
             </div>
 
             {/* Delete Account Modal (Simple Overlay) */}
-            {showDeleteModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                    <div className="bg-background rounded-lg p-6 max-w-md w-full space-y-4 shadow-xl border border-border">
-                        <h3 className="text-xl font-bold text-foreground">{p.deleteModal.title}</h3>
-                        <p className="text-muted-foreground">{p.deleteModal.irreversible}</p>
-                        <div className="flex justify-end gap-3">
-                            <Button variant="outline" onClick={() => setShowDeleteModal(false)}>{p.deleteModal.cancel}</Button>
-                            <Button
-                                variant="destructive"
-                                onClick={handleDeleteAccount}
-                                disabled={isDeleting}
-                            >
-                                {isDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                                {p.deleteModal.confirm}
-                            </Button>
+            {
+                showDeleteModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                        <div className="bg-background rounded-lg p-6 max-w-md w-full space-y-4 shadow-xl border border-border">
+                            <h3 className="text-xl font-bold text-foreground">{p.deleteModal.title}</h3>
+                            <p className="text-muted-foreground">{p.deleteModal.irreversible}</p>
+                            <div className="flex justify-end gap-3">
+                                <Button variant="outline" onClick={() => setShowDeleteModal(false)}>{p.deleteModal.cancel}</Button>
+                                <Button
+                                    variant="destructive"
+                                    onClick={handleDeleteAccount}
+                                    disabled={isDeleting}
+                                >
+                                    {isDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                                    {p.deleteModal.confirm}
+                                </Button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Add Property Modal */}
-            {showAddPropertyModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                    <div className="bg-background rounded-xl p-8 max-w-lg w-full space-y-6 shadow-2xl border border-border animate-in fade-in zoom-in-95 duration-200">
-                        <div className="text-center space-y-2">
-                            <h3 className="text-xl font-bold text-foreground">Adicionar Propriedade</h3>
-                            <p className="text-sm text-muted-foreground">Selecione o tipo de propriedade que deseja cadastrar.</p>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    const newProp = createEmptyProperty('single');
-                                    setProperties(prev => [...prev, newProp]);
-                                    setExpandedPropertyIdx(properties.length); // expand the newly added
-                                    setShowAddPropertyModal(false);
-                                }}
-                                className="group flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-border hover:border-emerald-400 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/20 transition-all duration-200 text-center"
-                            >
-                                <div className="p-3 bg-emerald-100 dark:bg-emerald-900/50 rounded-xl text-emerald-600 group-hover:scale-110 transition-transform">
-                                    <Home className="w-8 h-8" />
-                                </div>
-                                <div>
-                                    <p className="font-semibold text-foreground">Unifamiliar</p>
-                                    <p className="text-xs text-muted-foreground mt-1">Casa, apartamento ou terreno</p>
-                                </div>
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    const newProp = createEmptyProperty('multi');
-                                    setProperties(prev => [...prev, newProp]);
-                                    setExpandedPropertyIdx(properties.length); // expand the newly added
-                                    setShowAddPropertyModal(false);
-                                }}
-                                className="group flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-border hover:border-violet-400 hover:bg-violet-50/50 dark:hover:bg-violet-900/20 transition-all duration-200 text-center"
-                            >
-                                <div className="p-3 bg-violet-100 dark:bg-violet-900/50 rounded-xl text-violet-600 group-hover:scale-110 transition-transform">
-                                    <Building2 className="w-8 h-8" />
-                                </div>
-                                <div>
-                                    <p className="font-semibold text-foreground">Multifamiliar</p>
-                                    <p className="text-xs text-muted-foreground mt-1">Prédio, vila ou condomínio</p>
-                                </div>
-                            </button>
-                        </div>
-                        <div className="flex justify-center">
-                            <Button variant="ghost" size="sm" onClick={() => setShowAddPropertyModal(false)}>
-                                Cancelar
-                            </Button>
+            {
+                showAddPropertyModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                        <div className="bg-background rounded-xl p-8 max-w-lg w-full space-y-6 shadow-2xl border border-border animate-in fade-in zoom-in-95 duration-200">
+                            <div className="text-center space-y-2">
+                                <h3 className="text-xl font-bold text-foreground">Adicionar Propriedade</h3>
+                                <p className="text-sm text-muted-foreground">Selecione o tipo de propriedade que deseja cadastrar.</p>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const newProp = createEmptyProperty('single');
+                                        setProperties(prev => [...prev, newProp]);
+                                        setExpandedPropertyIdx(properties.length); // expand the newly added
+                                        setShowAddPropertyModal(false);
+                                    }}
+                                    className="group flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-border hover:border-emerald-400 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/20 transition-all duration-200 text-center"
+                                >
+                                    <div className="p-3 bg-emerald-100 dark:bg-emerald-900/50 rounded-xl text-emerald-600 group-hover:scale-110 transition-transform">
+                                        <Home className="w-8 h-8" />
+                                    </div>
+                                    <div>
+                                        <p className="font-semibold text-foreground">Unifamiliar</p>
+                                        <p className="text-xs text-muted-foreground mt-1">Casa, apartamento ou terreno</p>
+                                    </div>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const newProp = createEmptyProperty('multi');
+                                        setProperties(prev => [...prev, newProp]);
+                                        setExpandedPropertyIdx(properties.length); // expand the newly added
+                                        setShowAddPropertyModal(false);
+                                    }}
+                                    className="group flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-border hover:border-violet-400 hover:bg-violet-50/50 dark:hover:bg-violet-900/20 transition-all duration-200 text-center"
+                                >
+                                    <div className="p-3 bg-violet-100 dark:bg-violet-900/50 rounded-xl text-violet-600 group-hover:scale-110 transition-transform">
+                                        <Building2 className="w-8 h-8" />
+                                    </div>
+                                    <div>
+                                        <p className="font-semibold text-foreground">Multifamiliar</p>
+                                        <p className="text-xs text-muted-foreground mt-1">Prédio, vila ou condomínio</p>
+                                    </div>
+                                </button>
+                            </div>
+                            <div className="flex justify-center">
+                                <Button variant="ghost" size="sm" onClick={() => setShowAddPropertyModal(false)}>
+                                    Cancelar
+                                </Button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
-        </div>
+        </div >
     );
 }

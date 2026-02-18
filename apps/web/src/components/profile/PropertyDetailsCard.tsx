@@ -449,6 +449,7 @@ interface SubUnitsSectionProps {
     onImportContract?: (unitIndex: number, file: File) => void;
     importingContractIdx?: number | null;
     initialOpenIdx?: number | null;
+    propertyIndex?: number;
 }
 
 const UNIT_TYPE_OPTIONS = [
@@ -473,6 +474,7 @@ export function SubUnitsSection({
     onImportContract,
     importingContractIdx,
     initialOpenIdx,
+    propertyIndex,
 }: SubUnitsSectionProps) {
     // A unit is "complete" when all mandatory fields are filled
     const isUnitComplete = (unit: SubUnit): boolean => {
@@ -593,6 +595,7 @@ export function SubUnitsSection({
             {units.map((unit, idx) => (
                 <div
                     key={idx}
+                    id={propertyIndex !== undefined ? `prop-${propertyIndex}-unit-${idx}` : undefined}
                     className="bg-card border border-border rounded-xl shadow-sm overflow-hidden"
                 >
                     {/* Unit Header */}
@@ -1007,7 +1010,12 @@ export function SubUnitsSection({
                                         variant="outline"
                                         size="sm"
                                         className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                        onClick={() => setOpenUnitIndex(idx + 1)}
+                                        onClick={() => {
+                                            setOpenUnitIndex(idx + 1);
+                                            if (propertyIndex !== undefined) {
+                                                setTimeout(() => document.getElementById(`prop-${propertyIndex}-unit-${idx + 1}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+                                            }
+                                        }}
                                     >
                                         Próxima Unidade <ArrowRight className="w-4 h-4" />
                                     </Button>
