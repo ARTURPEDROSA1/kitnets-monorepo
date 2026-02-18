@@ -445,8 +445,8 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                 videos: [],
                                 savedVideos: Array.isArray(apTyped.savedVideos) ? apTyped.savedVideos as string[] : [],
                                 ownershipFiles: [],
-                                savedProofs: [], // Additional props don't have separate proof records yet
-                                ownershipSectionOpen: true,
+                                savedProofs: Array.isArray(apTyped.savedProofs) ? apTyped.savedProofs as ProofData[] : [],
+                                ownershipSectionOpen: !(Array.isArray(apTyped.savedProofs) && (apTyped.savedProofs as ProofData[]).length > 0),
                                 addressSectionOpen: true,
                                 photosSectionOpen: true,
                                 descriptionSectionOpen: true,
@@ -1106,6 +1106,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                     address: prop.address,
                     savedPhotos: prop.savedPhotos,
                     savedVideos: prop.savedVideos,
+                    savedProofs: prop.savedProofs,
                 })),
             };
 
@@ -1155,6 +1156,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
 
                     // 2. Upload Ownership Proof Files
                     if (prop.ownershipFiles.length > 0) {
+                        const newProofEntries: ProofData[] = [];
                         for (const file of prop.ownershipFiles) {
                             const fileExt = file.name.split('.').pop();
                             const fileName = `${propStoragePrefix}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
@@ -1168,20 +1170,35 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                 continue;
                             }
 
-                            const { error: proofError } = await sbUpload.from('ownership_proofs').insert({
-                                profile_id: profile.id,
-                                file_url: fileName,
-                                original_name: file.name,
-                                file_size: file.size,
-                                mime_type: file.type,
-                                status: 'pending',
-                            });
+                            // Insert into ownership_proofs table
+                            const { data: insertedProof, error: proofError } = await sbUpload
+                                .from('ownership_proofs')
+                                .insert({
+                                    profile_id: profile.id,
+                                    file_url: fileName,
+                                    original_name: file.name,
+                                    file_size: file.size,
+                                    mime_type: file.type,
+                                    status: 'pending',
+                                })
+                                .select()
+                                .single();
 
-                            if (proofError) console.error(proofError);
+                            if (proofError) {
+                                console.error(proofError);
+                            } else if (insertedProof) {
+                                newProofEntries.push(insertedProof as ProofData);
+                            }
                         }
-                        updatedProperties[propIdx] = { ...prop, ownershipFiles: [] };
 
-                        // Refresh proofs for property[0] (legacy savedProofs)
+                        // Update this property's saved proofs + clear pending files
+                        updatedProperties[propIdx] = {
+                            ...updatedProperties[propIdx],
+                            ownershipFiles: [],
+                            savedProofs: [...prop.savedProofs, ...newProofEntries],
+                        };
+
+                        // For property[0], also refresh all proofs from DB
                         if (propIdx === 0) {
                             const { data: proofs } = await sb
                                 .from('ownership_proofs')
@@ -1302,6 +1319,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                         address: prop.address,
                         savedPhotos: prop.savedPhotos,
                         savedVideos: prop.savedVideos,
+                        savedProofs: prop.savedProofs,
                     })),
                 }).eq('id', profile.id);
             }
