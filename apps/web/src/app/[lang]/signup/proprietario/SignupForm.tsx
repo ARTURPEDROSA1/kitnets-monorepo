@@ -15,7 +15,7 @@ export default function OwnerSignupPage({ lang }: { lang: "en" | "pt" | "es" }) 
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [name, setName] = useState("");
-    const [gatewayCode, setGatewayCode] = useState("");
+
     const [verifying, setVerifying] = useState(false);
     const [code, setCode] = useState("");
     const [error, setError] = useState("");
@@ -89,24 +89,6 @@ export default function OwnerSignupPage({ lang }: { lang: "en" | "pt" | "es" }) 
                     console.error("Profile creation request failed:", profileErr);
                 }
 
-                // If gateway code is provided, claim it (profile must exist first)
-                if (gatewayCode) {
-                    try {
-                        const claimRes = await fetch('/api/gateways/claim', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ code: gatewayCode, userId: completeSignUp.createdUserId })
-                        });
-                        const claimData = await claimRes.json();
-                        if (!claimRes.ok) {
-                            console.error("Gateway claim failed:", claimData);
-                        } else {
-                            console.log("Gateway claimed successfully:", claimData);
-                        }
-                    } catch (claimErr) {
-                        console.error("Gateway claim request failed:", claimErr);
-                    }
-                }
 
                 router.push("/dashboard");
             } else {
@@ -127,8 +109,7 @@ export default function OwnerSignupPage({ lang }: { lang: "en" | "pt" | "es" }) 
         email: "Email",
         password: "Senha",
         confirmPassword: "Confirmar Senha",
-        gateway: "Código do Gateway (Opcional)",
-        gatewayHelp: "Insira o código localizado na etiqueta do seu Gateway Kitnet.",
+
         signup: "Criar Conta",
         verify: "Verificar Email",
         login: "Fazer Login",
@@ -233,18 +214,7 @@ export default function OwnerSignupPage({ lang }: { lang: "en" | "pt" | "es" }) 
                                 </button>
                             </div>
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-foreground">{dict.gateway}</label>
-                            <input
-                                type="text"
-                                name="gateway_code"
-                                value={gatewayCode}
-                                onChange={(e) => setGatewayCode(e.target.value)}
-                                placeholder="ex: GW-1234-5678"
-                                className="mt-1 block w-full px-3 py-2 border border-input rounded-md shadow-sm bg-background text-foreground bg-white dark:bg-neutral-900"
-                            />
-                            <p className="mt-1 text-xs text-muted-foreground">{dict.gatewayHelp}</p>
-                        </div>
+
 
                         {error && <p className="text-red-500 text-sm">{error}</p>}
 
