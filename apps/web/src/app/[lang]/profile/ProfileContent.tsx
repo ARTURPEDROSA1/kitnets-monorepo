@@ -1091,6 +1091,15 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                 sub_units: subUnits,
                 admin_data: personType === 'pj' ? adminData : null,
                 role: 'landlord',
+                // Persist additional properties (index 1+) as JSON
+                additional_properties: properties.slice(1).map(prop => ({
+                    propertyType: prop.propertyType,
+                    details: prop.details,
+                    subUnits: prop.subUnits,
+                    address: prop.address,
+                    savedPhotos: prop.savedPhotos,
+                    savedVideos: prop.savedVideos,
+                })),
             };
 
             // Conditionally set PF or PJ fields
