@@ -1,12 +1,13 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { getIndexMetadata, getIndexValuesByDateRange, getAllIndexes } from '@/lib/indexes';
+import { getIndexMetadata, getIndexValuesByDateRange, getAllIndexes, getAllIndexValuesForCalculator } from '@/lib/indexes';
 import { getFipeZapData } from '@/lib/fipezap';
 import { getDictionary } from '../../../../dictionaries';
 import { IndexChartLazy } from '@/components/indices/IndexChartLazy';
 import { IndexHeatmapLazy } from '@/components/indices/IndexHeatmapLazy';
 import { IndexDateFilter } from '@/components/indices/IndexDateFilter';
 import { IndexHistoryTable } from '@/components/indices/IndexHistoryTable';
+import { IPCACalculatorLazy } from '@/components/indices/IPCACalculatorLazy';
 import Link from 'next/link';
 import { ArrowLeft, MapPinned, Home, CalendarDays, Hourglass } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -152,6 +153,11 @@ export default async function IndexPage({ params, searchParams }: Props) {
     // Fetch history based on date range or default to recent
     const history = await getIndexValuesByDateRange(metadata.id, startDateStr, endDateStr);
     const latest = history[0];
+
+    // Fetch full dataset for IPCA calculator
+    const ipcaCalcData = (code === 'IPCA' || code === 'INPC')
+        ? await getAllIndexValuesForCalculator(metadata.id)
+        : [];
 
     // Prepare Minimum Wage Data
     let minWageData: MinimumWageData[] = [];
@@ -551,6 +557,11 @@ export default async function IndexPage({ params, searchParams }: Props) {
                             </div>
                         </div>
                     </div>
+
+                    {/* IPCA/INPC Correction Calculator */}
+                    {(code === 'IPCA' || code === 'INPC') && ipcaCalcData.length > 0 && (
+                        <IPCACalculatorLazy data={ipcaCalcData} />
+                    )}
 
                     {/* Date Filter */}
                     <div className="md:col-span-3 min-w-0">

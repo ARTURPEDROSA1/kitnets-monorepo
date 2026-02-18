@@ -237,7 +237,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
     const tabs = [
         { id: 'ownership', label: ownershipTabLabel },
         { id: 'basics', label: personType === 'pj' ? 'Dados da Holding' : p.tabs.basics },
-        { id: 'security', label: p.tabs.security },
+        { id: 'security', label: properties.length > 1 ? 'Gerenciar Propriedades' : p.tabs.security },
     ];
 
     // Holding tab collapsible states
@@ -2241,7 +2241,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                         </div>
 
                         {/* IDENTITY VERIFICATION — Collapsible */}
-                        <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
+                        <div id="holding-identity" className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
                             <button
                                 type="button"
                                 onClick={() => setIdentitySectionOpen(prev => !prev)}
@@ -2391,6 +2391,20 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                 </>
                             )}
                         </div>
+
+                        {/* Continuar: Identity → Holding */}
+                        {identitySectionOpen && (identityResult?.success || formData.cpf || formData.cnpj) && (
+                            <div className="flex justify-end -mt-4">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                                    onClick={() => { setIdentitySectionOpen(false); setHoldingSectionOpen(true); setTimeout(() => document.getElementById('holding-data')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }}
+                                >
+                                    Continuar <ArrowRight className="w-4 h-4" />
+                                </Button>
+                            </div>
+                        )}
 
                         <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-6">
                             <button
@@ -2568,9 +2582,23 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                             </>)}
                         </div>
 
+                        {/* Continuar: Holding → Admin (only for PJ) */}
+                        {holdingSectionOpen && formData.name && formData.phone && personType === 'pj' && (
+                            <div className="flex justify-end -mt-4">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                                    onClick={() => { setHoldingSectionOpen(false); setAdminSectionOpen(true); setTimeout(() => document.getElementById('holding-admin')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }}
+                                >
+                                    Continuar <ArrowRight className="w-4 h-4" />
+                                </Button>
+                            </div>
+                        )}
+
                         {/* ADMIN DATA CARD — Only for PJ */}
                         {personType === 'pj' && (
-                            <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-6">
+                            <div id="holding-admin" className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-6">
                                 <button
                                     type="button"
                                     onClick={() => setAdminSectionOpen(prev => !prev)}

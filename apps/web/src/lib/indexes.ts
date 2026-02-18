@@ -218,6 +218,49 @@ export async function getIndexValuesByDateRange(indexId: string, startDate?: str
     return enrichedData;
 }
 
+export type IndexValueForCalc = {
+    month: string;   // "YYYY-MM" format
+    value: number;   // monthly variation in %
+};
+
+export async function getAllIndexValuesForCalculator(indexId: string): Promise<IndexValueForCalc[]> {
+    const supabase = createStaticClient();
+    const allData: IndexValueForCalc[] = [];
+    const pageSize = 1000;
+    let offset = 0;
+    let hasMore = true;
+
+    while (hasMore) {
+        const { data, error } = await supabase
+            .from("economic_index_values")
+            .select("year, month, value_percent")
+            .eq("index_id", indexId)
+            .eq("is_projection", false)
+            .order("reference_date", { ascending: true })
+            .range(offset, offset + pageSize - 1);
+
+        if (error) {
+            console.error(`Error fetching all index values for calculator:`, error);
+            break;
+        }
+
+        if (data && data.length > 0) {
+            for (const item of data) {
+                allData.push({
+                    month: `${item.year}-${String(item.month).padStart(2, '0')}`,
+                    value: item.value_percent,
+                });
+            }
+            offset += data.length;
+            hasMore = data.length === pageSize;
+        } else {
+            hasMore = false;
+        }
+    }
+
+    return allData;
+}
+
 export async function getAllIndexes(): Promise<IndexMetadata[]> {
     const supabase = createStaticClient();
     const { data, error } = await supabase
