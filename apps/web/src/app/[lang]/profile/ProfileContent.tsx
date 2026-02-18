@@ -1606,6 +1606,12 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                             const removePropSavedVideo = (url: string) => {
                                 setPSavedVideos(prev => prev.filter(u => u !== url));
                             };
+                            const removePropSavedProof = (proofId: string) => {
+                                updateProperty(propIdx, prev => ({
+                                    ...prev,
+                                    savedProofs: prev.savedProofs.filter(p => p.id !== proofId)
+                                }));
+                            };
                             const removePropFile = (idx: number) => {
                                 setPOwnershipFiles(prev => {
                                     const removed = prev[idx];
@@ -1777,7 +1783,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                                     );
                                                                 })}
                                                                 {pSavedProofs.map((proof) => (
-                                                                    <div key={proof.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border opacity-75">
+                                                                    <div key={proof.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border">
                                                                         <div className="flex items-center gap-3">
                                                                             <div className="w-8 h-8 rounded bg-muted flex items-center justify-center"><CheckCircle2 className="w-4 h-4 text-emerald-500" /></div>
                                                                             <div>
@@ -1785,6 +1791,9 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                                                 <p className="text-xs text-muted-foreground">Enviado em {new Date(proof.created_at).toLocaleDateString()}</p>
                                                                             </div>
                                                                         </div>
+                                                                        <Button variant="ghost" size="sm" onClick={() => removePropSavedProof(proof.id)} className="text-destructive hover:text-destructive">
+                                                                            <Trash2 className="w-4 h-4" />
+                                                                        </Button>
                                                                     </div>
                                                                 ))}
                                                             </div>
@@ -1904,9 +1913,10 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                 onUnitsChange={setPSubUnits}
                                                 propertyType={pType}
                                                 initialOpen={pDetailsOpen}
+                                                onOpenChange={(open) => setPDetailsOpen(open)}
                                             />
                                             {/* Continuar button for Details → Photos */}
-                                            {pDetailsOpen && pDetails.propertyName && pDetails.totalSqMeters && (
+                                            {pDetailsOpen && pDetails.propertyName && pDetails.totalSqMeters && (pType === 'single' || pDetails.numberOfUnits > 0) && (
                                                 <div className="flex justify-end -mt-4">
                                                     <Button
                                                         variant="outline"
@@ -2051,6 +2061,19 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                                     </>
                                                 )}
                                             </div>
+                                            {/* Continuar button for Photos → Description */}
+                                            {pPhotosOpen && ((pPhotos.length + pSavedPhotos.length) > 0 || (pVideos.length + pSavedVideos.length) > 0) && (
+                                                <div className="flex justify-end -mt-4">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                                                        onClick={() => { setPPhotosOpen(false); setPDescOpen(true); }}
+                                                    >
+                                                        Continuar <ArrowRight className="w-4 h-4" />
+                                                    </Button>
+                                                </div>
+                                            )}
 
                                             {/* 5. Description Section — Main Property — Collapsible */}
                                             <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
