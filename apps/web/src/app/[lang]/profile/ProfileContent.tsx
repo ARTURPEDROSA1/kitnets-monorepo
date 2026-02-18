@@ -2406,7 +2406,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                             </div>
                         )}
 
-                        <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-6">
+                        <div id="holding-data" className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-6">
                             <button
                                 type="button"
                                 onClick={() => setHoldingSectionOpen(prev => !prev)}
