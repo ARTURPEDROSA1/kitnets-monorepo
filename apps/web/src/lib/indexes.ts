@@ -1,5 +1,6 @@
 
 import { createStaticClient } from "@/utils/supabase/static";
+import { unstable_cache } from 'next/cache';
 
 export type IndexMetadata = {
     id: string;
@@ -23,7 +24,7 @@ export type IndexValue = {
     source_url: string | null;
 };
 
-export async function getIndexMetadata(code: string): Promise<IndexMetadata | null> {
+async function _getIndexMetadata(code: string): Promise<IndexMetadata | null> {
     const supabase = createStaticClient();
     const { data, error } = await supabase
         .from("economic_indexes")
@@ -38,7 +39,22 @@ export async function getIndexMetadata(code: string): Promise<IndexMetadata | nu
     return data;
 }
 
+export const getIndexMetadata = (code: string) =>
+    unstable_cache(
+        () => _getIndexMetadata(code),
+        [`index-metadata-${code.toUpperCase()}`],
+        { revalidate: 3600, tags: ['indices'] }
+    )();
+
 export async function getIndexValues(indexId: string, limit = 36): Promise<IndexValue[]> {
+    return unstable_cache(
+        () => _getIndexValues(indexId, limit),
+        [`index-values-${indexId}-${limit}`],
+        { revalidate: 3600, tags: ['indices'] }
+    )();
+}
+
+async function _getIndexValues(indexId: string, limit = 36): Promise<IndexValue[]> {
     const supabase = createStaticClient();
     // Fetch extra months to calculate 12-month accumulated for the oldest requested records
     const fetchLimit = limit + 12;
@@ -115,6 +131,14 @@ export async function getIndexValues(indexId: string, limit = 36): Promise<Index
 }
 
 export async function getIndexValuesByDateRange(indexId: string, startDate?: string, endDate?: string): Promise<IndexValue[]> {
+    return unstable_cache(
+        () => _getIndexValuesByDateRange(indexId, startDate, endDate),
+        [`index-values-${indexId}-${startDate ?? 'none'}-${endDate ?? 'none'}`],
+        { revalidate: 3600, tags: ['indices'] }
+    )();
+}
+
+async function _getIndexValuesByDateRange(indexId: string, startDate?: string, endDate?: string): Promise<IndexValue[]> {
     const supabase = createStaticClient();
 
     // Base query
@@ -223,7 +247,7 @@ export type IndexValueForCalc = {
     value: number;   // monthly variation in %
 };
 
-export async function getAllIndexValuesForCalculator(indexId: string): Promise<IndexValueForCalc[]> {
+async function _getAllIndexValuesForCalculator(indexId: string): Promise<IndexValueForCalc[]> {
     const supabase = createStaticClient();
     const allData: IndexValueForCalc[] = [];
     const pageSize = 1000;
@@ -261,7 +285,14 @@ export async function getAllIndexValuesForCalculator(indexId: string): Promise<I
     return allData;
 }
 
-export async function getAllIndexes(): Promise<IndexMetadata[]> {
+export const getAllIndexValuesForCalculator = (indexId: string) =>
+    unstable_cache(
+        () => _getAllIndexValuesForCalculator(indexId),
+        [`index-calc-values-${indexId}`],
+        { revalidate: 3600, tags: ['indices'] }
+    )();
+
+async function _getAllIndexes(): Promise<IndexMetadata[]> {
     const supabase = createStaticClient();
     const { data, error } = await supabase
         .from("economic_indexes")
@@ -273,3 +304,10 @@ export async function getAllIndexes(): Promise<IndexMetadata[]> {
     }
     return data;
 }
+
+export const getAllIndexes = () =>
+    unstable_cache(
+        _getAllIndexes,
+        ['all-indexes'],
+        { revalidate: 3600, tags: ['indices'] }
+    )();

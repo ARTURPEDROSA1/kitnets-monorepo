@@ -1,5 +1,3 @@
-"use client";
-
 import Link from "next/link";
 import { Instagram, Youtube, Facebook } from "lucide-react";
 import { Dictionary } from "../dictionaries";
