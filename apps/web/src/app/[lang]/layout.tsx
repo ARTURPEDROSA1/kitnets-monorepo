@@ -161,12 +161,17 @@ export default async function RootLayout({
                         enableSystem
                         disableTransitionOnChange
                     >
-                        <Sidebar lang={lang} dict={dict} />
+                        <Sidebar lang={lang} dict={{
+                            menu: dict.menu,
+                            rentLateFineCalculatorPage: dict.rentLateFineCalculatorPage ? { menuTitle: dict.rentLateFineCalculatorPage.menuTitle } : undefined,
+                            rentFineCalculatorPage: dict.rentFineCalculatorPage ? { menuTitle: dict.rentFineCalculatorPage.menuTitle } : undefined,
+                            proRataRentCalculatorPage: (dict.proRataRentCalculatorPage as Record<string, unknown>)?.menuTitle ? { menuTitle: (dict.proRataRentCalculatorPage as Record<string, unknown>).menuTitle as string } : undefined,
+                        }} />
                         <div className="sm:ml-64 flex min-h-screen flex-col pt-16 sm:pt-0">
                             <div className="flex-1 p-4">
                                 {children}
                             </div>
-                            <Footer lang={lang} dict={dict} />
+                            <Footer lang={lang} dict={{ footer: dict.footer }} />
                         </div>
                     </ThemeProvider>
                     <script
