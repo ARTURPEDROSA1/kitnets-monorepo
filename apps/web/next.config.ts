@@ -23,7 +23,7 @@ const nextConfig: NextConfig = {
     ],
   },
   experimental: {
-    optimizePackageImports: ['lucide-react', 'recharts', 'date-fns', '@kitnets/ui'],
+    optimizePackageImports: ['lucide-react', 'recharts', 'date-fns', '@kitnets/ui', '@clerk/nextjs', 'next-themes'],
     serverActions: {
       bodySizeLimit: '10mb',
     },
