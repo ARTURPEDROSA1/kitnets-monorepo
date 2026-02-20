@@ -1,8 +1,17 @@
 import Link from "next/link";
 import { Instagram, Youtube, Facebook } from "lucide-react";
-import { Dictionary } from "../dictionaries";
 
-export function Footer({ lang, dict }: { lang?: string; dict: Dictionary }) {
+interface FooterDict {
+    footer: {
+        legalNotice: string;
+        termsOfUse: string;
+        privacyPolicy: string;
+        cookiePolicy: string;
+        disclosure: string;
+    };
+}
+
+export function Footer({ lang, dict }: { lang?: string; dict: FooterDict }) {
     const isDefaultLang = lang === "pt" || !lang;
     const legalHref = isDefaultLang ? "/aviso-legal" : `/${lang}/aviso-legal`;
     const termsHref = isDefaultLang ? "/termos-de-uso" : `/${lang}/termos-de-uso`;
