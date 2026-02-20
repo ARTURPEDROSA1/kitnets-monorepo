@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { IndexValue } from "@/lib/indexes";
-import { ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronsDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface IndexHistoryTableProps {
@@ -14,8 +14,11 @@ type SortConfig = {
     direction: 'asc' | 'desc';
 };
 
+const PAGE_SIZE = 12;
+
 export function IndexHistoryTable({ data }: IndexHistoryTableProps) {
     const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'reference_date', direction: 'desc' });
+    const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
     const toggleSort = (key: keyof IndexValue) => {
         setSortConfig((current) => ({
@@ -43,6 +46,23 @@ export function IndexHistoryTable({ data }: IndexHistoryTableProps) {
         }
         return 0;
     });
+
+    const displayedData = sortedData.slice(0, visibleCount);
+    const totalRows = sortedData.length;
+    const hasMore = visibleCount < totalRows;
+    const isShowingAll = visibleCount >= totalRows;
+
+    const handleShowMore = () => {
+        setVisibleCount((prev) => Math.min(prev + PAGE_SIZE, totalRows));
+    };
+
+    const handleShowAll = () => {
+        setVisibleCount(totalRows);
+    };
+
+    const handleCollapse = () => {
+        setVisibleCount(PAGE_SIZE);
+    };
 
     const renderSortIcon = (columnKey: keyof IndexValue) => {
         if (sortConfig.key !== columnKey) {
@@ -92,7 +112,7 @@ export function IndexHistoryTable({ data }: IndexHistoryTableProps) {
                     </tr>
                 </thead>
                 <tbody className="[&_tr:last-child]:border-0">
-                    {sortedData.map((row) => (
+                    {displayedData.map((row) => (
                         <tr key={row.id} className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
                             <td className="p-4 align-middle [&:has([role=checkbox])]:pr-0 font-medium">
                                 {row.month.toString().padStart(2, '0')}/{row.year}
@@ -110,6 +130,53 @@ export function IndexHistoryTable({ data }: IndexHistoryTableProps) {
                     ))}
                 </tbody>
             </table>
+
+            {/* Expand / Collapse controls */}
+            {totalRows > PAGE_SIZE && (
+                <div className="flex items-center justify-center gap-2 pt-3 pb-1 border-t">
+                    {hasMore ? (
+                        <>
+                            <button
+                                type="button"
+                                onClick={handleShowMore}
+                                className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-muted-foreground
+                                    rounded-lg border border-border bg-background hover:bg-muted hover:text-foreground
+                                    transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
+                                title={`Mostrar mais ${Math.min(PAGE_SIZE, totalRows - visibleCount)} meses`}
+                            >
+                                <ChevronDown className="h-3.5 w-3.5" />
+                                Mais {Math.min(PAGE_SIZE, totalRows - visibleCount)}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleShowAll}
+                                className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-muted-foreground
+                                    rounded-lg border border-border bg-background hover:bg-muted hover:text-foreground
+                                    transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
+                                title={`Mostrar todos os ${totalRows} meses`}
+                            >
+                                <ChevronsDown className="h-3.5 w-3.5" />
+                                Todos ({totalRows})
+                            </button>
+                        </>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={handleCollapse}
+                            className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-muted-foreground
+                                rounded-lg border border-border bg-background hover:bg-muted hover:text-foreground
+                                transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
+                            title="Recolher tabela"
+                        >
+                            <ChevronUp className="h-3.5 w-3.5" />
+                            Recolher
+                        </button>
+                    )}
+                    <span className="text-xs text-muted-foreground ml-2">
+                        {Math.min(visibleCount, totalRows)} de {totalRows}
+                    </span>
+                </div>
+            )}
         </div>
     );
 }
