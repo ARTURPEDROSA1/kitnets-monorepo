@@ -1015,9 +1015,26 @@ export default async function IndexPage({ params, searchParams }: Props) {
                             <section key={idx} className="space-y-4 md:space-y-6">
                                 <h3 className="text-xl md:text-2xl font-semibold text-foreground">{dynamicTitle}</h3>
 
-                                {dynamicText && (
-                                    <p className="text-muted-foreground leading-relaxed">{dynamicText}</p>
-                                )}
+                                {dynamicText && (() => {
+                                    const linkPhrase = 'calculadora de reajuste de aluguel';
+                                    const lowerText = dynamicText.toLowerCase();
+                                    const linkIdx = lowerText.lastIndexOf(linkPhrase);
+                                    if (linkIdx === -1) {
+                                        return <p className="text-muted-foreground leading-relaxed">{dynamicText}</p>;
+                                    }
+                                    const before = dynamicText.slice(0, linkIdx);
+                                    const match = dynamicText.slice(linkIdx, linkIdx + linkPhrase.length);
+                                    const after = dynamicText.slice(linkIdx + linkPhrase.length);
+                                    return (
+                                        <p className="text-muted-foreground leading-relaxed">
+                                            {before}
+                                            <Link href={`/${lang}/calculadora-reajuste-aluguel`} className="text-emerald-600 dark:text-emerald-400 font-medium hover:underline">
+                                                {match}
+                                            </Link>
+                                            {after}
+                                        </p>
+                                    );
+                                })()}
 
                                 {section.items && (
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
