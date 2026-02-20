@@ -15,6 +15,12 @@ import { Button } from "@/components/ui/button";
 import { FipeZapDashboardWrapper } from '@/components/indices/FipeZap/FipeZapDashboardWrapper';
 import { MinimumWageDashboardWrapper } from '@/components/indices/MinimumWage/MinimumWageDashboardWrapper';
 import { getMinimumWageData, MinimumWageData } from '@/lib/minimum-wage';
+import {
+    IBGE_RELEASE_DATES_2026, IBGE_CALENDAR_2026,
+    IGPM_RELEASE_DATES_2026, IGPM_CALENDAR_2026,
+    IVAR_CALENDAR_2026, COPOM_DATES_2026,
+    parseCalendarDate, getReleaseDay, getToday, MONTH_NAMES,
+} from '@/lib/release-calendars';
 
 interface Props {
     params: Promise<{
@@ -44,12 +50,6 @@ interface IndexContent {
 
 // Revalidate every hour
 export const revalidate = 3600;
-
-const ivarReleaseDates2026 = [
-    { formatted: '06/02/2026', time: '9h', ref: 'Janeiro/2026', label: 'Índice de Variação de Aluguéis Residenciais (IVAR)' },
-    { formatted: '05/03/2026', time: '9h', ref: 'Fevereiro/2026', label: 'Índice de Variação de Aluguéis Residenciais (IVAR)' },
-    { formatted: '08/04/2026', time: '9h', ref: 'Março/2026', label: 'Índice de Variação de Aluguéis Residenciais (IVAR)' },
-];
 
 export async function generateStaticParams() {
     const indices = await getAllIndexes();
@@ -325,28 +325,25 @@ export default async function IndexPage({ params, searchParams }: Props) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ctaContent = (dict as any).indicesCta as IndicesCta | undefined;
 
+    // Compute today once for the entire render
+    const today = getToday();
+
     // Compute next release date for Event schema (IPCA/INPC)
     const nextReleaseDate = (() => {
         if (code !== 'IPCA' && code !== 'INPC') return null;
         if (!latest) return null;
-        const ibgeReleaseDates2026: Record<number, number> = {
-            1: 10, 2: 10, 3: 12, 4: 10, 5: 12, 6: 12,
-            7: 10, 8: 11, 9: 11, 10: 9, 11: 12, 12: 11,
-        };
         let nextRefMonth = latest.month + 1;
         let nextRefYear = latest.year;
         if (nextRefMonth > 12) { nextRefMonth = 1; nextRefYear++; }
         let relMonth = nextRefMonth + 1;
         let relYear = nextRefYear;
         if (relMonth > 12) { relMonth = 1; relYear++; }
-        const getDay = (m: number, y: number) => (y === 2026 && ibgeReleaseDates2026[m]) ? ibgeReleaseDates2026[m] : 10;
-        let day = getDay(relMonth, relYear);
+        let day = getReleaseDay(IBGE_RELEASE_DATES_2026, 2026, relMonth, relYear);
         let date = new Date(relYear, relMonth - 1, day);
-        const now = new Date(); now.setHours(0, 0, 0, 0);
-        if (date <= now) {
+        if (date <= today) {
             relMonth++;
             if (relMonth > 12) { relMonth = 1; relYear++; }
-            day = getDay(relMonth, relYear);
+            day = getReleaseDay(IBGE_RELEASE_DATES_2026, 2026, relMonth, relYear);
             date = new Date(relYear, relMonth - 1, day);
         }
         return date;
@@ -531,22 +528,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
                                             }
 
                                             if (code === 'SELIC') {
-                                                const copomDates2026 = [
-                                                    new Date(2026, 0, 28), // Jan 28
-                                                    new Date(2026, 2, 18), // Mar 18
-                                                    new Date(2026, 3, 29), // Apr 29
-                                                    new Date(2026, 5, 17), // Jun 17
-                                                    new Date(2026, 7, 5),  // Aug 5
-                                                    new Date(2026, 8, 16), // Sep 16
-                                                    new Date(2026, 10, 4), // Nov 4
-                                                    new Date(2026, 11, 9), // Dec 9
-                                                ];
-
-                                                const now = new Date();
-                                                now.setHours(0, 0, 0, 0);
-
-                                                const nextMeeting = copomDates2026.find(d => d >= now);
-
+                                                const nextMeeting = COPOM_DATES_2026.find(d => d >= today);
                                                 if (nextMeeting) {
                                                     const locale = lang === 'pt' ? 'pt-BR' : lang === 'en' ? 'en-US' : 'es-ES';
                                                     return nextMeeting.toLocaleDateString(locale, { day: '2-digit', month: 'short' });
@@ -555,7 +537,6 @@ export default async function IndexPage({ params, searchParams }: Props) {
                                             }
 
                                             if (!latest) return '--';
-                                            // Determine next reference month (default: latest + 1)
                                             let nextRefMonth = latest.month + 1;
                                             let nextRefYear = latest.year;
                                             if (nextRefMonth > 12) {
@@ -564,94 +545,38 @@ export default async function IndexPage({ params, searchParams }: Props) {
                                             }
 
                                             if (code === 'IGPM') {
-                                                // Calendar for 2026
-                                                const releaseDates_2026: Record<number, number> = {
-                                                    1: 29, // Jan
-                                                    2: 26, // Feb
-                                                    3: 30, // Mar
-                                                    4: 29, // Apr
-                                                };
-
-                                                // Helper to get release day for a given month/year
-                                                const getDay = (m: number, y: number) =>
-                                                    (y === 2026 && releaseDates_2026[m]) ? releaseDates_2026[m] : 29;
-
-                                                let day = getDay(nextRefMonth, nextRefYear);
+                                                let day = getReleaseDay(IGPM_RELEASE_DATES_2026, 2026, nextRefMonth, nextRefYear, 29);
                                                 let date = new Date(nextRefYear, nextRefMonth - 1, day);
-
-                                                // Check if this calculated date is today or in the past
-                                                const now = new Date();
-                                                now.setHours(0, 0, 0, 0);
-
-                                                if (date <= now) {
-                                                    // Advance to NEXT month
+                                                if (date <= today) {
                                                     nextRefMonth++;
-                                                    if (nextRefMonth > 12) {
-                                                        nextRefMonth = 1;
-                                                        nextRefYear++;
-                                                    }
-                                                    day = getDay(nextRefMonth, nextRefYear);
+                                                    if (nextRefMonth > 12) { nextRefMonth = 1; nextRefYear++; }
+                                                    day = getReleaseDay(IGPM_RELEASE_DATES_2026, 2026, nextRefMonth, nextRefYear, 29);
                                                     date = new Date(nextRefYear, nextRefMonth - 1, day);
                                                 }
-
                                                 return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
                                             }
 
-
                                             if (code === 'IVAR') {
-                                                const today = new Date();
-                                                today.setHours(0, 0, 0, 0);
-
-                                                const nextDate = ivarReleaseDates2026.find(item => {
-                                                    const [day, month, year] = item.formatted.split('/').map(Number);
-                                                    const dateObj = new Date(year, month - 1, day);
-                                                    return dateObj >= today;
-                                                });
-
+                                                const nextDate = IVAR_CALENDAR_2026.find(item => parseCalendarDate(item.date) >= today);
                                                 if (nextDate) {
-                                                    const [day, month, year] = nextDate.formatted.split('/').map(Number);
-                                                    const dateObj = new Date(year, month - 1, day);
-                                                    return dateObj.toLocaleDateString(lang === 'pt' ? 'pt-BR' : lang === 'es' ? 'es-ES' : 'en-US', { day: '2-digit', month: 'short' });
+                                                    return parseCalendarDate(nextDate.date).toLocaleDateString(lang === 'pt' ? 'pt-BR' : lang === 'es' ? 'es-ES' : 'en-US', { day: '2-digit', month: 'short' });
                                                 }
                                                 return 'A definir';
                                             }
 
                                             // IPCA / INPC — IBGE official release calendar 2026
-                                            // Key = release month, Value = release day
                                             if (code === 'IPCA' || code === 'INPC') {
-                                                const ibgeReleaseDates2026: Record<number, number> = {
-                                                    1: 10,  // 10/Jan — ref Dez/2025
-                                                    2: 10,  // 10/Feb — ref Jan/2026
-                                                    3: 12,  // 12/Mar — ref Feb/2026
-                                                    4: 10,  // 10/Apr — ref Mar/2026
-                                                    5: 12,  // 12/May — ref Apr/2026
-                                                    6: 12,  // 12/Jun — ref May/2026
-                                                    7: 10,  // 10/Jul — ref Jun/2026
-                                                    8: 11,  // 11/Aug — ref Jul/2026
-                                                    9: 11,  // 11/Sep — ref Aug/2026
-                                                    10: 9,  // 09/Oct — ref Sep/2026
-                                                    11: 12, // 12/Nov — ref Oct/2026
-                                                    12: 11, // 11/Dec — ref Nov/2026
-                                                };
-
-                                                // Release month is 2 months after latest data month
                                                 let relMonth = nextRefMonth + 1;
                                                 let relYear = nextRefYear;
                                                 if (relMonth > 12) { relMonth = 1; relYear++; }
 
-                                                const getIbgeDay = (m: number, y: number) =>
-                                                    (y === 2026 && ibgeReleaseDates2026[m]) ? ibgeReleaseDates2026[m] : 10;
-
-                                                let day = getIbgeDay(relMonth, relYear);
+                                                let day = getReleaseDay(IBGE_RELEASE_DATES_2026, 2026, relMonth, relYear);
                                                 let date = new Date(relYear, relMonth - 1, day);
 
-                                                const now = new Date();
-                                                now.setHours(0, 0, 0, 0);
-
-                                                if (date <= now) {
+                                                if (date <= today) {
                                                     relMonth++;
                                                     if (relMonth > 12) { relMonth = 1; relYear++; }
-                                                    day = getIbgeDay(relMonth, relYear);
+                                                    day = getReleaseDay(IBGE_RELEASE_DATES_2026, 2026, relMonth, relYear);
                                                     date = new Date(relYear, relMonth - 1, day);
                                                 }
 
@@ -738,22 +663,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
 
                     {/* IGPM Calendar Specific Section */}
                     {code === 'IGPM' && (() => {
-                        const igpmCalendar2026 = [
-                            { date: '29/01/2026', ref: 'Janeiro/2026', time: '8h' },
-                            { date: '26/02/2026', ref: 'Fevereiro/2026', time: '8h' },
-                            { date: '30/03/2026', ref: 'Março/2026', time: '8h' },
-                            { date: '29/04/2026', ref: 'Abril/2026', time: '8h' },
-                        ];
-
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0);
-
-                        const parseDate = (d: string) => {
-                            const [day, month, year] = d.split('/').map(Number);
-                            return new Date(year, month - 1, day);
-                        };
-
-                        const nextIdx = igpmCalendar2026.findIndex(item => parseDate(item.date) >= today);
+                        const nextIdx = IGPM_CALENDAR_2026.findIndex(item => parseCalendarDate(item.date) >= today);
                         const pesquisa = 'IGP-M e os componentes: IPA-M e IPC-M';
 
                         return (
@@ -773,7 +683,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y">
-                                                {igpmCalendar2026.map((item, i) => {
+                                                {IGPM_CALENDAR_2026.map((item, i) => {
                                                     const isNext = i === nextIdx;
                                                     const isPast = nextIdx === -1 ? true : i < nextIdx;
 
@@ -808,32 +718,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
 
                     {/* IPCA / INPC Calendar Section */}
                     {(code === 'IPCA' || code === 'INPC') && (() => {
-                        const ibgeCalendar2026 = [
-                            { date: '10/01/2026', ref: 'Dezembro/2025', time: '9h' },
-                            { date: '10/02/2026', ref: 'Janeiro/2026', time: '9h' },
-                            { date: '12/03/2026', ref: 'Fevereiro/2026', time: '9h' },
-                            { date: '10/04/2026', ref: 'Março/2026', time: '9h' },
-                            { date: '12/05/2026', ref: 'Abril/2026', time: '9h' },
-                            { date: '12/06/2026', ref: 'Maio/2026', time: '9h' },
-                            { date: '10/07/2026', ref: 'Junho/2026', time: '9h' },
-                            { date: '11/08/2026', ref: 'Julho/2026', time: '9h' },
-                            { date: '11/09/2026', ref: 'Agosto/2026', time: '9h' },
-                            { date: '09/10/2026', ref: 'Setembro/2026', time: '9h' },
-                            { date: '12/11/2026', ref: 'Outubro/2026', time: '9h' },
-                            { date: '11/12/2026', ref: 'Novembro/2026', time: '9h' },
-                            { date: '12/01/2027', ref: 'Dezembro/2026', time: '9h' },
-                        ];
-
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0);
-
-                        const parseDate = (d: string) => {
-                            const [day, month, year] = d.split('/').map(Number);
-                            return new Date(year, month - 1, day);
-                        };
-
-                        // Find the index of the next upcoming release (first date >= today)
-                        const nextIdx = ibgeCalendar2026.findIndex(item => parseDate(item.date) >= today);
+                        const nextIdx = IBGE_CALENDAR_2026.findIndex(item => parseCalendarDate(item.date) >= today);
                         const pesquisa = `${code} — Índice Nacional de Preços ao Consumidor ${code === 'IPCA' ? 'Amplo' : ''}`;
 
                         return (
@@ -853,7 +738,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y">
-                                                {ibgeCalendar2026.map((item, i) => {
+                                                {IBGE_CALENDAR_2026.map((item, i) => {
                                                     const isNext = i === nextIdx;
                                                     const isPast = nextIdx === -1 ? true : i < nextIdx;
 
@@ -888,15 +773,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
 
                     {/* IVAR Calendar Specific Section */}
                     {code === 'IVAR' && (() => {
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0);
-
-                        const parseDate = (d: string) => {
-                            const [day, month, year] = d.split('/').map(Number);
-                            return new Date(year, month - 1, day);
-                        };
-
-                        const nextIdx = ivarReleaseDates2026.findIndex(item => parseDate(item.formatted) >= today);
+                        const nextIdx = IVAR_CALENDAR_2026.findIndex(item => parseCalendarDate(item.date) >= today);
 
                         return (
                             <div id="calendario" className="md:col-span-3 min-w-0 scroll-mt-20">
@@ -915,7 +792,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y">
-                                                {ivarReleaseDates2026.map((item, i) => {
+                                                {IVAR_CALENDAR_2026.map((item, i) => {
                                                     const isNext = i === nextIdx;
                                                     const isPast = nextIdx === -1 ? true : i < nextIdx;
 
@@ -931,7 +808,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
                                                             }
                                                         >
                                                             <td className={`p-4 ${isNext ? 'text-emerald-700 dark:text-emerald-400 font-bold' : 'font-medium'}`}>
-                                                                {item.formatted}
+                                                                {item.date}
                                                                 {isNext && <span className="ml-2 text-xs bg-emerald-500 text-white px-2 py-0.5 rounded-full">Próxima</span>}
                                                             </td>
                                                             <td className={`p-4 ${isNext ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'}`}>{item.label}</td>
@@ -975,12 +852,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
                         let dynamicText = section.text;
 
                         if (isAnalysisSection && isAutoUpdatableIndex && latest) {
-                            const monthNames: Record<string, string[]> = {
-                                pt: ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'],
-                                en: ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
-                                es: ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'],
-                            };
-                            const months = monthNames[lang] || monthNames['pt'];
+                            const months = MONTH_NAMES[lang] || MONTH_NAMES['pt'];
                             const monthLabel = months[latest.month];
                             const shortRef = `${String(latest.month).padStart(2, '0')}/${latest.year}`;
 

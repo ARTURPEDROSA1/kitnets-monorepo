@@ -254,10 +254,6 @@ export function IPCAAlertForm({ indexCode, lang, variant = "default" }: IPCAAler
                         )}
                     </button>
                 </form>
-
-                {/* Hidden fields for SEO / form data */}
-                <input type="hidden" name="index_type" value={indexCode} />
-                <input type="hidden" name="locale" value={lang === "pt" ? "pt-BR" : lang === "es" ? "es-ES" : "en-US"} />
             </div>
         </div>
     );
