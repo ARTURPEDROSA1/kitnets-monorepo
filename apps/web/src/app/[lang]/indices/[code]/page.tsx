@@ -1145,15 +1145,15 @@ export default async function IndexPage({ params, searchParams }: Props) {
                             </Button>
                         </Link>
                     </div>
-
-                    {/* IPCA/INPC Alert Form — Secondary placement within CTA */}
-                    {(code === 'IPCA' || code === 'INPC') && (
-                        <div className="pt-6 max-w-xl mx-auto w-full">
-                            <IPCAAlertForm indexCode={code} lang={lang} variant="compact" />
-                        </div>
-                    )}
                 </div>
             </div>
+
+            {/* IPCA/INPC Alert Form — Standalone card below CTA */}
+            {(code === 'IPCA' || code === 'INPC') && (
+                <div className="mt-10 max-w-2xl mx-auto w-full">
+                    <IPCAAlertForm indexCode={code} lang={lang} variant="compact" />
+                </div>
+            )}
 
             <script
                 type="application/ld+json"
