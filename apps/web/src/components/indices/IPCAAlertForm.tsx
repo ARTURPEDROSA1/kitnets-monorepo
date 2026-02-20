@@ -117,16 +117,31 @@ export function IPCAAlertForm({ indexCode, lang, variant = "default" }: IPCAAler
         <div className={`rounded-xl border bg-card shadow-sm overflow-hidden ${variant === "compact" ? "" : "md:col-span-3 min-w-0"}`}>
             <div className="px-5 py-6 md:px-8 md:py-8 bg-gradient-to-br from-amber-500/[0.03] via-transparent to-orange-500/[0.03] dark:from-amber-500/[0.06] dark:to-orange-500/[0.06]">
                 {/* Header */}
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="flex-shrink-0 h-10 w-10 rounded-full bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center">
+                <div className="flex items-start gap-3 mb-5">
+                    <div className="flex-shrink-0 h-10 w-10 rounded-full bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center mt-0.5">
                         <Bell className="h-5 w-5 text-amber-600 dark:text-amber-400" />
                     </div>
-                    <div>
+                    <div className="space-y-2">
                         <h3 className="text-base md:text-lg font-bold text-foreground">
-                            Receba alerta do próximo {indexCode}
+                            🔔 Receba Alerta do Próximo {indexCode}
                         </h3>
                         <p className="text-xs md:text-sm text-muted-foreground">
-                            Seja avisado assim que o IBGE divulgar o novo {indexCode}.
+                            Quer ser avisado assim que o novo {indexCode} for divulgado? Cadastre seu nome e receba gratuitamente:
+                        </p>
+                        <ul className="space-y-1">
+                            {[
+                                `${indexCode} do mês`,
+                                `${indexCode} acumulado no ano`,
+                                `${indexCode} acumulado em 12 meses`,
+                                'Link direto para simulação de correção',
+                            ].map((item) => (
+                                <li key={item} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                    <span className="text-emerald-500">✓</span> {item}
+                                </li>
+                            ))}
+                        </ul>
+                        <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                            Não perca a data de reajuste do seu aluguel.
                         </p>
                     </div>
                 </div>

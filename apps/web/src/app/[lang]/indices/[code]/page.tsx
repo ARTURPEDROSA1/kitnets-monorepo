@@ -250,10 +250,45 @@ export default async function IndexPage({ params, searchParams }: Props) {
             }
         }));
 
-    const faqJsonLd = faqItems && faqItems.length > 0 ? {
+    // Hardcoded FAQ for IPCA/INPC (SEO-optimized)
+    const ipcaFaqItems = (code === 'IPCA' || code === 'INPC') ? [
+        {
+            '@type': 'Question',
+            name: `O que é o ${code}?`,
+            acceptedAnswer: {
+                '@type': 'Answer',
+                text: code === 'IPCA'
+                    ? 'O IPCA (Índice Nacional de Preços ao Consumidor Amplo) é o indicador oficial de inflação do Brasil. Calculado mensalmente pelo IBGE, ele mede a variação de preços de bens e serviços consumidos por famílias com renda de 1 a 40 salários mínimos. É usado pelo Banco Central como meta de inflação e serve de referência para reajuste de aluguéis, contratos e salários.'
+                    : 'O INPC (Índice Nacional de Preços ao Consumidor) mede a variação de preços para famílias com renda de 1 a 5 salários mínimos. Calculado pelo IBGE, é amplamente usado para reajuste de salários, benefícios previdenciários e acordos coletivos.'
+            }
+        },
+        {
+            '@type': 'Question',
+            name: `Como calcular o reajuste de aluguel pelo ${code}?`,
+            acceptedAnswer: {
+                '@type': 'Answer',
+                text: `Para calcular o reajuste pelo ${code}, multiplique o valor atual pelo fator (1 + ${code} acumulado 12 meses / 100). Na Kitnets.com, você pode usar a calculadora de correção pelo ${code} para simular automaticamente o valor corrigido entre quaisquer duas datas.`
+            }
+        },
+        {
+            '@type': 'Question',
+            name: `Quando sai o próximo ${code}?`,
+            acceptedAnswer: {
+                '@type': 'Answer',
+                text: `O ${code} é divulgado pelo IBGE por volta do dia 10 de cada mês, referente ao mês anterior. A data exata da próxima divulgação é informada no topo da página do ${code} na Kitnets.com. Você também pode se cadastrar para receber um alerta por e-mail ou WhatsApp.`
+            }
+        }
+    ] : null;
+
+    const allFaqItems = [
+        ...(faqItems || []),
+        ...(ipcaFaqItems || [])
+    ];
+
+    const faqJsonLd = allFaqItems.length > 0 ? {
         '@context': 'https://schema.org',
         '@type': 'FAQPage',
-        mainEntity: faqItems
+        mainEntity: allFaqItems
     } : null;
 
     // Schema.org Structured Data - Breadcrumbs
@@ -290,6 +325,53 @@ export default async function IndexPage({ params, searchParams }: Props) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ctaContent = (dict as any).indicesCta as IndicesCta | undefined;
 
+    // Compute next release date for Event schema (IPCA/INPC)
+    const nextReleaseDate = (() => {
+        if (code !== 'IPCA' && code !== 'INPC') return null;
+        if (!latest) return null;
+        const ibgeReleaseDates2026: Record<number, number> = {
+            1: 10, 2: 10, 3: 12, 4: 10, 5: 12, 6: 12,
+            7: 10, 8: 11, 9: 11, 10: 9, 11: 12, 12: 11,
+        };
+        let nextRefMonth = latest.month + 1;
+        let nextRefYear = latest.year;
+        if (nextRefMonth > 12) { nextRefMonth = 1; nextRefYear++; }
+        let relMonth = nextRefMonth + 1;
+        let relYear = nextRefYear;
+        if (relMonth > 12) { relMonth = 1; relYear++; }
+        const getDay = (m: number, y: number) => (y === 2026 && ibgeReleaseDates2026[m]) ? ibgeReleaseDates2026[m] : 10;
+        let day = getDay(relMonth, relYear);
+        let date = new Date(relYear, relMonth - 1, day);
+        const now = new Date(); now.setHours(0, 0, 0, 0);
+        if (date <= now) {
+            relMonth++;
+            if (relMonth > 12) { relMonth = 1; relYear++; }
+            day = getDay(relMonth, relYear);
+            date = new Date(relYear, relMonth - 1, day);
+        }
+        return date;
+    })();
+
+    const eventJsonLd = nextReleaseDate ? {
+        '@context': 'https://schema.org',
+        '@type': 'Event',
+        name: `Divulgação do ${code} – ${nextReleaseDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}`,
+        startDate: nextReleaseDate.toISOString().split('T')[0],
+        endDate: nextReleaseDate.toISOString().split('T')[0],
+        eventAttendanceMode: 'https://schema.org/OnlineEventAttendanceMode',
+        eventStatus: 'https://schema.org/EventScheduled',
+        location: {
+            '@type': 'VirtualLocation',
+            url: `https://kitnets.com/${lang}/indices/${code.toLowerCase()}`
+        },
+        organizer: {
+            '@type': 'Organization',
+            name: 'IBGE',
+            url: 'https://www.ibge.gov.br'
+        },
+        description: `O IBGE divulga o novo ${code} referente ao mês anterior. Acompanhe o resultado em tempo real na Kitnets.com.`
+    } : null;
+
     return (
         <div className="container mx-auto py-4 md:py-10 px-4 max-w-5xl">
             <Link href={`/${lang}`} passHref>
@@ -302,7 +384,14 @@ export default async function IndexPage({ params, searchParams }: Props) {
             {/* Header Section */}
             <div className="space-y-4 mb-6 md:mb-8">
                 <div className="flex flex-wrap items-center gap-2 md:gap-3">
-                    <h1 className="text-2xl md:text-4xl font-bold tracking-tight">{code === 'REAJUSTE-SALARIO-MINIMO' ? metadata.code.replace(/-/g, ' ') : metadata.code}</h1>
+                    <h1 className="text-2xl md:text-4xl font-bold tracking-tight">
+                        {(code === 'IPCA' || code === 'INPC') && indexContent?.title
+                            ? indexContent.title
+                            : code === 'REAJUSTE-SALARIO-MINIMO'
+                                ? metadata.code.replace(/-/g, ' ')
+                                : metadata.code
+                        }
+                    </h1>
                     <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${metadata.is_official ? 'border-transparent bg-primary text-primary-foreground hover:bg-primary/80' : 'border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}>
                         {metadata.is_official ? 'Oficial' : 'Projeção'}
                     </span>
@@ -318,13 +407,39 @@ export default async function IndexPage({ params, searchParams }: Props) {
                         })()}
                     </span>
                 </div>
-                {code !== 'REAJUSTE-SALARIO-MINIMO' && (
+                {code !== 'REAJUSTE-SALARIO-MINIMO' && !(code === 'IPCA' || code === 'INPC') && (
                     <h2 className="text-xl text-muted-foreground">{metadata.name}</h2>
                 )}
-                <p className="max-w-3xl text-muted-foreground/80">
-                    Acompanhe a evolução do {code === 'REAJUSTE-SALARIO-MINIMO' ? metadata.code.replace(/-/g, ' ') : metadata.code}, atualizado mensalmente.
-                    Fonte: <strong>{metadata.source}</strong>.
-                </p>
+
+                {/* SEO-rich intro for IPCA/INPC */}
+                {(code === 'IPCA' || code === 'INPC') && indexContent ? (
+                    <div className="max-w-3xl space-y-3">
+                        <p className="text-base md:text-lg text-muted-foreground leading-relaxed">
+                            {indexContent.description}
+                        </p>
+                        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5">
+                            {[
+                                'Reajuste de aluguel',
+                                'Atualização de contratos',
+                                'Correção de salários e benefícios',
+                                'Análise econômica e investimentos',
+                            ].map((item) => (
+                                <li key={item} className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <span className="flex-shrink-0 h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
+                                    {item}
+                                </li>
+                            ))}
+                        </ul>
+                        <p className="text-sm text-muted-foreground/80">
+                            {indexContent.pageDescription} Fonte: <strong>{metadata.source}</strong>.
+                        </p>
+                    </div>
+                ) : (
+                    <p className="max-w-3xl text-muted-foreground/80">
+                        Acompanhe a evolução do {code === 'REAJUSTE-SALARIO-MINIMO' ? metadata.code.replace(/-/g, ' ') : metadata.code}, atualizado mensalmente.
+                        Fonte: <strong>{metadata.source}</strong>.
+                    </p>
+                )}
             </div>
 
             {/* FIPEZAP Specific Layout */}
@@ -983,6 +1098,33 @@ export default async function IndexPage({ params, searchParams }: Props) {
                     <p className="text-sm text-muted-foreground leading-relaxed">
                         Digite o valor inicial, escolha o período e veja o valor corrigido automaticamente com base nos dados oficiais do IBGE.
                     </p>
+
+                    {/* Internal links for SEO */}
+                    <nav className="mt-6 pt-4 border-t border-border" aria-label="Páginas relacionadas">
+                        <h3 className="text-sm font-semibold text-foreground mb-2">Páginas relacionadas</h3>
+                        <ul className="flex flex-wrap gap-x-4 gap-y-1.5">
+                            <li>
+                                <Link href={`/${lang}/calculadora-reajuste-aluguel`} className="text-sm text-emerald-600 dark:text-emerald-400 hover:underline">
+                                    Calculadora de Reajuste de Aluguel
+                                </Link>
+                            </li>
+                            <li>
+                                <Link href={`/${lang}/indices/igpm`} className="text-sm text-emerald-600 dark:text-emerald-400 hover:underline">
+                                    IGP-M — Histórico e Gráfico
+                                </Link>
+                            </li>
+                            <li>
+                                <Link href={`/${lang}/indices/${code === 'IPCA' ? 'inpc' : 'ipca'}`} className="text-sm text-emerald-600 dark:text-emerald-400 hover:underline">
+                                    {code === 'IPCA' ? 'INPC — Série Histórica' : 'IPCA — Histórico Completo'}
+                                </Link>
+                            </li>
+                            <li>
+                                <Link href={`/${lang}/indices/ivar`} className="text-sm text-emerald-600 dark:text-emerald-400 hover:underline">
+                                    IVAR — Índice de Aluguéis Residenciais
+                                </Link>
+                            </li>
+                        </ul>
+                    </nav>
                 </section>
             )}
 
@@ -1029,6 +1171,12 @@ export default async function IndexPage({ params, searchParams }: Props) {
                 <script
                     type="application/ld+json"
                     dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+                />
+            )}
+            {eventJsonLd && (
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{ __html: JSON.stringify(eventJsonLd) }}
                 />
             )}
         </div>

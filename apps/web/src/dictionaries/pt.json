@@ -1479,27 +1479,31 @@
     },
     "indices": {
         "ipca": {
-            "title": "IPCA Hoje 2026 – Índice Nacional de Preços ao Consumidor Amplo | Histórico Completo e Análise",
-            "description": "O IPCA (Índice Nacional de Preços ao Consumidor Amplo) é o principal indicador oficial de inflação do Brasil, calculado e divulgado mensalmente pelo IBGE. Ele mede a variação dos preços de bens e serviços consumidos pelas famílias brasileiras e é amplamente utilizado como referência para política monetária, reajustes de contratos, aluguéis, salários, benefícios, investimentos e análises econômicas de longo prazo.",
-            "pageDescription": "Nesta página do Kitnets.com, você pode acompanhar o histórico completo do IPCA desde janeiro de 1995 até a data atual, com dados confiáveis, organizados e fáceis de analisar.",
+            "title": "IPCA Hoje 2026: Valor Atual, Acumulado em 12 Meses e Correção de Aluguel",
+            "description": "O IPCA hoje é o principal indicador oficial de inflação do Brasil, divulgado mensalmente pelo IBGE. Ele mede a variação de preços de bens e serviços consumidos pelas famílias brasileiras e é amplamente utilizado para reajuste de aluguel, atualização de contratos, correção de salários e benefícios, e análise econômica e investimentos.",
+            "pageDescription": "Nesta página você encontra o IPCA atualizado, histórico completo desde 1995, gráfico interativo, mapa de calor mensal e uma calculadora de correção automática pelo índice.",
             "keywords": [
                 "IPCA hoje",
+                "IPCA atualizado",
                 "IPCA 2026",
                 "IPCA acumulado",
                 "IPCA acumulado 12 meses",
+                "IPCA acumulado no ano",
+                "correção pelo IPCA",
+                "reajuste aluguel IPCA",
+                "calculadora IPCA",
+                "histórico IPCA completo",
+                "próxima divulgação IPCA",
                 "inflação hoje",
                 "inflação 2026",
                 "inflação acumulada",
                 "IPCA mensal",
-                "IPCA janeiro 2026",
                 "IPCA IBGE",
                 "índice de inflação",
                 "IPCA histórico",
                 "IPCA tabela",
                 "IPCA gráfico",
-                "reajuste aluguel IPCA",
-                "IPCA mês a mês",
-                "próxima divulgação IPCA"
+                "IPCA mês a mês"
             ],
             "sections": [
                 {
@@ -1518,6 +1522,10 @@
                             "text": "Indicador essencial para reajustes de aluguel, contratos e correção de valores."
                         },
                         {
+                            "title": "Calculadora de Correção pelo IPCA",
+                            "text": "Simule a atualização de valores pelo IPCA entre duas datas, ideal para reajuste de aluguel, atualização de contratos, correção judicial e preservação do poder de compra."
+                        },
+                        {
                             "title": "Gráfico histórico interativo",
                             "text": "Visualize a evolução da inflação brasileira ao longo do tempo e identifique ciclos econômicos, períodos de alta e de desaceleração."
                         },
@@ -1534,6 +1542,18 @@
                             "text": "Consulte qualquer intervalo de datas entre 01/01/1995 e o mês mais recente disponível, permitindo análises históricas completas ou focadas em períodos específicos."
                         }
                     ]
+                },
+                {
+                    "title": "O que é o IPCA?",
+                    "text": "O IPCA (Índice Nacional de Preços ao Consumidor Amplo) é o indicador oficial de inflação do Brasil. Calculado e divulgado mensalmente pelo IBGE, ele mede a variação de preços de bens e serviços consumidos por famílias com renda mensal de 1 a 40 salários mínimos. O IPCA é utilizado pelo Banco Central como meta de inflação e serve de referência para reajuste de contratos de aluguel, correção de salários, atualização de dívidas judiciais e análise de investimentos."
+                },
+                {
+                    "title": "Como calcular o reajuste de aluguel pelo IPCA?",
+                    "text": "Para calcular o reajuste de aluguel pelo IPCA, você precisa do IPCA acumulado em 12 meses referente ao mês de aniversário do contrato. O novo valor é obtido multiplicando o aluguel atual pelo fator (1 + IPCA acumulado / 100). Na Kitnets.com, você pode usar a calculadora de correção pelo IPCA para simular automaticamente o valor corrigido entre quaisquer duas datas, ou usar a calculadora de reajuste de aluguel para um cálculo direto."
+                },
+                {
+                    "title": "Quando sai o próximo IPCA?",
+                    "text": "O IPCA é divulgado pelo IBGE por volta do dia 10 de cada mês, referente ao mês anterior. A data exata da próxima divulgação é informada no topo desta página, no card 'Data da próxima divulgação'. Você também pode se cadastrar para receber um alerta por e-mail ou WhatsApp assim que o novo IPCA for publicado."
                 },
                 {
                     "title": "Por que o IPCA é importante para o mercado imobiliário?",
