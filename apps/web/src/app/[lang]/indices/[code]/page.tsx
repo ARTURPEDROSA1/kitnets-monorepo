@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { getIndexMetadata, getIndexValuesByDateRange, getAllIndexes, getAllIndexValuesForCalculator } from '@/lib/indexes';
+import { getIndexMetadata, getIndexValuesByDateRange, getAllIndexes } from '@/lib/indexes';
 import { getFipeZapData } from '@/lib/fipezap';
 import { getDictionary } from '../../../../dictionaries';
 import { IndexChartLazy } from '@/components/indices/IndexChartLazy';
@@ -154,11 +154,6 @@ export default async function IndexPage({ params, searchParams }: Props) {
     // Fetch history based on date range or default to recent
     const history = await getIndexValuesByDateRange(metadata.id, startDateStr, endDateStr);
     const latest = history[0];
-
-    // Fetch full dataset for IPCA calculator
-    const ipcaCalcData = (code === 'IPCA' || code === 'INPC')
-        ? await getAllIndexValuesForCalculator(metadata.id)
-        : [];
 
     // Prepare Minimum Wage Data
     let minWageData: MinimumWageData[] = [];
@@ -480,9 +475,9 @@ export default async function IndexPage({ params, searchParams }: Props) {
                     />
 
                     {/* IPCA/INPC Correction Calculator */}
-                    {(code === 'IPCA' || code === 'INPC') && ipcaCalcData.length > 0 && (
+                    {(code === 'IPCA' || code === 'INPC') && (
                         <Suspense fallback={<div className="rounded-xl border bg-card shadow-sm p-6 h-48 animate-pulse" />}>
-                            <IPCACalculatorLazy data={ipcaCalcData} />
+                            <IPCACalculatorLazy indexCode={code} />
                         </Suspense>
                     )}
 
@@ -722,7 +717,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
             )}
 
             {/* SEO text for IPCA/INPC calculator */}
-            {(code === 'IPCA' || code === 'INPC') && ipcaCalcData.length > 0 && (
+            {(code === 'IPCA' || code === 'INPC') && (
                 <section className="mt-16 max-w-3xl">
                     <h2 className="text-lg md:text-xl font-bold tracking-tight text-foreground mb-3">
                         {lang === 'pt' ? 'Calculadora de Correção pelo' : lang === 'es' ? 'Calculadora de Corrección por' : 'Correction Calculator by'} {code}
