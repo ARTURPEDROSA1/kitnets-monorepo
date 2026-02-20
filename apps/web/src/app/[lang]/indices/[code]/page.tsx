@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getIndexMetadata, getIndexValuesByDateRange, getAllIndexes, getAllIndexValuesForCalculator } from '@/lib/indexes';
@@ -5,10 +6,10 @@ import { getFipeZapData } from '@/lib/fipezap';
 import { getDictionary } from '../../../../dictionaries';
 import { IndexChartLazy } from '@/components/indices/IndexChartLazy';
 import { IndexHeatmapLazy } from '@/components/indices/IndexHeatmapLazy';
-import { IndexDateFilter } from '@/components/indices/IndexDateFilter';
-import { IndexHistoryTable } from '@/components/indices/IndexHistoryTable';
+import { IndexDateFilterLazy } from '@/components/indices/IndexDateFilterLazy';
+import { IndexHistoryTableLazy } from '@/components/indices/IndexHistoryTableLazy';
 import { IPCACalculatorLazy } from '@/components/indices/IPCACalculatorLazy';
-import { IPCAAlertForm } from '@/components/indices/IPCAAlertForm';
+import { IPCAAlertFormLazy } from '@/components/indices/IPCAAlertFormLazy';
 import Link from 'next/link';
 import { ArrowLeft, MapPinned, Home, CalendarDays, Hourglass } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -71,11 +72,10 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
     }
 
     const dict = getDictionary(lang as "pt" | "en" | "es");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const indices = (dict as any).indices || {};
-    const indexContent = indices[code.toLowerCase()] as IndexContent | undefined;
+    const indices = dict.indices ?? {};
+    const indexContent = (indices as Record<string, IndexContent | undefined>)[code.toLowerCase()];
 
-    let title = indexContent?.title || `Índice ${metadata.code} - Histórico, Tabela e Gráfico 2025 | Kitnets`;
+    let title = indexContent?.title || `Índice ${metadata.code} - Histórico, Tabela e Gráfico 2026 | Kitnets`;
     let description = indexContent?.description || `Acompanhe a variação do ${metadata.code} (${metadata.name}). Tabela histórica completa dos últimos meses, gráfico de evolução e acumulado de 12 meses.`;
 
     // Dynamic SEO for FIPEZAP
@@ -481,12 +481,16 @@ export default async function IndexPage({ params, searchParams }: Props) {
 
                     {/* IPCA/INPC Correction Calculator */}
                     {(code === 'IPCA' || code === 'INPC') && ipcaCalcData.length > 0 && (
-                        <IPCACalculatorLazy data={ipcaCalcData} />
+                        <Suspense fallback={<div className="rounded-xl border bg-card shadow-sm p-6 h-48 animate-pulse" />}>
+                            <IPCACalculatorLazy data={ipcaCalcData} />
+                        </Suspense>
                     )}
 
-                    {/* IPCA/INPC Alert Form — Primary placement */}
+                    {/* IPCA/INPC Alert Form */}
                     {(code === 'IPCA' || code === 'INPC') && (
-                        <IPCAAlertForm indexCode={code} lang={lang} />
+                        <Suspense fallback={<div className="rounded-xl border bg-card shadow-sm p-6 h-32 animate-pulse" />}>
+                            <IPCAAlertFormLazy indexCode={code} lang={lang} />
+                        </Suspense>
                     )}
 
                     {/* Date Filter */}
@@ -494,11 +498,12 @@ export default async function IndexPage({ params, searchParams }: Props) {
                         <h3 className="text-lg md:text-xl font-semibold text-foreground mb-3">
                             {t.filterHistory} {code !== 'FIPEZAP' ? `do ${code}` : ''}
                         </h3>
-                        <IndexDateFilter
-                            key={`${startDateStr || 'start'}-${endDateStr || 'end'}`}
-                            defaultStartDate={defaultStartDate}
-                            defaultEndDate={defaultEndDate}
-                        />
+                        <Suspense fallback={<div className="bg-card border rounded-xl p-4 shadow-sm mb-6 h-20 animate-pulse" />}>
+                            <IndexDateFilterLazy
+                                defaultStartDate={defaultStartDate}
+                                defaultEndDate={defaultEndDate}
+                            />
+                        </Suspense>
                     </div>
 
                     {/* Chart Section */}
@@ -509,7 +514,9 @@ export default async function IndexPage({ params, searchParams }: Props) {
                                 <p className="text-xs md:text-sm text-muted-foreground">{t.chartSubtitle}</p>
                             </div>
                             <div className="p-3 md:p-6 pt-0">
-                                <IndexChartLazy data={history} indexCode={code} />
+                                <Suspense fallback={<div className="h-[250px] md:h-[350px] w-full bg-muted/20 animate-pulse rounded-lg" />}>
+                                    <IndexChartLazy data={history} indexCode={code} />
+                                </Suspense>
                             </div>
                         </div>
                     </div>
@@ -522,7 +529,9 @@ export default async function IndexPage({ params, searchParams }: Props) {
                                 <p className="text-xs md:text-sm text-muted-foreground">{t.heatmapSubtitle}</p>
                             </div>
                             <div className="p-3 md:p-6 pt-0">
-                                <IndexHeatmapLazy data={history} />
+                                <Suspense fallback={<div className="h-[300px] w-full bg-muted/20 animate-pulse rounded-lg" />}>
+                                    <IndexHeatmapLazy data={history} />
+                                </Suspense>
                             </div>
                         </div>
                     </div>
@@ -535,7 +544,15 @@ export default async function IndexPage({ params, searchParams }: Props) {
                                 <p className="text-xs md:text-sm text-muted-foreground">{t.tableSubtitle}</p>
                             </div>
                             <div className="p-3 md:p-6 pt-0">
-                                <IndexHistoryTable data={history} />
+                                <Suspense fallback={
+                                    <div className="w-full space-y-2">
+                                        {Array.from({ length: 6 }).map((_, i) => (
+                                            <div key={i} className="h-10 w-full bg-muted/20 animate-pulse rounded" />
+                                        ))}
+                                    </div>
+                                }>
+                                    <IndexHistoryTableLazy data={history} />
+                                </Suspense>
                             </div>
                             <p className="text-xs text-center text-muted-foreground pb-3 md:hidden">{t.swipeHint}</p>
                         </div>
@@ -782,7 +799,9 @@ export default async function IndexPage({ params, searchParams }: Props) {
             {/* IPCA/INPC Alert Form — Standalone card below CTA */}
             {(code === 'IPCA' || code === 'INPC') && (
                 <div className="mt-10 w-full">
-                    <IPCAAlertForm indexCode={code} lang={lang} />
+                    <Suspense fallback={<div className="rounded-xl border bg-card shadow-sm p-6 h-32 animate-pulse" />}>
+                        <IPCAAlertFormLazy indexCode={code} lang={lang} />
+                    </Suspense>
                 </div>
             )}
 
