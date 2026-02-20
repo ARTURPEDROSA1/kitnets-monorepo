@@ -18,9 +18,10 @@ import { getMinimumWageData, MinimumWageData } from '@/lib/minimum-wage';
 import {
     IBGE_RELEASE_DATES_2026, IBGE_CALENDAR_2026,
     IGPM_CALENDAR_2026, IVAR_CALENDAR_2026,
-    getReleaseDay, getToday, MONTH_NAMES, getNextReleaseLabel,
+    getReleaseDay, getToday, MONTH_NAMES,
 } from '@/lib/release-calendars';
 import { ReleaseCalendarTable } from '@/components/indices/ReleaseCalendarTable';
+import { IndexMetricsCards } from '@/components/indices/IndexMetricsCards';
 
 interface Props {
     params: Promise<{
@@ -139,9 +140,8 @@ export default async function IndexPage({ params, searchParams }: Props) {
     const defaultEndDate = new Date().toISOString().split('T')[0];
 
     const dict = getDictionary(lang as "pt" | "en" | "es");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const indices = (dict as any).indices || {};
-    const indexContent = indices[code.toLowerCase()] as IndexContent | undefined;
+    const indices = dict.indices ?? {};
+    const indexContent = (indices as Record<string, IndexContent | undefined>)[code.toLowerCase()];
 
     const metadata = await getIndexMetadata(code);
     if (!metadata) {
@@ -317,13 +317,8 @@ export default async function IndexPage({ params, searchParams }: Props) {
         ],
     };
 
-    interface IndicesCta {
-        title: string;
-        description: string;
-        button: string;
-    }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const ctaContent = (dict as any).indicesCta as IndicesCta | undefined;
+    const t = dict.indexPage;
+    const ctaContent = dict.indicesCta;
 
     // Compute today once for the entire render
     const today = getToday();
@@ -374,7 +369,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
             <Link href={`/${lang}`} passHref>
                 <div className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-primary transition-colors mb-2">
                     <ArrowLeft className="mr-1 h-3 w-3" />
-                    Voltar
+                    {t.back}
                 </div>
             </Link>
 
@@ -390,17 +385,17 @@ export default async function IndexPage({ params, searchParams }: Props) {
                         }
                     </h1>
                     <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${metadata.is_official ? 'border-transparent bg-primary text-primary-foreground hover:bg-primary/80' : 'border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}>
-                        {metadata.is_official ? 'Oficial' : 'Projeção'}
+                        {metadata.is_official ? t.official : t.projection}
                     </span>
                     <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 text-foreground border-border">
                         {(() => {
-                            const translations: Record<string, Record<string, string>> = {
-                                'rent': { 'pt': 'Aluguel', 'en': 'Rent', 'es': 'Alquiler' },
-                                'market': { 'pt': 'Mercado', 'en': 'Market', 'es': 'Mercado' },
-                                'inflation': { 'pt': 'Inflação', 'en': 'Inflation', 'es': 'Inflación' }
+                            const categoryMap: Record<string, string> = {
+                                rent: t.categoryRent,
+                                market: t.categoryMarket,
+                                inflation: t.categoryInflation,
                             };
                             const category = code === 'IGPM' ? 'inflation' : metadata.category;
-                            return translations[category]?.[lang] || category;
+                            return categoryMap[category] ?? category;
                         })()}
                     </span>
                 </div>
@@ -416,10 +411,10 @@ export default async function IndexPage({ params, searchParams }: Props) {
                         </p>
                         <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5">
                             {[
-                                'Reajuste de aluguel',
-                                'Atualização de contratos',
-                                'Correção de salários e benefícios',
-                                'Análise econômica e investimentos',
+                                t.rentAdjust,
+                                t.contractUpdate,
+                                t.salaryCorrection,
+                                t.economicAnalysis,
                             ].map((item) => (
                                 <li key={item} className="flex items-center gap-2 text-sm text-muted-foreground">
                                     <span className="flex-shrink-0 h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
@@ -428,13 +423,13 @@ export default async function IndexPage({ params, searchParams }: Props) {
                             ))}
                         </ul>
                         <p className="text-sm text-muted-foreground/80">
-                            {indexContent.pageDescription} Fonte: <strong>{metadata.source}</strong>.
+                            {indexContent.pageDescription} {t.source}: <strong>{metadata.source}</strong>.
                         </p>
                     </div>
                 ) : (
                     <p className="max-w-3xl text-muted-foreground/80">
-                        Acompanhe a evolução do {code === 'REAJUSTE-SALARIO-MINIMO' ? metadata.code.replace(/-/g, ' ') : metadata.code}, atualizado mensalmente.
-                        Fonte: <strong>{metadata.source}</strong>.
+                        {t.followEvolution} {code === 'REAJUSTE-SALARIO-MINIMO' ? metadata.code.replace(/-/g, ' ') : metadata.code}, {t.updatedMonthly}
+                        {t.source}: <strong>{metadata.source}</strong>.
                     </p>
                 )}
             </div>
@@ -468,66 +463,21 @@ export default async function IndexPage({ params, searchParams }: Props) {
             {code !== 'FIPEZAP' && code !== 'REAJUSTE-SALARIO-MINIMO' && (
                 <div className="grid gap-3 md:grid-cols-3 md:gap-6">
                     {/* Key Metrics Cards */}
-                    <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
-                        {/* Card 1: Variação Mensal */}
-                        <div className="rounded-xl border bg-card text-card-foreground shadow-sm" role="region" aria-label={`${code} variação mensal`}>
-                            <div className="flex flex-col space-y-1 p-3 md:p-6 pb-1 md:pb-2">
-                                <h3 className="text-sm font-medium text-muted-foreground whitespace-nowrap">{code} hoje:</h3>
-                            </div>
-                            <div className="p-3 md:p-6 pt-0">
-                                <div className="text-2xl md:text-3xl font-bold text-primary">
-                                    {latest ? `${latest.value_percent}%` : '--'}
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                    Referente a <time dateTime={latest ? `${latest.year}-${String(latest.month).padStart(2, '0')}` : ''}>{latest ? `${latest.month.toString().padStart(2, '0')}/${latest.year}` : '--'}</time>
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Card 2: Acumulado 12m */}
-                        <div className="rounded-xl border bg-card text-card-foreground shadow-sm" role="region" aria-label={`${code} acumulado 12 meses`}>
-                            <div className="flex flex-col space-y-1 p-3 md:p-6 pb-1 md:pb-2">
-                                <h3 className="text-sm font-medium text-muted-foreground whitespace-nowrap">{code} acumulado em 12 meses:</h3>
-                            </div>
-                            <div className="p-3 md:p-6 pt-0">
-                                <div className="text-2xl md:text-3xl font-bold text-primary">
-                                    {latest?.accumulated_12m ? `${latest.accumulated_12m}%` : '--'}
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                    Últimos 12 meses
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Card 3: Acumulado Ano (YTD) */}
-                        <div className="rounded-xl border bg-card text-card-foreground shadow-sm" role="region" aria-label={`${code} acumulado no ano`}>
-                            <div className="flex flex-col space-y-1 p-3 md:p-6 pb-1 md:pb-2">
-                                <h3 className="text-sm font-medium text-muted-foreground whitespace-nowrap">{code} acumulado em {latest?.year}:</h3>
-                            </div>
-                            <div className="p-3 md:p-6 pt-0">
-                                <div className="text-2xl md:text-3xl font-bold text-primary">
-                                    {latest?.accumulated_year ? `${latest.accumulated_year}%` : '--'}
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                    Até {latest ? `${latest.month.toString().padStart(2, '0')}/${latest.year}` : '--'}
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Card 4: Next Release Date */}
-                        <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
-                            <div className="flex flex-col space-y-1 p-3 md:p-6 pb-1 md:pb-2">
-                                <h3 className="text-sm font-medium text-muted-foreground whitespace-nowrap">Data da próxima divulgação:</h3>
-                            </div>
-                            <div className="p-3 md:p-6 pt-0">
-                                <div className="text-2xl md:text-3xl font-bold text-primary">
-                                    <span className="text-sm md:text-xl">
-                                        {getNextReleaseLabel(code, lang, latest, today)}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <IndexMetricsCards
+                        code={code}
+                        lang={lang}
+                        latest={latest}
+                        today={today}
+                        labels={{
+                            today: t.today,
+                            referentTo: t.referentTo,
+                            accumulated12m: t.accumulated12m,
+                            last12m: t.last12m,
+                            accumulatedYear: t.accumulatedYear,
+                            until: t.until,
+                            nextRelease: t.nextRelease,
+                        }}
+                    />
 
                     {/* IPCA/INPC Correction Calculator */}
                     {(code === 'IPCA' || code === 'INPC') && ipcaCalcData.length > 0 && (
@@ -542,7 +492,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
                     {/* Date Filter */}
                     <div className="md:col-span-3 min-w-0">
                         <h3 className="text-lg md:text-xl font-semibold text-foreground mb-3">
-                            Filtrar Série Histórica {code !== 'FIPEZAP' ? `do ${code}` : ''}
+                            {t.filterHistory} {code !== 'FIPEZAP' ? `do ${code}` : ''}
                         </h3>
                         <IndexDateFilter
                             key={`${startDateStr || 'start'}-${endDateStr || 'end'}`}
@@ -555,8 +505,8 @@ export default async function IndexPage({ params, searchParams }: Props) {
                     <div id="grafico" className="md:col-span-3 min-w-0 scroll-mt-20">
                         <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
                             <div className="flex flex-col space-y-1.5 p-3 md:p-6">
-                                <h3 className="text-lg md:text-2xl font-semibold leading-none tracking-tight">Histórico de Variação (%)</h3>
-                                <p className="text-xs md:text-sm text-muted-foreground">Visualização gráfica da evolução do índice no período selecionado.</p>
+                                <h3 className="text-lg md:text-2xl font-semibold leading-none tracking-tight">{t.chartTitle}</h3>
+                                <p className="text-xs md:text-sm text-muted-foreground">{t.chartSubtitle}</p>
                             </div>
                             <div className="p-3 md:p-6 pt-0">
                                 <IndexChartLazy data={history} indexCode={code} />
@@ -568,8 +518,8 @@ export default async function IndexPage({ params, searchParams }: Props) {
                     <div id="mapa-calor" className="md:col-span-3 min-w-0 scroll-mt-20">
                         <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
                             <div className="flex flex-col space-y-1.5 p-3 md:p-6">
-                                <h3 className="text-lg md:text-2xl font-semibold leading-none tracking-tight">Mapa de Calor Mensal</h3>
-                                <p className="text-xs md:text-sm text-muted-foreground">Comportamento mensal e acumulado anual.</p>
+                                <h3 className="text-lg md:text-2xl font-semibold leading-none tracking-tight">{t.heatmapTitle}</h3>
+                                <p className="text-xs md:text-sm text-muted-foreground">{t.heatmapSubtitle}</p>
                             </div>
                             <div className="p-3 md:p-6 pt-0">
                                 <IndexHeatmapLazy data={history} />
@@ -581,13 +531,13 @@ export default async function IndexPage({ params, searchParams }: Props) {
                     <div id="tabela" className="md:col-span-3 min-w-0 scroll-mt-20">
                         <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
                             <div className="flex flex-col space-y-1.5 p-3 md:p-6">
-                                <h3 className="text-lg md:text-2xl font-semibold leading-none tracking-tight">Série Histórica</h3>
-                                <p className="text-xs md:text-sm text-muted-foreground">Valores detalhados mês a mês.</p>
+                                <h3 className="text-lg md:text-2xl font-semibold leading-none tracking-tight">{t.tableTitle}</h3>
+                                <p className="text-xs md:text-sm text-muted-foreground">{t.tableSubtitle}</p>
                             </div>
                             <div className="p-3 md:p-6 pt-0">
                                 <IndexHistoryTable data={history} />
                             </div>
-                            <p className="text-xs text-center text-muted-foreground pb-3 md:hidden">← Deslize para ver mais →</p>
+                            <p className="text-xs text-center text-muted-foreground pb-3 md:hidden">{t.swipeHint}</p>
                         </div>
                     </div>
 
@@ -758,17 +708,17 @@ export default async function IndexPage({ params, searchParams }: Props) {
             {(code === 'IPCA' || code === 'INPC') && ipcaCalcData.length > 0 && (
                 <section className="mt-16 max-w-3xl">
                     <h2 className="text-lg md:text-xl font-bold tracking-tight text-foreground mb-3">
-                        Calculadora de Correção pelo {code}
+                        {lang === 'pt' ? 'Calculadora de Correção pelo' : lang === 'es' ? 'Calculadora de Corrección por' : 'Correction Calculator by'} {code}
                     </h2>
                     <p className="text-sm md:text-base text-muted-foreground leading-relaxed mb-4">
-                        Simule a atualização de valores pelo {code} entre duas datas. Ideal para:
+                        {lang === 'pt' ? `Simule a atualização de valores pelo ${code} entre duas datas. Ideal para:` : lang === 'es' ? `Simule la actualización de valores por ${code} entre dos fechas. Ideal para:` : `Simulate value adjustments using ${code} between two dates. Ideal for:`}
                     </p>
                     <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 mb-4">
                         {[
-                            'Reajuste de aluguel',
-                            'Atualização de contratos',
-                            'Correção judicial',
-                            'Preservação do poder de compra',
+                            t.rentAdjust,
+                            t.contractUpdate,
+                            t.judicialCorrection,
+                            t.purchasingPower,
                         ].map((item) => (
                             <li key={item} className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <span className="flex-shrink-0 h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
@@ -777,31 +727,31 @@ export default async function IndexPage({ params, searchParams }: Props) {
                         ))}
                     </ul>
                     <p className="text-sm text-muted-foreground leading-relaxed">
-                        Digite o valor inicial, escolha o período e veja o valor corrigido automaticamente com base nos dados oficiais do IBGE.
+                        {t.calcIntro}
                     </p>
 
                     {/* Internal links for SEO */}
-                    <nav className="mt-6 pt-4 border-t border-border" aria-label="Páginas relacionadas">
-                        <h3 className="text-sm font-semibold text-foreground mb-2">Páginas relacionadas</h3>
+                    <nav className="mt-6 pt-4 border-t border-border" aria-label={t.relatedPages}>
+                        <h3 className="text-sm font-semibold text-foreground mb-2">{t.relatedPages}</h3>
                         <ul className="flex flex-wrap gap-x-4 gap-y-1.5">
                             <li>
                                 <Link href={`/${lang}/calculadora-reajuste-aluguel`} className="text-sm text-emerald-600 dark:text-emerald-400 hover:underline">
-                                    Calculadora de Reajuste de Aluguel
+                                    {t.rentAdjustCalc}
                                 </Link>
                             </li>
                             <li>
                                 <Link href={`/${lang}/indices/igpm`} className="text-sm text-emerald-600 dark:text-emerald-400 hover:underline">
-                                    IGP-M — Histórico e Gráfico
+                                    {t.igpmHistory}
                                 </Link>
                             </li>
                             <li>
                                 <Link href={`/${lang}/indices/${code === 'IPCA' ? 'inpc' : 'ipca'}`} className="text-sm text-emerald-600 dark:text-emerald-400 hover:underline">
-                                    {code === 'IPCA' ? 'INPC — Série Histórica' : 'IPCA — Histórico Completo'}
+                                    {code === 'IPCA' ? t.inpcHistory : t.ipcaHistory}
                                 </Link>
                             </li>
                             <li>
                                 <Link href={`/${lang}/indices/ivar`} className="text-sm text-emerald-600 dark:text-emerald-400 hover:underline">
-                                    IVAR — Índice de Aluguéis Residenciais
+                                    {t.ivarHistory}
                                 </Link>
                             </li>
                         </ul>
