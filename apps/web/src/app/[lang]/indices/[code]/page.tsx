@@ -17,10 +17,10 @@ import { MinimumWageDashboardWrapper } from '@/components/indices/MinimumWage/Mi
 import { getMinimumWageData, MinimumWageData } from '@/lib/minimum-wage';
 import {
     IBGE_RELEASE_DATES_2026, IBGE_CALENDAR_2026,
-    IGPM_RELEASE_DATES_2026, IGPM_CALENDAR_2026,
-    IVAR_CALENDAR_2026, COPOM_DATES_2026,
-    parseCalendarDate, getReleaseDay, getToday, MONTH_NAMES,
+    IGPM_CALENDAR_2026, IVAR_CALENDAR_2026,
+    getReleaseDay, getToday, MONTH_NAMES, getNextReleaseLabel,
 } from '@/lib/release-calendars';
+import { ReleaseCalendarTable } from '@/components/indices/ReleaseCalendarTable';
 
 interface Props {
     params: Promise<{
@@ -522,77 +522,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
                             <div className="p-3 md:p-6 pt-0">
                                 <div className="text-2xl md:text-3xl font-bold text-primary">
                                     <span className="text-sm md:text-xl">
-                                        {(() => {
-                                            if (code === 'CDI') {
-                                                return '1º dia útil/mês';
-                                            }
-
-                                            if (code === 'SELIC') {
-                                                const nextMeeting = COPOM_DATES_2026.find(d => d >= today);
-                                                if (nextMeeting) {
-                                                    const locale = lang === 'pt' ? 'pt-BR' : lang === 'en' ? 'en-US' : 'es-ES';
-                                                    return nextMeeting.toLocaleDateString(locale, { day: '2-digit', month: 'short' });
-                                                }
-                                                return 'A definir';
-                                            }
-
-                                            if (!latest) return '--';
-                                            let nextRefMonth = latest.month + 1;
-                                            let nextRefYear = latest.year;
-                                            if (nextRefMonth > 12) {
-                                                nextRefMonth = 1;
-                                                nextRefYear++;
-                                            }
-
-                                            if (code === 'IGPM') {
-                                                let day = getReleaseDay(IGPM_RELEASE_DATES_2026, 2026, nextRefMonth, nextRefYear, 29);
-                                                let date = new Date(nextRefYear, nextRefMonth - 1, day);
-                                                if (date <= today) {
-                                                    nextRefMonth++;
-                                                    if (nextRefMonth > 12) { nextRefMonth = 1; nextRefYear++; }
-                                                    day = getReleaseDay(IGPM_RELEASE_DATES_2026, 2026, nextRefMonth, nextRefYear, 29);
-                                                    date = new Date(nextRefYear, nextRefMonth - 1, day);
-                                                }
-                                                return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
-                                            }
-
-                                            if (code === 'IVAR') {
-                                                const nextDate = IVAR_CALENDAR_2026.find(item => parseCalendarDate(item.date) >= today);
-                                                if (nextDate) {
-                                                    return parseCalendarDate(nextDate.date).toLocaleDateString(lang === 'pt' ? 'pt-BR' : lang === 'es' ? 'es-ES' : 'en-US', { day: '2-digit', month: 'short' });
-                                                }
-                                                return 'A definir';
-                                            }
-
-                                            // IPCA / INPC — IBGE official release calendar 2026
-                                            if (code === 'IPCA' || code === 'INPC') {
-                                                let relMonth = nextRefMonth + 1;
-                                                let relYear = nextRefYear;
-                                                if (relMonth > 12) { relMonth = 1; relYear++; }
-
-                                                let day = getReleaseDay(IBGE_RELEASE_DATES_2026, 2026, relMonth, relYear);
-                                                let date = new Date(relYear, relMonth - 1, day);
-
-                                                if (date <= today) {
-                                                    relMonth++;
-                                                    if (relMonth > 12) { relMonth = 1; relYear++; }
-                                                    day = getReleaseDay(IBGE_RELEASE_DATES_2026, 2026, relMonth, relYear);
-                                                    date = new Date(relYear, relMonth - 1, day);
-                                                }
-
-                                                return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
-                                            }
-
-                                            // Default fallback for other indexes
-                                            let releaseMonth = nextRefMonth + 1;
-                                            let releaseYear = nextRefYear;
-                                            if (releaseMonth > 12) {
-                                                releaseMonth = 1;
-                                                releaseYear++;
-                                            }
-                                            const date = new Date(releaseYear, releaseMonth - 1, 10);
-                                            return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
-                                        })()}
+                                        {getNextReleaseLabel(code, lang, latest, today)}
                                     </span>
                                 </div>
                             </div>
@@ -661,169 +591,31 @@ export default async function IndexPage({ params, searchParams }: Props) {
                         </div>
                     </div>
 
-                    {/* IGPM Calendar Specific Section */}
-                    {code === 'IGPM' && (() => {
-                        const nextIdx = IGPM_CALENDAR_2026.findIndex(item => parseCalendarDate(item.date) >= today);
-                        const pesquisa = 'IGP-M e os componentes: IPA-M e IPC-M';
+                    {/* IGPM Calendar */}
+                    {code === 'IGPM' && (
+                        <ReleaseCalendarTable
+                            title="Calendário de divulgação IGP-M 2026"
+                            items={IGPM_CALENDAR_2026}
+                            pesquisa="IGP-M e os componentes: IPA-M e IPC-M"
+                        />
+                    )}
 
-                        return (
-                            <div id="calendario" className="md:col-span-3 min-w-0 scroll-mt-20">
-                                <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
-                                    <div className="flex flex-col space-y-1.5 p-3 md:p-6">
-                                        <h3 className="text-lg md:text-2xl font-semibold leading-none tracking-tight">Calendário de divulgação IGP-M 2026</h3>
-                                    </div>
-                                    <div className="p-3 md:p-6 pt-0 overflow-x-auto">
-                                        <table className="w-full text-left">
-                                            <thead className="text-muted-foreground bg-muted/50 text-xs uppercase">
-                                                <tr className="border-b">
-                                                    <th className="p-4 font-medium min-w-[120px]">Prev. divulgação</th>
-                                                    <th className="p-4 font-medium min-w-[200px]">Pesquisa</th>
-                                                    <th className="p-4 font-medium min-w-[150px]">Referência</th>
-                                                    <th className="p-4 font-medium">Horário</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y">
-                                                {IGPM_CALENDAR_2026.map((item, i) => {
-                                                    const isNext = i === nextIdx;
-                                                    const isPast = nextIdx === -1 ? true : i < nextIdx;
+                    {/* IPCA / INPC Calendar */}
+                    {(code === 'IPCA' || code === 'INPC') && (
+                        <ReleaseCalendarTable
+                            title={`Calendário de divulgação ${code} 2026`}
+                            items={IBGE_CALENDAR_2026}
+                            pesquisa={`${code} — Índice Nacional de Preços ao Consumidor ${code === 'IPCA' ? 'Amplo' : ''}`}
+                        />
+                    )}
 
-                                                    return (
-                                                        <tr
-                                                            key={i}
-                                                            className={
-                                                                isNext
-                                                                    ? 'bg-emerald-50 dark:bg-emerald-950/40 border-l-4 border-l-emerald-500 font-semibold'
-                                                                    : isPast
-                                                                        ? 'opacity-50 hover:opacity-75 transition-opacity'
-                                                                        : 'hover:bg-muted/50 transition-colors'
-                                                            }
-                                                        >
-                                                            <td className={`p-4 ${isNext ? 'text-emerald-700 dark:text-emerald-400 font-bold' : 'font-medium'}`}>
-                                                                {item.date}
-                                                                {isNext && <span className="ml-2 text-xs bg-emerald-500 text-white px-2 py-0.5 rounded-full">Próxima</span>}
-                                                            </td>
-                                                            <td className={`p-4 ${isNext ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'}`}>{pesquisa}</td>
-                                                            <td className={`p-4 ${isNext ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'}`}>{item.ref}</td>
-                                                            <td className={`p-4 ${isNext ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'}`}>{item.time}</td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })()}
-
-                    {/* IPCA / INPC Calendar Section */}
-                    {(code === 'IPCA' || code === 'INPC') && (() => {
-                        const nextIdx = IBGE_CALENDAR_2026.findIndex(item => parseCalendarDate(item.date) >= today);
-                        const pesquisa = `${code} — Índice Nacional de Preços ao Consumidor ${code === 'IPCA' ? 'Amplo' : ''}`;
-
-                        return (
-                            <div id="calendario" className="md:col-span-3 min-w-0 scroll-mt-20">
-                                <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
-                                    <div className="flex flex-col space-y-1.5 p-3 md:p-6">
-                                        <h3 className="text-lg md:text-2xl font-semibold leading-none tracking-tight">Calendário de divulgação {code} 2026</h3>
-                                    </div>
-                                    <div className="p-3 md:p-6 pt-0 overflow-x-auto">
-                                        <table className="w-full text-left">
-                                            <thead className="text-muted-foreground bg-muted/50 text-xs uppercase">
-                                                <tr className="border-b">
-                                                    <th className="p-4 font-medium min-w-[120px]">Prev. divulgação</th>
-                                                    <th className="p-4 font-medium min-w-[200px]">Pesquisa</th>
-                                                    <th className="p-4 font-medium min-w-[150px]">Referência</th>
-                                                    <th className="p-4 font-medium">Horário</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y">
-                                                {IBGE_CALENDAR_2026.map((item, i) => {
-                                                    const isNext = i === nextIdx;
-                                                    const isPast = nextIdx === -1 ? true : i < nextIdx;
-
-                                                    return (
-                                                        <tr
-                                                            key={i}
-                                                            className={
-                                                                isNext
-                                                                    ? 'bg-emerald-50 dark:bg-emerald-950/40 border-l-4 border-l-emerald-500 font-semibold'
-                                                                    : isPast
-                                                                        ? 'opacity-50 hover:opacity-75 transition-opacity'
-                                                                        : 'hover:bg-muted/50 transition-colors'
-                                                            }
-                                                        >
-                                                            <td className={`p-4 ${isNext ? 'text-emerald-700 dark:text-emerald-400 font-bold' : 'font-medium'}`}>
-                                                                {item.date}
-                                                                {isNext && <span className="ml-2 text-xs bg-emerald-500 text-white px-2 py-0.5 rounded-full">Próxima</span>}
-                                                            </td>
-                                                            <td className={`p-4 ${isNext ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'}`}>{pesquisa}</td>
-                                                            <td className={`p-4 ${isNext ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'}`}>{item.ref}</td>
-                                                            <td className={`p-4 ${isNext ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'}`}>{item.time}</td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })()}
-
-                    {/* IVAR Calendar Specific Section */}
-                    {code === 'IVAR' && (() => {
-                        const nextIdx = IVAR_CALENDAR_2026.findIndex(item => parseCalendarDate(item.date) >= today);
-
-                        return (
-                            <div id="calendario" className="md:col-span-3 min-w-0 scroll-mt-20">
-                                <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
-                                    <div className="flex flex-col space-y-1.5 p-3 md:p-6">
-                                        <h3 className="text-lg md:text-2xl font-semibold leading-none tracking-tight">Calendário de divulgação IVAR 2026</h3>
-                                    </div>
-                                    <div className="p-3 md:p-6 pt-0 overflow-x-auto">
-                                        <table className="w-full text-left">
-                                            <thead className="text-muted-foreground bg-muted/50 text-xs uppercase">
-                                                <tr className="border-b">
-                                                    <th className="p-4 font-medium min-w-[120px]">Prev. divulgação</th>
-                                                    <th className="p-4 font-medium min-w-[200px]">Pesquisa</th>
-                                                    <th className="p-4 font-medium min-w-[150px]">Referência</th>
-                                                    <th className="p-4 font-medium">Horário</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y">
-                                                {IVAR_CALENDAR_2026.map((item, i) => {
-                                                    const isNext = i === nextIdx;
-                                                    const isPast = nextIdx === -1 ? true : i < nextIdx;
-
-                                                    return (
-                                                        <tr
-                                                            key={i}
-                                                            className={
-                                                                isNext
-                                                                    ? 'bg-emerald-50 dark:bg-emerald-950/40 border-l-4 border-l-emerald-500 font-semibold'
-                                                                    : isPast
-                                                                        ? 'opacity-50 hover:opacity-75 transition-opacity'
-                                                                        : 'hover:bg-muted/50 transition-colors'
-                                                            }
-                                                        >
-                                                            <td className={`p-4 ${isNext ? 'text-emerald-700 dark:text-emerald-400 font-bold' : 'font-medium'}`}>
-                                                                {item.date}
-                                                                {isNext && <span className="ml-2 text-xs bg-emerald-500 text-white px-2 py-0.5 rounded-full">Próxima</span>}
-                                                            </td>
-                                                            <td className={`p-4 ${isNext ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'}`}>{item.label}</td>
-                                                            <td className={`p-4 ${isNext ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'}`}>{item.ref}</td>
-                                                            <td className={`p-4 ${isNext ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'}`}>{item.time}</td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })()}
+                    {/* IVAR Calendar */}
+                    {code === 'IVAR' && (
+                        <ReleaseCalendarTable
+                            title="Calendário de divulgação IVAR 2026"
+                            items={IVAR_CALENDAR_2026}
+                        />
+                    )}
                 </div>
             )}
 

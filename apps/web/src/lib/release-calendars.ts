@@ -120,3 +120,86 @@ export const MONTH_NAMES: Record<string, string[]> = {
     en: ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
     es: ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'],
 };
+
+// ─── Next Release Date Label ─────────────────────────────────────
+
+interface LatestValue {
+    month: number;
+    year: number;
+}
+
+function toLocale(lang: string): string {
+    return lang === 'pt' ? 'pt-BR' : lang === 'es' ? 'es-ES' : 'en-US';
+}
+
+const DATE_FMT: Intl.DateTimeFormatOptions = { day: '2-digit', month: 'short' };
+
+/**
+ * Returns the display label for Card 4 "Data da próxima divulgação".
+ * Pure function — no side effects, fully testable.
+ */
+export function getNextReleaseLabel(
+    code: string,
+    lang: string,
+    latest: LatestValue | null,
+    today: Date,
+): string {
+    if (code === 'CDI') return '1º dia útil/mês';
+
+    if (code === 'SELIC') {
+        const nextMeeting = COPOM_DATES_2026.find(d => d >= today);
+        return nextMeeting
+            ? nextMeeting.toLocaleDateString(toLocale(lang), DATE_FMT)
+            : 'A definir';
+    }
+
+    if (!latest) return '--';
+
+    let nextRefMonth = latest.month + 1;
+    let nextRefYear = latest.year;
+    if (nextRefMonth > 12) { nextRefMonth = 1; nextRefYear++; }
+
+    if (code === 'IGPM') {
+        let day = getReleaseDay(IGPM_RELEASE_DATES_2026, 2026, nextRefMonth, nextRefYear, 29);
+        let date = new Date(nextRefYear, nextRefMonth - 1, day);
+        if (date <= today) {
+            nextRefMonth++;
+            if (nextRefMonth > 12) { nextRefMonth = 1; nextRefYear++; }
+            day = getReleaseDay(IGPM_RELEASE_DATES_2026, 2026, nextRefMonth, nextRefYear, 29);
+            date = new Date(nextRefYear, nextRefMonth - 1, day);
+        }
+        return date.toLocaleDateString('pt-BR', DATE_FMT);
+    }
+
+    if (code === 'IVAR') {
+        const nextDate = IVAR_CALENDAR_2026.find(item => parseCalendarDate(item.date) >= today);
+        return nextDate
+            ? parseCalendarDate(nextDate.date).toLocaleDateString(toLocale(lang), DATE_FMT)
+            : 'A definir';
+    }
+
+    // IPCA / INPC — release is 2 months after reference
+    if (code === 'IPCA' || code === 'INPC') {
+        let relMonth = nextRefMonth + 1;
+        let relYear = nextRefYear;
+        if (relMonth > 12) { relMonth = 1; relYear++; }
+
+        let day = getReleaseDay(IBGE_RELEASE_DATES_2026, 2026, relMonth, relYear);
+        let date = new Date(relYear, relMonth - 1, day);
+
+        if (date <= today) {
+            relMonth++;
+            if (relMonth > 12) { relMonth = 1; relYear++; }
+            day = getReleaseDay(IBGE_RELEASE_DATES_2026, 2026, relMonth, relYear);
+            date = new Date(relYear, relMonth - 1, day);
+        }
+        return date.toLocaleDateString('pt-BR', DATE_FMT);
+    }
+
+    // Default fallback for other indexes
+    let releaseMonth = nextRefMonth + 1;
+    let releaseYear = nextRefYear;
+    if (releaseMonth > 12) { releaseMonth = 1; releaseYear++; }
+    const date = new Date(releaseYear, releaseMonth - 1, 10);
+    return date.toLocaleDateString('pt-BR', DATE_FMT);
+}
