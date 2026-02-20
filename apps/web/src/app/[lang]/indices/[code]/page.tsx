@@ -8,6 +8,7 @@ import { IndexHeatmapLazy } from '@/components/indices/IndexHeatmapLazy';
 import { IndexDateFilter } from '@/components/indices/IndexDateFilter';
 import { IndexHistoryTable } from '@/components/indices/IndexHistoryTable';
 import { IPCACalculatorLazy } from '@/components/indices/IPCACalculatorLazy';
+import { IPCAAlertForm } from '@/components/indices/IPCAAlertForm';
 import Link from 'next/link';
 import { ArrowLeft, MapPinned, Home, CalendarDays, Hourglass } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -563,8 +564,16 @@ export default async function IndexPage({ params, searchParams }: Props) {
                         <IPCACalculatorLazy data={ipcaCalcData} />
                     )}
 
+                    {/* IPCA/INPC Alert Form — Primary placement */}
+                    {(code === 'IPCA' || code === 'INPC') && (
+                        <IPCAAlertForm indexCode={code} lang={lang} />
+                    )}
+
                     {/* Date Filter */}
                     <div className="md:col-span-3 min-w-0">
+                        <h3 className="text-lg md:text-xl font-semibold text-foreground mb-3">
+                            Filtrar Série Histórica {code !== 'FIPEZAP' ? `do ${code}` : ''}
+                        </h3>
                         <IndexDateFilter
                             key={`${startDateStr || 'start'}-${endDateStr || 'end'}`}
                             defaultStartDate={defaultStartDate}
@@ -994,6 +1003,13 @@ export default async function IndexPage({ params, searchParams }: Props) {
                             </Button>
                         </Link>
                     </div>
+
+                    {/* IPCA/INPC Alert Form — Secondary placement within CTA */}
+                    {(code === 'IPCA' || code === 'INPC') && (
+                        <div className="pt-6 max-w-xl mx-auto w-full">
+                            <IPCAAlertForm indexCode={code} lang={lang} variant="compact" />
+                        </div>
+                    )}
                 </div>
             </div>
 
