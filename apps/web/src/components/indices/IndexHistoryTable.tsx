@@ -50,7 +50,6 @@ export function IndexHistoryTable({ data }: IndexHistoryTableProps) {
     const displayedData = sortedData.slice(0, visibleCount);
     const totalRows = sortedData.length;
     const hasMore = visibleCount < totalRows;
-    const isShowingAll = visibleCount >= totalRows;
 
     const handleShowMore = () => {
         setVisibleCount((prev) => Math.min(prev + PAGE_SIZE, totalRows));

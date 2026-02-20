@@ -558,39 +558,9 @@ export default async function IndexPage({ params, searchParams }: Props) {
                         </div>
                     </div>
 
-                    {/* IPCA/INPC Correction Calculator + SEO Section */}
+                    {/* IPCA/INPC Correction Calculator */}
                     {(code === 'IPCA' || code === 'INPC') && ipcaCalcData.length > 0 && (
-                        <>
-                            {/* SEO-rich intro section */}
-                            <section className="md:col-span-3 min-w-0 rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden">
-                                <div className="relative px-5 py-6 md:px-8 md:py-8 bg-gradient-to-br from-emerald-500/[0.03] via-transparent to-teal-500/[0.03] dark:from-emerald-500/[0.06] dark:to-teal-500/[0.06]">
-                                    <h2 className="text-lg md:text-xl font-bold tracking-tight text-foreground mb-3">
-                                        Calculadora de Correção pelo {code}
-                                    </h2>
-                                    <p className="text-sm md:text-base text-muted-foreground leading-relaxed mb-4">
-                                        Simule a atualização de valores pelo {code} entre duas datas. Ideal para:
-                                    </p>
-                                    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 mb-4">
-                                        {[
-                                            'Reajuste de aluguel',
-                                            'Atualização de contratos',
-                                            'Correção judicial',
-                                            'Preservação do poder de compra',
-                                        ].map((item) => (
-                                            <li key={item} className="flex items-center gap-2 text-sm text-muted-foreground">
-                                                <span className="flex-shrink-0 h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
-                                                {item}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                    <p className="text-sm text-muted-foreground leading-relaxed">
-                                        Digite o valor inicial, escolha o período e veja o valor corrigido automaticamente com base nos dados oficiais do IBGE.
-                                    </p>
-                                </div>
-                            </section>
-
-                            <IPCACalculatorLazy data={ipcaCalcData} />
-                        </>
+                        <IPCACalculatorLazy data={ipcaCalcData} />
                     )}
 
                     {/* Date Filter */}
@@ -977,6 +947,34 @@ export default async function IndexPage({ params, searchParams }: Props) {
                         </p>
                     </div>
                 </article>
+            )}
+
+            {/* SEO text for IPCA/INPC calculator */}
+            {(code === 'IPCA' || code === 'INPC') && ipcaCalcData.length > 0 && (
+                <section className="mt-16 max-w-3xl">
+                    <h2 className="text-lg md:text-xl font-bold tracking-tight text-foreground mb-3">
+                        Calculadora de Correção pelo {code}
+                    </h2>
+                    <p className="text-sm md:text-base text-muted-foreground leading-relaxed mb-4">
+                        Simule a atualização de valores pelo {code} entre duas datas. Ideal para:
+                    </p>
+                    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 mb-4">
+                        {[
+                            'Reajuste de aluguel',
+                            'Atualização de contratos',
+                            'Correção judicial',
+                            'Preservação do poder de compra',
+                        ].map((item) => (
+                            <li key={item} className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <span className="flex-shrink-0 h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
+                                {item}
+                            </li>
+                        ))}
+                    </ul>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                        Digite o valor inicial, escolha o período e veja o valor corrigido automaticamente com base nos dados oficiais do IBGE.
+                    </p>
+                </section>
             )}
 
             {/* Authority CTA */}
