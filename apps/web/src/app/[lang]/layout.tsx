@@ -11,11 +11,13 @@ import { ClerkProvider } from "@clerk/nextjs";
 const geistSans = Geist({
     variable: "--font-geist-sans",
     subsets: ["latin"],
+    display: 'swap',
 });
 
 const geistMono = Geist_Mono({
     variable: "--font-geist-mono",
     subsets: ["latin"],
+    display: 'swap',
 });
 
 export const viewport: Viewport = {
@@ -146,6 +148,8 @@ export default async function RootLayout({
         <ClerkProvider>
             <html lang={lang} suppressHydrationWarning>
                 <head>
+                    <link rel="dns-prefetch" href="https://kqhfzcxqmjkqekozhlng.supabase.co" />
+                    <link rel="preconnect" href="https://kqhfzcxqmjkqekozhlng.supabase.co" crossOrigin="anonymous" />
                     <link rel="preconnect" href="https://prompt-monarch-11.clerk.accounts.dev" crossOrigin="anonymous" />
                 </head>
                 <body
