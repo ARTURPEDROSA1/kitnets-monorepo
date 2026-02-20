@@ -23,6 +23,7 @@ import {
     Check,
     Info,
     Zap,
+    ChevronDown,
 } from "lucide-react";
 
 interface IPCACalculatorProps {
@@ -172,6 +173,7 @@ export function IPCACalculator({ data }: IPCACalculatorProps) {
     const [showBaseline, setShowBaseline] = useState(false);
     const [copied, setCopied] = useState(false);
     const [isCalculating, setIsCalculating] = useState(false);
+    const [detailsOpen, setDetailsOpen] = useState(false);
 
     const ROWS_PER_PAGE = 25;
 
@@ -208,18 +210,8 @@ export function IPCACalculator({ data }: IPCACalculatorProps) {
                 end: latestMonth,
             },
             {
-                label: "Últimos 24 meses",
-                start: addMonths(latestMonth, -24) < earliestMonth ? earliestMonth : addMonths(latestMonth, -24),
-                end: latestMonth,
-            },
-            {
                 label: `Ano ${currentYear}`,
                 start: `${currentYear}-01` < earliestMonth ? earliestMonth : `${currentYear}-01`,
-                end: latestMonth,
-            },
-            {
-                label: "Desde Jan/1995",
-                start: earliestMonth,
                 end: latestMonth,
             },
         ];
@@ -598,181 +590,208 @@ export function IPCACalculator({ data }: IPCACalculatorProps) {
                                 </button>
                             </div>
 
-                            {/* Chart */}
-                            {chartData.length > 1 && (
-                                <div className="space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <h4 className="text-sm font-semibold text-foreground">
-                                            Evolução do Valor Corrigido
-                                        </h4>
-                                        <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
-                                            <input
-                                                type="checkbox"
-                                                checked={showBaseline}
-                                                onChange={(e) => setShowBaseline(e.target.checked)}
-                                                className="rounded border-input accent-emerald-600"
-                                            />
-                                            Mostrar valor original
-                                        </label>
-                                    </div>
-                                    <div className="h-[250px] md:h-[320px] w-full">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <AreaChart
-                                                data={chartData}
-                                                margin={{ top: 10, right: 10, bottom: 0, left: 0 }}
-                                            >
-                                                <defs>
-                                                    <linearGradient id="correctedGrad" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="5%" stopColor="hsl(160, 84%, 39%)" stopOpacity={0.25} />
-                                                        <stop offset="95%" stopColor="hsl(160, 84%, 39%)" stopOpacity={0.02} />
-                                                    </linearGradient>
-                                                </defs>
-                                                <CartesianGrid
-                                                    strokeDasharray="3 3"
-                                                    vertical={false}
-                                                    stroke="hsl(var(--border))"
-                                                />
-                                                <XAxis
-                                                    dataKey="month"
-                                                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
-                                                    tickLine={false}
-                                                    axisLine={false}
-                                                    interval="preserveStartEnd"
-                                                />
-                                                <YAxis
-                                                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
-                                                    tickLine={false}
-                                                    axisLine={false}
-                                                    tickFormatter={(v) => `R$${formatBRL(v)}`}
-                                                    width={100}
-                                                />
-                                                <RechartsTooltip
-                                                    contentStyle={{
-                                                        backgroundColor: "hsl(var(--card))",
-                                                        borderColor: "hsl(var(--border))",
-                                                        borderRadius: "10px",
-                                                        color: "hsl(var(--card-foreground))",
-                                                        fontSize: "12px",
-                                                        padding: "10px 14px",
-                                                    }}
-                                                    formatter={
-                                                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                                        ((value: any, name: any) => {
-                                                            const v = Number(value ?? 0);
-                                                            if (name === "corrected")
-                                                                return [`R$ ${formatBRL(v)}`, "Valor corrigido"];
-                                                            return [`R$ ${formatBRL(v)}`, "Valor original"];
-                                                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                                        }) as any
-                                                    }
-                                                    labelFormatter={(label) => `Mês: ${label}`}
-                                                />
-                                                {showBaseline && (
-                                                    <Line
-                                                        type="monotone"
-                                                        dataKey="original"
-                                                        name="original"
-                                                        stroke="hsl(var(--muted-foreground))"
-                                                        strokeWidth={1.5}
-                                                        strokeDasharray="6 4"
-                                                        dot={false}
-                                                    />
-                                                )}
-                                                <Area
-                                                    type="monotone"
-                                                    dataKey="corrected"
-                                                    name="corrected"
-                                                    stroke="hsl(160, 84%, 39%)"
-                                                    strokeWidth={2.5}
-                                                    fill="url(#correctedGrad)"
-                                                    dot={false}
-                                                    activeDot={{
-                                                        r: 5,
-                                                        fill: "hsl(160, 84%, 39%)",
-                                                        stroke: "#fff",
-                                                        strokeWidth: 2,
-                                                    }}
-                                                />
-                                            </AreaChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                </div>
-                            )}
+                            {/* Collapsible Details: Chart + Table */}
+                            {(chartData.length > 1 || result.monthlyBreakdown.length > 0) && (
+                                <div className="rounded-xl border bg-card overflow-hidden">
+                                    <button
+                                        type="button"
+                                        onClick={() => setDetailsOpen(prev => !prev)}
+                                        className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-foreground
+                                            hover:bg-muted/40 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:ring-inset"
+                                    >
+                                        <span className="flex items-center gap-2">
+                                            <TrendingUp className="h-4 w-4 text-emerald-600" />
+                                            Ver detalhamento
+                                            <span className="text-xs font-normal text-muted-foreground">
+                                                (gráfico e tabela mês a mês)
+                                            </span>
+                                        </span>
+                                        <ChevronDown
+                                            className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${detailsOpen ? "rotate-180" : ""}`}
+                                        />
+                                    </button>
 
-                            {/* Monthly Breakdown Table */}
-                            {result.monthlyBreakdown.length > 0 && (
-                                <div className="space-y-3">
-                                    <h4 className="text-sm font-semibold text-foreground">
-                                        Detalhamento Mês a Mês
-                                    </h4>
-                                    <div className="overflow-x-auto rounded-lg border">
-                                        <table className="w-full text-left text-sm">
-                                            <thead className="bg-muted/50 text-muted-foreground text-xs uppercase">
-                                                <tr className="border-b">
-                                                    <th className="p-3 font-medium min-w-[100px]">Mês/Ano</th>
-                                                    <th className="p-3 font-medium text-right min-w-[100px]">IPCA (%)</th>
-                                                    <th className="p-3 font-medium text-right min-w-[120px] hidden sm:table-cell">Fator</th>
-                                                    <th className="p-3 font-medium text-right min-w-[140px]">Valor corrigido</th>
-                                                    <th className="p-3 font-medium text-right min-w-[120px] hidden md:table-cell">Variação (R$)</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y">
-                                                {paginatedRows.map((row) => (
-                                                    <tr
-                                                        key={row.month}
-                                                        className="hover:bg-muted/30 transition-colors"
-                                                    >
-                                                        <td className="p-3 font-medium">{formatMonthLabel(row.month)}</td>
-                                                        <td className={`p-3 text-right tabular-nums ${row.ipcaPercent >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-                                                            {row.ipcaPercent.toFixed(2).replace(".", ",")}%
-                                                        </td>
-                                                        <td className="p-3 text-right tabular-nums text-muted-foreground hidden sm:table-cell">
-                                                            {row.factor.toFixed(6).replace(".", ",")}
-                                                        </td>
-                                                        <td className="p-3 text-right tabular-nums font-medium">
-                                                            R$ {formatBRL(row.valueAtMonth)}
-                                                        </td>
-                                                        <td className={`p-3 text-right tabular-nums hidden md:table-cell ${row.deltaMonth >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-                                                            {row.deltaMonth >= 0 ? "+" : ""}R$ {formatBRL(row.deltaMonth)}
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                    {detailsOpen && (
+                                        <div className="border-t px-4 py-5 md:px-6 space-y-6">
+                                            {/* Chart */}
+                                            {chartData.length > 1 && (
+                                                <div className="space-y-3">
+                                                    <div className="flex items-center justify-between">
+                                                        <h4 className="text-sm font-semibold text-foreground">
+                                                            Evolução do Valor Corrigido
+                                                        </h4>
+                                                        <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={showBaseline}
+                                                                onChange={(e) => setShowBaseline(e.target.checked)}
+                                                                className="rounded border-input accent-emerald-600"
+                                                            />
+                                                            Mostrar valor original
+                                                        </label>
+                                                    </div>
+                                                    <div className="h-[250px] md:h-[320px] w-full">
+                                                        <ResponsiveContainer width="100%" height="100%">
+                                                            <AreaChart
+                                                                data={chartData}
+                                                                margin={{ top: 10, right: 10, bottom: 0, left: 0 }}
+                                                            >
+                                                                <defs>
+                                                                    <linearGradient id="correctedGrad" x1="0" y1="0" x2="0" y2="1">
+                                                                        <stop offset="5%" stopColor="hsl(160, 84%, 39%)" stopOpacity={0.25} />
+                                                                        <stop offset="95%" stopColor="hsl(160, 84%, 39%)" stopOpacity={0.02} />
+                                                                    </linearGradient>
+                                                                </defs>
+                                                                <CartesianGrid
+                                                                    strokeDasharray="3 3"
+                                                                    vertical={false}
+                                                                    stroke="hsl(var(--border))"
+                                                                />
+                                                                <XAxis
+                                                                    dataKey="month"
+                                                                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                                                                    tickLine={false}
+                                                                    axisLine={false}
+                                                                    interval="preserveStartEnd"
+                                                                />
+                                                                <YAxis
+                                                                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                                                                    tickLine={false}
+                                                                    axisLine={false}
+                                                                    tickFormatter={(v) => `R$${formatBRL(v)}`}
+                                                                    width={100}
+                                                                />
+                                                                <RechartsTooltip
+                                                                    contentStyle={{
+                                                                        backgroundColor: "hsl(var(--card))",
+                                                                        borderColor: "hsl(var(--border))",
+                                                                        borderRadius: "10px",
+                                                                        color: "hsl(var(--card-foreground))",
+                                                                        fontSize: "12px",
+                                                                        padding: "10px 14px",
+                                                                    }}
+                                                                    formatter={
+                                                                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                                                        ((value: any, name: any) => {
+                                                                            const v = Number(value ?? 0);
+                                                                            if (name === "corrected")
+                                                                                return [`R$ ${formatBRL(v)}`, "Valor corrigido"];
+                                                                            return [`R$ ${formatBRL(v)}`, "Valor original"];
+                                                                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                                                        }) as any
+                                                                    }
+                                                                    labelFormatter={(label) => `Mês: ${label}`}
+                                                                />
+                                                                {showBaseline && (
+                                                                    <Line
+                                                                        type="monotone"
+                                                                        dataKey="original"
+                                                                        name="original"
+                                                                        stroke="hsl(var(--muted-foreground))"
+                                                                        strokeWidth={1.5}
+                                                                        strokeDasharray="6 4"
+                                                                        dot={false}
+                                                                    />
+                                                                )}
+                                                                <Area
+                                                                    type="monotone"
+                                                                    dataKey="corrected"
+                                                                    name="corrected"
+                                                                    stroke="hsl(160, 84%, 39%)"
+                                                                    strokeWidth={2.5}
+                                                                    fill="url(#correctedGrad)"
+                                                                    dot={false}
+                                                                    activeDot={{
+                                                                        r: 5,
+                                                                        fill: "hsl(160, 84%, 39%)",
+                                                                        stroke: "#fff",
+                                                                        strokeWidth: 2,
+                                                                    }}
+                                                                />
+                                                            </AreaChart>
+                                                        </ResponsiveContainer>
+                                                    </div>
+                                                </div>
+                                            )}
 
-                                    {/* Pagination */}
-                                    {totalPages > 1 && (
-                                        <div className="flex items-center justify-between pt-1">
-                                            <p className="text-xs text-muted-foreground">
-                                                Mostrando {tablePage * ROWS_PER_PAGE + 1}–
-                                                {Math.min((tablePage + 1) * ROWS_PER_PAGE, result.monthlyBreakdown.length)} de{" "}
-                                                {result.monthlyBreakdown.length} meses
-                                            </p>
-                                            <div className="flex gap-1">
-                                                <button
-                                                    type="button"
-                                                    disabled={tablePage === 0}
-                                                    onClick={() => setTablePage(p => p - 1)}
-                                                    className="px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-background
-                                                        hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                                                >
-                                                    ← Anterior
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    disabled={tablePage >= totalPages - 1}
-                                                    onClick={() => setTablePage(p => p + 1)}
-                                                    className="px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-background
-                                                        hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                                                >
-                                                    Próxima →
-                                                </button>
-                                            </div>
+                                            {/* Monthly Breakdown Table */}
+                                            {result.monthlyBreakdown.length > 0 && (
+                                                <div className="space-y-3">
+                                                    <h4 className="text-sm font-semibold text-foreground">
+                                                        Detalhamento Mês a Mês
+                                                    </h4>
+                                                    <div className="overflow-x-auto rounded-lg border">
+                                                        <table className="w-full text-left text-sm">
+                                                            <thead className="bg-muted/50 text-muted-foreground text-xs uppercase">
+                                                                <tr className="border-b">
+                                                                    <th className="p-3 font-medium min-w-[100px]">Mês/Ano</th>
+                                                                    <th className="p-3 font-medium text-right min-w-[100px]">IPCA (%)</th>
+                                                                    <th className="p-3 font-medium text-right min-w-[120px] hidden sm:table-cell">Fator</th>
+                                                                    <th className="p-3 font-medium text-right min-w-[140px]">Valor corrigido</th>
+                                                                    <th className="p-3 font-medium text-right min-w-[120px] hidden md:table-cell">Variação (R$)</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="divide-y">
+                                                                {paginatedRows.map((row) => (
+                                                                    <tr
+                                                                        key={row.month}
+                                                                        className="hover:bg-muted/30 transition-colors"
+                                                                    >
+                                                                        <td className="p-3 font-medium">{formatMonthLabel(row.month)}</td>
+                                                                        <td className={`p-3 text-right tabular-nums ${row.ipcaPercent >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                                                                            {row.ipcaPercent.toFixed(2).replace(".", ",")}%
+                                                                        </td>
+                                                                        <td className="p-3 text-right tabular-nums text-muted-foreground hidden sm:table-cell">
+                                                                            {row.factor.toFixed(6).replace(".", ",")}
+                                                                        </td>
+                                                                        <td className="p-3 text-right tabular-nums font-medium">
+                                                                            R$ {formatBRL(row.valueAtMonth)}
+                                                                        </td>
+                                                                        <td className={`p-3 text-right tabular-nums hidden md:table-cell ${row.deltaMonth >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                                                                            {row.deltaMonth >= 0 ? "+" : ""}R$ {formatBRL(row.deltaMonth)}
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+
+                                                    {/* Pagination */}
+                                                    {totalPages > 1 && (
+                                                        <div className="flex items-center justify-between pt-1">
+                                                            <p className="text-xs text-muted-foreground">
+                                                                Mostrando {tablePage * ROWS_PER_PAGE + 1}–
+                                                                {Math.min((tablePage + 1) * ROWS_PER_PAGE, result.monthlyBreakdown.length)} de{" "}
+                                                                {result.monthlyBreakdown.length} meses
+                                                            </p>
+                                                            <div className="flex gap-1">
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={tablePage === 0}
+                                                                    onClick={() => setTablePage(p => p - 1)}
+                                                                    className="px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-background
+                                                                        hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                                                >
+                                                                    ← Anterior
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={tablePage >= totalPages - 1}
+                                                                    onClick={() => setTablePage(p => p + 1)}
+                                                                    className="px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-background
+                                                                        hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                                                >
+                                                                    Próxima →
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    <p className="text-xs text-center text-muted-foreground md:hidden">← Deslize para ver mais →</p>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
-
-                                    <p className="text-xs text-center text-muted-foreground md:hidden">← Deslize para ver mais →</p>
                                 </div>
                             )}
                         </div>
