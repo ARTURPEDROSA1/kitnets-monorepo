@@ -210,7 +210,7 @@ export function IPCACalculator({ data }: IPCACalculatorProps) {
                 end: latestMonth,
             },
             {
-                label: `Ano ${currentYear}`,
+                label: "Esse Ano",
                 start: `${currentYear}-01` < earliestMonth ? earliestMonth : `${currentYear}-01`,
                 end: latestMonth,
             },
