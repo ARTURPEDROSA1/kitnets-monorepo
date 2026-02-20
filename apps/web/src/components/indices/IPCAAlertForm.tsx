@@ -128,7 +128,7 @@ export function IPCAAlertForm({ indexCode, lang, variant = "default" }: IPCAAler
                         <p className="text-xs md:text-sm text-muted-foreground">
                             Quer ser avisado assim que o novo {indexCode} for divulgado? Cadastre seu nome e receba gratuitamente:
                         </p>
-                        <ul className="space-y-1">
+                        <ul className="grid grid-cols-2 gap-x-4 gap-y-1">
                             {[
                                 `${indexCode} do mês`,
                                 `${indexCode} acumulado no ano`,
