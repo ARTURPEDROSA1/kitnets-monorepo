@@ -126,12 +126,6 @@ export async function POST(request: Request) {
         if (body.email?.trim() && !validateEmail(body.email)) {
             errors.email = 'E-mail inválido.';
         }
-        if (body.additional_phone?.trim() && !validatePhone(body.additional_phone)) {
-            errors.additional_phone = 'Telefone adicional inválido.';
-        }
-        if (body.whatsapp_phone?.trim() && !validatePhone(body.whatsapp_phone)) {
-            errors.whatsapp_phone = 'WhatsApp inválido.';
-        }
         if (body.website?.trim() && !validateWebsite(body.website)) {
             errors.website = 'Website inválido.';
         }
@@ -226,12 +220,13 @@ export async function POST(request: Request) {
                 ? body.agency_id.trim()
                 : null,
             main_phone: parsePhoneToE164(body.main_phone),
+            main_phone_whatsapp: body.main_phone_whatsapp === true,
             additional_phone: body.additional_phone?.trim()
                 ? parsePhoneToE164(body.additional_phone)
                 : null,
-            whatsapp_phone: body.whatsapp_phone?.trim()
-                ? parsePhoneToE164(body.whatsapp_phone)
-                : null,
+            additional_phone_whatsapp: body.additional_phone?.trim()
+                ? (body.additional_phone_whatsapp === true)
+                : false,
             email: body.email?.trim() ? normalizeEmail(body.email) : null,
             website: body.website?.trim() ? normalizeWebsite(body.website) : null,
             notes: body.notes?.trim() || null,

@@ -163,39 +163,46 @@ export default function AgentProfileCard({ agent, onEdit, onDelete, onToggleStat
 
                             <div className="flex items-start gap-3">
                                 <Phone className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
-                                <div>
+                                <div className="flex-1">
                                     <p className="text-xs text-muted-foreground">Telefone principal</p>
-                                    <p className="text-sm font-medium text-foreground">
-                                        {formatPhone(agent.main_phone)}
-                                    </p>
+                                    {agent.main_phone_whatsapp ? (
+                                        <a
+                                            href={`https://wa.me/${agent.main_phone.replace(/\D/g, '')}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-sm font-medium text-green-600 dark:text-green-400 hover:underline inline-flex items-center gap-1"
+                                        >
+                                            <MessageCircle className="w-3.5 h-3.5" />
+                                            {formatPhone(agent.main_phone)}
+                                        </a>
+                                    ) : (
+                                        <p className="text-sm font-medium text-foreground">
+                                            {formatPhone(agent.main_phone)}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
 
                             {agent.additional_phone && (
                                 <div className="flex items-start gap-3">
                                     <Phone className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
-                                    <div>
+                                    <div className="flex-1">
                                         <p className="text-xs text-muted-foreground">Telefone adicional</p>
-                                        <p className="text-sm font-medium text-foreground">
-                                            {formatPhone(agent.additional_phone)}
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
-
-                            {agent.whatsapp_phone && (
-                                <div className="flex items-start gap-3">
-                                    <MessageCircle className="w-4 h-4 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
-                                    <div>
-                                        <p className="text-xs text-muted-foreground">WhatsApp</p>
-                                        <a
-                                            href={`https://wa.me/${agent.whatsapp_phone.replace(/\D/g, '')}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-sm font-medium text-green-600 dark:text-green-400 hover:underline"
-                                        >
-                                            {formatPhone(agent.whatsapp_phone)}
-                                        </a>
+                                        {agent.additional_phone_whatsapp ? (
+                                            <a
+                                                href={`https://wa.me/${agent.additional_phone.replace(/\D/g, '')}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-sm font-medium text-green-600 dark:text-green-400 hover:underline inline-flex items-center gap-1"
+                                            >
+                                                <MessageCircle className="w-3.5 h-3.5" />
+                                                {formatPhone(agent.additional_phone)}
+                                            </a>
+                                        ) : (
+                                            <p className="text-sm font-medium text-foreground">
+                                                {formatPhone(agent.additional_phone)}
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
                             )}
