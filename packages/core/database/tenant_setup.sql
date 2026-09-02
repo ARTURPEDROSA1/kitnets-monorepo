@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS public.tenants (
     full_name TEXT NOT NULL,
     cpf TEXT NOT NULL,                              -- Digits only: "12345678901"
     main_phone TEXT NOT NULL,                       -- E.164: "+5531999999999"
-    email TEXT NOT NULL,
+    email TEXT,
 
     -- Personal info (optional)
     date_of_birth DATE,

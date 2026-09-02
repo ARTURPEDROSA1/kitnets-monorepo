@@ -11,7 +11,7 @@ export interface Tenant {
     full_name: string;
     cpf: string;                          // Digits only: "12345678901"
     main_phone: string;                   // E.164
-    email: string;
+    email: string | null;
 
     // Personal (optional)
     date_of_birth: string | null;         // ISO date
