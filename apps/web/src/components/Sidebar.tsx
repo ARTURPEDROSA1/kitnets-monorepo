@@ -315,6 +315,16 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                             </li>
                                             <li>
                                                 <Link
+                                                    href={lang === 'pt' ? '/contratos' : `/${lang}/contratos`}
+                                                    aria-current={isActive(lang === 'pt' ? '/contratos' : `/${lang}/contratos`) ? "page" : undefined}
+                                                    className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/contratos' : `/${lang}/contratos`) ? 'bg-accent' : ''}`}
+                                                >
+                                                    <FileText className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3">Contratos</span>
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <Link
                                                     href={lang === 'pt' ? '/profile' : `/${lang}/profile`}
                                                     aria-current={isActive(lang === 'pt' ? '/profile' : `/${lang}/profile`) ? "page" : undefined}
                                                     className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/profile' : `/${lang}/profile`) ? 'bg-accent' : ''}`}
