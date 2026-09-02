@@ -23,7 +23,7 @@ function getServiceSupabase() {
 
 /**
  * GET /api/agencies
- * Returns the current user's agency (with their role) or null.
+ * Returns all agencies associated with the current user (with their role).
  */
 export async function GET() {
     try {
@@ -42,35 +42,40 @@ export async function GET() {
             .maybeSingle();
 
         if (!profile) {
-            return NextResponse.json({ agency: null });
+            return NextResponse.json({ agencies: [] });
         }
 
-        // Find user's agency membership(s)
+        // Find ALL user's agency memberships
         const { data: memberships, error: memberError } = await supabase
             .from('agency_members')
             .select('agency_id, role')
             .eq('user_id', profile.id);
 
         if (memberError || !memberships || memberships.length === 0) {
-            return NextResponse.json({ agency: null });
+            return NextResponse.json({ agencies: [] });
         }
 
-        // For MVP, return the first agency (future: return list for multi-agency)
-        const membership = memberships[0];
-
-        const { data: agency, error: agencyError } = await supabase
+        // Fetch all agencies for user's memberships (exclude soft-deleted)
+        const agencyIds = memberships.map(m => m.agency_id);
+        const { data: agencies, error: agencyError } = await supabase
             .from('agencies')
             .select('*')
-            .eq('id', membership.agency_id)
-            .single();
+            .in('id', agencyIds)
+            .is('deleted_at', null)
+            .order('created_at', { ascending: false });
 
-        if (agencyError || !agency) {
-            return NextResponse.json({ agency: null });
+        if (agencyError || !agencies) {
+            return NextResponse.json({ agencies: [] });
         }
 
-        return NextResponse.json({
-            agency: { ...agency, role: membership.role },
-        });
+        // Merge role into each agency
+        const roleMap = new Map(memberships.map(m => [m.agency_id, m.role]));
+        const agenciesWithRole = agencies.map(a => ({
+            ...a,
+            role: roleMap.get(a.id) || 'VIEWER',
+        }));
+
+        return NextResponse.json({ agencies: agenciesWithRole });
     } catch (err) {
         console.error('[Agencies GET] Error:', err);
         return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
@@ -157,19 +162,7 @@ export async function POST(request: Request) {
             );
         }
 
-        // ── Check if user already has an agency ──────────────────────
-        const { data: existingMembership } = await supabase
-            .from('agency_members')
-            .select('agency_id')
-            .eq('user_id', profile.id)
-            .maybeSingle();
-
-        if (existingMembership) {
-            return NextResponse.json(
-                { error: 'Você já possui uma imobiliária cadastrada.' },
-                { status: 409 }
-            );
-        }
+        // Multi-agency: no single-agency constraint — users can create multiple agencies
 
         // ── CNPJ uniqueness check ────────────────────────────────────
         const cnpjDigits = body.cnpj?.trim() ? parseCNPJ(body.cnpj) : null;
@@ -178,6 +171,7 @@ export async function POST(request: Request) {
                 .from('agencies')
                 .select('id')
                 .eq('cnpj', cnpjDigits)
+                .is('deleted_at', null)
                 .maybeSingle();
 
             if (existingCnpj) {
