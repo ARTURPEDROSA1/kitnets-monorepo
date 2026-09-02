@@ -293,6 +293,44 @@ export default function ContratosContent({ lang }: { lang: string }) {
         });
     }, [leases, searchQuery, filterStatus, filterProperty, filterManagement]);
 
+    // ── Auto-calculate next adjustment date ───────────────────────
+
+    useEffect(() => {
+        if (form.start_date && form.adjustment_frequency && form.adjustment_index && form.adjustment_index !== 'NONE') {
+            const iso = parseDateBR(form.start_date);
+            if (iso) {
+                const freq = parseInt(form.adjustment_frequency, 10);
+                if (!isNaN(freq) && freq > 0) {
+                    const startDate = new Date(iso + 'T00:00:00');
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+
+                    // Find the next adjustment date that is in the future
+                    let nextDate = new Date(startDate);
+                    nextDate.setMonth(nextDate.getMonth() + freq);
+
+                    while (nextDate <= today) {
+                        nextDate.setMonth(nextDate.getMonth() + freq);
+                    }
+
+                    const dd = String(nextDate.getDate()).padStart(2, '0');
+                    const mm = String(nextDate.getMonth() + 1).padStart(2, '0');
+                    const yyyy = nextDate.getFullYear();
+                    const computed = `${dd}/${mm}/${yyyy}`;
+
+                    if (form.next_adjustment_date !== computed) {
+                        setForm(prev => ({ ...prev, next_adjustment_date: computed }));
+                    }
+                }
+            }
+        } else if (form.adjustment_index === 'NONE' || !form.adjustment_index) {
+            if (form.next_adjustment_date) {
+                setForm(prev => ({ ...prev, next_adjustment_date: '' }));
+            }
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [form.start_date, form.adjustment_frequency, form.adjustment_index]);
+
     // ── Form helpers ──────────────────────────────────────────────
 
     const toggleSection = (key: string) => {
@@ -975,12 +1013,15 @@ export default function ContratosContent({ lang }: { lang: string }) {
                         <Label>Próximo Reajuste</Label>
                         <Input
                             value={form.next_adjustment_date}
-                            onChange={e => updateForm('next_adjustment_date', maskDate(e.target.value))}
-                            placeholder="DD/MM/AAAA"
-                            maxLength={10}
-                            className={errors.next_adjustment_date ? 'border-red-500' : ''}
+                            readOnly
+                            placeholder={form.adjustment_index && form.adjustment_index !== 'NONE' ? 'Calculado automaticamente' : 'Selecione um índice de reajuste'}
+                            className="bg-muted/50 cursor-default"
                         />
-                        {errors.next_adjustment_date && <p className="mt-1 text-xs text-red-500">{errors.next_adjustment_date}</p>}
+                        <p className="mt-1 text-xs text-muted-foreground">
+                            {form.next_adjustment_date
+                                ? 'Calculado automaticamente a partir da data de início + frequência.'
+                                : 'Preencha a data de início e selecione um índice para calcular.'}
+                        </p>
                     </div>
                 </FormSection>
 
