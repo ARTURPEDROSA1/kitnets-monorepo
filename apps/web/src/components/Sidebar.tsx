@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@kitnets/ui";
 import { SignOutButton, useAuth } from "@clerk/nextjs";
-import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Rocket, HardHat, Briefcase, Building2, User, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart, ArrowLeftRight, FileText, AlertCircle, Plus, Minus, Gem, X } from "lucide-react";
+import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Rocket, HardHat, Briefcase, Building2, User, Users, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart, ArrowLeftRight, FileText, AlertCircle, Plus, Minus, Gem, X } from "lucide-react";
 import { PropertyFilters } from "./PropertyFilters";
 
 import { useTheme } from "next-themes";
@@ -291,6 +291,16 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                                 >
                                                     <Building2 className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                     <span className="ms-3">Imobiliária</span>
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <Link
+                                                    href={lang === 'pt' ? '/corretores' : `/${lang}/corretores`}
+                                                    aria-current={isActive(lang === 'pt' ? '/corretores' : `/${lang}/corretores`) ? "page" : undefined}
+                                                    className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/corretores' : `/${lang}/corretores`) ? 'bg-accent' : ''}`}
+                                                >
+                                                    <Users className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3">Corretores</span>
                                                 </Link>
                                             </li>
                                             <li>
