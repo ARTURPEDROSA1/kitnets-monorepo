@@ -34,8 +34,9 @@ CREATE TABLE IF NOT EXISTS public.agents (
 
     -- Contact
     main_phone TEXT NOT NULL,                        -- E.164: "+5531999999999"
+    main_phone_whatsapp BOOLEAN NOT NULL DEFAULT FALSE,
     additional_phone TEXT,
-    whatsapp_phone TEXT,                             -- E.164 (separate from main phone)
+    additional_phone_whatsapp BOOLEAN NOT NULL DEFAULT FALSE,
     email TEXT,
     website TEXT,                                    -- Normalized: "https://..."
 
@@ -116,3 +117,11 @@ COMMENT ON COLUMN public.agents.agency_id IS 'FK to agencies. SET NULL on agency
 COMMENT ON COLUMN public.agents.cpf IS 'Brazilian CPF, digits only (11 chars)';
 COMMENT ON COLUMN public.agents.creci_number IS 'CRECI registration number';
 COMMENT ON COLUMN public.agents.creci_state IS 'State (UF) of CRECI registration';
+COMMENT ON COLUMN public.agents.main_phone_whatsapp IS 'True if main_phone is also the WhatsApp number';
+COMMENT ON COLUMN public.agents.additional_phone_whatsapp IS 'True if additional_phone is also a WhatsApp number';
+
+-- ── Migration: if upgrading from earlier schema that had whatsapp_phone ────────
+-- Run this block only if the column exists:
+-- ALTER TABLE public.agents DROP COLUMN IF EXISTS whatsapp_phone;
+-- ALTER TABLE public.agents ADD COLUMN IF NOT EXISTS main_phone_whatsapp BOOLEAN NOT NULL DEFAULT FALSE;
+-- ALTER TABLE public.agents ADD COLUMN IF NOT EXISTS additional_phone_whatsapp BOOLEAN NOT NULL DEFAULT FALSE;

@@ -22,8 +22,9 @@ export interface Agent {
 
     // Contact
     main_phone: string;                   // E.164
+    main_phone_whatsapp: boolean;
     additional_phone: string | null;
-    whatsapp_phone: string | null;        // E.164
+    additional_phone_whatsapp: boolean;
     email: string | null;
     website: string | null;
 
@@ -50,8 +51,9 @@ export interface AgentFormData {
     agent_type: AgentType;
     agency_id: string;                    // '' when autonomous
     main_phone: string;
+    main_phone_whatsapp: boolean;
     additional_phone: string;
-    whatsapp_phone: string;
+    additional_phone_whatsapp: boolean;
     email: string;
     website: string;
     notes: string;

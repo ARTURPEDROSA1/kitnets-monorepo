@@ -61,8 +61,9 @@ function getEmptyFormData(): AgentFormData {
         agent_type: 'AUTONOMO',
         agency_id: '',
         main_phone: '',
+        main_phone_whatsapp: false,
         additional_phone: '',
-        whatsapp_phone: '',
+        additional_phone_whatsapp: false,
         email: '',
         website: '',
         notes: '',
@@ -79,8 +80,9 @@ function agentToFormData(agent: AgentWithAgency): AgentFormData {
         agent_type: agent.agent_type || 'AUTONOMO',
         agency_id: agent.agency_id || '',
         main_phone: formatPhone(agent.main_phone),
+        main_phone_whatsapp: agent.main_phone_whatsapp ?? false,
         additional_phone: agent.additional_phone ? formatPhone(agent.additional_phone) : '',
-        whatsapp_phone: agent.whatsapp_phone ? formatPhone(agent.whatsapp_phone) : '',
+        additional_phone_whatsapp: agent.additional_phone_whatsapp ?? false,
         email: agent.email || '',
         website: agent.website?.replace(/^https?:\/\//, '') || '',
         notes: agent.notes || '',
@@ -227,10 +229,6 @@ export default function CorretoresContent({ lang }: CorretoresContentProps) {
 
         if (form.additional_phone.trim() && !validatePhone(form.additional_phone)) {
             errs.additional_phone = 'Telefone inválido.';
-        }
-
-        if (form.whatsapp_phone.trim() && !validatePhone(form.whatsapp_phone)) {
-            errs.whatsapp_phone = 'WhatsApp inválido.';
         }
 
         if (form.website.trim() && !validateWebsite(form.website)) {
@@ -586,9 +584,9 @@ export default function CorretoresContent({ lang }: CorretoresContentProps) {
                                         </div>
 
                                         {/* WhatsApp / Phone link */}
-                                        {agent.whatsapp_phone ? (
+                                        {agent.main_phone_whatsapp ? (
                                             <a
-                                                href={`https://wa.me/${agent.whatsapp_phone.replace(/\D/g, '')}`}
+                                                href={`https://wa.me/${agent.main_phone.replace(/\D/g, '')}`}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 onClick={(e) => e.stopPropagation()}
@@ -596,7 +594,7 @@ export default function CorretoresContent({ lang }: CorretoresContentProps) {
                                                 title="Abrir WhatsApp"
                                             >
                                                 <MessageCircle className="w-4 h-4" />
-                                                <span>{formatPhone(agent.whatsapp_phone)}</span>
+                                                <span>{formatPhone(agent.main_phone)}</span>
                                             </a>
                                         ) : (
                                             <span className="hidden sm:inline-flex items-center gap-1.5 shrink-0 text-sm text-muted-foreground">
@@ -983,9 +981,24 @@ export default function CorretoresContent({ lang }: CorretoresContentProps) {
                     <div className="space-y-4">
                         {/* Main phone */}
                         <div id="field-main_phone">
-                            <Label htmlFor="agent-phone">
-                                Telefone principal <span className="text-red-500">*</span>
-                            </Label>
+                            <div className="flex items-center justify-between mb-1">
+                                <Label htmlFor="agent-phone">
+                                    Telefone principal <span className="text-red-500">*</span>
+                                </Label>
+                                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                                    <input
+                                        type="checkbox"
+                                        id="agent-phone-whatsapp"
+                                        checked={form.main_phone_whatsapp}
+                                        onChange={(e) => updateField('main_phone_whatsapp', e.target.checked)}
+                                        className="w-4 h-4 rounded accent-green-600"
+                                    />
+                                    <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                                        <MessageCircle className="w-3.5 h-3.5 text-green-600" />
+                                        WhatsApp
+                                    </span>
+                                </label>
+                            </div>
                             <Input
                                 id="agent-phone"
                                 value={form.main_phone}
@@ -999,35 +1012,35 @@ export default function CorretoresContent({ lang }: CorretoresContentProps) {
 
                         {/* Additional phone */}
                         <div id="field-additional_phone">
-                            <Label htmlFor="agent-phone2">Telefone adicional</Label>
+                            <div className="flex items-center justify-between mb-1">
+                                <Label htmlFor="agent-phone2">Telefone adicional</Label>
+                                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                                    <input
+                                        type="checkbox"
+                                        id="agent-phone2-whatsapp"
+                                        checked={form.additional_phone_whatsapp}
+                                        onChange={(e) => updateField('additional_phone_whatsapp', e.target.checked)}
+                                        className="w-4 h-4 rounded accent-green-600"
+                                        disabled={!form.additional_phone.trim()}
+                                    />
+                                    <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                                        <MessageCircle className="w-3.5 h-3.5 text-green-600" />
+                                        WhatsApp
+                                    </span>
+                                </label>
+                            </div>
                             <Input
                                 id="agent-phone2"
                                 value={form.additional_phone}
-                                onChange={(e) => handleMaskedInput('additional_phone', e.target.value, maskPhone)}
+                                onChange={(e) => {
+                                    handleMaskedInput('additional_phone', e.target.value, maskPhone);
+                                    if (!e.target.value.trim()) updateField('additional_phone_whatsapp', false);
+                                }}
                                 placeholder="(31) 3561-3173 (opcional)"
                                 className={cn(errors.additional_phone && 'border-red-500')}
                                 maxLength={15}
                             />
                             {errors.additional_phone && <p className="text-xs text-red-500 mt-1">{errors.additional_phone}</p>}
-                        </div>
-
-                        {/* WhatsApp */}
-                        <div id="field-whatsapp_phone">
-                            <Label htmlFor="agent-whatsapp">
-                                <span className="inline-flex items-center gap-1.5">
-                                    <MessageCircle className="w-4 h-4 text-green-600" />
-                                    WhatsApp
-                                </span>
-                            </Label>
-                            <Input
-                                id="agent-whatsapp"
-                                value={form.whatsapp_phone}
-                                onChange={(e) => handleMaskedInput('whatsapp_phone', e.target.value, maskPhone)}
-                                placeholder="(31) 99999-9999 (opcional)"
-                                className={cn(errors.whatsapp_phone && 'border-red-500')}
-                                maxLength={15}
-                            />
-                            {errors.whatsapp_phone && <p className="text-xs text-red-500 mt-1">{errors.whatsapp_phone}</p>}
                         </div>
 
                         {/* Email */}
