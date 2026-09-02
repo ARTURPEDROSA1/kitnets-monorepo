@@ -38,7 +38,8 @@ export async function GET() {
         }
 
         // Fetch all dropdown data in parallel
-        const [propertiesRes, tenantsRes, agenciesRes, agentsRes] = await Promise.all([
+        // NOTE: Agencies use a membership model (agency_members), not a direct user_id
+        const [propertiesRes, tenantsRes, membershipsRes, agentsRes] = await Promise.all([
             supabase
                 .from('properties')
                 .select('id, name')
@@ -51,11 +52,9 @@ export async function GET() {
                 .is('deleted_at', null)
                 .order('full_name', { ascending: true }),
             supabase
-                .from('agencies')
-                .select('id, name')
-                .eq('user_id', profile.id)
-                .is('deleted_at', null)
-                .order('name', { ascending: true }),
+                .from('agency_members')
+                .select('agency_id')
+                .eq('user_id', profile.id),
             supabase
                 .from('agents')
                 .select('id, full_name, agency_id')
@@ -64,10 +63,24 @@ export async function GET() {
                 .order('full_name', { ascending: true }),
         ]);
 
+        // Fetch agencies from membership IDs
+        let agenciesList: { id: string; name: string }[] = [];
+        const membershipData = membershipsRes.data || [];
+        if (membershipData.length > 0) {
+            const agencyIds = membershipData.map((m: { agency_id: string }) => m.agency_id);
+            const { data: agenciesData } = await supabase
+                .from('agencies')
+                .select('id, name')
+                .in('id', agencyIds)
+                .is('deleted_at', null)
+                .order('name', { ascending: true });
+            agenciesList = agenciesData || [];
+        }
+
         return NextResponse.json({
             properties: propertiesRes.data || [],
             tenants: tenantsRes.data || [],
-            agencies: agenciesRes.data || [],
+            agencies: agenciesList,
             agents: agentsRes.data || [],
         });
     } catch (err) {
