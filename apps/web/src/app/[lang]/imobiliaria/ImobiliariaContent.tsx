@@ -20,6 +20,10 @@ import {
     ChevronDown,
     ChevronUp,
     X,
+    Upload,
+    Trash2,
+    ImageIcon,
+    ExternalLink,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
@@ -151,6 +155,12 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
     const [cepLoading, setCepLoading] = useState(false);
     const [cepError, setCepError] = useState<string | null>(null);
     const [cepFilled, setCepFilled] = useState(false);
+
+    // Logo upload state
+    const [logoPreview, setLogoPreview] = useState<string | null>(null);
+    const [logoFile, setLogoFile] = useState<File | null>(null);
+    const [logoUploading, setLogoUploading] = useState(false);
+    const [logoError, setLogoError] = useState<string | null>(null);
 
     // ── Fetch agencies on mount ──────────────────────────────────────
 
@@ -290,6 +300,32 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
         return errs;
     }, [form]);
 
+    // ── Logo upload helper ───────────────────────────────────────────
+
+    const uploadLogo = useCallback(async (agencyId: string) => {
+        if (!logoFile) return;
+
+        setLogoUploading(true);
+        try {
+            const formData = new FormData();
+            formData.append('file', logoFile);
+
+            const res = await fetch(`/api/agencies/${agencyId}/logo`, {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                setLogoError(data.error || 'Erro ao fazer upload do logo.');
+            }
+        } catch {
+            setLogoError('Erro de conexão ao fazer upload do logo.');
+        } finally {
+            setLogoUploading(false);
+        }
+    }, [logoFile]);
+
     // ── Submit handler ───────────────────────────────────────────────
 
     const handleSubmit = useCallback(async (e: React.FormEvent) => {
@@ -337,6 +373,12 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
             }
 
             setSubmitSuccess(true);
+
+            // Upload logo if a new file was selected
+            if (logoFile && data.agency?.id) {
+                await uploadLogo(data.agency.id);
+            }
+
             // Refetch agencies list to get updated data
             await fetchAgencies();
         } catch {
@@ -344,7 +386,7 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
         } finally {
             setSubmitting(false);
         }
-    }, [form, validate, pageState, editingAgency, fetchAgencies]);
+    }, [form, validate, pageState, editingAgency, fetchAgencies, logoFile, uploadLogo]);
 
     // ── Navigation handlers ──────────────────────────────────────────
 
@@ -355,6 +397,9 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
         setSubmitSuccess(false);
         setCepFilled(false);
         setEditingAgency(null);
+        setLogoPreview(null);
+        setLogoFile(null);
+        setLogoError(null);
         setPageState('form');
     }, []);
 
@@ -365,8 +410,46 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
         setSubmitSuccess(false);
         setCepFilled(false);
         setEditingAgency(agency);
+        setLogoPreview(agency.logo_url || null);
+        setLogoFile(null);
+        setLogoError(null);
         setPageState('editing');
     }, []);
+
+    // ── Logo upload handlers ─────────────────────────────────────────
+
+    const handleLogoSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'];
+        if (!allowedTypes.includes(file.type)) {
+            setLogoError('Formato não suportado. Use JPG, PNG, WebP ou SVG.');
+            return;
+        }
+        if (file.size > 2 * 1024 * 1024) {
+            setLogoError('Arquivo muito grande. Máximo 2 MB.');
+            return;
+        }
+
+        setLogoFile(file);
+        setLogoPreview(URL.createObjectURL(file));
+        setLogoError(null);
+    }, []);
+
+    const removeLogo = useCallback(async () => {
+        if (editingAgency?.id && editingAgency.logo_url) {
+            // Remove from server
+            try {
+                await fetch(`/api/agencies/${editingAgency.id}/logo`, { method: 'DELETE' });
+            } catch {
+                // Ignore — we still clear locally
+            }
+        }
+        setLogoPreview(null);
+        setLogoFile(null);
+        setLogoError(null);
+    }, [editingAgency]);
 
     const cancelForm = useCallback(() => {
         setErrors({});
@@ -515,6 +598,32 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                                                 <ChevronDown className="w-5 h-5" />
                                             )}
                                         </div>
+
+                                        {/* Logo thumbnail */}
+                                        {agency.logo_url ? (
+                                            agency.website ? (
+                                                <a
+                                                    href={agency.website}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="shrink-0 hidden sm:block"
+                                                    title={`Visitar ${agency.website.replace(/^https?:\/\//, '')}`}
+                                                >
+                                                    <img
+                                                        src={agency.logo_url}
+                                                        alt={`Logo ${agency.trade_name || agency.name}`}
+                                                        className="w-10 h-10 rounded-lg object-contain border border-border hover:border-primary transition-colors"
+                                                    />
+                                                </a>
+                                            ) : (
+                                                <img
+                                                    src={agency.logo_url}
+                                                    alt={`Logo ${agency.trade_name || agency.name}`}
+                                                    className="w-10 h-10 rounded-lg object-contain border border-border shrink-0 hidden sm:block"
+                                                />
+                                            )
+                                        ) : null}
 
                                         {/* Agency info */}
                                         <div className="flex-1 min-w-0">
@@ -690,6 +799,65 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                     </div>
 
                     <div className="space-y-4">
+                        {/* Logo Upload */}
+                        <div>
+                            <Label>Logo da imobiliária</Label>
+                            <div className="mt-2 flex items-center gap-4">
+                                {logoPreview ? (
+                                    <div className="relative group">
+                                        <img
+                                            src={logoPreview}
+                                            alt="Logo preview"
+                                            className="w-20 h-20 rounded-xl object-contain border border-border bg-muted/30"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={removeLogo}
+                                            className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-red-600"
+                                            title="Remover logo"
+                                        >
+                                            <X className="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="w-20 h-20 rounded-xl border-2 border-dashed border-border flex items-center justify-center bg-muted/30">
+                                        <ImageIcon className="w-8 h-8 text-muted-foreground/50" />
+                                    </div>
+                                )}
+                                <div className="flex-1">
+                                    <label
+                                        htmlFor="logo-upload"
+                                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border border-input bg-background hover:bg-accent cursor-pointer transition-colors"
+                                    >
+                                        <Upload className="w-4 h-4" />
+                                        {logoPreview ? 'Trocar logo' : 'Escolher arquivo'}
+                                    </label>
+                                    <input
+                                        id="logo-upload"
+                                        type="file"
+                                        accept="image/jpeg,image/png,image/webp,image/svg+xml"
+                                        onChange={handleLogoSelect}
+                                        className="hidden"
+                                    />
+                                    <p className="text-xs text-muted-foreground mt-1.5">
+                                        JPG, PNG, WebP ou SVG. Máx. 2 MB.
+                                    </p>
+                                    {logoError && (
+                                        <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                                            <AlertTriangle className="w-3 h-3" />
+                                            {logoError}
+                                        </p>
+                                    )}
+                                    {logoUploading && (
+                                        <p className="text-xs text-primary mt-1 flex items-center gap-1">
+                                            <Loader2 className="w-3 h-3 animate-spin" />
+                                            Enviando logo...
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
                         {/* Name */}
                         <div id="field-name">
                             <Label htmlFor="agency-name">
