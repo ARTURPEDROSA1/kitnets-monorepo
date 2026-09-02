@@ -16,10 +16,15 @@ import {
     CheckCircle2,
     AlertTriangle,
     MessageCircle,
+    Plus,
+    ChevronDown,
+    ChevronUp,
+    X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import AgencyProfileCard from '@/components/imobiliaria/AgencyProfileCard';
+import { Badge } from '@/components/ui/badge';
 import type { AgencyWithRole, AgencyFormData } from '@/types/agency';
 import {
     maskCNPJ,
@@ -40,7 +45,7 @@ import {
 
 // ── Types ────────────────────────────────────────────────────────────
 
-type PageState = 'loading' | 'form' | 'profile' | 'editing';
+type PageState = 'loading' | 'list' | 'form' | 'editing';
 
 interface FieldErrors {
     [key: string]: string;
@@ -98,6 +103,21 @@ function agencyToFormData(agency: AgencyWithRole): AgencyFormData {
     };
 }
 
+function getStatusLabel(status: string): { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' } {
+    switch (status) {
+        case 'ACTIVE':
+            return { label: 'Ativa', variant: 'default' };
+        case 'VERIFIED':
+            return { label: 'Verificada', variant: 'default' };
+        case 'DRAFT':
+            return { label: 'Rascunho', variant: 'secondary' };
+        case 'SUSPENDED':
+            return { label: 'Suspensa', variant: 'destructive' };
+        default:
+            return { label: status, variant: 'outline' };
+    }
+}
+
 // ── Component ────────────────────────────────────────────────────────
 
 interface ImobiliariaContentProps {
@@ -109,7 +129,16 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
 
     // Page state
     const [pageState, setPageState] = useState<PageState>('loading');
-    const [agency, setAgency] = useState<AgencyWithRole | null>(null);
+    const [agencies, setAgencies] = useState<AgencyWithRole[]>([]);
+    const [editingAgency, setEditingAgency] = useState<AgencyWithRole | null>(null);
+
+    // Accordion state — which agency is expanded
+    const [expandedId, setExpandedId] = useState<string | null>(null);
+
+    // Delete confirmation
+    const [deletingAgency, setDeletingAgency] = useState<AgencyWithRole | null>(null);
+    const [deleteLoading, setDeleteLoading] = useState(false);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
 
     // Form state
     const [form, setForm] = useState<AgencyFormData>(getEmptyFormData());
@@ -123,26 +152,30 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
     const [cepError, setCepError] = useState<string | null>(null);
     const [cepFilled, setCepFilled] = useState(false);
 
-    // ── Fetch agency on mount ────────────────────────────────────────
+    // ── Fetch agencies on mount ──────────────────────────────────────
+
+    const fetchAgencies = useCallback(async () => {
+        try {
+            const res = await fetch('/api/agencies');
+            if (!res.ok) throw new Error('Failed to fetch');
+            const data = await res.json();
+            setAgencies(data.agencies || []);
+            setPageState('list');
+        } catch (err) {
+            console.error('[Imobiliária] Error fetching agencies:', err);
+            setAgencies([]);
+            setPageState('list');
+        }
+    }, []);
 
     useEffect(() => {
-        async function fetchAgency() {
-            try {
-                const res = await fetch('/api/agencies');
-                if (!res.ok) throw new Error('Failed to fetch');
-                const data = await res.json();
-                if (data.agency) {
-                    setAgency(data.agency);
-                    setPageState('profile');
-                } else {
-                    setPageState('form');
-                }
-            } catch (err) {
-                console.error('[Imobiliária] Error fetching agency:', err);
-                setPageState('form');
-            }
-        }
-        fetchAgency();
+        fetchAgencies();
+    }, [fetchAgencies]);
+
+    // ── Accordion toggle ─────────────────────────────────────────────
+
+    const toggleExpand = useCallback((id: string) => {
+        setExpandedId(prev => prev === id ? null : id);
     }, []);
 
     // ── Form field handlers ──────────────────────────────────────────
@@ -265,7 +298,6 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
         const validationErrors = validate();
         if (Object.keys(validationErrors).length > 0) {
             setErrors(validationErrors);
-            // Scroll to first error
             const firstErrorField = Object.keys(validationErrors)[0];
             document.getElementById(`field-${firstErrorField}`)?.scrollIntoView({
                 behavior: 'smooth',
@@ -278,8 +310,8 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
         setSubmitError(null);
 
         try {
-            const isEditing = pageState === 'editing' && agency;
-            const url = isEditing ? `/api/agencies/${agency.id}` : '/api/agencies';
+            const isEditing = pageState === 'editing' && editingAgency;
+            const url = isEditing ? `/api/agencies/${editingAgency.id}` : '/api/agencies';
             const method = isEditing ? 'PUT' : 'POST';
 
             const res = await fetch(url, {
@@ -304,40 +336,90 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                 return;
             }
 
-            setAgency(data.agency);
             setSubmitSuccess(true);
-            setPageState('profile');
+            // Refetch agencies list to get updated data
+            await fetchAgencies();
         } catch {
             setSubmitError('Erro de conexão. Verifique sua internet e tente novamente.');
         } finally {
             setSubmitting(false);
         }
-    }, [form, validate, pageState, agency]);
+    }, [form, validate, pageState, editingAgency, fetchAgencies]);
 
-    // ── Edit mode handler ────────────────────────────────────────────
+    // ── Navigation handlers ──────────────────────────────────────────
 
-    const startEditing = useCallback(() => {
-        if (agency) {
-            setForm(agencyToFormData(agency));
-            setErrors({});
-            setSubmitError(null);
-            setSubmitSuccess(false);
-            setCepFilled(false);
-            setPageState('editing');
-        }
-    }, [agency]);
-
-    const cancelEditing = useCallback(() => {
+    const startAdding = useCallback(() => {
+        setForm(getEmptyFormData());
         setErrors({});
         setSubmitError(null);
-        if (agency) {
-            setPageState('profile');
-        } else {
-            router.push(`/${lang}/dashboard`);
-        }
-    }, [agency, router, lang]);
+        setSubmitSuccess(false);
+        setCepFilled(false);
+        setEditingAgency(null);
+        setPageState('form');
+    }, []);
 
-    // ── Check if form has all required fields for submit ──────────────
+    const startEditing = useCallback((agency: AgencyWithRole) => {
+        setForm(agencyToFormData(agency));
+        setErrors({});
+        setSubmitError(null);
+        setSubmitSuccess(false);
+        setCepFilled(false);
+        setEditingAgency(agency);
+        setPageState('editing');
+    }, []);
+
+    const cancelForm = useCallback(() => {
+        setErrors({});
+        setSubmitError(null);
+        setSubmitSuccess(false);
+        setEditingAgency(null);
+        setPageState('list');
+    }, []);
+
+    // ── Delete handlers ──────────────────────────────────────────────
+
+    const confirmDelete = useCallback((agency: AgencyWithRole) => {
+        setDeletingAgency(agency);
+        setDeleteError(null);
+    }, []);
+
+    const cancelDelete = useCallback(() => {
+        setDeletingAgency(null);
+        setDeleteError(null);
+    }, []);
+
+    const executeDelete = useCallback(async () => {
+        if (!deletingAgency) return;
+
+        setDeleteLoading(true);
+        setDeleteError(null);
+
+        try {
+            const res = await fetch(`/api/agencies/${deletingAgency.id}`, {
+                method: 'DELETE',
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                setDeleteError(data.error || 'Erro ao excluir imobiliária.');
+                return;
+            }
+
+            // Remove from local state
+            setAgencies(prev => prev.filter(a => a.id !== deletingAgency.id));
+            if (expandedId === deletingAgency.id) {
+                setExpandedId(null);
+            }
+            setDeletingAgency(null);
+        } catch {
+            setDeleteError('Erro de conexão. Tente novamente.');
+        } finally {
+            setDeleteLoading(false);
+        }
+    }, [deletingAgency, expandedId]);
+
+    // ── Check if form has all required fields ────────────────────────
 
     const isFormValid = form.name.trim() !== '' &&
         form.main_phone.trim() !== '' &&
@@ -363,17 +445,25 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
         );
     }
 
-    // Profile view
-    if (pageState === 'profile' && agency) {
+    // ── List view ────────────────────────────────────────────────────
+    if (pageState === 'list') {
         return (
             <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <div className="mb-6">
-                    <h1 className="text-3xl font-bold text-foreground">Imobiliária</h1>
-                    <p className="text-muted-foreground mt-1">
-                        Gerencie os dados da sua imobiliária.
-                    </p>
+                {/* Page Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+                    <div>
+                        <h1 className="text-3xl font-bold text-foreground">Imobiliárias</h1>
+                        <p className="text-muted-foreground mt-1">
+                            Gerencie suas imobiliárias cadastradas.
+                        </p>
+                    </div>
+                    <Button onClick={startAdding} className="shrink-0">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Adicionar imobiliária
+                    </Button>
                 </div>
 
+                {/* Success message */}
                 {submitSuccess && (
                     <div className="mb-6 flex items-center gap-2 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 px-4 py-3 rounded-xl text-sm">
                         <CheckCircle2 className="w-4 h-4 shrink-0" />
@@ -381,12 +471,164 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                     </div>
                 )}
 
-                <AgencyProfileCard agency={agency} onEdit={startEditing} />
+                {/* Empty state */}
+                {agencies.length === 0 ? (
+                    <div className="bg-card border border-border rounded-2xl p-12 text-center shadow-sm">
+                        <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                            <Building2 className="w-8 h-8 text-primary" />
+                        </div>
+                        <h2 className="text-lg font-semibold text-foreground mb-2">
+                            Nenhuma imobiliária cadastrada
+                        </h2>
+                        <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                            Cadastre sua primeira imobiliária para gerenciar imóveis, corretores e anúncios no Kitnets.com.
+                        </p>
+                        <Button onClick={startAdding}>
+                            <Plus className="w-4 h-4 mr-2" />
+                            Adicionar imobiliária
+                        </Button>
+                    </div>
+                ) : (
+                    /* Agency list */
+                    <div className="space-y-3">
+                        {agencies.map((agency) => {
+                            const isExpanded = expandedId === agency.id;
+                            const status = getStatusLabel(agency.status);
+                            const location = [agency.city, agency.state].filter(Boolean).join('/');
+                            const subtitle = [agency.trade_name, location].filter(Boolean).join(' — ');
+
+                            return (
+                                <div key={agency.id} className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm transition-shadow hover:shadow-md">
+                                    {/* Compact Row */}
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleExpand(agency.id)}
+                                        className="w-full flex items-center gap-3 p-4 sm:p-5 text-left hover:bg-accent/50 transition-colors cursor-pointer"
+                                        aria-expanded={isExpanded}
+                                        aria-controls={`agency-detail-${agency.id}`}
+                                    >
+                                        {/* Expand/collapse icon */}
+                                        <div className="shrink-0 text-muted-foreground">
+                                            {isExpanded ? (
+                                                <ChevronUp className="w-5 h-5" />
+                                            ) : (
+                                                <ChevronDown className="w-5 h-5" />
+                                            )}
+                                        </div>
+
+                                        {/* Agency info */}
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-semibold text-foreground truncate">
+                                                {agency.name}
+                                            </p>
+                                            {subtitle && (
+                                                <p className="text-sm text-muted-foreground truncate mt-0.5">
+                                                    {subtitle}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        {/* Status badge */}
+                                        <Badge variant={status.variant} className="shrink-0">
+                                            {status.label}
+                                        </Badge>
+                                    </button>
+
+                                    {/* Expanded detail card */}
+                                    {isExpanded && (
+                                        <div
+                                            id={`agency-detail-${agency.id}`}
+                                            className="border-t border-border p-4 sm:p-6"
+                                        >
+                                            <AgencyProfileCard
+                                                agency={agency}
+                                                onEdit={() => startEditing(agency)}
+                                                onDelete={() => confirmDelete(agency)}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+
+                {/* Delete confirmation modal */}
+                {deletingAgency && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        {/* Backdrop */}
+                        <div
+                            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                            onClick={cancelDelete}
+                        />
+
+                        {/* Modal */}
+                        <div className="relative bg-card border border-border rounded-2xl shadow-xl max-w-md w-full p-6 sm:p-8">
+                            <button
+                                type="button"
+                                onClick={cancelDelete}
+                                className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors"
+                                aria-label="Fechar"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+
+                            <div className="text-center mb-6">
+                                <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-950/50 flex items-center justify-center mx-auto mb-4">
+                                    <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
+                                </div>
+                                <h2 className="text-xl font-bold text-foreground mb-2">
+                                    Excluir imobiliária?
+                                </h2>
+                                <p className="text-muted-foreground text-sm">
+                                    Tem certeza de que deseja excluir{' '}
+                                    <span className="font-semibold text-foreground">
+                                        {deletingAgency.name}
+                                    </span>
+                                    ?
+                                </p>
+                            </div>
+
+                            {deleteError && (
+                                <div className="mb-4 flex items-center gap-2 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-3 py-2 rounded-lg text-sm">
+                                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                                    {deleteError}
+                                </div>
+                            )}
+
+                            <div className="flex gap-3">
+                                <Button
+                                    variant="outline"
+                                    className="flex-1"
+                                    onClick={cancelDelete}
+                                    disabled={deleteLoading}
+                                >
+                                    Cancelar
+                                </Button>
+                                <Button
+                                    variant="destructive"
+                                    className="flex-1"
+                                    onClick={executeDelete}
+                                    disabled={deleteLoading}
+                                >
+                                    {deleteLoading ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                            Excluindo...
+                                        </>
+                                    ) : (
+                                        'Excluir imobiliária'
+                                    )}
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         );
     }
 
-    // Registration / Edit form
+    // ── Registration / Edit form ─────────────────────────────────────
     const isEditing = pageState === 'editing';
 
     return (
@@ -419,37 +661,44 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                 {/* ── Section 1: Informações da imobiliária ──────────── */}
                 <section className="bg-card border border-border rounded-2xl p-6 sm:p-8 mb-6 shadow-sm">
                     <div className="flex items-center gap-3 mb-6">
-                        <div className="p-2 rounded-lg bg-primary/10">
+                        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                             <Building2 className="w-5 h-5 text-primary" />
                         </div>
-                        <h2 className="text-lg font-semibold text-foreground">Informações da imobiliária</h2>
+                        <div>
+                            <h2 className="text-lg font-semibold text-foreground">
+                                Informações da imobiliária
+                            </h2>
+                            <p className="text-xs text-muted-foreground">
+                                Razão social, nome fantasia e registros profissionais.
+                            </p>
+                        </div>
                     </div>
 
-                    <div className="space-y-5">
+                    <div className="space-y-4">
                         {/* Name */}
                         <div id="field-name">
                             <Label htmlFor="agency-name">
-                                Nome da imobiliária <span className="text-red-500">*</span>
+                                Razão social / Nome <span className="text-red-500">*</span>
                             </Label>
                             <Input
                                 id="agency-name"
                                 value={form.name}
                                 onChange={(e) => updateField('name', e.target.value)}
-                                placeholder="Ex: Imobiliária Central Ltda"
+                                placeholder="Nome completo da imobiliária"
                                 className={cn(errors.name && 'border-red-500')}
                                 maxLength={200}
                             />
                             {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
                         </div>
 
-                        {/* Trade Name */}
-                        <div>
+                        {/* Trade name */}
+                        <div id="field-trade_name">
                             <Label htmlFor="agency-trade-name">Nome fantasia</Label>
                             <Input
                                 id="agency-trade-name"
                                 value={form.trade_name}
                                 onChange={(e) => updateField('trade_name', e.target.value)}
-                                placeholder="Ex: Central Imóveis"
+                                placeholder="Nome fantasia (opcional)"
                                 maxLength={200}
                             />
                         </div>
@@ -462,7 +711,7 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                                 value={form.cnpj}
                                 onChange={(e) => handleMaskedInput('cnpj', e.target.value, maskCNPJ)}
                                 placeholder="00.000.000/0000-00"
-                                className={cn('font-mono', errors.cnpj && 'border-red-500')}
+                                className={cn(errors.cnpj && 'border-red-500')}
                                 maxLength={18}
                             />
                             {errors.cnpj && <p className="text-xs text-red-500 mt-1">{errors.cnpj}</p>}
@@ -470,17 +719,17 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
 
                         {/* CRECI */}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <div className="sm:col-span-1">
+                            <div id="field-creci_number">
                                 <Label htmlFor="agency-creci">Nº CRECI</Label>
                                 <Input
                                     id="agency-creci"
                                     value={form.creci_number}
                                     onChange={(e) => updateField('creci_number', e.target.value)}
-                                    placeholder="Ex: 12345"
+                                    placeholder="Ex: 6013"
                                     maxLength={20}
                                 />
                             </div>
-                            <div>
+                            <div id="field-creci_state">
                                 <Label htmlFor="agency-creci-state">UF CRECI</Label>
                                 <select
                                     id="agency-creci-state"
@@ -494,7 +743,7 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                                     ))}
                                 </select>
                             </div>
-                            <div>
+                            <div id="field-creci_type">
                                 <Label htmlFor="agency-creci-type">Tipo CRECI</Label>
                                 <select
                                     id="agency-creci-type"
@@ -503,84 +752,93 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                                 >
                                     <option value="">Selecione</option>
-                                    <option value="PJ">PJ (Pessoa Jurídica)</option>
-                                    <option value="PF">PF (Pessoa Física)</option>
+                                    <option value="PJ">Pessoa Jurídica (PJ)</option>
+                                    <option value="PF">Pessoa Física (PF)</option>
                                 </select>
                             </div>
                         </div>
                     </div>
                 </section>
 
-                {/* ── Section 2: Responsável ──────────────────────────── */}
+                {/* ── Section 2: Responsável ─────────────────────────── */}
                 <section className="bg-card border border-border rounded-2xl p-6 sm:p-8 mb-6 shadow-sm">
                     <div className="flex items-center gap-3 mb-6">
-                        <div className="p-2 rounded-lg bg-primary/10">
+                        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                             <User className="w-5 h-5 text-primary" />
                         </div>
-                        <h2 className="text-lg font-semibold text-foreground">Responsável</h2>
+                        <div>
+                            <h2 className="text-lg font-semibold text-foreground">Responsável</h2>
+                            <p className="text-xs text-muted-foreground">
+                                Nome do proprietário ou representante legal.
+                            </p>
+                        </div>
                     </div>
 
-                    <div>
-                        <Label htmlFor="agency-owner-name">Nome do responsável legal</Label>
+                    <div id="field-owner_name">
+                        <Label htmlFor="agency-owner">Nome do responsável</Label>
                         <Input
-                            id="agency-owner-name"
+                            id="agency-owner"
                             value={form.owner_name}
                             onChange={(e) => updateField('owner_name', e.target.value)}
-                            placeholder="Ex: João da Silva"
+                            placeholder="Nome completo do responsável"
                             maxLength={200}
                         />
-                        <p className="text-xs text-muted-foreground mt-1">
-                            Representante legal ou sócio administrador.
-                        </p>
                     </div>
                 </section>
 
-                {/* ── Section 3: Contato ──────────────────────────────── */}
+                {/* ── Section 3: Contato ────────────────────────────── */}
                 <section className="bg-card border border-border rounded-2xl p-6 sm:p-8 mb-6 shadow-sm">
                     <div className="flex items-center gap-3 mb-6">
-                        <div className="p-2 rounded-lg bg-primary/10">
+                        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                             <Phone className="w-5 h-5 text-primary" />
                         </div>
-                        <h2 className="text-lg font-semibold text-foreground">Contato</h2>
+                        <div>
+                            <h2 className="text-lg font-semibold text-foreground">Contato</h2>
+                            <p className="text-xs text-muted-foreground">
+                                Telefone, e-mail e website da imobiliária.
+                            </p>
+                        </div>
                     </div>
 
-                    <div className="space-y-5">
-                        {/* Main Phone */}
-                        <div id="field-main_phone">
-                            <Label htmlFor="agency-phone">
-                                Telefone principal <span className="text-red-500">*</span>
-                            </Label>
-                            <div className="flex items-center gap-3">
-                                <Input
-                                    id="agency-phone"
-                                    value={form.main_phone}
-                                    onChange={(e) => handleMaskedInput('main_phone', e.target.value, maskPhone)}
-                                    placeholder="(41) 99999-9999"
-                                    className={cn('flex-1', errors.main_phone && 'border-red-500')}
-                                    maxLength={15}
-                                />
-                                <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none whitespace-nowrap">
+                    <div className="space-y-4">
+                        {/* Main phone + WhatsApp */}
+                        <div>
+                            <div className="flex items-end gap-4">
+                                <div className="flex-1" id="field-main_phone">
+                                    <Label htmlFor="agency-phone">
+                                        Telefone principal <span className="text-red-500">*</span>
+                                    </Label>
+                                    <Input
+                                        id="agency-phone"
+                                        value={form.main_phone}
+                                        onChange={(e) => handleMaskedInput('main_phone', e.target.value, maskPhone)}
+                                        placeholder="(31) 99999-9999"
+                                        className={cn(errors.main_phone && 'border-red-500')}
+                                        maxLength={15}
+                                    />
+                                </div>
+                                <label className="flex items-center gap-2 pb-2 cursor-pointer whitespace-nowrap">
                                     <input
                                         type="checkbox"
-                                        checked={form.main_phone_whatsapp}
+                                        checked={form.main_phone_whatsapp as boolean}
                                         onChange={(e) => updateField('main_phone_whatsapp', e.target.checked)}
-                                        className="rounded border-input"
+                                        className="w-4 h-4 rounded border-input"
                                     />
                                     <MessageCircle className="w-4 h-4 text-green-600" />
-                                    WhatsApp
+                                    <span className="text-sm text-foreground">WhatsApp</span>
                                 </label>
                             </div>
                             {errors.main_phone && <p className="text-xs text-red-500 mt-1">{errors.main_phone}</p>}
                         </div>
 
-                        {/* Additional Phone */}
+                        {/* Additional phone */}
                         <div id="field-additional_phone">
                             <Label htmlFor="agency-phone2">Telefone adicional</Label>
                             <Input
                                 id="agency-phone2"
                                 value={form.additional_phone}
                                 onChange={(e) => handleMaskedInput('additional_phone', e.target.value, maskPhone)}
-                                placeholder="(41) 3333-4444"
+                                placeholder="(31) 3561-3173 (opcional)"
                                 className={cn(errors.additional_phone && 'border-red-500')}
                                 maxLength={15}
                             />
@@ -595,7 +853,7 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                                 type="email"
                                 value={form.email}
                                 onChange={(e) => updateField('email', e.target.value)}
-                                placeholder="contato@imobiliaria.com.br"
+                                placeholder="contato@imobiliaria.com.br (opcional)"
                                 className={cn(errors.email && 'border-red-500')}
                                 maxLength={254}
                             />
@@ -607,66 +865,76 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                             <Label htmlFor="agency-website">Website</Label>
                             <Input
                                 id="agency-website"
-                                type="url"
                                 value={form.website}
                                 onChange={(e) => updateField('website', e.target.value)}
-                                placeholder="www.imobiliaria.com.br"
+                                placeholder="www.imobiliaria.com.br (opcional)"
                                 className={cn(errors.website && 'border-red-500')}
-                                maxLength={500}
+                                maxLength={200}
                             />
                             {errors.website && <p className="text-xs text-red-500 mt-1">{errors.website}</p>}
                         </div>
                     </div>
                 </section>
 
-                {/* ── Section 4: Endereço ─────────────────────────────── */}
+                {/* ── Section 4: Endereço ───────────────────────────── */}
                 <section className="bg-card border border-border rounded-2xl p-6 sm:p-8 mb-6 shadow-sm">
                     <div className="flex items-center gap-3 mb-6">
-                        <div className="p-2 rounded-lg bg-primary/10">
+                        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                             <MapPin className="w-5 h-5 text-primary" />
                         </div>
-                        <h2 className="text-lg font-semibold text-foreground">Endereço</h2>
+                        <div>
+                            <h2 className="text-lg font-semibold text-foreground">Endereço</h2>
+                            <p className="text-xs text-muted-foreground">
+                                Endereço comercial da imobiliária.
+                            </p>
+                        </div>
                     </div>
 
-                    <div className="space-y-5">
-                        {/* CEP */}
-                        <div id="field-postal_code">
-                            <Label htmlFor="agency-cep">
-                                CEP <span className="text-red-500">*</span>
-                            </Label>
-                            <div className="flex items-center gap-2">
-                                <Input
-                                    id="agency-cep"
-                                    value={form.postal_code}
-                                    onChange={(e) => {
-                                        handleMaskedInput('postal_code', e.target.value, maskCEP);
-                                        setCepFilled(false);
-                                        setCepError(null);
-                                    }}
-                                    placeholder="80000-000"
-                                    className={cn('w-40 font-mono', errors.postal_code && 'border-red-500')}
-                                    maxLength={9}
-                                />
+                    <div className="space-y-4">
+                        {/* CEP + Lookup */}
+                        <div>
+                            <div className="flex items-end gap-3">
+                                <div className="flex-1" id="field-postal_code">
+                                    <Label htmlFor="agency-cep">
+                                        CEP <span className="text-red-500">*</span>
+                                    </Label>
+                                    <Input
+                                        id="agency-cep"
+                                        value={form.postal_code}
+                                        onChange={(e) => handleMaskedInput('postal_code', e.target.value, maskCEP)}
+                                        placeholder="35450-075"
+                                        className={cn(errors.postal_code && 'border-red-500')}
+                                        maxLength={9}
+                                    />
+                                </div>
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    size="sm"
                                     onClick={lookupCEP}
-                                    disabled={cepLoading || !validateCEP(form.postal_code)}
+                                    disabled={cepLoading}
+                                    className="shrink-0"
                                 >
                                     {cepLoading ? (
-                                        <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                                        <Loader2 className="w-4 h-4 animate-spin" />
                                     ) : (
-                                        <Search className="w-4 h-4 mr-1" />
+                                        <Search className="w-4 h-4 mr-2" />
                                     )}
-                                    Buscar CEP
+                                    {cepLoading ? 'Buscando...' : 'Buscar CEP'}
                                 </Button>
-                                {cepFilled && (
-                                    <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
-                                )}
                             </div>
                             {errors.postal_code && <p className="text-xs text-red-500 mt-1">{errors.postal_code}</p>}
-                            {cepError && <p className="text-xs text-red-500 mt-1">{cepError}</p>}
+                            {cepError && (
+                                <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                                    <AlertTriangle className="w-3 h-3" />
+                                    {cepError}
+                                </p>
+                            )}
+                            {cepFilled && (
+                                <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    Endereço preenchido automaticamente.
+                                </p>
+                            )}
                         </div>
 
                         {/* Street */}
@@ -678,7 +946,7 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                                 id="agency-street"
                                 value={form.street}
                                 onChange={(e) => updateField('street', e.target.value)}
-                                placeholder="Rua, Avenida, Travessa..."
+                                placeholder="Rua, Av., etc."
                                 className={cn(errors.street && 'border-red-500')}
                                 maxLength={300}
                             />
@@ -695,19 +963,19 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                                     id="agency-number"
                                     value={form.street_number}
                                     onChange={(e) => updateField('street_number', e.target.value)}
-                                    placeholder="123 ou S/N"
+                                    placeholder="Nº"
                                     className={cn(errors.street_number && 'border-red-500')}
                                     maxLength={20}
                                 />
                                 {errors.street_number && <p className="text-xs text-red-500 mt-1">{errors.street_number}</p>}
                             </div>
-                            <div>
+                            <div id="field-address_complement">
                                 <Label htmlFor="agency-complement">Complemento</Label>
                                 <Input
                                     id="agency-complement"
                                     value={form.address_complement}
                                     onChange={(e) => updateField('address_complement', e.target.value)}
-                                    placeholder="Sala, Andar, Bloco..."
+                                    placeholder="Sala, andar, bloco (opcional)"
                                     maxLength={200}
                                 />
                             </div>
@@ -786,11 +1054,11 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                     <Button
                         type="button"
                         variant="ghost"
-                        onClick={cancelEditing}
+                        onClick={cancelForm}
                         disabled={submitting}
                     >
                         <ArrowLeft className="w-4 h-4 mr-2" />
-                        {isEditing ? 'Cancelar' : 'Voltar ao Dashboard'}
+                        {isEditing ? 'Cancelar' : 'Voltar à lista'}
                     </Button>
 
                     <Button

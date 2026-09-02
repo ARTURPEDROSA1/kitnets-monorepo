@@ -107,6 +107,7 @@ export async function PUT(
                 .select('id')
                 .eq('cnpj', cnpjDigits)
                 .neq('id', agencyId)
+                .is('deleted_at', null)
                 .maybeSingle();
 
             if (existingCnpj) {
@@ -163,6 +164,85 @@ export async function PUT(
         });
     } catch (err) {
         console.error('[Agencies PUT] Unexpected error:', err);
+        return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
+    }
+}
+
+/**
+ * DELETE /api/agencies/[id]
+ * Soft-deletes an agency. Only OWNER role allowed.
+ */
+export async function DELETE(
+    _request: Request,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    try {
+        const user = await currentUser();
+        if (!user) {
+            return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+        }
+
+        const { id: agencyId } = await params;
+        const supabase = getServiceSupabase();
+
+        // ── Verify user has OWNER permission ─────────────────────────
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('clerk_id', user.id)
+            .maybeSingle();
+
+        if (!profile) {
+            return NextResponse.json({ error: 'Perfil não encontrado.' }, { status: 404 });
+        }
+
+        const { data: membership } = await supabase
+            .from('agency_members')
+            .select('role')
+            .eq('agency_id', agencyId)
+            .eq('user_id', profile.id)
+            .maybeSingle();
+
+        if (!membership || membership.role !== 'OWNER') {
+            return NextResponse.json(
+                { error: 'Apenas o proprietário pode excluir a imobiliária.' },
+                { status: 403 }
+            );
+        }
+
+        // ── Verify agency exists and is not already deleted ──────────
+        const { data: agency } = await supabase
+            .from('agencies')
+            .select('id, deleted_at')
+            .eq('id', agencyId)
+            .maybeSingle();
+
+        if (!agency) {
+            return NextResponse.json({ error: 'Imobiliária não encontrada.' }, { status: 404 });
+        }
+
+        if (agency.deleted_at) {
+            return NextResponse.json({ error: 'Imobiliária já foi excluída.' }, { status: 409 });
+        }
+
+        // ── Soft delete ──────────────────────────────────────────────
+        const { error: deleteError } = await supabase
+            .from('agencies')
+            .update({
+                deleted_at: new Date().toISOString(),
+                deleted_by: profile.id,
+            })
+            .eq('id', agencyId);
+
+        if (deleteError) {
+            console.error('[Agencies DELETE] Error:', deleteError);
+            return NextResponse.json({ error: 'Erro ao excluir imobiliária.' }, { status: 500 });
+        }
+
+        console.log('[Agencies DELETE] Soft-deleted agency:', agencyId, 'by:', profile.id);
+        return NextResponse.json({ success: true });
+    } catch (err) {
+        console.error('[Agencies DELETE] Unexpected error:', err);
         return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
     }
 }

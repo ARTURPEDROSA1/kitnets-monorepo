@@ -11,6 +11,7 @@ import {
     Edit3,
     ExternalLink,
     MessageCircle,
+    Trash2,
 } from 'lucide-react';
 import { Button } from '@kitnets/ui';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +26,7 @@ import {
 interface AgencyProfileCardProps {
     agency: AgencyWithRole;
     onEdit: () => void;
+    onDelete?: () => void;
 }
 
 function getStatusLabel(status: string): { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' } {
@@ -57,9 +59,10 @@ function getStateName(code: string): string {
     return BRAZILIAN_STATES.find(s => s.code === code)?.name || code;
 }
 
-export default function AgencyProfileCard({ agency, onEdit }: AgencyProfileCardProps) {
+export default function AgencyProfileCard({ agency, onEdit, onDelete }: AgencyProfileCardProps) {
     const status = getStatusLabel(agency.status);
     const canEdit = agency.role === 'OWNER' || agency.role === 'ADMIN';
+    const canDelete = agency.role === 'OWNER';
 
     const fullAddress = [
         agency.street,
@@ -74,7 +77,7 @@ export default function AgencyProfileCard({ agency, onEdit }: AgencyProfileCardP
     ].filter(Boolean).join(' — ');
 
     return (
-        <div className="max-w-3xl mx-auto">
+        <div>
             {/* Header Card */}
             <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
                 {/* Top gradient bar */}
@@ -110,11 +113,21 @@ export default function AgencyProfileCard({ agency, onEdit }: AgencyProfileCardP
                             </div>
                         </div>
 
-                        {canEdit && (
-                            <Button variant="outline" size="sm" onClick={onEdit} className="shrink-0">
-                                <Edit3 className="w-4 h-4 mr-2" />
-                                Editar dados
-                            </Button>
+                        {(canEdit || canDelete) && (
+                            <div className="flex items-center gap-2 shrink-0">
+                                {canEdit && (
+                                    <Button variant="outline" size="sm" onClick={onEdit}>
+                                        <Edit3 className="w-4 h-4 mr-2" />
+                                        Editar dados
+                                    </Button>
+                                )}
+                                {canDelete && onDelete && (
+                                    <Button variant="outline" size="sm" onClick={onDelete} className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 border-red-200 dark:border-red-800">
+                                        <Trash2 className="w-4 h-4 mr-2" />
+                                        Excluir
+                                    </Button>
+                                )}
+                            </div>
                         )}
                     </div>
 
