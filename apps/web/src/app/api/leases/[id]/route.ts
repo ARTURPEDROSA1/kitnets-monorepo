@@ -213,6 +213,49 @@ export async function PUT(request: Request, context: RouteContext) {
             }, { status: 400 });
         }
 
+        // Verify agency if applicable
+        if (body.management_type === 'AGENCY' && body.agency_id) {
+            const { data: agencyMember } = await supabase
+                .from('agency_members')
+                .select('id')
+                .eq('agency_id', body.agency_id)
+                .eq('user_id', profile.id)
+                .maybeSingle();
+
+            if (!agencyMember) {
+                // Fallback: check if agency exists and is not deleted
+                const { data: agency } = await supabase
+                    .from('agencies')
+                    .select('id')
+                    .eq('id', body.agency_id)
+                    .is('deleted_at', null)
+                    .maybeSingle();
+
+                if (!agency) {
+                    return NextResponse.json({
+                        errors: { agency_id: 'Imobiliária não encontrada.' }
+                    }, { status: 400 });
+                }
+            }
+        }
+
+        // Verify agent if applicable
+        if (body.agent_id && ['AGENCY', 'AGENT'].includes(body.management_type)) {
+            const { data: agentRow } = await supabase
+                .from('agents')
+                .select('id, agency_id')
+                .eq('id', body.agent_id)
+                .eq('user_id', profile.id)
+                .is('deleted_at', null)
+                .maybeSingle();
+
+            if (!agentRow) {
+                return NextResponse.json({
+                    errors: { agent_id: 'Corretor não encontrado.' }
+                }, { status: 400 });
+            }
+        }
+
         // ── Active lease warning ─────────────────────────────────────
         let warning: string | null = null;
         if (status === 'ACTIVE') {

@@ -192,23 +192,32 @@ export async function POST(request: Request) {
 
         // Verify agency if applicable
         if (body.management_type === 'AGENCY' && body.agency_id) {
-            const { data: agency } = await supabase
-                .from('agencies')
+            const { data: agencyMember } = await supabase
+                .from('agency_members')
                 .select('id')
-                .eq('id', body.agency_id)
+                .eq('agency_id', body.agency_id)
                 .eq('user_id', profile.id)
-                .is('deleted_at', null)
                 .maybeSingle();
 
-            if (!agency) {
-                return NextResponse.json({
-                    errors: { agency_id: 'Imobiliária não encontrada.' }
-                }, { status: 400 });
+            if (!agencyMember) {
+                // Fallback: check if agency exists and is not deleted
+                const { data: agency } = await supabase
+                    .from('agencies')
+                    .select('id')
+                    .eq('id', body.agency_id)
+                    .is('deleted_at', null)
+                    .maybeSingle();
+
+                if (!agency) {
+                    return NextResponse.json({
+                        errors: { agency_id: 'Imobiliária não encontrada.' }
+                    }, { status: 400 });
+                }
             }
         }
 
         // Verify agent if applicable
-        if (body.management_type === 'AGENT' && body.agent_id) {
+        if (body.agent_id && ['AGENCY', 'AGENT'].includes(body.management_type)) {
             const { data: agentRow } = await supabase
                 .from('agents')
                 .select('id, agency_id')
