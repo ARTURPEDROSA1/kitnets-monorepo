@@ -223,6 +223,82 @@ export function maskCEP(value: string): string {
     return `${d.slice(0, 5)}-${d.slice(5)}`;
 }
 
+// ── CPF ──────────────────────────────────────────────────────────────
+
+/**
+ * Validates a Brazilian CPF using the official check-digit algorithm (mod 11).
+ * Accepts formatted (123.456.789-01) or digits-only (12345678901).
+ */
+export function validateCPF(cpf: string): boolean {
+    const digits = cpf.replace(/\D/g, '');
+
+    if (digits.length !== 11) return false;
+
+    // Reject known invalid patterns (all same digit)
+    if (/^(\d)\1{10}$/.test(digits)) return false;
+
+    // First check digit
+    let sum = 0;
+    for (let i = 0; i < 9; i++) {
+        sum += parseInt(digits[i]) * (10 - i);
+    }
+    let remainder = (sum * 10) % 11;
+    if (remainder === 10) remainder = 0;
+    if (parseInt(digits[9]) !== remainder) return false;
+
+    // Second check digit
+    sum = 0;
+    for (let i = 0; i < 10; i++) {
+        sum += parseInt(digits[i]) * (11 - i);
+    }
+    remainder = (sum * 10) % 11;
+    if (remainder === 10) remainder = 0;
+    if (parseInt(digits[10]) !== remainder) return false;
+
+    return true;
+}
+
+/**
+ * Formats a CPF digits-only string to display format.
+ * 12345678901 → 123.456.789-01
+ */
+export function formatCPF(digits: string): string {
+    const d = digits.replace(/\D/g, '');
+    if (d.length !== 11) return digits;
+    return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9, 11)}`;
+}
+
+/**
+ * Strips CPF to digits only.
+ * 123.456.789-01 → 12345678901
+ */
+export function parseCPF(formatted: string): string {
+    return formatted.replace(/\D/g, '');
+}
+
+/**
+ * Applies CPF mask as the user types.
+ * Returns the masked value for the current input length.
+ */
+export function maskCPF(value: string): string {
+    const d = value.replace(/\D/g, '').slice(0, 11);
+    if (d.length <= 3) return d;
+    if (d.length <= 6) return `${d.slice(0, 3)}.${d.slice(3)}`;
+    if (d.length <= 9) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
+    return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+}
+
+// ── CRECI Display ───────────────────────────────────────────────────
+
+/**
+ * Formats CRECI number + state for display.
+ * ("12345", "MG") → "CRECI-MG 12345"
+ */
+export function formatCRECI(number: string, state: string): string {
+    if (!number || !state) return number || '';
+    return `CRECI-${state} ${number}`;
+}
+
 // ── Brazilian States ─────────────────────────────────────────────────
 
 export const BRAZILIAN_STATES = [
