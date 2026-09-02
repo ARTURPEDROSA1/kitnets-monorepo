@@ -528,6 +528,21 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                                             )}
                                         </div>
 
+                                        {/* WhatsApp link */}
+                                        {agency.main_phone_whatsapp && agency.main_phone && (
+                                            <a
+                                                href={`https://wa.me/${agency.main_phone.replace(/\D/g, '')}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="hidden sm:inline-flex items-center gap-1.5 shrink-0 text-sm text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 transition-colors"
+                                                title="Abrir WhatsApp"
+                                            >
+                                                <MessageCircle className="w-4 h-4" />
+                                                <span>{formatPhone(agency.main_phone)}</span>
+                                            </a>
+                                        )}
+
                                         {/* Status badge */}
                                         <Badge variant={status.variant} className="shrink-0">
                                             {status.label}
