@@ -204,7 +204,15 @@ export default function AgencyProfileCard({ agency, onEdit, onDelete }: AgencyPr
                                 <div className="flex items-start gap-3">
                                     <Phone className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
                                     <div>
-                                        <p className="text-xs text-muted-foreground">Telefone adicional</p>
+                                        <p className="text-xs text-muted-foreground">
+                                            Telefone adicional
+                                            {agency.additional_phone_whatsapp && (
+                                                <span className="inline-flex items-center gap-1 ml-1.5 text-green-600 dark:text-green-400">
+                                                    <MessageCircle className="w-3 h-3" />
+                                                    WhatsApp
+                                                </span>
+                                            )}
+                                        </p>
                                         <p className="text-sm font-medium text-foreground">
                                             {formatPhone(agency.additional_phone)}
                                         </p>

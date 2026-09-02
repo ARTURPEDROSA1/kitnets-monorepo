@@ -118,6 +118,7 @@ interface Agency {
     main_phone: string;              // E.164: "+5531999999999"
     additional_phone: string | null;
     main_phone_whatsapp: boolean;
+    additional_phone_whatsapp: boolean;
     email: string | null;
     website: string | null;          // Normalized: "https://..."
 
@@ -164,6 +165,7 @@ interface AgencyFormData {
     owner_name: string;
     main_phone: string;    additional_phone: string;
     main_phone_whatsapp: boolean;
+    additional_phone_whatsapp: boolean;
     email: string;         website: string;
     postal_code: string;   street: string;
     street_number: string; address_complement: string;
@@ -187,6 +189,7 @@ CREATE TABLE public.agencies (
     main_phone TEXT NOT NULL,                            -- E.164
     additional_phone TEXT,
     main_phone_whatsapp BOOLEAN DEFAULT false,
+    additional_phone_whatsapp BOOLEAN DEFAULT false,
     email TEXT,
     website TEXT,
     postal_code TEXT NOT NULL,                            -- Digits only
@@ -455,7 +458,7 @@ The default view after loading. Shows:
   - Expand/collapse chevron icon
   - Agency name (bold, truncated)
   - Subtitle: trade name + city/state
-  - WhatsApp link (green, with wa.me URL — hidden on mobile)
+  - WhatsApp link(s) (green, with wa.me URL — up to 2 links shown if both phones have WhatsApp enabled — hidden on mobile)
   - Status badge (Ativa, Verificada, Rascunho, Suspensa)
 - **Expanded detail:** `AgencyProfileCard` with edit + delete buttons
 - **Delete modal:** Overlay with confirmation + cancel/confirm buttons
@@ -466,7 +469,7 @@ Four form sections matching the spec:
 
 1. **Informações da imobiliária** — Name*, trade name, CNPJ (masked `00.000.000/0000-00`), CRECI + UF + type
 2. **Responsável** — Owner/legal representative name
-3. **Contato** — Main phone* (masked `(XX) XXXXX-XXXX`) + WhatsApp checkbox, additional phone, email, website
+3. **Contato** — Main phone* (masked `(XX) XXXXX-XXXX`) + WhatsApp checkbox, additional phone + WhatsApp checkbox, email, website
 4. **Endereço** — CEP* + "Buscar CEP" button, street*, number*, complement, neighborhood*, city*, state* (dropdown), country (read-only "Brasil")
 
 **Footer:** "Voltar à lista" + "Cadastrar imobiliária" (disabled until valid)

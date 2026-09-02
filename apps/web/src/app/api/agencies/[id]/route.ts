@@ -132,6 +132,7 @@ export async function PUT(
                 ? parsePhoneToE164(body.additional_phone)
                 : null,
             main_phone_whatsapp: body.main_phone_whatsapp === true,
+            additional_phone_whatsapp: body.additional_phone_whatsapp === true,
             email: body.email?.trim() ? normalizeEmail(body.email) : null,
             website: body.website?.trim() ? normalizeWebsite(body.website) : null,
             postal_code: parseCEP(body.postal_code),

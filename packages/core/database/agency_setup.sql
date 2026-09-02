@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS public.agencies (
     main_phone TEXT NOT NULL,       -- E.164 format: +5541999999999
     additional_phone TEXT,          -- E.164 format
     main_phone_whatsapp BOOLEAN DEFAULT false,
+    additional_phone_whatsapp BOOLEAN DEFAULT false,
     email TEXT,
     website TEXT,
 
@@ -125,3 +126,6 @@ CREATE POLICY "Members can view own memberships"
 -- Note: INSERT policies are not needed because we use the service role key
 -- from API routes (bypasses RLS) to create agencies and memberships.
 -- This matches the existing pattern used by profiles/create API.
+
+-- ── Migration: if upgrading existing agencies table ──────────────────────────
+-- ALTER TABLE public.agencies ADD COLUMN IF NOT EXISTS additional_phone_whatsapp BOOLEAN DEFAULT false;

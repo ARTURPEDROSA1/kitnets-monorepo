@@ -13,6 +13,7 @@ export interface Agency {
     main_phone: string;
     additional_phone: string | null;
     main_phone_whatsapp: boolean;
+    additional_phone_whatsapp: boolean;
     email: string | null;
     website: string | null;
 
@@ -59,6 +60,7 @@ export interface AgencyFormData {
     main_phone: string;
     additional_phone: string;
     main_phone_whatsapp: boolean;
+    additional_phone_whatsapp: boolean;
     email: string;
     website: string;
 
