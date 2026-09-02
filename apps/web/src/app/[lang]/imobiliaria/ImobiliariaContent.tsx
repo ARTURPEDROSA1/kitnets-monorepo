@@ -69,6 +69,7 @@ function getEmptyFormData(): AgencyFormData {
         main_phone: '',
         additional_phone: '',
         main_phone_whatsapp: false,
+        additional_phone_whatsapp: false,
         email: '',
         website: '',
         postal_code: '',
@@ -93,7 +94,8 @@ function agencyToFormData(agency: AgencyWithRole): AgencyFormData {
         owner_name: agency.owner_name || '',
         main_phone: formatPhone(agency.main_phone),
         additional_phone: agency.additional_phone ? formatPhone(agency.additional_phone) : '',
-        main_phone_whatsapp: agency.main_phone_whatsapp,
+        main_phone_whatsapp: agency.main_phone_whatsapp ?? false,
+        additional_phone_whatsapp: agency.additional_phone_whatsapp ?? false,
         email: agency.email || '',
         website: agency.website?.replace(/^https?:\/\//, '') || '',
         postal_code: formatCEP(agency.postal_code),
@@ -637,19 +639,36 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                                             )}
                                         </div>
 
-                                        {/* WhatsApp link */}
-                                        {agency.main_phone_whatsapp && agency.main_phone && (
-                                            <a
-                                                href={`https://wa.me/${agency.main_phone.replace(/\D/g, '')}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                onClick={(e) => e.stopPropagation()}
-                                                className="hidden sm:inline-flex items-center gap-1.5 shrink-0 text-sm text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 transition-colors"
-                                                title="Abrir WhatsApp"
-                                            >
-                                                <MessageCircle className="w-4 h-4" />
-                                                <span>{formatPhone(agency.main_phone)}</span>
-                                            </a>
+                                        {/* WhatsApp link(s) */}
+                                        {((agency.main_phone_whatsapp && agency.main_phone) || (agency.additional_phone_whatsapp && agency.additional_phone)) && (
+                                            <div className="hidden sm:flex items-center gap-3 shrink-0">
+                                                {agency.main_phone_whatsapp && agency.main_phone && (
+                                                    <a
+                                                        href={`https://wa.me/${agency.main_phone.replace(/\D/g, '')}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="inline-flex items-center gap-1.5 text-sm text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 transition-colors"
+                                                        title="Abrir WhatsApp"
+                                                    >
+                                                        <MessageCircle className="w-4 h-4" />
+                                                        <span>{formatPhone(agency.main_phone)}</span>
+                                                    </a>
+                                                )}
+                                                {agency.additional_phone_whatsapp && agency.additional_phone && (
+                                                    <a
+                                                        href={`https://wa.me/${agency.additional_phone.replace(/\D/g, '')}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="inline-flex items-center gap-1.5 text-sm text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 transition-colors"
+                                                        title="Abrir WhatsApp"
+                                                    >
+                                                        <MessageCircle className="w-4 h-4" />
+                                                        <span>{formatPhone(agency.additional_phone)}</span>
+                                                    </a>
+                                                )}
+                                            </div>
                                         )}
 
                                         {/* Status badge */}
@@ -1014,17 +1033,34 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                             {errors.main_phone && <p className="text-xs text-red-500 mt-1">{errors.main_phone}</p>}
                         </div>
 
-                        {/* Additional phone */}
-                        <div id="field-additional_phone">
-                            <Label htmlFor="agency-phone2">Telefone adicional</Label>
-                            <Input
-                                id="agency-phone2"
-                                value={form.additional_phone}
-                                onChange={(e) => handleMaskedInput('additional_phone', e.target.value, maskPhone)}
-                                placeholder="(31) 3561-3173 (opcional)"
-                                className={cn(errors.additional_phone && 'border-red-500')}
-                                maxLength={15}
-                            />
+                        {/* Additional phone + WhatsApp */}
+                        <div>
+                            <div className="flex items-end gap-4">
+                                <div className="flex-1" id="field-additional_phone">
+                                    <Label htmlFor="agency-phone2">Telefone adicional</Label>
+                                    <Input
+                                        id="agency-phone2"
+                                        value={form.additional_phone}
+                                        onChange={(e) => {
+                                            handleMaskedInput('additional_phone', e.target.value, maskPhone);
+                                            if (!e.target.value.trim()) updateField('additional_phone_whatsapp', false);
+                                        }}
+                                        placeholder="(31) 3561-3173 (opcional)"
+                                        className={cn(errors.additional_phone && 'border-red-500')}
+                                        maxLength={15}
+                                    />
+                                </div>
+                                <label className="flex items-center gap-2 pb-2 cursor-pointer whitespace-nowrap">
+                                    <input
+                                        type="checkbox"
+                                        checked={form.additional_phone_whatsapp as boolean}
+                                        onChange={(e) => updateField('additional_phone_whatsapp', e.target.checked)}
+                                        className="w-4 h-4 rounded border-input"
+                                    />
+                                    <MessageCircle className="w-4 h-4 text-green-600" />
+                                    <span className="text-sm text-foreground">WhatsApp</span>
+                                </label>
+                            </div>
                             {errors.additional_phone && <p className="text-xs text-red-500 mt-1">{errors.additional_phone}</p>}
                         </div>
 
