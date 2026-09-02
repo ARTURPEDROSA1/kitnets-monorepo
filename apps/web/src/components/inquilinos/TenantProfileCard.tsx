@@ -115,7 +115,9 @@ export default function TenantProfileCard({ tenant, lang, onEdit, onDelete }: Te
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <InfoRow label="Nome completo" value={tenant.full_name} />
                     <InfoRow label="CPF" value={formatCPF(tenant.cpf)} />
-                    <InfoRow label="E-mail" value={tenant.email} href={`mailto:${tenant.email}`} />
+                    {tenant.email && (
+                        <InfoRow label="E-mail" value={tenant.email} href={`mailto:${tenant.email}`} />
+                    )}
                     <InfoRow label="Telefone principal" value={formatPhone(tenant.main_phone)} />
                     {tenant.additional_phone && (
                         <InfoRow label="Telefone adicional" value={formatPhone(tenant.additional_phone)} />

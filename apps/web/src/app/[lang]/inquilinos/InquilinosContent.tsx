@@ -89,7 +89,7 @@ function tenantToFormData(tenant: TenantWithDetails): TenantFormData {
         cpf: tenant.cpf ? formatCPF(tenant.cpf) : '',
         main_phone: formatPhone(tenant.main_phone),
         email: tenant.email || '',
-        date_of_birth: tenant.date_of_birth || '',
+        date_of_birth: formatDateBR(tenant.date_of_birth),
         rg: tenant.rg || '',
         additional_phone: tenant.additional_phone ? formatPhone(tenant.additional_phone) : '',
         postal_code: tenant.postal_code ? tenant.postal_code.replace(/(\d{5})(\d{3})/, '$1-$2') : '',
@@ -104,8 +104,8 @@ function tenantToFormData(tenant: TenantWithDetails): TenantFormData {
         management_type: tenant.management_type || 'SELF_MANAGED',
         agency_id: tenant.agency_id || '',
         agent_id: tenant.agent_id || '',
-        move_in_date: tenant.move_in_date || '',
-        move_out_date: tenant.move_out_date || '',
+        move_in_date: formatDateBR(tenant.move_in_date),
+        move_out_date: formatDateBR(tenant.move_out_date),
         status: tenant.status || 'ACTIVE',
         emergency_contact_name: tenant.emergency_contact_name || '',
         emergency_contact_phone: tenant.emergency_contact_phone ? formatPhone(tenant.emergency_contact_phone) : '',
@@ -132,6 +132,32 @@ function maskCPFDisplay(cpf: string): string {
         return `***.${formatted.slice(4, 11)}-**`;
     }
     return formatted;
+}
+
+// ── Date helpers (DD/MM/YYYY — Brazil format) ────────────────────────
+
+/** Mask date input as DD/MM/YYYY while typing */
+function maskDate(value: string): string {
+    const d = value.replace(/\D/g, '').slice(0, 8);
+    if (d.length <= 2) return d;
+    if (d.length <= 4) return `${d.slice(0, 2)}/${d.slice(2)}`;
+    return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}`;
+}
+
+/** Convert DD/MM/YYYY → YYYY-MM-DD (ISO) for the API */
+function parseDateBR(brDate: string): string {
+    if (!brDate) return '';
+    const parts = brDate.split('/');
+    if (parts.length !== 3 || parts[2].length !== 4) return '';
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+}
+
+/** Convert YYYY-MM-DD (ISO) → DD/MM/YYYY for display */
+function formatDateBR(isoDate: string | null): string {
+    if (!isoDate) return '';
+    const parts = isoDate.split('-');
+    if (parts.length !== 3) return isoDate;
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 
 // ── Component ────────────────────────────────────────────────────────
@@ -359,9 +385,7 @@ export default function InquilinosContent({ lang }: InquilinosContentProps) {
             errs.main_phone = 'Telefone inválido. Use (XX) XXXXX-XXXX.';
         }
 
-        if (!form.email.trim()) {
-            errs.email = 'E-mail é obrigatório.';
-        } else if (!validateEmail(form.email)) {
+        if (form.email.trim() && !validateEmail(form.email)) {
             errs.email = 'E-mail inválido.';
         }
 
@@ -416,10 +440,18 @@ export default function InquilinosContent({ lang }: InquilinosContentProps) {
             const url = isEditing ? `/api/tenants/${editingTenant.id}` : '/api/tenants';
             const method = isEditing ? 'PUT' : 'POST';
 
+            // Convert DD/MM/YYYY dates to ISO (YYYY-MM-DD) before sending
+            const payload = {
+                ...form,
+                date_of_birth: parseDateBR(form.date_of_birth),
+                move_in_date: parseDateBR(form.move_in_date),
+                move_out_date: parseDateBR(form.move_out_date),
+            };
+
             const res = await fetch(url, {
                 method,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(form),
+                body: JSON.stringify(payload),
             });
 
             const data = await res.json();
@@ -917,7 +949,7 @@ export default function InquilinosContent({ lang }: InquilinosContentProps) {
 
                         {/* Email */}
                         <div id="field-email">
-                            <Label htmlFor="email">E-mail <span className="text-red-500">*</span></Label>
+                            <Label htmlFor="email">E-mail</Label>
                             <Input
                                 id="email"
                                 type="email"
@@ -947,9 +979,10 @@ export default function InquilinosContent({ lang }: InquilinosContentProps) {
                             <Label htmlFor="date_of_birth">Data de nascimento</Label>
                             <Input
                                 id="date_of_birth"
-                                type="date"
                                 value={form.date_of_birth}
-                                onChange={(e) => updateField('date_of_birth', e.target.value)}
+                                onChange={(e) => handleMaskedInput('date_of_birth', e.target.value, maskDate)}
+                                placeholder="DD/MM/AAAA"
+                                maxLength={10}
                             />
                         </div>
 
@@ -1284,9 +1317,10 @@ export default function InquilinosContent({ lang }: InquilinosContentProps) {
                             <Label htmlFor="move_in_date">Data de entrada</Label>
                             <Input
                                 id="move_in_date"
-                                type="date"
                                 value={form.move_in_date}
-                                onChange={(e) => updateField('move_in_date', e.target.value)}
+                                onChange={(e) => handleMaskedInput('move_in_date', e.target.value, maskDate)}
+                                placeholder="DD/MM/AAAA"
+                                maxLength={10}
                             />
                         </div>
 
@@ -1295,9 +1329,10 @@ export default function InquilinosContent({ lang }: InquilinosContentProps) {
                             <Label htmlFor="move_out_date">Data de saída</Label>
                             <Input
                                 id="move_out_date"
-                                type="date"
                                 value={form.move_out_date}
-                                onChange={(e) => updateField('move_out_date', e.target.value)}
+                                onChange={(e) => handleMaskedInput('move_out_date', e.target.value, maskDate)}
+                                placeholder="DD/MM/AAAA"
+                                maxLength={10}
                             />
                         </div>
 

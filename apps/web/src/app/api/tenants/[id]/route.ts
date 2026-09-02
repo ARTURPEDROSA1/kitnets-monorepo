@@ -84,7 +84,7 @@ export async function PUT(
             errors.main_phone = 'Telefone principal inválido.';
         }
         if (!body.email?.trim()) {
-            errors.email = 'E-mail é obrigatório.';
+            // email is optional — skip
         } else if (!validateEmail(body.email)) {
             errors.email = 'E-mail inválido.';
         }
@@ -199,7 +199,7 @@ export async function PUT(
             full_name: body.full_name.trim(),
             cpf: cpfDigits,
             main_phone: parsePhoneToE164(body.main_phone),
-            email: normalizeEmail(body.email),
+            email: body.email?.trim() ? normalizeEmail(body.email) : null,
             date_of_birth: body.date_of_birth?.trim() || null,
             rg: body.rg?.trim() || null,
             additional_phone: body.additional_phone?.trim()
