@@ -1673,9 +1673,22 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                 uploadedUrls.push(publicUrl);
                                             }
                                             if (uploadedUrls.length > 0) {
-                                                setPSavedPhotos(prev => [...prev, ...uploadedUrls]);
-                                                // Persist to DB
-                                                handleSave(true);
+                                                const allPhotos = [...pSavedPhotos, ...uploadedUrls];
+                                                setPSavedPhotos(allPhotos);
+                                                // Persist directly to DB without handleSave (avoids stale closure)
+                                                if (propIdx === 0) {
+                                                    await sbUpload.from('profiles').update({ property_photos: allPhotos }).eq('id', profileId);
+                                                } else {
+                                                    // For additional properties, update the JSON column
+                                                    const { data: profile } = await sbUpload.from('profiles').select('additional_properties').eq('id', profileId).single();
+                                                    if (profile?.additional_properties) {
+                                                        const addProps = [...(profile.additional_properties as Record<string, unknown>[])];
+                                                        if (addProps[propIdx - 1]) {
+                                                            addProps[propIdx - 1] = { ...addProps[propIdx - 1], savedPhotos: allPhotos };
+                                                            await sbUpload.from('profiles').update({ additional_properties: addProps }).eq('id', profileId);
+                                                        }
+                                                    }
+                                                }
                                             }
                                         } catch (err) {
                                             console.error('Photo upload failed:', err);
@@ -1705,8 +1718,21 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                             const { error: uploadError } = await sbUpload.storage.from('documents').upload(fileName, videoFile);
                                             if (uploadError) { console.error('Video upload error:', uploadError); setPVideos(prev => [...prev, videoFile]); return; }
                                             const { data: { publicUrl } } = sbUpload.storage.from('documents').getPublicUrl(fileName);
-                                            setPSavedVideos(prev => [...prev, publicUrl]);
-                                            handleSave(true);
+                                            const allVideos = [...pSavedVideos, publicUrl];
+                                            setPSavedVideos(allVideos);
+                                            // Persist directly to DB without handleSave
+                                            if (propIdx === 0) {
+                                                await sbUpload.from('profiles').update({ property_videos: allVideos }).eq('id', profileId);
+                                            } else {
+                                                const { data: profile } = await sbUpload.from('profiles').select('additional_properties').eq('id', profileId).single();
+                                                if (profile?.additional_properties) {
+                                                    const addProps = [...(profile.additional_properties as Record<string, unknown>[])];
+                                                    if (addProps[propIdx - 1]) {
+                                                        addProps[propIdx - 1] = { ...addProps[propIdx - 1], savedVideos: allVideos };
+                                                        await sbUpload.from('profiles').update({ additional_properties: addProps }).eq('id', profileId);
+                                                    }
+                                                }
+                                            }
                                         } catch (err) {
                                             console.error('Video upload failed:', err);
                                             setPVideos(prev => [...prev, videoFile]);
