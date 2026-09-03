@@ -1104,10 +1104,13 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                 phone: formData.phone,
                 person_type: personType,
                 address: formData.ownerAddress,
-                property_address: properties[0]?.address ?? formData.propertyAddress,
-                property_type: properties[0]?.propertyType ?? propertyType,
-                property_details: properties[0]?.details ?? propertyDetails,
-                sub_units: subUnits,
+                // When all properties are deleted, null out legacy columns to prevent ghost properties
+                property_address: properties.length > 0 ? properties[0].address : null,
+                property_type: properties.length > 0 ? properties[0].propertyType : null,
+                property_details: properties.length > 0 ? properties[0].details : null,
+                sub_units: properties.length > 0 ? properties[0].subUnits : null,
+                property_photos: properties.length > 0 ? properties[0].savedPhotos : null,
+                property_videos: properties.length > 0 ? properties[0].savedVideos : null,
                 admin_data: personType === 'pj' ? adminData : null,
                 role: 'landlord',
                 // Persist additional properties (index 1+) as JSON
