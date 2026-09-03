@@ -1492,13 +1492,10 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                     <div>
                         <h1 className="text-2xl font-bold text-foreground">{formData.name || user.fullName}</h1>
                         <p className="text-muted-foreground">{user.primaryEmailAddress?.emailAddress}</p>
-                        <div className="flex items-center gap-2 mt-2">
-                            <span className="bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400 text-xs px-2 py-0.5 rounded-full flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> {p.header.emailVerified}</span>
-                            {!savedProofs.some(pr => pr.status === 'approved') && <span className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-400 text-xs px-2 py-0.5 rounded-full flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> {p.header.verificationPending}</span>}
-                        </div>
                     </div>
                 </div>
             </div>
+
 
 
 
