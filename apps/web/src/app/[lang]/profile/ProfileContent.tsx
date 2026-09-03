@@ -43,6 +43,7 @@ interface PropertyState {
     savedVideos: string[]; // already-uploaded URLs
     ownershipFiles: File[]; // new proof files
     savedProofs: ProofData[];
+    profilePhotoUrl: string | null; // main profile photo URL for collapsed card
     // collapsible section states
     ownershipSectionOpen: boolean;
     addressSectionOpen: boolean;
@@ -138,6 +139,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
         photos: [], savedPhotos: [],
         videos: [], savedVideos: [],
         ownershipFiles: [], savedProofs: [],
+        profilePhotoUrl: null,
         ownershipSectionOpen: true,
         addressSectionOpen: true,
         photosSectionOpen: true,
@@ -409,6 +411,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                     const primaryVideos = Array.isArray(profile.property_videos) ? profile.property_videos as string[] : [];
                     const primarySubUnits = Array.isArray(profile.sub_units) ? profile.sub_units as SubUnit[] : [];
 
+                    const primaryProfilePhoto = (profile.profile_photo_url as string) || null;
                     const primaryProperty: PropertyState = {
                         propertyType: (profile.property_type as 'single' | 'multi') || 'single',
                         details: primaryPropDetails ? {
@@ -433,6 +436,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                         savedVideos: primaryVideos,
                         ownershipFiles: [],
                         savedProofs: loadedProofs,
+                        profilePhotoUrl: primaryProfilePhoto,
                         // Collapse filled sections
                         ownershipSectionOpen: loadedProofs.length === 0,
                         addressSectionOpen: !primaryPropAddr.street,
@@ -458,6 +462,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                 savedVideos: Array.isArray(apTyped.savedVideos) ? apTyped.savedVideos as string[] : [],
                                 ownershipFiles: [],
                                 savedProofs: Array.isArray(apTyped.savedProofs) ? apTyped.savedProofs as ProofData[] : [],
+                                profilePhotoUrl: (apTyped.profilePhotoUrl as string) || null,
                                 ownershipSectionOpen: !(Array.isArray(apTyped.savedProofs) && (apTyped.savedProofs as ProofData[]).length > 0),
                                 addressSectionOpen: true,
                                 photosSectionOpen: true,
@@ -1111,6 +1116,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                 sub_units: properties.length > 0 ? properties[0].subUnits : null,
                 property_photos: properties.length > 0 ? properties[0].savedPhotos : null,
                 property_videos: properties.length > 0 ? properties[0].savedVideos : null,
+                profile_photo_url: properties.length > 0 ? properties[0].profilePhotoUrl : null,
                 admin_data: personType === 'pj' ? adminData : null,
                 role: 'landlord',
                 // Persist additional properties (index 1+) as JSON
@@ -1122,6 +1128,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                     savedPhotos: prop.savedPhotos,
                     savedVideos: prop.savedVideos,
                     savedProofs: prop.savedProofs,
+                    profilePhotoUrl: prop.profilePhotoUrl,
                 })),
             };
 
@@ -1336,6 +1343,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             savedPhotos: prop.savedPhotos,
                             savedVideos: prop.savedVideos,
                             savedProofs: prop.savedProofs,
+                            profilePhotoUrl: prop.profilePhotoUrl,
                         })),
                     }).eq('id', profile.id);
                 }
@@ -1682,14 +1690,21 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                         )}
                                     >
                                         <div className="flex items-center gap-3">
-                                            <div className={cn(
-                                                "p-2 rounded-lg",
-                                                prop.propertyType === 'single'
-                                                    ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600"
-                                                    : "bg-violet-100 dark:bg-violet-900/50 text-violet-600"
-                                            )}>
-                                                {propIcon}
-                                            </div>
+                                            {/* Profile photo thumbnail on collapsed card */}
+                                            {!isExpanded && prop.profilePhotoUrl ? (
+                                                <div className="w-10 h-10 rounded-lg overflow-hidden border border-border flex-shrink-0">
+                                                    <Image src={prop.profilePhotoUrl} alt={propLabel} width={40} height={40} className="w-full h-full object-cover" />
+                                                </div>
+                                            ) : (
+                                                <div className={cn(
+                                                    "p-2 rounded-lg",
+                                                    prop.propertyType === 'single'
+                                                        ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600"
+                                                        : "bg-violet-100 dark:bg-violet-900/50 text-violet-600"
+                                                )}>
+                                                    {propIcon}
+                                                </div>
+                                            )}
                                             <div className="text-left">
                                                 <div className="flex items-center gap-2">
                                                     <span className="font-semibold text-foreground text-sm">{propLabel}</span>
@@ -2027,16 +2042,32 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                                 ))}
 
                                                                 {/* Saved Photos */}
-                                                                {pSavedPhotos.map((url, idx) => (
-                                                                    <div key={`saved-p-${idx}`} className="aspect-square rounded-lg border border-border relative group overflow-hidden">
-                                                                        <Image src={url} alt="Property" width={200} height={200} className="w-full h-full object-cover" />
-                                                                        <div className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                            <Button size="icon" variant="destructive" className="h-6 w-6" onClick={() => removePropSavedPhoto(url)}>
-                                                                                <Trash2 className="w-3 h-3" />
-                                                                            </Button>
+                                                                {pSavedPhotos.map((url, idx) => {
+                                                                    const isProfilePhoto = prop.profilePhotoUrl === url;
+                                                                    return (
+                                                                        <div key={`saved-p-${idx}`} className={cn("aspect-square rounded-lg border relative group overflow-hidden", isProfilePhoto ? "border-emerald-500 border-2 ring-2 ring-emerald-200 dark:ring-emerald-800" : "border-border")}>
+                                                                            <Image src={url} alt="Property" width={200} height={200} className="w-full h-full object-cover" />
+                                                                            <div className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                                <Button size="icon" variant="destructive" className="h-6 w-6" onClick={() => removePropSavedPhoto(url)}>
+                                                                                    <Trash2 className="w-3 h-3" />
+                                                                                </Button>
+                                                                            </div>
+                                                                            {/* Profile photo selection checkbox */}
+                                                                            <label
+                                                                                className={cn(
+                                                                                    "absolute bottom-0 inset-x-0 flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-medium cursor-pointer transition-colors",
+                                                                                    isProfilePhoto
+                                                                                        ? "bg-emerald-600 text-white"
+                                                                                        : "bg-black/50 text-white opacity-0 group-hover:opacity-100"
+                                                                                )}
+                                                                                onClick={(e) => { e.stopPropagation(); updateProperty(propIdx, prev => ({ ...prev, profilePhotoUrl: isProfilePhoto ? null : url })); }}
+                                                                            >
+                                                                                <input type="checkbox" checked={isProfilePhoto} readOnly className="w-3 h-3 accent-emerald-500" />
+                                                                                {isProfilePhoto ? 'Foto Principal' : 'Definir como principal'}
+                                                                            </label>
                                                                         </div>
-                                                                    </div>
-                                                                ))}
+                                                                    );
+                                                                })}
                                                             </div>
                                                         </div>
 
@@ -2171,35 +2202,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                     </div>
                                                 )}
 
-                                                {/* Continuar button for Description → Sub-units (or save) */}
-                                                {pDescOpen && pAddr.description?.trim() && (
-                                                    <div className="flex justify-end pt-2">
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                                            onClick={() => {
-                                                                setPDescOpen(false);
-                                                                // If multi with units, the sub-units section shows itself
-                                                                // Otherwise, navigate to Basics tab (only if not in imoveis view)
-                                                                if (pType !== 'multi' || pDetails.numberOfUnits === 0) {
-                                                                    handleSave();
-                                                                    if (view !== 'imoveis') {
-                                                                        setActiveTab('basics');
-                                                                    }
-                                                                } else {
-                                                                    handleSave(true);
-                                                                    setPropField('subUnitOpenIdx', 0);
-                                                                    setTimeout(() => document.getElementById(`prop-${propIdx}-subunits`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
-                                                                }
-                                                            }}
-                                                        >
-                                                            {pType === 'multi' && pDetails.numberOfUnits > 0
-                                                                ? <>Continuar <ArrowRight className="w-4 h-4" /></>
-                                                                : <>Salvar e Continuar <ArrowRight className="w-4 h-4" /></>}
-                                                        </Button>
-                                                    </div>
-                                                )}
+                                                {/* No Continuar button here — user uses "Salvar Imóvel e Documentos" */}
                                             </div>
 
                                             {/* 6. Sub-unidades Section (at the bottom, only for multi) */}
@@ -2232,7 +2235,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
 
                         {propertyCreated && (
                         <div className="flex justify-end pt-4">
-                            <Button size="lg" onClick={() => handleSave()} disabled={isSaving} className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-lg shadow-emerald-900/20">
+                            <Button size="lg" onClick={async () => { await handleSave(); setExpandedPropertyIdx(null); window.scrollTo({ top: 0, behavior: 'smooth' }); }} disabled={isSaving} className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-lg shadow-emerald-900/20">
                                 {isSaving ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Save className="w-5 h-5 mr-2" />}
                                 Salvar Imóvel e Documentos
                             </Button>
