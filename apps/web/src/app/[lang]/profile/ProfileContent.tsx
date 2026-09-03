@@ -1319,8 +1319,22 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                     };
                 }
 
-                // Commit updated properties to state
-                setProperties(updatedProperties);
+                // Commit updated properties to state, preserving current UI section states
+                setProperties(currentProps => currentProps.map((currentProp, idx) => {
+                    if (idx >= updatedProperties.length) return currentProp;
+                    const uploaded = updatedProperties[idx];
+                    return {
+                        ...currentProp,
+                        // Merge only data fields from upload results
+                        photos: uploaded.photos,
+                        videos: uploaded.videos,
+                        savedPhotos: uploaded.savedPhotos,
+                        savedVideos: uploaded.savedVideos,
+                        subUnits: uploaded.subUnits,
+                        ownershipFiles: uploaded.ownershipFiles,
+                        savedProofs: uploaded.savedProofs,
+                    };
+                }));
 
                 // Sync primary property's Photos/Videos/SubUnits to Profile columns (only if properties exist)
                 if (updatedProperties.length > 0) {
