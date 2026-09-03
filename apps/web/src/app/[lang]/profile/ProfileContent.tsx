@@ -1491,28 +1491,30 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                 </div>
             )}
 
-            {/* Header / Overview */}
-            <div className="flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <div className="relative group w-20 h-20 rounded-full bg-slate-200 border-4 border-white dark:bg-slate-800 dark:border-slate-700 shadow-sm flex items-center justify-center overflow-hidden">
-                        <Image
-                            src={user.imageUrl}
-                            alt={user.fullName || ''}
-                            width={80}
-                            height={80}
-                            className="w-full h-full object-cover"
-                        />
-                        <label className="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity text-xs font-medium text-center">
-                            {p.header.changePhoto}
-                            <input type="file" className="hidden" accept="image/*" onChange={handleProfileImageUpload} />
-                        </label>
-                    </div>
-                    <div>
-                        <h1 className="text-2xl font-bold text-foreground">{formData.name || user.fullName}</h1>
-                        <p className="text-muted-foreground">{user.primaryEmailAddress?.emailAddress}</p>
+            {/* Header / Overview — hidden on imoveis view */}
+            {view !== 'imoveis' && (
+                <div className="flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <div className="relative group w-20 h-20 rounded-full bg-slate-200 border-4 border-white dark:bg-slate-800 dark:border-slate-700 shadow-sm flex items-center justify-center overflow-hidden">
+                            <Image
+                                src={user.imageUrl}
+                                alt={user.fullName || ''}
+                                width={80}
+                                height={80}
+                                className="w-full h-full object-cover"
+                            />
+                            <label className="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity text-xs font-medium text-center">
+                                {p.header.changePhoto}
+                                <input type="file" className="hidden" accept="image/*" onChange={handleProfileImageUpload} />
+                            </label>
+                        </div>
+                        <div>
+                            <h1 className="text-2xl font-bold text-foreground">{formData.name || user.fullName}</h1>
+                            <p className="text-muted-foreground">{user.primaryEmailAddress?.emailAddress}</p>
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
 
 
 
