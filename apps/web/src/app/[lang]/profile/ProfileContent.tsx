@@ -1731,9 +1731,9 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                     <span className="font-semibold text-foreground text-sm">{propLabel}</span>
                                                     <span className="text-xs text-muted-foreground">({propTypeName})</span>
                                                 </div>
-                                                {!isExpanded && pAddr.rua && (
+                                                {!isExpanded && pAddr.street && (
                                                     <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                                                        {[pAddr.rua, pAddr.numero, pAddr.bairro, pAddr.city, pAddr.state, pAddr.cep].filter(Boolean).join(', ')}
+                                                        {[pAddr.street, pAddr.number, pAddr.neighborhood, pAddr.city, pAddr.state, pAddr.cep].filter(Boolean).join(', ')}
                                                     </p>
                                                 )}
                                                 {propComplete && !isExpanded && (
