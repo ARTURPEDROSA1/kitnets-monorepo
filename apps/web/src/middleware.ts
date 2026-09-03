@@ -1,7 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
-const isProtectedRoute = createRouteMatcher(["/dashboard(.*)", "/imobiliaria(.*)", "/corretores(.*)", "/profile(.*)"]);
+const isProtectedRoute = createRouteMatcher(["/dashboard(.*)", "/imobiliaria(.*)", "/corretores(.*)", "/profile(.*)", "/proprietario(.*)", "/imoveis(.*)"]);
 const locales = ["en", "pt", "es"];
 const defaultLocale = "pt";
 

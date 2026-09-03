@@ -285,6 +285,26 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                             </li>
                                             <li>
                                                 <Link
+                                                    href={lang === 'pt' ? '/proprietario' : `/${lang}/proprietario`}
+                                                    aria-current={isActive(lang === 'pt' ? '/proprietario' : `/${lang}/proprietario`) ? "page" : undefined}
+                                                    className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/proprietario' : `/${lang}/proprietario`) ? 'bg-accent' : ''}`}
+                                                >
+                                                    <User className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3">Proprietário</span>
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <Link
+                                                    href={lang === 'pt' ? '/imoveis' : `/${lang}/imoveis`}
+                                                    aria-current={isActive(lang === 'pt' ? '/imoveis' : `/${lang}/imoveis`) ? "page" : undefined}
+                                                    className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/imoveis' : `/${lang}/imoveis`) ? 'bg-accent' : ''}`}
+                                                >
+                                                    <Home className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3">Imóveis</span>
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <Link
                                                     href={lang === 'pt' ? '/imobiliaria' : `/${lang}/imobiliaria`}
                                                     aria-current={isActive(lang === 'pt' ? '/imobiliaria' : `/${lang}/imobiliaria`) ? "page" : undefined}
                                                     className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/imobiliaria' : `/${lang}/imobiliaria`) ? 'bg-accent' : ''}`}
@@ -321,16 +341,6 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                                 >
                                                     <FileText className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                     <span className="ms-3">Contratos</span>
-                                                </Link>
-                                            </li>
-                                            <li>
-                                                <Link
-                                                    href={lang === 'pt' ? '/profile' : `/${lang}/profile`}
-                                                    aria-current={isActive(lang === 'pt' ? '/profile' : `/${lang}/profile`) ? "page" : undefined}
-                                                    className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/profile' : `/${lang}/profile`) ? 'bg-accent' : ''}`}
-                                                >
-                                                    <User className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3">Meu Perfil</span>
                                                 </Link>
                                             </li>
                                             <li>
