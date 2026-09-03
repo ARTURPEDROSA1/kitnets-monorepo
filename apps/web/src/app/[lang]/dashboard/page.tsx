@@ -148,7 +148,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ lang
                         Bem vindo de volta, {profile?.full_name || user.firstName}.
                     </p>
                 </div>
-                <Link href={`/${lang}/profile?add=true`}>
+                <Link href={`/${lang}/imoveis?add=true`}>
                     <Button>
                         <Plus className="w-4 h-4 mr-2" />
                         Novo Imóvel
@@ -277,7 +277,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ lang
                     <div className="bg-card border border-dashed border-border rounded-xl p-12 text-center">
                         <Home className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                         <p className="text-muted-foreground">Você ainda não cadastrou nenhum imóvel.</p>
-                        <Link href={`/${lang}/profile?add=true`}>
+                        <Link href={`/${lang}/imoveis?add=true`}>
                             <Button variant="link" className="mt-4 text-primary">Cadastrar agora</Button>
                         </Link>
                     </div>

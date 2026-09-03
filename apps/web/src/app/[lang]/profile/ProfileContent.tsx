@@ -52,8 +52,11 @@ interface PropertyState {
     subUnitOpenIdx: number | null;
 }
 
+type ProfileView = 'proprietario' | 'imoveis' | 'full';
+
 interface ProfileContentProps {
     dict: Dictionary;
+    view?: ProfileView;
 }
 
 // Helper component for photo preview
@@ -80,12 +83,14 @@ const PhotoPreview = ({ file, onRemove }: { file: File, onRemove: () => void }) 
     );
 };
 
-export default function ProfileContent({ dict }: ProfileContentProps) {
+export default function ProfileContent({ dict, view = 'full' }: ProfileContentProps) {
     const { isLoaded, user } = useUser();
     const p = dict.profile;
     const { getToken } = useAuth();
 
-    const [activeTab, setActiveTab] = useState<'basics' | 'ownership' | 'security'>('ownership');
+    // Determine initial tab based on view
+    const initialTab = view === 'proprietario' ? 'basics' : view === 'imoveis' ? 'ownership' : 'ownership';
+    const [activeTab, setActiveTab] = useState<'basics' | 'ownership' | 'security'>(initialTab);
 
     // UI state
     const [isSaving, setIsSaving] = useState(false);
@@ -245,11 +250,18 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
 
     // Dynamic tab labels
     const ownershipTabLabel = properties.length > 1 ? 'Dados das Propriedades' : p.tabs.ownership;
-    const tabs = [
+    const allTabs = [
         { id: 'ownership', label: ownershipTabLabel },
         { id: 'basics', label: personType === 'pj' ? 'Dados da Holding' : p.tabs.basics },
         { id: 'security', label: properties.length > 1 ? 'Gerenciar Propriedades' : p.tabs.security },
     ];
+
+    // Filter tabs based on view prop
+    const tabs = view === 'proprietario'
+        ? allTabs.filter(t => t.id === 'basics')
+        : view === 'imoveis'
+            ? allTabs.filter(t => t.id === 'ownership' || t.id === 'security')
+            : allTabs;
 
     // Holding tab collapsible states
     const [holdingSectionOpen, setHoldingSectionOpen] = useState(true);
@@ -1336,7 +1348,7 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                 setShowSuccess(true);
                 setTimeout(() => {
                     setShowSuccess(false);
-                    if (activeTab === 'ownership') {
+                    if (activeTab === 'ownership' && view !== 'imoveis') {
                         setActiveTab('basics');
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                     }
@@ -1363,70 +1375,6 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
             setShowDeleteModal(false);
             alert(p.alerts.deleteError);
         }
-    };
-
-    // Calculate progress — counts ALL wizard steps
-    const calculateProgress = () => {
-        let completed = 0;
-        let total = 0;
-
-        // ── Ownership Tab Steps ──
-        // 1. Documentation uploaded
-        total++;
-        if (savedProofs.length > 0 || ownershipFiles.length > 0) completed++;
-        // 2. Address complete
-        total++;
-        if (formData.propertyAddress.cep && formData.propertyAddress.city && formData.propertyAddress.state) completed++;
-        // 3. Details filled (propertyName + totalSqMeters)
-        total++;
-        if (propertyDetails.propertyName && propertyDetails.totalSqMeters) completed++;
-        // 4. Photos uploaded (≥2 photos or ≥1 video)
-        total++;
-        const totalMainPhotos = savedPhotos.length + propertyPhotos.length;
-        const totalMainVideos = savedVideos.length + propertyVideos.length;
-        if (totalMainPhotos >= 2 || totalMainVideos >= 1) completed++;
-        // 5. Description written
-        total++;
-        if (formData.propertyAddress.description?.trim()) completed++;
-        // 6. Sub-units complete (multi only)
-        if (propertyType === 'multi' && propertyDetails.numberOfUnits > 0) {
-            total++;
-            const allUnitsComplete = subUnits.length >= propertyDetails.numberOfUnits && subUnits.every(u => {
-                const photos = (u.photos?.length || 0) + (u.newPhotos?.length || 0);
-                return !!(u.unitType && u.name?.trim() && u.sqMeters?.trim() && u.rooms?.trim() && u.bedrooms?.trim() && u.bathrooms?.trim() && u.description?.trim() && photos >= 2);
-            });
-            if (allUnitsComplete) completed++;
-        }
-
-        // ── Basics Tab Steps ──
-        // 7. Identity verified
-        total++;
-        if (personType === 'pf' ? formData.cpf : formData.cnpj) completed++;
-        // 8. Personal/Business data
-        total++;
-        if (formData.name && formData.phone) completed++;
-        // 9. Owner address
-        total++;
-        if (formData.ownerAddress.cep && formData.ownerAddress.city && formData.ownerAddress.state) completed++;
-        // 10. Admin data (PJ only)
-        if (personType === 'pj') {
-            total++;
-            if (adminData.name && adminData.email) completed++;
-        }
-
-        const isVerified = false;
-        const rawPercentage = total > 0 ? Math.round((completed / total) * 100) : 0;
-        return { percentage: rawPercentage, isVerified };
-    };
-
-    const { percentage: progress, isVerified } = calculateProgress();
-
-    // Dynamic Color for Progress Bar
-    const getProgressColor = () => {
-        if (isVerified) return 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]'; // Green & Glowing if verified
-        if (progress < 30) return 'bg-red-500';
-        if (progress < 70) return 'bg-orange-500';
-        return 'bg-yellow-400'; // High progress but not verified
     };
 
     if (!isLoaded || !user) return <div className="p-8 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-emerald-600" /></div>;
@@ -1552,40 +1500,27 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                 </div>
             </div>
 
-            {/* Progress Bar Section (Above Tabs) */}
-            <div className="space-y-2">
-                <div className="flex justify-between text-sm font-medium items-end">
-                    <span className="text-muted-foreground">{p.progress.completion}</span>
-                    <span className={`${isVerified ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{progress}% {isVerified && p.progress.verified}</span>
-                </div>
-                <div className="h-3 bg-secondary rounded-full overflow-hidden shadow-inner">
-                    <div
-                        className={`h-full transition-all duration-700 ease-out ${getProgressColor()}`}
-                        style={{ width: `${progress}%` }}
-                    />
-                </div>
-                {!isVerified && progress === 100 && (
-                    <p className="text-xs text-amber-600 dark:text-amber-500 font-medium text-right mt-1">{p.progress.verifyBadge}</p>
-                )}
-            </div>
 
-            {/* Navigation Tabs */}
-            <div className="border-b border-border flex overflow-x-auto">
-                {tabs.map((tab: { id: string; label: string }) => (
-                    <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                        className={cn(
-                            "px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
-                            activeTab === tab.id
-                                ? "border-emerald-500 text-emerald-600 dark:text-emerald-400"
-                                : "border-transparent text-muted-foreground hover:text-foreground"
-                        )}
-                    >
-                        {tab.label}
-                    </button>
-                ))}
-            </div>
+
+            {/* Navigation Tabs — only show when more than 1 tab */}
+            {tabs.length > 1 && (
+                <div className="border-b border-border flex overflow-x-auto">
+                    {tabs.map((tab: { id: string; label: string }) => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                            className={cn(
+                                "px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
+                                activeTab === tab.id
+                                    ? "border-emerald-500 text-emerald-600 dark:text-emerald-400"
+                                    : "border-transparent text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+            )}
 
             {/* Content Area */}
             <div className="bg-card text-card-foreground rounded-xl border border-border p-6 min-h-[400px] shadow-sm">
@@ -2815,12 +2750,45 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                                 {p.basics.save}
                             </Button>
                         </div>
+
+                        {/* Notification Preferences — shown in proprietário view */}
+                        {view === 'proprietario' && (
+                            <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-6">
+                                <div>
+                                    <h3 className="text-lg font-semibold text-foreground mb-4">Preferências de Notificação</h3>
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <Label>Receber e-mails marketing</Label>
+                                            <Input type="checkbox" className="w-4 h-4" />
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <Label>Receber alertas de segurança</Label>
+                                            <Input type="checkbox" className="w-4 h-4" defaultChecked />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Delete Account — shown in proprietário view */}
+                        {view === 'proprietario' && (
+                            <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-6">
+                                <div>
+                                    <h3 className="text-lg font-semibold text-red-600 mb-4">{p.deleteModal.title}</h3>
+                                    <div className="space-y-4">
+                                        <p className="text-sm text-muted-foreground">{p.deleteModal.irreversible}</p>
+                                        <Button variant="destructive" onClick={() => setShowDeleteModal(true)}>
+                                            {p.deleteModal.confirm}
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 
 
-                {/* SECURITY TAB */}
-                {/* SECURITY TAB */}
+                {/* SECURITY TAB — Gerenciar Propriedades (Quick Actions) */}
                 {activeTab === 'security' && (
                     <div className="space-y-6">
                         {/* Card 0: Quick Actions */}
@@ -2846,35 +2814,39 @@ export default function ProfileContent({ dict }: ProfileContentProps) {
                             </div>
                         </div>
 
-                        {/* Card 1: Notifications */}
-                        <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-6">
-                            <div>
-                                <h3 className="text-lg font-semibold text-foreground mb-4">Preferências de Notificação</h3>
-                                <div className="space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <Label>Receber e-mails marketing</Label>
-                                        <Input type="checkbox" className="w-4 h-4" />
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <Label>Receber alertas de segurança</Label>
-                                        <Input type="checkbox" className="w-4 h-4" defaultChecked />
+                        {/* Notifications — shown in full view only (proprietário view has its own copy) */}
+                        {view === 'full' && (
+                            <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-6">
+                                <div>
+                                    <h3 className="text-lg font-semibold text-foreground mb-4">Preferências de Notificação</h3>
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <Label>Receber e-mails marketing</Label>
+                                            <Input type="checkbox" className="w-4 h-4" />
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <Label>Receber alertas de segurança</Label>
+                                            <Input type="checkbox" className="w-4 h-4" defaultChecked />
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        )}
 
-                        {/* Card 2: Delete Account */}
-                        <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-6">
-                            <div>
-                                <h3 className="text-lg font-semibold text-red-600 mb-4">{p.deleteModal.title}</h3>
-                                <div className="space-y-4">
-                                    <p className="text-sm text-muted-foreground">{p.deleteModal.irreversible}</p>
-                                    <Button variant="destructive" onClick={() => setShowDeleteModal(true)}>
-                                        {p.deleteModal.confirm}
-                                    </Button>
+                        {/* Delete Account — shown in full view only (proprietário view has its own copy) */}
+                        {view === 'full' && (
+                            <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-6">
+                                <div>
+                                    <h3 className="text-lg font-semibold text-red-600 mb-4">{p.deleteModal.title}</h3>
+                                    <div className="space-y-4">
+                                        <p className="text-sm text-muted-foreground">{p.deleteModal.irreversible}</p>
+                                        <Button variant="destructive" onClick={() => setShowDeleteModal(true)}>
+                                            {p.deleteModal.confirm}
+                                        </Button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        )}
                     </div>
                 )}
 
