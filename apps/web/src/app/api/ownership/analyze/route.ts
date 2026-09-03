@@ -71,120 +71,168 @@ function extractDataFromText(text: string): {
     // Normalize: collapse multiple spaces/newlines, keep structure
     const t = text.replace(/\r\n/g, '\n');
 
-    // ---- STREET + NUMBER ----
-    // Patterns like:
-    //   "Endereço:Rua CLAUDIONOR IDELFONSO BRAGA, 000035"
-    //   "Endereço do Imóvel: Rua CLAUDIONOR IDELFONSO BRAGA , 000035"
-    //   "Endereço: RUA JOSE GOIS, 45"
-    //   "End.: Av. Brasil, 1200"
     let street: string | null = null;
     let number: string | null = null;
+    let neighborhood: string | null = null;
+    let city: string | null = null;
+    let state: string | null = null;
+    let cep: string | null = null;
+    let matricula: string | null = null;
 
-    // Try "Endereço" patterns (most common)
-    const addrPatterns = [
-        /Endere[çc]o\s*(?:do\s*Im[oó]vel)?\s*[:.]?\s*(.+?)(?:\n|$)/i,
-        /End\.?\s*[:.]?\s*(.+?)(?:\n|$)/i,
-        /Logradouro\s*[:.]?\s*(.+?)(?:\n|$)/i,
-    ];
+    // ---- PRIORITY 1: OBJETO DE TRIBUTAÇÃO (IPTU PROPERTY ADDRESS) ----
+    // In Brazilian IPTU bills, "Objeto de Tributação" / "Localização do Imóvel" contains the
+    // ACTUAL physical property address. "Contribuinte" is only the taxpayer's mailing address.
+    const objetoMatch = t.match(/Objeto\s*d[ea]\s*Tributa[çc][aã]o\s*[:.]?\s*([\s\S]+?)(?=(?:Descri[çc][aã]o|Parcela|Informa[çc][õo]es|Valor|Base|Demonstrativo|Contribuinte|Receita|$))/i);
+    if (objetoMatch) {
+        const objetoBlock = objetoMatch[1].trim();
 
-    for (const pattern of addrPatterns) {
-        const match = t.match(pattern);
-        if (match) {
-            const raw = match[1].trim();
-            // Try to split "Rua X, 123" or "Rua X , 000035" or "Rua X 123"
-            const streetNumMatch = raw.match(/^(.+?)\s*[,]\s*(\d+)\s*$/);
-            if (streetNumMatch) {
-                street = streetNumMatch[1].trim();
-                number = streetNumMatch[2].replace(/^0+/, '') || streetNumMatch[2]; // remove leading zeros
-            } else {
-                // Try "Rua X Nº 123" or "Rua X nro 123" or "Rua X Número 123"
-                const nroMatch = raw.match(/^(.+?)\s*(?:N[ºo°]\.?|nro\.?|N[uú]mero)\s*(\d+)/i);
-                if (nroMatch) {
-                    street = nroMatch[1].trim();
-                    number = nroMatch[2].replace(/^0+/, '') || nroMatch[2];
+        // 1. Street and number from Objeto de Tributação
+        // e.g. "RUA CLAUDIONOR IDELF BRAGA, 000035 CASA MATRICULA 8021"
+        const streetNumMatch = objetoBlock.match(/([A-Za-zÀ-ÖØ-öø-ÿ\s.'-]+?)\s*,\s*(\d{1,6})/);
+        if (streetNumMatch) {
+            street = streetNumMatch[1].trim();
+            number = streetNumMatch[2].replace(/^0+/, '') || streetNumMatch[2];
+        }
+
+        // Matrícula in Objeto de Tributação (e.g. "MATRICULA 8021" or "MATRÍCULA: 8021")
+        const matInObjeto = objetoBlock.match(/MATR[IÍ]CULA\s*[:.]?\s*(\d+)/i);
+        if (matInObjeto) {
+            matricula = matInObjeto[1].trim();
+        }
+
+        // 2. Neighborhood from Objeto de Tributação
+        // e.g. "SANTO ANTONIO - CÓD. LOTEAMENTO: 0013..." or "Bairro: SANTO ANTONIO"
+        const bairroMatch = objetoBlock.match(/\n\s*([A-Za-zÀ-ÖØ-öø-ÿ\s]+?)\s*(?:[-–]\s*(?:C[ÓO]D|LOTE|QUADRA|ITABIRITO|\d)|\n|$)/i)
+            || objetoBlock.match(/Bairro\s*[:.]?\s*([^\n,]+)/i);
+        if (bairroMatch) {
+            neighborhood = bairroMatch[1].trim();
+        }
+
+        // 3. City and State from Objeto de Tributação
+        // e.g. "ITABIRITO/MG" or "ITABIRITO - MG"
+        const cityStateMatch = objetoBlock.match(/([A-Za-zÀ-ÖØ-öø-ÿ\s]+?)\s*[/]\s*([A-Z]{2})/);
+        if (cityStateMatch) {
+            city = cityStateMatch[1].trim();
+            state = cityStateMatch[2].trim().toUpperCase();
+        }
+
+        // 4. CEP from Objeto de Tributação
+        // e.g. "35.450-272"
+        const cepInObjeto = objetoBlock.match(/(\d{2}\.?\d{3}[-.]?\d{3})/);
+        if (cepInObjeto) {
+            cep = cepInObjeto[1].replace(/\./g, '').replace(/^(\d{5})(\d{3})$/, '$1-$2');
+        }
+    }
+
+    // ---- FALLBACK: GENERAL STREET + NUMBER ----
+    if (!street) {
+        // Patterns like:
+        //   "Endereço: Rua X, 123"
+        //   "Endereço do Imóvel: Rua X, 123"
+        const addrPatterns = [
+            /Endere[çc]o\s*(?:do\s*Im[oó]vel)?\s*[:.]?\s*(.+?)(?:\n|$)/i,
+            /End\.?\s*[:.]?\s*(.+?)(?:\n|$)/i,
+            /Logradouro\s*[:.]?\s*(.+?)(?:\n|$)/i,
+        ];
+
+        for (const pattern of addrPatterns) {
+            const match = t.match(pattern);
+            if (match) {
+                const raw = match[1].trim();
+                const streetNumMatch = raw.match(/^(.+?)\s*[,]\s*(\d+)\s*$/);
+                if (streetNumMatch) {
+                    street = streetNumMatch[1].trim();
+                    number = streetNumMatch[2].replace(/^0+/, '') || streetNumMatch[2];
                 } else {
-                    // Try splitting last word if it's a number
-                    const lastNumMatch = raw.match(/^(.+?)\s+(\d{1,6})\s*$/);
-                    if (lastNumMatch) {
-                        street = lastNumMatch[1].trim();
-                        number = lastNumMatch[2].replace(/^0+/, '') || lastNumMatch[2];
+                    const nroMatch = raw.match(/^(.+?)\s*(?:N[ºo°]\.?|nro\.?|N[uú]mero)\s*(\d+)/i);
+                    if (nroMatch) {
+                        street = nroMatch[1].trim();
+                        number = nroMatch[2].replace(/^0+/, '') || nroMatch[2];
                     } else {
-                        street = raw;
+                        const lastNumMatch = raw.match(/^(.+?)\s+(\d{1,6})\s*$/);
+                        if (lastNumMatch) {
+                            street = lastNumMatch[1].trim();
+                            number = lastNumMatch[2].replace(/^0+/, '') || lastNumMatch[2];
+                        } else {
+                            street = raw;
+                        }
                     }
                 }
+                break;
             }
-            break;
         }
     }
 
-    // ---- NEIGHBORHOOD ----
-    let neighborhood: string | null = null;
-    const bairroPatterns = [
-        /Bairro\s*[:.]?\s*([^\n,]+)/i,
-        /Setor\s*[:.]?\s*([^\n,]+)/i,
-    ];
-    for (const pattern of bairroPatterns) {
-        const match = t.match(pattern);
-        if (match) {
-            neighborhood = match[1].trim();
-            break;
+    // ---- FALLBACK: NEIGHBORHOOD ----
+    if (!neighborhood) {
+        const bairroPatterns = [
+            /Bairro\s*[:.]?\s*([^\n,]+)/i,
+            /Setor\s*[:.]?\s*([^\n,]+)/i,
+        ];
+        for (const pattern of bairroPatterns) {
+            const match = t.match(pattern);
+            if (match) {
+                neighborhood = match[1].trim();
+                break;
+            }
         }
     }
 
-    // ---- CITY ----
-    let city: string | null = null;
-    const cityPatterns = [
-        /Cidade\s*[:.]?\s*([^\n,]+)/i,
-        /Munic[ií]pio\s*(?:de\s+)?[:.]?\s*([^\n,\-]+)/i,
-        /PREFEITURA\s+MUNICIPAL\s+DE\s+([^\n,]+)/i,
-    ];
-    for (const pattern of cityPatterns) {
-        const match = t.match(pattern);
-        if (match) {
-            city = match[1].trim()
-                .replace(/\s*[-–]\s*CNPJ.*$/i, '') // remove "- CNPJ ..." suffix
-                .replace(/\s*[-–]\s*$/, '')
-                .trim();
-            break;
+    // ---- FALLBACK: CITY ----
+    if (!city) {
+        const cityPatterns = [
+            /Cidade\s*[:.]?\s*([^\n,]+)/i,
+            /Munic[ií]pio\s*(?:de\s+)?[:.]?\s*([^\n,\-]+)/i,
+            /PREFEITURA\s+MUNICIPAL\s+DE\s+([^\n,]+)/i,
+        ];
+        for (const pattern of cityPatterns) {
+            const match = t.match(pattern);
+            if (match) {
+                city = match[1].trim()
+                    .replace(/\s*[-–]\s*CNPJ.*$/i, '')
+                    .replace(/\s*[-–]\s*$/, '')
+                    .trim();
+                break;
+            }
         }
     }
 
-    // ---- STATE ----
-    let state: string | null = null;
-    const statePatterns = [
-        /Estado\s*[:.]?\s*([^\n,]+)/i,
-        /UF\s*[:.]?\s*([A-Z]{2})/i,
-        // Try extracting from CEP pattern region
-    ];
-    for (const pattern of statePatterns) {
-        const match = t.match(pattern);
-        if (match) {
-            state = match[1].trim().substring(0, 2).toUpperCase();
-            break;
+    // ---- FALLBACK: STATE ----
+    if (!state) {
+        const statePatterns = [
+            /Estado\s*[:.]?\s*([^\n,]+)/i,
+            /UF\s*[:.]?\s*([A-Z]{2})/i,
+        ];
+        for (const pattern of statePatterns) {
+            const match = t.match(pattern);
+            if (match) {
+                state = match[1].trim().substring(0, 2).toUpperCase();
+                break;
+            }
         }
     }
 
-    // ---- CEP ----
-    let cep: string | null = null;
-    const cepPatterns = [
-        /CEP\s*[:.]?\s*(\d{2}\.?\d{3}[-.]?\d{3})/i,
-        /Cep\s*[:.]?\s*(\d{2}\.?\d{3}[-.]?\d{3})/i,
-        /C\.?E\.?P\.?\s*[:.]?\s*(\d{2}\.?\d{3}[-.]?\d{3})/i,
-    ];
-    for (const pattern of cepPatterns) {
-        const match = t.match(pattern);
-        if (match) {
-            // Normalize to XXXXX-XXX
-            cep = match[1].replace(/\./g, '').replace(/^(\d{5})(\d{3})$/, '$1-$2');
-            break;
+    // ---- FALLBACK: CEP ----
+    if (!cep) {
+        const cepPatterns = [
+            /CEP\s*[:.]?\s*(\d{2}\.?\d{3}[-.]?\d{3})/i,
+            /Cep\s*[:.]?\s*(\d{2}\.?\d{3}[-.]?\d{3})/i,
+            /C\.?E\.?P\.?\s*[:.]?\s*(\d{2}\.?\d{3}[-.]?\d{3})/i,
+        ];
+        for (const pattern of cepPatterns) {
+            const match = t.match(pattern);
+            if (match) {
+                cep = match[1].replace(/\./g, '').replace(/^(\d{5})(\d{3})$/, '$1-$2');
+                break;
+            }
         }
     }
 
     // ---- OWNER NAME ----
     let owner_name: string | null = null;
     const ownerPatterns = [
-        /Sacado\s*[:.]?\s*\d*\s*[-–]?\s*([^\n]+?)(?:\s+CPF|$)/i,
         /Contribuinte\s*[:.]?\s*([^\n]+)/i,
+        /Sacado\s*[:.]?\s*\d*\s*[-–]?\s*([^\n]+?)(?:\s+CPF|$)/i,
         /Propriet[aá]rio\s*[:.]?\s*([^\n]+)/i,
         /Nome\s*[:.]?\s*([^\n]+)/i,
         /Titular\s*[:.]?\s*([^\n]+)/i,
@@ -192,7 +240,7 @@ function extractDataFromText(text: string): {
     for (const pattern of ownerPatterns) {
         const match = t.match(pattern);
         if (match) {
-            owner_name = match[1].trim().replace(/\s+/g, ' ');
+            owner_name = match[1].trim().replace(/\s*CPF.*$/i, '').replace(/\s*CNPJ.*$/i, '').replace(/\s+/g, ' ');
             break;
         }
     }
@@ -215,22 +263,24 @@ function extractDataFromText(text: string): {
     // ---- IPTU-SPECIFIC DATA ----
     let cadastro_imobiliario: string | null = null;
     let inscricao_imobiliaria: string | null = null;
-    let matricula: string | null = null;
     let area_lote: string | null = null;
     let area_edificada: string | null = null;
 
     // Cadastro Imobiliário
     const cadastroPatterns = [
-        /Cadastro\s*Imobili[aá]rio\s*[:.]?\s*([\d.\-\/]+)/i,
-        /N[°º]?\s*(?:do\s+)?cadastro\s*[:.]?\s*([\d.\-\/]+)/i,
+        /N[°º.]?\s*(?:do\s+)?cadastro\s*[-–\s]*DV\s*[:.]?\s*([A-Za-z0-9.\-\/]+)/i,
+        /Cadastro\s*Imobili[aá]rio\s*[:.]?\s*([A-Za-z0-9.\-\/]+)/i,
+        /N[°º.]?\s*(?:do\s+)?cadastro\s*[:.]?\s*([A-Za-z0-9.\-\/]+)/i,
+        /Se[çc][aã]o\s*[:.]?\s*([A-Za-z0-9]+)/i,
     ];
     for (const pattern of cadastroPatterns) {
         const match = t.match(pattern);
         if (match) { cadastro_imobiliario = match[1].trim(); break; }
     }
 
-    // Inscrição Imobiliária / C.M.C.
+    // Inscrição Imobiliária / C.M.C. / Inscrição Cadastral
     const inscricaoPatterns = [
+        /Inscri[çc][aã]o\s*Cadastral\s*[:.]?\s*([\d\/.\-]+)/i,
         /Inscri[çc][aã]o\s*(?:\/\s*C\.?M\.?C\.?)?\s*[:.]?\s*([\d\/.\-]+)/i,
         /C\.?M\.?C\.?\s*[:.]?\s*([\d\/.\-]+)/i,
         /Inscri[çc][aã]o\s*Imobili[aá]ria\s*[:.]?\s*([\d\/.\-]+)/i,
@@ -241,20 +291,22 @@ function extractDataFromText(text: string): {
         if (match) { inscricao_imobiliaria = match[1].trim(); break; }
     }
 
-    // Matrícula
-    const matriculaPatterns = [
-        /Matr[ií]cula\s*[:.]?\s*([\d.\-\/]+)/i,
-    ];
-    for (const pattern of matriculaPatterns) {
-        const match = t.match(pattern);
-        if (match) { matricula = match[1].trim(); break; }
+    // Matrícula (if not already extracted from Objeto de Tributação)
+    if (!matricula) {
+        const matriculaPatterns = [
+            /Matr[ií]cula\s*[:.]?\s*([\d.\-\/]+)/i,
+        ];
+        for (const pattern of matriculaPatterns) {
+            const match = t.match(pattern);
+            if (match) { matricula = match[1].trim(); break; }
+        }
     }
 
     // Área Terreno / Lote
     const areaLotePatterns = [
-        /[Áá]rea\s*(?:do\s+)?Terreno\s*[:.]?\s*([\d.,]+)/i,
+        /[Áá]rea\s*(?:do\s+)?Terreno\s*(?:\(m[²2]\))?\s*[:.]?\s*([\d.,]+)/i,
         /[Áá]rea\s*(?:do\s+)?Lote\s*[:.]?\s*([\d.,]+)/i,
-        /Fra[çc][aã]o\s*de\s*Terreno\s*m[²2]\s*[:.]?\s*([\d.,]+)/i,
+        /Fra[çc][aã]o\s*(?:do\s+)?Terreno\s*(?:\(m[²2]\))?\s*[:.]?\s*([\d.,]+)/i,
     ];
     for (const pattern of areaLotePatterns) {
         const match = t.match(pattern);
@@ -263,6 +315,7 @@ function extractDataFromText(text: string): {
 
     // Área Edificada / Construída
     const areaEdifPatterns = [
+        /[Áá]rea\s*Edificada\s*(?:\(m[²2]\))?\s*[:.]?\s*([\d.,]+)/i,
         /[Áá]rea\s*Constru[ií]da\s*[:.]?\s*([\d.,]+)/i,
         /[Áá]rea\s*(?:da\s+)?Edifica[çc][aã]o\s*[:.]?\s*([\d.,]+)/i,
         /[Áá]rea\s*Edif(?:icada)?\.?\s*[:.]?\s*([\d.,]+)/i,
@@ -303,18 +356,60 @@ You are an expert real estate document analyst. Your task is to extract structur
 
 Identify the document type from: 'MATRICULA', 'ESCRITURA', 'CONTRATO_COMPRA_VENDA', 'IPTU', 'CONTRATO_LOCACAO', 'CONTA_AGUA', 'CONTA_LUZ', 'CONTA_GAS', 'OUTRO'.
 
+======================================================================
+CRITICAL RULE FOR BRAZILIAN IPTU DOCUMENTS (READ CAREFULLY!):
+======================================================================
+1. ADDRESS DISAMBIGUATION (MANDATORY):
+   In Brazilian IPTU bills/documents, there are almost ALWAYS TWO different addresses:
+   a) "CONTRIBUINTE" / "ENDEREÇO DE NOTIFICAÇÃO" / "ENDEREÇO DE CORRESPONDÊNCIA":
+      - This is the TAXPAYER's mailing address (e.g. corporate headquarters or landlord's personal residence).
+      - NEVER use the "Contribuinte" address for the property "address" field!
+   b) "OBJETO DE TRIBUTAÇÃO" / "OBJETO DA TRIBUTAÇÃO" / "LOCALIZAÇÃO DO IMÓVEL" / "ENDEREÇO DO IMÓVEL":
+      - This is the ACTUAL PHYSICAL PROPERTY being taxed and listed for rent!
+      - You MUST EXTRACT the "address" field EXCLUSIVELY from "OBJETO DE TRIBUTAÇÃO" / "LOCALIZAÇÃO DO IMÓVEL"!
+
+   EXAMPLE:
+   If document contains:
+     Contribuinte: AP DIGITAL LTDA, CPF/CNPJ: 44496170000184
+     RUA JOSE GOIS, 45 - SANTO ANTONIO - ITABIRITO - 35.450-264
+     Objeto de Tributação: RUA CLAUDIONOR IDELF BRAGA, 000035 CASA MATRICULA 8021
+     SANTO ANTONIO - CÓD. LOTEAMENTO: 0013 - QUADRA: Q LOTE: 6 -
+     ITABIRITO/MG - 35.450-272
+   YOU MUST EXTRACT:
+     "address": {
+       "street": "RUA CLAUDIONOR IDELF BRAGA",
+       "number": "35",
+       "neighborhood": "SANTO ANTONIO",
+       "city": "ITABIRITO",
+       "state": "MG",
+       "cep": "35.450-272"
+     }
+     "owner_name": "AP DIGITAL LTDA"
+     "cpf": "44496170000184"
+     "iptu_data": {
+       "matricula": "8021",
+       ...
+     }
+   DO NOT extract "RUA JOSE GOIS" or "35.450-264" as the property address!
+
+2. NUMBER EXTRACTION:
+   - Strip leading zeros from street numbers (e.g., "000035" -> "35", "000050" -> "50").
+
+3. IPTU CADASTRAL & AREA FIELDS:
+   - cadastro_imobiliario: "Cadastro Imobiliário" or "N.º do Cadastro - DV" (e.g. "00180D")
+   - inscricao_imobiliaria: "Inscrição Cadastral" / "Inscrição Imobiliária" / "C.M.C." (e.g. "01/03/044/0081-001")
+   - matricula: Matrícula number if present anywhere in the document (e.g. from "MATRICULA 8021" -> "8021")
+   - area_lote: "Área do Terreno (m²)" or "Área do Lote" (e.g. "300.00")
+   - area_edificada: "Área Edificada (m²)" or "Área Construída" (e.g. "66.12")
+======================================================================
+
 Extract the following fields if present:
 - owner_name (Full name of the owner/landlord or "Contribuinte")
 - cpf (Owner's CPF or CNPJ)
-- address (street/logradouro, number, neighborhood/bairro, city, state, cep)
+- address (PHYSICAL PROPERTY ADDRESS: street, number, neighborhood, city, state, cep - MUST be from Objeto de Tributação on IPTU)
 - registry (matricula_number, cartorio_name) needed if type is MATRICULA/ESCRITURA
 - dates (issue_date, registration_date)
-- iptu_data: ONLY for IPTU documents, extract:
-  - cadastro_imobiliario (Cadastro Imobiliário / N° do cadastro)
-  - inscricao_imobiliaria (Inscrição / C.M.C. / Inscrição Imobiliária)
-  - matricula (Matrícula number if present)
-  - area_lote (Área Terreno / Área do Lote in m²)
-  - area_edificada (Área Construída / Área Edificação in m²)
+- iptu_data: for IPTU documents (cadastro_imobiliario, inscricao_imobiliaria, matricula, area_lote, area_edificada)
 
 Return ONLY valid JSON matching this structure:
 {
@@ -324,24 +419,24 @@ Return ONLY valid JSON matching this structure:
         "owner_name": "string",
         "cpf": "string",
         "address": { 
-             "street": "string (Extract full street name, e.g. RUA ATLAS-0040)", 
-             "number": "string (e.g. 50, remove leading zeros from 000050)", 
-             "neighborhood": "string (e.g. VALE DO SOL)", 
-             "city": "string (e.g. NOVA LIMA)", 
-             "state": "string (e.g. MG)", 
-             "cep": "string (e.g. 34011-111)" 
+             "street": "string", 
+             "number": "string", 
+             "neighborhood": "string", 
+             "city": "string", 
+             "state": "string", 
+             "cep": "string" 
         },
         "iptu_data": {
              "cadastro_imobiliario": "string",
-             "inscricao_imobiliaria": "string (e.g. 01/07/029/0055-001)",
+             "inscricao_imobiliaria": "string",
              "matricula": "string",
-             "area_lote": "string (e.g. 360.00)",
-             "area_edificada": "string (e.g. 112.42)"
+             "area_lote": "string",
+             "area_edificada": "string"
         },
         "registry": { "matricula_number": "...", "cartorio_name": "..." },
         "dates": { "issue_date": "YYYY-MM-DD" }
     },
-    "instructions": "EXTRACT THE PROPERTY ADDRESS LISTED ON THE BILL/DOCUMENT. FOCUS ON THE SERVICE ADDRESS / Endereço de Localização. For IPTU, also extract all cadastral and area data.",
+    "instructions": "FOR IPTU: Extract property address strictly from 'Objeto de Tributação' / 'Localização do Imóvel'. NEVER use the 'Contribuinte' address. Strip leading zeros from street number.",
     "field_confidence": { "field_name": number }
 }
 
