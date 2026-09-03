@@ -1651,25 +1651,69 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                     for (const file of newFiles) { analyzeDocument(file); }
                                 }
                             };
-                            const handlePropPhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+                            const handlePropPhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
                                 if (e.target.files && e.target.files.length > 0) {
                                     const total = pSavedPhotos.length + pPhotos.length;
                                     const remaining = 10 - total;
                                     if (remaining <= 0) { alert('Máximo de 10 fotos por propriedade.'); return; }
                                     const newPhotos = Array.from(e.target.files).slice(0, remaining);
-                                    setPPhotos(prev => [...prev, ...newPhotos]);
-                                    // Auto-save so new photos become savedPhotos (enables profile photo checkbox)
-                                    setTimeout(() => handleSave(true), 200);
+
+                                    // Upload directly to storage and add as savedPhotos
+                                    if (profileId) {
+                                        try {
+                                            const sbUpload = await getSupabase();
+                                            const propStoragePrefix = propIdx === 0 ? profileId : `${profileId}/prop-${propIdx}`;
+                                            const uploadedUrls: string[] = [];
+                                            for (const file of newPhotos) {
+                                                const fileExt = file.name.split('.').pop();
+                                                const fileName = `photos/${propStoragePrefix}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+                                                const { error: uploadError } = await sbUpload.storage.from('documents').upload(fileName, file);
+                                                if (uploadError) { console.error('Photo upload error:', uploadError); continue; }
+                                                const { data: { publicUrl } } = sbUpload.storage.from('documents').getPublicUrl(fileName);
+                                                uploadedUrls.push(publicUrl);
+                                            }
+                                            if (uploadedUrls.length > 0) {
+                                                setPSavedPhotos(prev => [...prev, ...uploadedUrls]);
+                                                // Persist to DB
+                                                handleSave(true);
+                                            }
+                                        } catch (err) {
+                                            console.error('Photo upload failed:', err);
+                                            // Fallback: add as pending photos
+                                            setPPhotos(prev => [...prev, ...newPhotos]);
+                                        }
+                                    } else {
+                                        // No profile yet, add as pending
+                                        setPPhotos(prev => [...prev, ...newPhotos]);
+                                    }
                                 }
                             };
                             const removePropPhoto = (idx: number) => setPPhotos(prev => prev.filter((_, i) => i !== idx));
-                            const handlePropVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+                            const handlePropVideoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
                                 if (e.target.files && e.target.files.length > 0) {
                                     const total = pSavedVideos.length + pVideos.length;
                                     if (total >= 2) { alert('Máximo de 2 vídeos por propriedade.'); return; }
-                                    setPVideos(prev => [...prev, Array.from(e.target.files!)[0]]);
-                                    // Auto-save so new videos become savedVideos
-                                    setTimeout(() => handleSave(true), 200);
+                                    const videoFile = Array.from(e.target.files)[0];
+
+                                    // Upload directly to storage and add as savedVideos
+                                    if (profileId) {
+                                        try {
+                                            const sbUpload = await getSupabase();
+                                            const propStoragePrefix = propIdx === 0 ? profileId : `${profileId}/prop-${propIdx}`;
+                                            const fileExt = videoFile.name.split('.').pop();
+                                            const fileName = `videos/${propStoragePrefix}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+                                            const { error: uploadError } = await sbUpload.storage.from('documents').upload(fileName, videoFile);
+                                            if (uploadError) { console.error('Video upload error:', uploadError); setPVideos(prev => [...prev, videoFile]); return; }
+                                            const { data: { publicUrl } } = sbUpload.storage.from('documents').getPublicUrl(fileName);
+                                            setPSavedVideos(prev => [...prev, publicUrl]);
+                                            handleSave(true);
+                                        } catch (err) {
+                                            console.error('Video upload failed:', err);
+                                            setPVideos(prev => [...prev, videoFile]);
+                                        }
+                                    } else {
+                                        setPVideos(prev => [...prev, videoFile]);
+                                    }
                                 }
                             };
                             const removePropVideo = (idx: number) => setPVideos(prev => prev.filter((_, i) => i !== idx));
