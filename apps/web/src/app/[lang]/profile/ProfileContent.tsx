@@ -1961,7 +1961,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                             variant="outline"
                                                             size="sm"
                                                             className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                                            onClick={() => { handleSave(true); setPAddressOpen(false); setPDetailsOpen(true); setTimeout(() => document.getElementById(`prop-${propIdx}-details`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }}
+                                                            onClick={() => { setPAddressOpen(false); setPDetailsOpen(true); handleSave(true); setTimeout(() => document.getElementById(`prop-${propIdx}-details`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }}
                                                         >
                                                             Continuar <ArrowRight className="w-4 h-4" />
                                                         </Button>
@@ -1980,9 +1980,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                 propertyType={pType}
                                                 initialOpen={pDetailsOpen}
                                                 onOpenChange={(open) => setPDetailsOpen(open)}
-                                                onContinue={pDetails.propertyName && pDetails.totalSqMeters && (pType === 'single' || pDetails.numberOfUnits > 0)
-                                                    ? () => { handleSave(true); setPDetailsOpen(false); setPPhotosOpen(true); setTimeout(() => document.getElementById(`prop-${propIdx}-photos`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }
-                                                    : undefined
+                                                onContinue={() => { setPDetailsOpen(false); setPPhotosOpen(true); handleSave(true); setTimeout(() => document.getElementById(`prop-${propIdx}-photos`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }}
                                                 }
                                             />
 
@@ -2138,7 +2136,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                                     variant="outline"
                                                                     size="sm"
                                                                     className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                                                    onClick={() => { handleSave(true); setPPhotosOpen(false); setPDescOpen(true); setTimeout(() => document.getElementById(`prop-${propIdx}-description`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }}
+                                                                    onClick={() => { setPPhotosOpen(false); setPDescOpen(true); handleSave(true); setTimeout(() => document.getElementById(`prop-${propIdx}-description`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }}
                                                                 >
                                                                     Continuar <ArrowRight className="w-4 h-4" />
                                                                 </Button>
