@@ -1658,6 +1658,8 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                     if (remaining <= 0) { alert('Máximo de 10 fotos por propriedade.'); return; }
                                     const newPhotos = Array.from(e.target.files).slice(0, remaining);
                                     setPPhotos(prev => [...prev, ...newPhotos]);
+                                    // Auto-save so new photos become savedPhotos (enables profile photo checkbox)
+                                    setTimeout(() => handleSave(true), 200);
                                 }
                             };
                             const removePropPhoto = (idx: number) => setPPhotos(prev => prev.filter((_, i) => i !== idx));
@@ -1666,6 +1668,8 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                     const total = pSavedVideos.length + pVideos.length;
                                     if (total >= 2) { alert('Máximo de 2 vídeos por propriedade.'); return; }
                                     setPVideos(prev => [...prev, Array.from(e.target.files!)[0]]);
+                                    // Auto-save so new videos become savedVideos
+                                    setTimeout(() => handleSave(true), 200);
                                 }
                             };
                             const removePropVideo = (idx: number) => setPVideos(prev => prev.filter((_, i) => i !== idx));
@@ -2038,26 +2042,6 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                                 <span className="text-xs text-muted-foreground">{pSavedPhotos.length + pPhotos.length}/10</span>
                                                             </div>
                                                             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                                                                {/* Upload Button */}
-                                                                {pSavedPhotos.length + pPhotos.length < 10 && (
-                                                                    <div className="aspect-square rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors relative">
-                                                                        <input
-                                                                            type="file"
-                                                                            multiple
-                                                                            accept="image/*"
-                                                                            onChange={handlePropPhotoSelect}
-                                                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                                                        />
-                                                                        <Camera className="w-8 h-8 text-muted-foreground mb-2" />
-                                                                        <span className="text-xs text-muted-foreground">Adicionar Fotos</span>
-                                                                    </div>
-                                                                )}
-
-                                                                {/* New Photos */}
-                                                                {pPhotos.map((file, idx) => (
-                                                                    <PhotoPreview key={`new-p-${idx}`} file={file} onRemove={() => removePropPhoto(idx)} />
-                                                                ))}
-
                                                                 {/* Saved Photos */}
                                                                 {pSavedPhotos.map((url, idx) => {
                                                                     const isProfilePhoto = prop.profilePhotoUrl === url;
@@ -2085,6 +2069,26 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                                         </div>
                                                                     );
                                                                 })}
+
+                                                                {/* New Photos (pending upload) */}
+                                                                {pPhotos.map((file, idx) => (
+                                                                    <PhotoPreview key={`new-p-${idx}`} file={file} onRemove={() => removePropPhoto(idx)} />
+                                                                ))}
+
+                                                                {/* Upload Button — appears last when photos exist */}
+                                                                {pSavedPhotos.length + pPhotos.length < 10 && (
+                                                                    <div className="aspect-square rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors relative">
+                                                                        <input
+                                                                            type="file"
+                                                                            multiple
+                                                                            accept="image/*"
+                                                                            onChange={handlePropPhotoSelect}
+                                                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                                                        />
+                                                                        <Camera className="w-8 h-8 text-muted-foreground mb-2" />
+                                                                        <span className="text-xs text-muted-foreground">Adicionar Fotos</span>
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         </div>
 
@@ -2098,18 +2102,20 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                                 <span className="text-xs text-muted-foreground">{pSavedVideos.length + pVideos.length}/2</span>
                                                             </div>
                                                             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                                                                {pSavedVideos.length + pVideos.length < 2 && (
-                                                                    <div className="aspect-square rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors relative">
-                                                                        <input
-                                                                            type="file"
-                                                                            accept="video/*"
-                                                                            onChange={handlePropVideoSelect}
-                                                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                                                        />
-                                                                        <Video className="w-8 h-8 text-muted-foreground mb-2" />
-                                                                        <span className="text-xs text-muted-foreground">Adicionar Vídeo</span>
+                                                                {/* Saved Videos */}
+                                                                {pSavedVideos.map((url, idx) => (
+                                                                    <div key={`saved-v-${idx}`} className="aspect-square rounded-lg border border-border relative group overflow-hidden">
+                                                                        <video src={url} className="w-full h-full object-cover" muted />
+                                                                        <div className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                            <Button size="icon" variant="destructive" className="h-6 w-6" onClick={() => removePropSavedVideo(url)}>
+                                                                                <Trash2 className="w-3 h-3" />
+                                                                            </Button>
+                                                                        </div>
+                                                                        <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[10px] p-1 text-center flex items-center justify-center gap-1">
+                                                                            <Video className="w-3 h-3" /> Vídeo
+                                                                        </div>
                                                                     </div>
-                                                                )}
+                                                                ))}
 
                                                                 {/* New Videos */}
                                                                 {pVideos.map((file, idx) => (
@@ -2126,20 +2132,19 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                                     </div>
                                                                 ))}
 
-                                                                {/* Saved Videos */}
-                                                                {pSavedVideos.map((url, idx) => (
-                                                                    <div key={`saved-v-${idx}`} className="aspect-square rounded-lg border border-border relative group overflow-hidden">
-                                                                        <video src={url} className="w-full h-full object-cover" muted />
-                                                                        <div className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                            <Button size="icon" variant="destructive" className="h-6 w-6" onClick={() => removePropSavedVideo(url)}>
-                                                                                <Trash2 className="w-3 h-3" />
-                                                                            </Button>
-                                                                        </div>
-                                                                        <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[10px] p-1 text-center flex items-center justify-center gap-1">
-                                                                            <Video className="w-3 h-3" /> Vídeo
-                                                                        </div>
+                                                                {/* Upload Button — appears last when videos exist */}
+                                                                {pSavedVideos.length + pVideos.length < 2 && (
+                                                                    <div className="aspect-square rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors relative">
+                                                                        <input
+                                                                            type="file"
+                                                                            accept="video/*"
+                                                                            onChange={handlePropVideoSelect}
+                                                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                                                        />
+                                                                        <Video className="w-8 h-8 text-muted-foreground mb-2" />
+                                                                        <span className="text-xs text-muted-foreground">Adicionar Vídeo</span>
                                                                     </div>
-                                                                ))}
+                                                                )}
                                                             </div>
                                                         </div>
                                                         {/* Continuar button for Photos → Description */}
