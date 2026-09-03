@@ -1767,7 +1767,23 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                     {/* Collapsible header */}
                                     <button
                                         type="button"
-                                        onClick={() => setExpandedPropertyIdx(isExpanded ? null : propIdx)}
+                                        onClick={() => {
+                                            if (isExpanded) {
+                                                setExpandedPropertyIdx(null);
+                                            } else {
+                                                // Collapse all internal sections when expanding property
+                                                updateProperty(propIdx, prev => ({
+                                                    ...prev,
+                                                    ownershipSectionOpen: false,
+                                                    addressSectionOpen: false,
+                                                    photosSectionOpen: false,
+                                                    descriptionSectionOpen: false,
+                                                    detailsInitialOpen: false,
+                                                    subUnitOpenIdx: null,
+                                                }));
+                                                setExpandedPropertyIdx(propIdx);
+                                            }
+                                        }}
                                         className={cn(
                                             "flex items-center justify-between w-full px-5 py-4 transition-colors",
                                             isExpanded ? "bg-card" : "bg-muted/30 hover:bg-muted/50"
