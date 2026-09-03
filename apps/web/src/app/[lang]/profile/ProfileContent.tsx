@@ -1498,11 +1498,6 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                         </div>
                     </div>
                 </div>
-                <div className="flex flex-col items-end gap-2">
-                    <Button className="bg-gradient-to-r from-amber-300 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-600 text-amber-950 font-bold border-0 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 gap-2 px-6">
-                        {p.header.verifyProfile} <span className="bg-white/20 px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wider">{p.header.premium}</span>
-                    </Button>
-                </div>
             </div>
 
 
@@ -2189,10 +2184,12 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                             onClick={() => {
                                                                 setPDescOpen(false);
                                                                 // If multi with units, the sub-units section shows itself
-                                                                // Otherwise, navigate to Basics tab
+                                                                // Otherwise, navigate to Basics tab (only if not in imoveis view)
                                                                 if (pType !== 'multi' || pDetails.numberOfUnits === 0) {
                                                                     handleSave();
-                                                                    setActiveTab('basics');
+                                                                    if (view !== 'imoveis') {
+                                                                        setActiveTab('basics');
+                                                                    }
                                                                 } else {
                                                                     handleSave(true);
                                                                     setPropField('subUnitOpenIdx', 0);
@@ -2812,10 +2809,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                     <FileText className="w-4 h-4" />
                                     Gerenciar Aluguel
                                 </Button>
-                                <Button className="w-full flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white shadow-amber-900/10 shadow-lg" onClick={() => alert('Premium feature coming soon!')}>
-                                    <CheckCircle2 className="w-4 h-4" />
-                                    Verificar Premium
-                                </Button>
+
                             </div>
                         </div>
 
