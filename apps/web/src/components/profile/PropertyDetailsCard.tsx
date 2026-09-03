@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import {
     ChevronDown, ChevronUp, Settings2, Sun, Droplets, Zap, Flame,
     Landmark, Wifi, Plus, Trash2, Home, BedDouble, Car, Shirt, Wind, CookingPot,
-    DoorOpen, Building2, Camera, Video, Bath, FileText, Wand2, Loader2, UploadCloud, ArrowRight
+    DoorOpen, Building2, Camera, Video, Bath, FileText, Wand2, Loader2, UploadCloud, ArrowRight, Copy
 } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { cn } from "@/lib/utils";
@@ -540,6 +540,26 @@ export function SubUnitsSection({
         onUnitsChange(updated);
     };
 
+    const duplicateUnit = (index: number) => {
+        const source = units[index];
+        const cloned: SubUnit = {
+            ...source,
+            name: `${source.name || `Unidade ${index + 1}`} (cópia)`,
+            // Clone amenity/condo objects so they're independent
+            condominiumIncludes: { ...source.condominiumIncludes },
+            // Clear file-based fields to avoid duplicate references
+            photos: [],
+            videos: [],
+            newPhotos: [],
+            newVideos: [],
+        };
+        const newUnits = [...units];
+        newUnits.splice(index + 1, 0, cloned);
+        onDetailsChange({ ...details, numberOfUnits: newUnits.length });
+        onUnitsChange(newUnits);
+        setOpenUnitIndex(index + 1);
+    };
+
     const handleUnitPhotoSelect = (idx: number, e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files || e.target.files.length === 0) return;
         const unit = units[idx];
@@ -640,6 +660,18 @@ export function SubUnitsSection({
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 h-8 w-8 p-0"
+                                title="Duplicar unidade"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    duplicateUnit(idx);
+                                }}
+                            >
+                                <Copy className="w-4 h-4" />
+                            </Button>
                             <Button
                                 variant="ghost"
                                 size="sm"
