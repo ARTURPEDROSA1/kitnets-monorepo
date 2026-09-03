@@ -184,6 +184,13 @@ export async function POST(request: Request) {
                     { status: 409 }
                 );
             }
+
+            // If a soft-deleted agency is holding this CNPJ, release it so the DB unique constraint doesn't block
+            await supabase
+                .from('agencies')
+                .update({ cnpj: null })
+                .eq('cnpj', cnpjDigits)
+                .not('deleted_at', 'is', null);
         }
 
         // ── Normalize fields ─────────────────────────────────────────
@@ -223,8 +230,18 @@ export async function POST(request: Request) {
 
         if (insertError) {
             console.error('[Agencies POST] Insert error:', insertError);
+            if (insertError.code === '23505') {
+                return NextResponse.json(
+                    {
+                        errors: {
+                            cnpj: 'Este CNPJ já está cadastrado por outra imobiliária.',
+                        },
+                    },
+                    { status: 409 }
+                );
+            }
             return NextResponse.json(
-                { error: 'Erro ao criar imobiliária.' },
+                { error: insertError.message || 'Erro ao criar imobiliária.' },
                 { status: 500 }
             );
         }

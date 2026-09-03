@@ -102,6 +102,7 @@ export async function PUT(
         // ── CNPJ uniqueness check (if changed) ──────────────────────
         const cnpjDigits = body.cnpj?.trim() ? parseCNPJ(body.cnpj) : null;
         if (cnpjDigits && cnpjDigits.length === 14) {
+            // Check if an ACTIVE agency already has this CNPJ
             const { data: existingCnpj } = await supabase
                 .from('agencies')
                 .select('id')
@@ -116,6 +117,14 @@ export async function PUT(
                     { status: 409 }
                 );
             }
+
+            // If a soft-deleted agency is holding this CNPJ, release it so the DB unique constraint doesn't block
+            await supabase
+                .from('agencies')
+                .update({ cnpj: null })
+                .eq('cnpj', cnpjDigits)
+                .neq('id', agencyId)
+                .not('deleted_at', 'is', null);
         }
 
         // ── Normalize and update ─────────────────────────────────────
@@ -155,7 +164,16 @@ export async function PUT(
 
         if (updateError) {
             console.error('[Agencies PUT] Update error:', updateError);
-            return NextResponse.json({ error: 'Erro ao atualizar imobiliária.' }, { status: 500 });
+            if (updateError.code === '23505') {
+                return NextResponse.json(
+                    { errors: { cnpj: 'Este CNPJ já está cadastrado por outra imobiliária.' } },
+                    { status: 409 }
+                );
+            }
+            return NextResponse.json(
+                { error: updateError.message || 'Erro ao atualizar imobiliária.' },
+                { status: 500 }
+            );
         }
 
         console.log('[Agencies PUT] Updated agency:', agencyId);
@@ -232,6 +250,7 @@ export async function DELETE(
             .update({
                 deleted_at: new Date().toISOString(),
                 deleted_by: profile.id,
+                cnpj: null, // Release CNPJ so it can be re-registered or assigned to a new agency
             })
             .eq('id', agencyId);
 
