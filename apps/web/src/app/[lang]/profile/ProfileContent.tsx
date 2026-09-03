@@ -1087,7 +1087,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
         }
     };
 
-    const handleSave = async (silent = false) => {
+    const handleSave = async (silent = false, propertiesOverride?: PropertyState[]) => {
         if (!user) return;
         setIsSaving(true);
         try {
@@ -1100,6 +1100,9 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
 
             const sb = await getSupabase();
 
+            // Use override if provided (e.g. after deletion), otherwise use current state
+            const props = propertiesOverride ?? properties;
+
             // 1. Upsert Profile
 
             const profilePayload: Record<string, unknown> = {
@@ -1110,17 +1113,17 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                 person_type: personType,
                 address: formData.ownerAddress,
                 // When all properties are deleted, null out legacy columns to prevent ghost properties
-                property_address: properties.length > 0 ? properties[0].address : null,
-                property_type: properties.length > 0 ? properties[0].propertyType : null,
-                property_details: properties.length > 0 ? properties[0].details : null,
-                sub_units: properties.length > 0 ? properties[0].subUnits : null,
-                property_photos: properties.length > 0 ? properties[0].savedPhotos : null,
-                property_videos: properties.length > 0 ? properties[0].savedVideos : null,
-                profile_photo_url: properties.length > 0 ? properties[0].profilePhotoUrl : null,
+                property_address: props.length > 0 ? props[0].address : null,
+                property_type: props.length > 0 ? props[0].propertyType : null,
+                property_details: props.length > 0 ? props[0].details : null,
+                sub_units: props.length > 0 ? props[0].subUnits : null,
+                property_photos: props.length > 0 ? props[0].savedPhotos : null,
+                property_videos: props.length > 0 ? props[0].savedVideos : null,
+                profile_photo_url: props.length > 0 ? props[0].profilePhotoUrl : null,
                 admin_data: personType === 'pj' ? adminData : null,
                 role: 'landlord',
                 // Persist additional properties (index 1+) as JSON
-                additional_properties: properties.slice(1).map(prop => ({
+                additional_properties: props.slice(1).map(prop => ({
                     propertyType: prop.propertyType,
                     details: prop.details,
                     subUnits: prop.subUnits,
@@ -1726,13 +1729,14 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         if (confirm(`Remover "${propLabel}"? Esta ação não pode ser desfeita.`)) {
-                                                            setProperties(prev => prev.filter((_, i) => i !== propIdx));
+                                                            const remainingProperties = properties.filter((_, i) => i !== propIdx);
+                                                            setProperties(remainingProperties);
                                                             if (expandedPropertyIdx === propIdx) setExpandedPropertyIdx(null);
                                                             else if (expandedPropertyIdx !== null && expandedPropertyIdx > propIdx) {
                                                                 setExpandedPropertyIdx(expandedPropertyIdx - 1);
                                                             }
-                                                            // Persist deletion to DB so it survives navigation
-                                                            setTimeout(() => handleSave(true), 100);
+                                                            // Persist deletion to DB using the already-filtered list
+                                                            handleSave(true, remainingProperties);
                                                         }
                                                     }}
                                                     onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }}
