@@ -1491,7 +1491,19 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                 </div>
             )}
 
-            {/* Header / Overview — hidden on imoveis view */}
+            {/* Page Header for imoveis view */}
+            {view === 'imoveis' && (
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                        <h1 className="text-3xl font-bold text-foreground">Imóveis</h1>
+                        <p className="text-muted-foreground mt-1">
+                            Gerencie seus imóveis cadastrados.
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            {/* Header / Overview — shown on profile/proprietario view */}
             {view !== 'imoveis' && (
                 <div className="flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
                     <div className="flex items-center gap-4">
