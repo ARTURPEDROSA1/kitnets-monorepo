@@ -1731,6 +1731,8 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                             else if (expandedPropertyIdx !== null && expandedPropertyIdx > propIdx) {
                                                                 setExpandedPropertyIdx(expandedPropertyIdx - 1);
                                                             }
+                                                            // Persist deletion to DB so it survives navigation
+                                                            setTimeout(() => handleSave(true), 100);
                                                         }
                                                     }}
                                                     onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }}
