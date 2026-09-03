@@ -1545,7 +1545,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
             )}
 
             {/* Content Area */}
-            <div className="bg-card text-card-foreground rounded-xl border border-border p-6 min-h-[400px] shadow-sm">
+            <div className="min-h-[400px]">
 
                 {/* OWNERSHIP TAB */}
                 {activeTab === 'ownership' && (
@@ -1731,6 +1731,11 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                     <span className="font-semibold text-foreground text-sm">{propLabel}</span>
                                                     <span className="text-xs text-muted-foreground">({propTypeName})</span>
                                                 </div>
+                                                {!isExpanded && pAddr.rua && (
+                                                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                                                        {[pAddr.rua, pAddr.numero, pAddr.bairro, pAddr.city, pAddr.state, pAddr.cep].filter(Boolean).join(', ')}
+                                                    </p>
+                                                )}
                                                 {propComplete && !isExpanded && (
                                                     <span className="text-xs text-emerald-600 flex items-center gap-1 mt-0.5">
                                                         <CheckCircle2 className="w-3 h-3" /> Preenchido
