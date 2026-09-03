@@ -478,15 +478,8 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                         const allProps = [primaryProperty, ...additionalProps];
                         setProperties(allProps);
 
-                        // Decide which to expand
-                        // All collapsed if ALL are complete, else expand first incomplete
-                        const allComplete = allProps.every(isPropertyComplete);
-                        if (allComplete) {
-                            setExpandedPropertyIdx(null);
-                        } else {
-                            const firstIncomplete = allProps.findIndex(p2 => !isPropertyComplete(p2));
-                            setExpandedPropertyIdx(firstIncomplete >= 0 ? firstIncomplete : 0);
-                        }
+                        // Start with all properties collapsed
+                        setExpandedPropertyIdx(null);
                     }
                     // Auto-collapse identity section if identity verification data exists
                     if (profile.cpf || profile.cnpj || profile.business_name) {
