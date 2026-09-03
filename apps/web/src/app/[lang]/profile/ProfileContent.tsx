@@ -1981,7 +1981,6 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                 initialOpen={pDetailsOpen}
                                                 onOpenChange={(open) => setPDetailsOpen(open)}
                                                 onContinue={() => { setPDetailsOpen(false); setPPhotosOpen(true); handleSave(true); setTimeout(() => document.getElementById(`prop-${propIdx}-photos`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }}
-                                                }
                                             />
 
                                             {/* 4. Photos & Videos Section — Main Property — Collapsible */}
