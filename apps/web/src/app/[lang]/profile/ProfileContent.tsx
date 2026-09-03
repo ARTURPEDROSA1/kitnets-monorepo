@@ -1312,31 +1312,33 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                 // Commit updated properties to state
                 setProperties(updatedProperties);
 
-                // Serialize sub-units for DB (strip File objects) — for property[0]
-                const subUnitsForDB = updatedProperties[0].subUnits.map(u => {
-                    const { newPhotos: _np, newVideos: _nv, ...rest } = u;
-                    return rest;
-                });
+                // Sync primary property's Photos/Videos/SubUnits to Profile columns (only if properties exist)
+                if (updatedProperties.length > 0) {
+                    // Serialize sub-units for DB (strip File objects) — for property[0]
+                    const subUnitsForDB = updatedProperties[0].subUnits.map(u => {
+                        const { newPhotos: _np, newVideos: _nv, ...rest } = u;
+                        return rest;
+                    });
 
-                // Sync primary property's Photos/Videos/SubUnits to Profile columns
-                await sb.from('profiles').update({
-                    property_photos: updatedProperties[0].savedPhotos,
-                    property_videos: updatedProperties[0].savedVideos,
-                    sub_units: subUnitsForDB,
-                    // Also update additional_properties with uploaded URLs
-                    additional_properties: updatedProperties.slice(1).map(prop => ({
-                        propertyType: prop.propertyType,
-                        details: prop.details,
-                        subUnits: prop.subUnits.map(u => {
-                            const { newPhotos: _np2, newVideos: _nv2, ...rest2 } = u;
-                            return rest2;
-                        }),
-                        address: prop.address,
-                        savedPhotos: prop.savedPhotos,
-                        savedVideos: prop.savedVideos,
-                        savedProofs: prop.savedProofs,
-                    })),
-                }).eq('id', profile.id);
+                    await sb.from('profiles').update({
+                        property_photos: updatedProperties[0].savedPhotos,
+                        property_videos: updatedProperties[0].savedVideos,
+                        sub_units: subUnitsForDB,
+                        // Also update additional_properties with uploaded URLs
+                        additional_properties: updatedProperties.slice(1).map(prop => ({
+                            propertyType: prop.propertyType,
+                            details: prop.details,
+                            subUnits: prop.subUnits.map(u => {
+                                const { newPhotos: _np2, newVideos: _nv2, ...rest2 } = u;
+                                return rest2;
+                            }),
+                            address: prop.address,
+                            savedPhotos: prop.savedPhotos,
+                            savedVideos: prop.savedVideos,
+                            savedProofs: prop.savedProofs,
+                        })),
+                    }).eq('id', profile.id);
+                }
             }
 
             // Update Clerk Name
