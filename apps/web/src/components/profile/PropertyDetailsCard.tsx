@@ -511,12 +511,13 @@ export function SubUnitsSection({
         [units]
     );
 
-    // Use initialOpenIdx from parent if provided, otherwise open first incomplete unit
+    // Use initialOpenIdx from parent if provided (number or null = explicit), otherwise auto-pick
     const [openUnitIndex, setOpenUnitIndex] = useState<number | null>(() => {
-        if (initialOpenIdx !== undefined) return initialOpenIdx;
+        if (initialOpenIdx !== undefined) return initialOpenIdx; // null = all collapsed, number = open that one
+        // Auto-pick: all collapsed if complete, else first incomplete
         if (allComplete) return null;
         const firstIncomplete = units.findIndex(u => !isUnitComplete(u));
-        return firstIncomplete >= 0 ? firstIncomplete : 0;
+        return firstIncomplete >= 0 ? firstIncomplete : null;
     });
 
     const updateUnit = (index: number, partial: Partial<SubUnit>) => {

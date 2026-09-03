@@ -2325,7 +2325,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                         generatingDescriptionIdx={generatingUnitDescriptionIdx}
                                                         onImportContract={(unitIdx, file) => importContract(propIdx, unitIdx, file)}
                                                         importingContractIdx={importingContractIdx}
-                                                        initialOpenIdx={prop.subUnitOpenIdx ?? undefined}
+                                                        initialOpenIdx={prop.subUnitOpenIdx}
                                                         propertyIndex={propIdx}
                                                     />
                                                 </>
