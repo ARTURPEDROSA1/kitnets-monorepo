@@ -1,8 +1,3 @@
--- ============================================================
--- Add property_index to ownership_proofs and enable DELETE RLS
--- Run in Supabase SQL Editor
--- ============================================================
-
 -- 1. Add property_index column (default 0 for primary property)
 ALTER TABLE public.ownership_proofs 
     ADD COLUMN IF NOT EXISTS property_index INTEGER NOT NULL DEFAULT 0;
