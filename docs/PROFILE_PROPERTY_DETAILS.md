@@ -231,10 +231,12 @@ type ProofData = {
     original_name: string;
     status: 'pending' | 'approved' | 'rejected';
     created_at: string;
+    property_index?: number;
+    file_url?: string;
 };
 ```
 
-**Stored in:** The `ownership_proofs` table for all properties. For additional properties (index 1+), the proof records are **also persisted** in the `additional_properties` JSON's `savedProofs` field for correct reload.
+**Stored in:** The `ownership_proofs` table for all properties with `property_index`. For additional properties (index 1+), the proof records are **also persisted** in the `additional_properties` JSON's `savedProofs` field for redundancy.
 
 ### 3.5 Database Schema
 
@@ -256,6 +258,7 @@ The `ownership_proofs` table:
 |--------|------|-------------|
 | `id` | `UUID` | Primary key |
 | `profile_id` | `UUID` | FK to profiles.id |
+| `property_index` | `INTEGER` | Property index (0 = primary, 1+ = additional) |
 | `file_url` | `TEXT` | Storage path in documents bucket |
 | `original_name` | `TEXT` | Original filename |
 | `file_size` | `BIGINT` | File size in bytes |
@@ -593,31 +596,36 @@ When a file is selected:
 
 ### 8.2 Persistence Strategy
 
-Ownership proofs use a **dual persistence** strategy:
+Ownership proofs are scoped per property via the `property_index` column:
 
 | Property Index | DB Table | JSON Column |
 |----------------|----------|-------------|
-| 0 (primary) | `ownership_proofs` table (queried by `profile_id`) | Not needed — loaded from table |
-| 1+ (additional) | `ownership_proofs` table (inserted for all properties) | `additional_properties[idx].savedProofs` |
+| 0 (primary) | `ownership_proofs` table (`property_index = 0`) | Not needed — loaded from table |
+| 1+ (additional) | `ownership_proofs` table (`property_index = idx`) | `additional_properties[idx].savedProofs` (redundancy) |
 
-**Why dual?** The `ownership_proofs` table doesn't have a `property_index` column to distinguish which property each proof belongs to. For the primary property, all proofs are loaded from the table. For additional properties, the proof metadata (`id`, `original_name`, `status`, `created_at`) is also stored in the `additional_properties` JSON to enable correct reload.
+Each proof row records `property_index` matching its property. For additional properties, proof metadata is also mirrored in `additional_properties` JSON for fast client-side restores.
 
 ### 8.3 Load Flow
 
 ```typescript
-// 1. Load all proofs from DB → assign to primary property
+// 1. Load all proofs from DB for this profile
 const { data: proofs } = await sb
     .from('ownership_proofs')
     .select('*')
     .eq('profile_id', profile.id)
     .order('created_at', { ascending: false });
 
-primaryProperty.savedProofs = proofs as ProofData[];
+// 2. Primary property receives ONLY proofs with property_index === 0
+primaryProperty.savedProofs = dedupeProofs(
+    allProofs.filter(p => getProofPropertyIndex(p) === 0 && !additionalProofIds.has(p.id))
+);
 
-// 2. Load additional properties' proofs from JSON
-for (const ap of profile.additional_properties) {
-    additionalProp.savedProofs = ap.savedProofs || [];
-    additionalProp.ownershipSectionOpen = !(ap.savedProofs?.length > 0);
+// 3. Additional properties receive their own matching proofs, deduplicated
+for (let apIdx = 0; apIdx < profile.additional_properties.length; apIdx++) {
+    const targetPropIdx = apIdx + 1;
+    const dbProofsForProp = allProofs.filter(p => getProofPropertyIndex(p) === targetPropIdx);
+    const jsonProofsForProp = apTyped.savedProofs || [];
+    additionalProp.savedProofs = dedupeProofs([...dbProofsForProp, ...jsonProofsForProp]);
 }
 ```
 
@@ -861,12 +869,27 @@ Property details and sub-units are stored as JSONB in the `profiles` table becau
 - [ ] **Delete media from storage** — Currently removing a saved photo/video only removes the URL from state; the file remains in Supabase storage
 - [ ] **Progress indicator** during multi-file upload (currently no per-file feedback)
 - [ ] **Optimistic UI** — Show uploaded photos immediately with loading indicators
-- [ ] **`property_index` column** in `ownership_proofs` table — Would eliminate the need for dual persistence and enable admin-side per-property proof filtering
+- [x] **`property_index` column** in `ownership_proofs` table — Enables true per-property proof isolation, eliminates cross-leakage, and supports admin-side per-property proof filtering
 - [ ] **Separate relational table** for sub-units if cross-profile querying becomes necessary
 
 ---
 
 ## 14. Changelog
+
+### v2.1 — 2026-09-04
+
+#### Multi-Property Document Cross-Contamination & Duplication Fix
+
+**Problem:**
+1. Documents from multi-property (Property 1+) were showing up inside the single property (Property 0).
+2. Multiple duplicate copies of the same document (e.g., 10 copies of `IPTU 2025.pdf`) existed and kept reappearing even after deletion.
+
+**Root Causes & Fixes:**
+1. **Per-property scoping:** Added `property_index` column to `ownership_proofs`. Proof loading now strictly filters proofs per property index (`property_index === 0` for primary property, `property_index === i + 1` for additional properties), with fallback matching on `file_url` and exclusion of IDs in `additional_properties`.
+2. **True deletion:** `removePropSavedProof` now deletes the record from `ownership_proofs` table in Supabase and removes the file from the storage bucket. Added RLS `DELETE` policy on `ownership_proofs`.
+3. **Save concurrency guards:** Added `if (!user || isSaving) return;` guard to `handleSave` and disabled all section "Continuar" buttons while saving (`disabled={isSaving}`), preventing rapid clicks from triggering multiple concurrent upload operations.
+4. **Deduplication:** Added `dedupeProofs` utility to filter out identical proofs by ID and document name both on load, save, and UI rendering. Added client-side duplicate prevention on file input dropzone.
+5. **Database migration script:** Created `packages/core/database/add_property_index_to_ownership_proofs.sql` to add the column, backfill existing records from `file_url`, enable the `DELETE` policy, and deduplicate existing rows.
 
 ### v2.0 — 2026-02-18
 
