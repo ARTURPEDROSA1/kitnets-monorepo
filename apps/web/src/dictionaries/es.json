@@ -683,7 +683,7 @@
             "verifyBadge": "Verifique su perfil para obtener la insignia oficial."
         },
         "ownership": {
-            "title": "Verificación de Propriedad",
+            "title": "Documentos",
             "description": "Para garantizar la seguridad de la plataforma, solicitamos comprobantes de propiedad de los inmuebles. Nuestra IA analizará los documentos para extraer direcciones y confirmar la titularidad.",
             "acceptedDocs": "Documentos aceptados:",
             "docs": {

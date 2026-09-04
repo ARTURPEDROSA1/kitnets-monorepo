@@ -259,7 +259,7 @@ export default function PropertyDetailsCard({
                     <div className="p-2 bg-violet-100 dark:bg-violet-900/50 rounded-lg text-violet-600">
                         <Settings2 className="w-5 h-5" />
                     </div>
-                    <h3 className="text-lg font-semibold text-foreground">Detalhes</h3>
+                    <h3 className="text-lg font-semibold text-foreground">Dados do Imóvel</h3>
                     {!isOpen && (details.propertyName || details.totalSqMeters) && (
                         <span className="ml-2 text-xs bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 px-2 py-0.5 rounded-full">
                             {details.propertyName ? `${details.propertyName} · ` : ''}{details.totalSqMeters ? `${details.totalSqMeters} m²` : ''}{propertyType === 'multi' && details.numberOfUnits > 0 ? ` · ${details.numberOfUnits} unidades` : ''} ✓

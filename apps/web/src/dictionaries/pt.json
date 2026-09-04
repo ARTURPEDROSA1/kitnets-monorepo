@@ -919,7 +919,7 @@
             "verifyBadge": "Verifique seu perfil para obter o selo oficial."
         },
         "ownership": {
-            "title": "Verificação de Propriedade",
+            "title": "Documentos",
             "description": "Para garantir a segurança da plataforma, solicitamos comprovantes de propriedade dos imóveis. Nossa IA analisará os documentos para extrair endereços e confirmar a titularidade.",
             "acceptedDocs": "Documentos aceitos:",
             "docs": {

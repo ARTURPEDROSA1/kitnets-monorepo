@@ -705,7 +705,7 @@
             "verifyBadge": "Verify your profile to get the official badge."
         },
         "ownership": {
-            "title": "Property Verification",
+            "title": "Documents",
             "description": "To ensure platform security, we request proof of property ownership. Our AI will analyze documents to extract addresses and confirm ownership.",
             "acceptedDocs": "Accepted documents:",
             "docs": {
