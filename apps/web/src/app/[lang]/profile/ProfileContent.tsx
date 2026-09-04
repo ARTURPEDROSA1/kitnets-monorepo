@@ -286,14 +286,14 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
     const allTabs = [
         { id: 'ownership', label: ownershipTabLabel },
         { id: 'basics', label: personType === 'pj' ? 'Dados da Holding' : p.tabs.basics },
-        { id: 'security', label: properties.length > 1 ? 'Gerenciar Propriedades' : p.tabs.security },
+        { id: 'security', label: p.tabs.security },
     ];
 
     // Filter tabs based on view prop
     const tabs = view === 'proprietario'
         ? allTabs.filter(t => t.id === 'basics')
         : view === 'imoveis'
-            ? allTabs.filter(t => t.id === 'ownership' || t.id === 'security')
+            ? allTabs.filter(t => t.id === 'ownership')
             : allTabs;
 
     // Holding tab collapsible states
@@ -1461,32 +1461,47 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
 
     if (!isLoaded || !user) return <div className="p-8 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-emerald-600" /></div>;
 
-    const handleQuickPublish = (intent: 'rent' | 'sale') => {
+    const handleQuickPublish = (intent: 'rent' | 'sale', targetPropIdx: number = 0) => {
+        const targetProp = properties[targetPropIdx] || properties[0];
+        const propAddr = targetProp ? targetProp.address : formData.propertyAddress;
+        const propDetails = targetProp ? targetProp.details : propertyDetails;
+        const propPhotos = targetProp ? [...targetProp.savedPhotos, ...targetProp.photos] : [...savedPhotos, ...propertyPhotos];
+        const propProofs = targetProp ? targetProp.savedProofs : savedProofs;
+
+        const street = propAddr?.street || formData.propertyAddress.street || '';
+        const number = propAddr?.number || formData.propertyAddress.number || '';
+        const neighborhood = propAddr?.neighborhood || formData.propertyAddress.neighborhood || '';
+        const city = propAddr?.city || formData.propertyAddress.city || '';
+        const state = propAddr?.state || formData.propertyAddress.state || '';
+        const cep = propAddr?.cep || formData.propertyAddress.cep || '';
+        const complement = propAddr?.complement || formData.propertyAddress.complement || '';
+        const description = propAddr?.description || formData.propertyAddress.description || '';
+
         // Map profile data to ListingData structure
         const draftListing = {
             role: 'owner',
             intent: intent,
-            propertyType: 'kitnet', // Defaulting to kitnet as it's the platform focus
+            propertyType: targetProp?.propertyType === 'multi' ? 'kitnet' : (targetProp?.propertyType || 'kitnet'),
             location: {
-                city: formData.propertyAddress.city,
-                state: formData.propertyAddress.state,
-                neighborhood: formData.propertyAddress.neighborhood,
-                street: formData.propertyAddress.street,
-                number: formData.propertyAddress.number,
-                complement: formData.propertyAddress.complement || '',
-                address: `${formData.propertyAddress.street}, ${formData.propertyAddress.number} - ${formData.propertyAddress.neighborhood}, ${formData.propertyAddress.city} - ${formData.propertyAddress.state}`,
-                zip: formData.propertyAddress.cep
+                city,
+                state,
+                neighborhood,
+                street,
+                number,
+                complement,
+                address: `${street}, ${number} - ${neighborhood}, ${city} - ${state}`,
+                zip: cep
             },
             details: {
-                area: "", // Missing in profile
-                bedrooms: 1, // Default
-                bathrooms: 1, // Default
+                area: propDetails?.totalSqMeters || "",
+                bedrooms: 1,
+                bathrooms: 1,
                 parking: 0,
                 furnished: false,
                 pets: false,
                 deliveryDate: "",
-                units: "1",
-                rentValue: "", // User needs to set this
+                units: targetProp?.propertyType === 'multi' ? (targetProp.details?.numberOfUnits ? String(targetProp.details.numberOfUnits) : "1") : "1",
+                rentValue: "",
                 condoFee: "",
                 tax: "",
                 minPeriod: "12",
@@ -1494,15 +1509,15 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                 financing: false,
             },
             media: {
-                photos: [...savedPhotos, ...propertyPhotos], // Combined strings and Files
+                photos: propPhotos,
                 video: null,
                 pdf: null
             },
-            description: formData.propertyAddress.description || '',
+            description: description,
             contact: {
                 email: user?.primaryEmailAddress?.emailAddress || '',
                 phone: formData.phone,
-                whatsapp: true // Assume true for owner
+                whatsapp: true
             },
             identity: {
                 cpf: formData.cpf,
@@ -1514,8 +1529,8 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                 birthDate: formData.birthDate
             },
             ownership: {
-                documents: [], // Skip documents for now to avoid file object issues
-                verified: savedProofs.length > 0
+                documents: [],
+                verified: propProofs.length > 0
             }
         };
 
@@ -1878,8 +1893,9 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             return (
                                 <div key={propIdx} className="border border-border rounded-xl shadow-sm overflow-hidden transition-all duration-200">
                                     {/* Collapsible header */}
-                                    <button
-                                        type="button"
+                                    <div
+                                        role="button"
+                                        tabIndex={0}
                                         onClick={() => {
                                             if (isExpanded) {
                                                 setExpandedPropertyIdx(null);
@@ -1897,12 +1913,19 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                 setExpandedPropertyIdx(propIdx);
                                             }
                                         }}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                if (isExpanded) setExpandedPropertyIdx(null);
+                                                else setExpandedPropertyIdx(propIdx);
+                                            }
+                                        }}
                                         className={cn(
-                                            "flex items-center justify-between w-full px-5 py-4 transition-colors",
+                                            "flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 w-full px-5 py-4 transition-colors cursor-pointer select-none",
                                             isExpanded ? "bg-card" : "bg-muted/30 hover:bg-muted/50"
                                         )}
                                     >
-                                        <div className="flex items-center gap-3">
+                                        <div className="flex items-center gap-3 min-w-0">
                                             {/* Profile photo thumbnail on collapsed card */}
                                             {!isExpanded && prop.profilePhotoUrl ? (
                                                 <div className="w-10 h-10 rounded-lg overflow-hidden border border-border flex-shrink-0">
@@ -1910,7 +1933,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                 </div>
                                             ) : (
                                                 <div className={cn(
-                                                    "p-2 rounded-lg",
+                                                    "p-2 rounded-lg flex-shrink-0",
                                                     prop.propertyType === 'single'
                                                         ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600"
                                                         : "bg-violet-100 dark:bg-violet-900/50 text-violet-600"
@@ -1918,10 +1941,10 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                     {propIcon}
                                                 </div>
                                             )}
-                                            <div className="text-left">
+                                            <div className="text-left min-w-0">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="font-semibold text-foreground text-sm">{propLabel}</span>
-                                                    <span className="text-xs text-muted-foreground">({propTypeName})</span>
+                                                    <span className="font-semibold text-foreground text-sm truncate">{propLabel}</span>
+                                                    <span className="text-xs text-muted-foreground whitespace-nowrap">({propTypeName})</span>
                                                 </div>
                                                 {!isExpanded && pAddr.street && (
                                                     <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
@@ -1935,7 +1958,45 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                 )}
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-2">
+
+                                        {/* Quick Actions at the very top of property card on expanded mode */}
+                                        {isExpanded && (
+                                            <div
+                                                className="flex items-center gap-2 flex-wrap order-3 sm:order-2 w-full sm:w-auto mt-2 sm:mt-0 justify-start sm:justify-center"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <Button
+                                                    size="sm"
+                                                    type="button"
+                                                    className="h-8 text-xs flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-xs"
+                                                    onClick={() => handleQuickPublish('rent', propIdx)}
+                                                >
+                                                    <Home className="w-3.5 h-3.5" />
+                                                    Anunciar Aluguel
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    type="button"
+                                                    className="h-8 text-xs flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-xs"
+                                                    onClick={() => handleQuickPublish('sale', propIdx)}
+                                                >
+                                                    <Sparkles className="w-3.5 h-3.5" />
+                                                    Anunciar Venda
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    type="button"
+                                                    variant="outline"
+                                                    className="h-8 text-xs flex items-center gap-1.5 font-medium shadow-xs"
+                                                    onClick={() => window.location.href = '/dashboard'}
+                                                >
+                                                    <FileText className="w-3.5 h-3.5" />
+                                                    Gerenciar Aluguel
+                                                </Button>
+                                            </div>
+                                        )}
+
+                                        <div className="flex items-center gap-2 flex-shrink-0 order-2 sm:order-3">
                                             {(
                                                 <span
                                                     role="button"
@@ -1961,7 +2022,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                             )}
                                             {isExpanded ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
                                         </div>
-                                    </button>
+                                    </div>
 
                                     {/* Expanded wizard content for any property */}
                                     {isExpanded && (
@@ -3014,29 +3075,9 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                 )}
 
 
-                {/* SECURITY TAB — Gerenciar Propriedades (Quick Actions) */}
+                {/* SECURITY TAB */}
                 {activeTab === 'security' && (
                     <div className="space-y-6">
-                        {/* Card 0: Quick Actions */}
-                        <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
-                            <h3 className="text-lg font-semibold text-foreground mb-4">Ações Rápidas</h3>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                <Button className="w-full flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white" onClick={() => handleQuickPublish('rent')}>
-                                    <Home className="w-4 h-4" />
-                                    Anunciar Aluguel
-                                </Button>
-                                <Button className="w-full flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => handleQuickPublish('sale')}>
-                                    <Sparkles className="w-4 h-4" />
-                                    Anunciar Venda
-                                </Button>
-                                <Button className="w-full flex items-center gap-2" variant="outline" onClick={() => window.location.href = '/dashboard'}>
-                                    <FileText className="w-4 h-4" />
-                                    Gerenciar Aluguel
-                                </Button>
-
-                            </div>
-                        </div>
-
                         {/* Notifications — shown in full view only (proprietário view has its own copy) */}
                         {view === 'full' && (
                             <div className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-6">
