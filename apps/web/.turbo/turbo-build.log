@@ -13,7 +13,7 @@
    Creating an optimized production build ...
 [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
 [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
- ✓ Compiled successfully in 32.2s
+ ✓ Compiled successfully in 42s
    Running TypeScript ...
    Collecting page data using 7 workers ...
 [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
@@ -23,7 +23,7 @@
 [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
 [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
 [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
-   Generating static pages using 7 workers (0/187) ...
+   Generating static pages using 7 workers (0/207) ...
 [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
 [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
 [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
@@ -31,6 +31,8 @@
 [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
 [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
 [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+   Generating static pages using 7 workers (51/207) 
+   Generating static pages using 7 workers (103/207) 
 The width(-1) and height(-1) of chart should be greater than 0,
        please check the style of container, or the props width(100%) and height(100%),
        or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
@@ -39,33 +41,6 @@ The width(-1) and height(-1) of chart should be greater than 0,
        please check the style of container, or the props width(100%) and height(100%),
        or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
        height and width.
-The width(-1) and height(-1) of chart should be greater than 0,
-       please check the style of container, or the props width(100%) and height(100%),
-       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
-       height and width.
-The width(-1) and height(-1) of chart should be greater than 0,
-       please check the style of container, or the props width(100%) and height(100%),
-       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
-       height and width.
-The width(-1) and height(-1) of chart should be greater than 0,
-       please check the style of container, or the props width(100%) and height(100%),
-       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
-       height and width.
-The width(-1) and height(-1) of chart should be greater than 0,
-       please check the style of container, or the props width(100%) and height(100%),
-       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
-       height and width.
-   Generating static pages using 7 workers (46/187) 
-   Generating static pages using 7 workers (93/187) 
-The width(-1) and height(-1) of chart should be greater than 0,
-       please check the style of container, or the props width(100%) and height(100%),
-       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
-       height and width.
-The width(-1) and height(-1) of chart should be greater than 0,
-       please check the style of container, or the props width(100%) and height(100%),
-       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
-       height and width.
-   Generating static pages using 7 workers (140/187) 
 Failed to fetch articles for sitemap Error: Dynamic server usage: Route /sitemap.xml couldn't be rendered statically because it used `cookies`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
     at ignore-listed frames {
   description: "Route /sitemap.xml couldn't be rendered statically because it used `cookies`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
@@ -75,6 +50,7 @@ The width(-1) and height(-1) of chart should be greater than 0,
        please check the style of container, or the props width(100%) and height(100%),
        or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
        height and width.
+   Generating static pages using 7 workers (155/207) 
 The width(-1) and height(-1) of chart should be greater than 0,
        please check the style of container, or the props width(100%) and height(100%),
        or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
@@ -123,7 +99,31 @@ The width(-1) and height(-1) of chart should be greater than 0,
        please check the style of container, or the props width(100%) and height(100%),
        or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
        height and width.
- ✓ Generating static pages using 7 workers (187/187) in 4.3s
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+ ✓ Generating static pages using 7 workers (207/207) in 4.1s
    Finalizing page optimization ...
 
 Route (app)                                                    Revalidate  Expire
@@ -216,6 +216,8 @@ Route (app)                                                    Revalidate  Expir
 ├ ƒ /[lang]/conteudos/[category]
 ├ ƒ /[lang]/conteudos/[category]/[slug]
 ├ ƒ /[lang]/conteudos/autor/[slug]
+├ ƒ /[lang]/contratos
+├ ƒ /[lang]/corretores
 ├ ƒ /[lang]/dashboard
 ├ ƒ /[lang]/dashboard/billing/[propertyId]
 ├ ƒ /[lang]/dashboard/billing/[propertyId]/new
@@ -235,11 +237,16 @@ Route (app)                                                    Revalidate  Expir
 │ └ /es/forgot-password
 ├ ○ /[lang]/icon.png
 ├ ƒ /[lang]/imobiliaria
+├ ● /[lang]/imoveis
+│ ├ /en/imoveis
+│ ├ /pt/imoveis
+│ └ /es/imoveis
 ├ ƒ /[lang]/indices/[code]
 ├ ● /[lang]/indices/panorama                                           1h      1y
 │ ├ /en/indices/panorama                                               1h      1y
 │ ├ /pt/indices/panorama                                               1h      1y
 │ └ /es/indices/panorama                                               1h      1y
+├ ƒ /[lang]/inquilinos
 ├ ● /[lang]/lancamentos
 │ ├ /en/lancamentos
 │ ├ /pt/lancamentos
@@ -296,6 +303,10 @@ Route (app)                                                    Revalidate  Expir
 │ ├ /en/profile
 │ ├ /pt/profile
 │ └ /es/profile
+├ ● /[lang]/proprietario
+│ ├ /en/proprietario
+│ ├ /pt/proprietario
+│ └ /es/proprietario
 ├ ● /[lang]/signup
 │ ├ /en/signup
 │ ├ /pt/signup
@@ -328,6 +339,9 @@ Route (app)                                                    Revalidate  Expir
 ├ ƒ /api/agencies
 ├ ƒ /api/agencies/[id]
 ├ ƒ /api/agencies/[id]/logo
+├ ƒ /api/agents
+├ ƒ /api/agents/[id]
+├ ƒ /api/agents/[id]/photo
 ├ ƒ /api/cep
 ├ ƒ /api/cron/update-igpm
 ├ ƒ /api/cron/update-ipca-inpc
@@ -339,10 +353,18 @@ Route (app)                                                    Revalidate  Expir
 ├ ƒ /api/gateways/ingest
 ├ ƒ /api/identity/verify
 ├ ○ /api/indices/[code]/calculator-data
+├ ƒ /api/leases
+├ ƒ /api/leases/[id]
+├ ƒ /api/leases/[id]/documents
+├ ƒ /api/leases/[id]/terminate
+├ ƒ /api/leases/dropdowns
 ├ ƒ /api/ownership/analyze
 ├ ƒ /api/profiles/create
 ├ ƒ /api/property/extract-contract
 ├ ƒ /api/property/generate-description
+├ ƒ /api/tenants
+├ ƒ /api/tenants/[id]
+├ ƒ /api/tenants/properties
 ├ ○ /apple-icon.png
 ├ ○ /icon.png
 ├ ○ /manifest.webmanifest

@@ -15,11 +15,42 @@ import { deleteAccount } from './actions';
 import { Dictionary } from '@/dictionaries';
 
 // Types
-type ProofData = {
+export type ProofData = {
     id: string;
     original_name: string;
     status: 'pending' | 'approved' | 'rejected';
     created_at: string;
+    property_index?: number;
+    file_url?: string;
+};
+
+export const getProofPropertyIndex = (proof: ProofData): number => {
+    if (typeof proof.property_index === 'number') {
+        return proof.property_index;
+    }
+    if (proof.file_url) {
+        const match = proof.file_url.match(/\/prop-([0-9]+)\//);
+        if (match && match[1]) {
+            return parseInt(match[1], 10);
+        }
+    }
+    return 0;
+};
+
+export const dedupeProofs = (proofsList: ProofData[]): ProofData[] => {
+    const seenIds = new Set<string>();
+    const seenNames = new Set<string>();
+    const unique: ProofData[] = [];
+    for (const p of proofsList) {
+        if (!p) continue;
+        if (p.id && seenIds.has(p.id)) continue;
+        const nameKey = p.original_name ? p.original_name.trim().toLowerCase() : '';
+        if (nameKey && seenNames.has(nameKey)) continue;
+        if (p.id) seenIds.add(p.id);
+        if (nameKey) seenNames.add(nameKey);
+        unique.push(p);
+    }
+    return unique;
 };
 
 // Per-property bundled state
@@ -395,15 +426,33 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                     });
 
                     // ── Build properties array from DB ──
-                    const loadedProofs: ProofData[] = [];
+                    const allProofs: ProofData[] = [];
                     {
                         const { data: proofs } = await sb
                             .from('ownership_proofs')
                             .select('*')
                             .eq('profile_id', profile.id)
                             .order('created_at', { ascending: false });
-                        if (proofs) loadedProofs.push(...(proofs as ProofData[]));
+                        if (proofs) allProofs.push(...(proofs as ProofData[]));
                     }
+
+                    // Collect all proof IDs recorded in additional_properties to prevent cross-leakage
+                    const additionalProofIds = new Set<string>();
+                    if (profile.additional_properties && Array.isArray(profile.additional_properties)) {
+                        for (const ap of profile.additional_properties) {
+                            const apTyped = ap as Record<string, unknown>;
+                            if (Array.isArray(apTyped.savedProofs)) {
+                                for (const sp of apTyped.savedProofs as ProofData[]) {
+                                    if (sp?.id) additionalProofIds.add(sp.id);
+                                }
+                            }
+                        }
+                    }
+
+                    // Primary property (Property 0): ONLY proofs belonging to property 0 (and not in additional properties)
+                    const primaryProofs = dedupeProofs(
+                        allProofs.filter(p => getProofPropertyIndex(p) === 0 && !additionalProofIds.has(p.id))
+                    );
 
                     const primaryPropAddr = profile.property_address || emptyPropertyAddress();
                     const primaryPropDetails = profile.property_details as PropertyDetails | null;
@@ -435,10 +484,10 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                         videos: [],
                         savedVideos: primaryVideos,
                         ownershipFiles: [],
-                        savedProofs: loadedProofs,
+                        savedProofs: primaryProofs,
                         profilePhotoUrl: primaryProfilePhoto,
                         // Collapse filled sections
-                        ownershipSectionOpen: loadedProofs.length === 0,
+                        ownershipSectionOpen: primaryProofs.length === 0,
                         addressSectionOpen: !primaryPropAddr.street,
                         photosSectionOpen: primaryPhotos.length < 2,
                         descriptionSectionOpen: !primaryPropAddr.description,
@@ -449,8 +498,14 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                     // Load additional properties from JSON column
                     const additionalProps: PropertyState[] = [];
                     if (profile.additional_properties && Array.isArray(profile.additional_properties)) {
-                        for (const ap of profile.additional_properties) {
+                        for (let apIdx = 0; apIdx < profile.additional_properties.length; apIdx++) {
+                            const ap = profile.additional_properties[apIdx];
                             const apTyped = ap as Record<string, unknown>;
+                            const targetPropIdx = apIdx + 1;
+                            const dbProofsForProp = allProofs.filter(p => getProofPropertyIndex(p) === targetPropIdx);
+                            const jsonProofsForProp = Array.isArray(apTyped.savedProofs) ? apTyped.savedProofs as ProofData[] : [];
+                            const combinedProofs = dedupeProofs([...dbProofsForProp, ...jsonProofsForProp]);
+
                             additionalProps.push({
                                 propertyType: (apTyped.propertyType as 'single' | 'multi') || 'single',
                                 details: (apTyped.details as PropertyDetails) || emptyPropertyDetails(),
@@ -461,9 +516,9 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                 videos: [],
                                 savedVideos: Array.isArray(apTyped.savedVideos) ? apTyped.savedVideos as string[] : [],
                                 ownershipFiles: [],
-                                savedProofs: Array.isArray(apTyped.savedProofs) ? apTyped.savedProofs as ProofData[] : [],
+                                savedProofs: combinedProofs,
                                 profilePhotoUrl: (apTyped.profilePhotoUrl as string) || null,
-                                ownershipSectionOpen: !(Array.isArray(apTyped.savedProofs) && (apTyped.savedProofs as ProofData[]).length > 0),
+                                ownershipSectionOpen: combinedProofs.length === 0,
                                 addressSectionOpen: true,
                                 photosSectionOpen: true,
                                 descriptionSectionOpen: true,
@@ -870,7 +925,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
         }
     };
 
-    const analyzeDocument = async (file: File) => {
+    const analyzeDocument = async (file: File, targetPropIdx?: number) => {
         setAnalyzingFiles(prev => {
             const next = new Set(prev);
             next.add(file.name);
@@ -937,7 +992,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
 
             if (result?.success && result.extracted_data?.address) {
                 const addr = result.extracted_data.address;
-                const propIdx = expandedPropertyIdx ?? 0;
+                const propIdx = targetPropIdx ?? expandedPropertyIdx ?? 0;
 
                 // Auto-fill per-property address from extracted data
                 updateProperty(propIdx, prev => ({
@@ -1081,7 +1136,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
     };
 
     const handleSave = async (silent = false, propertiesOverride?: PropertyState[]) => {
-        if (!user) return;
+        if (!user || isSaving) return;
         setIsSaving(true);
         try {
             const token = await getToken({ template: 'supabase' });
@@ -1123,7 +1178,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                     address: prop.address,
                     savedPhotos: prop.savedPhotos,
                     savedVideos: prop.savedVideos,
-                    savedProofs: prop.savedProofs,
+                    savedProofs: dedupeProofs(prop.savedProofs),
                     profilePhotoUrl: prop.profilePhotoUrl,
                 })),
             };
@@ -1166,7 +1221,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
             // ── Upload files for ALL properties ──────────────────────────
             if (profile) {
                 const sbUpload = await getSupabase();
-                const updatedProperties = [...properties];
+                const updatedProperties = [...(propertiesOverride ?? properties)];
 
                 for (let propIdx = 0; propIdx < updatedProperties.length; propIdx++) {
                     const prop = updatedProperties[propIdx];
@@ -1188,11 +1243,12 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                 continue;
                             }
 
-                            // Insert into ownership_proofs table
+                            // Insert into ownership_proofs table with property_index
                             const { data: insertedProof, error: proofError } = await sbUpload
                                 .from('ownership_proofs')
                                 .insert({
                                     profile_id: profile.id,
+                                    property_index: propIdx,
                                     file_url: fileName,
                                     original_name: file.name,
                                     file_size: file.size,
@@ -1213,10 +1269,10 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                         updatedProperties[propIdx] = {
                             ...updatedProperties[propIdx],
                             ownershipFiles: [],
-                            savedProofs: [...prop.savedProofs, ...newProofEntries],
+                            savedProofs: dedupeProofs([...prop.savedProofs, ...newProofEntries]),
                         };
 
-                        // For property[0], also refresh all proofs from DB
+                        // For property[0], also refresh only property 0 proofs from DB
                         if (propIdx === 0) {
                             const { data: proofs } = await sb
                                 .from('ownership_proofs')
@@ -1224,7 +1280,10 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                 .eq('profile_id', profile.id)
                                 .order('created_at', { ascending: false });
                             if (proofs) {
-                                updatedProperties[0] = { ...updatedProperties[0], savedProofs: proofs as ProofData[] };
+                                const prop0Proofs = dedupeProofs(
+                                    (proofs as ProofData[]).filter(p => getProofPropertyIndex(p) === 0)
+                                );
+                                updatedProperties[0] = { ...updatedProperties[0], savedProofs: prop0Proofs };
                             }
                         }
                     }
@@ -1352,7 +1411,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             address: prop.address,
                             savedPhotos: prop.savedPhotos,
                             savedVideos: prop.savedVideos,
-                            savedProofs: prop.savedProofs,
+                            savedProofs: dedupeProofs(prop.savedProofs),
                             profilePhotoUrl: prop.profilePhotoUrl,
                         })),
                     }).eq('id', profile.id);
@@ -1654,8 +1713,18 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             const handlePropFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
                                 if (e.target.files && e.target.files.length > 0) {
                                     const newFiles = Array.from(e.target.files);
-                                    setPOwnershipFiles(prev => [...prev, ...newFiles]);
-                                    for (const file of newFiles) { analyzeDocument(file); }
+                                    // Deduplicate against already selected or saved proofs
+                                    const existingNames = new Set([
+                                        ...pOwnershipFiles.map(f => f.name.toLowerCase().trim()),
+                                        ...pSavedProofs.map(p => p.original_name.toLowerCase().trim())
+                                    ]);
+                                    const uniqueNewFiles = newFiles.filter(f => !existingNames.has(f.name.toLowerCase().trim()));
+                                    if (uniqueNewFiles.length > 0) {
+                                        setPOwnershipFiles(prev => [...prev, ...uniqueNewFiles]);
+                                        for (const file of uniqueNewFiles) { analyzeDocument(file, propIdx); }
+                                    }
+                                    // Reset input so user can re-select after deletion if desired
+                                    e.target.value = '';
                                 }
                             };
                             const handlePropPhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1756,11 +1825,41 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             const removePropSavedVideo = (url: string) => {
                                 setPSavedVideos(prev => prev.filter(u => u !== url));
                             };
-                            const removePropSavedProof = (proofId: string) => {
+                            const removePropSavedProof = async (proofId: string) => {
+                                const proofToDelete = pSavedProofs.find(p => p.id === proofId);
+                                const updatedProofs = pSavedProofs.filter(p => p.id !== proofId);
                                 updateProperty(propIdx, prev => ({
                                     ...prev,
-                                    savedProofs: prev.savedProofs.filter(p => p.id !== proofId)
+                                    savedProofs: updatedProofs
                                 }));
+
+                                try {
+                                    const sb = await getSupabase();
+                                    // 1. Delete from ownership_proofs table
+                                    await sb.from('ownership_proofs').delete().eq('id', proofId);
+
+                                    // 2. Delete file from storage if file_url is available
+                                    if (proofToDelete?.file_url) {
+                                        await sb.storage.from('documents').remove([proofToDelete.file_url]);
+                                    }
+
+                                    // 3. If additional property, update JSON column in profiles table
+                                    if (propIdx > 0 && profileId) {
+                                        const { data: prof } = await sb.from('profiles').select('additional_properties').eq('id', profileId).single();
+                                        if (prof?.additional_properties && Array.isArray(prof.additional_properties)) {
+                                            const addProps = [...(prof.additional_properties as Record<string, unknown>[])];
+                                            if (addProps[propIdx - 1]) {
+                                                addProps[propIdx - 1] = {
+                                                    ...addProps[propIdx - 1],
+                                                    savedProofs: updatedProofs
+                                                };
+                                                await sb.from('profiles').update({ additional_properties: addProps }).eq('id', profileId);
+                                            }
+                                        }
+                                    }
+                                } catch (err) {
+                                    console.error('Failed to delete ownership proof:', err);
+                                }
                             };
                             const removePropFile = (idx: number) => {
                                 setPOwnershipFiles(prev => {
@@ -1963,7 +2062,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                                         </div>
                                                                     );
                                                                 })}
-                                                                {pSavedProofs.map((proof) => (
+                                                                {dedupeProofs(pSavedProofs).map((proof) => (
                                                                     <div key={proof.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border">
                                                                         <div className="flex items-center gap-3">
                                                                             <div className="w-8 h-8 rounded bg-muted flex items-center justify-center"><CheckCircle2 className="w-4 h-4 text-emerald-500" /></div>
@@ -1985,6 +2084,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                                 <Button
                                                                     variant="outline"
                                                                     size="sm"
+                                                                    disabled={isSaving}
                                                                     className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
                                                                     onClick={() => { handleSave(true); setPOwnershipOpen(false); setPAddressOpen(true); setTimeout(() => document.getElementById(`prop-${propIdx}-address`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }}
                                                                 >
@@ -2076,6 +2176,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                         <Button
                                                             variant="outline"
                                                             size="sm"
+                                                            disabled={isSaving}
                                                             className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
                                                             onClick={() => { setPAddressOpen(false); setPDetailsOpen(true); handleSave(true); setTimeout(() => document.getElementById(`prop-${propIdx}-details`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }}
                                                         >
@@ -2251,6 +2352,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                                 <Button
                                                                     variant="outline"
                                                                     size="sm"
+                                                                    disabled={isSaving}
                                                                     className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
                                                                     onClick={() => { setPPhotosOpen(false); setPDescOpen(true); handleSave(true); setTimeout(() => document.getElementById(`prop-${propIdx}-description`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }}
                                                                 >
