@@ -613,6 +613,9 @@ export function SubUnitsSection({
                 <Button
                     variant="outline"
                     size="sm"
+                    title="Adicionar"
+                    aria-label="Adicionar"
+                    className="h-8 w-8 p-0"
                     onClick={() => {
                         const newUnits = [...units, defaultSubUnit(units.length)];
                         onUnitsChange(newUnits);
@@ -620,8 +623,7 @@ export function SubUnitsSection({
                         setOpenUnitIndex(newUnits.length - 1);
                     }}
                 >
-                    <Plus className="w-4 h-4 mr-1" />
-                    Adicionar
+                    <Plus className="w-4 h-4" />
                 </Button>
             </div>
 
