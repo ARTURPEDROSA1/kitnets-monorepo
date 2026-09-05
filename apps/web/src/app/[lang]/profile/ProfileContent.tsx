@@ -5,7 +5,7 @@ import { Button } from '@kitnets/ui';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Image from 'next/image';
-import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera, Video, Sparkles, Save, UploadCloud, Home, Building2, User, ShieldCheck, Fingerprint, ChevronDown, ChevronUp, Wand2, Plus, ArrowRight } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera, Video, Sparkles, Save, UploadCloud, Home, Building2, User, ShieldCheck, Fingerprint, ChevronDown, ChevronUp, Wand2, Plus, ArrowRight, Minus, Pencil } from 'lucide-react';
 import PropertyDetailsCard, { PropertyDetails, SubUnit, SubUnitsSection, Checkbox as DetailCheckbox } from '@/components/profile/PropertyDetailsCard';
 import { cn } from '@/lib/utils';
 import { useUser, useAuth } from '@clerk/nextjs';
@@ -181,6 +181,18 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
 
     const [properties, setProperties] = useState<PropertyState[]>([]);
     const [expandedPropertyIdx, setExpandedPropertyIdx] = useState<number | null>(null);
+    const [collapsedUnitsTrees, setCollapsedUnitsTrees] = useState<Record<number, boolean>>({});
+
+    // Count all leasable units (1 per single-family property + count of units for multi-family)
+    const totalUnits = useMemo(() => {
+        return properties.reduce((acc, prop) => {
+            if (prop.propertyType === 'single') return acc + 1;
+            const count = (prop.subUnits && prop.subUnits.length > 0)
+                ? prop.subUnits.length
+                : (prop.details?.numberOfUnits || 0);
+            return acc + count;
+        }, 0);
+    }, [properties]);
 
     // Helper: check if a property has all mandatory fields filled
     const isPropertyComplete = (prop: PropertyState): boolean => {
@@ -1635,9 +1647,15 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                         {/* Add property button (when properties exist) */}
                         {propertyCreated && (
                             <div className="flex items-center justify-between">
-                                <h3 className="text-lg font-semibold text-foreground">
-                                    {properties.length === 1 ? 'Propriedade' : `Propriedades (${properties.length})`}
-                                </h3>
+                                <div className="flex items-center gap-2 sm:gap-3">
+                                    <h3 className="text-lg font-semibold text-foreground">
+                                        {properties.length === 1 ? 'Propriedade' : 'Propriedades'} ({properties.length})
+                                    </h3>
+                                    <span className="text-muted-foreground font-normal">·</span>
+                                    <h3 className="text-lg font-semibold text-muted-foreground">
+                                        {totalUnits === 1 ? 'Unidade' : 'Unidades'} ({totalUnits})
+                                    </h3>
+                                </div>
                                 <Button
                                     size="sm"
                                     variant="outline"
@@ -1713,6 +1731,14 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             const setPVideos = (v: File[] | ((p: File[]) => File[])) => setPropField('videos', v);
                             const setPSavedVideos = (v: string[] | ((p: string[]) => string[])) => setPropField('savedVideos', v);
                             const setPOwnershipFiles = (v: File[] | ((p: File[]) => File[])) => setPropField('ownershipFiles', v);
+                            const isUnitsTreeOpen = pType === 'multi' ? !collapsedUnitsTrees[propIdx] : false;
+                            const toggleUnitsTree = (e?: React.MouseEvent) => {
+                                e?.stopPropagation();
+                                setCollapsedUnitsTrees(prev => ({
+                                    ...prev,
+                                    [propIdx]: !prev[propIdx]
+                                }));
+                            };
                             const handlePropAddrChange = (field: string, value: string) => {
                                 if (field === 'cep') {
                                     const formatted = value.replace(/\D/g, '').replace(/(\d{5})(\d)/, '$1-$2').slice(0, 9);
@@ -1891,138 +1917,193 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             };
 
                             return (
-                                <div key={propIdx} className="border border-border rounded-xl shadow-sm overflow-hidden transition-all duration-200">
-                                    {/* Collapsible header */}
-                                    <div
-                                        role="button"
-                                        tabIndex={0}
-                                        onClick={() => {
-                                            if (isExpanded) {
-                                                setExpandedPropertyIdx(null);
-                                            } else {
-                                                // Collapse all internal sections when expanding property
-                                                updateProperty(propIdx, prev => ({
-                                                    ...prev,
-                                                    ownershipSectionOpen: false,
-                                                    addressSectionOpen: false,
-                                                    photosSectionOpen: false,
-                                                    descriptionSectionOpen: false,
-                                                    detailsInitialOpen: false,
-                                                    subUnitOpenIdx: null,
-                                                }));
-                                                setExpandedPropertyIdx(propIdx);
-                                            }
-                                        }}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' || e.key === ' ') {
-                                                e.preventDefault();
-                                                if (isExpanded) setExpandedPropertyIdx(null);
-                                                else setExpandedPropertyIdx(propIdx);
-                                            }
-                                        }}
-                                        className={cn(
-                                            "flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 w-full px-5 py-4 transition-colors cursor-pointer select-none",
-                                            isExpanded ? "bg-card" : "bg-muted/30 hover:bg-muted/50"
-                                        )}
-                                    >
-                                        <div className="flex items-center gap-3 min-w-0">
-                                            {/* Profile photo thumbnail on collapsed card */}
-                                            {!isExpanded && prop.profilePhotoUrl ? (
-                                                <div className="w-10 h-10 rounded-lg overflow-hidden border border-border flex-shrink-0">
-                                                    <Image src={prop.profilePhotoUrl} alt={propLabel} width={40} height={40} className="w-full h-full object-cover" />
+                                <div key={propIdx} className="space-y-3">
+                                    <div className="border border-border rounded-xl shadow-sm overflow-hidden transition-all duration-200">
+                                        {/* Collapsible header */}
+                                        <div
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={() => {
+                                                if (pType === 'multi') {
+                                                    toggleUnitsTree();
+                                                } else {
+                                                    if (isExpanded) {
+                                                        setExpandedPropertyIdx(null);
+                                                    } else {
+                                                        // Collapse all internal sections when expanding property
+                                                        updateProperty(propIdx, prev => ({
+                                                            ...prev,
+                                                            ownershipSectionOpen: false,
+                                                            addressSectionOpen: false,
+                                                            photosSectionOpen: false,
+                                                            descriptionSectionOpen: false,
+                                                            detailsInitialOpen: false,
+                                                            subUnitOpenIdx: null,
+                                                        }));
+                                                        setExpandedPropertyIdx(propIdx);
+                                                    }
+                                                }
+                                            }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' || e.key === ' ') {
+                                                    e.preventDefault();
+                                                    if (pType === 'multi') {
+                                                        toggleUnitsTree();
+                                                    } else {
+                                                        if (isExpanded) setExpandedPropertyIdx(null);
+                                                        else setExpandedPropertyIdx(propIdx);
+                                                    }
+                                                }
+                                            }}
+                                            className={cn(
+                                                "flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 w-full px-5 py-4 transition-colors cursor-pointer select-none",
+                                                isExpanded ? "bg-card" : "bg-muted/30 hover:bg-muted/50"
+                                            )}
+                                        >
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                {/* Profile photo thumbnail on collapsed card */}
+                                                {!isExpanded && prop.profilePhotoUrl ? (
+                                                    <div className="w-10 h-10 rounded-lg overflow-hidden border border-border flex-shrink-0">
+                                                        <Image src={prop.profilePhotoUrl} alt={propLabel} width={40} height={40} className="w-full h-full object-cover" />
+                                                    </div>
+                                                ) : (
+                                                    <div className={cn(
+                                                        "p-2 rounded-lg flex-shrink-0",
+                                                        prop.propertyType === 'single'
+                                                            ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600"
+                                                            : "bg-violet-100 dark:bg-violet-900/50 text-violet-600"
+                                                    )}>
+                                                        {propIcon}
+                                                    </div>
+                                                )}
+                                                <div className="text-left min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-semibold text-foreground text-sm truncate">{propLabel}</span>
+                                                        <span className="text-xs text-muted-foreground whitespace-nowrap">({propTypeName})</span>
+                                                    </div>
+                                                    {!isExpanded && pAddr.street && (
+                                                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                                                            {[pAddr.street, pAddr.number, pAddr.neighborhood, pAddr.city, pAddr.state, pAddr.cep].filter(Boolean).join(', ')}
+                                                        </p>
+                                                    )}
+                                                    {propComplete && !isExpanded && (
+                                                        <span className="text-xs text-emerald-600 flex items-center gap-1 mt-0.5">
+                                                            <CheckCircle2 className="w-3 h-3" /> Preenchido
+                                                        </span>
+                                                    )}
                                                 </div>
-                                            ) : (
-                                                <div className={cn(
-                                                    "p-2 rounded-lg flex-shrink-0",
-                                                    prop.propertyType === 'single'
-                                                        ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600"
-                                                        : "bg-violet-100 dark:bg-violet-900/50 text-violet-600"
-                                                )}>
-                                                    {propIcon}
+                                            </div>
+
+                                            {/* Quick Actions at the very top of property card on expanded mode */}
+                                            {isExpanded && (
+                                                <div
+                                                    className="flex items-center gap-2 flex-wrap order-3 sm:order-2 w-full sm:w-auto mt-2 sm:mt-0 justify-start sm:justify-center"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    <Button
+                                                        size="sm"
+                                                        type="button"
+                                                        className="h-8 text-xs flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-xs"
+                                                        onClick={() => handleQuickPublish('rent', propIdx)}
+                                                    >
+                                                        <Home className="w-3.5 h-3.5" />
+                                                        Anunciar Aluguel
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        type="button"
+                                                        className="h-8 text-xs flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-xs"
+                                                        onClick={() => handleQuickPublish('sale', propIdx)}
+                                                    >
+                                                        <Sparkles className="w-3.5 h-3.5" />
+                                                        Anunciar Venda
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        type="button"
+                                                        variant="outline"
+                                                        className="h-8 text-xs flex items-center gap-1.5 font-medium shadow-xs"
+                                                        onClick={() => window.location.href = '/dashboard'}
+                                                    >
+                                                        <FileText className="w-3.5 h-3.5" />
+                                                        Gerenciar Aluguel
+                                                    </Button>
                                                 </div>
                                             )}
-                                            <div className="text-left min-w-0">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-semibold text-foreground text-sm truncate">{propLabel}</span>
-                                                    <span className="text-xs text-muted-foreground whitespace-nowrap">({propTypeName})</span>
-                                                </div>
-                                                {!isExpanded && pAddr.street && (
-                                                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                                                        {[pAddr.street, pAddr.number, pAddr.neighborhood, pAddr.city, pAddr.state, pAddr.cep].filter(Boolean).join(', ')}
-                                                    </p>
-                                                )}
-                                                {propComplete && !isExpanded && (
-                                                    <span className="text-xs text-emerald-600 flex items-center gap-1 mt-0.5">
-                                                        <CheckCircle2 className="w-3 h-3" /> Preenchido
+
+                                            <div className="flex items-center gap-2 flex-shrink-0 order-2 sm:order-3">
+                                                {(
+                                                    <span
+                                                        role="button"
+                                                        tabIndex={0}
+                                                        className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (confirm(`Remover "${propLabel}"? Esta ação não pode ser desfeita.`)) {
+                                                                const remainingProperties = properties.filter((_, i) => i !== propIdx);
+                                                                setProperties(remainingProperties);
+                                                                if (expandedPropertyIdx === propIdx) setExpandedPropertyIdx(null);
+                                                                else if (expandedPropertyIdx !== null && expandedPropertyIdx > propIdx) {
+                                                                    setExpandedPropertyIdx(expandedPropertyIdx - 1);
+                                                                }
+                                                                // Persist deletion to DB using the already-filtered list
+                                                                handleSave(true, remainingProperties);
+                                                            }
+                                                        }}
+                                                        onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }}
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
                                                     </span>
                                                 )}
-                                            </div>
-                                        </div>
 
-                                        {/* Quick Actions at the very top of property card on expanded mode */}
-                                        {isExpanded && (
-                                            <div
-                                                className="flex items-center gap-2 flex-wrap order-3 sm:order-2 w-full sm:w-auto mt-2 sm:mt-0 justify-start sm:justify-center"
-                                                onClick={(e) => e.stopPropagation()}
-                                            >
-                                                <Button
-                                                    size="sm"
-                                                    type="button"
-                                                    className="h-8 text-xs flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-xs"
-                                                    onClick={() => handleQuickPublish('rent', propIdx)}
-                                                >
-                                                    <Home className="w-3.5 h-3.5" />
-                                                    Anunciar Aluguel
-                                                </Button>
-                                                <Button
-                                                    size="sm"
-                                                    type="button"
-                                                    className="h-8 text-xs flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-xs"
-                                                    onClick={() => handleQuickPublish('sale', propIdx)}
-                                                >
-                                                    <Sparkles className="w-3.5 h-3.5" />
-                                                    Anunciar Venda
-                                                </Button>
-                                                <Button
-                                                    size="sm"
-                                                    type="button"
-                                                    variant="outline"
-                                                    className="h-8 text-xs flex items-center gap-1.5 font-medium shadow-xs"
-                                                    onClick={() => window.location.href = '/dashboard'}
-                                                >
-                                                    <FileText className="w-3.5 h-3.5" />
-                                                    Gerenciar Aluguel
-                                                </Button>
-                                            </div>
-                                        )}
-
-                                        <div className="flex items-center gap-2 flex-shrink-0 order-2 sm:order-3">
-                                            {(
-                                                <span
-                                                    role="button"
-                                                    tabIndex={0}
-                                                    className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        if (confirm(`Remover "${propLabel}"? Esta ação não pode ser desfeita.`)) {
-                                                            const remainingProperties = properties.filter((_, i) => i !== propIdx);
-                                                            setProperties(remainingProperties);
-                                                            if (expandedPropertyIdx === propIdx) setExpandedPropertyIdx(null);
-                                                            else if (expandedPropertyIdx !== null && expandedPropertyIdx > propIdx) {
-                                                                setExpandedPropertyIdx(expandedPropertyIdx - 1);
+                                                {/* For multi-family: Edit building data button */}
+                                                {pType === 'multi' && (
+                                                    <button
+                                                        type="button"
+                                                        title={isExpanded ? "Fechar edição do condomínio/prédio" : "Editar dados do condomínio/prédio"}
+                                                        className={cn(
+                                                            "p-1.5 rounded-lg transition-colors text-xs flex items-center gap-1",
+                                                            isExpanded ? "bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                                                        )}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (isExpanded) {
+                                                                setExpandedPropertyIdx(null);
+                                                            } else {
+                                                                updateProperty(propIdx, prev => ({
+                                                                    ...prev,
+                                                                    ownershipSectionOpen: false,
+                                                                    addressSectionOpen: false,
+                                                                    photosSectionOpen: false,
+                                                                    descriptionSectionOpen: false,
+                                                                    detailsInitialOpen: false,
+                                                                    subUnitOpenIdx: null,
+                                                                }));
+                                                                setExpandedPropertyIdx(propIdx);
                                                             }
-                                                            // Persist deletion to DB using the already-filtered list
-                                                            handleSave(true, remainingProperties);
-                                                        }
-                                                    }}
-                                                    onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }}
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </span>
-                                            )}
-                                            {isExpanded ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
+                                                        }}
+                                                    >
+                                                        <Pencil className="w-3.5 h-3.5" />
+                                                        <span className="hidden md:inline text-xs font-medium">Editar Imóvel</span>
+                                                    </button>
+                                                )}
+
+                                                {/* Toggle button: Tree toggle (-) / (+) for multi, chevron for single */}
+                                                {pType === 'multi' ? (
+                                                    <button
+                                                        type="button"
+                                                        aria-label={isUnitsTreeOpen ? "Recolher unidades" : "Expandir unidades"}
+                                                        title={isUnitsTreeOpen ? "Recolher unidades (-)" : "Expandir unidades (+)"}
+                                                        className="w-7 h-7 rounded-md border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors shadow-2xs"
+                                                        onClick={toggleUnitsTree}
+                                                    >
+                                                        {isUnitsTreeOpen ? <Minus className="w-4 h-4 stroke-[2.5]" /> : <Plus className="w-4 h-4 stroke-[2.5]" />}
+                                                    </button>
+                                                ) : (
+                                                    isExpanded ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
 
                                     {/* Expanded wizard content for any property */}
                                     {isExpanded && (
@@ -2487,31 +2568,29 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
 
                                                 {/* No Continuar button here — user uses "Salvar Imóvel e Documentos" */}
                                             </div>
-
-                                            {/* 6. Sub-unidades Section (at the bottom, only for multi) */}
-                                            {pType === 'multi' && pDetails.numberOfUnits > 0 && (
-                                                <>
-                                                    <div id={`prop-${propIdx}-subunits`} />
-                                                    <SubUnitsSection
-                                                        key={`subunits-${propIdx}-${prop.subUnitOpenIdx}`}
-                                                        details={pDetails}
-                                                        units={pSubUnits}
-                                                        onDetailsChange={setPDetails}
-                                                        onUnitsChange={setPSubUnits}
-                                                        onGenerateDescription={(unitIdx) => generateUnitDescription(propIdx, unitIdx)}
-                                                        generatingDescriptionIdx={generatingUnitDescriptionIdx}
-                                                        onImportContract={(unitIdx, file) => importContract(propIdx, unitIdx, file)}
-                                                        importingContractIdx={importingContractIdx}
-                                                        initialOpenIdx={prop.subUnitOpenIdx}
-                                                        propertyIndex={propIdx}
-                                                    />
-                                                </>
-                                            )}
-
                                         </div>
-                                    )
-                                    }
+                                    )}
+                                    </div>
 
+                                    {/* Indented Units Tree (for multi property) */}
+                                    {pType === 'multi' && isUnitsTreeOpen && (
+                                        <div className="ml-4 sm:ml-10 pl-4 sm:pl-6 border-l-2 border-border/70 space-y-3">
+                                            <div id={`prop-${propIdx}-subunits`} />
+                                            <SubUnitsSection
+                                                key={`subunits-${propIdx}-${prop.subUnitOpenIdx}`}
+                                                details={pDetails}
+                                                units={pSubUnits}
+                                                onDetailsChange={setPDetails}
+                                                onUnitsChange={setPSubUnits}
+                                                onGenerateDescription={(unitIdx) => generateUnitDescription(propIdx, unitIdx)}
+                                                generatingDescriptionIdx={generatingUnitDescriptionIdx}
+                                                onImportContract={(unitIdx, file) => importContract(propIdx, unitIdx, file)}
+                                                importingContractIdx={importingContractIdx}
+                                                initialOpenIdx={prop.subUnitOpenIdx}
+                                                propertyIndex={propIdx}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}
