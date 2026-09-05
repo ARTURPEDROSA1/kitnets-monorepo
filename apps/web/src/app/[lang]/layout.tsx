@@ -150,7 +150,7 @@ export default async function RootLayout({
                 <head>
                     <link rel="dns-prefetch" href="https://kqhfzcxqmjkqekozhlng.supabase.co" />
                     <link rel="preconnect" href="https://kqhfzcxqmjkqekozhlng.supabase.co" crossOrigin="anonymous" />
-                    <link rel="preconnect" href="https://prompt-monarch-11.clerk.accounts.dev" crossOrigin="anonymous" />
+                    <link rel="preconnect" href="https://clerk.kitnets.com" crossOrigin="anonymous" />
                 </head>
                 <body
                     className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white dark:bg-black text-black dark:text-white`}
