@@ -603,8 +603,6 @@ export function SubUnitsSection({
         updateUnit(unitIdx, { videos: (unit.videos || []).filter(u => u !== url) });
     };
 
-    if (details.numberOfUnits <= 0) return null;
-
     return (
         <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -626,6 +624,12 @@ export function SubUnitsSection({
                     Adicionar
                 </Button>
             </div>
+
+            {units.length === 0 && (
+                <div className="p-4 border border-dashed border-border rounded-xl text-center text-sm text-muted-foreground bg-muted/20">
+                    Nenhuma sub-unidade cadastrada. Clique em &quot;+ Adicionar&quot; para cadastrar a primeira unidade.
+                </div>
+            )}
 
             {units.map((unit, idx) => (
                 <div
