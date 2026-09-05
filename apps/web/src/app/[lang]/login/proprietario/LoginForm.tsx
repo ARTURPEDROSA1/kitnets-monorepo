@@ -51,7 +51,10 @@ export default function LoginForm({ dict, lang }: { dict: Dict; lang: string }) 
 
             if (result.status === "complete") {
                 await setActive({ session: result.createdSessionId });
-                router.push("/dashboard");
+                // Small pause to allow Clerk to commit the session cookie before
+                // navigating — required on strict-SameSite browsers (laptop/mobile).
+                await new Promise(resolve => setTimeout(resolve, 100));
+                router.push(`/${lang}/dashboard`);
             } else {
                 console.error(JSON.stringify(result, null, 2));
             }
@@ -62,7 +65,7 @@ export default function LoginForm({ dict, lang }: { dict: Dict; lang: string }) 
 
             if (code === "session_exists") {
                 setError(dict.login.errors.sessionExists);
-                setTimeout(() => router.push("/dashboard"), 1000);
+                setTimeout(() => router.push(`/${lang}/dashboard`), 1000);
             } else if (code === "form_identifier_not_found") {
                 setError(dict.login.errors.accountNotFound);
             } else if (code === "form_password_incorrect") {
