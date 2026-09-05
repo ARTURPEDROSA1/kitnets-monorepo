@@ -1954,7 +1954,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                         >
                                             <div className="flex items-center gap-3 min-w-0">
                                                 {/* For multi-family: Tree toggle (-) / (+) to expand/collapse sub-units */}
-                                                {pType === 'multi' && (
+                                                {pType === 'multi' ? (
                                                     <button
                                                         type="button"
                                                         aria-label={isUnitsTreeOpen ? "Recolher unidades" : "Expandir unidades"}
@@ -1974,6 +1974,8 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                     >
                                                         {isUnitsTreeOpen ? <Minus className="w-4 h-4 stroke-[2.5]" /> : <Plus className="w-4 h-4 stroke-[2.5]" />}
                                                     </button>
+                                                ) : (
+                                                    <div className="w-7 h-7 flex-shrink-0" aria-hidden="true" />
                                                 )}
 
                                                 {/* Profile photo thumbnail on collapsed card */}
