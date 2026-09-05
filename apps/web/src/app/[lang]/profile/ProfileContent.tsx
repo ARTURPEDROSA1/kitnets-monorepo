@@ -5,7 +5,7 @@ import { Button } from '@kitnets/ui';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Image from 'next/image';
-import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera, Video, Sparkles, Save, UploadCloud, Home, Building2, User, ShieldCheck, Fingerprint, ChevronDown, ChevronUp, Wand2, Plus, ArrowRight, Minus, Pencil } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera, Video, Sparkles, Save, UploadCloud, Home, Building2, User, ShieldCheck, Fingerprint, ChevronDown, ChevronUp, Wand2, Plus, ArrowRight, Minus } from 'lucide-react';
 import PropertyDetailsCard, { PropertyDetails, SubUnit, SubUnitsSection, Checkbox as DetailCheckbox } from '@/components/profile/PropertyDetailsCard';
 import { cn } from '@/lib/utils';
 import { useUser, useAuth } from '@clerk/nextjs';
@@ -1924,35 +1924,27 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                             role="button"
                                             tabIndex={0}
                                             onClick={() => {
-                                                if (pType === 'multi') {
-                                                    toggleUnitsTree();
+                                                if (isExpanded) {
+                                                    setExpandedPropertyIdx(null);
                                                 } else {
-                                                    if (isExpanded) {
-                                                        setExpandedPropertyIdx(null);
-                                                    } else {
-                                                        // Collapse all internal sections when expanding property
-                                                        updateProperty(propIdx, prev => ({
-                                                            ...prev,
-                                                            ownershipSectionOpen: false,
-                                                            addressSectionOpen: false,
-                                                            photosSectionOpen: false,
-                                                            descriptionSectionOpen: false,
-                                                            detailsInitialOpen: false,
-                                                            subUnitOpenIdx: null,
-                                                        }));
-                                                        setExpandedPropertyIdx(propIdx);
-                                                    }
+                                                    // Collapse all internal sections when expanding property
+                                                    updateProperty(propIdx, prev => ({
+                                                        ...prev,
+                                                        ownershipSectionOpen: false,
+                                                        addressSectionOpen: false,
+                                                        photosSectionOpen: false,
+                                                        descriptionSectionOpen: false,
+                                                        detailsInitialOpen: false,
+                                                        subUnitOpenIdx: null,
+                                                    }));
+                                                    setExpandedPropertyIdx(propIdx);
                                                 }
                                             }}
                                             onKeyDown={(e) => {
                                                 if (e.key === 'Enter' || e.key === ' ') {
                                                     e.preventDefault();
-                                                    if (pType === 'multi') {
-                                                        toggleUnitsTree();
-                                                    } else {
-                                                        if (isExpanded) setExpandedPropertyIdx(null);
-                                                        else setExpandedPropertyIdx(propIdx);
-                                                    }
+                                                    if (isExpanded) setExpandedPropertyIdx(null);
+                                                    else setExpandedPropertyIdx(propIdx);
                                                 }
                                             }}
                                             className={cn(
@@ -1961,6 +1953,29 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                             )}
                                         >
                                             <div className="flex items-center gap-3 min-w-0">
+                                                {/* For multi-family: Tree toggle (-) / (+) to expand/collapse sub-units */}
+                                                {pType === 'multi' && (
+                                                    <button
+                                                        type="button"
+                                                        aria-label={isUnitsTreeOpen ? "Recolher unidades" : "Expandir unidades"}
+                                                        title={isUnitsTreeOpen ? "Recolher unidades (-)" : "Expandir unidades (+)"}
+                                                        className="w-7 h-7 rounded-md border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors shadow-2xs flex-shrink-0"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            toggleUnitsTree(e);
+                                                        }}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                                e.stopPropagation();
+                                                                e.preventDefault();
+                                                                toggleUnitsTree();
+                                                            }
+                                                        }}
+                                                    >
+                                                        {isUnitsTreeOpen ? <Minus className="w-4 h-4 stroke-[2.5]" /> : <Plus className="w-4 h-4 stroke-[2.5]" />}
+                                                    </button>
+                                                )}
+
                                                 {/* Profile photo thumbnail on collapsed card */}
                                                 {!isExpanded && prop.profilePhotoUrl ? (
                                                     <div className="w-10 h-10 rounded-lg overflow-hidden border border-border flex-shrink-0">
@@ -2056,52 +2071,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                     </span>
                                                 )}
 
-                                                {/* For multi-family: Edit building data button */}
-                                                {pType === 'multi' && (
-                                                    <button
-                                                        type="button"
-                                                        title={isExpanded ? "Fechar edição do condomínio/prédio" : "Editar dados do condomínio/prédio"}
-                                                        className={cn(
-                                                            "p-1.5 rounded-lg transition-colors text-xs flex items-center gap-1",
-                                                            isExpanded ? "bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300" : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                                                        )}
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            if (isExpanded) {
-                                                                setExpandedPropertyIdx(null);
-                                                            } else {
-                                                                updateProperty(propIdx, prev => ({
-                                                                    ...prev,
-                                                                    ownershipSectionOpen: false,
-                                                                    addressSectionOpen: false,
-                                                                    photosSectionOpen: false,
-                                                                    descriptionSectionOpen: false,
-                                                                    detailsInitialOpen: false,
-                                                                    subUnitOpenIdx: null,
-                                                                }));
-                                                                setExpandedPropertyIdx(propIdx);
-                                                            }
-                                                        }}
-                                                    >
-                                                        <Pencil className="w-3.5 h-3.5" />
-                                                        <span className="hidden md:inline text-xs font-medium">Editar Imóvel</span>
-                                                    </button>
-                                                )}
-
-                                                {/* Toggle button: Tree toggle (-) / (+) for multi, chevron for single */}
-                                                {pType === 'multi' ? (
-                                                    <button
-                                                        type="button"
-                                                        aria-label={isUnitsTreeOpen ? "Recolher unidades" : "Expandir unidades"}
-                                                        title={isUnitsTreeOpen ? "Recolher unidades (-)" : "Expandir unidades (+)"}
-                                                        className="w-7 h-7 rounded-md border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors shadow-2xs"
-                                                        onClick={toggleUnitsTree}
-                                                    >
-                                                        {isUnitsTreeOpen ? <Minus className="w-4 h-4 stroke-[2.5]" /> : <Plus className="w-4 h-4 stroke-[2.5]" />}
-                                                    </button>
-                                                ) : (
-                                                    isExpanded ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />
-                                                )}
+                                                {isExpanded ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
                                             </div>
                                         </div>
 
