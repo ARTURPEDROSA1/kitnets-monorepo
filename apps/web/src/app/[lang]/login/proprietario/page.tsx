@@ -2,9 +2,17 @@ import Link from "next/link";
 import { Button } from "@kitnets/ui";
 import { getDictionary } from "../../../../dictionaries";
 import LoginForm from "./LoginForm";
+import { currentUser } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
 
 export default async function OwnerLoginPage({ params }: { params: Promise<{ lang: "en" | "pt" | "es" }> }) {
     const { lang } = await params;
+
+    const user = await currentUser();
+    if (user) {
+        redirect(`/${lang}/dashboard`);
+    }
+
     const dict = getDictionary(lang);
 
     return (
