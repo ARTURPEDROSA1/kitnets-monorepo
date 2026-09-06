@@ -13,35 +13,72 @@ function getServiceSupabase() {
 
 export async function POST(request: Request) {
     try {
-        const { clerkId, fullName, email } = await request.json();
+        const { clerkId, fullName, email, role } = await request.json();
 
         if (!clerkId || !email) {
             return NextResponse.json({ error: 'Missing clerkId or email' }, { status: 400 });
         }
 
         const supabase = getServiceSupabase();
+        const cleanEmail = email.trim().toLowerCase();
 
-        // Check if profile already exists (prevent duplicates)
-        const { data: existing } = await supabase
+        // 1. Check if profile already exists by clerk_id
+        const { data: existingByClerk } = await supabase
             .from('profiles')
-            .select('id')
+            .select('*')
             .eq('clerk_id', clerkId)
             .maybeSingle();
 
-        if (existing) {
+        if (existingByClerk) {
             console.log('[Profile Create] Profile already exists for clerk_id:', clerkId);
-            return NextResponse.json({ success: true, profile: existing, existing: true });
+            return NextResponse.json({ success: true, profile: existingByClerk, existing: true });
         }
 
-        // Create new profile
+        // 2. Check if profile exists by email (case-insensitive) - handles re-signups / OAuth / changed Clerk ID
+        const { data: existingByEmail } = await supabase
+            .from('profiles')
+            .select('*')
+            .ilike('email', cleanEmail)
+            .maybeSingle();
+
+        if (existingByEmail) {
+            console.log(`[Profile Create] Re-linking existing profile ${existingByEmail.id} to new clerk_id ${clerkId}`);
+            const updatePayload: Record<string, unknown> = {
+                clerk_id: clerkId,
+                email: cleanEmail,
+                updated_at: new Date().toISOString()
+            };
+            if (fullName && (!existingByEmail.full_name || existingByEmail.full_name === 'EMPTY')) {
+                updatePayload.full_name = fullName;
+            }
+            if (role && !existingByEmail.role) {
+                updatePayload.role = role;
+            }
+
+            const { data: updated, error: updateError } = await supabase
+                .from('profiles')
+                .update(updatePayload)
+                .eq('id', existingByEmail.id)
+                .select()
+                .single();
+
+            if (updateError) {
+                console.error('[Profile Create] Update error linking clerk_id:', updateError);
+                return NextResponse.json({ error: updateError.message }, { status: 500 });
+            }
+
+            return NextResponse.json({ success: true, profile: updated, linked: true });
+        }
+
+        // 3. Create new profile
         const { data: profile, error } = await supabase
             .from('profiles')
             .insert({
                 id: crypto.randomUUID(),
                 clerk_id: clerkId,
-                role: 'landlord',
+                role: role || 'landlord',
                 full_name: fullName || '',
-                email: email
+                email: cleanEmail
             })
             .select()
             .single();
