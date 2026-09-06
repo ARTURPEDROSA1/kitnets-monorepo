@@ -5,7 +5,7 @@ import { Button } from '@kitnets/ui';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Image from 'next/image';
-import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera, Video, Sparkles, Save, UploadCloud, Home, Building2, User, ShieldCheck, Fingerprint, ChevronDown, ChevronUp, Wand2, Plus, ArrowRight, Minus } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera, Video, Sparkles, Save, UploadCloud, Home, Building2, User, ShieldCheck, Fingerprint, ChevronDown, ChevronUp, Wand2, Plus, ArrowRight, Minus, Edit3 } from 'lucide-react';
 import PropertyDetailsCard, { PropertyDetails, SubUnit, SubUnitsSection, Checkbox as DetailCheckbox } from '@/components/profile/PropertyDetailsCard';
 import { cn } from '@/lib/utils';
 import { useUser, useAuth } from '@clerk/nextjs';
@@ -82,6 +82,11 @@ interface PropertyState {
     descriptionSectionOpen: boolean;
     detailsInitialOpen: boolean;
     subUnitOpenIdx: number | null;
+    // Sequential wizard card visibility
+    showAddressCard?: boolean;
+    showDetailsCard?: boolean;
+    showPhotosCard?: boolean;
+    showDescriptionCard?: boolean;
 }
 
 type ProfileView = 'proprietario' | 'imoveis' | 'full';
@@ -177,6 +182,10 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
         descriptionSectionOpen: true,
         detailsInitialOpen: true,
         subUnitOpenIdx: null,
+        showAddressCard: false,
+        showDetailsCard: false,
+        showPhotosCard: false,
+        showDescriptionCard: false,
     });
 
     const [properties, setProperties] = useState<PropertyState[]>([]);
@@ -532,6 +541,10 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                         descriptionSectionOpen: !primaryPropAddr.description,
                         detailsInitialOpen: !primaryPropDetails?.totalSqMeters,
                         subUnitOpenIdx: null,
+                        showAddressCard: Boolean(primaryProofs.length > 0 || primaryPropAddr.street || primaryPropAddr.cep || primaryPropDetails?.propertyName || primaryPropDetails?.totalSqMeters || primaryPhotos.length > 0 || primaryVideos.length > 0 || primaryPropAddr.description),
+                        showDetailsCard: Boolean(primaryPropAddr.street || primaryPropAddr.cep || primaryPropDetails?.propertyName || primaryPropDetails?.totalSqMeters || primaryPhotos.length > 0 || primaryVideos.length > 0 || primaryPropAddr.description),
+                        showPhotosCard: Boolean(primaryPropDetails?.propertyName || primaryPropDetails?.totalSqMeters || primaryPhotos.length > 0 || primaryVideos.length > 0 || primaryPropAddr.description),
+                        showDescriptionCard: Boolean(primaryPhotos.length > 0 || primaryVideos.length > 0 || primaryPropAddr.description),
                     };
 
                     // Load additional properties from JSON column
@@ -544,6 +557,11 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             const dbProofsForProp = allProofs.filter(p => getProofPropertyIndex(p) === targetPropIdx);
                             const jsonProofsForProp = Array.isArray(apTyped.savedProofs) ? apTyped.savedProofs as ProofData[] : [];
                             const combinedProofs = dedupeProofs([...dbProofsForProp, ...jsonProofsForProp]);
+                            const hasAddDocs = combinedProofs.length > 0;
+                            const hasAddAddr = Boolean(apTyped.address && ((apTyped.address as PropertyState['address']).street || (apTyped.address as PropertyState['address']).cep));
+                            const hasAddDetails = Boolean(apTyped.details && ((apTyped.details as PropertyDetails).propertyName || (apTyped.details as PropertyDetails).totalSqMeters));
+                            const hasAddPhotos = (Array.isArray(apTyped.savedPhotos) && apTyped.savedPhotos.length > 0) || (Array.isArray(apTyped.savedVideos) && apTyped.savedVideos.length > 0);
+                            const hasAddDesc = Boolean(apTyped.address && (apTyped.address as PropertyState['address']).description);
 
                             additionalProps.push({
                                 propertyType: (apTyped.propertyType as 'single' | 'multi') || 'single',
@@ -563,6 +581,10 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                 descriptionSectionOpen: true,
                                 detailsInitialOpen: true,
                                 subUnitOpenIdx: null,
+                                showAddressCard: typeof apTyped.showAddressCard === 'boolean' ? apTyped.showAddressCard : Boolean(hasAddDocs || hasAddAddr || hasAddDetails || hasAddPhotos || hasAddDesc),
+                                showDetailsCard: typeof apTyped.showDetailsCard === 'boolean' ? apTyped.showDetailsCard : Boolean(hasAddAddr || hasAddDetails || hasAddPhotos || hasAddDesc),
+                                showPhotosCard: typeof apTyped.showPhotosCard === 'boolean' ? apTyped.showPhotosCard : Boolean(hasAddDetails || hasAddPhotos || hasAddDesc),
+                                showDescriptionCard: typeof apTyped.showDescriptionCard === 'boolean' ? apTyped.showDescriptionCard : Boolean(hasAddPhotos || hasAddDesc),
                             });
                         }
                     }
@@ -1105,8 +1127,16 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             : method;
                 setExtractedAddressInfo(`✅ ${docType} — Endereço extraído com sucesso (${methodLabel})`);
                 setFileAnalysisStatus(prev => ({ ...prev, [file.name]: 'success' }));
-                // Auto-collapse verification section after successful extraction
-                updateProperty(propIdx, prev => ({ ...prev, ownershipSectionOpen: false }));
+                // Auto-collapse verification section after successful extraction and reveal address card
+                updateProperty(propIdx, prev => ({
+                    ...prev,
+                    showAddressCard: true,
+                    ownershipSectionOpen: false,
+                    addressSectionOpen: true,
+                }));
+                setTimeout(() => {
+                    document.getElementById(`prop-${propIdx}-address`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 150);
             } else {
                 const methodsTried = result?.methods_tried?.join(' → ') || 'nenhum';
                 setFileAnalysisStatus(prev => ({ ...prev, [file.name]: 'error' }));
@@ -1543,6 +1573,10 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             savedVideos: prop.savedVideos,
                             savedProofs: dedupeProofs(prop.savedProofs),
                             profilePhotoUrl: prop.profilePhotoUrl,
+                            showAddressCard: prop.showAddressCard,
+                            showDetailsCard: prop.showDetailsCard,
+                            showPhotosCard: prop.showPhotosCard,
+                            showDescriptionCard: prop.showDescriptionCard,
                         })),
                     }).eq('id', profile.id);
                 }
@@ -1830,6 +1864,18 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             const pDescOpen = prop.descriptionSectionOpen;
                             const pDetailsOpen = prop.detailsInitialOpen;
 
+                            // Sequential wizard card visibility calculations
+                            const hasDocsData = (pSavedProofs.length > 0 || pOwnershipFiles.length > 0);
+                            const hasAddressData = Boolean(pAddr.street || pAddr.cep || pAddr.city);
+                            const hasDetailsData = Boolean(pDetails.propertyName || pDetails.totalSqMeters || pDetails.areaEdificada);
+                            const hasPhotosData = (pSavedPhotos.length + pPhotos.length > 0 || pSavedVideos.length + pVideos.length > 0);
+                            const hasDescriptionData = Boolean(pAddr.description?.trim());
+
+                            const isAddressCardVisible = prop.showAddressCard ?? (hasDocsData || hasAddressData || hasDetailsData || hasPhotosData || hasDescriptionData);
+                            const isDetailsCardVisible = prop.showDetailsCard ?? (hasAddressData || hasDetailsData || hasPhotosData || hasDescriptionData);
+                            const isPhotosCardVisible = prop.showPhotosCard ?? (hasDetailsData || hasPhotosData || hasDescriptionData);
+                            const isDescriptionCardVisible = prop.showDescriptionCard ?? (hasPhotosData || hasDescriptionData);
+
                             // ── Per-property setter factories ──
                             const setPropField = <K extends keyof PropertyState>(field: K, val: PropertyState[K] | ((prev: PropertyState[K]) => PropertyState[K])) => {
                                 updateProperty(propIdx, prev => ({
@@ -1880,6 +1926,11 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                     const uniqueNewFiles = newFiles.filter(f => !existingNames.has(f.name.toLowerCase().trim()));
                                     if (uniqueNewFiles.length > 0) {
                                         setPOwnershipFiles(prev => [...prev, ...uniqueNewFiles]);
+                                        updateProperty(propIdx, prev => ({
+                                            ...prev,
+                                            showAddressCard: true,
+                                            addressSectionOpen: true,
+                                        }));
                                         for (const file of uniqueNewFiles) { analyzeDocument(file, propIdx); }
                                     }
                                     // Reset input so user can re-select after deletion if desired
@@ -2045,10 +2096,11 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                 if (isExpanded) {
                                                     setExpandedPropertyIdx(null);
                                                 } else {
-                                                    // Collapse all internal sections when expanding property
+                                                    // When expanding property: keep Documentos open if it's the only unlocked card
+                                                    const keepDocsOpen = !isAddressCardVisible;
                                                     updateProperty(propIdx, prev => ({
                                                         ...prev,
-                                                        ownershipSectionOpen: false,
+                                                        ownershipSectionOpen: keepDocsOpen,
                                                         addressSectionOpen: false,
                                                         photosSectionOpen: false,
                                                         descriptionSectionOpen: false,
@@ -2326,20 +2378,51 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                                 ))}
                                                             </div>
                                                         )}
-                                                        {/* Continuar button for Documentation → Address */}
-                                                        {(pSavedProofs.length > 0 || pOwnershipFiles.length > 0) && (
-                                                            <div className="flex justify-end pt-2">
+                                                        {/* Actions in bottom right corner of Documents card: Digitar manualmente & Confirmar */}
+                                                        <div className="flex items-center justify-end gap-3 pt-2">
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="gap-1.5 text-blue-600 border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                                                onClick={() => {
+                                                                    updateProperty(propIdx, prev => ({
+                                                                        ...prev,
+                                                                        showAddressCard: true,
+                                                                        ownershipSectionOpen: false,
+                                                                        addressSectionOpen: true,
+                                                                    }));
+                                                                    setTimeout(() => {
+                                                                        document.getElementById(`prop-${propIdx}-address`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                                                    }, 150);
+                                                                }}
+                                                            >
+                                                                <Edit3 className="w-4 h-4" /> Digitar manualmente
+                                                            </Button>
+                                                            {(pSavedProofs.length > 0 || pOwnershipFiles.length > 0) && (
                                                                 <Button
+                                                                    type="button"
                                                                     variant="outline"
                                                                     size="sm"
                                                                     disabled={isSaving}
                                                                     className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                                                    onClick={() => { handleSave(true); setPOwnershipOpen(false); setPAddressOpen(true); setTimeout(() => document.getElementById(`prop-${propIdx}-address`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }}
+                                                                    onClick={() => {
+                                                                        handleSave(true);
+                                                                        updateProperty(propIdx, prev => ({
+                                                                            ...prev,
+                                                                            showAddressCard: true,
+                                                                            ownershipSectionOpen: false,
+                                                                            addressSectionOpen: true,
+                                                                        }));
+                                                                        setTimeout(() => {
+                                                                            document.getElementById(`prop-${propIdx}-address`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                                                        }, 150);
+                                                                    }}
                                                                 >
-                                                                    Continuar <ArrowRight className="w-4 h-4" />
+                                                                    Confirmar <ArrowRight className="w-4 h-4" />
                                                                 </Button>
-                                                            </div>
-                                                        )}
+                                                            )}
+                                                        </div>
                                                     </>
                                                 )}
                                             </div>
@@ -2359,321 +2442,379 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                             )}
 
                                             {/* 2. Address Section — Collapsible */}
-                                            <div id={`prop-${propIdx}-address`} className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setPAddressOpen(prev => !prev)}
-                                                    className="flex items-center justify-between w-full"
-                                                >
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="p-2 bg-emerald-100 dark:bg-emerald-900/50 rounded-lg text-emerald-600">
-                                                            <MapPin className="w-5 h-5" />
-                                                        </div>
-                                                        <h3 className="text-lg font-semibold text-foreground">{p.basics.addressTitle}</h3>
-                                                        {!pAddressOpen && pAddr.street && (
-                                                            <span className="ml-2 text-xs bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full">Preenchido ✓</span>
-                                                        )}
-                                                    </div>
-                                                    {pAddressOpen ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
-                                                </button>
-
-                                                {pAddressOpen && (
-                                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                                        <div className="space-y-2">
-                                                            <Label>{p.basics.cep}</Label>
-                                                            <div className="relative">
-                                                                <Input
-                                                                    value={pAddr.cep || ''}
-                                                                    onChange={(e) => handlePropAddrChange('cep', e.target.value)}
-                                                                    placeholder="00000-000"
-                                                                    maxLength={9}
-                                                                />
-                                                                {isLoadingAddress && <Loader2 className="absolute right-3 top-2.5 w-4 h-4 animate-spin text-muted-foreground" />}
+                                            {isAddressCardVisible && (
+                                                <div id={`prop-${propIdx}-address`} className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setPAddressOpen(prev => !prev)}
+                                                        className="flex items-center justify-between w-full"
+                                                    >
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="p-2 bg-emerald-100 dark:bg-emerald-900/50 rounded-lg text-emerald-600">
+                                                                <MapPin className="w-5 h-5" />
                                                             </div>
-                                                            {cepError && <p className="text-xs text-red-500">{cepError}</p>}
+                                                            <h3 className="text-lg font-semibold text-foreground">{p.basics.addressTitle}</h3>
+                                                            {!pAddressOpen && pAddr.street && (
+                                                                <span className="ml-2 text-xs bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full">Preenchido ✓</span>
+                                                            )}
                                                         </div>
-                                                        <div className="md:col-span-3 space-y-2">
-                                                            <Label>Cidade / UF</Label>
-                                                            <div className="flex gap-2">
-                                                                <Input value={pAddr.city || ''} onChange={(e) => handlePropAddrChange('city', e.target.value)} placeholder="Cidade" />
-                                                                <Input value={pAddr.state || ''} onChange={(e) => handlePropAddrChange('state', e.target.value)} placeholder="UF" className="w-20" maxLength={2} />
+                                                        {pAddressOpen ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
+                                                    </button>
+
+                                                    {pAddressOpen && (
+                                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                                            <div className="space-y-2">
+                                                                <Label>{p.basics.cep}</Label>
+                                                                <div className="relative">
+                                                                    <Input
+                                                                        value={pAddr.cep || ''}
+                                                                        onChange={(e) => handlePropAddrChange('cep', e.target.value)}
+                                                                        placeholder="00000-000"
+                                                                        maxLength={9}
+                                                                    />
+                                                                    {isLoadingAddress && <Loader2 className="absolute right-3 top-2.5 w-4 h-4 animate-spin text-muted-foreground" />}
+                                                                </div>
+                                                                {cepError && <p className="text-xs text-red-500">{cepError}</p>}
+                                                            </div>
+                                                            <div className="md:col-span-3 space-y-2">
+                                                                <Label>Cidade / UF</Label>
+                                                                <div className="flex gap-2">
+                                                                    <Input value={pAddr.city || ''} onChange={(e) => handlePropAddrChange('city', e.target.value)} placeholder="Cidade" />
+                                                                    <Input value={pAddr.state || ''} onChange={(e) => handlePropAddrChange('state', e.target.value)} placeholder="UF" className="w-20" maxLength={2} />
+                                                                </div>
+                                                            </div>
+                                                            <div className="md:col-span-3 space-y-2">
+                                                                <Label>{p.basics.street}</Label>
+                                                                <Input value={pAddr.street || ''} onChange={(e) => handlePropAddrChange('street', e.target.value)} placeholder="Rua / Avenida" />
+                                                            </div>
+                                                            <div className="space-y-2">
+                                                                <Label>{p.basics.number}</Label>
+                                                                <Input value={pAddr.number || ''} onChange={(e) => handlePropAddrChange('number', e.target.value)} placeholder="123" />
+                                                            </div>
+                                                            <div className="md:col-span-2 space-y-2">
+                                                                <Label>{p.basics.neighborhood}</Label>
+                                                                <Input value={pAddr.neighborhood || ''} onChange={(e) => handlePropAddrChange('neighborhood', e.target.value)} placeholder="Bairro" />
+                                                            </div>
+                                                            <div className="md:col-span-2 space-y-2">
+                                                                <Label>{p.basics.complement}</Label>
+                                                                <Input value={pAddr.complement || ''} onChange={(e) => handlePropAddrChange('complement', e.target.value)} placeholder={p.basics.complement} />
                                                             </div>
                                                         </div>
-                                                        <div className="md:col-span-3 space-y-2">
-                                                            <Label>{p.basics.street}</Label>
-                                                            <Input value={pAddr.street || ''} onChange={(e) => handlePropAddrChange('street', e.target.value)} placeholder="Rua / Avenida" />
-                                                        </div>
-                                                        <div className="space-y-2">
-                                                            <Label>{p.basics.number}</Label>
-                                                            <Input value={pAddr.number || ''} onChange={(e) => handlePropAddrChange('number', e.target.value)} placeholder="123" />
-                                                        </div>
-                                                        <div className="md:col-span-2 space-y-2">
-                                                            <Label>{p.basics.neighborhood}</Label>
-                                                            <Input value={pAddr.neighborhood || ''} onChange={(e) => handlePropAddrChange('neighborhood', e.target.value)} placeholder="Bairro" />
-                                                        </div>
-                                                        <div className="md:col-span-2 space-y-2">
-                                                            <Label>{p.basics.complement}</Label>
-                                                            <Input value={pAddr.complement || ''} onChange={(e) => handlePropAddrChange('complement', e.target.value)} placeholder={p.basics.complement} />
-                                                        </div>
-                                                    </div>
-                                                )}
+                                                    )}
 
-                                                {/* Continuar button for Address → Details */}
-                                                {pAddressOpen && pAddr.cep && pAddr.city && (
-                                                    <div className="flex justify-end pt-2">
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            disabled={isSaving}
-                                                            className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                                            onClick={() => { setPAddressOpen(false); setPDetailsOpen(true); handleSave(true); setTimeout(() => document.getElementById(`prop-${propIdx}-details`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }}
-                                                        >
-                                                            Continuar <ArrowRight className="w-4 h-4" />
-                                                        </Button>
-                                                    </div>
-                                                )}
-                                            </div>
+                                                    {/* Confirmar button for Address → Details */}
+                                                    {pAddressOpen && (
+                                                        <div className="flex justify-end pt-2">
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                size="sm"
+                                                                disabled={isSaving || (!pAddr.street && !pAddr.cep)}
+                                                                className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                                                                onClick={() => {
+                                                                    updateProperty(propIdx, prev => ({
+                                                                        ...prev,
+                                                                        showDetailsCard: true,
+                                                                        addressSectionOpen: false,
+                                                                        detailsInitialOpen: true,
+                                                                    }));
+                                                                    handleSave(true);
+                                                                    setTimeout(() => document.getElementById(`prop-${propIdx}-details`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+                                                                }}
+                                                            >
+                                                                Confirmar <ArrowRight className="w-4 h-4" />
+                                                            </Button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
 
                                             {/* 3. Detalhes Section */}
-                                            <div id={`prop-${propIdx}-details`} />
-                                            <PropertyDetailsCard
-                                                key={`details-${propIdx}-${pDetailsOpen}`}
-                                                details={pDetails}
-                                                units={pSubUnits}
-                                                onDetailsChange={setPDetails}
-                                                onUnitsChange={setPSubUnits}
-                                                propertyType={pType}
-                                                initialOpen={pDetailsOpen}
-                                                onOpenChange={(open) => setPDetailsOpen(open)}
-                                                onContinue={() => { setPDetailsOpen(false); setPPhotosOpen(true); handleSave(true); setTimeout(() => document.getElementById(`prop-${propIdx}-photos`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }}
-                                            />
+                                            {isDetailsCardVisible && (
+                                                <>
+                                                    <div id={`prop-${propIdx}-details`} />
+                                                    <PropertyDetailsCard
+                                                        key={`details-${propIdx}-${pDetailsOpen}`}
+                                                        details={pDetails}
+                                                        units={pSubUnits}
+                                                        onDetailsChange={setPDetails}
+                                                        onUnitsChange={setPSubUnits}
+                                                        propertyType={pType}
+                                                        initialOpen={pDetailsOpen}
+                                                        onOpenChange={(open) => setPDetailsOpen(open)}
+                                                        onContinue={() => {
+                                                            updateProperty(propIdx, prev => ({
+                                                                ...prev,
+                                                                showPhotosCard: true,
+                                                                detailsInitialOpen: false,
+                                                                photosSectionOpen: true,
+                                                            }));
+                                                            handleSave(true);
+                                                            setTimeout(() => document.getElementById(`prop-${propIdx}-photos`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+                                                        }}
+                                                    />
+                                                </>
+                                            )}
 
                                             {/* 4. Photos & Videos Section — Main Property — Collapsible */}
-                                            <div id={`prop-${propIdx}-photos`} className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setPPhotosOpen(prev => !prev)}
-                                                    className="flex items-center justify-between w-full"
-                                                >
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded-lg text-amber-600">
-                                                            <Camera className="w-5 h-5" />
-                                                        </div>
-                                                        <h3 className="text-lg font-semibold text-foreground">Fotos e Vídeos do Imóvel</h3>
-                                                        {!pPhotosOpen && (pSavedPhotos.length > 0 || pPhotos.length > 0 || pSavedVideos.length > 0 || pVideos.length > 0) && (
-                                                            <span className="ml-2 text-xs bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full">
-                                                                {pSavedPhotos.length + pPhotos.length} fotos · {pSavedVideos.length + pVideos.length} vídeos
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    {pPhotosOpen ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
-                                                </button>
-
-                                                {pPhotosOpen && (
-                                                    <>
-                                                        <div className="bg-muted/30 p-4 rounded-lg border border-border flex gap-3 items-start">
-                                                            <Sparkles className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
-                                                            <div>
-                                                                <p className="text-sm font-medium text-foreground mb-1">Dica Profissional</p>
-                                                                <p className="text-sm text-muted-foreground">Imóveis com pelo menos 5 fotos recebem 4x mais visualizações! Capriche na iluminação.</p>
+                                            {isPhotosCardVisible && (
+                                                <div id={`prop-${propIdx}-photos`} className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setPPhotosOpen(prev => !prev)}
+                                                        className="flex items-center justify-between w-full"
+                                                    >
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded-lg text-amber-600">
+                                                                <Camera className="w-5 h-5" />
                                                             </div>
+                                                            <h3 className="text-lg font-semibold text-foreground">Fotos e Vídeos do Imóvel</h3>
+                                                            {!pPhotosOpen && (pSavedPhotos.length > 0 || pPhotos.length > 0 || pSavedVideos.length > 0 || pVideos.length > 0) && (
+                                                                <span className="ml-2 text-xs bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full">
+                                                                    {pSavedPhotos.length + pPhotos.length} fotos · {pSavedVideos.length + pVideos.length} vídeos
+                                                                </span>
+                                                            )}
                                                         </div>
+                                                        {pPhotosOpen ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
+                                                    </button>
 
-                                                        {/* Photos (up to 10) */}
-                                                        <div className="space-y-2">
-                                                            <div className="flex items-center justify-between">
-                                                                <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                                                                    <Camera className="w-4 h-4 text-muted-foreground" />
-                                                                    Fotos
-                                                                </p>
-                                                                <span className="text-xs text-muted-foreground">{pSavedPhotos.length + pPhotos.length}/10</span>
+                                                    {pPhotosOpen && (
+                                                        <>
+                                                            <div className="bg-muted/30 p-4 rounded-lg border border-border flex gap-3 items-start">
+                                                                <Sparkles className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
+                                                                <div>
+                                                                    <p className="text-sm font-medium text-foreground mb-1">Dica Profissional</p>
+                                                                    <p className="text-sm text-muted-foreground">Imóveis com pelo menos 5 fotos recebem 4x mais visualizações! Capriche na iluminação.</p>
+                                                                </div>
                                                             </div>
-                                                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                                                                {/* Saved Photos */}
-                                                                {pSavedPhotos.map((url, idx) => {
-                                                                    const isProfilePhoto = prop.profilePhotoUrl === url;
-                                                                    return (
-                                                                        <div key={`saved-p-${idx}`} className={cn("aspect-square rounded-lg border relative group overflow-hidden", isProfilePhoto ? "border-emerald-500 border-2 ring-2 ring-emerald-200 dark:ring-emerald-800" : "border-border")}>
-                                                                            <Image src={url} alt="Property" width={200} height={200} className="w-full h-full object-cover" />
+
+                                                            {/* Photos (up to 10) */}
+                                                            <div className="space-y-2">
+                                                                <div className="flex items-center justify-between">
+                                                                    <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                                                                        <Camera className="w-4 h-4 text-muted-foreground" />
+                                                                        Fotos
+                                                                    </p>
+                                                                    <span className="text-xs text-muted-foreground">{pSavedPhotos.length + pPhotos.length}/10</span>
+                                                                </div>
+                                                                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                                                    {/* Saved Photos */}
+                                                                    {pSavedPhotos.map((url, idx) => {
+                                                                        const isProfilePhoto = prop.profilePhotoUrl === url;
+                                                                        return (
+                                                                            <div key={`saved-p-${idx}`} className={cn("aspect-square rounded-lg border relative group overflow-hidden", isProfilePhoto ? "border-emerald-500 border-2 ring-2 ring-emerald-200 dark:ring-emerald-800" : "border-border")}>
+                                                                                <Image src={url} alt="Property" width={200} height={200} className="w-full h-full object-cover" />
+                                                                                <div className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                                    <Button size="icon" variant="destructive" className="h-6 w-6" onClick={() => removePropSavedPhoto(url)}>
+                                                                                        <Trash2 className="w-3 h-3" />
+                                                                                    </Button>
+                                                                                </div>
+                                                                                {/* Profile photo selection checkbox */}
+                                                                                <label
+                                                                                    className={cn(
+                                                                                        "absolute bottom-0 inset-x-0 flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-medium cursor-pointer transition-colors",
+                                                                                        isProfilePhoto
+                                                                                            ? "bg-emerald-600 text-white"
+                                                                                            : "bg-black/50 text-white opacity-0 group-hover:opacity-100"
+                                                                                    )}
+                                                                                    onClick={(e) => { e.stopPropagation(); updateProperty(propIdx, prev => ({ ...prev, profilePhotoUrl: isProfilePhoto ? null : url })); }}
+                                                                                >
+                                                                                    <input type="checkbox" checked={isProfilePhoto} readOnly className="w-3 h-3 accent-emerald-500" />
+                                                                                    {isProfilePhoto ? 'Foto Principal' : 'Definir como principal'}
+                                                                                </label>
+                                                                            </div>
+                                                                        );
+                                                                    })}
+
+                                                                    {/* New Photos (pending upload) */}
+                                                                    {pPhotos.map((file, idx) => (
+                                                                        <PhotoPreview key={`new-p-${idx}`} file={file} onRemove={() => removePropPhoto(idx)} />
+                                                                    ))}
+
+                                                                    {/* Upload Button — appears last when photos exist */}
+                                                                    {pSavedPhotos.length + pPhotos.length < 10 && (
+                                                                        <div className="aspect-square rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors relative">
+                                                                            <input
+                                                                                type="file"
+                                                                                multiple
+                                                                                accept="image/*"
+                                                                                onChange={handlePropPhotoSelect}
+                                                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                                                            />
+                                                                            <Camera className="w-8 h-8 text-muted-foreground mb-2" />
+                                                                            <span className="text-xs text-muted-foreground">Adicionar Fotos</span>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Videos (up to 2) */}
+                                                            <div className="space-y-2 pt-3 border-t border-border">
+                                                                <div className="flex items-center justify-between">
+                                                                    <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                                                                        <Video className="w-4 h-4 text-muted-foreground" />
+                                                                        Vídeos
+                                                                    </p>
+                                                                    <span className="text-xs text-muted-foreground">{pSavedVideos.length + pVideos.length}/2</span>
+                                                                </div>
+                                                                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                                                    {/* Saved Videos */}
+                                                                    {pSavedVideos.map((url, idx) => (
+                                                                        <div key={`saved-v-${idx}`} className="aspect-square rounded-lg border border-border relative group overflow-hidden">
+                                                                            <video src={url} className="w-full h-full object-cover" muted />
                                                                             <div className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                                <Button size="icon" variant="destructive" className="h-6 w-6" onClick={() => removePropSavedPhoto(url)}>
+                                                                                <Button size="icon" variant="destructive" className="h-6 w-6" onClick={() => removePropSavedVideo(url)}>
                                                                                     <Trash2 className="w-3 h-3" />
                                                                                 </Button>
                                                                             </div>
-                                                                            {/* Profile photo selection checkbox */}
-                                                                            <label
-                                                                                className={cn(
-                                                                                    "absolute bottom-0 inset-x-0 flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-medium cursor-pointer transition-colors",
-                                                                                    isProfilePhoto
-                                                                                        ? "bg-emerald-600 text-white"
-                                                                                        : "bg-black/50 text-white opacity-0 group-hover:opacity-100"
-                                                                                )}
-                                                                                onClick={(e) => { e.stopPropagation(); updateProperty(propIdx, prev => ({ ...prev, profilePhotoUrl: isProfilePhoto ? null : url })); }}
-                                                                            >
-                                                                                <input type="checkbox" checked={isProfilePhoto} readOnly className="w-3 h-3 accent-emerald-500" />
-                                                                                {isProfilePhoto ? 'Foto Principal' : 'Definir como principal'}
-                                                                            </label>
+                                                                            <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[10px] p-1 text-center flex items-center justify-center gap-1">
+                                                                                <Video className="w-3 h-3" /> Vídeo
+                                                                            </div>
                                                                         </div>
-                                                                    );
-                                                                })}
+                                                                    ))}
 
-                                                                {/* New Photos (pending upload) */}
-                                                                {pPhotos.map((file, idx) => (
-                                                                    <PhotoPreview key={`new-p-${idx}`} file={file} onRemove={() => removePropPhoto(idx)} />
-                                                                ))}
+                                                                    {/* New Videos */}
+                                                                    {pVideos.map((file, idx) => (
+                                                                        <div key={`new-v-${idx}`} className="aspect-square rounded-lg border border-border relative group overflow-hidden bg-muted">
+                                                                            <video src={URL.createObjectURL(file)} className="w-full h-full object-cover" muted />
+                                                                            <div className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                                <Button size="icon" variant="destructive" className="h-6 w-6" onClick={() => removePropVideo(idx)}>
+                                                                                    <Trash2 className="w-3 h-3" />
+                                                                                </Button>
+                                                                            </div>
+                                                                            <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[10px] p-1 text-center flex items-center justify-center gap-1">
+                                                                                <Video className="w-3 h-3" /> {file.name}
+                                                                            </div>
+                                                                        </div>
+                                                                    ))}
 
-                                                                {/* Upload Button — appears last when photos exist */}
-                                                                {pSavedPhotos.length + pPhotos.length < 10 && (
-                                                                    <div className="aspect-square rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors relative">
-                                                                        <input
-                                                                            type="file"
-                                                                            multiple
-                                                                            accept="image/*"
-                                                                            onChange={handlePropPhotoSelect}
-                                                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                                                        />
-                                                                        <Camera className="w-8 h-8 text-muted-foreground mb-2" />
-                                                                        <span className="text-xs text-muted-foreground">Adicionar Fotos</span>
-                                                                    </div>
-                                                                )}
+                                                                    {/* Upload Button — appears last when videos exist */}
+                                                                    {pSavedVideos.length + pVideos.length < 2 && (
+                                                                        <div className="aspect-square rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors relative">
+                                                                            <input
+                                                                                type="file"
+                                                                                accept="video/*"
+                                                                                onChange={handlePropVideoSelect}
+                                                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                                                            />
+                                                                            <Video className="w-8 h-8 text-muted-foreground mb-2" />
+                                                                            <span className="text-xs text-muted-foreground">Adicionar Vídeo</span>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
                                                             </div>
-                                                        </div>
-
-                                                        {/* Videos (up to 2) */}
-                                                        <div className="space-y-2 pt-3 border-t border-border">
-                                                            <div className="flex items-center justify-between">
-                                                                <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                                                                    <Video className="w-4 h-4 text-muted-foreground" />
-                                                                    Vídeos
-                                                                </p>
-                                                                <span className="text-xs text-muted-foreground">{pSavedVideos.length + pVideos.length}/2</span>
-                                                            </div>
-                                                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                                                                {/* Saved Videos */}
-                                                                {pSavedVideos.map((url, idx) => (
-                                                                    <div key={`saved-v-${idx}`} className="aspect-square rounded-lg border border-border relative group overflow-hidden">
-                                                                        <video src={url} className="w-full h-full object-cover" muted />
-                                                                        <div className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                            <Button size="icon" variant="destructive" className="h-6 w-6" onClick={() => removePropSavedVideo(url)}>
-                                                                                <Trash2 className="w-3 h-3" />
-                                                                            </Button>
-                                                                        </div>
-                                                                        <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[10px] p-1 text-center flex items-center justify-center gap-1">
-                                                                            <Video className="w-3 h-3" /> Vídeo
-                                                                        </div>
-                                                                    </div>
-                                                                ))}
-
-                                                                {/* New Videos */}
-                                                                {pVideos.map((file, idx) => (
-                                                                    <div key={`new-v-${idx}`} className="aspect-square rounded-lg border border-border relative group overflow-hidden bg-muted">
-                                                                        <video src={URL.createObjectURL(file)} className="w-full h-full object-cover" muted />
-                                                                        <div className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                            <Button size="icon" variant="destructive" className="h-6 w-6" onClick={() => removePropVideo(idx)}>
-                                                                                <Trash2 className="w-3 h-3" />
-                                                                            </Button>
-                                                                        </div>
-                                                                        <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[10px] p-1 text-center flex items-center justify-center gap-1">
-                                                                            <Video className="w-3 h-3" /> {file.name}
-                                                                        </div>
-                                                                    </div>
-                                                                ))}
-
-                                                                {/* Upload Button — appears last when videos exist */}
-                                                                {pSavedVideos.length + pVideos.length < 2 && (
-                                                                    <div className="aspect-square rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors relative">
-                                                                        <input
-                                                                            type="file"
-                                                                            accept="video/*"
-                                                                            onChange={handlePropVideoSelect}
-                                                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                                                        />
-                                                                        <Video className="w-8 h-8 text-muted-foreground mb-2" />
-                                                                        <span className="text-xs text-muted-foreground">Adicionar Vídeo</span>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                        {/* Continuar button for Photos → Description */}
-                                                        {((pPhotos.length + pSavedPhotos.length) > 0 || (pVideos.length + pSavedVideos.length) > 0) && (
+                                                            {/* Confirmar button for Photos → Description */}
                                                             <div className="flex justify-end pt-4">
                                                                 <Button
+                                                                    type="button"
                                                                     variant="outline"
                                                                     size="sm"
                                                                     disabled={isSaving}
                                                                     className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                                                    onClick={() => { setPPhotosOpen(false); setPDescOpen(true); handleSave(true); setTimeout(() => document.getElementById(`prop-${propIdx}-description`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150); }}
+                                                                    onClick={() => {
+                                                                        updateProperty(propIdx, prev => ({
+                                                                            ...prev,
+                                                                            showDescriptionCard: true,
+                                                                            photosSectionOpen: false,
+                                                                            descriptionSectionOpen: true,
+                                                                        }));
+                                                                        handleSave(true);
+                                                                        setTimeout(() => document.getElementById(`prop-${propIdx}-description`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+                                                                    }}
                                                                 >
-                                                                    Continuar <ArrowRight className="w-4 h-4" />
+                                                                    Confirmar <ArrowRight className="w-4 h-4" />
                                                                 </Button>
                                                             </div>
-                                                        )}
-                                                    </>
-                                                )}
-                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            )}
 
                                             {/* 5. Description Section — Main Property — Collapsible */}
-                                            <div id={`prop-${propIdx}-description`} className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setPDescOpen(prev => !prev)}
-                                                    className="flex items-center justify-between w-full"
-                                                >
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="p-2 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg text-indigo-600">
-                                                            <FileText className="w-5 h-5" />
+                                            {isDescriptionCardVisible && (
+                                                <div id={`prop-${propIdx}-description`} className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setPDescOpen(prev => !prev)}
+                                                        className="flex items-center justify-between w-full"
+                                                    >
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="p-2 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg text-indigo-600">
+                                                                <FileText className="w-5 h-5" />
+                                                            </div>
+                                                            <h3 className="text-lg font-semibold text-foreground">Descrição do Imóvel</h3>
+                                                            {!pDescOpen && pAddr.description && (
+                                                                <span className="ml-2 text-xs bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full">Preenchido ✓</span>
+                                                            )}
                                                         </div>
-                                                        <h3 className="text-lg font-semibold text-foreground">Descrição do Imóvel</h3>
-                                                        {!pDescOpen && pAddr.description && (
-                                                            <span className="ml-2 text-xs bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full">Preenchido ✓</span>
-                                                        )}
-                                                    </div>
-                                                    {pDescOpen ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
-                                                </button>
-                                                {pDescOpen && (
-                                                    <div className="space-y-3">
-                                                        <div className="flex items-center justify-between">
-                                                            <Label>Descreva seu imóvel em detalhes <span className="text-red-500">*</span></Label>
-                                                        </div>
-                                                        <div className="flex items-center gap-4 flex-wrap">
-                                                            <span className="text-sm font-medium text-foreground">Finalidade da descrição:</span>
-                                                            <DetailCheckbox
-                                                                checked={descriptionPurpose.aluguel}
-                                                                onChange={(val) => setDescriptionPurpose(prev => ({ ...prev, aluguel: val }))}
-                                                                label="Aluguel"
+                                                        {pDescOpen ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
+                                                    </button>
+                                                    {pDescOpen && (
+                                                        <div className="space-y-3">
+                                                            <div className="flex items-center justify-between">
+                                                                <Label>Descreva seu imóvel em detalhes <span className="text-red-500">*</span></Label>
+                                                            </div>
+                                                            <div className="flex items-center gap-4 flex-wrap">
+                                                                <span className="text-sm font-medium text-foreground">Finalidade da descrição:</span>
+                                                                <DetailCheckbox
+                                                                    checked={descriptionPurpose.aluguel}
+                                                                    onChange={(val) => setDescriptionPurpose(prev => ({ ...prev, aluguel: val }))}
+                                                                    label="Aluguel"
+                                                                />
+                                                                <DetailCheckbox
+                                                                    checked={descriptionPurpose.venda}
+                                                                    onChange={(val) => setDescriptionPurpose(prev => ({ ...prev, venda: val }))}
+                                                                    label="Venda"
+                                                                />
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    className="h-7 text-xs gap-1 text-violet-600 border-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/20 ml-auto"
+                                                                    onClick={() => generateMainDescription(propIdx)}
+                                                                    disabled={generatingMainDescription || (!descriptionPurpose.venda && !descriptionPurpose.aluguel)}
+                                                                >
+                                                                    {generatingMainDescription ? (
+                                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                                    ) : (
+                                                                        <Wand2 className="w-3.5 h-3.5" />
+                                                                    )}
+                                                                    {generatingMainDescription ? 'Gerando...' : 'Gerar com IA'}
+                                                                </Button>
+                                                            </div>
+                                                            <textarea
+                                                                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[120px]"
+                                                                placeholder="Ex: Excelente apartamento com varanda gourmet, vista livre, armários planejados na cozinha e banheiros..."
+                                                                value={pAddr.description || ''}
+                                                                onChange={(e) => handlePropAddrChange('description', e.target.value)}
                                                             />
-                                                            <DetailCheckbox
-                                                                checked={descriptionPurpose.venda}
-                                                                onChange={(val) => setDescriptionPurpose(prev => ({ ...prev, venda: val }))}
-                                                                label="Venda"
-                                                            />
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                className="h-7 text-xs gap-1 text-violet-600 border-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/20 ml-auto"
-                                                                onClick={() => generateMainDescription(propIdx)}
-                                                                disabled={generatingMainDescription || (!descriptionPurpose.venda && !descriptionPurpose.aluguel)}
-                                                            >
-                                                                {generatingMainDescription ? (
-                                                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                                ) : (
-                                                                    <Wand2 className="w-3.5 h-3.5" />
-                                                                )}
-                                                                {generatingMainDescription ? 'Gerando...' : 'Gerar com IA'}
-                                                            </Button>
-                                                        </div>
-                                                        <textarea
-                                                            className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[120px]"
-                                                            placeholder="Ex: Excelente apartamento com varanda gourmet, vista livre, armários planejados na cozinha e banheiros..."
-                                                            value={pAddr.description || ''}
-                                                            onChange={(e) => handlePropAddrChange('description', e.target.value)}
-                                                        />
-                                                        <span className="text-xs text-muted-foreground">Esta descrição será exibida no anúncio do imóvel principal.</span>
-                                                    </div>
-                                                )}
+                                                            <span className="text-xs text-muted-foreground">Esta descrição será exibida no anúncio do imóvel principal.</span>
 
-                                                {/* No Continuar button here — user uses "Salvar Imóvel e Documentos" */}
-                                            </div>
+                                                            {/* Confirmar button for Description */}
+                                                            <div className="flex justify-end pt-4">
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    disabled={isSaving}
+                                                                    className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                                                                    onClick={async () => {
+                                                                        await handleSave(true);
+                                                                        if (pType === 'multi') {
+                                                                            setCollapsedUnitsTrees(prev => ({ ...prev, [propIdx]: false }));
+                                                                            setTimeout(() => {
+                                                                                document.getElementById(`prop-${propIdx}-subunits`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                                                            }, 150);
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : <CheckCircle2 className="w-4 h-4 mr-1.5" />}
+                                                                    Confirmar
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                     </div>
