@@ -71,7 +71,8 @@ export default function LoginForm({ dict, lang }: { dict: Dict; lang: string }) 
             } else if (code === "form_password_incorrect") {
                 setError(dict.login.errors.incorrectPassword);
             } else {
-                setError(dict.login.errors.generic);
+                // Surface the raw code to help diagnose unexpected errors (e.g. captcha_invalid)
+                setError(`${dict.login.errors.generic}${code ? ` [${code}]` : ""}`);
             }
         }
     };
@@ -130,6 +131,9 @@ export default function LoginForm({ dict, lang }: { dict: Dict; lang: string }) 
             </div>
 
             {error && <p className="text-red-500 text-sm">{error}</p>}
+
+            {/* Required by Clerk Bot Protection in production — renders CAPTCHA if challenged */}
+            <div id="clerk-captcha" />
 
             <div>
                 <Button type="submit" className="w-full flex justify-center py-2 px-4 shadow-sm text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90">
