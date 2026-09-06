@@ -60,7 +60,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ lang
     // Fetch user profile with all property-related fields
     let { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('id, full_name, property_type, property_details, additional_properties')
+        .select('id, full_name, property_type, property_details, property_address, additional_properties')
         .eq('clerk_id', user.id)
         .maybeSingle();
 
@@ -69,7 +69,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ lang
         const userEmail = user.emailAddresses[0].emailAddress.toLowerCase().trim();
         const { data: existingByEmail } = await supabase
             .from('profiles')
-            .select('id, full_name, property_type, property_details, additional_properties')
+            .select('id, full_name, property_type, property_details, property_address, additional_properties')
             .ilike('email', userEmail)
             .maybeSingle();
 
@@ -118,14 +118,34 @@ export default async function DashboardPage({ params }: { params: Promise<{ lang
     // ── Compute property counts from profile data ────────────────────
     const primaryType = (profile?.property_type as string) || null;
     const primaryDetails = (profile?.property_details as PropertyDetails) || {};
+    const primaryAddress = (profile?.property_address as Record<string, unknown>) || {};
     const additionalProps = (Array.isArray(profile?.additional_properties) ? profile.additional_properties : []) as AdditionalProperty[];
+
+    // Detect unconfigured accounts (new account or legacy profile where DB defaulted to 'single' with empty details/address)
+    const isUnconfiguredAccount = !primaryType || (
+        primaryType === 'single' &&
+        (!profile?.property_address || Object.keys(primaryAddress).length === 0 || !Object.values(primaryAddress).some(Boolean)) &&
+        (!profile?.property_details || Object.keys(primaryDetails).length === 0 || !Object.values(primaryDetails).some(v => v !== '' && v !== false && v !== 0 && v !== null && typeof v !== 'object')) &&
+        additionalProps.length === 0
+    );
+
+    // Auto-clean unconfigured legacy profile in the background
+    if (profile?.id && isUnconfiguredAccount && primaryType === 'single') {
+        supabase.from('profiles').update({
+            property_type: null,
+            property_address: null,
+            property_details: null
+        }).eq('id', profile.id).then();
+    }
+
+    const hasPrimaryProperty = !isUnconfiguredAccount && !!primaryType;
 
     // Count all properties (primary + additional)
     let singleCount = 0;
     let multiCount = 0;
     let totalUnits = 0;
 
-    if (primaryType) {
+    if (hasPrimaryProperty) {
         if (primaryType === 'single') {
             singleCount++;
         } else if (primaryType === 'multi') {

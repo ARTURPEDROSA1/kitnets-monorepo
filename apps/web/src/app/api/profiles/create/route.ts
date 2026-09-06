@@ -54,6 +54,14 @@ export async function POST(request: Request) {
             if (role && !existingByEmail.role) {
                 updatePayload.role = role;
             }
+            // Clean up unconfigured profile legacy default 'single'
+            if (existingByEmail.property_type === 'single' &&
+                (!existingByEmail.property_address || Object.keys(existingByEmail.property_address).length === 0) &&
+                (!existingByEmail.property_details || Object.keys(existingByEmail.property_details).length === 0)) {
+                updatePayload.property_type = null;
+                updatePayload.property_address = null;
+                updatePayload.property_details = null;
+            }
 
             const { data: updated, error: updateError } = await supabase
                 .from('profiles')
@@ -70,7 +78,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: true, profile: updated, linked: true });
         }
 
-        // 3. Create new profile
+        // 3. Create new profile (starts with 0 properties; user creates explicitly)
         const { data: profile, error } = await supabase
             .from('profiles')
             .insert({
@@ -78,7 +86,11 @@ export async function POST(request: Request) {
                 clerk_id: clerkId,
                 role: role || 'landlord',
                 full_name: fullName || '',
-                email: cleanEmail
+                email: cleanEmail,
+                property_type: null,
+                property_address: null,
+                property_details: null,
+                additional_properties: []
             })
             .select()
             .single();

@@ -567,13 +567,47 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                         }
                     }
 
-                    // Only set properties if we actually have a property_type saved
-                    if (profile.property_type) {
-                        const allProps = [primaryProperty, ...additionalProps];
+                    // Check if the profile is an unconfigured account (e.g. newly created account,
+                    // or legacy account where DB column default 'single' was set with completely empty details/address)
+                    const isUnconfiguredAccount = !profile.property_type || (
+                        profile.property_type === 'single' &&
+                        (!profile.property_address || Object.keys(profile.property_address).length === 0 || !Object.values(profile.property_address).some(Boolean)) &&
+                        (!profile.property_details || Object.keys(profile.property_details).length === 0 || !Object.values(profile.property_details).some(v => v !== '' && v !== false && v !== 0 && v !== null && typeof v !== 'object')) &&
+                        primaryProofs.length === 0 &&
+                        primaryPhotos.length === 0 &&
+                        primaryVideos.length === 0 &&
+                        primarySubUnits.length === 0 &&
+                        additionalProps.length === 0
+                    );
+
+                    // Auto-clean unconfigured legacy profile in the background
+                    if (profile.property_type === 'single' && isUnconfiguredAccount && profile.id) {
+                        (async () => {
+                            try {
+                                const sbClean = await getSupabase();
+                                await sbClean.from('profiles').update({
+                                    property_type: null,
+                                    property_address: null,
+                                    property_details: null
+                                }).eq('id', profile.id);
+                            } catch (e) {
+                                console.error('[Profile] Error auto-cleaning unconfigured profile:', e);
+                            }
+                        })();
+                    }
+
+                    // Only set properties if we actually have configured properties
+                    if (!isUnconfiguredAccount) {
+                        const hasPrimaryProperty = Boolean(profile.property_type);
+                        const allProps = hasPrimaryProperty
+                            ? [primaryProperty, ...additionalProps]
+                            : additionalProps;
                         setProperties(allProps);
 
                         // Start with all properties collapsed
                         setExpandedPropertyIdx(null);
+                    } else {
+                        setProperties([]);
                     }
                     // Auto-collapse identity section if identity verification data exists
                     if (profile.cpf || profile.cnpj || profile.business_name) {
