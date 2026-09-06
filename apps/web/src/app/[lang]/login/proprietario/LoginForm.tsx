@@ -39,34 +39,44 @@ export default function LoginForm({ dict, lang }: { dict: Dict; lang: string }) 
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState("");
+    const [loading, setLoading] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!isLoaded) return;
+        if (!isLoaded || loading) return;
+
+        setError("");
+        setLoading(true);
 
         try {
+            const cleanEmail = email.trim().toLowerCase();
             const result = await signIn.create({
-                identifier: email,
+                identifier: cleanEmail,
                 password,
             });
 
             if (result.status === "complete") {
                 await setActive({ session: result.createdSessionId });
-                // Small pause to allow Clerk to commit the session cookie before
-                // navigating — required on strict-SameSite browsers (laptop/mobile).
-                await new Promise(resolve => setTimeout(resolve, 100));
-                router.push(`/${lang}/dashboard`);
+                // Full browser navigation guarantees cookies are committed and transmitted
+                // in HTTP headers on WebKit (iOS Safari/Chrome) where client-side router.push
+                // can trigger a race condition with currentUser() on the server component.
+                window.location.href = `/${lang}/dashboard`;
             } else {
-                console.error(JSON.stringify(result, null, 2));
+                console.error("Sign-in incomplete status:", JSON.stringify(result, null, 2));
+                setError(`Status: ${result.status}`);
+                setLoading(false);
             }
         } catch (err: unknown) {
-            console.error(JSON.stringify(err, null, 2));
+            console.error("Sign-in error:", JSON.stringify(err, null, 2));
+            setLoading(false);
             const clerkError = err as ClerkError;
             const code = clerkError.errors?.[0]?.code;
 
             if (code === "session_exists") {
                 setError(dict.login.errors.sessionExists);
-                setTimeout(() => router.push(`/${lang}/dashboard`), 1000);
+                setTimeout(() => {
+                    window.location.href = `/${lang}/dashboard`;
+                }, 1000);
             } else if (code === "form_identifier_not_found") {
                 setError(dict.login.errors.accountNotFound);
             } else if (code === "form_password_incorrect") {
@@ -91,6 +101,9 @@ export default function LoginForm({ dict, lang }: { dict: Dict; lang: string }) 
                         name="email"
                         type="email"
                         autoComplete="email"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
                         required
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
@@ -138,8 +151,12 @@ export default function LoginForm({ dict, lang }: { dict: Dict; lang: string }) 
             <div id="clerk-captcha" />
 
             <div>
-                <Button type="submit" className="w-full flex justify-center py-2 px-4 shadow-sm text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90">
-                    {dict.login.signIn}
+                <Button 
+                    type="submit" 
+                    disabled={loading || !isLoaded}
+                    className="w-full flex justify-center py-2 px-4 shadow-sm text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    {loading ? "Entrando..." : dict.login.signIn}
                 </Button>
             </div>
         </form>
