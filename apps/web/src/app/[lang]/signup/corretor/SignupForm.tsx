@@ -101,7 +101,14 @@ export default function SignupForm({ lang }: { lang: "en" | "pt" | "es" }) {
             <div className="flex min-h-screen flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-background">
                 <div className="w-full max-w-md space-y-8 bg-card p-8 rounded-xl border border-border">
                     <h2 className="text-2xl font-bold text-center mb-4">{dict.verify}</h2>
-                    <p className="text-center text-muted-foreground mb-6">Enviamos um código para {emailAddress}</p>
+                    <p className="text-center text-muted-foreground mb-3">Enviamos um código para <span className="font-semibold text-foreground">{emailAddress}</span></p>
+                    <p className="text-center text-xs text-muted-foreground bg-muted/40 p-2.5 rounded-lg border border-border/60 mb-6">
+                        {lang === 'en'
+                            ? "Didn't receive the email? Please check your spam or junk folder."
+                            : lang === 'es'
+                            ? "¿No recibiste el correo? Revisa também tu carpeta de spam o correo no deseado."
+                            : "Não encontrou o código na caixa de entrada? Verifique também sua pasta de spam ou lixo eletrônico."}
+                    </p>
                     <form onSubmit={handleVerify} className="space-y-4">
                         <input
                             value={code}
