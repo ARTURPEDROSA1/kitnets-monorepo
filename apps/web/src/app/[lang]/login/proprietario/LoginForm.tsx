@@ -1,8 +1,8 @@
 
 "use client";
 
-import { useState } from "react";
-import { useSignIn } from "@clerk/nextjs";
+import { useState, useEffect } from "react";
+import { useSignIn, useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { Button } from "@kitnets/ui";
 import { Eye, EyeOff } from "lucide-react";
@@ -33,6 +33,7 @@ interface Dict {
 
 export default function LoginForm({ dict, lang }: { dict: Dict; lang: string }) {
     const { isLoaded, signIn, setActive } = useSignIn();
+    const { isSignedIn } = useAuth();
     const router = useRouter();
 
     const [email, setEmail] = useState("");
@@ -40,6 +41,14 @@ export default function LoginForm({ dict, lang }: { dict: Dict; lang: string }) 
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+
+    // If the user already has an active session (e.g. after successful auth on mobile WebKit),
+    // automatically redirect them to the dashboard instead of remaining on the login form.
+    useEffect(() => {
+        if (isSignedIn) {
+            window.location.href = `/${lang}/dashboard`;
+        }
+    }, [isSignedIn, lang]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -56,10 +65,10 @@ export default function LoginForm({ dict, lang }: { dict: Dict; lang: string }) 
             });
 
             if (result.status === "complete") {
-                await setActive({ session: result.createdSessionId });
-                // Full browser navigation guarantees cookies are committed and transmitted
-                // in HTTP headers on WebKit (iOS Safari/Chrome) where client-side router.push
-                // can trigger a race condition with currentUser() on the server component.
+                await setActive({
+                    session: result.createdSessionId,
+                    redirectUrl: `/${lang}/dashboard`,
+                });
                 window.location.href = `/${lang}/dashboard`;
             } else {
                 console.error("Sign-in incomplete status:", JSON.stringify(result, null, 2));
