@@ -82,7 +82,11 @@ export default function SignupForm({ lang }: { lang: "en" | "pt" | "es" }) {
                     clerk_id: completeSignUp.createdUserId,
                     role: 'agency',
                     full_name: name,
-                    email: emailAddress
+                    email: emailAddress,
+                    property_type: null,
+                    property_address: null,
+                    property_details: null,
+                    additional_properties: []
                 });
 
                 if (dbError) console.error("Error creating profile:", dbError);
