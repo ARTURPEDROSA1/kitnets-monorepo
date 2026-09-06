@@ -2145,7 +2145,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             };
 
                             return (
-                                <div key={propIdx} className="space-y-3">
+                                <div key={propIdx} id={`prop-${propIdx}-card`} className="space-y-3">
                                     <div className="border border-border rounded-xl shadow-sm overflow-hidden transition-all duration-200">
                                         {/* Collapsible header */}
                                         <div
@@ -2914,13 +2914,19 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                                     disabled={isSaving}
                                                                     className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
                                                                     onClick={async () => {
-                                                                        await handleSave(true);
-                                                                        if (pType === 'multi') {
-                                                                            setCollapsedUnitsTrees(prev => ({ ...prev, [propIdx]: false }));
-                                                                            setTimeout(() => {
-                                                                                document.getElementById(`prop-${propIdx}-subunits`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                                                            }, 150);
-                                                                        }
+                                                                        const updatedProps = properties.map((pItem, i) => {
+                                                                            if (i !== propIdx) return pItem;
+                                                                            return {
+                                                                                ...pItem,
+                                                                                descriptionSectionOpen: false,
+                                                                            };
+                                                                        });
+                                                                        setProperties(updatedProps);
+                                                                        await handleSave(true, updatedProps);
+                                                                        setExpandedPropertyIdx(null);
+                                                                        setTimeout(() => {
+                                                                            document.getElementById(`prop-${propIdx}-card`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                                                                        }, 100);
                                                                     }}
                                                                 >
                                                                     {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : <CheckCircle2 className="w-4 h-4 mr-1.5" />}
@@ -2958,14 +2964,6 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             );
                         })}
 
-                        {propertyCreated && (
-                        <div className="flex justify-end pt-4">
-                            <Button size="lg" onClick={async () => { await handleSave(); setExpandedPropertyIdx(null); window.scrollTo({ top: 0, behavior: 'smooth' }); }} disabled={isSaving} className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-lg shadow-emerald-900/20">
-                                {isSaving ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Save className="w-5 h-5 mr-2" />}
-                                Salvar Imóvel e Documentos
-                            </Button>
-                        </div>
-                        )}
                     </div>
                 )}
 
