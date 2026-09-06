@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useSignUp } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { Button } from "@kitnets/ui";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 
 export default function SignupForm({ lang }: { lang: "en" | "pt" | "es" }) {
@@ -22,15 +22,20 @@ export default function SignupForm({ lang }: { lang: "en" | "pt" | "es" }) {
     const [error, setError] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isVerifyingCode, setIsVerifyingCode] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!isLoaded) return;
+        if (!isLoaded || isSubmitting) return;
 
         if (password !== confirmPassword) {
             setError("As senhas não coincidem.");
             return;
         }
+
+        setError("");
+        setIsSubmitting(true);
 
         try {
             await signUp.create({
@@ -44,16 +49,23 @@ export default function SignupForm({ lang }: { lang: "en" | "pt" | "es" }) {
             console.error(JSON.stringify(err, null, 2));
             if (err.errors?.[0]?.code === "session_exists") {
                 setError("Você já está logado. Redirecionando...");
-                setTimeout(() => router.push("/dashboard"), 2000);
+                setTimeout(() => {
+                    window.location.href = `/${lang}/dashboard`;
+                }, 1000);
             } else {
                 setError(err.errors?.[0]?.message || "Something went wrong during sign up");
             }
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
     const handleVerify = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!isLoaded) return;
+        if (!isLoaded || isVerifyingCode) return;
+
+        setError("");
+        setIsVerifyingCode(true);
 
         try {
             const completeSignUp = await signUp.attemptEmailAddressVerification({
@@ -61,24 +73,29 @@ export default function SignupForm({ lang }: { lang: "en" | "pt" | "es" }) {
             });
 
             if (completeSignUp.status === "complete") {
-                await setActive({ session: completeSignUp.createdSessionId });
+                await setActive({
+                    session: completeSignUp.createdSessionId,
+                    redirectUrl: `/${lang}/dashboard`
+                });
 
                 const { error: dbError } = await supabase.from('profiles').insert({
                     clerk_id: completeSignUp.createdUserId,
-                    role: 'broker',
+                    role: 'realtor',
                     full_name: name,
                     email: emailAddress
                 });
 
                 if (dbError) console.error("Error creating profile:", dbError);
 
-                router.push("/dashboard");
+                window.location.href = `/${lang}/dashboard`;
             } else {
                 console.error(JSON.stringify(completeSignUp, null, 2));
+                setIsVerifyingCode(false);
             }
         } catch (err: any) {
             console.error(JSON.stringify(err, null, 2));
             setError(err.errors?.[0]?.message || "Invalid verification code");
+            setIsVerifyingCode(false);
         }
     };
 
@@ -119,7 +136,20 @@ export default function SignupForm({ lang }: { lang: "en" | "pt" | "es" }) {
                         {error && <p className="text-red-500 text-sm">{error}</p>}
                         {/* Required by Clerk Bot Protection in production */}
                         <div id="clerk-captcha" />
-                        <Button type="submit" className="w-full bg-primary text-white">Verificar</Button>
+                        <Button 
+                            type="submit" 
+                            disabled={isVerifyingCode || !isLoaded}
+                            className="w-full flex justify-center items-center bg-primary text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {isVerifyingCode ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    {lang === 'en' ? "Verifying..." : lang === 'es' ? "Verificando..." : "Verificando..."}
+                                </>
+                            ) : (
+                                "Verificar"
+                            )}
+                        </Button>
                     </form>
                 </div>
             </div>
@@ -208,8 +238,19 @@ export default function SignupForm({ lang }: { lang: "en" | "pt" | "es" }) {
                         {/* Required by Clerk Bot Protection in production */}
                         <div id="clerk-captcha" />
 
-                        <Button type="submit" className="w-full flex justify-center py-2 px-4 shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90">
-                            {dict.signup}
+                        <Button 
+                            type="submit" 
+                            disabled={isSubmitting || !isLoaded}
+                            className="w-full flex justify-center items-center py-2 px-4 shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {isSubmitting ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    {lang === 'en' ? "Creating..." : lang === 'es' ? "Creando..." : "Criando..."}
+                                </>
+                            ) : (
+                                dict.signup
+                            )}
                         </Button>
                     </form>
 
