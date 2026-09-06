@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@kitnets/ui';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Image from 'next/image';
-import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera, Video, Sparkles, Save, UploadCloud, Home, Building2, User, ShieldCheck, Fingerprint, ChevronDown, ChevronUp, Wand2, Plus, ArrowRight, Minus, Edit3 } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera, Video, Sparkles, Save, UploadCloud, Home, Building2, User, ShieldCheck, Fingerprint, ChevronDown, ChevronUp, Wand2, Plus, ArrowRight, Minus, Edit3, X } from 'lucide-react';
 import PropertyDetailsCard, { PropertyDetails, SubUnit, SubUnitsSection, Checkbox as DetailCheckbox } from '@/components/profile/PropertyDetailsCard';
 import { cn } from '@/lib/utils';
 import { useUser, useAuth } from '@clerk/nextjs';
@@ -883,6 +883,30 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
 
     const [analyzingFiles, setAnalyzingFiles] = useState<Set<string>>(new Set());
     const [extractedAddressInfo, setExtractedAddressInfo] = useState<string | null>(null);
+    const extractedInfoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    const setTemporaryExtractedInfo = useCallback((message: string | null, durationMs = 6000) => {
+        if (extractedInfoTimeoutRef.current) {
+            clearTimeout(extractedInfoTimeoutRef.current);
+            extractedInfoTimeoutRef.current = null;
+        }
+        setExtractedAddressInfo(message);
+        if (message) {
+            extractedInfoTimeoutRef.current = setTimeout(() => {
+                setExtractedAddressInfo(null);
+                extractedInfoTimeoutRef.current = null;
+            }, durationMs);
+        }
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            if (extractedInfoTimeoutRef.current) {
+                clearTimeout(extractedInfoTimeoutRef.current);
+            }
+        };
+    }, []);
+
     const [fileAnalysisStatus, setFileAnalysisStatus] = useState<Record<string, 'analyzing' | 'success' | 'error'>>({});
     const [identitySectionOpen, setIdentitySectionOpen] = useState(true);
 
@@ -1125,7 +1149,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                     : method === 'vision_gemini' ? 'Visão Gemini'
                         : method === 'vision_openai' ? 'Visão GPT'
                             : method;
-                setExtractedAddressInfo(`✅ ${docType} — Endereço extraído com sucesso (${methodLabel})`);
+                setTemporaryExtractedInfo(`✅ ${docType} — Endereço extraído com sucesso (${methodLabel})`, 6000);
                 setFileAnalysisStatus(prev => ({ ...prev, [file.name]: 'success' }));
                 // Auto-collapse verification section after successful extraction and reveal address card
                 updateProperty(propIdx, prev => ({
@@ -1140,7 +1164,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
             } else {
                 const methodsTried = result?.methods_tried?.join(' → ') || 'nenhum';
                 setFileAnalysisStatus(prev => ({ ...prev, [file.name]: 'error' }));
-                setExtractedAddressInfo(`⚠️ Não foi possível extrair endereço. Métodos tentados: ${methodsTried}`);
+                setTemporaryExtractedInfo(`⚠️ Não foi possível extrair endereço. Métodos tentados: ${methodsTried}`, 8000);
             }
         } catch (error) {
             console.error('[Ownership] Analysis failed', error);
@@ -1898,6 +1922,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             const setPVideos = (v: File[] | ((p: File[]) => File[])) => setPropField('videos', v);
                             const setPSavedVideos = (v: string[] | ((p: string[]) => string[])) => setPropField('savedVideos', v);
                             const setPOwnershipFiles = (v: File[] | ((p: File[]) => File[])) => setPropField('ownershipFiles', v);
+                            const isDocVerified = pSavedProofs.length > 0 || pOwnershipFiles.some(f => fileAnalysisStatus[f.name] === 'success');
                             const isUnitsTreeOpen = pType === 'multi' ? !collapsedUnitsTrees[propIdx] : false;
                             const toggleUnitsTree = (e?: React.MouseEvent) => {
                                 e?.stopPropagation();
@@ -1928,6 +1953,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                     ]);
                                     const uniqueNewFiles = newFiles.filter(f => !existingNames.has(f.name.toLowerCase().trim()));
                                     if (uniqueNewFiles.length > 0) {
+                                        setTemporaryExtractedInfo(null);
                                         setPOwnershipFiles(prev => [...prev, ...uniqueNewFiles]);
                                         updateProperty(propIdx, prev => ({
                                             ...prev,
@@ -2152,6 +2178,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                             role="button"
                                             tabIndex={0}
                                             onClick={() => {
+                                                setTemporaryExtractedInfo(null);
                                                 if (isExpanded) {
                                                     setExpandedPropertyIdx(null);
                                                 } else {
@@ -2172,6 +2199,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                             onKeyDown={(e) => {
                                                 if (e.key === 'Enter' || e.key === ' ') {
                                                     e.preventDefault();
+                                                    setTemporaryExtractedInfo(null);
                                                     if (isExpanded) setExpandedPropertyIdx(null);
                                                     else setExpandedPropertyIdx(propIdx);
                                                 }
@@ -2334,16 +2362,16 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                     className="flex items-center justify-between w-full"
                                                 >
                                                     <div className="flex items-center gap-2">
-                                                        <div className={`p-2 rounded-lg ${(extractedAddressInfo?.startsWith('✅') || (!pOwnershipOpen && pSavedProofs.length > 0))
+                                                        <div className={`p-2 rounded-lg ${(isDocVerified || extractedAddressInfo?.startsWith('✅'))
                                                             ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600'
                                                             : 'bg-blue-100 dark:bg-blue-900/50 text-blue-600'
                                                             }`}>
-                                                            {(extractedAddressInfo?.startsWith('✅') || (!pOwnershipOpen && pSavedProofs.length > 0))
+                                                            {(isDocVerified || extractedAddressInfo?.startsWith('✅'))
                                                                 ? <CheckCircle2 className="w-5 h-5" />
                                                                 : <FileText className="w-5 h-5" />}
                                                         </div>
                                                         <h3 className="text-lg font-semibold text-foreground">{p.ownership.title}</h3>
-                                                        {!pOwnershipOpen && (extractedAddressInfo?.startsWith('✅') || pSavedProofs.length > 0) && (
+                                                        {!pOwnershipOpen && (isDocVerified || extractedAddressInfo?.startsWith('✅')) && (
                                                             <span className="ml-2 text-xs bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full">Verificado ✓</span>
                                                         )}
                                                     </div>
@@ -2488,15 +2516,25 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
 
                                             {/* Extraction feedback banner */}
                                             {extractedAddressInfo && (
-                                                <div className={`flex items-center gap-3 p-4 rounded-xl border text-sm font-medium ${extractedAddressInfo.startsWith('✅')
+                                                <div className={`flex items-center justify-between gap-3 p-4 rounded-xl border text-sm font-medium transition-all duration-300 animate-in fade-in slide-in-from-top-2 ${extractedAddressInfo.startsWith('✅')
                                                     ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
                                                     : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300'
                                                     }`}>
-                                                    {extractedAddressInfo.startsWith('✅')
-                                                        ? <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
-                                                        : <AlertTriangle className="w-5 h-5 flex-shrink-0" />
-                                                    }
-                                                    <span>{extractedAddressInfo}</span>
+                                                    <div className="flex items-center gap-3 min-w-0">
+                                                        {extractedAddressInfo.startsWith('✅')
+                                                            ? <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+                                                            : <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+                                                        }
+                                                        <span>{extractedAddressInfo}</span>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setTemporaryExtractedInfo(null)}
+                                                        className="text-current opacity-60 hover:opacity-100 p-1 rounded-md transition-opacity flex-shrink-0"
+                                                        aria-label="Fechar mensagem"
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </button>
                                                 </div>
                                             )}
 
@@ -2924,6 +2962,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                                         setProperties(updatedProps);
                                                                         await handleSave(true, updatedProps);
                                                                         setExpandedPropertyIdx(null);
+                                                                        setTemporaryExtractedInfo(null);
                                                                         setTimeout(() => {
                                                                             document.getElementById(`prop-${propIdx}-card`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                                                                         }, 100);
