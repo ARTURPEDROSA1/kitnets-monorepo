@@ -508,7 +508,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                     const primaryVideos = Array.isArray(profile.property_videos) ? profile.property_videos as string[] : [];
                     const primarySubUnits = Array.isArray(profile.sub_units) ? profile.sub_units as SubUnit[] : [];
 
-                    const primaryProfilePhoto = (profile.profile_photo_url as string) || null;
+                    const primaryProfilePhoto = (profile.profile_photo_url as string) || (primaryPhotos.length > 0 ? primaryPhotos[0] : null);
                     const primaryProperty: PropertyState = {
                         propertyType: (profile.property_type as 'single' | 'multi') || 'single',
                         details: primaryPropDetails ? {
@@ -574,7 +574,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                 savedVideos: Array.isArray(apTyped.savedVideos) ? apTyped.savedVideos as string[] : [],
                                 ownershipFiles: [],
                                 savedProofs: combinedProofs,
-                                profilePhotoUrl: (apTyped.profilePhotoUrl as string) || null,
+                                profilePhotoUrl: (apTyped.profilePhotoUrl as string) || (Array.isArray(apTyped.savedPhotos) && apTyped.savedPhotos.length > 0 ? (apTyped.savedPhotos[0] as string) : null),
                                 ownershipSectionOpen: combinedProofs.length === 0,
                                 addressSectionOpen: true,
                                 photosSectionOpen: true,
@@ -1524,6 +1524,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                         savedPhotos: updatedPhotoUrls,
                         savedVideos: updatedVideoUrls,
                         subUnits: updatedSubUnits,
+                        profilePhotoUrl: prop.profilePhotoUrl || (updatedPhotoUrls.length > 0 ? updatedPhotoUrls[0] : null),
                     };
                 }
 
@@ -1544,6 +1545,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             subUnits: uploaded.subUnits,
                             ownershipFiles: uploaded.ownershipFiles,
                             savedProofs: uploaded.savedProofs,
+                            profilePhotoUrl: uploaded.profilePhotoUrl,
                         };
                     }));
                 }
@@ -1559,6 +1561,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                     await sb.from('profiles').update({
                         property_photos: updatedProperties[0].savedPhotos,
                         property_videos: updatedProperties[0].savedVideos,
+                        profile_photo_url: updatedProperties[0].profilePhotoUrl,
                         sub_units: subUnitsForDB,
                         // Also update additional_properties with uploaded URLs
                         additional_properties: updatedProperties.slice(1).map(prop => ({
@@ -1960,17 +1963,35 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                             }
                                             if (uploadedUrls.length > 0) {
                                                 const allPhotos = [...pSavedPhotos, ...uploadedUrls];
+                                                const currentProfilePhoto = prop.profilePhotoUrl;
+                                                const newProfilePhoto = (currentProfilePhoto && allPhotos.includes(currentProfilePhoto))
+                                                    ? currentProfilePhoto
+                                                    : allPhotos[0];
+
                                                 setPSavedPhotos(allPhotos);
+                                                updateProperty(propIdx, prev => ({
+                                                    ...prev,
+                                                    savedPhotos: allPhotos,
+                                                    profilePhotoUrl: newProfilePhoto,
+                                                }));
+
                                                 // Persist directly to DB without handleSave (avoids stale closure)
                                                 if (propIdx === 0) {
-                                                    await sbUpload.from('profiles').update({ property_photos: allPhotos }).eq('id', profileId);
+                                                    await sbUpload.from('profiles').update({
+                                                        property_photos: allPhotos,
+                                                        profile_photo_url: newProfilePhoto,
+                                                    }).eq('id', profileId);
                                                 } else {
                                                     // For additional properties, update the JSON column
                                                     const { data: profile } = await sbUpload.from('profiles').select('additional_properties').eq('id', profileId).single();
                                                     if (profile?.additional_properties) {
                                                         const addProps = [...(profile.additional_properties as Record<string, unknown>[])];
                                                         if (addProps[propIdx - 1]) {
-                                                            addProps[propIdx - 1] = { ...addProps[propIdx - 1], savedPhotos: allPhotos };
+                                                            addProps[propIdx - 1] = {
+                                                                ...addProps[propIdx - 1],
+                                                                savedPhotos: allPhotos,
+                                                                profilePhotoUrl: newProfilePhoto,
+                                                            };
                                                             await sbUpload.from('profiles').update({ additional_properties: addProps }).eq('id', profileId);
                                                         }
                                                     }
@@ -2030,7 +2051,45 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             };
                             const removePropVideo = (idx: number) => setPVideos(prev => prev.filter((_, i) => i !== idx));
                             const removePropSavedPhoto = async (url: string) => {
-                                setPSavedPhotos(prev => prev.filter(u => u !== url));
+                                const remaining = pSavedPhotos.filter(u => u !== url);
+                                const currentProfilePhoto = prop.profilePhotoUrl || (pSavedPhotos.length > 0 ? pSavedPhotos[0] : null);
+                                const newProfilePhoto = currentProfilePhoto === url
+                                    ? (remaining.length > 0 ? remaining[0] : null)
+                                    : currentProfilePhoto;
+
+                                setPSavedPhotos(remaining);
+                                updateProperty(propIdx, prev => ({
+                                    ...prev,
+                                    savedPhotos: remaining,
+                                    profilePhotoUrl: newProfilePhoto,
+                                }));
+
+                                if (profileId) {
+                                    try {
+                                        const sb = await getSupabase();
+                                        if (propIdx === 0) {
+                                            await sb.from('profiles').update({
+                                                property_photos: remaining,
+                                                profile_photo_url: newProfilePhoto,
+                                            }).eq('id', profileId);
+                                        } else {
+                                            const { data: profile } = await sb.from('profiles').select('additional_properties').eq('id', profileId).single();
+                                            if (profile?.additional_properties) {
+                                                const addProps = [...(profile.additional_properties as Record<string, unknown>[])];
+                                                if (addProps[propIdx - 1]) {
+                                                    addProps[propIdx - 1] = {
+                                                        ...addProps[propIdx - 1],
+                                                        savedPhotos: remaining,
+                                                        profilePhotoUrl: newProfilePhoto,
+                                                    };
+                                                    await sb.from('profiles').update({ additional_properties: addProps }).eq('id', profileId);
+                                                }
+                                            }
+                                        }
+                                    } catch (err) {
+                                        console.error('Failed to update photos after deletion:', err);
+                                    }
+                                }
                             };
                             const removePropSavedVideo = (url: string) => {
                                 setPSavedVideos(prev => prev.filter(u => u !== url));
@@ -2149,9 +2208,9 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                 )}
 
                                                 {/* Profile photo thumbnail on collapsed card */}
-                                                {!isExpanded && prop.profilePhotoUrl ? (
+                                                {!isExpanded && (prop.profilePhotoUrl || (pSavedPhotos.length > 0 ? pSavedPhotos[0] : null)) ? (
                                                     <div className="w-10 h-10 rounded-lg overflow-hidden border border-border flex-shrink-0">
-                                                        <Image src={prop.profilePhotoUrl} alt={propLabel} width={40} height={40} className="w-full h-full object-cover" />
+                                                        <Image src={prop.profilePhotoUrl || pSavedPhotos[0]} alt={propLabel} width={40} height={40} className="w-full h-full object-cover" />
                                                     </div>
                                                 ) : (
                                                     <div className={cn(
@@ -2610,28 +2669,69 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                                                                     {/* Saved Photos */}
                                                                     {pSavedPhotos.map((url, idx) => {
-                                                                        const isProfilePhoto = prop.profilePhotoUrl === url;
+                                                                        const effectiveProfilePhoto = prop.profilePhotoUrl || (pSavedPhotos.length > 0 ? pSavedPhotos[0] : null);
+                                                                        const isProfilePhoto = effectiveProfilePhoto === url;
                                                                         return (
-                                                                            <div key={`saved-p-${idx}`} className={cn("aspect-square rounded-lg border relative group overflow-hidden", isProfilePhoto ? "border-emerald-500 border-2 ring-2 ring-emerald-200 dark:ring-emerald-800" : "border-border")}>
+                                                                            <div
+                                                                                key={`saved-p-${idx}`}
+                                                                                className={cn(
+                                                                                    "aspect-square rounded-lg border relative group overflow-hidden cursor-pointer transition-all",
+                                                                                    isProfilePhoto
+                                                                                        ? "border-emerald-500 border-2 ring-2 ring-emerald-200 dark:ring-emerald-800 shadow-sm"
+                                                                                        : "border-border hover:border-emerald-300"
+                                                                                )}
+                                                                                onClick={() => {
+                                                                                    updateProperty(propIdx, prev => ({ ...prev, profilePhotoUrl: url }));
+                                                                                    if (profileId) {
+                                                                                        getSupabase().then(sb => {
+                                                                                            if (propIdx === 0) {
+                                                                                                sb.from('profiles').update({ profile_photo_url: url }).eq('id', profileId);
+                                                                                            } else {
+                                                                                                sb.from('profiles').select('additional_properties').eq('id', profileId).single().then(({ data: prof }) => {
+                                                                                                    if (prof?.additional_properties) {
+                                                                                                        const addProps = [...(prof.additional_properties as Record<string, unknown>[])];
+                                                                                                        if (addProps[propIdx - 1]) {
+                                                                                                            addProps[propIdx - 1] = { ...addProps[propIdx - 1], profilePhotoUrl: url };
+                                                                                                            sb.from('profiles').update({ additional_properties: addProps }).eq('id', profileId);
+                                                                                                        }
+                                                                                                    }
+                                                                                                });
+                                                                                            }
+                                                                                        }).catch(console.error);
+                                                                                    }
+                                                                                }}
+                                                                            >
                                                                                 <Image src={url} alt="Property" width={200} height={200} className="w-full h-full object-cover" />
                                                                                 <div className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                                    <Button size="icon" variant="destructive" className="h-6 w-6" onClick={() => removePropSavedPhoto(url)}>
+                                                                                    <Button
+                                                                                        size="icon"
+                                                                                        variant="destructive"
+                                                                                        className="h-6 w-6"
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            removePropSavedPhoto(url);
+                                                                                        }}
+                                                                                    >
                                                                                         <Trash2 className="w-3 h-3" />
                                                                                     </Button>
                                                                                 </div>
-                                                                                {/* Profile photo selection checkbox */}
-                                                                                <label
+                                                                                {/* Profile photo selection badge */}
+                                                                                <div
                                                                                     className={cn(
-                                                                                        "absolute bottom-0 inset-x-0 flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-medium cursor-pointer transition-colors",
+                                                                                        "absolute bottom-0 inset-x-0 flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-medium transition-colors select-none",
                                                                                         isProfilePhoto
-                                                                                            ? "bg-emerald-600 text-white"
-                                                                                            : "bg-black/50 text-white opacity-0 group-hover:opacity-100"
+                                                                                            ? "bg-emerald-600 text-white font-semibold"
+                                                                                            : "bg-black/60 text-white opacity-0 group-hover:opacity-100"
                                                                                     )}
-                                                                                    onClick={(e) => { e.stopPropagation(); updateProperty(propIdx, prev => ({ ...prev, profilePhotoUrl: isProfilePhoto ? null : url })); }}
                                                                                 >
-                                                                                    <input type="checkbox" checked={isProfilePhoto} readOnly className="w-3 h-3 accent-emerald-500" />
-                                                                                    {isProfilePhoto ? 'Foto Principal' : 'Definir como principal'}
-                                                                                </label>
+                                                                                    <input
+                                                                                        type="checkbox"
+                                                                                        checked={isProfilePhoto}
+                                                                                        readOnly
+                                                                                        className="w-3.5 h-3.5 accent-emerald-500 rounded cursor-pointer pointer-events-none"
+                                                                                    />
+                                                                                    <span>{isProfilePhoto ? 'Foto Principal' : 'Definir como principal'}</span>
+                                                                                </div>
                                                                             </div>
                                                                         );
                                                                     })}
@@ -2722,13 +2822,19 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                                     disabled={isSaving}
                                                                     className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
                                                                     onClick={() => {
-                                                                        updateProperty(propIdx, prev => ({
-                                                                            ...prev,
-                                                                            showDescriptionCard: true,
-                                                                            photosSectionOpen: false,
-                                                                            descriptionSectionOpen: true,
-                                                                        }));
-                                                                        handleSave(true);
+                                                                        const defaultProfilePhoto = prop.profilePhotoUrl || (pSavedPhotos.length > 0 ? pSavedPhotos[0] : null);
+                                                                        const updatedProps = properties.map((pItem, i) => {
+                                                                            if (i !== propIdx) return pItem;
+                                                                            return {
+                                                                                ...pItem,
+                                                                                showDescriptionCard: true,
+                                                                                photosSectionOpen: false,
+                                                                                descriptionSectionOpen: true,
+                                                                                profilePhotoUrl: defaultProfilePhoto,
+                                                                            };
+                                                                        });
+                                                                        setProperties(updatedProps);
+                                                                        handleSave(true, updatedProps);
                                                                         setTimeout(() => document.getElementById(`prop-${propIdx}-description`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
                                                                     }}
                                                                 >
