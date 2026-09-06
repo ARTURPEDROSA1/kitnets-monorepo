@@ -388,11 +388,38 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                 const sb = await getSupabase();
 
                 // Use .maybeSingle() instead of .single() — returns null (no error) when 0 rows found
-                const { data: profile, error: fetchError } = await sb
+                let { data: profile, error: fetchError } = await sb
                     .from('profiles')
                     .select('*')
                     .eq('clerk_id', user.id)
                     .maybeSingle();
+
+                // If not found by clerk_id, try reconciling via server-side API (handles re-signups / OAuth / changed Clerk ID)
+                if (!profile && !fetchError && user.primaryEmailAddress?.emailAddress) {
+                    try {
+                        const syncRes = await fetch('/api/profiles/create', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                clerkId: user.id,
+                                fullName: user.fullName || '',
+                                email: user.primaryEmailAddress.emailAddress
+                            })
+                        });
+                        if (syncRes.ok) {
+                            const refetch = await sb
+                                .from('profiles')
+                                .select('*')
+                                .eq('clerk_id', user.id)
+                                .maybeSingle();
+                            if (refetch.data) {
+                                profile = refetch.data;
+                            }
+                        }
+                    } catch (syncErr) {
+                        console.error('[Profile] Sync on load error:', syncErr);
+                    }
+                }
 
                 if (fetchError) {
                     console.error('[Profile] Supabase fetch error:', fetchError.code, fetchError.message, fetchError.details);
@@ -1163,12 +1190,37 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
             // Use override if provided (e.g. after deletion), otherwise use current state
             const props = propertiesOverride ?? properties;
 
-            // 1. Upsert Profile
+            const normalizedEmail = user.primaryEmailAddress?.emailAddress?.trim().toLowerCase();
+
+            // Ensure profile exists and clerk_id is synced before saving
+            let currentProfileId = profileId;
+            if (!currentProfileId && normalizedEmail) {
+                try {
+                    const syncRes = await fetch('/api/profiles/create', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            clerkId: user.id,
+                            fullName: formData.name || user.fullName || '',
+                            email: normalizedEmail
+                        })
+                    });
+                    if (syncRes.ok) {
+                        const syncData = await syncRes.json();
+                        if (syncData.profile?.id) {
+                            currentProfileId = syncData.profile.id;
+                            setProfileId(currentProfileId);
+                        }
+                    }
+                } catch (syncErr) {
+                    console.error('[Profile Save] Error ensuring profile before save:', syncErr);
+                }
+            }
 
             const profilePayload: Record<string, unknown> = {
                 clerk_id: user.id,
                 full_name: formData.name,
-                email: user.primaryEmailAddress?.emailAddress,
+                email: normalizedEmail,
                 phone: formData.phone,
                 person_type: personType,
                 address: formData.ownerAddress,
@@ -1214,20 +1266,48 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                 profilePayload.birth_date = null;
             }
 
-            // Only generate new ID if we don't have one loaded
-            if (!profileId) {
+            let profile: any = null;
+            if (currentProfileId) {
+                profilePayload.id = currentProfileId;
+                const { data: updatedProfile, error: updateError } = await sb
+                    .from('profiles')
+                    .update(profilePayload)
+                    .eq('id', currentProfileId)
+                    .select()
+                    .maybeSingle();
+
+                if (updateError || !updatedProfile) {
+                    // Fallback to upsert if update didn't match row
+                    const { data: upsertProfile, error: upsertError } = await sb
+                        .from('profiles')
+                        .upsert(profilePayload, { onConflict: 'clerk_id' })
+                        .select()
+                        .single();
+                    if (upsertError) {
+                        console.error("Supabase Profile Upsert Error:", upsertError);
+                        throw new Error(`${p.alerts.saveError}: ${upsertError.message} (${upsertError.code})`);
+                    }
+                    profile = upsertProfile;
+                } else {
+                    profile = updatedProfile;
+                }
+            } else {
                 profilePayload.id = crypto.randomUUID();
+                const { data: upsertProfile, error: profileError } = await sb
+                    .from('profiles')
+                    .upsert(profilePayload, { onConflict: 'clerk_id' })
+                    .select()
+                    .single();
+
+                if (profileError) {
+                    console.error("Supabase Profile Error:", profileError);
+                    throw new Error(`${p.alerts.saveError}: ${profileError.message} (${profileError.code})`);
+                }
+                profile = upsertProfile;
             }
 
-            const { data: profile, error: profileError } = await sb
-                .from('profiles')
-                .upsert(profilePayload, { onConflict: 'clerk_id' })
-                .select()
-                .single();
-
-            if (profileError) {
-                console.error("Supabase Profile Error:", profileError);
-                throw new Error(`${p.alerts.saveError}: ${profileError.message} (${profileError.code})`);
+            if (profile?.id && !profileId) {
+                setProfileId(profile.id);
             }
 
             // ── Upload files for ALL properties ──────────────────────────
@@ -1384,21 +1464,25 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                 }
 
                 // Commit updated properties to state, preserving current UI section states
-                setProperties(currentProps => currentProps.map((currentProp, idx) => {
-                    if (idx >= updatedProperties.length) return currentProp;
-                    const uploaded = updatedProperties[idx];
-                    return {
-                        ...currentProp,
-                        // Merge only data fields from upload results
-                        photos: uploaded.photos,
-                        videos: uploaded.videos,
-                        savedPhotos: uploaded.savedPhotos,
-                        savedVideos: uploaded.savedVideos,
-                        subUnits: uploaded.subUnits,
-                        ownershipFiles: uploaded.ownershipFiles,
-                        savedProofs: uploaded.savedProofs,
-                    };
-                }));
+                if (propertiesOverride) {
+                    setProperties(updatedProperties);
+                } else {
+                    setProperties(currentProps => updatedProperties.map((uploaded, idx) => {
+                        const currentProp = currentProps[idx];
+                        if (!currentProp) return uploaded;
+                        return {
+                            ...currentProp,
+                            // Merge only data fields from upload results
+                            photos: uploaded.photos,
+                            videos: uploaded.videos,
+                            savedPhotos: uploaded.savedPhotos,
+                            savedVideos: uploaded.savedVideos,
+                            subUnits: uploaded.subUnits,
+                            ownershipFiles: uploaded.ownershipFiles,
+                            savedProofs: uploaded.savedProofs,
+                        };
+                    }));
+                }
 
                 // Sync primary property's Photos/Videos/SubUnits to Profile columns (only if properties exist)
                 if (updatedProperties.length > 0) {
@@ -2057,11 +2141,27 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             if (confirm(`Remover "${propLabel}"? Esta ação não pode ser desfeita.`)) {
+                                                                const deletedProp = properties[propIdx];
                                                                 const remainingProperties = properties.filter((_, i) => i !== propIdx);
                                                                 setProperties(remainingProperties);
                                                                 if (expandedPropertyIdx === propIdx) setExpandedPropertyIdx(null);
                                                                 else if (expandedPropertyIdx !== null && expandedPropertyIdx > propIdx) {
                                                                     setExpandedPropertyIdx(expandedPropertyIdx - 1);
+                                                                }
+                                                                // Clean up ownership proofs for deleted property from ownership_proofs table
+                                                                if (deletedProp?.savedProofs && deletedProp.savedProofs.length > 0) {
+                                                                    (async () => {
+                                                                        try {
+                                                                            const sb = await getSupabase();
+                                                                            for (const proof of deletedProp.savedProofs) {
+                                                                                if (proof?.id) {
+                                                                                    await sb.from('ownership_proofs').delete().eq('id', proof.id);
+                                                                                }
+                                                                            }
+                                                                        } catch (err) {
+                                                                            console.error('[Profile] Error deleting ownership proofs for removed property:', err);
+                                                                        }
+                                                                    })();
                                                                 }
                                                                 // Persist deletion to DB using the already-filtered list
                                                                 handleSave(true, remainingProperties);

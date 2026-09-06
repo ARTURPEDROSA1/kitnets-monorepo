@@ -58,11 +58,29 @@ export default async function DashboardPage({ params }: { params: Promise<{ lang
     const supabase = createAdminClient();
 
     // Fetch user profile with all property-related fields
-    const { data: profile, error: profileError } = await supabase
+    let { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('id, full_name, property_type, property_details, additional_properties')
         .eq('clerk_id', user.id)
         .maybeSingle();
+
+    // Fallback: reconcile by email if clerk_id changed
+    if (!profile && user.emailAddresses?.[0]?.emailAddress) {
+        const userEmail = user.emailAddresses[0].emailAddress.toLowerCase().trim();
+        const { data: existingByEmail } = await supabase
+            .from('profiles')
+            .select('id, full_name, property_type, property_details, additional_properties')
+            .ilike('email', userEmail)
+            .maybeSingle();
+
+        if (existingByEmail) {
+            await supabase
+                .from('profiles')
+                .update({ clerk_id: user.id, email: userEmail, updated_at: new Date().toISOString() })
+                .eq('id', existingByEmail.id);
+            profile = existingByEmail;
+        }
+    }
 
     if (profileError) {
         console.error('[Dashboard] Profile fetch error:', profileError);
