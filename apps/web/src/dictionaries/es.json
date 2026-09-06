@@ -317,7 +317,8 @@
             "accountNotFound": "No se pudo encontrar su cuenta.",
             "incorrectPassword": "Contraseña incorrecta.",
             "sessionExists": "Ya has iniciado sesión. Redirigiendo...",
-            "generic": "Correo electrónico o contraseña inválidos."
+            "generic": "Correo electrónico o contraseña inválidos.",
+            "tooManyRequests": "Demasiados intentos. Espere unos minutos e inténtelo de nuevo."
         }
     },
     "brokerLogin": {

@@ -357,7 +357,8 @@
             "accountNotFound": "Conta não encontrada.",
             "incorrectPassword": "Senha incorreta.",
             "sessionExists": "Você já está logado. Redirecionando...",
-            "generic": "Email ou senha inválidos."
+            "generic": "Email ou senha inválidos.",
+            "tooManyRequests": "Muitas tentativas. Aguarde alguns minutos e tente novamente."
         }
     },
     "brokerLogin": {

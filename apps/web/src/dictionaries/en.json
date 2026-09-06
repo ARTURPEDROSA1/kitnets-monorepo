@@ -339,7 +339,8 @@
             "accountNotFound": "Couldn't find your account.",
             "incorrectPassword": "Incorrect password.",
             "sessionExists": "You are already logged in. Redirecting...",
-            "generic": "Invalid email or password."
+            "generic": "Invalid email or password.",
+            "tooManyRequests": "Too many attempts. Please wait a few minutes and try again."
         }
     },
     "brokerLogin": {
