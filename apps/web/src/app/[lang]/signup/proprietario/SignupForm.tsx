@@ -131,6 +131,8 @@ export default function OwnerSignupPage({ lang }: { lang: "en" | "pt" | "es" }) 
                             className="appearance-none block w-full px-3 py-2 border border-input rounded-md shadow-sm bg-background text-foreground"
                         />
                         {error && <p className="text-red-500 text-sm">{error}</p>}
+                        {/* Required by Clerk Bot Protection in production */}
+                        <div id="clerk-captcha" />
                         <Button type="submit" className="w-full bg-primary text-white">Verificar</Button>
                     </form>
                 </div>
@@ -217,6 +219,9 @@ export default function OwnerSignupPage({ lang }: { lang: "en" | "pt" | "es" }) 
 
 
                         {error && <p className="text-red-500 text-sm">{error}</p>}
+
+                        {/* Required by Clerk Bot Protection in production */}
+                        <div id="clerk-captcha" />
 
                         <Button type="submit" className="w-full flex justify-center py-2 px-4 shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90">
                             {dict.signup}

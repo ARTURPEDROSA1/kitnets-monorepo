@@ -98,6 +98,9 @@ export default function LoginForm({ dict, lang }: { dict: any; lang: string }) {
 
             {error && <p className="text-red-500 text-sm">{error}</p>}
 
+            {/* Required by Clerk Bot Protection in production — renders CAPTCHA if challenged */}
+            <div id="clerk-captcha" />
+
             <div>
                 <Button type="submit" className="w-full flex justify-center py-2 px-4 shadow-sm text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90">
                     {dict.login.signIn}
