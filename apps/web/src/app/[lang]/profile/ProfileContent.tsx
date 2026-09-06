@@ -828,7 +828,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
         }
     };
 
-    const fetchAddress = async (type: 'ownerAddress' | 'propertyAddress' | 'adminAddress', cep: string) => {
+    const fetchAddress = async (type: 'ownerAddress' | 'propertyAddress' | 'adminAddress', cep: string, propIdx: number = 0) => {
         setIsLoadingAddress(true);
         setCepError("");
         const cleanCep = cep.replace(/\D/g, "");
@@ -851,8 +851,8 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                     }
                 }));
             } else if (type === 'propertyAddress') {
-                // Route to properties[0].address
-                updateProperty(0, prop => ({
+                // Route to properties[propIdx].address
+                updateProperty(propIdx, prop => ({
                     ...prop,
                     address: {
                         ...prop.address,
@@ -1908,7 +1908,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                     const formatted = value.replace(/\D/g, '').replace(/(\d{5})(\d)/, '$1-$2').slice(0, 9);
                                     updateProperty(propIdx, prev => ({ ...prev, address: { ...prev.address, cep: formatted } }));
                                     if (formatted.replace(/\D/g, '').length === 8) {
-                                        fetchAddress('propertyAddress', formatted);
+                                        fetchAddress('propertyAddress', formatted, propIdx);
                                     }
                                 } else {
                                     updateProperty(propIdx, prev => ({ ...prev, address: { ...prev.address, [field]: value } }));
@@ -2512,13 +2512,23 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                                 disabled={isSaving || (!pAddr.street && !pAddr.cep)}
                                                                 className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
                                                                 onClick={() => {
-                                                                    updateProperty(propIdx, prev => ({
-                                                                        ...prev,
-                                                                        showDetailsCard: true,
-                                                                        addressSectionOpen: false,
-                                                                        detailsInitialOpen: true,
-                                                                    }));
-                                                                    handleSave(true);
+                                                                    const bairro = pAddr.neighborhood?.trim();
+                                                                    const updatedProps = properties.map((pItem, i) => {
+                                                                        if (i !== propIdx) return pItem;
+                                                                        const currentName = pItem.details?.propertyName?.trim();
+                                                                        return {
+                                                                            ...pItem,
+                                                                            showDetailsCard: true,
+                                                                            addressSectionOpen: false,
+                                                                            detailsInitialOpen: true,
+                                                                            details: {
+                                                                                ...pItem.details,
+                                                                                propertyName: currentName || bairro || '',
+                                                                            }
+                                                                        };
+                                                                    });
+                                                                    setProperties(updatedProps);
+                                                                    handleSave(true, updatedProps);
                                                                     setTimeout(() => document.getElementById(`prop-${propIdx}-details`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
                                                                 }}
                                                             >
