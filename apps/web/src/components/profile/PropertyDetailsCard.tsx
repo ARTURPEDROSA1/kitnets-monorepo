@@ -434,12 +434,13 @@ export default function PropertyDetailsCard({
                     {onContinue && (
                         <div className="flex justify-end pt-4">
                             <Button
+                                type="button"
                                 variant="outline"
                                 size="sm"
                                 className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
                                 onClick={onContinue}
                             >
-                                Continuar <ArrowRight className="w-4 h-4" />
+                                Confirmar <ArrowRight className="w-4 h-4" />
                             </Button>
                         </div>
                     )}
