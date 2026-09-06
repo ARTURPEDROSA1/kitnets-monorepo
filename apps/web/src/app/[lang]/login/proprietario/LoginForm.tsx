@@ -25,6 +25,7 @@ interface Dict {
             sessionExists: string;
             accountNotFound: string;
             incorrectPassword: string;
+            tooManyRequests: string;
             generic: string;
         };
     };
@@ -70,8 +71,9 @@ export default function LoginForm({ dict, lang }: { dict: Dict; lang: string }) 
                 setError(dict.login.errors.accountNotFound);
             } else if (code === "form_password_incorrect") {
                 setError(dict.login.errors.incorrectPassword);
+            } else if (code === "too_many_requests") {
+                setError(dict.login.errors.tooManyRequests);
             } else {
-                // Surface the raw code to help diagnose unexpected errors (e.g. captcha_invalid)
                 setError(`${dict.login.errors.generic}${code ? ` [${code}]` : ""}`);
             }
         }
