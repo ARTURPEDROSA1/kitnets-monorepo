@@ -356,12 +356,22 @@ export default function PropertyDetailsCard({
                                     placeholder="ex: 350"
                                 />
                             </div>
+                            <div className="space-y-1.5">
+                                <Label>Área Total (m²)</Label>
+                                <Input
+                                    type="number"
+                                    min={0}
+                                    value={details.totalSqMeters ?? ''}
+                                    onChange={(e) => updateDetail("totalSqMeters", e.target.value)}
+                                    placeholder="ex: 250"
+                                />
+                            </div>
                         </div>
                     </div>
 
-                    {/* Number of Units + Total sqm */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {propertyType === "multi" && (
+                    {/* Number of Units (multi-family only) */}
+                    {propertyType === "multi" && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-1.5">
                                 <Label className="flex items-center gap-1.5">
                                     <Building2 className="w-4 h-4 text-muted-foreground" />
@@ -381,21 +391,8 @@ export default function PropertyDetailsCard({
                                     placeholder="ex: 1"
                                 />
                             </div>
-                        )}
-                        <div className="space-y-1.5">
-                            <Label className="flex items-center gap-1.5">
-                                <DoorOpen className="w-4 h-4 text-muted-foreground" />
-                                Área Total (m²)
-                            </Label>
-                            <Input
-                                type="number"
-                                min={0}
-                                value={details.totalSqMeters}
-                                onChange={(e) => updateDetail("totalSqMeters", e.target.value)}
-                                placeholder="ex: 250"
-                            />
                         </div>
-                    </div>
+                    )}
 
                     {/* Single-family specific characteristics */}
                     {propertyType === "single" && (
@@ -558,7 +555,7 @@ export default function PropertyDetailsCard({
                     <Checkbox
                         checked={details.internetBill}
                         onChange={(val) => updateDetail("internetBill", val)}
-                        label="Conta de Internet"
+                        label="Internet"
                         icon={<Wifi className="w-4 h-4" />}
                     />
                     {onContinue && (
