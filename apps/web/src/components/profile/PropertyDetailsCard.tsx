@@ -526,7 +526,7 @@ export default function PropertyDetailsCard({
                         )}
                     </div>
 
-                    {/* Main Meters */}
+                    {/* Main Meters & Utilities */}
                     <div className="space-y-2">
                         <p className="text-sm font-semibold text-foreground">Medidores Principais do Imóvel <span className="font-normal text-muted-foreground">(pagos pelo Proprietário)</span></p>
                         <div className="flex flex-wrap gap-4">
@@ -543,6 +543,12 @@ export default function PropertyDetailsCard({
                                 icon={<Zap className="w-4 h-4" />}
                             />
                             <Checkbox
+                                checked={details.internetBill}
+                                onChange={(val) => updateDetail("internetBill", val)}
+                                label="Internet"
+                                icon={<Wifi className="w-4 h-4" />}
+                            />
+                            <Checkbox
                                 checked={details.mainMeters.gas}
                                 onChange={(val) => updateMainMeter("gas", val)}
                                 label="Gás"
@@ -550,14 +556,6 @@ export default function PropertyDetailsCard({
                             />
                         </div>
                     </div>
-
-                    {/* Internet Bill */}
-                    <Checkbox
-                        checked={details.internetBill}
-                        onChange={(val) => updateDetail("internetBill", val)}
-                        label="Internet"
-                        icon={<Wifi className="w-4 h-4" />}
-                    />
                     {onContinue && (
                         <div className="flex justify-end pt-4">
                             <Button
