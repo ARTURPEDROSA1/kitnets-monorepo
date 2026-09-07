@@ -3,13 +3,16 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { Button } from '@kitnets/ui';
 import {
+    Folder,
+    FolderOpen,
+    ArrowLeft,
     Receipt,
     FileSignature,
     ClipboardCheck,
     FileSpreadsheet,
     Scroll,
     ShieldCheck,
-    FolderOpen,
+    FolderPlus,
     Eye,
     History,
     Sparkles,
@@ -101,7 +104,7 @@ export const DOCUMENT_CATEGORIES: CategoryDef[] = [
         label: 'Outros Documentos',
         singular: 'Outro Documento',
         description: 'Contas de concessionárias (água, luz, gás), plantas e demais arquivos',
-        icon: FolderOpen,
+        icon: FolderPlus,
     },
 ];
 
@@ -150,7 +153,6 @@ export const getProofYear = (name: string, createdAt?: string, explicitYear?: nu
 
 /**
  * Strips bracketed category/year prefix for display.
- * e.g., "[IPTU 2026] carnê_parcela.pdf" -> "carnê_parcela.pdf"
  */
 export const formatDocumentDisplayName = (originalName: string): string => {
     if (!originalName) return 'Documento sem nome';
@@ -275,47 +277,17 @@ export const PropertyDocumentsCard: React.FC<PropertyDocumentsCardProps> = ({
         return items;
     }, [savedProofs, ownershipFiles, fileAnalysisStatus]);
 
-    // Categories present in unified docs
-    const existingCategories = useMemo(() => {
-        const set = new Set<DocCategory>();
-        for (const doc of unifiedDocs) {
-            set.add(doc.category);
-        }
-        return set;
-    }, [unifiedDocs]);
-
-    // Determine default active tab:
-    // If IPTU exists -> 'iptu'
-    // Else if any category has docs -> first existing category
-    // Else -> 'upload'
-    const defaultTab = useMemo(() => {
-        if (existingCategories.has('iptu')) return 'iptu';
-        if (existingCategories.size > 0) {
-            const first = Array.from(existingCategories)[0];
-            return first;
-        }
-        return 'upload';
-    }, [existingCategories]);
-
-    const [activeTab, setActiveTab] = useState<string>(defaultTab);
-
-    // If activeTab is no longer valid, fallback
-    const effectiveActiveTab = useMemo(() => {
-        if (activeTab === 'upload') return 'upload';
-        if (existingCategories.has(activeTab as DocCategory)) return activeTab;
-        if (existingCategories.has('iptu')) return 'iptu';
-        if (existingCategories.size > 0) return Array.from(existingCategories)[0];
-        return 'upload';
-    }, [activeTab, existingCategories]);
+    // Active folder state: null = root view (all folders grid), string = opened folder
+    const [openFolder, setOpenFolder] = useState<DocCategory | null>(null);
 
     // Upload state inside component
     const [isUploading, setIsUploading] = useState<boolean>(false);
-    const [uploadCategory, setUploadCategory] = useState<DocCategory | 'auto'>('auto');
+    const [rootUploadCategory, setRootUploadCategory] = useState<DocCategory | 'auto'>('auto');
     const [selectedYear, setSelectedYear] = useState<number>(currentCalendarYear);
     const [customYearInput, setCustomYearInput] = useState<string>('');
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    const rootFileInputRef = useRef<HTMLInputElement>(null);
     const iptuFileInputRef = useRef<HTMLInputElement>(null);
-    const categoryFileInputRef = useRef<HTMLInputElement>(null);
+    const folderFileInputRef = useRef<HTMLInputElement>(null);
 
     // Total documents count
     const totalDocsCount = unifiedDocs.length;
@@ -376,24 +348,24 @@ export const PropertyDocumentsCard: React.FC<PropertyDocumentsCardProps> = ({
         const filesArray = Array.from(fileList);
         setIsUploading(true);
         try {
-            const effectiveCategory = targetCategory ?? (uploadCategory === 'auto' ? undefined : uploadCategory);
+            const effectiveCategory = targetCategory ?? (rootUploadCategory === 'auto' ? undefined : rootUploadCategory);
             const effectiveYear = targetYear ?? (customYearInput ? parseInt(customYearInput, 10) : selectedYear);
             await onUploadFiles(filesArray, effectiveCategory, effectiveYear);
 
-            // Automatically switch to target category tab once uploaded
+            // Navigate into the target folder once uploaded
             if (effectiveCategory) {
-                setActiveTab(effectiveCategory);
+                setOpenFolder(effectiveCategory);
             } else if (filesArray.length > 0) {
                 const detected = getProofCategory(filesArray[0].name);
-                setActiveTab(detected);
+                setOpenFolder(detected);
             }
         } catch (err) {
             console.error('Error in handleFilesSelected:', err);
         } finally {
             setIsUploading(false);
-            if (fileInputRef.current) fileInputRef.current.value = '';
+            if (rootFileInputRef.current) rootFileInputRef.current.value = '';
             if (iptuFileInputRef.current) iptuFileInputRef.current.value = '';
-            if (categoryFileInputRef.current) categoryFileInputRef.current.value = '';
+            if (folderFileInputRef.current) folderFileInputRef.current.value = '';
         }
     };
 
@@ -416,40 +388,6 @@ export const PropertyDocumentsCard: React.FC<PropertyDocumentsCardProps> = ({
         list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         return list;
     };
-
-    // Visible tabs in navigation bar:
-    // 1. IPTU (always first if present, or if active)
-    // 2. Any other categories that currently have documents
-    // 3. Active category (if user opened an empty one)
-    // 4. '+ Enviar Documento' (always LAST!)
-    const visibleCategoryTabs = useMemo(() => {
-        const tabs: CategoryDef[] = [];
-        const addedIds = new Set<DocCategory>();
-
-        // 1. If IPTU has documents or is currently selected, add it first
-        const iptuDef = DOCUMENT_CATEGORIES.find(c => c.id === 'iptu')!;
-        if (existingCategories.has('iptu') || effectiveActiveTab === 'iptu') {
-            tabs.push(iptuDef);
-            addedIds.add('iptu');
-        }
-
-        // 2. Add remaining categories that have documents
-        for (const cat of DOCUMENT_CATEGORIES) {
-            if (cat.id === 'iptu') continue;
-            if (existingCategories.has(cat.id)) {
-                tabs.push(cat);
-                addedIds.add(cat.id);
-            }
-        }
-
-        // 3. If effectiveActiveTab is not 'upload' and not in tabs yet, add it
-        if (effectiveActiveTab !== 'upload' && !addedIds.has(effectiveActiveTab as DocCategory)) {
-            const activeDef = DOCUMENT_CATEGORIES.find(c => c.id === effectiveActiveTab);
-            if (activeDef) tabs.push(activeDef);
-        }
-
-        return tabs;
-    }, [existingCategories, effectiveActiveTab]);
 
     return (
         <div id={`prop-${propIdx}-ownership`} className="bg-card border border-border p-5 sm:p-6 rounded-xl shadow-sm space-y-4">
@@ -491,7 +429,7 @@ export const PropertyDocumentsCard: React.FC<PropertyDocumentsCardProps> = ({
                             )}
                         </div>
                         <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                            Centralize IPTU, contratos, vistorias e certidões em um único lugar seguro.
+                            Pastas organizadas para IPTU, contratos de aluguel, vistorias, escrituras e certidões.
                         </p>
                     </div>
                 </div>
@@ -558,235 +496,141 @@ export const PropertyDocumentsCard: React.FC<PropertyDocumentsCardProps> = ({
                             </div>
                         </div>
                     ) : (
-                        /* Case 2: Tabbed Layout for Saved Properties or once documents are present */
+                        /* Case 2: FOLDER VIEW */
                         <div className="space-y-4">
-                            {/* Tab navigation bar */}
-                            <div className="flex items-center gap-1.5 border-b border-border pb-2 overflow-x-auto scrollbar-none">
-                                {visibleCategoryTabs.map((cat) => {
-                                    const Icon = cat.icon;
-                                    const count = unifiedDocs.filter(d => d.category === cat.id).length;
-                                    const isActive = effectiveActiveTab === cat.id;
-
-                                    return (
-                                        <button
-                                            key={cat.id}
-                                            type="button"
-                                            onClick={() => setActiveTab(cat.id)}
-                                            className={cn(
-                                                "flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all flex-shrink-0 border",
-                                                isActive
-                                                    ? "bg-primary/10 border-primary text-primary shadow-2xs dark:bg-primary/20"
-                                                    : "bg-background border-border text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                                            )}
-                                        >
-                                            <Icon className="w-3.5 h-3.5 flex-shrink-0" />
-                                            <span>{cat.label}</span>
-                                            {count > 0 && (
-                                                <span
-                                                    className={cn(
-                                                        "text-[10px] px-1.5 py-0.5 rounded-full font-bold",
-                                                        isActive
-                                                            ? "bg-primary text-primary-foreground"
-                                                            : "bg-muted text-muted-foreground"
-                                                    )}
-                                                >
-                                                    {count}
-                                                </span>
-                                            )}
-                                        </button>
-                                    );
-                                })}
-
-                                {/* LAST TAB: Always '+ Enviar Documento' */}
-                                <button
-                                    type="button"
-                                    onClick={() => setActiveTab('upload')}
-                                    className={cn(
-                                        "flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all flex-shrink-0 border",
-                                        effectiveActiveTab === 'upload'
-                                            ? "bg-blue-600 text-white border-blue-600 shadow-sm"
-                                            : "bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900 hover:bg-blue-100 dark:hover:bg-blue-900/60"
-                                    )}
-                                >
-                                    <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                                    <span>+ Enviar Documento</span>
-                                </button>
-                            </div>
-
-                            {/* TAB CONTENT: IPTU Tab */}
-                            {effectiveActiveTab === 'iptu' && (
+                            {/* VIEW A: ROOT VIEW - 8 Folders Grid */}
+                            {openFolder === null && (
                                 <div className="space-y-5 animate-in fade-in-50 duration-200">
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-muted/20 p-3 rounded-lg border border-border">
+                                    {/* Folders Section Header */}
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                                         <div>
                                             <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                                                <Receipt className="w-4 h-4 text-emerald-600" />
-                                                IPTU — Imposto Predial e Territorial Urbano
+                                                <Folder className="w-4 h-4 text-amber-500 fill-amber-500/20" />
+                                                Pastas de Documentos do Imóvel
                                             </h4>
                                             <p className="text-xs text-muted-foreground mt-0.5">
-                                                Mantenha o histórico anual do IPTU organizado. O documento do ano vigente fica destacado abaixo.
+                                                Clique em uma pasta para abrir os arquivos arquivados ou adicionar novos documentos.
                                             </p>
                                         </div>
                                     </div>
 
-                                    {/* 1. HIGHLIGHT: Current Year Document */}
-                                    {currentIptuDoc ? (
-                                        <div className="border-2 border-emerald-500/50 dark:border-emerald-600/50 bg-emerald-50/40 dark:bg-emerald-950/20 rounded-xl p-4 sm:p-5 shadow-2xs space-y-3 relative overflow-hidden">
-                                            <div className="flex flex-wrap items-center justify-between gap-2">
-                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 dark:bg-emerald-900/70 text-emerald-800 dark:text-emerald-300">
-                                                    <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                                                    Ano Vigente • Exercício {currentIptuDoc.year}
-                                                </span>
-                                                <div className="flex items-center gap-2">
-                                                    {currentIptuDoc.status === 'analyzing' ? (
-                                                        <span className="text-xs text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1">
-                                                            <Loader2 className="w-3 h-3 animate-spin" /> Analisando com IA...
-                                                        </span>
-                                                    ) : currentIptuDoc.status === 'success' ? (
-                                                        <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
-                                                            <CheckCircle2 className="w-3.5 h-3.5" /> Endereço extraído ✓
-                                                        </span>
-                                                    ) : currentIptuDoc.status === 'error' ? (
-                                                        <span className="text-xs text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
-                                                            <AlertTriangle className="w-3.5 h-3.5" /> Falha na extração
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-xs text-muted-foreground">
-                                                            Enviado em {new Date(currentIptuDoc.createdAt).toLocaleDateString()}
-                                                        </span>
+                                    {/* 8 Folders Grid */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                                        {DOCUMENT_CATEGORIES.map((cat) => {
+                                            const CatIcon = cat.icon;
+                                            const docs = getDocsForCategory(cat.id);
+                                            const count = docs.length;
+
+                                            return (
+                                                <div
+                                                    key={cat.id}
+                                                    onClick={() => setOpenFolder(cat.id)}
+                                                    role="button"
+                                                    tabIndex={0}
+                                                    onKeyDown={(e) => { if (e.key === 'Enter') setOpenFolder(cat.id); }}
+                                                    className={cn(
+                                                        "group relative flex flex-col justify-between p-4 rounded-xl border transition-all duration-200 cursor-pointer text-left select-none",
+                                                        count > 0
+                                                            ? "bg-card border-border hover:border-primary/60 hover:shadow-md hover:-translate-y-0.5"
+                                                            : "bg-muted/10 border-border/70 hover:border-border hover:bg-muted/30"
                                                     )}
-                                                </div>
-                                            </div>
+                                                >
+                                                    {/* Top row: Folder Icon + Count Badge */}
+                                                    <div className="flex items-center justify-between gap-2 mb-3">
+                                                        <div
+                                                            className={cn(
+                                                                "w-11 h-11 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105",
+                                                                count > 0
+                                                                    ? "bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 shadow-2xs"
+                                                                    : "bg-muted text-muted-foreground"
+                                                        )}
+                                                        >
+                                                            {count > 0 ? (
+                                                                <FolderOpen className="w-6 h-6 fill-amber-500/20" />
+                                                            ) : (
+                                                                <Folder className="w-6 h-6" />
+                                                            )}
+                                                        </div>
 
-                                            <div className="flex items-center justify-between gap-4 pt-1">
-                                                <div className="flex items-center gap-3 min-w-0">
-                                                    <div className="w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center flex-shrink-0">
-                                                        <Receipt className="w-5 h-5" />
-                                                    </div>
-                                                    <div className="min-w-0">
-                                                        <p className="text-sm font-semibold text-foreground truncate">
-                                                            {currentIptuDoc.displayName}
-                                                        </p>
-                                                        <p className="text-xs text-muted-foreground mt-0.5">
-                                                            {formatFileSize(currentIptuDoc.size)} {currentIptuDoc.size ? '•' : ''} IPTU {currentIptuDoc.year}
-                                                        </p>
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex items-center gap-2 flex-shrink-0">
-                                                    <Button
-                                                        type="button"
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => handleViewDocument(currentIptuDoc)}
-                                                        className="h-8 gap-1.5 text-xs text-foreground hover:bg-muted"
-                                                    >
-                                                        <Eye className="w-3.5 h-3.5" />
-                                                        <span>Visualizar</span>
-                                                    </Button>
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => handleDeleteDocument(currentIptuDoc)}
-                                                        className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10 px-2"
-                                                        title="Excluir IPTU"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="p-4 rounded-xl border border-dashed border-border text-center text-sm text-muted-foreground">
-                                            Nenhum IPTU arquivado para esta propriedade ainda.
-                                        </div>
-                                    )}
-
-                                    {/* 2. HISTORY: Past Years Documents */}
-                                    <div className="space-y-2 pt-2">
-                                        <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                                            <History className="w-3.5 h-3.5" />
-                                            Histórico de Anos Anteriores {pastIptuDocs.length > 0 ? `(${pastIptuDocs.length})` : ''}
-                                        </h4>
-
-                                        {pastIptuDocs.length > 0 ? (
-                                            <div className="space-y-2">
-                                                {pastIptuDocs.map((past) => (
-                                                    <div
-                                                        key={past.id}
-                                                        className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/20 hover:bg-muted/40 transition-colors gap-3"
-                                                    >
-                                                        <div className="flex items-center gap-3 min-w-0">
-                                                            <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-muted text-muted-foreground border border-border flex-shrink-0">
-                                                                {past.year}
+                                                        {count > 0 ? (
+                                                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20">
+                                                                {count} {count === 1 ? 'arquivo' : 'arquivos'}
                                                             </span>
-                                                            <div className="min-w-0">
-                                                                <p className="text-sm font-medium text-foreground truncate">
-                                                                    {past.displayName}
-                                                                </p>
-                                                                <p className="text-xs text-muted-foreground">
-                                                                    {formatFileSize(past.size)} {past.size ? '•' : ''} Enviado em {new Date(past.createdAt).toLocaleDateString()}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="flex items-center gap-2 flex-shrink-0">
-                                                            <Button
-                                                                type="button"
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() => handleViewDocument(past)}
-                                                                className="h-8 gap-1.5 text-xs"
-                                                            >
-                                                                <Eye className="w-3.5 h-3.5" />
-                                                                <span>Visualizar</span>
-                                                            </Button>
-                                                            <Button
-                                                                type="button"
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                onClick={() => handleDeleteDocument(past)}
-                                                                className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10 px-2"
-                                                            >
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </Button>
-                                                        </div>
+                                                        ) : (
+                                                            <span className="text-[11px] text-muted-foreground font-medium">
+                                                                Vazia
+                                                            </span>
+                                                        )}
                                                     </div>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <p className="text-xs text-muted-foreground italic pl-1">
-                                                Nenhum IPTU de anos anteriores arquivado. Você pode enviar recibos de exercícios anteriores abaixo.
-                                            </p>
-                                        )}
+
+                                                    {/* Middle: Category Title and Description */}
+                                                    <div>
+                                                        <h4 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors flex items-center gap-1.5">
+                                                            <CatIcon className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary flex-shrink-0" />
+                                                            <span className="truncate">{cat.label}</span>
+                                                        </h4>
+                                                        <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
+                                                            {cat.description}
+                                                        </p>
+                                                    </div>
+
+                                                    {/* Bottom: Preview line and arrow */}
+                                                    <div className="pt-3 mt-3 border-t border-border/50 flex items-center justify-between text-[11px] text-muted-foreground">
+                                                        {count > 0 ? (
+                                                            <span className="truncate text-foreground/80 font-medium">
+                                                                {cat.id === 'iptu' && currentIptuDoc
+                                                                    ? `Exercício ${currentIptuDoc.year}`
+                                                                    : `${count} ${count === 1 ? 'documento' : 'documentos'}`
+                                                                }
+                                                            </span>
+                                                        ) : (
+                                                            <span className="italic">Abrir pasta</span>
+                                                        )}
+                                                        <span className="text-primary font-bold group-hover:translate-x-0.5 transition-transform text-xs">
+                                                            →
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
 
-                                    {/* 3. DIRECT UPLOAD: Upload new IPTU right there inside the IPTU tab */}
+                                    {/* Quick Upload Dropzone on Root View */}
                                     <div className="border border-border bg-muted/10 rounded-xl p-4 sm:p-5 space-y-3">
                                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                                             <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                                                <Plus className="w-4 h-4 text-emerald-600" />
-                                                Adicionar IPTU (Ano Vigente ou Anterior)
+                                                <UploadCloud className="w-4 h-4 text-blue-600" />
+                                                Envio Rápido para as Pastas
                                             </h4>
-                                            {/* Year Selector Pills */}
-                                            <div className="flex items-center gap-1 flex-wrap">
-                                                <span className="text-xs text-muted-foreground mr-1">Exercício:</span>
-                                                {[currentCalendarYear, currentCalendarYear - 1, currentCalendarYear - 2, currentCalendarYear - 3].map((y) => (
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className="text-xs text-muted-foreground mr-1">Organizar em:</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setRootUploadCategory('auto')}
+                                                    className={cn(
+                                                        "px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all",
+                                                        rootUploadCategory === 'auto'
+                                                            ? "bg-blue-600 text-white border-blue-600 shadow-2xs"
+                                                            : "bg-background border-border text-muted-foreground hover:bg-muted"
+                                                    )}
+                                                >
+                                                    <span className="flex items-center gap-1">
+                                                        <Sparkles className="w-3 h-3" /> Automático
+                                                    </span>
+                                                </button>
+                                                {DOCUMENT_CATEGORIES.map((cat) => (
                                                     <button
-                                                        key={y}
+                                                        key={cat.id}
                                                         type="button"
-                                                        onClick={() => {
-                                                            setSelectedYear(y);
-                                                            setCustomYearInput('');
-                                                        }}
+                                                        onClick={() => setRootUploadCategory(cat.id)}
                                                         className={cn(
-                                                            "px-2.5 py-0.5 rounded-full text-xs font-semibold border transition-all",
-                                                            selectedYear === y && !customYearInput
-                                                                ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs"
+                                                            "px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all",
+                                                            rootUploadCategory === cat.id
+                                                                ? "bg-blue-600 text-white border-blue-600 shadow-2xs"
                                                                 : "bg-background border-border text-muted-foreground hover:bg-muted"
                                                         )}
                                                     >
-                                                        {y}
+                                                        {cat.singular}
                                                     </button>
                                                 ))}
                                             </div>
@@ -794,15 +638,15 @@ export const PropertyDocumentsCard: React.FC<PropertyDocumentsCardProps> = ({
 
                                         <div className="border-2 border-dashed border-border rounded-xl p-6 flex flex-col items-center justify-center hover:bg-muted/40 transition-colors relative cursor-pointer group">
                                             <input
-                                                ref={iptuFileInputRef}
+                                                ref={rootFileInputRef}
                                                 type="file"
                                                 multiple
                                                 accept=".pdf,.jpg,.jpeg,.png"
-                                                onChange={(e) => handleFilesSelected(e.target.files, 'iptu', selectedYear)}
+                                                onChange={(e) => handleFilesSelected(e.target.files)}
                                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                                 disabled={isUploading}
                                             />
-                                            <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
+                                            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
                                                 {isUploading ? (
                                                     <Loader2 className="w-5 h-5 animate-spin" />
                                                 ) : (
@@ -810,236 +654,347 @@ export const PropertyDocumentsCard: React.FC<PropertyDocumentsCardProps> = ({
                                                 )}
                                             </div>
                                             <p className="text-sm font-semibold text-foreground text-center">
-                                                Clique ou arraste para enviar IPTU ({selectedYear})
+                                                Arraste qualquer documento aqui ou clique para selecionar
                                             </p>
                                             <p className="text-xs text-muted-foreground mt-0.5 text-center">
-                                                PDF, JPG ou PNG • O documento será adicionado ao histórico da propriedade
+                                                PDF, JPG ou PNG • O arquivo será organizado na pasta correspondente automaticamente
                                             </p>
                                         </div>
                                     </div>
                                 </div>
                             )}
 
-                            {/* TAB CONTENT: Other Category Tabs (Contrato, Vistoria, Matrícula, etc.) */}
-                            {effectiveActiveTab !== 'iptu' && effectiveActiveTab !== 'upload' && (() => {
-                                const currentCatDef = DOCUMENT_CATEGORIES.find(c => c.id === effectiveActiveTab)!;
-                                const categoryDocs = getDocsForCategory(currentCatDef.id);
+                            {/* VIEW B: INSIDE A SPECIFIC FOLDER */}
+                            {openFolder !== null && (() => {
+                                const currentCatDef = DOCUMENT_CATEGORIES.find(c => c.id === openFolder)!;
                                 const CatIcon = currentCatDef.icon;
+                                const categoryDocs = getDocsForCategory(currentCatDef.id);
 
                                 return (
-                                    <div className="space-y-4 animate-in fade-in-50 duration-200">
-                                        <div className="bg-muted/20 p-3 rounded-lg border border-border">
-                                            <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                                                <CatIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                                                {currentCatDef.label}
-                                            </h4>
-                                            <p className="text-xs text-muted-foreground mt-0.5">
+                                    <div className="space-y-5 animate-in fade-in-50 duration-200">
+                                        {/* Breadcrumb navigation bar */}
+                                        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-border">
+                                            <div className="flex items-center gap-2">
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => setOpenFolder(null)}
+                                                    className="gap-1.5 text-xs font-semibold h-8 hover:bg-muted"
+                                                >
+                                                    <ArrowLeft className="w-3.5 h-3.5" />
+                                                    <span>Todas as Pastas</span>
+                                                </Button>
+                                                <span className="text-muted-foreground text-sm">/</span>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-7 h-7 rounded-md bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                                                        <FolderOpen className="w-4 h-4 fill-amber-500/20" />
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                                                        <CatIcon className="w-4 h-4 text-muted-foreground" />
+                                                        <span>{currentCatDef.label}</span>
+                                                    </h4>
+                                                    <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full font-medium">
+                                                        {categoryDocs.length} {categoryDocs.length === 1 ? 'arquivo' : 'arquivos'}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div className="text-xs text-muted-foreground">
                                                 {currentCatDef.description}
-                                            </p>
+                                            </div>
                                         </div>
 
-                                        {/* Document List */}
-                                        {categoryDocs.length > 0 ? (
-                                            <div className="space-y-2">
-                                                {categoryDocs.map((doc) => (
-                                                    <div
-                                                        key={doc.id}
-                                                        className="flex items-center justify-between p-3 rounded-lg border border-border bg-card hover:bg-muted/30 transition-colors gap-3"
-                                                    >
-                                                        <div className="flex items-center gap-3 min-w-0">
-                                                            <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center flex-shrink-0">
-                                                                <CatIcon className="w-4 h-4" />
-                                                            </div>
-                                                            <div className="min-w-0">
-                                                                <p className="text-sm font-medium text-foreground truncate">
-                                                                    {doc.displayName}
-                                                                </p>
-                                                                <p className="text-xs text-muted-foreground">
-                                                                    {formatFileSize(doc.size)} {doc.size ? '•' : ''} Enviado em {new Date(doc.createdAt).toLocaleDateString()}
-                                                                </p>
+                                        {/* FOLDER CONTENTS: SPECIAL IPTU FOLDER */}
+                                        {openFolder === 'iptu' && (
+                                            <div className="space-y-5">
+                                                {/* 1. HIGHLIGHT: Current Year Document */}
+                                                {currentIptuDoc ? (
+                                                    <div className="border-2 border-emerald-500/50 dark:border-emerald-600/50 bg-emerald-50/40 dark:bg-emerald-950/20 rounded-xl p-4 sm:p-5 shadow-2xs space-y-3 relative overflow-hidden">
+                                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 dark:bg-emerald-900/70 text-emerald-800 dark:text-emerald-300">
+                                                                <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                                                                Ano Vigente • Exercício {currentIptuDoc.year}
+                                                            </span>
+                                                            <div className="flex items-center gap-2">
+                                                                {currentIptuDoc.status === 'analyzing' ? (
+                                                                    <span className="text-xs text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1">
+                                                                        <Loader2 className="w-3 h-3 animate-spin" /> Analisando com IA...
+                                                                    </span>
+                                                                ) : currentIptuDoc.status === 'success' ? (
+                                                                    <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                                                                        <CheckCircle2 className="w-3.5 h-3.5" /> Endereço extraído ✓
+                                                                    </span>
+                                                                ) : currentIptuDoc.status === 'error' ? (
+                                                                    <span className="text-xs text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
+                                                                        <AlertTriangle className="w-3.5 h-3.5" /> Falha na extração
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-xs text-muted-foreground">
+                                                                        Enviado em {new Date(currentIptuDoc.createdAt).toLocaleDateString()}
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                         </div>
 
-                                                        <div className="flex items-center gap-2 flex-shrink-0">
-                                                            <Button
-                                                                type="button"
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() => handleViewDocument(doc)}
-                                                                className="h-8 gap-1.5 text-xs"
-                                                            >
-                                                                <Eye className="w-3.5 h-3.5" />
-                                                                <span>Visualizar</span>
-                                                            </Button>
-                                                            <Button
-                                                                type="button"
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                onClick={() => handleDeleteDocument(doc)}
-                                                                className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10 px-2"
-                                                            >
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </Button>
+                                                        <div className="flex items-center justify-between gap-4 pt-1">
+                                                            <div className="flex items-center gap-3 min-w-0">
+                                                                <div className="w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center flex-shrink-0">
+                                                                    <Receipt className="w-5 h-5" />
+                                                                </div>
+                                                                <div className="min-w-0">
+                                                                    <p className="text-sm font-semibold text-foreground truncate">
+                                                                        {currentIptuDoc.displayName}
+                                                                    </p>
+                                                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                                                        {formatFileSize(currentIptuDoc.size)} {currentIptuDoc.size ? '•' : ''} IPTU {currentIptuDoc.year}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="flex items-center gap-2 flex-shrink-0">
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() => handleViewDocument(currentIptuDoc)}
+                                                                    className="h-8 gap-1.5 text-xs text-foreground hover:bg-muted"
+                                                                >
+                                                                    <Eye className="w-3.5 h-3.5" />
+                                                                    <span>Visualizar</span>
+                                                                </Button>
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    onClick={() => handleDeleteDocument(currentIptuDoc)}
+                                                                    className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10 px-2"
+                                                                    title="Excluir IPTU"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </Button>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <div className="p-6 rounded-xl border border-dashed border-border text-center text-sm text-muted-foreground">
-                                                Nenhum documento arquivado nesta categoria ainda.
+                                                ) : (
+                                                    <div className="p-5 rounded-xl border border-dashed border-border text-center text-sm text-muted-foreground">
+                                                        Nenhum IPTU arquivado nesta pasta ainda.
+                                                    </div>
+                                                )}
+
+                                                {/* 2. HISTORY: Past Years Documents */}
+                                                <div className="space-y-2 pt-1">
+                                                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                                                        <History className="w-3.5 h-3.5" />
+                                                        Histórico de Anos Anteriores {pastIptuDocs.length > 0 ? `(${pastIptuDocs.length})` : ''}
+                                                    </h4>
+
+                                                    {pastIptuDocs.length > 0 ? (
+                                                        <div className="space-y-2">
+                                                            {pastIptuDocs.map((past) => (
+                                                                <div
+                                                                    key={past.id}
+                                                                    className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/20 hover:bg-muted/40 transition-colors gap-3"
+                                                                >
+                                                                    <div className="flex items-center gap-3 min-w-0">
+                                                                        <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-muted text-muted-foreground border border-border flex-shrink-0">
+                                                                            {past.year}
+                                                                        </span>
+                                                                        <div className="min-w-0">
+                                                                            <p className="text-sm font-medium text-foreground truncate">
+                                                                                {past.displayName}
+                                                                            </p>
+                                                                            <p className="text-xs text-muted-foreground">
+                                                                                {formatFileSize(past.size)} {past.size ? '•' : ''} Enviado em {new Date(past.createdAt).toLocaleDateString()}
+                                                                            </p>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            onClick={() => handleViewDocument(past)}
+                                                                            className="h-8 gap-1.5 text-xs"
+                                                                        >
+                                                                            <Eye className="w-3.5 h-3.5" />
+                                                                            <span>Visualizar</span>
+                                                                        </Button>
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="ghost"
+                                                                            size="sm"
+                                                                            onClick={() => handleDeleteDocument(past)}
+                                                                            className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10 px-2"
+                                                                        >
+                                                                            <Trash2 className="w-4 h-4" />
+                                                                        </Button>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <p className="text-xs text-muted-foreground italic pl-1">
+                                                            Nenhum IPTU de anos anteriores arquivado. Você pode enviar recibos de exercícios anteriores abaixo.
+                                                        </p>
+                                                    )}
+                                                </div>
+
+                                                {/* 3. DIRECT UPLOAD: Upload new IPTU right there inside the IPTU folder */}
+                                                <div className="border border-border bg-muted/10 rounded-xl p-4 sm:p-5 space-y-3">
+                                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                                        <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                                                            <Plus className="w-4 h-4 text-emerald-600" />
+                                                            Adicionar IPTU nesta Pasta
+                                                        </h4>
+                                                        {/* Year Selector Pills */}
+                                                        <div className="flex items-center gap-1 flex-wrap">
+                                                            <span className="text-xs text-muted-foreground mr-1">Exercício:</span>
+                                                            {[currentCalendarYear, currentCalendarYear - 1, currentCalendarYear - 2, currentCalendarYear - 3].map((y) => (
+                                                                <button
+                                                                    key={y}
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setSelectedYear(y);
+                                                                        setCustomYearInput('');
+                                                                    }}
+                                                                    className={cn(
+                                                                        "px-2.5 py-0.5 rounded-full text-xs font-semibold border transition-all",
+                                                                        selectedYear === y && !customYearInput
+                                                                            ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs"
+                                                                            : "bg-background border-border text-muted-foreground hover:bg-muted"
+                                                                    )}
+                                                                >
+                                                                    {y}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="border-2 border-dashed border-border rounded-xl p-6 flex flex-col items-center justify-center hover:bg-muted/40 transition-colors relative cursor-pointer group">
+                                                        <input
+                                                            ref={iptuFileInputRef}
+                                                            type="file"
+                                                            multiple
+                                                            accept=".pdf,.jpg,.jpeg,.png"
+                                                            onChange={(e) => handleFilesSelected(e.target.files, 'iptu', selectedYear)}
+                                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                                            disabled={isUploading}
+                                                        />
+                                                        <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
+                                                            {isUploading ? (
+                                                                <Loader2 className="w-5 h-5 animate-spin" />
+                                                            ) : (
+                                                                <UploadCloud className="w-5 h-5" />
+                                                            )}
+                                                        </div>
+                                                        <p className="text-sm font-semibold text-foreground text-center">
+                                                            Clique ou arraste para enviar IPTU ({selectedYear}) nesta pasta
+                                                        </p>
+                                                        <p className="text-xs text-muted-foreground mt-0.5 text-center">
+                                                            PDF, JPG ou PNG • O documento será arquivado no histórico de IPTU
+                                                        </p>
+                                                    </div>
+                                                </div>
                                             </div>
                                         )}
 
-                                        {/* Direct Quick Upload for this Category */}
-                                        <div className="border border-border bg-muted/10 rounded-xl p-4 space-y-2">
-                                            <div className="border-2 border-dashed border-border rounded-xl p-6 flex flex-col items-center justify-center hover:bg-muted/40 transition-colors relative cursor-pointer group">
-                                                <input
-                                                    ref={categoryFileInputRef}
-                                                    type="file"
-                                                    multiple
-                                                    accept=".pdf,.jpg,.jpeg,.png"
-                                                    onChange={(e) => handleFilesSelected(e.target.files, currentCatDef.id)}
-                                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                                    disabled={isUploading}
-                                                />
-                                                <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
-                                                    {isUploading ? (
-                                                        <Loader2 className="w-5 h-5 animate-spin" />
-                                                    ) : (
-                                                        <UploadCloud className="w-5 h-5" />
-                                                    )}
+                                        {/* FOLDER CONTENTS: OTHER CATEGORIES (Contratos, Vistoria, Matrícula, etc.) */}
+                                        {openFolder !== 'iptu' && (
+                                            <div className="space-y-4">
+                                                {/* Documents List */}
+                                                {categoryDocs.length > 0 ? (
+                                                    <div className="space-y-2">
+                                                        {categoryDocs.map((doc) => (
+                                                            <div
+                                                                key={doc.id}
+                                                                className="flex items-center justify-between p-3.5 rounded-lg border border-border bg-card hover:bg-muted/30 transition-colors gap-3"
+                                                            >
+                                                                <div className="flex items-center gap-3 min-w-0">
+                                                                    <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center flex-shrink-0">
+                                                                        <CatIcon className="w-4 h-4" />
+                                                                    </div>
+                                                                    <div className="min-w-0">
+                                                                        <p className="text-sm font-semibold text-foreground truncate">
+                                                                            {doc.displayName}
+                                                                        </p>
+                                                                        <p className="text-xs text-muted-foreground mt-0.5">
+                                                                            {formatFileSize(doc.size)} {doc.size ? '•' : ''} Enviado em {new Date(doc.createdAt).toLocaleDateString()}
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="flex items-center gap-2 flex-shrink-0">
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        onClick={() => handleViewDocument(doc)}
+                                                                        className="h-8 gap-1.5 text-xs"
+                                                                    >
+                                                                        <Eye className="w-3.5 h-3.5" />
+                                                                        <span>Visualizar</span>
+                                                                    </Button>
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        onClick={() => handleDeleteDocument(doc)}
+                                                                        className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10 px-2"
+                                                                    >
+                                                                        <Trash2 className="w-4 h-4" />
+                                                                    </Button>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <div className="p-8 rounded-xl border border-dashed border-border text-center space-y-2">
+                                                        <div className="w-12 h-12 rounded-xl bg-muted mx-auto flex items-center justify-center text-muted-foreground">
+                                                            <Folder className="w-6 h-6" />
+                                                        </div>
+                                                        <p className="text-sm font-medium text-foreground">
+                                                            Esta pasta está vazia
+                                                        </p>
+                                                        <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                                                            Envie o primeiro documento para começar a organizar os arquivos de {currentCatDef.label.toLowerCase()} desta propriedade.
+                                                        </p>
+                                                    </div>
+                                                )}
+
+                                                {/* Direct Quick Upload for this Folder */}
+                                                <div className="border border-border bg-muted/10 rounded-xl p-4 sm:p-5 space-y-2">
+                                                    <div className="border-2 border-dashed border-border rounded-xl p-6 flex flex-col items-center justify-center hover:bg-muted/40 transition-colors relative cursor-pointer group">
+                                                        <input
+                                                            ref={folderFileInputRef}
+                                                            type="file"
+                                                            multiple
+                                                            accept=".pdf,.jpg,.jpeg,.png"
+                                                            onChange={(e) => handleFilesSelected(e.target.files, currentCatDef.id)}
+                                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                                            disabled={isUploading}
+                                                        />
+                                                        <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
+                                                            {isUploading ? (
+                                                                <Loader2 className="w-5 h-5 animate-spin" />
+                                                            ) : (
+                                                                <UploadCloud className="w-5 h-5" />
+                                                            )}
+                                                        </div>
+                                                        <p className="text-sm font-semibold text-foreground text-center">
+                                                            Adicionar {currentCatDef.singular} nesta pasta
+                                                        </p>
+                                                        <p className="text-xs text-muted-foreground mt-0.5 text-center">
+                                                            Arraste ou clique para enviar arquivos (.pdf, .jpg, .png)
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                                <p className="text-sm font-semibold text-foreground text-center">
-                                                    Adicionar {currentCatDef.singular}
-                                                </p>
-                                                <p className="text-xs text-muted-foreground mt-0.5 text-center">
-                                                    Arraste ou clique para enviar arquivos (.pdf, .jpg, .png)
-                                                </p>
                                             </div>
-                                        </div>
+                                        )}
                                     </div>
                                 );
                             })()}
-
-                            {/* TAB CONTENT: LAST TAB: '+ Enviar Documento' */}
-                            {effectiveActiveTab === 'upload' && (
-                                <div className="space-y-4 animate-in fade-in-50 duration-200">
-                                    <div className="bg-blue-50/50 dark:bg-blue-950/20 p-4 rounded-xl border border-blue-200 dark:border-blue-900/50">
-                                        <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
-                                            <UploadCloud className="w-4 h-4 text-blue-600" />
-                                            Central de Envio de Documentos
-                                        </h4>
-                                        <p className="text-xs text-muted-foreground mt-1">
-                                            Selecione o tipo de documento abaixo para organizar seus arquivos ou deixe em automático para detecção inteligente.
-                                        </p>
-                                    </div>
-
-                                    {/* Category Selector Pills */}
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-semibold text-foreground">
-                                            Categoria do Documento:
-                                        </label>
-                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => setUploadCategory('auto')}
-                                                className={cn(
-                                                    "flex items-center gap-2 p-2.5 rounded-lg border text-xs font-medium text-left transition-all",
-                                                    uploadCategory === 'auto'
-                                                        ? "bg-blue-600 text-white border-blue-600 shadow-xs"
-                                                        : "bg-card border-border hover:bg-muted text-foreground"
-                                                )}
-                                            >
-                                                <Sparkles className="w-4 h-4 flex-shrink-0" />
-                                                <span className="truncate">Automático (Detectar)</span>
-                                            </button>
-
-                                            {DOCUMENT_CATEGORIES.map((cat) => {
-                                                const CatIcon = cat.icon;
-                                                const isSel = uploadCategory === cat.id;
-                                                return (
-                                                    <button
-                                                        key={cat.id}
-                                                        type="button"
-                                                        onClick={() => setUploadCategory(cat.id)}
-                                                        className={cn(
-                                                            "flex items-center gap-2 p-2.5 rounded-lg border text-xs font-medium text-left transition-all",
-                                                            isSel
-                                                                ? "bg-blue-600 text-white border-blue-600 shadow-xs"
-                                                                : "bg-card border-border hover:bg-muted text-foreground"
-                                                        )}
-                                                    >
-                                                        <CatIcon className="w-4 h-4 flex-shrink-0" />
-                                                        <span className="truncate">{cat.label}</span>
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-
-                                    {/* If IPTU is selected, offer Year selection */}
-                                    {uploadCategory === 'iptu' && (
-                                        <div className="p-3 bg-muted/20 rounded-lg border border-border space-y-2">
-                                            <label className="text-xs font-semibold text-foreground">
-                                                Ano de Exercício do IPTU:
-                                            </label>
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                {[currentCalendarYear, currentCalendarYear - 1, currentCalendarYear - 2, currentCalendarYear - 3].map((y) => (
-                                                    <button
-                                                        key={y}
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setSelectedYear(y);
-                                                            setCustomYearInput('');
-                                                        }}
-                                                        className={cn(
-                                                            "px-3 py-1 rounded-full text-xs font-semibold border transition-all",
-                                                            selectedYear === y && !customYearInput
-                                                                ? "bg-emerald-600 text-white border-emerald-600"
-                                                                : "bg-background border-border text-muted-foreground hover:bg-muted"
-                                                        )}
-                                                    >
-                                                        {y}
-                                                    </button>
-                                                ))}
-                                                <input
-                                                    type="number"
-                                                    placeholder="Outro ano"
-                                                    value={customYearInput}
-                                                    onChange={(e) => setCustomYearInput(e.target.value)}
-                                                    className="w-24 h-8 px-2 text-xs rounded-md border border-border bg-background"
-                                                />
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Upload Dropzone */}
-                                    <div className="border-2 border-dashed border-border rounded-xl p-8 flex flex-col items-center justify-center hover:bg-muted/40 transition-colors relative cursor-pointer group">
-                                        <input
-                                            ref={fileInputRef}
-                                            type="file"
-                                            multiple
-                                            accept=".pdf,.jpg,.jpeg,.png"
-                                            onChange={(e) => handleFilesSelected(e.target.files)}
-                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                            disabled={isUploading}
-                                        />
-                                        <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
-                                            {isUploading ? (
-                                                <Loader2 className="w-6 h-6 animate-spin" />
-                                            ) : (
-                                                <UploadCloud className="w-6 h-6" />
-                                            )}
-                                        </div>
-                                        <p className="font-semibold text-foreground text-center">
-                                            Clique para selecionar ou arraste arquivos aqui
-                                        </p>
-                                        <p className="text-xs text-muted-foreground mt-1 text-center">
-                                            Suporta PDF, JPG e PNG (máx. 15MB por arquivo)
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     )}
 
