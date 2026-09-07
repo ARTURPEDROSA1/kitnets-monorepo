@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import Image from 'next/image';
 import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera, Video, Sparkles, Save, UploadCloud, Home, Building2, User, ShieldCheck, Fingerprint, ChevronDown, ChevronUp, Wand2, Plus, ArrowRight, Minus, Edit3, X } from 'lucide-react';
 import PropertyDetailsCard, { PropertyDetails, SubUnit, SubUnitsSection, Checkbox as DetailCheckbox, defaultSubUnit } from '@/components/profile/PropertyDetailsCard';
+import PropertyDocumentsCard, { DocCategory } from '@/components/profile/PropertyDocumentsCard';
 import { cn } from '@/lib/utils';
 import { useUser, useAuth } from '@clerk/nextjs';
 import { useSearchParams } from 'next/navigation';
@@ -22,6 +23,9 @@ export type ProofData = {
     created_at: string;
     property_index?: number;
     file_url?: string;
+    document_type?: string;
+    year?: number | string;
+    file_size?: number;
 };
 
 export const getProofPropertyIndex = (proof: ProofData): number => {
@@ -1973,27 +1977,117 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                     updateProperty(propIdx, prev => ({ ...prev, address: { ...prev.address, [field]: value } }));
                                 }
                             };
-                            // File upload for this property
+                            // File upload for this property documents
+                            const handlePropDocUpload = async (files: File[], category?: DocCategory, year?: number) => {
+                                if (!files || files.length === 0) return;
+
+                                // Process files to encode category/year tag if specified
+                                const processedFiles: File[] = [];
+                                for (const file of files) {
+                                    let newName = file.name;
+                                    if (category === 'iptu') {
+                                        const y = year || new Date().getFullYear();
+                                        if (!file.name.toLowerCase().includes('iptu') || !file.name.includes(String(y))) {
+                                            newName = `[IPTU ${y}] ${file.name}`;
+                                        }
+                                    } else if (category && category !== 'outros') {
+                                        const catTag = category.replace('_', ' ');
+                                        if (!file.name.toLowerCase().includes(catTag)) {
+                                            newName = `[${category}] ${file.name}`;
+                                        }
+                                    }
+                                    processedFiles.push(new File([file], newName, { type: file.type }));
+                                }
+
+                                if (profileId) {
+                                    try {
+                                        const sbUpload = await getSupabase();
+                                        const propStoragePrefix = propIdx === 0 ? profileId : `${profileId}/prop-${propIdx}`;
+                                        const newProofEntries: ProofData[] = [];
+
+                                        for (const file of processedFiles) {
+                                            const fileExt = file.name.split('.').pop();
+                                            const fileName = `${propStoragePrefix}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+                                            const { error: uploadError } = await sbUpload.storage
+                                                .from('documents')
+                                                .upload(fileName, file);
+
+                                            if (uploadError) {
+                                                console.error('Doc upload error:', uploadError);
+                                                alert(`Erro ao enviar documento ${file.name}: ${uploadError.message}`);
+                                                continue;
+                                            }
+
+                                            const { data: insertedProof, error: proofError } = await sbUpload
+                                                .from('ownership_proofs')
+                                                .insert({
+                                                    profile_id: profileId,
+                                                    property_index: propIdx,
+                                                    file_url: fileName,
+                                                    original_name: file.name,
+                                                    file_size: file.size,
+                                                    mime_type: file.type,
+                                                    status: 'pending',
+                                                })
+                                                .select()
+                                                .single();
+
+                                            if (proofError) {
+                                                console.error('Failed to insert ownership proof:', proofError);
+                                            } else if (insertedProof) {
+                                                newProofEntries.push(insertedProof as ProofData);
+                                            }
+                                        }
+
+                                        if (newProofEntries.length > 0) {
+                                            const updatedProofs = dedupeProofs([...pSavedProofs, ...newProofEntries]);
+                                            setPropField('savedProofs', updatedProofs);
+
+                                            // Update additional_properties JSON in database if property_index > 0
+                                            if (propIdx > 0) {
+                                                const { data: prof } = await sbUpload.from('profiles').select('additional_properties').eq('id', profileId).single();
+                                                if (prof?.additional_properties && Array.isArray(prof.additional_properties)) {
+                                                    const addProps = [...(prof.additional_properties as Record<string, unknown>[])];
+                                                    if (addProps[propIdx - 1]) {
+                                                        addProps[propIdx - 1] = {
+                                                            ...addProps[propIdx - 1],
+                                                            savedProofs: updatedProofs,
+                                                        };
+                                                        await sbUpload.from('profiles').update({ additional_properties: addProps }).eq('id', profileId);
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // Run AI analysis if address is missing
+                                        if (!pAddr.street) {
+                                            for (const file of processedFiles) {
+                                                analyzeDocument(file, propIdx);
+                                            }
+                                        }
+                                    } catch (err) {
+                                        console.error('Direct doc upload error:', err);
+                                        setPOwnershipFiles(prev => [...prev, ...processedFiles]);
+                                    }
+                                } else {
+                                    // Drafting property
+                                    setTemporaryExtractedInfo(null);
+                                    setPOwnershipFiles(prev => [...prev, ...processedFiles]);
+                                    updateProperty(propIdx, prev => ({
+                                        ...prev,
+                                        showAddressCard: true,
+                                        addressSectionOpen: true,
+                                    }));
+                                    for (const file of processedFiles) {
+                                        analyzeDocument(file, propIdx);
+                                    }
+                                }
+                            };
+
                             const handlePropFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
                                 if (e.target.files && e.target.files.length > 0) {
-                                    const newFiles = Array.from(e.target.files);
-                                    // Deduplicate against already selected or saved proofs
-                                    const existingNames = new Set([
-                                        ...pOwnershipFiles.map(f => f.name.toLowerCase().trim()),
-                                        ...pSavedProofs.map(p => p.original_name.toLowerCase().trim())
-                                    ]);
-                                    const uniqueNewFiles = newFiles.filter(f => !existingNames.has(f.name.toLowerCase().trim()));
-                                    if (uniqueNewFiles.length > 0) {
-                                        setTemporaryExtractedInfo(null);
-                                        setPOwnershipFiles(prev => [...prev, ...uniqueNewFiles]);
-                                        updateProperty(propIdx, prev => ({
-                                            ...prev,
-                                            showAddressCard: true,
-                                            addressSectionOpen: true,
-                                        }));
-                                        for (const file of uniqueNewFiles) { analyzeDocument(file, propIdx); }
-                                    }
-                                    // Reset input so user can re-select after deletion if desired
+                                    handlePropDocUpload(Array.from(e.target.files));
                                     e.target.value = '';
                                 }
                             };
@@ -2385,165 +2479,47 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                     {isExpanded && (
                                         <div className="p-6 space-y-6 border-t border-border bg-card">
 
-                                            {/* 1. Documentation Section (ownership verification — first!) */}
-                                            <div id={`prop-${propIdx}-ownership`} className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setPOwnershipOpen(prev => !prev)}
-                                                    className="flex items-center justify-between w-full"
-                                                >
-                                                    <div className="flex items-center gap-2">
-                                                        <div className={`p-2 rounded-lg ${(isDocVerified || extractedAddressInfo?.startsWith('✅'))
-                                                            ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600'
-                                                            : 'bg-blue-100 dark:bg-blue-900/50 text-blue-600'
-                                                            }`}>
-                                                            {(isDocVerified || extractedAddressInfo?.startsWith('✅'))
-                                                                ? <CheckCircle2 className="w-5 h-5" />
-                                                                : <FileText className="w-5 h-5" />}
-                                                        </div>
-                                                        <h3 className="text-lg font-semibold text-foreground">{p.ownership.title}</h3>
-                                                        {!pOwnershipOpen && (isDocVerified || extractedAddressInfo?.startsWith('✅')) && (
-                                                            <span className="ml-2 text-xs bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full">Verificado ✓</span>
-                                                        )}
-                                                    </div>
-                                                    {pOwnershipOpen ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
-                                                </button>
-
-                                                {pOwnershipOpen && (
-                                                    <>
-                                                        <div className="bg-muted/30 p-4 rounded-lg border border-border text-sm text-muted-foreground mb-4">
-                                                            <p className="font-medium text-foreground mb-2">{p.ownership.acceptedDocs}</p>
-                                                            <ul className="list-disc list-inside space-y-1 ml-1">
-                                                                <li>{p.ownership.docs.iptu}</li>
-                                                                <li>{p.ownership.docs.purchase}</li>
-                                                                <li>{p.ownership.docs.registry}</li>
-                                                                <li>{p.ownership.docs.deed}</li>
-                                                            </ul>
-                                                        </div>
-
-                                                        <div className="border-2 border-dashed border-border rounded-lg p-8 flex flex-col items-center justify-center hover:bg-muted/50 transition-colors relative">
-                                                            <input
-                                                                type="file"
-                                                                multiple
-                                                                accept=".pdf,.jpg,.jpeg,.png"
-                                                                onChange={handlePropFileUpload}
-                                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                                            />
-                                                            <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 flex items-center justify-center mb-2">
-                                                                <UploadCloud className="w-6 h-6" />
-                                                            </div>
-                                                            <p className="font-medium text-foreground">{p.ownership.uploadPlaceholder}</p>
-                                                            <p className="text-xs text-muted-foreground mt-1">{p.ownership.uploadDrop}</p>
-                                                        </div>
-
-                                                        {/* File List */}
-                                                        {(pOwnershipFiles.length > 0 || pSavedProofs.length > 0) && (
-                                                            <div className="space-y-2 mt-4">
-                                                                {pOwnershipFiles.map((file, i) => {
-                                                                    const status = fileAnalysisStatus[file.name];
-                                                                    return (
-                                                                        <div key={`new-${i}`} className={`flex items-center justify-between p-3 rounded-lg border ${status === 'success' ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800' :
-                                                                            status === 'error' ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' :
-                                                                                'bg-muted/30 border-border'
-                                                                            }`}>
-                                                                            <div className="flex items-center gap-3 overflow-hidden">
-                                                                                <div className="w-10 h-10 rounded-lg bg-white dark:bg-slate-800 border flex items-center justify-center flex-shrink-0">
-                                                                                    {status === 'analyzing' ? (
-                                                                                        <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
-                                                                                    ) : status === 'success' ? (
-                                                                                        <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                                                                                    ) : status === 'error' ? (
-                                                                                        <AlertTriangle className="w-5 h-5 text-red-500" />
-                                                                                    ) : (
-                                                                                        <FileText className="w-5 h-5 text-blue-500" />
-                                                                                    )}
-                                                                                </div>
-                                                                                <div className="flex flex-col min-w-0">
-                                                                                    <p className="text-sm font-medium truncate pr-4">{file.name}</p>
-                                                                                    <span className="text-xs text-muted-foreground">
-                                                                                        {(file.size / 1024 / 1024).toFixed(2)} MB •{' '}
-                                                                                        {status === 'analyzing' ? (
-                                                                                            <span className="text-blue-600 dark:text-blue-400 font-medium">Analisando com IA...</span>
-                                                                                        ) : status === 'success' ? (
-                                                                                            <span className="text-emerald-600 dark:text-emerald-400 font-medium">Endereço extraído ✓</span>
-                                                                                        ) : status === 'error' ? (
-                                                                                            <span className="text-red-600 dark:text-red-400 font-medium">Falha na extração</span>
-                                                                                        ) : (
-                                                                                            'Pronto para enviar'
-                                                                                        )}
-                                                                                    </span>
-                                                                                </div>
-                                                                            </div>
-                                                                            <Button variant="ghost" size="sm" onClick={() => removePropFile(i)} className="text-destructive">
-                                                                                <Trash2 className="w-4 h-4" />
-                                                                            </Button>
-                                                                        </div>
-                                                                    );
-                                                                })}
-                                                                {dedupeProofs(pSavedProofs).map((proof) => (
-                                                                    <div key={proof.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border">
-                                                                        <div className="flex items-center gap-3">
-                                                                            <div className="w-8 h-8 rounded bg-muted flex items-center justify-center"><CheckCircle2 className="w-4 h-4 text-emerald-500" /></div>
-                                                                            <div>
-                                                                                <p className="text-sm font-medium text-foreground">{proof.original_name}</p>
-                                                                                <p className="text-xs text-muted-foreground">Enviado em {new Date(proof.created_at).toLocaleDateString()}</p>
-                                                                            </div>
-                                                                        </div>
-                                                                        <Button variant="ghost" size="sm" onClick={() => removePropSavedProof(proof.id)} className="text-destructive hover:text-destructive">
-                                                                            <Trash2 className="w-4 h-4" />
-                                                                        </Button>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                        {/* Actions in bottom right corner of Documents card: Digitar manualmente & Confirmar */}
-                                                        <div className="flex items-center justify-end gap-3 pt-2">
-                                                            <Button
-                                                                type="button"
-                                                                variant="outline"
-                                                                size="sm"
-                                                                className="gap-1.5 text-blue-600 border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                                                                onClick={() => {
-                                                                    updateProperty(propIdx, prev => ({
-                                                                        ...prev,
-                                                                        showAddressCard: true,
-                                                                        ownershipSectionOpen: false,
-                                                                        addressSectionOpen: true,
-                                                                    }));
-                                                                    setTimeout(() => {
-                                                                        document.getElementById(`prop-${propIdx}-address`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                                                    }, 150);
-                                                                }}
-                                                            >
-                                                                <Edit3 className="w-4 h-4" /> Digitar manualmente
-                                                            </Button>
-                                                            {(pSavedProofs.length > 0 || pOwnershipFiles.length > 0) && (
-                                                                <Button
-                                                                    type="button"
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    disabled={isSaving}
-                                                                    className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                                                    onClick={() => {
-                                                                        handleSave(true);
-                                                                        updateProperty(propIdx, prev => ({
-                                                                            ...prev,
-                                                                            showAddressCard: true,
-                                                                            ownershipSectionOpen: false,
-                                                                            addressSectionOpen: true,
-                                                                        }));
-                                                                        setTimeout(() => {
-                                                                            document.getElementById(`prop-${propIdx}-address`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                                                        }, 150);
-                                                                    }}
-                                                                >
-                                                                    Confirmar <ArrowRight className="w-4 h-4" />
-                                                                </Button>
-                                                            )}
-                                                        </div>
-                                                    </>
-                                                )}
-                                            </div>
+                                            {/* 1. Documentation Section (ownership verification & documents manager) */}
+                                            <PropertyDocumentsCard
+                                                propIdx={propIdx}
+                                                savedProofs={pSavedProofs}
+                                                ownershipFiles={pOwnershipFiles}
+                                                fileAnalysisStatus={fileAnalysisStatus}
+                                                profileId={profileId}
+                                                isDocVerified={isDocVerified}
+                                                extractedAddressInfo={extractedAddressInfo}
+                                                isOwnershipOpen={pOwnershipOpen}
+                                                isAddressCardVisible={isAddressCardVisible}
+                                                isSaving={isSaving}
+                                                onToggleOpen={() => setPOwnershipOpen(prev => !prev)}
+                                                onUploadFiles={handlePropDocUpload}
+                                                onRemoveSavedProof={removePropSavedProof}
+                                                onRemovePendingFile={removePropFile}
+                                                onManualAddress={() => {
+                                                    updateProperty(propIdx, prev => ({
+                                                        ...prev,
+                                                        showAddressCard: true,
+                                                        ownershipSectionOpen: false,
+                                                        addressSectionOpen: true,
+                                                    }));
+                                                    setTimeout(() => {
+                                                        document.getElementById(`prop-${propIdx}-address`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                                    }, 150);
+                                                }}
+                                                onConfirm={() => {
+                                                    handleSave(true);
+                                                    updateProperty(propIdx, prev => ({
+                                                        ...prev,
+                                                        showAddressCard: true,
+                                                        ownershipSectionOpen: false,
+                                                        addressSectionOpen: true,
+                                                    }));
+                                                    setTimeout(() => {
+                                                        document.getElementById(`prop-${propIdx}-address`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                                    }, 150);
+                                                }}
+                                                getSupabase={getSupabase}
+                                            />
 
                                             {/* Extraction feedback banner */}
                                             {extractedAddressInfo && (
