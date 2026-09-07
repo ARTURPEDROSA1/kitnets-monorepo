@@ -77,6 +77,14 @@ export async function POST(request: NextRequest) {
             if (propertyData.address?.neighborhood) context += `- Bairro: ${propertyData.address.neighborhood}\n`;
             if (propertyData.address?.city) context += `- Cidade: ${propertyData.address.city}${propertyData.address.state ? '/' + propertyData.address.state : ''}\n`;
             if (propertyData.totalSqMeters) context += `- Área total: ${propertyData.totalSqMeters} m²\n`;
+            if (propertyData.rooms) context += `- Cômodos: ${propertyData.rooms}\n`;
+            if (propertyData.bedrooms) context += `- Quartos: ${propertyData.bedrooms}\n`;
+            if (propertyData.bathrooms) context += `- Banheiros: ${propertyData.bathrooms}\n`;
+            if (propertyData.parkingSpaces) context += `- Vagas de Garagem: ${propertyData.parkingSpaces}\n`;
+            if (propertyData.kitchenCabinets) context += `- Armários de cozinha: Sim\n`;
+            if (propertyData.laundry && propertyData.laundry !== 'none') context += `- Lavanderia: ${propertyData.laundry === 'individual' ? 'Individual' : 'Compartilhada'}\n`;
+            if (propertyData.ac && propertyData.ac !== 'none') context += `- Ar-condicionado: ${propertyData.ac === 'cold' ? 'Frio' : 'Quente e Frio'}\n`;
+            if (propertyData.cooktop && propertyData.cooktop !== 'none') context += `- Cooktop: ${propertyData.cooktop === 'gas' ? 'Gás' : propertyData.cooktop === 'electric' ? 'Elétrico' : 'Indução'}\n`;
             if (propertyData.solarEnergy) context += `- Energia solar: ${propertyData.solarKwp ? propertyData.solarKwp + ' kWp' : 'Sim'}\n`;
             if (propertyData.propertyType === 'multi' && propertyData.numberOfUnits) {
                 context += `- Tipo: Multi-unidades (${propertyData.numberOfUnits} unidades)\n`;

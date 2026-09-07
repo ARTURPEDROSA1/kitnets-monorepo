@@ -30,6 +30,15 @@ export interface PropertyDetails {
         gas: boolean;
     };
     internetBill: boolean;
+    // Single-family unit characteristics
+    rooms?: string;
+    bedrooms?: string;
+    bathrooms?: string;
+    parkingSpaces?: string;
+    kitchenCabinets?: boolean;
+    laundry?: "none" | "individual" | "shared";
+    ac?: "none" | "cold" | "cold_hot";
+    cooktop?: "none" | "gas" | "electric" | "induction";
 }
 
 export type UnitType = 'kitnet' | 'studio' | 'apartment' | 'house' | 'bedroom' | 'commercial_room' | 'garage' | 'other' | '';
@@ -375,6 +384,115 @@ export default function PropertyDetailsCard({
                             />
                         </div>
                     </div>
+
+                    {/* Single-family specific characteristics */}
+                    {propertyType === "single" && (
+                        <div className="space-y-4 pt-1 border-t border-border/60">
+                            {/* Rooms + Bedrooms + Bathrooms + Garage */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div className="space-y-1.5">
+                                    <Label className="flex items-center gap-1.5">
+                                        <DoorOpen className="w-4 h-4 text-muted-foreground" />
+                                        Cômodos
+                                    </Label>
+                                    <Input
+                                        type="number"
+                                        min={0}
+                                        value={details.rooms || ''}
+                                        onChange={(e) => updateDetail("rooms", e.target.value)}
+                                        placeholder="ex: 4"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="flex items-center gap-1.5">
+                                        <BedDouble className="w-4 h-4 text-muted-foreground" />
+                                        Quartos
+                                    </Label>
+                                    <Input
+                                        type="number"
+                                        min={0}
+                                        value={details.bedrooms || ''}
+                                        onChange={(e) => updateDetail("bedrooms", e.target.value)}
+                                        placeholder="ex: 1"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="flex items-center gap-1.5">
+                                        <Bath className="w-4 h-4 text-muted-foreground" />
+                                        Banheiros
+                                    </Label>
+                                    <Input
+                                        type="number"
+                                        min={0}
+                                        value={details.bathrooms || ''}
+                                        onChange={(e) => updateDetail("bathrooms", e.target.value)}
+                                        placeholder="ex: 1"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="flex items-center gap-1.5">
+                                        <Car className="w-4 h-4 text-muted-foreground" />
+                                        Garagem
+                                    </Label>
+                                    <Input
+                                        type="number"
+                                        min={0}
+                                        value={details.parkingSpaces !== undefined ? details.parkingSpaces : '1'}
+                                        onChange={(e) => updateDetail("parkingSpaces", e.target.value)}
+                                        placeholder="ex: 1"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Armários de Cozinha */}
+                            <div className="flex flex-wrap gap-5">
+                                <Checkbox
+                                    checked={details.kitchenCabinets || false}
+                                    onChange={(val) => updateDetail("kitchenCabinets", val)}
+                                    label="Armários de Cozinha"
+                                    icon={<CookingPot className="w-4 h-4" />}
+                                />
+                            </div>
+
+                            {/* Selects: Laundry, AC, Cooktop */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <SelectField
+                                    label="Lavanderia"
+                                    value={details.laundry || 'none'}
+                                    onChange={(val) => updateDetail("laundry", val as PropertyDetails["laundry"])}
+                                    icon={<Shirt className="w-4 h-4 text-muted-foreground" />}
+                                    options={[
+                                        { value: "none", label: "Não possui" },
+                                        { value: "individual", label: "Individual" },
+                                        { value: "shared", label: "Compartilhada" },
+                                    ]}
+                                />
+                                <SelectField
+                                    label="Ar-Condicionado"
+                                    value={details.ac || 'none'}
+                                    onChange={(val) => updateDetail("ac", val as PropertyDetails["ac"])}
+                                    icon={<Wind className="w-4 h-4 text-muted-foreground" />}
+                                    options={[
+                                        { value: "none", label: "Não possui" },
+                                        { value: "cold", label: "Apenas Frio" },
+                                        { value: "cold_hot", label: "Quente e Frio" },
+                                    ]}
+                                />
+                                <SelectField
+                                    label="Cooktop"
+                                    value={details.cooktop || 'none'}
+                                    onChange={(val) => updateDetail("cooktop", val as PropertyDetails["cooktop"])}
+                                    icon={<CookingPot className="w-4 h-4 text-muted-foreground" />}
+                                    options={[
+                                        { value: "none", label: "Não possui" },
+                                        { value: "gas", label: "A Gás" },
+                                        { value: "electric", label: "Elétrico" },
+                                        { value: "induction", label: "Indução" },
+                                    ]}
+                                />
+                            </div>
+                        </div>
+                    )}
 
                     {/* Solar Energy */}
                     <div className="space-y-3">
