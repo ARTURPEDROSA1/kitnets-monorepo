@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -207,6 +208,7 @@ interface DetailsProps {
     onDetailsChange: (details: PropertyDetails) => void;
     onUnitsChange: (units: SubUnit[]) => void;
     propertyType: "single" | "multi";
+    propertyId?: string;
     initialOpen?: boolean;
     onOpenChange?: (open: boolean) => void;
     onContinue?: () => void;
@@ -218,6 +220,7 @@ export default function PropertyDetailsCard({
     onDetailsChange,
     onUnitsChange,
     propertyType,
+    propertyId,
     initialOpen = true,
     onOpenChange,
     onContinue,
@@ -512,16 +515,37 @@ export default function PropertyDetailsCard({
                             icon={<Sun className="w-4 h-4" />}
                         />
                         {details.solarEnergy && (
-                            <div className="ml-9 space-y-1.5 max-w-xs animate-in fade-in slide-in-from-top-1 duration-200">
-                                <Label>Capacidade de Geração (kWp)</Label>
-                                <Input
-                                    type="number"
-                                    min={0}
-                                    step={0.1}
-                                    value={details.solarKwp}
-                                    onChange={(e) => updateDetail("solarKwp", e.target.value)}
-                                    placeholder="ex: 5.5"
-                                />
+                            <div className="ml-9 space-y-3 max-w-md animate-in fade-in slide-in-from-top-1 duration-200">
+                                <div className="space-y-1.5 max-w-xs">
+                                    <Label>Capacidade de Geração (kWp)</Label>
+                                    <Input
+                                        type="number"
+                                        min={0}
+                                        step={0.1}
+                                        value={details.solarKwp}
+                                        onChange={(e) => updateDetail("solarKwp", e.target.value)}
+                                        placeholder="ex: 5.5"
+                                    />
+                                </div>
+                                <div className="p-3.5 bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/60 rounded-xl space-y-2">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-2">
+                                            <Zap className="w-4 h-4 text-amber-600 shrink-0" />
+                                            <span className="text-xs font-semibold text-amber-900 dark:text-amber-200">
+                                                Gestão de Energia Solar & Consumo
+                                            </span>
+                                        </div>
+                                        <Link
+                                            href={`/pt/dashboard/energy/${propertyId || 'primary'}`}
+                                            className="inline-flex items-center text-xs font-semibold text-amber-700 dark:text-amber-400 hover:text-amber-800 hover:underline gap-1 shrink-0"
+                                        >
+                                            Ver Painel & Histórico →
+                                        </Link>
+                                    </div>
+                                    <p className="text-[11px] text-amber-800/80 dark:text-amber-300/80 leading-relaxed">
+                                        Importe faturas de luz (CEMIG), acompanhe consumo kWh, energia injetada, saldo de geração e gráficos interativos.
+                                    </p>
+                                </div>
                             </div>
                         )}
                     </div>
