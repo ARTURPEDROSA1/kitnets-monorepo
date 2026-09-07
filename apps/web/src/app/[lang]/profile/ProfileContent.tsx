@@ -166,6 +166,8 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
         propertyName: '', cadastroImobiliario: '', inscricaoImobiliaria: '', matricula: '',
         areaLote: '', areaEdificada: '', numberOfUnits: 0, totalSqMeters: '',
         solarEnergy: false, solarKwp: '', mainMeters: { water: false, energy: false, gas: false }, internetBill: false,
+        rooms: '', bedrooms: '', bathrooms: '', parkingSpaces: '1',
+        kitchenCabinets: false, laundry: 'none', ac: 'none', cooktop: 'none',
     });
     const createEmptyProperty = (type: 'single' | 'multi'): PropertyState => ({
         propertyType: type,
@@ -524,6 +526,14 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             solarKwp: primaryPropDetails.solarKwp || '',
                             mainMeters: primaryPropDetails.mainMeters || { water: false, energy: false, gas: false },
                             internetBill: primaryPropDetails.internetBill || false,
+                            rooms: primaryPropDetails.rooms || '',
+                            bedrooms: primaryPropDetails.bedrooms || '',
+                            bathrooms: primaryPropDetails.bathrooms || '',
+                            parkingSpaces: primaryPropDetails.parkingSpaces !== undefined ? primaryPropDetails.parkingSpaces : '1',
+                            kitchenCabinets: primaryPropDetails.kitchenCabinets || false,
+                            laundry: primaryPropDetails.laundry || 'none',
+                            ac: primaryPropDetails.ac || 'none',
+                            cooktop: primaryPropDetails.cooktop || 'none',
                         } : emptyPropertyDetails(),
                         subUnits: primarySubUnits,
                         address: primaryPropAddr,
@@ -565,7 +575,11 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
 
                             additionalProps.push({
                                 propertyType: (apTyped.propertyType as 'single' | 'multi') || 'single',
-                                details: (apTyped.details as PropertyDetails) || emptyPropertyDetails(),
+                                details: apTyped.details ? {
+                                    ...emptyPropertyDetails(),
+                                    ...(apTyped.details as PropertyDetails),
+                                    parkingSpaces: (apTyped.details as PropertyDetails).parkingSpaces !== undefined ? (apTyped.details as PropertyDetails).parkingSpaces : '1',
+                                } : emptyPropertyDetails(),
                                 subUnits: Array.isArray(apTyped.subUnits) ? apTyped.subUnits as SubUnit[] : [],
                                 address: (apTyped.address as PropertyState['address']) || emptyPropertyAddress(),
                                 photos: [],
@@ -931,6 +945,14 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                         solarKwp: prop.details.solarKwp,
                         propertyType: prop.propertyType,
                         numberOfUnits: prop.details.numberOfUnits,
+                        rooms: prop.details.rooms,
+                        bedrooms: prop.details.bedrooms,
+                        bathrooms: prop.details.bathrooms,
+                        parkingSpaces: prop.details.parkingSpaces,
+                        kitchenCabinets: prop.details.kitchenCabinets,
+                        laundry: prop.details.laundry,
+                        ac: prop.details.ac,
+                        cooktop: prop.details.cooktop,
                     },
                 }),
             });
