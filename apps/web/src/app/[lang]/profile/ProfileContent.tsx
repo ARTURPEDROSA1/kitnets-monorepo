@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Image from 'next/image';
 import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera, Video, Sparkles, Save, UploadCloud, Home, Building2, User, ShieldCheck, Fingerprint, ChevronDown, ChevronUp, Wand2, Plus, ArrowRight, Minus, Edit3, X } from 'lucide-react';
-import PropertyDetailsCard, { PropertyDetails, SubUnit, SubUnitsSection, Checkbox as DetailCheckbox } from '@/components/profile/PropertyDetailsCard';
+import PropertyDetailsCard, { PropertyDetails, SubUnit, SubUnitsSection, Checkbox as DetailCheckbox, defaultSubUnit } from '@/components/profile/PropertyDetailsCard';
 import { cn } from '@/lib/utils';
 import { useUser, useAuth } from '@clerk/nextjs';
 import { useSearchParams } from 'next/navigation';
@@ -162,17 +162,17 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
     const emptyPropertyAddress = () => ({
         cep: '', street: '', number: '', city: '', state: '', neighborhood: '', complement: '', description: ''
     });
-    const emptyPropertyDetails = (): PropertyDetails => ({
+    const emptyPropertyDetails = (type?: 'single' | 'multi'): PropertyDetails => ({
         propertyName: '', cadastroImobiliario: '', inscricaoImobiliaria: '', matricula: '',
-        areaLote: '', areaEdificada: '', numberOfUnits: 0, totalSqMeters: '',
+        areaLote: '', areaEdificada: '', numberOfUnits: type === 'multi' ? 1 : 0, totalSqMeters: '',
         solarEnergy: false, solarKwp: '', mainMeters: { water: false, energy: false, gas: false }, internetBill: false,
         rooms: '', bedrooms: '', bathrooms: '', parkingSpaces: '1',
         kitchenCabinets: false, laundry: 'none', ac: 'none', cooktop: 'none',
     });
     const createEmptyProperty = (type: 'single' | 'multi'): PropertyState => ({
         propertyType: type,
-        details: emptyPropertyDetails(),
-        subUnits: [],
+        details: emptyPropertyDetails(type),
+        subUnits: type === 'multi' ? [defaultSubUnit(0)] : [],
         address: emptyPropertyAddress(),
         photos: [], savedPhotos: [],
         videos: [], savedVideos: [],
@@ -208,7 +208,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
     // Helper: check if a property has all mandatory fields filled
     const isPropertyComplete = (prop: PropertyState): boolean => {
         const hasAddress = !!(prop.address.cep && prop.address.city && prop.address.state);
-        const hasDetails = !!(prop.details.propertyName && prop.details.totalSqMeters);
+        const hasDetails = !!prop.details.propertyName;
         const hasPhotos = (prop.savedPhotos.length + prop.photos.length) >= 2 || (prop.savedVideos.length + prop.videos.length) >= 1;
         const hasDescription = !!prop.address.description?.trim();
         const hasDocs = prop.savedProofs.length > 0 || prop.ownershipFiles.length > 0;
@@ -520,7 +520,9 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             matricula: primaryPropDetails.matricula || '',
                             areaLote: primaryPropDetails.areaLote || '',
                             areaEdificada: primaryPropDetails.areaEdificada || '',
-                            numberOfUnits: primaryPropDetails.numberOfUnits || 0,
+                            numberOfUnits: (primaryPropDetails.numberOfUnits && primaryPropDetails.numberOfUnits > 0)
+                                ? primaryPropDetails.numberOfUnits
+                                : (profile.property_type === 'multi' ? 1 : 0),
                             totalSqMeters: primaryPropDetails.totalSqMeters || '',
                             solarEnergy: primaryPropDetails.solarEnergy || false,
                             solarKwp: primaryPropDetails.solarKwp || '',
@@ -534,8 +536,8 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             laundry: primaryPropDetails.laundry || 'none',
                             ac: primaryPropDetails.ac || 'none',
                             cooktop: primaryPropDetails.cooktop || 'none',
-                        } : emptyPropertyDetails(),
-                        subUnits: primarySubUnits,
+                        } : emptyPropertyDetails((profile.property_type as 'single' | 'multi') || 'single'),
+                        subUnits: (profile.property_type === 'multi' && primarySubUnits.length === 0) ? [defaultSubUnit(0)] : primarySubUnits,
                         address: primaryPropAddr,
                         photos: [],
                         savedPhotos: primaryPhotos,
@@ -549,7 +551,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                         addressSectionOpen: !primaryPropAddr.street,
                         photosSectionOpen: primaryPhotos.length < 2,
                         descriptionSectionOpen: !primaryPropAddr.description,
-                        detailsInitialOpen: !primaryPropDetails?.totalSqMeters,
+                        detailsInitialOpen: !primaryPropDetails?.propertyName,
                         subUnitOpenIdx: null,
                         showAddressCard: Boolean(primaryProofs.length > 0 || primaryPropAddr.street || primaryPropAddr.cep || primaryPropDetails?.propertyName || primaryPropDetails?.totalSqMeters || primaryPhotos.length > 0 || primaryVideos.length > 0 || primaryPropAddr.description),
                         showDetailsCard: Boolean(primaryPropAddr.street || primaryPropAddr.cep || primaryPropDetails?.propertyName || primaryPropDetails?.totalSqMeters || primaryPhotos.length > 0 || primaryVideos.length > 0 || primaryPropAddr.description),
@@ -569,18 +571,25 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             const combinedProofs = dedupeProofs([...dbProofsForProp, ...jsonProofsForProp]);
                             const hasAddDocs = combinedProofs.length > 0;
                             const hasAddAddr = Boolean(apTyped.address && ((apTyped.address as PropertyState['address']).street || (apTyped.address as PropertyState['address']).cep));
-                            const hasAddDetails = Boolean(apTyped.details && ((apTyped.details as PropertyDetails).propertyName || (apTyped.details as PropertyDetails).totalSqMeters));
+                            const hasAddDetails = Boolean(apTyped.details && (apTyped.details as PropertyDetails).propertyName);
                             const hasAddPhotos = (Array.isArray(apTyped.savedPhotos) && apTyped.savedPhotos.length > 0) || (Array.isArray(apTyped.savedVideos) && apTyped.savedVideos.length > 0);
                             const hasAddDesc = Boolean(apTyped.address && (apTyped.address as PropertyState['address']).description);
 
+                            const propType = (apTyped.propertyType as 'single' | 'multi') || 'single';
+                            const apDetails = apTyped.details as PropertyDetails | undefined;
+                            const apUnits = Array.isArray(apTyped.subUnits) ? apTyped.subUnits as SubUnit[] : [];
+
                             additionalProps.push({
-                                propertyType: (apTyped.propertyType as 'single' | 'multi') || 'single',
-                                details: apTyped.details ? {
-                                    ...emptyPropertyDetails(),
-                                    ...(apTyped.details as PropertyDetails),
-                                    parkingSpaces: (apTyped.details as PropertyDetails).parkingSpaces !== undefined ? (apTyped.details as PropertyDetails).parkingSpaces : '1',
-                                } : emptyPropertyDetails(),
-                                subUnits: Array.isArray(apTyped.subUnits) ? apTyped.subUnits as SubUnit[] : [],
+                                propertyType: propType,
+                                details: apDetails ? {
+                                    ...emptyPropertyDetails(propType),
+                                    ...apDetails,
+                                    numberOfUnits: (apDetails.numberOfUnits && apDetails.numberOfUnits > 0)
+                                        ? apDetails.numberOfUnits
+                                        : (propType === 'multi' ? 1 : 0),
+                                    parkingSpaces: apDetails.parkingSpaces !== undefined ? apDetails.parkingSpaces : '1',
+                                } : emptyPropertyDetails(propType),
+                                subUnits: (propType === 'multi' && apUnits.length === 0) ? [defaultSubUnit(0)] : apUnits,
                                 address: (apTyped.address as PropertyState['address']) || emptyPropertyAddress(),
                                 photos: [],
                                 savedPhotos: Array.isArray(apTyped.savedPhotos) ? apTyped.savedPhotos as string[] : [],
