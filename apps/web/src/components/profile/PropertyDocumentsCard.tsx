@@ -190,6 +190,7 @@ export interface PropertyDocumentsCardProps {
     isOwnershipOpen: boolean;
     isAddressCardVisible: boolean;
     isAddressFilled?: boolean;
+    isPropertySaved?: boolean;
     isSaving: boolean;
     onToggleOpen: () => void;
     onUploadFiles: (files: File[], category?: DocCategory, year?: number) => Promise<void>;
@@ -211,6 +212,7 @@ export const PropertyDocumentsCard: React.FC<PropertyDocumentsCardProps> = ({
     extractedAddressInfo,
     isOwnershipOpen,
     isAddressFilled,
+    isPropertySaved = false,
     isSaving,
     onToggleOpen,
     onUploadFiles,
@@ -285,9 +287,6 @@ export const PropertyDocumentsCard: React.FC<PropertyDocumentsCardProps> = ({
     // Total documents count
     const totalDocsCount = unifiedDocs.length;
 
-    // Is property considered saved or has documents?
-    const isSavedOrHasDocs = Boolean(profileId) || totalDocsCount > 0;
-
     // Open/view document in new window
     const handleViewDocument = async (doc: UnifiedDocItem) => {
         if (doc.rawFile) {
@@ -345,12 +344,14 @@ export const PropertyDocumentsCard: React.FC<PropertyDocumentsCardProps> = ({
             const effectiveYear = targetYear ?? currentCalendarYear;
             await onUploadFiles(filesArray, effectiveCategory, effectiveYear);
 
-            // Navigate into the target folder once uploaded
-            if (effectiveCategory) {
-                setOpenFolder(effectiveCategory);
-            } else if (filesArray.length > 0) {
-                const detected = getProofCategory(filesArray[0].name);
-                setOpenFolder(detected);
+            // Only navigate into the target folder if property is already saved
+            if (isPropertySaved) {
+                if (effectiveCategory) {
+                    setOpenFolder(effectiveCategory);
+                } else if (filesArray.length > 0) {
+                    const detected = getProofCategory(filesArray[0].name);
+                    setOpenFolder(detected);
+                }
             }
         } catch (err) {
             console.error('Error in handleFilesSelected:', err);
@@ -412,7 +413,9 @@ export const PropertyDocumentsCard: React.FC<PropertyDocumentsCardProps> = ({
                             )}
                         </div>
                         <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                            Pastas organizadas para IPTU, contratos de aluguel, vistorias, escrituras e certidões.
+                            {isPropertySaved
+                                ? "Pastas organizadas para IPTU, contratos de aluguel, vistorias, escrituras e certidões."
+                                : "Envie IPTU, matrícula ou escritura para preencher o endereço automaticamente."}
                         </p>
                     </div>
                 </div>
@@ -428,8 +431,8 @@ export const PropertyDocumentsCard: React.FC<PropertyDocumentsCardProps> = ({
             {/* Accordion Body */}
             {isOwnershipOpen && (
                 <div className="pt-2 space-y-5">
-                    {/* Case 1: Initial empty state during property creation (no docs uploaded yet and unsaved) */}
-                    {!isSavedOrHasDocs ? (
+                    {/* Case 1: Initial empty/adding state during property creation (unsaved property) */}
+                    {!isPropertySaved ? (
                         <div className="space-y-4">
                             <div className="bg-muted/30 p-4 rounded-xl border border-border text-sm text-muted-foreground">
                                 <p className="font-semibold text-foreground mb-1">
@@ -454,7 +457,82 @@ export const PropertyDocumentsCard: React.FC<PropertyDocumentsCardProps> = ({
                                 </div>
                             </div>
 
-                            <div className="border-2 border-dashed border-border rounded-xl p-8 flex flex-col items-center justify-center hover:bg-muted/40 transition-colors relative cursor-pointer group">
+                            {/* If user has uploaded any documents while adding, list them cleanly */}
+                            {unifiedDocs.length > 0 && (
+                                <div className="space-y-2.5">
+                                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                        Documentos enviados ({unifiedDocs.length})
+                                    </h4>
+                                    <div className="space-y-2">
+                                        {unifiedDocs.map((doc) => {
+                                            const catDef = DOCUMENT_CATEGORIES.find(c => c.id === doc.category);
+                                            const CatIcon = catDef?.icon || FileText;
+                                            return (
+                                                <div
+                                                    key={doc.id}
+                                                    className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border bg-card hover:bg-muted/20 transition-colors"
+                                                >
+                                                    <div className="flex items-center gap-3 min-w-0">
+                                                        <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 flex items-center justify-center flex-shrink-0">
+                                                            <CatIcon className="w-4 h-4" />
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <div className="flex items-center gap-2">
+                                                                <p className="text-sm font-medium text-foreground truncate max-w-[200px] sm:max-w-xs md:max-w-sm">
+                                                                    {doc.displayName}
+                                                                </p>
+                                                                <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
+                                                                    {catDef?.label || 'Documento'}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                                                                {doc.size && <span>{formatFileSize(doc.size)}</span>}
+                                                                {doc.status === 'analyzing' && (
+                                                                    <span className="inline-flex items-center gap-1 text-blue-600 font-medium">
+                                                                        <Loader2 className="w-3 h-3 animate-spin" /> Analisando com IA...
+                                                                    </span>
+                                                                )}
+                                                                {doc.status === 'success' && (
+                                                                    <span className="inline-flex items-center gap-1 text-emerald-600 font-medium">
+                                                                        <CheckCircle2 className="w-3 h-3" /> Endereço extraído
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 flex-shrink-0">
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                                                            onClick={() => handleViewDocument(doc)}
+                                                        >
+                                                            <Eye className="w-3.5 h-3.5 mr-1" />
+                                                            Visualizar
+                                                        </Button>
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                                            onClick={() => handleDeleteDocument(doc)}
+                                                            title="Remover documento"
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className={cn(
+                                "border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center hover:bg-muted/40 transition-colors relative cursor-pointer group",
+                                unifiedDocs.length > 0 ? "p-5" : "p-8"
+                            )}>
                                 <input
                                     type="file"
                                     multiple
@@ -463,15 +541,20 @@ export const PropertyDocumentsCard: React.FC<PropertyDocumentsCardProps> = ({
                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                     disabled={isUploading}
                                 />
-                                <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+                                <div className={cn(
+                                    "rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center group-hover:scale-105 transition-transform",
+                                    unifiedDocs.length > 0 ? "w-10 h-10 mb-2" : "w-12 h-12 mb-3"
+                                )}>
                                     {isUploading ? (
-                                        <Loader2 className="w-6 h-6 animate-spin" />
+                                        <Loader2 className={cn(unifiedDocs.length > 0 ? "w-5 h-5" : "w-6 h-6", "animate-spin")} />
                                     ) : (
-                                        <UploadCloud className="w-6 h-6" />
+                                        <UploadCloud className={unifiedDocs.length > 0 ? "w-5 h-5" : "w-6 h-6"} />
                                     )}
                                 </div>
-                                <p className="font-semibold text-foreground text-center">
-                                    Arraste seus documentos aqui ou clique para selecionar
+                                <p className="font-semibold text-foreground text-center text-sm">
+                                    {unifiedDocs.length > 0
+                                        ? "Adicionar outro documento ou arraste aqui"
+                                        : "Arraste seus documentos aqui ou clique para selecionar"}
                                 </p>
                                 <p className="text-xs text-muted-foreground mt-1 text-center">
                                     Formatos aceitos: PDF, JPG, PNG (máx. 15MB por arquivo)

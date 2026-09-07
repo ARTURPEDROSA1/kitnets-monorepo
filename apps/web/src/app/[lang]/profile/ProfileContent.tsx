@@ -91,6 +91,7 @@ interface PropertyState {
     showDetailsCard?: boolean;
     showPhotosCard?: boolean;
     showDescriptionCard?: boolean;
+    isSavedProperty?: boolean;
 }
 
 type ProfileView = 'proprietario' | 'imoveis' | 'full';
@@ -192,6 +193,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
         showDetailsCard: false,
         showPhotosCard: false,
         showDescriptionCard: false,
+        isSavedProperty: false,
     });
 
     const [properties, setProperties] = useState<PropertyState[]>([]);
@@ -561,6 +563,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                         showDetailsCard: Boolean(primaryPropAddr.street || primaryPropAddr.cep || primaryPropDetails?.propertyName || primaryPropDetails?.totalSqMeters || primaryPhotos.length > 0 || primaryVideos.length > 0 || primaryPropAddr.description),
                         showPhotosCard: Boolean(primaryPropDetails?.propertyName || primaryPropDetails?.totalSqMeters || primaryPhotos.length > 0 || primaryVideos.length > 0 || primaryPropAddr.description),
                         showDescriptionCard: Boolean(primaryPhotos.length > 0 || primaryVideos.length > 0 || primaryPropAddr.description),
+                        isSavedProperty: Boolean(primaryPropAddr.description?.trim() || (primaryPropDetails as Record<string, unknown> | null)?.isSavedProperty || (primaryPropDetails?.propertyName && primaryPropAddr.street)),
                     };
 
                     // Load additional properties from JSON column
@@ -612,6 +615,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                 showDetailsCard: typeof apTyped.showDetailsCard === 'boolean' ? apTyped.showDetailsCard : Boolean(hasAddAddr || hasAddDetails || hasAddPhotos || hasAddDesc),
                                 showPhotosCard: typeof apTyped.showPhotosCard === 'boolean' ? apTyped.showPhotosCard : Boolean(hasAddDetails || hasAddPhotos || hasAddDesc),
                                 showDescriptionCard: typeof apTyped.showDescriptionCard === 'boolean' ? apTyped.showDescriptionCard : Boolean(hasAddPhotos || hasAddDesc),
+                                isSavedProperty: apTyped.isSavedProperty === true || Boolean((apTyped.address as PropertyState['address'])?.description?.trim()) || Boolean(((apTyped.details as PropertyDetails)?.propertyName && (apTyped.address as PropertyState['address'])?.street)),
                             });
                         }
                     }
@@ -1350,7 +1354,10 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                 // When all properties are deleted, null out legacy columns to prevent ghost properties
                 property_address: props.length > 0 ? props[0].address : null,
                 property_type: props.length > 0 ? props[0].propertyType : null,
-                property_details: props.length > 0 ? props[0].details : null,
+                property_details: props.length > 0 ? {
+                    ...props[0].details,
+                    isSavedProperty: props[0].isSavedProperty,
+                } : null,
                 sub_units: props.length > 0 ? props[0].subUnits : null,
                 property_photos: props.length > 0 ? props[0].savedPhotos : null,
                 property_videos: props.length > 0 ? props[0].savedVideos : null,
@@ -1367,6 +1374,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                     savedVideos: prop.savedVideos,
                     savedProofs: dedupeProofs(prop.savedProofs),
                     profilePhotoUrl: prop.profilePhotoUrl,
+                    isSavedProperty: prop.isSavedProperty,
                 })),
             };
 
@@ -2491,6 +2499,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                 isOwnershipOpen={pOwnershipOpen}
                                                 isAddressCardVisible={isAddressCardVisible}
                                                 isAddressFilled={Boolean(pAddr.street?.trim() || pAddr.cep?.trim())}
+                                                isPropertySaved={Boolean(prop.isSavedProperty || prop.address.description?.trim())}
                                                 isSaving={isSaving}
                                                 onToggleOpen={() => setPOwnershipOpen(prev => !prev)}
                                                 onUploadFiles={handlePropDocUpload}
@@ -2965,6 +2974,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                                             return {
                                                                                 ...pItem,
                                                                                 descriptionSectionOpen: false,
+                                                                                isSavedProperty: true,
                                                                             };
                                                                         });
                                                                         setProperties(updatedProps);
