@@ -1,7 +1,7 @@
 # Profile Page — Property Details & Configuration
 
-**Version:** 2.0  
-**Last updated:** 2026-02-18  
+**Version:** 2.2  
+**Last updated:** 2026-09-07  
 **Author:** Kitnets Engineering
 
 ---
@@ -23,21 +23,23 @@
    - 4.4 [Additional Properties JSON Column](#44-additional-properties-json-column)
 5. [Components](#5-components)
    - 5.1 [ProfileContent (Page Orchestrator)](#51-profilecontent-page-orchestrator)
-   - 5.2 [PropertyDetailsCard](#52-propertydetailscard)
-   - 5.3 [SubUnitsSection](#53-subunitssection)
-   - 5.4 [Helper Components](#54-helper-components)
+   - 5.2 [PropertyDocumentsCard (Document Manager & Creation Dropzone)](#52-propertydocumentscard-document-manager--creation-dropzone)
+   - 5.3 [PropertyDetailsCard (Property Details & Amenities)](#53-propertydetailscard-property-details--amenities)
+   - 5.4 [SubUnitsSection (Multi-family Sub-Units)](#54-subunitssection-multi-family-sub-units)
+   - 5.5 [Helper Components](#55-helper-components)
 6. [Ownership Tab — Section Layout](#6-ownership-tab--section-layout)
-   - 6.1 [Section Order](#61-section-order)
+   - 6.1 [Section Order & Wizard Progression](#61-section-order--wizard-progression)
    - 6.2 [Collapsible Sections](#62-collapsible-sections)
 7. [Media Management](#7-media-management)
    - 7.1 [Main Property Media](#71-main-property-media)
    - 7.2 [Sub-Unit Media](#72-sub-unit-media)
    - 7.3 [Upload Flow](#73-upload-flow)
    - 7.4 [Storage Structure](#74-storage-structure)
-8. [Ownership Proof Documents](#8-ownership-proof-documents)
-   - 8.1 [Upload & Storage](#81-upload--storage)
-   - 8.2 [Persistence Strategy](#82-persistence-strategy)
-   - 8.3 [Load Flow](#83-load-flow)
+8. [Ownership Proof Documents & Categorized Folders](#8-ownership-proof-documents--categorized-folders)
+   - 8.1 [Creation Dropzone Mode](#81-creation-dropzone-mode)
+   - 8.2 [8-Folder Categorized Document System](#82-8-folder-categorized-document-system)
+   - 8.3 [IPTU Exercise Year Organization](#83-iptu-exercise-year-organization)
+   - 8.4 [Upload, Storage & Persistence Strategy](#84-upload-storage--persistence-strategy)
 9. [Save & Load Flow](#9-save--load-flow)
    - 9.1 [Loading Profile Data](#91-loading-profile-data)
    - 9.2 [Saving Profile Data](#92-saving-profile-data)
@@ -51,25 +53,26 @@
 
 ## 1. Overview
 
-The **Profile Page** (`/[lang]/profile`) is the central hub where property owners (landlords) configure their property information, upload documents, and manage their identity. The page is organized into three tabs:
+The **Profile Page** (`/[lang]/profile` and `/[lang]/imoveis`) is the central hub where property owners (landlords) configure their property information, upload documents, and manage their identity. The page is organized into three tabs:
 
 | Tab | Purpose |
 |-----|---------|
-| **Imóvel** (Ownership) | Property address, photos/videos, description, property details, sub-units, ownership proofs |
+| **Imóvel** (Ownership) | Property address, documents, details, sub-units, photos/videos, description |
 | **Dados Pessoais** (Basics) | Name, CPF/CNPJ, phone, personal address, PF/PJ toggle |
 | **Segurança** (Security) | Account deletion, password management |
 
-This document focuses on the **Ownership tab**, specifically the **Property Details** system, **Sub-Units** configuration, and the **Multi-Property Architecture** that supports multiple properties per user profile.
+This document focuses on the **Ownership tab**, specifically the **Property Documents & Folders** system, **Property Details** system, **Sub-Units** configuration, and the **Multi-Property Architecture** that supports multiple properties per user profile.
 
 ### Key Features
 
 - **Multi-Property Support** — Users can add and manage multiple properties (primary + additional)
-- **Property Details Card** — Solar energy, main meters, total area, internet bill, number of units
-- **Dynamic Sub-Unit Cards** — Auto-generated based on unit count, each with full amenity configuration
+- **Document Management & AI Ingestion** — Creation-mode dropzone for instant GPT Vision address extraction; switches to 8-Folder categorized manager once property is saved
+- **Categorized Document Folders** — Dedicated folders for IPTU (by exercise year), Contratos, Vistoria, Compra e Venda, Matrícula, Escritura, Certidões, and Outros
+- **Comprehensive Property Details** — Lot area, built area, total area, units count, solar kWp, utilities (Water, Energy, Internet, Gas), and full single-family amenity configuration (rooms, bedrooms, bathrooms, parking spaces, kitchen cabinets, laundry, AC, cooktop)
+- **Dynamic Sub-Unit Cards** — Auto-generated based on unit count for multi-family, each with full amenity & utility configuration
 - **Media Per Entity** — Up to 10 photos + 2 videos for main property AND each sub-unit
-- **Ownership Proof Documents** — PDF/JPG/PNG upload per property with AI-powered extraction
-- **Per-Property File Uploads** — All file types (docs, photos, videos) are scoped to each property
-- **Collapsible Sections** — All ownership tab sections are collapsible with smooth animations
+- **Sequential Step Wizard** — Smooth card disclosure guiding landlord from documents to address, details, media, and description
+- **Collapsible Sections** — All ownership tab sections are collapsible with smooth animations and status indicators
 
 ---
 
@@ -79,14 +82,16 @@ This document focuses on the **Ownership tab**, specifically the **Property Deta
 apps/web/src/
 ├── app/[lang]/profile/
 │   ├── page.tsx                    # Server component (loads dictionary)
-│   ├── ProfileContent.tsx          # Client component — page orchestrator (~2965 lines)
+│   ├── ProfileContent.tsx          # Client component — page orchestrator (~3700 lines)
 │   └── actions.ts                  # Server actions (account deletion)
 │
 ├── components/profile/
-│   └── PropertyDetailsCard.tsx     # Property details + SubUnits components (787 lines)
+│   ├── PropertyDocumentsCard.tsx   # Document dropzone & 8-folder system (~720 lines)
+│   └── PropertyDetailsCard.tsx     # Property details + SubUnits components (~1210 lines)
 │
 packages/core/database/
-│   └── add_property_details.sql    # Migration script for new DB columns
+├── add_property_details.sql        # Migration script for property details DB columns
+└── add_property_index_to_ownership_proofs.sql # Migration for per-property proof isolation
 ```
 
 ### Component Relationship Diagram
@@ -96,12 +101,12 @@ ProfileContent.tsx (Page Orchestrator)
 ├── Ownership Tab
 │   ├── properties.map(prop, propIdx =>    ← iterates ALL properties
 │   │   ├── Property Header (collapsible accordion)
-│   │   ├── Verification Section (collapsible)    ← per-property ownership proofs
-│   │   ├── Address Section (collapsible)          ← per-property address
-│   │   ├── SubUnitsSection                        ← per-property sub-units
-│   │   ├── Photos & Videos Section (collapsible)  ← per-property media
-│   │   ├── Description Section (collapsible)      ← per-property description
-│   │   └── PropertyDetailsCard                    ← per-property details
+│   │   ├── 1. PropertyDocumentsCard (Dropzone when adding / 8-Folder Grid when saved)
+│   │   ├── 2. Address Section (collapsible)
+│   │   ├── 3. PropertyDetailsCard (Single-family & common details)
+│   │   ├── 4. SubUnitsSection (Multi-family unit configuration)
+│   │   ├── 5. Photos & Videos Section (collapsible)
+│   │   └── 6. Description Section (collapsible)
 │   │)
 │   └── "+ Adicionar Propriedade" button
 ├── Basics Tab
@@ -116,7 +121,7 @@ ProfileContent.tsx (Page Orchestrator)
 
 ### 3.1 PropertyState Interface
 
-> **Added: 2026-02-18** — Central state interface that bundles all per-property data.
+> **Updated: 2026-09-07** — Bundles per-property data, section open states, step wizard visibility flags, and persistent saved status.
 
 ```typescript
 interface PropertyState {
@@ -139,6 +144,7 @@ interface PropertyState {
     savedVideos: string[];    // already-uploaded video URLs
     ownershipFiles: File[];   // new proof files pending upload
     savedProofs: ProofData[]; // uploaded proof records
+    profilePhotoUrl: string | null;
 
     // Collapsible section states
     ownershipSectionOpen: boolean;
@@ -147,6 +153,15 @@ interface PropertyState {
     descriptionSectionOpen: boolean;
     detailsInitialOpen: boolean;
     subUnitOpenIdx: number | null;
+
+    // Sequential step wizard visibility flags
+    showAddressCard?: boolean;
+    showDetailsCard?: boolean;
+    showPhotosCard?: boolean;
+    showDescriptionCard?: boolean;
+
+    // Saved status: false during creation until wizard is completed; true once saved
+    isSavedProperty?: boolean;
 }
 ```
 
@@ -160,18 +175,28 @@ export interface PropertyDetails {
     cadastroImobiliario: string; // Municipal property registration
     inscricaoImobiliaria: string;// Property inscription number
     matricula: string;           // Registry number
-    areaLote: string;           // Lot area
-    areaEdificada: string;      // Built area
-    numberOfUnits: number;       // Only used when propertyType === 'multi'
-    totalSqMeters: string;       // Total property area in m²
+    areaLote: string;            // Lot area in m²
+    areaEdificada: string;       // Built area in m²
+    totalSqMeters: string;       // Total property area in m² (optional, positioned right of areaEdificada)
+    numberOfUnits: number;       // For multi: defaults to 1; for single: 0
     solarEnergy: boolean;        // Has solar energy installed
     solarKwp: string;            // Solar generation capacity in kWp
     mainMeters: {
-        water: boolean;          // Main water meter present
-        energy: boolean;         // Main energy meter present
-        gas: boolean;            // Main gas meter present
+        water: boolean;          // Main water meter (paid by landlord)
+        energy: boolean;         // Main energy meter (paid by landlord)
+        gas: boolean;            // Main gas meter (paid by landlord)
     };
-    internetBill: boolean;       // Has internet bill
+    internetBill: boolean;       // Internet included (paid by landlord, placed between energy and gas)
+
+    // Single-family details & amenities
+    rooms: string;               // Total rooms
+    bedrooms: string;            // Bedrooms
+    bathrooms: string;           // Bathrooms
+    parkingSpaces: string;       // Parking spaces (text input, defaults to '1')
+    kitchenCabinets: boolean;    // Kitchen cabinets
+    laundry: "none" | "individual" | "shared";
+    ac: "none" | "cold" | "cold_hot";
+    cooktop: "none" | "gas" | "electric" | "induction";
 }
 ```
 
@@ -385,16 +410,16 @@ if (profile.additional_properties && Array.isArray(profile.additional_properties
 
 **File:** `apps/web/src/app/[lang]/profile/ProfileContent.tsx`  
 **Type:** Client Component (`"use client"`)  
-**Lines:** ~2965
+**Lines:** ~3700
 
 This is the main orchestrator component that:
 
 - Manages all state via the `properties: PropertyState[]` array
 - Handles data loading from Supabase (`loadProfile`)
-- Handles data saving to Supabase (`handleSave`) — with per-property file uploads
-- Renders the three-tab interface
-- Manages collapsible section states per property
-- Supports automatic modal opening via `?add=true` query parameter
+- Handles data saving to Supabase (`handleSave`) — with per-property file uploads and persistence
+- Coordinates the step-by-step disclosure wizard (`showAddressCard`, `showDetailsCard`, `showPhotosCard`, `showDescriptionCard`)
+- Tracks `isSavedProperty` status to toggle between initial upload mode and full folder management mode
+- Renders the three-tab interface and multi-property management controls
 
 **Key State Variables:**
 
@@ -405,75 +430,92 @@ This is the main orchestrator component that:
 | `personType` | `'pf' \| 'pj'` | Person type (individual or company) |
 | `formData` | `object` | Personal data form fields |
 | `fileAnalysisStatus` | `Record<string, string>` | AI document analysis status per file |
-| `activeTab` | `string` | Currently active tab |
+| `activeTab` | `string` | Currently active tab (`basics`, `ownership`, `security`) |
 
-### 5.2 PropertyDetailsCard
+### 5.2 PropertyDocumentsCard (Document Manager & Creation Dropzone)
 
-**File:** `apps/web/src/components/profile/PropertyDetailsCard.tsx`  
+**File:** `apps/web/src/components/profile/PropertyDocumentsCard.tsx`  
+**Lines:** ~720  
 **Export:** `default` (default export)
 
-Renders the **"Detalhes"** collapsible card with:
+A specialized document management component with two distinct modes:
 
-- Number of Units (only for `propertyType === 'multi'`)
-- Total Area (m²)
-- Solar Energy toggle + kWp input
-- Main Meters checkboxes (Water, Energy, Gas)
-- Internet Bill checkbox
+1. **Creation Mode (`!isPropertySaved`)**:
+   - Renders a clean, simple, inviting upload dropzone designed to encourage users to send documents (IPTU, Matrícula, Escritura, Compra e Venda) for automated address extraction via GPT Vision.
+   - If files are uploaded while adding, displays an orderly list of uploaded documents with AI extraction status (`Analisando com IA...`, `Endereço extraído`) and `Visualizar` / `Excluir` actions, keeping the dropzone available for further files.
+   - Conditionally hides "Digitar manualmente" once address fields are already filled.
+   - Displays "Confirmar →" button once documents are added to advance to the address card.
 
-### 5.3 SubUnitsSection
+2. **Saved Mode (`isPropertySaved`)**:
+   - Renders the organized **8-Folder System** grid:
+     1. **IPTU**: Organizes IPTU files by tax exercise year (current year + past years) with quick-upload inside the folder.
+     2. **Contratos**: Rental contracts, addenda, and termination agreements.
+     3. **Vistoria**: Ingoing and outgoing inspection reports.
+     4. **Compra e Venda**: Purchase and sale agreements.
+     5. **Matrícula**: Property registry certificates from the Cartório de Registro de Imóveis.
+     6. **Escritura**: Public deeds.
+     7. **Certidões**: Clearance and negative certificates (municipal, state, federal).
+     8. **Outros**: Floor plans and other property files.
+   - Clean, short folder labels without visual subtitle clutter; displays file count badges ("X arquivos" or "Vazia").
+   - Clicking a folder opens a full folder view with document cards, download/view signed URLs, delete actions, and direct folder file upload.
+
+### 5.3 PropertyDetailsCard (Property Details & Amenities)
+
+**File:** `apps/web/src/components/profile/PropertyDetailsCard.tsx`  
+**Lines:** ~1210  
+**Export:** `default` (default export)
+
+Renders the **"Dados da Propriedade"** card:
+
+- Property name, municipal registration, inscription, matricula
+- **3-Column Area Grid**: Área Lote (m²), Área Edif. (m²), and Área Total (m²) (non-mandatory)
+- **Number of Units**: Only displayed for `multi` properties (defaults to `1`)
+- **Solar Energy**: Toggle + generation capacity in kWp
+- **Main Meters & Utilities** (`pagos pelo Proprietário`): Inline checkboxes for **Água**, **Energia**, **Internet**, and **Gás**
+- **Single-Family Details & Amenities**: Rooms, bedrooms, bathrooms, parking spaces (text input, defaults to `1`), kitchen cabinets, laundry (none/individual/shared), AC (none/cold/cold_hot), and cooktop (none/gas/electric/induction)
+
+### 5.4 SubUnitsSection (Multi-family Sub-Units)
 
 **File:** `apps/web/src/components/profile/PropertyDetailsCard.tsx`  
 **Export:** Named export (`SubUnitsSection`)
 
-Renders the sub-unit card list with full per-unit configuration. Each sub-unit card is an accordion-style collapsible panel.
+Renders the sub-unit card list with full per-unit configuration for multi-family properties (`propertyType === 'multi'`). Each sub-unit card is an accordion panel with amenities, condominium inclusions, media, and description.
 
-**Per-Sub-Unit Fields:**
-
-| Section | Fields |
-|---------|--------|
-| **Identity** | Name, Area (m²) |
-| **Rooms** | Cômodos, Quartos, Banheiros |
-| **Amenities** | Garage, Kitchen Cabinets (checkboxes) |
-| **Equipment** | Laundry, AC, Cooktop (selects) |
-| **Description** | Free-text textarea |
-| **Photos** | Upload grid (max 10), preview + delete |
-| **Videos** | Upload grid (max 2), preview + delete |
-| **Condominium** | Toggle + value + inclusions (energy, water, internet, IPTU, gas) |
-
-### 5.4 Helper Components
+### 5.5 Helper Components
 
 #### `Checkbox`
-
 Styled checkbox with icon support. Used throughout the property details and sub-unit forms.
 
 #### `SelectField`
-
 Styled `<select>` dropdown with label and icon support.
 
 #### `FilePreview`
-
-Renders a preview thumbnail for a `File` object (photo or video) with a delete button overlay. Uses `useMemo` for creating the object URL.
-
-#### `PhotoPreview` (in ProfileContent.tsx)
-
-Similar to `FilePreview` but used specifically for the main property photo uploads.
+Renders a preview thumbnail for a `File` object (photo or video) with a delete button overlay.
 
 ---
 
 ## 6. Ownership Tab — Section Layout
 
-### 6.1 Section Order
+### 6.1 Section Order & Wizard Progression
 
-Within each property accordion, sections appear in this order:
+Within each property accordion, sections appear in this logical order:
 
-| # | Section | Component | Scope |
-|---|---------|-----------|-------|
-| 1 | **Verificação de Propriedade** | Inline (collapsible) | Document upload + AI extraction |
-| 2 | **Endereço** | Inline (collapsible) | Property address (auto-filled from docs) |
-| 3 | **Sub-unidades** | `SubUnitsSection` | Per-unit configuration (only for `multi` type) |
-| 4 | **Fotos e Vídeos do Imóvel** | Inline (collapsible) | Property media (10 photos + 2 videos) |
-| 5 | **Descrição do Imóvel** | Inline (collapsible) | Property description |
-| 6 | **Detalhes** | `PropertyDetailsCard` (collapsible) | Solar, meters, area, internet |
+| # | Section | Component | Scope / Purpose |
+|---|---------|-----------|-----------------|
+| 1 | **Documentos da Propriedade** | `PropertyDocumentsCard` | Document dropzone (creation) / 8-Folder manager (saved) |
+| 2 | **Endereço** | Inline (collapsible) | Property address (auto-filled by AI from documents or manual entry) |
+| 3 | **Dados da Propriedade** | `PropertyDetailsCard` | Single-family amenities, areas, utilities, solar |
+| 4 | **Sub-unidades** | `SubUnitsSection` | Per-unit configuration & media (only for `multi` properties) |
+| 5 | **Fotos e Vídeos do Imóvel** | Inline (collapsible) | Property media (up to 10 photos + 2 videos) |
+| 6 | **Descrição do Imóvel** | Inline (collapsible) | Property listing description; confirming marks property as saved |
+
+#### Wizard Card Progression:
+1. On a new property, only Step 1 (Documentos) is initially open.
+2. Clicking "Digitar manualmente" or uploading a document unlocks Step 2 (Endereço).
+3. Confirming Endereço unlocks Step 3 (Dados da Propriedade).
+4. Confirming Dados da Propriedade unlocks Step 5 (Fotos e Vídeos) or Step 4 (Sub-unidades).
+5. Confirming Fotos e Vídeos unlocks Step 6 (Descrição do Imóvel).
+6. Clicking "Confirmar" on Descrição persists the property, marks `isSavedProperty: true`, collapses the wizard, and enables the 8-folder system in Step 1.
 
 ### 6.2 Collapsible Sections
 
@@ -485,11 +527,11 @@ All sections are collapsible. Each uses:
 
 | Section | Color Scheme | Icon |
 |---------|-------------|------|
-| Ownership | Blue / Emerald (when verified) | `FileText` / `CheckCircle2` |
-| Address | Emerald | `MapPin` |
-| Photos/Videos | Amber | `Camera` |
-| Description | Indigo | `FileText` |
-| Details | Violet | `Settings2` |
+| Documentos | Blue / Emerald (when verified) | `FileText` / `CheckCircle2` |
+| Endereço | Emerald | `MapPin` |
+| Dados da Propriedade | Violet | `Home` / `Building2` |
+| Fotos/Vídeos | Amber | `Camera` |
+| Descrição | Indigo | `FileText` |
 
 ---
 
@@ -578,25 +620,55 @@ documents/
 
 ---
 
-## 8. Ownership Proof Documents
+## 8. Ownership Proof Documents & Categorized Folders
 
-> **Added: 2026-02-18** — Detailed documentation on per-property ownership proof handling.
+> **Updated: 2026-09-07** — Transformed from a flat verification list into an adaptive document management system: clean dropzone during creation and an organized 8-Folder grid once saved.
 
-### 8.1 Upload & Storage
+### 8.1 Creation Dropzone Mode (`!isPropertySaved`)
 
-Each property card has a **"Verificação de Propriedade"** section with a file drop zone accepting `.pdf`, `.jpg`, `.jpeg`, `.png` files.
+When a property is being created (`isPropertySaved: false`), the user is in the setup wizard. To reduce cognitive overhead and eliminate intimidating empty folders:
 
-When a file is selected:
+- Displays a single inviting dropzone with formats (`.pdf`, `.jpg`, `.jpeg`, `.png`, max 15MB) and an informational banner explaining that AI will automatically extract the address from IPTU, Matrícula, Escritura, or Compra e Venda.
+- As files are selected/dropped:
+  - Files are added to pending uploads.
+  - GPT Vision analysis (`analyzeDocument`) runs, extracting address, street, number, neighborhood, city, state, CEP, and cadastral data.
+  - A temporary floating success badge appears (`xxx — Endereço extraído com sucesso (Visão GPT)`) and auto-dismisses after 6 seconds, reappearing only upon new uploads.
+  - Uploaded files are listed in an orderly list with document category badge, size, status, and *Visualizar* / *Excluir* actions.
+  - The dropzone remains available below the list in a compact form to add more files if desired.
+- Includes a conditional **"Digitar manualmente"** button (hidden if address is already filled) and a **"Confirmar →"** button (visible once documents exist) to advance to the Address step.
 
-1. The file is added to `properties[propIdx].ownershipFiles` (client-side `File[]`)
-2. AI analysis (`analyzeDocument`) is triggered on the file
-3. On save, the file is uploaded to `documents/{propStoragePrefix}/` in Supabase Storage
-4. A record is created in the `ownership_proofs` table with `.select().single()` to get the inserted record back
-5. The returned `ProofData` is added to `properties[propIdx].savedProofs`
+### 8.2 8-Folder Categorized Document System (`isPropertySaved`)
 
-### 8.2 Persistence Strategy
+Once a property is saved (`isPropertySaved: true`), the document card switches to the full **8-Folder System**:
 
-Ownership proofs are scoped per property via the `property_index` column:
+| Folder | ID | Icon | Purpose |
+|--------|----|------|---------|
+| **IPTU** | `iptu` | `Receipt` | Annual property tax documents, organized by exercise year |
+| **Contratos** | `contrato_aluguel` | `FileSignature` | Lease contracts, renewals, amendments, termination agreements |
+| **Vistoria** | `vistoria` | `ClipboardCheck` | Entry and exit inspection reports with photos and checklists |
+| **Compra e Venda** | `compra_venda` | `FileText` | Purchase and sale agreements or commitment contracts |
+| **Matrícula** | `matricula` | `FileSpreadsheet` | Updated land registry certificates from Cartório de Registro |
+| **Escritura** | `escritura` | `Scroll` | Public deeds drawn up in Tabelionato de Notas |
+| **Certidões** | `certidoes` | `ShieldCheck` | Clearance/negative certificates (municipal, state, federal, labor) |
+| **Outros** | `outros` | `Folder` | Floor plans, utility receipts, and miscellaneous files |
+
+**Folder View Features:**
+- Root view displays a 4-column responsive grid with folder icon, title, and count badge (`X arquivos` or `Vazia`). Subtitle clutter has been stripped for a clean look.
+- Clicking any folder opens its dedicated folder view with:
+  - Back button (`← Todas as Pastas`) and folder header with total item count.
+  - Document cards with category badge, exercise year tag, file size, creation date, view link (signed URL or Blob), and delete button.
+  - Embedded dropzone allowing direct uploads directly into the opened folder.
+
+### 8.3 IPTU Exercise Year Organization
+
+The IPTU folder contains special logic to group files by tax exercise year:
+- **Current Year Highlight**: Emphasizes the current calendar year's IPTU document with a distinct badge.
+- **Historic Years List**: Neatly displays previous years' receipts and IPTU carnês in descending order.
+- Filenames and tags automatically parse the year from `[IPTU YYYY]`, filename patterns, or upload timestamps.
+
+### 8.4 Upload, Storage & Persistence Strategy
+
+Ownership proofs and documents are scoped per property via the `property_index` column:
 
 | Property Index | DB Table | JSON Column |
 |----------------|----------|-------------|
@@ -876,6 +948,29 @@ Property details and sub-units are stored as JSONB in the `profiles` table becau
 
 ## 14. Changelog
 
+### v2.2 — 2026-09-07
+
+#### Document Management Overhaul, Creation Dropzone & Property Details Expansion
+
+1. **Clean Creation Dropzone vs 8-Folder System**:
+   - Replaced empty 8-folder grid on new properties with a clean, inviting document dropzone encouraging uploads (IPTU, Matrícula, Escritura, Compra e Venda) for automated GPT Vision address extraction.
+   - 8-Folder system (IPTU, Contratos, Vistoria, Compra e Venda, Matrícula, Escritura, Certidões, Outros) now only appears after property creation is fully completed (saved) up to description confirmation.
+   - Floating GPT Vision address extraction success banner now auto-dismisses after 6 seconds and only reappears upon new document upload.
+   - "Digitar manualmente" button is hidden when address fields are already filled.
+   - Streamlined folder names and badges, eliminating clutter and redundant subtitles.
+   - IPTU folder unified and organized by exercise year (current calendar year highlighted + past years listed chronologically).
+
+2. **Dados da Propriedade (Property Details) Expansion**:
+   - Added single-family fields: Cômodos, Quartos, Banheiros, Vagas de Garagem (input with initial value `1`), Armários de Cozinha, Lavanderia, Ar-Condicionado, and Cooktop.
+   - Multi-family properties now default to `1` unit (`numberOfUnits: 1`).
+   - Repositioned **Área Total (m²)** to the right of **Área Edif. (m²)** and removed non-mandatory asterisk.
+   - Moved **Internet** checkbox inline into Medidores Principais between **Energia** and **Gás** (`Água`, `Energia`, `Internet`, `Gás`).
+
+3. **Step Wizard & Save State Flow**:
+   - Added `isSavedProperty` flag to `PropertyState` interface and DB persistence.
+   - Guided step disclosure: Documents → Address → Details → Photos/SubUnits → Description.
+   - Confirming Description sets `isSavedProperty: true`, collapses the wizard, and enables the organized 8-folder document view.
+
 ### v2.1 — 2026-09-04
 
 #### Multi-Property Document Cross-Contamination & Duplication Fix
@@ -933,4 +1028,4 @@ Property details and sub-units are stored as JSONB in the `profiles` table becau
 
 ---
 
-*Document updated on 2026-02-18. For questions, contact Kitnets Engineering.*
+*Document updated on 2026-09-07. For questions, contact Kitnets Engineering.*
