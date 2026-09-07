@@ -59,15 +59,15 @@ export const DOCUMENT_CATEGORIES: CategoryDef[] = [
     },
     {
         id: 'contrato_aluguel',
-        label: 'Contratos de Aluguel',
-        singular: 'Contrato de Aluguel',
+        label: 'Contratos',
+        singular: 'Contrato',
         description: 'Contratos de locação, aditivos e termos de rescisão',
         icon: FileSignature,
     },
     {
         id: 'vistoria',
-        label: 'Vistoria de Imóveis',
-        singular: 'Laudo de Vistoria',
+        label: 'Vistoria',
+        singular: 'Vistoria',
         description: 'Laudos de vistoria de entrada e saída com fotos e assinaturas',
         icon: ClipboardCheck,
     },
@@ -80,28 +80,28 @@ export const DOCUMENT_CATEGORIES: CategoryDef[] = [
     },
     {
         id: 'matricula',
-        label: 'Matrícula do Imóvel',
-        singular: 'Matrícula / RGI',
+        label: 'Matrícula',
+        singular: 'Matrícula',
         description: 'Certidão de matrícula atualizada expedida pelo Cartório de Registro de Imóveis',
         icon: FileSpreadsheet,
     },
     {
         id: 'escritura',
-        label: 'Escritura Pública',
-        singular: 'Escritura Pública',
+        label: 'Escritura',
+        singular: 'Escritura',
         description: 'Escritura pública de compra e venda lavrada em Tabelionato de Notas',
         icon: Scroll,
     },
     {
         id: 'certidoes',
-        label: 'Certidões Negativas',
-        singular: 'Certidão Negativa',
+        label: 'Certidões',
+        singular: 'Certidão',
         description: 'Certidões de regularidade fiscal, débitos municipais, estaduais e forenses',
         icon: ShieldCheck,
     },
     {
         id: 'outros',
-        label: 'Outros Documentos',
+        label: 'Outros',
         singular: 'Outro Documento',
         description: 'Plantas baixas e demais arquivos',
         icon: FolderPlus,
@@ -515,7 +515,7 @@ export const PropertyDocumentsCard: React.FC<PropertyDocumentsCardProps> = ({
                                                     tabIndex={0}
                                                     onKeyDown={(e) => { if (e.key === 'Enter') setOpenFolder(cat.id); }}
                                                     className={cn(
-                                                        "group relative flex flex-col justify-between p-4 rounded-xl border transition-all duration-200 cursor-pointer text-left select-none",
+                                                        "group relative flex flex-col justify-between p-3.5 sm:p-4 rounded-xl border transition-all duration-200 cursor-pointer text-left select-none",
                                                         count > 0
                                                             ? "bg-card border-border hover:border-primary/60 hover:shadow-md hover:-translate-y-0.5"
                                                             : "bg-muted/10 border-border/70 hover:border-border hover:bg-muted/30"
@@ -525,16 +525,16 @@ export const PropertyDocumentsCard: React.FC<PropertyDocumentsCardProps> = ({
                                                     <div className="flex items-center justify-between gap-2 mb-3">
                                                         <div
                                                             className={cn(
-                                                                "w-11 h-11 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105",
+                                                                "w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105",
                                                                 count > 0
                                                                     ? "bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 shadow-2xs"
                                                                     : "bg-muted text-muted-foreground"
                                                             )}
                                                         >
                                                             {count > 0 ? (
-                                                                <FolderOpen className="w-6 h-6 fill-amber-500/20" />
+                                                                <FolderOpen className="w-5 h-5 fill-amber-500/20" />
                                                             ) : (
-                                                                <Folder className="w-6 h-6" />
+                                                                <Folder className="w-5 h-5" />
                                                             )}
                                                         </div>
 
@@ -549,32 +549,12 @@ export const PropertyDocumentsCard: React.FC<PropertyDocumentsCardProps> = ({
                                                         )}
                                                     </div>
 
-                                                    {/* Middle: Category Title and Description */}
+                                                    {/* Folder Title */}
                                                     <div>
                                                         <h4 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors flex items-center gap-1.5">
                                                             <CatIcon className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary flex-shrink-0" />
                                                             <span className="truncate">{cat.label}</span>
                                                         </h4>
-                                                        <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
-                                                            {cat.description}
-                                                        </p>
-                                                    </div>
-
-                                                    {/* Bottom: Preview line and arrow */}
-                                                    <div className="pt-3 mt-3 border-t border-border/50 flex items-center justify-between text-[11px] text-muted-foreground">
-                                                        {count > 0 ? (
-                                                            <span className="truncate text-foreground/80 font-medium">
-                                                                {cat.id === 'iptu' && currentIptuDoc
-                                                                    ? `Exercício ${currentIptuDoc.year}`
-                                                                    : `${count} ${count === 1 ? 'documento' : 'documentos'}`
-                                                                }
-                                                            </span>
-                                                        ) : (
-                                                            <span className="italic">Abrir pasta</span>
-                                                        )}
-                                                        <span className="text-primary font-bold group-hover:translate-x-0.5 transition-transform text-xs">
-                                                            →
-                                                        </span>
                                                     </div>
                                                 </div>
                                             );
