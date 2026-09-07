@@ -103,7 +103,7 @@ export const DOCUMENT_CATEGORIES: CategoryDef[] = [
         id: 'outros',
         label: 'Outros Documentos',
         singular: 'Outro Documento',
-        description: 'Contas de concessionárias (água, luz, gás), plantas e demais arquivos',
+        description: 'Plantas baixas e demais arquivos',
         icon: FolderPlus,
     },
 ];
@@ -193,6 +193,7 @@ export interface PropertyDocumentsCardProps {
     extractedAddressInfo: string | null;
     isOwnershipOpen: boolean;
     isAddressCardVisible: boolean;
+    isAddressFilled?: boolean;
     isSaving: boolean;
     onToggleOpen: () => void;
     onUploadFiles: (files: File[], category?: DocCategory, year?: number) => Promise<void>;
@@ -213,6 +214,7 @@ export const PropertyDocumentsCard: React.FC<PropertyDocumentsCardProps> = ({
     isDocVerified,
     extractedAddressInfo,
     isOwnershipOpen,
+    isAddressFilled,
     isSaving,
     onToggleOpen,
     onUploadFiles,
@@ -282,10 +284,8 @@ export const PropertyDocumentsCard: React.FC<PropertyDocumentsCardProps> = ({
 
     // Upload state inside component
     const [isUploading, setIsUploading] = useState<boolean>(false);
-    const [rootUploadCategory, setRootUploadCategory] = useState<DocCategory | 'auto'>('auto');
     const [selectedYear, setSelectedYear] = useState<number>(currentCalendarYear);
     const [customYearInput, setCustomYearInput] = useState<string>('');
-    const rootFileInputRef = useRef<HTMLInputElement>(null);
     const iptuFileInputRef = useRef<HTMLInputElement>(null);
     const folderFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -348,7 +348,7 @@ export const PropertyDocumentsCard: React.FC<PropertyDocumentsCardProps> = ({
         const filesArray = Array.from(fileList);
         setIsUploading(true);
         try {
-            const effectiveCategory = targetCategory ?? (rootUploadCategory === 'auto' ? undefined : rootUploadCategory);
+            const effectiveCategory = targetCategory;
             const effectiveYear = targetYear ?? (customYearInput ? parseInt(customYearInput, 10) : selectedYear);
             await onUploadFiles(filesArray, effectiveCategory, effectiveYear);
 
@@ -363,7 +363,6 @@ export const PropertyDocumentsCard: React.FC<PropertyDocumentsCardProps> = ({
             console.error('Error in handleFilesSelected:', err);
         } finally {
             setIsUploading(false);
-            if (rootFileInputRef.current) rootFileInputRef.current.value = '';
             if (iptuFileInputRef.current) iptuFileInputRef.current.value = '';
             if (folderFileInputRef.current) folderFileInputRef.current.value = '';
         }
@@ -501,19 +500,6 @@ export const PropertyDocumentsCard: React.FC<PropertyDocumentsCardProps> = ({
                             {/* VIEW A: ROOT VIEW - 8 Folders Grid */}
                             {openFolder === null && (
                                 <div className="space-y-5 animate-in fade-in-50 duration-200">
-                                    {/* Folders Section Header */}
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                        <div>
-                                            <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                                                <Folder className="w-4 h-4 text-amber-500 fill-amber-500/20" />
-                                                Pastas de Documentos do Imóvel
-                                            </h4>
-                                            <p className="text-xs text-muted-foreground mt-0.5">
-                                                Clique em uma pasta para abrir os arquivos arquivados ou adicionar novos documentos.
-                                            </p>
-                                        </div>
-                                    </div>
-
                                     {/* 8 Folders Grid */}
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
                                         {DOCUMENT_CATEGORIES.map((cat) => {
@@ -543,7 +529,7 @@ export const PropertyDocumentsCard: React.FC<PropertyDocumentsCardProps> = ({
                                                                 count > 0
                                                                     ? "bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 shadow-2xs"
                                                                     : "bg-muted text-muted-foreground"
-                                                        )}
+                                                            )}
                                                         >
                                                             {count > 0 ? (
                                                                 <FolderOpen className="w-6 h-6 fill-amber-500/20" />
@@ -593,73 +579,6 @@ export const PropertyDocumentsCard: React.FC<PropertyDocumentsCardProps> = ({
                                                 </div>
                                             );
                                         })}
-                                    </div>
-
-                                    {/* Quick Upload Dropzone on Root View */}
-                                    <div className="border border-border bg-muted/10 rounded-xl p-4 sm:p-5 space-y-3">
-                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                            <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                                                <UploadCloud className="w-4 h-4 text-blue-600" />
-                                                Envio Rápido para as Pastas
-                                            </h4>
-                                            <div className="flex items-center gap-1.5 flex-wrap">
-                                                <span className="text-xs text-muted-foreground mr-1">Organizar em:</span>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setRootUploadCategory('auto')}
-                                                    className={cn(
-                                                        "px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all",
-                                                        rootUploadCategory === 'auto'
-                                                            ? "bg-blue-600 text-white border-blue-600 shadow-2xs"
-                                                            : "bg-background border-border text-muted-foreground hover:bg-muted"
-                                                    )}
-                                                >
-                                                    <span className="flex items-center gap-1">
-                                                        <Sparkles className="w-3 h-3" /> Automático
-                                                    </span>
-                                                </button>
-                                                {DOCUMENT_CATEGORIES.map((cat) => (
-                                                    <button
-                                                        key={cat.id}
-                                                        type="button"
-                                                        onClick={() => setRootUploadCategory(cat.id)}
-                                                        className={cn(
-                                                            "px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all",
-                                                            rootUploadCategory === cat.id
-                                                                ? "bg-blue-600 text-white border-blue-600 shadow-2xs"
-                                                                : "bg-background border-border text-muted-foreground hover:bg-muted"
-                                                        )}
-                                                    >
-                                                        {cat.singular}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        <div className="border-2 border-dashed border-border rounded-xl p-6 flex flex-col items-center justify-center hover:bg-muted/40 transition-colors relative cursor-pointer group">
-                                            <input
-                                                ref={rootFileInputRef}
-                                                type="file"
-                                                multiple
-                                                accept=".pdf,.jpg,.jpeg,.png"
-                                                onChange={(e) => handleFilesSelected(e.target.files)}
-                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                                disabled={isUploading}
-                                            />
-                                            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
-                                                {isUploading ? (
-                                                    <Loader2 className="w-5 h-5 animate-spin" />
-                                                ) : (
-                                                    <UploadCloud className="w-5 h-5" />
-                                                )}
-                                            </div>
-                                            <p className="text-sm font-semibold text-foreground text-center">
-                                                Arraste qualquer documento aqui ou clique para selecionar
-                                            </p>
-                                            <p className="text-xs text-muted-foreground mt-0.5 text-center">
-                                                PDF, JPG ou PNG • O arquivo será organizado na pasta correspondente automaticamente
-                                            </p>
-                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -1000,15 +919,17 @@ export const PropertyDocumentsCard: React.FC<PropertyDocumentsCardProps> = ({
 
                     {/* Actions in bottom right corner: Digitar manualmente & Confirmar */}
                     <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="gap-1.5 text-blue-600 border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                            onClick={onManualAddress}
-                        >
-                            <Edit3 className="w-4 h-4" /> Digitar manualmente
-                        </Button>
+                        {!isAddressFilled && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="gap-1.5 text-blue-600 border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                onClick={onManualAddress}
+                            >
+                                <Edit3 className="w-4 h-4" /> Digitar manualmente
+                            </Button>
+                        )}
                         {totalDocsCount > 0 && (
                             <Button
                                 type="button"

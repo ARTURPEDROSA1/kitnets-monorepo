@@ -2490,6 +2490,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                 extractedAddressInfo={extractedAddressInfo}
                                                 isOwnershipOpen={pOwnershipOpen}
                                                 isAddressCardVisible={isAddressCardVisible}
+                                                isAddressFilled={Boolean(pAddr.street?.trim() || pAddr.cep?.trim())}
                                                 isSaving={isSaving}
                                                 onToggleOpen={() => setPOwnershipOpen(prev => !prev)}
                                                 onUploadFiles={handlePropDocUpload}
