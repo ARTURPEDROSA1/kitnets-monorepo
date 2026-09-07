@@ -11,11 +11,83 @@ function getServiceSupabase() {
     return createClient(url, key);
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Resolves a propertyId input (which might be a valid UUID, or "primary", or legacy alias)
+ * to a verified UUID in public.properties. Auto-creates property record if needed.
+ */
+async function resolvePropertyUuid(
+    supabase: ReturnType<typeof getServiceSupabase>,
+    clerkUserId: string,
+    inputId: string
+): Promise<string> {
+    if (inputId && UUID_REGEX.test(inputId)) {
+        const { data: existing } = await supabase
+            .from("properties")
+            .select("id")
+            .eq("id", inputId)
+            .maybeSingle();
+
+        if (existing?.id) {
+            return existing.id;
+        }
+    }
+
+    // 1. Find user's profile
+    const { data: profile } = await supabase
+        .from("profiles")
+        .select("id, full_name, property_address, property_details")
+        .eq("clerk_id", clerkUserId)
+        .maybeSingle();
+
+    if (!profile) {
+        throw new Error("Perfil de usuário não encontrado");
+    }
+
+    // 2. Find existing property linked to this owner
+    const { data: ownerProp } = await supabase
+        .from("properties")
+        .select("id")
+        .eq("owner_id", profile.id)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+    if (ownerProp?.id) {
+        return ownerProp.id;
+    }
+
+    // 3. Fallback: Auto-create property in public.properties from profile
+    const addr = profile.property_address as Record<string, string> | null;
+    const details = profile.property_details as Record<string, string> | null;
+    const propName = details?.propertyName || (addr?.street ? `${addr.street}, ${addr.number || ""}`.trim() : (profile.full_name ? `Imóvel de ${profile.full_name}` : "Meu Imóvel"));
+
+    const { data: newProp, error: propError } = await supabase
+        .from("properties")
+        .insert({
+            owner_id: profile.id,
+            name: propName,
+            address: addr?.street ? `${addr.street}, ${addr.number || ""} - ${addr.neighborhood || ""}`.trim() : null,
+            city: addr?.city || null,
+            state: addr?.state || null,
+            zip: addr?.cep || null,
+        })
+        .select("id")
+        .single();
+
+    if (propError || !newProp?.id) {
+        console.error("[resolvePropertyUuid] Error creating property:", propError);
+        throw new Error("Não foi possível identificar nem criar o imóvel vinculado.");
+    }
+
+    return newProp.id;
+}
+
 // Convert "AGO/26" to "2026-08"
 function parseMonthLabelToIso(label: string): string | null {
     if (!label) return null;
     const clean = label.trim().toUpperCase();
-    // If already YYYY-MM
     if (/^\d{4}-\d{2}$/.test(clean)) return clean;
 
     const monthsMap: Record<string, string> = {
@@ -53,12 +125,13 @@ export async function GET(request: Request) {
         }
 
         const supabase = getServiceSupabase();
+        const resolvedPropertyId = await resolvePropertyUuid(supabase, user.id, propertyId);
 
-        // 1. Fetch bills for property
+        // Fetch bills for property
         const { data: bills, error } = await supabase
             .from("energy_bills")
             .select("*")
-            .eq("property_id", propertyId)
+            .eq("property_id", resolvedPropertyId)
             .order("reference_month", { ascending: false });
 
         if (error) {
@@ -66,10 +139,15 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
-        return NextResponse.json({ success: true, bills: bills || [] });
+        return NextResponse.json({
+            success: true,
+            bills: bills || [],
+            propertyId: resolvedPropertyId,
+        });
     } catch (err) {
         console.error("[Energy Bills GET] Critical error:", err);
-        return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
+        const message = err instanceof Error ? err.message : "Erro interno do servidor";
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }
 
@@ -96,10 +174,11 @@ export async function POST(request: Request) {
         }
 
         const supabase = getServiceSupabase();
+        const resolvedPropertyId = await resolvePropertyUuid(supabase, user.id, propertyId);
 
         // 1. Prepare main bill payload
         const mainBillPayload = {
-            property_id: propertyId,
+            property_id: resolvedPropertyId,
             utility_company: billData.utilityCompany || "CEMIG",
             consumer_unit: billData.consumerUnit || "Não informado",
             installation_class: billData.installationClass || null,
@@ -162,7 +241,7 @@ export async function POST(request: Request) {
                 if (!isoMonth || isoMonth === billData.referenceMonth) continue;
 
                 historicalRows.push({
-                    property_id: propertyId,
+                    property_id: resolvedPropertyId,
                     consumer_unit: billData.consumerUnit || "Não informado",
                     utility_company: billData.utilityCompany || "CEMIG",
                     reference_month: isoMonth,
@@ -181,7 +260,7 @@ export async function POST(request: Request) {
                 const { data: existing } = await supabase
                     .from("energy_bills")
                     .select("reference_month, is_historical_only")
-                    .eq("property_id", propertyId)
+                    .eq("property_id", resolvedPropertyId)
                     .in("reference_month", isoMonths);
 
                 const fullBillMonths = new Set(
@@ -200,10 +279,11 @@ export async function POST(request: Request) {
             }
         }
 
-        return NextResponse.json({ success: true, bill: savedBill });
+        return NextResponse.json({ success: true, bill: savedBill, propertyId: resolvedPropertyId });
     } catch (err) {
         console.error("[Energy Bills POST] Critical error:", err);
-        return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
+        const message = err instanceof Error ? err.message : "Erro interno do servidor";
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }
 

@@ -86,6 +86,7 @@ export default function EnergyDashboardPage() {
     const router = useRouter();
     const lang = (params.lang as string) || "pt";
     const propertyId = params.propertyId as string;
+    const [resolvedPropertyId, setResolvedPropertyId] = useState<string>(propertyId);
 
     const [bills, setBills] = useState<EnergyBillRecord[]>([]);
     const [loading, setLoading] = useState(true);
@@ -96,10 +97,17 @@ export default function EnergyDashboardPage() {
     const fetchBills = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`/api/energy-bills?propertyId=${propertyId}`);
+            const targetId = resolvedPropertyId || propertyId;
+            const res = await fetch(`/api/energy-bills?propertyId=${targetId}`);
             const data = await res.json();
-            if (data.success && Array.isArray(data.bills)) {
-                setBills(data.bills);
+            if (data.success) {
+                if (Array.isArray(data.bills)) {
+                    setBills(data.bills);
+                }
+                if (data.propertyId && data.propertyId !== propertyId) {
+                    setResolvedPropertyId(data.propertyId);
+                    window.history.replaceState(null, "", `/${lang}/dashboard/energy/${data.propertyId}`);
+                }
             }
         } catch (err) {
             console.error("[EnergyDashboard] Failed to fetch bills:", err);
@@ -556,7 +564,7 @@ export default function EnergyDashboardPage() {
             <EnergyBillUploadModal
                 isOpen={isUploadOpen}
                 onClose={() => setIsUploadOpen(false)}
-                propertyId={propertyId}
+                propertyId={resolvedPropertyId || propertyId}
                 onSuccess={() => {
                     fetchBills();
                 }}
