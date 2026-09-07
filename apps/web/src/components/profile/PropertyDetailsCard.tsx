@@ -224,6 +224,13 @@ export default function PropertyDetailsCard({
 }: DetailsProps) {
     const [isOpen, setIsOpen] = useState(initialOpen);
 
+    // For multi properties, ensure numberOfUnits defaults to 1 if unset or 0
+    useEffect(() => {
+        if (propertyType === "multi" && (!details.numberOfUnits || details.numberOfUnits < 1)) {
+            updateDetail("numberOfUnits", 1);
+        }
+    }, [propertyType]);
+
     const toggleOpen = () => {
         const next = !isOpen;
         setIsOpen(next);
@@ -362,18 +369,23 @@ export default function PropertyDetailsCard({
                                 </Label>
                                 <Input
                                     type="number"
-                                    min={0}
+                                    min={1}
                                     max={50}
-                                    value={details.numberOfUnits || ""}
+                                    value={details.numberOfUnits === undefined ? 1 : (details.numberOfUnits || "")}
                                     onChange={(e) => updateDetail("numberOfUnits", Math.max(0, parseInt(e.target.value) || 0))}
-                                    placeholder="ex: 5"
+                                    onBlur={() => {
+                                        if (!details.numberOfUnits || details.numberOfUnits < 1) {
+                                            updateDetail("numberOfUnits", 1);
+                                        }
+                                    }}
+                                    placeholder="ex: 1"
                                 />
                             </div>
                         )}
                         <div className="space-y-1.5">
                             <Label className="flex items-center gap-1.5">
                                 <DoorOpen className="w-4 h-4 text-muted-foreground" />
-                                Área Total (m²) <span className="text-red-500">*</span>
+                                Área Total (m²)
                             </Label>
                             <Input
                                 type="number"
