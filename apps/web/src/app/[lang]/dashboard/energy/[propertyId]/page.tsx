@@ -327,72 +327,57 @@ export default function EnergyDashboardPage() {
             {bills.length > 0 && (
                 <>
                     {/* Energy Distributor & Current PDF Bill Banner */}
-                    <div className="bg-card border border-border/80 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-card via-card to-emerald-500/5">
-                        <div className="flex flex-wrap sm:flex-nowrap items-center gap-4">
-                            {/* Distributor Dynamic Logo */}
-                            <div className="shrink-0 px-3.5 py-2.5 bg-white dark:bg-card border border-border rounded-xl shadow-2xs flex items-center justify-center">
-                                <EnergyDistributorLogo companyName={latestFullBill?.utility_company || "CEMIG"} size="md" />
-                            </div>
-
-                            {/* Short & Concise Info: Fatura Vigente, Vencimento & Link to open */}
-                            <div className="space-y-1">
-                                <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs">
-                                    <span className="font-semibold uppercase tracking-wider text-muted-foreground">
-                                        Fatura Vigente:
-                                    </span>
-                                    <span className="font-bold text-foreground bg-muted px-2 py-0.5 rounded-md">
-                                        {latestFullBill?.reference_month_label || formatMonthLabel(latestFullBill?.reference_month || "")}
-                                    </span>
-
-                                    {formattedDueDate && (
-                                        <>
-                                            <span className="text-muted-foreground">•</span>
-                                            <span className="font-semibold uppercase tracking-wider text-muted-foreground">
-                                                Vencimento:
-                                            </span>
-                                            <span className="font-bold text-foreground bg-muted px-2 py-0.5 rounded-md">
-                                                {formattedDueDate}
-                                            </span>
-                                        </>
-                                    )}
-                                </div>
-
-                                <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1.5 flex-wrap">
-                                    <span>Visualizar fatura original em PDF</span>
-                                    {activePdfUrl ? (
-                                        <a
-                                            href={activePdfUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 underline underline-offset-4 inline-flex items-center gap-1 transition-colors"
-                                        >
-                                            clicando aqui <ExternalLink className="w-3.5 h-3.5 inline" />
-                                        </a>
-                                    ) : (
-                                        <button
-                                            onClick={() => setIsUploadOpen(true)}
-                                            className="font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 underline underline-offset-4 inline-flex items-center gap-1 cursor-pointer transition-colors"
-                                        >
-                                            clicando aqui para enviar o PDF <ExternalLink className="w-3.5 h-3.5 inline" />
-                                        </button>
-                                    )}
-                                    .
-                                </p>
-                            </div>
+                    <div className="bg-card border border-border/80 rounded-2xl p-4 sm:p-5 shadow-xs flex items-center gap-4 bg-gradient-to-r from-card via-card to-emerald-500/5">
+                        {/* Distributor Dynamic Logo */}
+                        <div className="shrink-0 px-3.5 py-2.5 bg-white dark:bg-card border border-border rounded-xl shadow-2xs flex items-center justify-center">
+                            <EnergyDistributorLogo companyName={latestFullBill?.utility_company || "CEMIG"} size="md" />
                         </div>
 
-                        {/* Quick action button to view PDF */}
-                        {activePdfUrl && (
-                            <a
-                                href={activePdfUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all shrink-0 self-start md:self-auto shadow-2xs"
-                            >
-                                <FileText className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                                Abrir PDF da Fatura
-                            </a>
-                        )}
+                        {/* Short & Concise Info: Fatura Vigente, Vencimento & Link to open */}
+                        <div className="space-y-1">
+                            <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs">
+                                <span className="font-semibold uppercase tracking-wider text-muted-foreground">
+                                    Fatura Vigente:
+                                </span>
+                                <span className="font-bold text-foreground bg-muted px-2 py-0.5 rounded-md">
+                                    {latestFullBill?.reference_month_label || formatMonthLabel(latestFullBill?.reference_month || "")}
+                                </span>
+
+                                {formattedDueDate && (
+                                    <>
+                                        <span className="text-muted-foreground">•</span>
+                                        <span className="font-semibold uppercase tracking-wider text-muted-foreground">
+                                            Vencimento:
+                                        </span>
+                                        <span className="font-bold text-foreground bg-muted px-2 py-0.5 rounded-md">
+                                            {formattedDueDate}
+                                        </span>
+                                    </>
+                                )}
+                            </div>
+
+                            <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                                <span>Visualizar fatura original em PDF</span>
+                                {activePdfUrl ? (
+                                    <a
+                                        href={activePdfUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 underline underline-offset-4 inline-flex items-center gap-1 transition-colors"
+                                    >
+                                        clicando aqui <ExternalLink className="w-3.5 h-3.5 inline" />
+                                    </a>
+                                ) : (
+                                    <button
+                                        onClick={() => setIsUploadOpen(true)}
+                                        className="font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 underline underline-offset-4 inline-flex items-center gap-1 cursor-pointer transition-colors"
+                                    >
+                                        clicando aqui para enviar o PDF <ExternalLink className="w-3.5 h-3.5 inline" />
+                                    </button>
+                                )}
+                                .
+                            </p>
+                        </div>
                     </div>
 
                     {/* Top 7 KPI Metric Summary Cards */}
