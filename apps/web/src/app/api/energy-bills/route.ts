@@ -331,6 +331,43 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: mainError.message }, { status: 500 });
         }
 
+        // 2.1 Automatically update property address if extracted and property has no address or is standalone UC
+        if (billData.installationAddress || billData.installationCity) {
+            try {
+                const { data: propRow } = await supabase
+                    .from("properties")
+                    .select("id, address, city, state, zip, electronic_id")
+                    .eq("id", resolvedPropertyId)
+                    .maybeSingle();
+
+                let isStandalone = false;
+                if (propRow?.electronic_id) {
+                    try {
+                        const parsed = JSON.parse(propRow.electronic_id);
+                        if (parsed.isStandaloneUc) isStandalone = true;
+                    } catch {}
+                }
+
+                if (!propRow?.address || isStandalone) {
+                    const propUpdates: Record<string, any> = {};
+                    if (billData.installationAddress) propUpdates.address = billData.installationAddress.trim();
+                    if (billData.installationCity) propUpdates.city = billData.installationCity.trim();
+                    if (billData.installationState) propUpdates.state = billData.installationState.trim();
+                    if (billData.installationZip) propUpdates.zip = billData.installationZip.trim();
+
+                    if (Object.keys(propUpdates).length > 0) {
+                        await supabase
+                            .from("properties")
+                            .update(propUpdates)
+                            .eq("id", resolvedPropertyId);
+                        console.log(`[Energy Bills POST] Updated property ${resolvedPropertyId} address:`, propUpdates);
+                    }
+                }
+            } catch (addrErr) {
+                console.warn("[Energy Bills POST] Warning updating property address:", addrErr);
+            }
+        }
+
         // 3. Batch-seed historical baseline rows from 13-month table if provided
         if (Array.isArray(historicalConsumption) && historicalConsumption.length > 0) {
             const historicalRows = [];
@@ -477,6 +514,27 @@ export async function PUT(request: Request) {
         if (updateErr) {
             console.error("[Energy Bills PUT] Error updating bill:", updateErr);
             return NextResponse.json({ error: updateErr.message }, { status: 500 });
+        }
+
+        // Also update property address if passed in billData
+        const addrToUpdate = billData.address || billData.installationAddress;
+        if (addrToUpdate || billData.city || billData.installationCity) {
+            try {
+                const propUpdates: Record<string, any> = {};
+                if (addrToUpdate) propUpdates.address = addrToUpdate.trim();
+                if (billData.city || billData.installationCity) propUpdates.city = (billData.city || billData.installationCity).trim();
+                if (billData.state || billData.installationState) propUpdates.state = (billData.state || billData.installationState).trim();
+                if (billData.zip || billData.installationZip) propUpdates.zip = (billData.zip || billData.installationZip).trim();
+
+                if (Object.keys(propUpdates).length > 0) {
+                    await supabase
+                        .from("properties")
+                        .update(propUpdates)
+                        .eq("id", existingBill.property_id);
+                }
+            } catch (propErr) {
+                console.warn("[Energy Bills PUT] Warning updating property address:", propErr);
+            }
         }
 
         return NextResponse.json({ success: true, bill: updated });
