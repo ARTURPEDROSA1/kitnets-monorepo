@@ -121,7 +121,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
             )}
 
             <aside
-                className={`fixed left-0 top-0 z-[60] h-screen w-64 transition-transform border-r border-border bg-background sm:translate-x-0 ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
+                className={`fixed left-0 top-0 z-[60] sm:z-40 h-screen w-64 transition-transform border-r border-border bg-background sm:translate-x-0 ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
                 aria-modal={isMobileOpen ? "true" : undefined}
                 role={isMobileOpen ? "dialog" : undefined}
             >
