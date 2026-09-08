@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@kitnets/ui";
 import { SignOutButton, useAuth } from "@clerk/nextjs";
-import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Rocket, HardHat, Briefcase, Building2, User, Users, UserCheck, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart, ArrowLeftRight, FileText, AlertCircle, Plus, Minus, Gem, X } from "lucide-react";
+import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Rocket, HardHat, Briefcase, Building2, User, Users, UserCheck, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart, ArrowLeftRight, FileText, AlertCircle, Plus, Minus, Gem, X, Zap } from "lucide-react";
 import { PropertyFilters } from "./PropertyFilters";
 
 import { useTheme } from "next-themes";
@@ -301,6 +301,16 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                                 >
                                                     <Home className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                     <span className="ms-3">Imóveis</span>
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <Link
+                                                    href={lang === 'pt' ? '/dashboard/energy' : `/${lang}/dashboard/energy`}
+                                                    aria-current={pathname.includes('/dashboard/energy') ? "page" : undefined}
+                                                    className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${pathname.includes('/dashboard/energy') ? 'bg-accent font-medium' : ''}`}
+                                                >
+                                                    <Zap className="h-5 w-5 text-amber-500 transition duration-75 group-hover:text-amber-600" />
+                                                    <span className="ms-3">Energia Solar</span>
                                                 </Link>
                                             </li>
                                             <li>
