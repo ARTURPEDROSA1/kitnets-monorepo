@@ -184,7 +184,7 @@ export function FinancialAnalysisChart({ data, height = 300 }: { data: EnergyCha
                                         <span className="font-bold">{formatCurrency(total)}</span>
                                     </div>
                                     <div className="flex items-center justify-between gap-4 text-emerald-600 dark:text-emerald-400">
-                                        <span>Economia Estimada:</span>
+                                        <span>Economia Solar Compensada:</span>
                                         <span className="font-bold">{formatCurrency(savings)}</span>
                                     </div>
                                     {availability > 0 && (
@@ -199,7 +199,7 @@ export function FinancialAnalysisChart({ data, height = 300 }: { data: EnergyCha
                     />
                     <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
                     <Bar dataKey="total_amount" name="Valor Pago (R$)" fill="#64748b" radius={[4, 4, 0, 0]} maxBarSize={32} />
-                    <Bar dataKey="estimated_savings" name="Economia Solar Estimada (R$)" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                    <Bar dataKey="estimated_savings" name="Economia Solar Compensada (R$)" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={32} />
                 </BarChart>
             </ResponsiveContainer>
         </div>
