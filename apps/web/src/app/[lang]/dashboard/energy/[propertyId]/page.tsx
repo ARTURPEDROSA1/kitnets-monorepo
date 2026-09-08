@@ -171,6 +171,16 @@ export default function EnergyDashboardPage() {
         return currentPdfUrl || latestFullBill?.pdf_url || null;
     }, [currentPdfUrl, latestFullBill]);
 
+    // Formatted due date (Vencimento ex: 17/09/2026)
+    const formattedDueDate = useMemo(() => {
+        if (!latestFullBill?.due_date) return null;
+        const match = latestFullBill.due_date.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (match) {
+            return `${match[3]}/${match[2]}/${match[1]}`;
+        }
+        return latestFullBill.due_date;
+    }, [latestFullBill]);
+
     // Summary calculations
     const summary = useMemo(() => {
         if (!latestFullBill) return null;
@@ -317,46 +327,56 @@ export default function EnergyDashboardPage() {
             {bills.length > 0 && (
                 <>
                     {/* Energy Distributor & Current PDF Bill Banner */}
-                    <div className="bg-card border border-border/80 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-card via-card to-amber-500/5">
-                        <div className="flex items-center gap-4">
+                    <div className="bg-card border border-border/80 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-card via-card to-emerald-500/5">
+                        <div className="flex flex-wrap sm:flex-nowrap items-center gap-4">
                             {/* Distributor Dynamic Logo */}
-                            <div className="shrink-0 p-2.5 bg-background border border-border rounded-xl shadow-2xs">
+                            <div className="shrink-0 px-3.5 py-2.5 bg-white dark:bg-card border border-border rounded-xl shadow-2xs flex items-center justify-center">
                                 <EnergyDistributorLogo companyName={latestFullBill?.utility_company || "CEMIG"} size="md" />
                             </div>
+
+                            {/* Short & Concise Info: Fatura Vigente, Vencimento & Link to open */}
                             <div className="space-y-1">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                                        Distribuidora Concessionária
+                                <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs">
+                                    <span className="font-semibold uppercase tracking-wider text-muted-foreground">
+                                        Fatura Vigente:
                                     </span>
-                                    <span className="text-xs font-bold text-foreground px-2 py-0.5 rounded-md bg-muted">
-                                        {latestFullBill?.utility_company || "CEMIG"}
+                                    <span className="font-bold text-foreground bg-muted px-2 py-0.5 rounded-md">
+                                        {latestFullBill?.reference_month_label || formatMonthLabel(latestFullBill?.reference_month || "")}
                                     </span>
-                                    {latestFullBill?.reference_month_label && (
-                                        <span className="text-xs text-muted-foreground">
-                                            • Fatura Vigente: <strong className="text-foreground">{latestFullBill.reference_month_label}</strong>
-                                        </span>
+
+                                    {formattedDueDate && (
+                                        <>
+                                            <span className="text-muted-foreground">•</span>
+                                            <span className="font-semibold uppercase tracking-wider text-muted-foreground">
+                                                Vencimento:
+                                            </span>
+                                            <span className="font-bold text-foreground bg-muted px-2 py-0.5 rounded-md">
+                                                {formattedDueDate}
+                                            </span>
+                                        </>
                                     )}
                                 </div>
-                                <p className="text-xs sm:text-sm text-muted-foreground">
-                                    Fatura atual da distribuidora ({latestFullBill?.utility_company || "CEMIG"}): você pode abrir o PDF original{" "}
+
+                                <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                                    <span>Visualizar fatura original em PDF</span>
                                     {activePdfUrl ? (
                                         <a
                                             href={activePdfUrl}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="font-bold text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 underline underline-offset-4 inline-flex items-center gap-1 transition-colors"
+                                            className="font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 underline underline-offset-4 inline-flex items-center gap-1 transition-colors"
                                         >
                                             clicando aqui <ExternalLink className="w-3.5 h-3.5 inline" />
                                         </a>
                                     ) : (
                                         <button
                                             onClick={() => setIsUploadOpen(true)}
-                                            className="font-bold text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 underline underline-offset-4 inline-flex items-center gap-1 cursor-pointer transition-colors"
+                                            className="font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 underline underline-offset-4 inline-flex items-center gap-1 cursor-pointer transition-colors"
                                         >
                                             clicando aqui para enviar o PDF <ExternalLink className="w-3.5 h-3.5 inline" />
                                         </button>
                                     )}
-                                    . Mantemos arquivado apenas o PDF da fatura vigente, substituído automaticamente a cada novo ciclo.
+                                    .
                                 </p>
                             </div>
                         </div>
@@ -367,10 +387,10 @@ export default function EnergyDashboardPage() {
                                 href={activePdfUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 border border-amber-500/30 transition-all shrink-0 self-start md:self-auto shadow-2xs"
+                                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all shrink-0 self-start md:self-auto shadow-2xs"
                             >
-                                <FileText className="w-4 h-4 text-amber-600" />
-                                Abrir PDF da Fatura Atual
+                                <FileText className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                                Abrir PDF da Fatura
                             </a>
                         )}
                     </div>
