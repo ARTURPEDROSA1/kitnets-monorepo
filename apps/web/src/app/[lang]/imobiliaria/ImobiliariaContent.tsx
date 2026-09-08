@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@kitnets/ui';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -28,6 +28,7 @@ import {
     Shield,
     Edit3,
     Sparkles,
+    FileText,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -180,6 +181,14 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
     const [logoFile, setLogoFile] = useState<File | null>(null);
     const [logoUploading, setLogoUploading] = useState(false);
     const [logoError, setLogoError] = useState<string | null>(null);
+
+    // AI contract extraction & modal state
+    const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+    const [isExtracting, setIsExtracting] = useState(false);
+    const [extractError, setExtractError] = useState<string | null>(null);
+    const [isDragging, setIsDragging] = useState(false);
+    const [isAiExtracted, setIsAiExtracted] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // ── Fetch agencies on mount ──────────────────────────────────────
 
@@ -402,7 +411,175 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
         }
     }, [form, validate, pageState, editingAgency, fetchAgencies, logoFile, uploadLogo]);
 
+    // ── AI Contract Extraction handlers ─────────────────────────────
+
+    const cropLogoFromImage = useCallback((imageFile: File, box: [number, number, number, number]): Promise<File | null> => {
+        return new Promise((resolve) => {
+            const img = new Image();
+            const url = URL.createObjectURL(imageFile);
+            img.onload = () => {
+                try {
+                    const [ymin, xmin, ymax, xmax] = box;
+                    const naturalW = img.naturalWidth || img.width;
+                    const naturalH = img.naturalHeight || img.height;
+
+                    // box is normalized 0-1000
+                    const sx = Math.max(0, (xmin / 1000) * naturalW);
+                    const sy = Math.max(0, (ymin / 1000) * naturalH);
+                    const sWidth = Math.min(naturalW - sx, ((xmax - xmin) / 1000) * naturalW);
+                    const sHeight = Math.min(naturalH - sy, ((ymax - ymin) / 1000) * naturalH);
+
+                    if (sWidth > 20 && sHeight > 20) {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = sWidth;
+                        canvas.height = sHeight;
+                        const ctx = canvas.getContext('2d');
+                        if (ctx) {
+                            ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, sWidth, sHeight);
+                            canvas.toBlob((blob) => {
+                                URL.revokeObjectURL(url);
+                                if (blob) {
+                                    const croppedFile = new File([blob], 'logo-contrato.png', { type: 'image/png' });
+                                    resolve(croppedFile);
+                                } else {
+                                    resolve(null);
+                                }
+                            }, 'image/png');
+                            return;
+                        }
+                    }
+                    URL.revokeObjectURL(url);
+                    resolve(null);
+                } catch {
+                    URL.revokeObjectURL(url);
+                    resolve(null);
+                }
+            };
+            img.onerror = () => {
+                URL.revokeObjectURL(url);
+                resolve(null);
+            };
+            img.src = url;
+        });
+    }, []);
+
+    const handleContractUpload = useCallback(async (file: File) => {
+        const allowed = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+        if (!allowed.includes(file.type)) {
+            setExtractError('Formato de arquivo não suportado. Use PDF, JPG, PNG ou WebP.');
+            return;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+            setExtractError('Arquivo muito grande. O limite máximo é 10MB.');
+            return;
+        }
+
+        setIsExtracting(true);
+        setExtractError(null);
+
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const res = await fetch('/api/agencies/extract', {
+                method: 'POST',
+                body: formData,
+            });
+
+            const json = await res.json();
+
+            if (!res.ok) {
+                setExtractError(json.error || 'Não foi possível extrair os dados. Tente outro arquivo ou digite manualmente.');
+                setIsExtracting(false);
+                return;
+            }
+
+            const data = json.data;
+
+            // Crop logo if image and bounding box present
+            let croppedLogoFile: File | null = null;
+            let croppedLogoUrl: string | null = null;
+
+            if (data.logo_box_2d && Array.isArray(data.logo_box_2d) && data.logo_box_2d.length === 4 && file.type.startsWith('image/')) {
+                try {
+                    croppedLogoFile = await cropLogoFromImage(file, data.logo_box_2d as [number, number, number, number]);
+                    if (croppedLogoFile) {
+                        croppedLogoUrl = URL.createObjectURL(croppedLogoFile);
+                    }
+                } catch (err) {
+                    console.warn('[Imobiliária] Failed to crop logo:', err);
+                }
+            }
+
+            // Fill form
+            const rawCnpj = data.cnpj ? parseCNPJ(String(data.cnpj)) : '';
+            const formattedCnpj = rawCnpj.length === 14 ? formatCNPJ(rawCnpj) : (data.cnpj || '');
+
+            const rawCep = data.postal_code ? parseCEP(String(data.postal_code)) : '';
+            const formattedCep = rawCep.length === 8 ? formatCEP(rawCep) : (data.postal_code || '');
+
+            const formattedPhoneVal = data.main_phone ? formatPhone(String(data.main_phone)) : '';
+            const formattedAddPhoneVal = data.additional_phone ? formatPhone(String(data.additional_phone)) : '';
+
+            setForm({
+                name: data.name || '',
+                trade_name: data.trade_name || '',
+                cnpj: formattedCnpj,
+                creci_number: data.creci_number ? String(data.creci_number) : '',
+                creci_state: (data.creci_state || '').toUpperCase(),
+                creci_type: data.creci_type ? String(data.creci_type).toUpperCase() : '',
+                owner_name: data.owner_name || '',
+                main_phone: formattedPhoneVal,
+                additional_phone: formattedAddPhoneVal,
+                main_phone_whatsapp: true,
+                additional_phone_whatsapp: false,
+                email: data.email || '',
+                website: data.website ? String(data.website).replace(/^https?:\/\//, '') : '',
+                postal_code: formattedCep,
+                street: data.street || '',
+                street_number: data.street_number ? String(data.street_number) : '',
+                address_complement: data.address_complement || '',
+                neighborhood: data.neighborhood || '',
+                city: data.city || '',
+                state: (data.state || '').toUpperCase(),
+                country: 'BR',
+            });
+
+            if (croppedLogoFile && croppedLogoUrl) {
+                setLogoFile(croppedLogoFile);
+                setLogoPreview(croppedLogoUrl);
+                setLogoError(null);
+            } else {
+                setLogoFile(null);
+                setLogoPreview(null);
+                setLogoError(null);
+            }
+
+            setErrors({});
+            setSubmitError(null);
+            setSubmitSuccess(false);
+            setCepFilled(!!data.street && !!data.city);
+            setEditingAgency(null);
+            setIsAiExtracted(true);
+
+            setIsExtracting(false);
+            setIsUploadModalOpen(false);
+            setPageState('form');
+        } catch (err) {
+            console.error('[Imobiliária] Extraction error:', err);
+            setExtractError('Erro de conexão ao processar documento. Verifique sua internet ou digite manualmente.');
+            setIsExtracting(false);
+        }
+    }, [cropLogoFromImage]);
+
     // ── Navigation handlers ──────────────────────────────────────────
+
+    const openAddModal = useCallback(() => {
+        setExtractError(null);
+        setIsExtracting(false);
+        setIsDragging(false);
+        setIsUploadModalOpen(true);
+    }, []);
 
     const startAdding = useCallback(() => {
         setForm(getEmptyFormData());
@@ -414,6 +591,7 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
         setLogoPreview(null);
         setLogoFile(null);
         setLogoError(null);
+        setIsAiExtracted(false);
         setPageState('form');
     }, []);
 
@@ -427,6 +605,7 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
         setLogoPreview(agency.logo_url || null);
         setLogoFile(null);
         setLogoError(null);
+        setIsAiExtracted(false);
         setPageState('editing');
     }, []);
 
@@ -470,6 +649,7 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
         setSubmitError(null);
         setSubmitSuccess(false);
         setEditingAgency(null);
+        setIsAiExtracted(false);
         setPageState('list');
     }, []);
 
@@ -586,7 +766,7 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                     {/* Header Action Buttons */}
                     <div className="flex flex-wrap items-center gap-2.5 self-start md:self-auto">
                         <Button
-                            onClick={startAdding}
+                            onClick={openAddModal}
                             className="bg-amber-600 hover:bg-amber-700 text-white gap-2 text-sm font-medium shadow-sm"
                         >
                             <Plus className="w-4 h-4" />
@@ -887,7 +1067,7 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                         </div>
                         <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
                             <Button
-                                onClick={startAdding}
+                                onClick={openAddModal}
                                 className="bg-amber-600 hover:bg-amber-700 text-white gap-2 font-medium"
                             >
                                 <Plus className="w-4 h-4" />
@@ -1016,6 +1196,152 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                         </div>
                     </div>
                 )}
+
+                {/* AI Contract Upload Modal */}
+                {isUploadModalOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        {/* Backdrop */}
+                        <div
+                            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                            onClick={() => !isExtracting && setIsUploadModalOpen(false)}
+                        />
+
+                        {/* Modal Window */}
+                        <div className="relative bg-card border border-border rounded-2xl shadow-2xl max-w-lg w-full p-6 sm:p-7 overflow-hidden">
+                            {/* Close Button */}
+                            {!isExtracting && (
+                                <button
+                                    type="button"
+                                    onClick={() => setIsUploadModalOpen(false)}
+                                    className="absolute top-4 right-4 p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
+                                    aria-label="Fechar modal"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            )}
+
+                            {/* Header */}
+                            <div className="flex items-start gap-3.5 mb-5">
+                                <div className="p-2.5 rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-600 shrink-0">
+                                    <Sparkles className="w-6 h-6" />
+                                </div>
+                                <div className="space-y-1 pr-6">
+                                    <h2 className="text-xl font-bold text-foreground tracking-tight">
+                                        Adicionar Imobiliária
+                                    </h2>
+                                    <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                                        Envie um <strong className="text-foreground">Contrato de Locação</strong> ou <strong className="text-foreground">Prestação de Serviços</strong> para preenchimento automático via IA, ou digite manualmente.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Error Banner */}
+                            {extractError && (
+                                <div className="mb-4 flex items-start gap-2.5 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 p-3.5 rounded-xl text-xs sm:text-sm">
+                                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                                    <div className="flex-1 leading-snug">{extractError}</div>
+                                </div>
+                            )}
+
+                            {/* Upload Area */}
+                            {isExtracting ? (
+                                <div className="border-2 border-amber-500/40 bg-amber-500/5 dark:bg-amber-950/20 rounded-2xl p-8 flex flex-col items-center justify-center text-center space-y-4">
+                                    <div className="relative">
+                                        <div className="w-14 h-14 rounded-full border-4 border-amber-500/20 border-t-amber-600 animate-spin" />
+                                        <Sparkles className="w-6 h-6 text-amber-600 absolute inset-0 m-auto" />
+                                    </div>
+                                    <div className="space-y-1 max-w-sm">
+                                        <p className="font-semibold text-foreground text-sm">
+                                            Analisando contrato com IA...
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            Localizando administradora, CNPJ, CRECI, endereço e responsável legal
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div
+                                    onDragOver={(e) => {
+                                        e.preventDefault();
+                                        setIsDragging(true);
+                                    }}
+                                    onDragLeave={(e) => {
+                                        e.preventDefault();
+                                        setIsDragging(false);
+                                    }}
+                                    onDrop={(e) => {
+                                        e.preventDefault();
+                                        setIsDragging(false);
+                                        const file = e.dataTransfer.files?.[0];
+                                        if (file) handleContractUpload(file);
+                                    }}
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className={cn(
+                                        "group border-2 border-dashed rounded-2xl p-6 sm:p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200",
+                                        isDragging
+                                            ? "border-amber-500 bg-amber-500/10 scale-[1.01]"
+                                            : "border-border hover:border-amber-500/60 hover:bg-muted/30"
+                                    )}
+                                >
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        accept=".pdf,image/jpeg,image/png,image/webp"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) handleContractUpload(file);
+                                            e.target.value = '';
+                                        }}
+                                        className="hidden"
+                                    />
+
+                                    <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/40 text-amber-600 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+                                        <Upload className="w-6 h-6" />
+                                    </div>
+
+                                    <p className="text-sm font-semibold text-foreground mb-1">
+                                        Arraste o documento aqui ou <span className="text-amber-600 underline underline-offset-2">clique para selecionar</span>
+                                    </p>
+                                    <p className="text-xs text-muted-foreground mb-3">
+                                        PDF, PNG, JPG ou WebP (máx. 10MB)
+                                    </p>
+
+                                    {/* Hints badges */}
+                                    <div className="flex flex-wrap items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-muted/80 border border-border">
+                                            <FileText className="w-3 h-3 text-amber-600" />
+                                            Contrato de Locação
+                                        </span>
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-muted/80 border border-border">
+                                            <FileText className="w-3 h-3 text-amber-600" />
+                                            Prestação de Serviços
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Manual Typing Option */}
+                            <div className="mt-6 pt-5 border-t border-border/80 flex flex-col sm:flex-row items-center justify-between gap-3">
+                                <span className="text-xs text-muted-foreground text-center sm:text-left">
+                                    Prefere não enviar um documento agora?
+                                </span>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => {
+                                        setIsUploadModalOpen(false);
+                                        startAdding();
+                                    }}
+                                    disabled={isExtracting}
+                                    className="w-full sm:w-auto text-xs font-medium gap-2 hover:border-amber-500/60 hover:text-amber-600"
+                                >
+                                    <Edit3 className="w-3.5 h-3.5" />
+                                    Digitar manualmente
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         );
     }
@@ -1059,8 +1385,25 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                 </div>
             )}
 
+            {/* AI Extraction Success Banner */}
+            {isAiExtracted && (
+                <div className="mb-6 flex items-start gap-3.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 p-4 rounded-2xl text-sm shadow-xs">
+                    <div className="p-2 rounded-xl bg-amber-100 dark:bg-amber-900/50 text-amber-600 shrink-0">
+                        <Sparkles className="w-5 h-5" />
+                    </div>
+                    <div className="space-y-1">
+                        <p className="font-semibold text-foreground text-sm">
+                            Dados preenchidos automaticamente via IA!
+                        </p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                            As informações foram extraídas do contrato enviado. Por favor, revise todos os campos abaixo e complete quaisquer dados adicionais antes de salvar o cadastro.
+                        </p>
+                    </div>
+                </div>
+            )}
+
             <form onSubmit={handleSubmit} noValidate>
-                {/* ── Section 1: Informações da imobiliária ──────────── */}
+                {/* ── Section 1: Informações da imobiliária & Responsável ──────────── */}
                 <section className="bg-card border border-border rounded-2xl p-6 sm:p-8 mb-6 shadow-sm">
                     <div className="flex items-center gap-3 mb-6">
                         <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -1071,7 +1414,7 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                                 Informações da imobiliária
                             </h2>
                             <p className="text-xs text-muted-foreground">
-                                Razão social, nome fantasia e registros profissionais.
+                                Razão social, nome fantasia, registros profissionais e responsável legal.
                             </p>
                         </div>
                     </div>
@@ -1218,36 +1561,28 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                                 </select>
                             </div>
                         </div>
-                    </div>
-                </section>
 
-                {/* ── Section 2: Responsável ─────────────────────────── */}
-                <section className="bg-card border border-border rounded-2xl p-6 sm:p-8 mb-6 shadow-sm">
-                    <div className="flex items-center gap-3 mb-6">
-                        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                            <User className="w-5 h-5 text-primary" />
-                        </div>
-                        <div>
-                            <h2 className="text-lg font-semibold text-foreground">Responsável</h2>
-                            <p className="text-xs text-muted-foreground">
-                                Nome do proprietário ou representante legal.
+                        {/* Responsável Legal */}
+                        <div id="field-owner_name">
+                            <Label htmlFor="agency-owner" className="flex items-center gap-1.5">
+                                <User className="w-3.5 h-3.5 text-muted-foreground" />
+                                Responsável legal / Representante
+                            </Label>
+                            <Input
+                                id="agency-owner"
+                                value={form.owner_name}
+                                onChange={(e) => updateField('owner_name', e.target.value)}
+                                placeholder="Nome completo do responsável ou representante legal"
+                                maxLength={200}
+                            />
+                            <p className="text-[11px] text-muted-foreground mt-1">
+                                Sócio administrador, corretor responsável ou representante citado no contrato.
                             </p>
                         </div>
                     </div>
-
-                    <div id="field-owner_name">
-                        <Label htmlFor="agency-owner">Nome do responsável</Label>
-                        <Input
-                            id="agency-owner"
-                            value={form.owner_name}
-                            onChange={(e) => updateField('owner_name', e.target.value)}
-                            placeholder="Nome completo do responsável"
-                            maxLength={200}
-                        />
-                    </div>
                 </section>
 
-                {/* ── Section 3: Contato ────────────────────────────── */}
+                {/* ── Section 2: Contato ────────────────────────────── */}
                 <section className="bg-card border border-border rounded-2xl p-6 sm:p-8 mb-6 shadow-sm">
                     <div className="flex items-center gap-3 mb-6">
                         <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -1354,7 +1689,7 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                     </div>
                 </section>
 
-                {/* ── Section 4: Endereço ───────────────────────────── */}
+                {/* ── Section 3: Endereço ───────────────────────────── */}
                 <section className="bg-card border border-border rounded-2xl p-6 sm:p-8 mb-6 shadow-sm">
                     <div className="flex items-center gap-3 mb-6">
                         <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
