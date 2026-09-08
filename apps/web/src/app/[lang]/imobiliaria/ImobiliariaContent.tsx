@@ -377,6 +377,9 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
         try {
             const formData = new FormData();
             formData.append('file', serviceAgreementFile);
+            if (form.management_fee) formData.append('management_fee', form.management_fee);
+            if (form.agreement_start_date) formData.append('agreement_start_date', form.agreement_start_date);
+            if (form.agreement_end_date) formData.append('agreement_end_date', form.agreement_end_date);
 
             const res = await fetch(`/api/agencies/${agencyId}/agreement`, {
                 method: 'POST',
@@ -386,13 +389,15 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
             if (!res.ok) {
                 const data = await res.json();
                 console.warn('[Imobiliária] Service agreement upload warning:', data.error);
+                setServiceAgreementError(data.error || 'Erro ao enviar o contrato.');
             }
         } catch (err) {
             console.warn('[Imobiliária] Service agreement upload error:', err);
+            setServiceAgreementError('Erro de conexão ao salvar contrato.');
         } finally {
             setServiceAgreementUploading(false);
         }
-    }, [serviceAgreementFile]);
+    }, [serviceAgreementFile, form.management_fee, form.agreement_start_date, form.agreement_end_date]);
 
     // ── Submit handler ───────────────────────────────────────────────
 
@@ -992,22 +997,8 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                                                     </h3>
 
                                                     {/* Quick Action Icons */}
-                                                    <div className="flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
-                                                        {canEdit && (
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.preventDefault();
-                                                                    e.stopPropagation();
-                                                                    startEditing(agency);
-                                                                }}
-                                                                className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                                                                title="Editar imobiliária"
-                                                                aria-label="Editar imobiliária"
-                                                            >
-                                                                <Edit3 className="w-3.5 h-3.5" />
-                                                            </button>
-                                                        )}
-                                                        {canDelete && (
+                                                    {canDelete && (
+                                                        <div className="flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
                                                             <button
                                                                 onClick={(e) => {
                                                                     e.preventDefault();
@@ -1020,8 +1011,8 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                                                             >
                                                                 <Trash2 className="w-3.5 h-3.5" />
                                                             </button>
-                                                        )}
-                                                    </div>
+                                                        </div>
+                                                    )}
                                                 </div>
 
                                                 {/* Address */}
@@ -1162,7 +1153,7 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
 
                                         {/* CTA Action */}
                                         <Button
-                                            onClick={() => setSelectedAgencyForDetail(agency)}
+                                            onClick={() => startEditing(agency)}
                                             className={`w-full justify-between group-hover:bg-amber-600 group-hover:text-white transition-all ${
                                                 agency.status === 'VERIFIED'
                                                     ? 'bg-emerald-600 hover:bg-emerald-700 text-white'

@@ -13,6 +13,7 @@ import {
     parseCEP,
     validateCEP,
 } from '@/lib/validators';
+import { unpackAgencyMetadata, packAgencyMetadata } from '@/lib/agency-metadata';
 
 function getServiceSupabase() {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -68,12 +69,14 @@ export async function GET() {
             return NextResponse.json({ agencies: [] });
         }
 
-        // Merge role into each agency
+        // Merge role into each agency and unpack metadata if stored in description
         const roleMap = new Map(memberships.map(m => [m.agency_id, m.role]));
-        const agenciesWithRole = agencies.map(a => ({
-            ...a,
-            role: roleMap.get(a.id) || 'VIEWER',
-        }));
+        const agenciesWithRole = agencies.map(a =>
+            unpackAgencyMetadata({
+                ...a,
+                role: roleMap.get(a.id) || 'VIEWER',
+            })
+        );
 
         return NextResponse.json({ agencies: agenciesWithRole });
     } catch (err) {
@@ -243,13 +246,20 @@ export async function POST(request: Request) {
         agency = res.data;
         insertError = res.error;
 
-        // Fallback: if columns like service_agreement_* don't exist yet, insert without them
+        // Fallback: if columns like service_agreement_* don't exist yet, pack into description
         if (insertError && (insertError.code === '42703' || insertError.message?.includes('column'))) {
-            console.warn('[Agencies POST] Column not found, retrying with core fields:', insertError.message);
+            console.warn('[Agencies POST] Column not found, retrying with packed metadata in description:', insertError.message);
             const { service_agreement_url, service_agreement_filename, management_fee, agreement_start_date, agreement_end_date, ...coreData } = agencyData;
+            const packedDescription = packAgencyMetadata(coreData.description, {
+                service_agreement_url,
+                service_agreement_filename,
+                management_fee,
+                agreement_start_date,
+                agreement_end_date,
+            });
             const retryRes = await supabase
                 .from('agencies')
-                .insert(coreData)
+                .insert({ ...coreData, description: packedDescription })
                 .select()
                 .single();
             agency = retryRes.data;
@@ -296,7 +306,7 @@ export async function POST(request: Request) {
         console.log('[Agencies POST] Created agency:', agency.id, 'owner:', profile.id);
         return NextResponse.json({
             success: true,
-            agency: { ...agency, role: 'OWNER' },
+            agency: unpackAgencyMetadata({ ...agency, role: 'OWNER' }),
         });
     } catch (err) {
         console.error('[Agencies POST] Unexpected error:', err);
