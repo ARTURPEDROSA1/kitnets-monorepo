@@ -175,9 +175,10 @@ export function FinancialAnalysisChart({ data, height = 300 }: { data: EnergyCha
                             const total = Number(payload.find((p) => p.dataKey === "total_amount")?.value || 0);
                             const savings = Number(payload.find((p) => p.dataKey === "estimated_savings")?.value || 0);
                             const availability = Number(payload.find((p) => p.dataKey === "availability_cost_amount")?.value || 0);
+                            const estimatedWithoutSolar = total + savings;
 
                             return (
-                                <div className="bg-card border border-border p-3.5 rounded-xl shadow-lg text-xs space-y-1.5">
+                                <div className="bg-card border border-border p-3.5 rounded-xl shadow-lg text-xs space-y-2 min-w-[260px]">
                                     <p className="font-semibold text-foreground text-sm border-b border-border pb-1">{label}</p>
                                     <div className="flex items-center justify-between gap-4 text-foreground">
                                         <span>Valor Pago:</span>
@@ -187,6 +188,19 @@ export function FinancialAnalysisChart({ data, height = 300 }: { data: EnergyCha
                                         <span>Economia Solar Compensada:</span>
                                         <span className="font-bold">{formatCurrency(savings)}</span>
                                     </div>
+
+                                    {/* Fatura estimada sem compensação de créditos */}
+                                    {savings > 0 && (
+                                        <div className="pt-2 mt-1 border-t border-border space-y-1 bg-muted/40 dark:bg-muted/10 p-2.5 rounded-lg">
+                                            <p className="text-[11px] font-semibold text-foreground">
+                                                Fatura estimada sem compensação de créditos:
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                                Valor pago + energia compensada = <strong className="text-foreground font-bold">{formatCurrency(estimatedWithoutSolar)}</strong>
+                                            </p>
+                                        </div>
+                                    )}
+
                                     {availability > 0 && (
                                         <div className="flex items-center justify-between gap-4 text-amber-600 dark:text-amber-400 pt-1 border-t border-border">
                                             <span>Custo de Disponibilidade:</span>
