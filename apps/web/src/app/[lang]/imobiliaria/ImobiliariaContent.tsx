@@ -200,6 +200,8 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
     const [serviceAgreementFile, setServiceAgreementFile] = useState<File | null>(null);
     const [serviceAgreementUploading, setServiceAgreementUploading] = useState(false);
     const [serviceAgreementError, setServiceAgreementError] = useState<string | null>(null);
+    const [showDeleteAgreementModal, setShowDeleteAgreementModal] = useState(false);
+    const [deleteAgreementLoading, setDeleteAgreementLoading] = useState(false);
     const serviceAgreementInputRef = useRef<HTMLInputElement>(null);
 
     // AI contract extraction & modal state
@@ -725,21 +727,27 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
         setServiceAgreementError(null);
     }, []);
 
-    const removeAgreementFile = useCallback(async () => {
-        if (editingAgency?.id && editingAgency.service_agreement_url) {
-            try {
-                await fetch(`/api/agencies/${editingAgency.id}/agreement`, { method: 'DELETE' });
-            } catch {
-                // Ignore
+    const confirmRemoveAgreement = useCallback(async () => {
+        setDeleteAgreementLoading(true);
+        try {
+            if (editingAgency?.id && editingAgency.service_agreement_url) {
+                try {
+                    await fetch(`/api/agencies/${editingAgency.id}/agreement`, { method: 'DELETE' });
+                } catch {
+                    // Ignore
+                }
             }
+            setServiceAgreementFile(null);
+            setForm(prev => ({
+                ...prev,
+                service_agreement_url: '',
+                service_agreement_filename: '',
+            }));
+            setServiceAgreementError(null);
+            setShowDeleteAgreementModal(false);
+        } finally {
+            setDeleteAgreementLoading(false);
         }
-        setServiceAgreementFile(null);
-        setForm(prev => ({
-            ...prev,
-            service_agreement_url: '',
-            service_agreement_filename: '',
-        }));
-        setServiceAgreementError(null);
     }, [editingAgency]);
 
     // ── Logo upload handlers ─────────────────────────────────────────
@@ -2060,7 +2068,7 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                                             />
                                             <button
                                                 type="button"
-                                                onClick={removeAgreementFile}
+                                                onClick={() => setShowDeleteAgreementModal(true)}
                                                 className="p-2 rounded-lg border border-input bg-background text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/40 hover:border-red-200 dark:hover:border-red-900/50 transition-colors cursor-pointer flex items-center justify-center shadow-2xs"
                                                 title="Remover documento"
                                                 aria-label="Remover documento"
@@ -2242,6 +2250,74 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                     </Button>
                 </div>
             </form>
+
+            {/* ── Agreement Deletion Confirmation Modal ─────────────── */}
+            {showDeleteAgreementModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    {/* Backdrop */}
+                    <div
+                        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                        onClick={() => !deleteAgreementLoading && setShowDeleteAgreementModal(false)}
+                    />
+
+                    {/* Modal Dialog */}
+                    <div className="relative bg-card border border-border rounded-2xl shadow-xl max-w-md w-full p-6 sm:p-8">
+                        <button
+                            type="button"
+                            onClick={() => !deleteAgreementLoading && setShowDeleteAgreementModal(false)}
+                            disabled={deleteAgreementLoading}
+                            className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                            aria-label="Fechar"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+
+                        <div className="text-center mb-6">
+                            <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-950/50 flex items-center justify-center mx-auto mb-4">
+                                <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
+                            </div>
+                            <h2 className="text-xl font-bold text-foreground mb-2">
+                                Remover contrato anexado?
+                            </h2>
+                            <p className="text-muted-foreground text-sm">
+                                Tem certeza de que deseja remover o documento{' '}
+                                <span className="font-semibold text-foreground">
+                                    {serviceAgreementFile?.name || form.service_agreement_filename || 'Contrato de Prestação de Serviços'}
+                                </span>
+                                ? {editingAgency?.id && form.service_agreement_url ? 'O arquivo armazenado no sistema será excluído.' : 'O documento selecionado será desvinculado.'}
+                            </p>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="flex-1 cursor-pointer"
+                                onClick={() => setShowDeleteAgreementModal(false)}
+                                disabled={deleteAgreementLoading}
+                            >
+                                Cancelar
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="destructive"
+                                className="flex-1 cursor-pointer"
+                                onClick={confirmRemoveAgreement}
+                                disabled={deleteAgreementLoading}
+                            >
+                                {deleteAgreementLoading ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                        Removendo...
+                                    </>
+                                ) : (
+                                    'Sim, remover contrato'
+                                )}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
