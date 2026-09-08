@@ -183,7 +183,7 @@ CREATE TABLE public.agencies (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL,
     trade_name TEXT,
-    cnpj TEXT UNIQUE,                                    -- Digits only
+    cnpj TEXT,                                           -- Digits only
     creci_number TEXT,
     creci_state TEXT,
     creci_type TEXT CHECK (creci_type IN ('PJ', 'PF')),
@@ -215,7 +215,7 @@ CREATE TABLE public.agencies (
 ```
 
 **Indexes:**
-- `idx_agencies_cnpj` on `cnpj` (unique constraint)
+- `idx_agencies_cnpj` on `cnpj` (lookup index, non-unique)
 - `idx_agencies_deleted_at` partial index on `deleted_at WHERE deleted_at IS NULL`
 
 **Triggers:**
@@ -318,7 +318,7 @@ All agency API routes use the **service role key** to bypass RLS, with authentic
 **Logic:**
 1. Validate required fields (name, main_phone, address fields)
 2. Validate optional fields (CNPJ check-digit, email syntax, phone format)
-3. Check CNPJ uniqueness (excluding soft-deleted agencies)
+3. Check CNPJ uniqueness per user (allows different accounts to register the same agency)
 4. Normalize fields (phone → E.164, email → lowercase, website → https://)
 5. Insert into `agencies` with `status: 'ACTIVE'`
 6. Insert into `agency_members` with `role: 'OWNER'`
@@ -618,6 +618,7 @@ Two SQL files must be run **in order** in the Supabase SQL Editor:
 |-------|------|---------|
 | 1 | `packages/core/database/agency_setup.sql` | Create `agencies` and `agency_members` tables, RLS policies, indexes, triggers |
 | 2 | `packages/core/database/agency_soft_delete.sql` | Add `deleted_at` and `deleted_by` columns to `agencies`, partial index |
+| 3 | `packages/core/database/agency_allow_duplicate_cnpj.sql` | Drop global unique constraint on `cnpj`, allowing independent agency registrations by multiple accounts |
 
 **RLS Policies:**
 - `agencies` — Members can SELECT their own agencies via `agency_members` join
@@ -678,3 +679,4 @@ Two SQL files must be run **in order** in the Supabase SQL Editor:
 |------|---------|---------|
 | 2026-09-02 | 1.0 | Initial implementation: multi-agency list with accordion, CRUD APIs, soft delete, CNPJ/CEP validation, WhatsApp wa.me link on collapsed row |
 | 2026-09-08 | 1.1 | Redesigned list interface to match Energy Dashboard (`/dashboard/energy`) square cards grid with status-colored borders, badges, WhatsApp link, summary cards, and detail view modal |
+| 2026-09-08 | 1.2 | Replaced global CNPJ uniqueness check with per-account duplicate prevention, allowing multiple independent accounts to register the same management company |

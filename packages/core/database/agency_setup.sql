@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS public.agencies (
     -- Business identity
     name TEXT NOT NULL,
     trade_name TEXT,
-    cnpj TEXT UNIQUE,  -- Stored as digits only: 12345678000190
+    cnpj TEXT,  -- Stored as digits only: 12345678000190
     creci_number TEXT,
     creci_state TEXT,   -- UF: SP, PR, RJ, etc.
     creci_type TEXT CHECK (creci_type IN ('PJ', 'PF')),
