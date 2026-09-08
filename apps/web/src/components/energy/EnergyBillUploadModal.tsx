@@ -345,8 +345,35 @@ export function EnergyBillUploadModal({
                                         <Input
                                             value={extracted.installationClass || ""}
                                             onChange={(e) => updateField("installationClass", e.target.value)}
-                                            placeholder="Residencial Trifásico"
+                                            placeholder="Residencial Monofásico"
                                         />
+                                    </div>
+                                    <div className="space-y-1 pt-1 border-t border-border/50">
+                                        <Label className="text-xs font-semibold">Endereço da Instalação</Label>
+                                        <Input
+                                            value={extracted.installationAddress || ""}
+                                            onChange={(e) => updateField("installationAddress", e.target.value)}
+                                            placeholder="Rua, número e bairro"
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div className="space-y-1">
+                                            <Label className="text-xs">Cidade</Label>
+                                            <Input
+                                                value={extracted.installationCity || ""}
+                                                onChange={(e) => updateField("installationCity", e.target.value)}
+                                                placeholder="Cidade"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="text-xs">UF</Label>
+                                            <Input
+                                                value={extracted.installationState || ""}
+                                                onChange={(e) => updateField("installationState", e.target.value)}
+                                                placeholder="MG"
+                                                maxLength={2}
+                                            />
+                                        </div>
                                     </div>
                                 </div>
 

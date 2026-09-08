@@ -191,6 +191,22 @@ export function EditEnergyBillModal({
                                     />
                                 </div>
                             </div>
+                            <div className="space-y-1 pt-1 border-t border-border/50">
+                                <Label className="text-xs font-semibold">Endereço da Instalação</Label>
+                                <Input
+                                    value={(formData as any).address || ""}
+                                    onChange={(e) => handleFieldChange("address" as any, e.target.value)}
+                                    placeholder="Rua, número e bairro"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-xs">Cidade</Label>
+                                <Input
+                                    value={(formData as any).city || ""}
+                                    onChange={(e) => handleFieldChange("city" as any, e.target.value)}
+                                    placeholder="Cidade"
+                                />
+                            </div>
                         </div>
 
                         {/* Section 2: Consumo & Solar GD */}

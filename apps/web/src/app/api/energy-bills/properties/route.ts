@@ -26,6 +26,9 @@ export interface OwnerPropertySummary {
     consumerUnit: string | null;
     utilityCompany: string | null;
     latestMonth: string | null;
+    latestMonthLabel?: string | null;
+    latestDueDate?: string | null;
+    latestTotalAmount?: number | null;
     isStandaloneUc: boolean;
     ucCategory: UcCategory | null;
     notes?: string | null;
@@ -124,28 +127,54 @@ export async function GET() {
 
         // 5. Gather all property IDs to query energy_bills stats
         const propIds = dbProperties.map(p => p.id);
-        const billsByPropId: Record<string, { count: number; latestMonth: string | null; consumerUnit: string | null; utilityCompany: string | null }> = {};
+        const billsByPropId: Record<string, {
+            count: number;
+            latestMonth: string | null;
+            latestMonthLabel: string | null;
+            latestDueDate: string | null;
+            latestTotalAmount: number | null;
+            consumerUnit: string | null;
+            utilityCompany: string | null;
+        }> = {};
 
         if (propIds.length > 0) {
             const { data: allBills } = await supabase
                 .from("energy_bills")
-                .select("property_id, reference_month, consumer_unit, utility_company")
+                .select("property_id, reference_month, reference_month_label, due_date, total_amount, consumer_unit, utility_company, is_historical_only")
                 .in("property_id", propIds)
                 .order("reference_month", { ascending: false });
 
             if (allBills) {
                 for (const bill of allBills) {
-                    if (!billsByPropId[bill.property_id]) {
-                        billsByPropId[bill.property_id] = {
+                    const pid = bill.property_id;
+                    if (!billsByPropId[pid]) {
+                        billsByPropId[pid] = {
                             count: 1,
                             latestMonth: bill.reference_month || null,
+                            latestMonthLabel: bill.reference_month_label || null,
+                            latestDueDate: bill.due_date || null,
+                            latestTotalAmount: bill.total_amount != null && Number(bill.total_amount) > 0 ? Number(bill.total_amount) : null,
                             consumerUnit: bill.consumer_unit || null,
                             utilityCompany: bill.utility_company || null,
                         };
                     } else {
-                        billsByPropId[bill.property_id].count += 1;
-                        if (!billsByPropId[bill.property_id].latestMonth && bill.reference_month) {
-                            billsByPropId[bill.property_id].latestMonth = bill.reference_month;
+                        billsByPropId[pid].count += 1;
+                        const current = billsByPropId[pid];
+                        if (!current.latestMonth && bill.reference_month) {
+                            current.latestMonth = bill.reference_month;
+                        }
+                        if (!current.latestDueDate && bill.due_date) {
+                            current.latestDueDate = bill.due_date;
+                        }
+                        if ((!current.latestTotalAmount || current.latestTotalAmount === 0) && bill.total_amount && Number(bill.total_amount) > 0) {
+                            current.latestTotalAmount = Number(bill.total_amount);
+                            if (bill.reference_month_label) current.latestMonthLabel = bill.reference_month_label;
+                        }
+                        if (!current.consumerUnit && bill.consumer_unit) {
+                            current.consumerUnit = bill.consumer_unit;
+                        }
+                        if (!current.utilityCompany && bill.utility_company) {
+                            current.utilityCompany = bill.utility_company;
                         }
                     }
                 }
@@ -154,7 +183,15 @@ export async function GET() {
 
         // 6. Enrich each property with solar info from profile, bills, or electronic_id
         const enrichedProperties: OwnerPropertySummary[] = dbProperties.map((prop, idx) => {
-            const billStats = billsByPropId[prop.id] || { count: 0, latestMonth: null, consumerUnit: null, utilityCompany: null };
+            const billStats = billsByPropId[prop.id] || {
+                count: 0,
+                latestMonth: null,
+                latestMonthLabel: null,
+                latestDueDate: null,
+                latestTotalAmount: null,
+                consumerUnit: null,
+                utilityCompany: null,
+            };
 
             // Check if this property is marked as a standalone UC in electronic_id
             let isStandaloneUc = false;
@@ -199,22 +236,57 @@ export async function GET() {
                 }
             }
 
+            // Auto-backfill address for Mae or UC 2.778.206.018-17 if address is not registered
+            let currentAddress = prop.address;
+            let currentCity = prop.city;
+            let currentState = prop.state;
+            let currentZip = prop.zip;
+
+            const ucNum = billStats.consumerUnit || savedUcNumber;
+            if (!currentAddress && (ucNum === "2.778.206.018-17" || prop.name.trim().toLowerCase() === "mae")) {
+                currentAddress = "RUA JOSE GOIS, 45 CS - SANTO ANTONIO";
+                currentCity = "ITABIRITO";
+                currentState = "MG";
+                currentZip = "35450-264";
+
+                // Update row in background to persist permanently
+                (async () => {
+                    try {
+                        await supabase
+                            .from("properties")
+                            .update({
+                                address: currentAddress,
+                                city: currentCity,
+                                state: currentState,
+                                zip: currentZip,
+                            })
+                            .eq("id", prop.id);
+                        console.log(`[Properties GET] Auto-backfilled address for property ${prop.id}`);
+                    } catch (e) {
+                        console.warn("[Properties GET] Backfill warning:", e);
+                    }
+                })();
+            }
+
             // A standalone UC always participates in the Energy Hub
             const hasSolar = isStandaloneUc || solarEnergy || billStats.count > 0;
 
             return {
                 id: prop.id,
                 name: prop.name,
-                address: prop.address,
-                city: prop.city,
-                state: prop.state,
-                zip: prop.zip,
+                address: currentAddress,
+                city: currentCity,
+                state: currentState,
+                zip: currentZip,
                 hasSolar,
                 solarKwp,
                 billsCount: billStats.count,
-                consumerUnit: billStats.consumerUnit || savedUcNumber,
+                consumerUnit: ucNum,
                 utilityCompany: billStats.utilityCompany || savedUtilityCompany,
                 latestMonth: billStats.latestMonth,
+                latestMonthLabel: billStats.latestMonthLabel,
+                latestDueDate: billStats.latestDueDate,
+                latestTotalAmount: billStats.latestTotalAmount,
                 isStandaloneUc,
                 ucCategory,
                 notes: savedNotes,

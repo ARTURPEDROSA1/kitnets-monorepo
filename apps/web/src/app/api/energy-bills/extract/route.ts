@@ -16,6 +16,10 @@ export interface ExtractedEnergyBill {
     consumerUnit: string | null;
     installationClass: string | null;
     tariffModality: string | null;
+    installationAddress: string | null;  // Logradouro, número e bairro (ex: "RUA JOSE GOIS, 45 CS - SANTO ANTONIO")
+    installationCity: string | null;     // Cidade (ex: "ITABIRITO")
+    installationState: string | null;    // UF (ex: "MG")
+    installationZip: string | null;      // CEP (ex: "35450-264")
     referenceMonth: string | null;       // YYYY-MM
     referenceMonthLabel: string | null;  // e.g. "AGO/2026"
     readingDateCurrent: string | null;   // YYYY-MM-DD
@@ -58,6 +62,10 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido (sem markdown, sem explicações a
 {
   "utilityCompany": "string (ex: 'CEMIG')",
   "consumerUnit": "string (N.º da Unidade Consumidora / Instalação, ex: '2.778.206.018-17')",
+  "installationAddress": "string ou null (Endereço da instalação/unidade consumidora com rua, número e bairro, ex: 'RUA JOSE GOIS, 45 CS - SANTO ANTONIO')",
+  "installationCity": "string ou null (Cidade da instalação, ex: 'ITABIRITO')",
+  "installationState": "string ou null (UF com 2 letras, ex: 'MG')",
+  "installationZip": "string ou null (CEP da instalação, ex: '35450-264')",
   "installationClass": "string (ex: 'Residencial Monofásico', 'Residencial Bifásico', 'Residencial Trifásico')",
   "tariffModality": "string (ex: 'Convencional B1')",
   "referenceMonth": "YYYY-MM (ex: '2026-08')",
@@ -129,10 +137,15 @@ Regras Cruciais:
    - Extraia TODAS as linhas da tabela de histórico de consumo impressa na fatura (geralmente 12 ou 13 meses).
    - Cada linha deve conter: month (ex: "AGO/26"), consumptionKwh (ex: 68), dailyAvgKwh (ex: 2.26) e days (ex: 30).
 
-7. Decimais brasileiros: converta vírgula para ponto (ex: "1.586,61" -> 1586.61, "2,26" -> 2.26, "32,93" -> 32.93, "1,17999863" -> 1.17999863).
+7. "ENDEREÇO DA INSTALAÇÃO (installationAddress, installationCity, installationState, installationZip)":
+   - Procure no cabeçalho ou dados da unidade consumidora o endereço de localização do imóvel.
+   - Em contas da CEMIG, fica localizado no topo à esquerda, logo abaixo do nome do titular/cliente (ex: 'RUA JOSE GOIS 45 CS', 'SANTO ANTONIO', '35450-264 ITABIRITO, MG').
+   - Extraia o logradouro com número e bairro em installationAddress (ex: 'RUA JOSE GOIS, 45 CS - SANTO ANTONIO'), a cidade em installationCity (ex: 'ITABIRITO'), a UF em installationState (ex: 'MG') e o CEP em installationZip (ex: '35450-264').
 
-8. Datas: converta para YYYY-MM-DD. Mês de referência: "AGO/2026" ou "AGO/26" -> "2026-08".
-9. Nunca invente valores. Se um campo não estiver presente, use null ou 0.`;
+8. Decimais brasileiros: converta vírgula para ponto (ex: "1.586,61" -> 1586.61, "2,26" -> 2.26, "32,93" -> 32.93, "1,17999863" -> 1.17999863).
+
+9. Datas: converta para YYYY-MM-DD. Mês de referência: "AGO/2026" ou "AGO/26" -> "2026-08".
+10. Nunca invente valores. Se um campo não estiver presente, use null ou 0.`;
 
 function parseMonthToKey(str: string | null | undefined): string | null {
     if (!str) return null;
