@@ -60,11 +60,13 @@ The **Imobiliária Module** (`/[lang]/imobiliaria`) allows authenticated users t
 ### Key Features
 
 - **Multi-Agency Support** — Users can register and manage multiple agencies (no limit)
-- **Accordion List View** — Compact overview of all agencies with expand/collapse details
+- **Energy-Style Square Cards Grid** — Modern, responsive 3-column card grid mirroring the Energy Dashboard (`/dashboard/energy`)
+- **Status-Colored Borders & Badges** — Active (amber) and Verified (emerald) cards with CRECI, CNPJ, and status tags
+- **Agency Detail Modal** — Full agency profile dialog opened from "Gerenciar Imobiliária"
 - **Brazilian-Specific Validations** — CNPJ check-digit algorithm, phone masking, CEP auto-fill
 - **Soft Delete** — Agencies are soft-deleted with `deleted_at`/`deleted_by` for data recovery
 - **Role-Based Access** — OWNER/ADMIN can edit; only OWNER can delete
-- **WhatsApp Integration** — Direct wa.me link on collapsed agency row when WhatsApp is enabled
+- **WhatsApp Integration** — Direct wa.me link with WhatsApp indicator on agency card
 - **CEP Auto-Fill** — ViaCEP proxy auto-populates address fields from a postal code
 
 ---
@@ -451,16 +453,25 @@ loading ──→ list ◄──── cancelForm() ── form
 
 ### 7.2 List View
 
-The default view after loading. Shows:
-- **Header:** "Imobiliárias" + "+ Adicionar imobiliária" button
-- **Empty state:** Icon + message + CTA button (when no agencies)
-- **Agency rows:** Compact accordion rows with:
-  - Expand/collapse chevron icon
-  - Agency name (bold, truncated)
-  - Subtitle: trade name + city/state
-  - WhatsApp link(s) (green, with wa.me URL — up to 2 links shown if both phones have WhatsApp enabled — hidden on mobile)
-  - Status badge (Ativa, Verificada, Rascunho, Suspensa)
-- **Expanded detail:** `AgencyProfileCard` with edit + delete buttons
+The default view after loading. Modeled after the Energy Dashboard (`/dashboard/energy`):
+- **Top Navigation & Header:**
+  - Back link: "← Dashboard" (`/[lang]/dashboard`)
+  - Amber icon box: `Building2` inside rounded amber badge
+  - Title: "Gestão de Imobiliárias" + subtitle
+  - Action buttons: "+ Adicionar Imobiliária" (amber button) and "Meus Imóveis" (outline button)
+- **Filter Tabs:**
+  - "Todas as Imobiliárias (N)", "Ativas (X)", "Verificadas (Y)"
+- **Square Cards Grid (`grid-cols-1 md:grid-cols-2 lg:grid-cols-3`):**
+  - Rounded `rounded-2xl` cards with status-colored borders (`border-amber-500/40` for Active, `border-emerald-500/40` for Verified)
+  - Card Header: Name (bold uppercase, line-clamp-1), MapPin + full formatted address, quick edit & delete action icons
+  - Badges row: Status pill badge, CRECI pill badge, font-mono CNPJ badge
+  - Notes: `Razão Social` or `Obs` note in italic text
+  - Middle row: Agency logo (or custom initial box) on left, WhatsApp / phone link on right
+  - Bottom summary card: Responsável Legal (`agency.owner_name`) and user's role badge
+  - Bottom CTA: Full-width button with `ArrowRight` ("Gerenciar Imobiliária")
+- **Detail Modal:**
+  - Clicking "Gerenciar Imobiliária" opens a full dialog modal featuring `AgencyProfileCard` with complete business data, contact, address, edit button, and delete button
+- **Empty state:** Dashed rounded container with amber icon, descriptive copy, and CTA buttons
 - **Delete modal:** Overlay with confirmation + cancel/confirm buttons
 
 ### 7.3 Registration Form
@@ -666,3 +677,4 @@ Two SQL files must be run **in order** in the Supabase SQL Editor:
 | Date | Version | Changes |
 |------|---------|---------|
 | 2026-09-02 | 1.0 | Initial implementation: multi-agency list with accordion, CRUD APIs, soft delete, CNPJ/CEP validation, WhatsApp wa.me link on collapsed row |
+| 2026-09-08 | 1.1 | Redesigned list interface to match Energy Dashboard (`/dashboard/energy`) square cards grid with status-colored borders, badges, WhatsApp link, summary cards, and detail view modal |
