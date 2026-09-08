@@ -680,3 +680,4 @@ Two SQL files must be run **in order** in the Supabase SQL Editor:
 | 2026-09-02 | 1.0 | Initial implementation: multi-agency list with accordion, CRUD APIs, soft delete, CNPJ/CEP validation, WhatsApp wa.me link on collapsed row |
 | 2026-09-08 | 1.1 | Redesigned list interface to match Energy Dashboard (`/dashboard/energy`) square cards grid with status-colored borders, badges, WhatsApp link, summary cards, and detail view modal |
 | 2026-09-08 | 1.2 | Replaced global CNPJ uniqueness check with per-account duplicate prevention, allowing multiple independent accounts to register the same management company |
+| 2026-09-08 | 1.3 | Integrated AI contract extraction for lease and service agreements (`/api/agencies/extract`), added popup on "+ Adicionar Imobiliária" with drag & drop document upload, manual typing fallback, auto-cropping logo, and consolidated the "Responsável" card into Section 1 ("Informações da imobiliária") |
