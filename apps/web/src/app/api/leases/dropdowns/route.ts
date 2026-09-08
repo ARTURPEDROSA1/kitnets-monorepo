@@ -42,7 +42,7 @@ export async function GET() {
         const [propertiesRes, tenantsRes, membershipsRes, agentsRes] = await Promise.all([
             supabase
                 .from('properties')
-                .select('id, name')
+                .select('id, name, electronic_id')
                 .eq('owner_id', profile.id)
                 .order('name', { ascending: true }),
             supabase
@@ -77,8 +77,20 @@ export async function GET() {
             agenciesList = agenciesData || [];
         }
 
+        const rentalProperties = (propertiesRes.data || [])
+            .filter((p: any) => {
+                if (!p.electronic_id) return true;
+                try {
+                    const parsed = JSON.parse(p.electronic_id);
+                    return !parsed.isStandaloneUc;
+                } catch {
+                    return true;
+                }
+            })
+            .map(({ id, name }: any) => ({ id, name }));
+
         return NextResponse.json({
-            properties: propertiesRes.data || [],
+            properties: rentalProperties,
             tenants: tenantsRes.data || [],
             agencies: agenciesList,
             agents: agentsRes.data || [],
