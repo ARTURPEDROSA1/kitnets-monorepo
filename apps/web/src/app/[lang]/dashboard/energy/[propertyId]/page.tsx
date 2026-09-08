@@ -482,7 +482,6 @@ export default function EnergyDashboardPage() {
                                     <tr>
                                         <th className="py-3 px-4 font-semibold">MÊS/ANO</th>
                                         <th className="py-3 px-4 font-semibold text-right">Cons. kWh</th>
-                                        <th className="py-3 px-4 font-semibold text-right">Média kWh</th>
                                         <th className="py-3 px-4 font-semibold text-right">kWh/Dia</th>
                                         <th className="py-3 px-4 font-semibold text-right">Dias</th>
                                         <th className="py-3 px-4 font-semibold text-right text-emerald-600">Saldo Atual Geração</th>
@@ -504,9 +503,6 @@ export default function EnergyDashboardPage() {
                                                 </td>
                                                 <td className="py-3 px-4 text-right font-medium">
                                                     {formatNumber(b.grid_consumption_kwh, 0)}
-                                                </td>
-                                                <td className="py-3 px-4 text-right text-muted-foreground">
-                                                    {b.monthly_avg_kwh ? formatNumber(b.monthly_avg_kwh, 0) : "-"}
                                                 </td>
                                                 <td className="py-3 px-4 text-right font-mono">
                                                     {formatNumber(daily, 2)}
