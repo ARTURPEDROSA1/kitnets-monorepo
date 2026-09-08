@@ -28,6 +28,11 @@ export interface Agency {
 
     logo_url: string | null;
     description: string | null;
+    service_agreement_url?: string | null;
+    service_agreement_filename?: string | null;
+    management_fee?: number | string | null;
+    agreement_start_date?: string | null;
+    agreement_end_date?: string | null;
 
     status: AgencyStatus;
     verified_at: string | null;
@@ -72,6 +77,13 @@ export interface AgencyFormData {
     city: string;
     state: string;
     country: string;
+
+    description: string;
+    service_agreement_url: string;
+    service_agreement_filename: string;
+    management_fee: string;
+    agreement_start_date: string;
+    agreement_end_date: string;
 }
 
 /** Data returned by the API when querying the user's agency with membership info */
