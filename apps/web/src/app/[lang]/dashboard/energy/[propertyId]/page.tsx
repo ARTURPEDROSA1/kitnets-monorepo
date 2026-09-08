@@ -22,6 +22,7 @@ import {
     Share2,
     LineChart,
     ExternalLink,
+    ChevronDown,
 } from "lucide-react";
 import {
     EnergyBalanceChart,
@@ -33,6 +34,7 @@ import {
 import { EnergyBillUploadModal } from "@/components/energy/EnergyBillUploadModal";
 import { HistoricUnitPriceModal } from "@/components/energy/HistoricUnitPriceModal";
 import { EnergyDistributorLogo } from "@/components/energy/EnergyDistributorLogo";
+import type { OwnerPropertySummary } from "@/app/api/energy-bills/properties/route";
 
 export interface EnergyBillRecord {
     id: string;
@@ -95,12 +97,25 @@ export default function EnergyDashboardPage() {
     const [resolvedPropertyId, setResolvedPropertyId] = useState<string>(propertyId);
 
     const [bills, setBills] = useState<EnergyBillRecord[]>([]);
+    const [properties, setProperties] = useState<OwnerPropertySummary[]>([]);
     const [currentPdfUrl, setCurrentPdfUrl] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [isUploadOpen, setIsUploadOpen] = useState(false);
     const [isUnitPriceModalOpen, setIsUnitPriceModalOpen] = useState(false);
     const [filterMonths, setFilterMonths] = useState<number>(12);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+
+    const fetchProperties = async () => {
+        try {
+            const res = await fetch("/api/energy-bills/properties");
+            const data = await res.json();
+            if (data.success && Array.isArray(data.properties)) {
+                setProperties(data.properties);
+            }
+        } catch (err) {
+            console.error("[EnergyDashboard] Failed to fetch properties:", err);
+        }
+    };
 
     const fetchBills = async () => {
         setLoading(true);
@@ -128,11 +143,19 @@ export default function EnergyDashboardPage() {
     };
 
     useEffect(() => {
+        fetchProperties();
+    }, []);
+
+    useEffect(() => {
         if (propertyId) {
             fetchBills();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [propertyId]);
+
+    const currentProperty = useMemo(() => {
+        return properties.find((p) => p.id === resolvedPropertyId || p.id === propertyId) || null;
+    }, [properties, resolvedPropertyId, propertyId]);
 
     const handleDelete = async (id: string) => {
         if (!confirm("Tem certeza que deseja remover este registro de consumo?")) return;
@@ -251,25 +274,74 @@ export default function EnergyDashboardPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
             {/* Header & Navigation */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="space-y-1.5">
-                    <div className="flex items-center gap-2">
+                <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Link
+                            href={`/${lang}/dashboard/energy`}
+                            className="inline-flex items-center font-medium hover:text-foreground transition-colors"
+                        >
+                            <ArrowLeft className="w-4 h-4 mr-1" />
+                            Painel Solar
+                        </Link>
+                        <span className="text-border">•</span>
                         <Link
                             href={`/${lang}/imoveis`}
-                            className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                            className="inline-flex items-center font-medium hover:text-foreground transition-colors"
                         >
-                            <ArrowLeft className="w-4 h-4 mr-1.5" />
-                            Voltar para Imóveis
+                            Imóveis
                         </Link>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-amber-100 dark:bg-amber-900/50 rounded-xl text-amber-600">
+
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                        <div className="p-2.5 bg-amber-100 dark:bg-amber-900/50 rounded-xl text-amber-600 self-start sm:self-auto">
                             <Sun className="w-6 h-6" />
                         </div>
                         <div>
-                            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
-                                Gestão de Energia Solar & Consumo
-                            </h1>
-                            <div className="flex flex-wrap items-center gap-2 mt-1">
+                            <div className="flex flex-wrap items-center gap-3">
+                                <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+                                    Gestão de Energia Solar & Consumo
+                                </h1>
+
+                                {/* Property Selector Switcher */}
+                                {properties.length > 1 ? (
+                                    <div className="relative inline-flex items-center">
+                                        <div className="flex items-center gap-1.5 bg-card border border-amber-400/60 dark:border-amber-500/40 rounded-xl px-3 py-1 shadow-2xs hover:border-amber-500 transition-colors">
+                                            <Building2 className="w-4 h-4 text-amber-600 shrink-0" />
+                                            <span className="text-xs font-semibold text-muted-foreground">Imóvel:</span>
+                                            <select
+                                                value={resolvedPropertyId || propertyId}
+                                                onChange={(e) => {
+                                                    const newId = e.target.value;
+                                                    if (newId && newId !== (resolvedPropertyId || propertyId)) {
+                                                        router.push(`/${lang}/dashboard/energy/${newId}`);
+                                                    }
+                                                }}
+                                                className="bg-transparent text-sm font-semibold text-foreground focus:outline-none cursor-pointer pr-1"
+                                                aria-label="Selecionar Imóvel para Análise"
+                                            >
+                                                {properties.map((p) => (
+                                                    <option key={p.id} value={p.id} className="bg-popover text-popover-foreground">
+                                                        {p.name} {p.hasSolar ? "☀️" : ""}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                ) : currentProperty ? (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-200 border border-amber-200 dark:border-amber-800">
+                                        <Building2 className="w-3.5 h-3.5 text-amber-600" />
+                                        {currentProperty.name}
+                                    </span>
+                                ) : null}
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                                {currentProperty?.address && (
+                                    <span className="text-xs text-muted-foreground flex items-center gap-1 mr-1">
+                                        <Building2 className="w-3 h-3 text-muted-foreground" />
+                                        {currentProperty.address}
+                                    </span>
+                                )}
                                 {latestFullBill?.consumer_unit && (
                                     <span className="text-xs bg-muted text-muted-foreground px-2.5 py-0.5 rounded-full font-mono">
                                         UC: {latestFullBill.consumer_unit}
@@ -277,7 +349,7 @@ export default function EnergyDashboardPage() {
                                 )}
                                 <span className="text-xs bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
                                     <Sun className="w-3 h-3" />
-                                    Microgeração Distribuída (GD)
+                                    {currentProperty?.solarKwp ? `Microgeração GD • ${currentProperty.solarKwp} kWp` : "Microgeração Distribuída (GD)"}
                                 </span>
                                 {latestFullBill?.installation_class && (
                                     <span className="text-xs bg-muted text-muted-foreground px-2.5 py-0.5 rounded-full">
