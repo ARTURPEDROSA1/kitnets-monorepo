@@ -33,10 +33,10 @@ export async function GET() {
             return NextResponse.json({ properties: [] });
         }
 
-        // Fetch user's properties
+        // Fetch user's rental properties (excluding standalone UCs)
         const { data: properties, error } = await supabase
             .from('properties')
-            .select('id, name')
+            .select('id, name, electronic_id')
             .eq('owner_id', profile.id)
             .order('name', { ascending: true });
 
@@ -45,7 +45,19 @@ export async function GET() {
             return NextResponse.json({ properties: [] });
         }
 
-        return NextResponse.json({ properties: properties || [] });
+        const rentalProperties = (properties || [])
+            .filter(p => {
+                if (!p.electronic_id) return true;
+                try {
+                    const parsed = JSON.parse(p.electronic_id);
+                    return !parsed.isStandaloneUc;
+                } catch {
+                    return true;
+                }
+            })
+            .map(({ id, name }) => ({ id, name }));
+
+        return NextResponse.json({ properties: rentalProperties });
     } catch (err) {
         console.error('[Tenants Properties GET] Error:', err);
         return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });

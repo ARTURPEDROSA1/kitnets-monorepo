@@ -23,6 +23,9 @@ import {
     LineChart,
     ExternalLink,
     ChevronDown,
+    Home,
+    Users,
+    MapPin,
 } from "lucide-react";
 import {
     EnergyBalanceChart,
@@ -34,6 +37,7 @@ import {
 import { EnergyBillUploadModal } from "@/components/energy/EnergyBillUploadModal";
 import { HistoricUnitPriceModal } from "@/components/energy/HistoricUnitPriceModal";
 import { EnergyDistributorLogo } from "@/components/energy/EnergyDistributorLogo";
+import { AddStandaloneUcModal } from "@/components/energy/AddStandaloneUcModal";
 import type { OwnerPropertySummary } from "@/app/api/energy-bills/properties/route";
 
 export interface EnergyBillRecord {
@@ -101,6 +105,7 @@ export default function EnergyDashboardPage() {
     const [currentPdfUrl, setCurrentPdfUrl] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [isUploadOpen, setIsUploadOpen] = useState(false);
+    const [isAddUcOpen, setIsAddUcOpen] = useState(false);
     const [isUnitPriceModalOpen, setIsUnitPriceModalOpen] = useState(false);
     const [filterMonths, setFilterMonths] = useState<number>(12);
     const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -169,6 +174,27 @@ export default function EnergyDashboardPage() {
             console.error("[EnergyDashboard] Delete error:", err);
         } finally {
             setDeletingId(null);
+        }
+    };
+
+    const handleDeleteStandaloneUc = async () => {
+        if (!currentProperty) return;
+        if (!confirm(`Tem certeza que deseja remover a UC avulsa "${currentProperty.name}" e todo seu histórico?`)) {
+            return;
+        }
+        try {
+            const res = await fetch(`/api/energy-bills/properties?id=${currentProperty.id}`, {
+                method: "DELETE",
+            });
+            if (res.ok) {
+                router.push(`/${lang}/dashboard/energy`);
+            } else {
+                const data = await res.json();
+                alert(data.error || "Erro ao remover UC.");
+            }
+        } catch (err) {
+            console.error("[EnergyDashboard] Delete UC error:", err);
+            alert("Erro de conexão ao remover UC.");
         }
     };
 
@@ -307,7 +333,7 @@ export default function EnergyDashboardPage() {
                                     <div className="relative inline-flex items-center">
                                         <div className="flex items-center gap-1.5 bg-card border border-amber-400/60 dark:border-amber-500/40 rounded-xl px-3 py-1 shadow-2xs hover:border-amber-500 transition-colors">
                                             <Building2 className="w-4 h-4 text-amber-600 shrink-0" />
-                                            <span className="text-xs font-semibold text-muted-foreground">Imóvel:</span>
+                                            <span className="text-xs font-semibold text-muted-foreground">Unidade:</span>
                                             <select
                                                 value={resolvedPropertyId || propertyId}
                                                 onChange={(e) => {
@@ -317,11 +343,11 @@ export default function EnergyDashboardPage() {
                                                     }
                                                 }}
                                                 className="bg-transparent text-sm font-semibold text-foreground focus:outline-none cursor-pointer pr-1"
-                                                aria-label="Selecionar Imóvel para Análise"
+                                                aria-label="Selecionar Unidade para Análise"
                                             >
                                                 {properties.map((p) => (
                                                     <option key={p.id} value={p.id} className="bg-popover text-popover-foreground">
-                                                        {p.name} {p.hasSolar ? "☀️" : ""}
+                                                        {p.name} {p.isStandaloneUc ? (p.ucCategory === "residencia_propria" ? "🏠 (Casa Própria)" : p.ucCategory === "parente" ? "👨‍👩‍👧 (Parente)" : "⚡ (Beneficiária)") : "🏢 (Aluguel GD)"}
                                                     </option>
                                                 ))}
                                             </select>
@@ -329,7 +355,11 @@ export default function EnergyDashboardPage() {
                                     </div>
                                 ) : currentProperty ? (
                                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-200 border border-amber-200 dark:border-amber-800">
-                                        <Building2 className="w-3.5 h-3.5 text-amber-600" />
+                                        {currentProperty.isStandaloneUc ? (
+                                            <Home className="w-3.5 h-3.5 text-blue-600" />
+                                        ) : (
+                                            <Building2 className="w-3.5 h-3.5 text-amber-600" />
+                                        )}
                                         {currentProperty.name}
                                     </span>
                                 ) : null}
@@ -338,7 +368,7 @@ export default function EnergyDashboardPage() {
                             <div className="flex flex-wrap items-center gap-2 mt-1.5">
                                 {currentProperty?.address && (
                                     <span className="text-xs text-muted-foreground flex items-center gap-1 mr-1">
-                                        <Building2 className="w-3 h-3 text-muted-foreground" />
+                                        <MapPin className="w-3 h-3 text-muted-foreground" />
                                         {currentProperty.address}
                                     </span>
                                 )}
@@ -347,10 +377,55 @@ export default function EnergyDashboardPage() {
                                         UC: {latestFullBill.consumer_unit}
                                     </span>
                                 )}
-                                <span className="text-xs bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                                    <Sun className="w-3 h-3" />
-                                    {currentProperty?.solarKwp ? `Microgeração GD • ${currentProperty.solarKwp} kWp` : "Microgeração Distribuída (GD)"}
-                                </span>
+
+                                {/* Category Badge for Standalone UC or Rental GD */}
+                                {currentProperty?.isStandaloneUc ? (
+                                    <>
+                                        {currentProperty.ucCategory === "residencia_propria" && (
+                                            <span className="text-xs bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                                                <Home className="w-3 h-3 text-blue-500" />
+                                                Residência Própria (UC Avulsa)
+                                            </span>
+                                        )}
+                                        {currentProperty.ucCategory === "parente" && (
+                                            <span className="text-xs bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                                                <Users className="w-3 h-3 text-emerald-500" />
+                                                Casa de Parente (Fornecimento de Energia)
+                                            </span>
+                                        )}
+                                        {currentProperty.ucCategory === "beneficiaria" && (
+                                            <span className="text-xs bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                                                <Zap className="w-3 h-3 text-amber-500" />
+                                                Unidade Beneficiária (GD)
+                                            </span>
+                                        )}
+                                        {(!currentProperty.ucCategory || currentProperty.ucCategory === "outro") && (
+                                            <span className="text-xs bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                                                <Building2 className="w-3 h-3 text-purple-500" />
+                                                UC Avulsa
+                                            </span>
+                                        )}
+                                        {currentProperty.notes && (
+                                            <span className="text-xs text-muted-foreground italic">
+                                                ({currentProperty.notes})
+                                            </span>
+                                        )}
+                                        <button
+                                            onClick={handleDeleteStandaloneUc}
+                                            className="text-xs text-muted-foreground hover:text-red-600 flex items-center gap-1 ml-1 transition-colors"
+                                            title="Excluir esta UC avulsa"
+                                        >
+                                            <Trash2 className="w-3 h-3" />
+                                            Remover UC
+                                        </button>
+                                    </>
+                                ) : (
+                                    <span className="text-xs bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                                        <Sun className="w-3 h-3" />
+                                        {currentProperty?.solarKwp ? `Microgeração GD • ${currentProperty.solarKwp} kWp` : "Microgeração Distribuída (GD)"}
+                                    </span>
+                                )}
+
                                 {latestFullBill?.installation_class && (
                                     <span className="text-xs bg-muted text-muted-foreground px-2.5 py-0.5 rounded-full">
                                         {latestFullBill.installation_class}
@@ -362,7 +437,16 @@ export default function EnergyDashboardPage() {
                 </div>
 
                 {/* Header Actions */}
-                <div className="flex items-center gap-3 self-start md:self-auto">
+                <div className="flex flex-wrap items-center gap-2.5 self-start md:self-auto">
+                    <Button
+                        variant="outline"
+                        onClick={() => setIsAddUcOpen(true)}
+                        className="gap-2 text-sm font-medium"
+                    >
+                        <Plus className="w-4 h-4" />
+                        Nova UC Avulsa
+                    </Button>
+
                     <Button
                         onClick={() => setIsUploadOpen(true)}
                         className="bg-amber-600 hover:bg-amber-700 text-white gap-2 font-medium shadow-sm"
@@ -760,6 +844,16 @@ export default function EnergyDashboardPage() {
                 onClose={() => setIsUnitPriceModalOpen(false)}
                 bills={bills}
                 currentUnitPrice={summary?.currentUnitPrice}
+            />
+
+            {/* Add Standalone UC Modal */}
+            <AddStandaloneUcModal
+                isOpen={isAddUcOpen}
+                onClose={() => setIsAddUcOpen(false)}
+                onSuccess={(newProperty) => {
+                    setProperties((prev) => [newProperty, ...prev]);
+                    router.push(`/${lang}/dashboard/energy/${newProperty.id}`);
+                }}
             />
         </div>
     );
