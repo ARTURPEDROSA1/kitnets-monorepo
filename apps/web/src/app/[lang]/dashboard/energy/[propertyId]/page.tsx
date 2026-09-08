@@ -32,6 +32,7 @@ import {
 } from "@/components/energy/EnergyCharts";
 import { EnergyBillUploadModal } from "@/components/energy/EnergyBillUploadModal";
 import { HistoricUnitPriceModal } from "@/components/energy/HistoricUnitPriceModal";
+import { EnergyDistributorLogo } from "@/components/energy/EnergyDistributorLogo";
 
 export interface EnergyBillRecord {
     id: string;
@@ -66,6 +67,7 @@ export interface EnergyBillRecord {
     estimated_savings_amount: number;
     solar_coverage_ratio: number | null;
     is_historical_only: boolean;
+    pdf_url?: string | null;
     created_at: string;
 }
 
@@ -93,6 +95,7 @@ export default function EnergyDashboardPage() {
     const [resolvedPropertyId, setResolvedPropertyId] = useState<string>(propertyId);
 
     const [bills, setBills] = useState<EnergyBillRecord[]>([]);
+    const [currentPdfUrl, setCurrentPdfUrl] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [isUploadOpen, setIsUploadOpen] = useState(false);
     const [isUnitPriceModalOpen, setIsUnitPriceModalOpen] = useState(false);
@@ -108,6 +111,9 @@ export default function EnergyDashboardPage() {
             if (data.success) {
                 if (Array.isArray(data.bills)) {
                     setBills(data.bills);
+                }
+                if (data.currentPdfUrl) {
+                    setCurrentPdfUrl(data.currentPdfUrl);
                 }
                 if (data.propertyId && data.propertyId !== propertyId) {
                     setResolvedPropertyId(data.propertyId);
@@ -159,6 +165,11 @@ export default function EnergyDashboardPage() {
     const latestFullBill = useMemo(() => {
         return bills.find((b) => !b.is_historical_only) || bills[0] || null;
     }, [bills]);
+
+    // Active current PDF URL (from Supabase Storage single-file store or latest bill)
+    const activePdfUrl = useMemo(() => {
+        return currentPdfUrl || latestFullBill?.pdf_url || null;
+    }, [currentPdfUrl, latestFullBill]);
 
     // Summary calculations
     const summary = useMemo(() => {
@@ -289,7 +300,7 @@ export default function EnergyDashboardPage() {
                     <div className="space-y-1.5 max-w-md mx-auto">
                         <h3 className="text-lg font-semibold text-foreground">Nenhuma fatura de energia cadastrada</h3>
                         <p className="text-sm text-muted-foreground">
-                            Faça o upload de uma conta de luz recente da concessionária (ex: CEMIG). Nossa IA extrairá automaticamente o consumo, geração injetada, saldo de créditos e 13 meses de histórico sem armazenar o arquivo PDF!
+                            Faça o upload de uma conta de luz recente da concessionária (ex: CEMIG). Nossa IA extrairá automaticamente o consumo, geração injetada, saldo de créditos e 13 meses de histórico, mantendo arquivado apenas o PDF da fatura vigente.
                         </p>
                     </div>
                     <Button
@@ -305,6 +316,65 @@ export default function EnergyDashboardPage() {
             {/* Content when bills exist */}
             {bills.length > 0 && (
                 <>
+                    {/* Energy Distributor & Current PDF Bill Banner */}
+                    <div className="bg-card border border-border/80 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-card via-card to-amber-500/5">
+                        <div className="flex items-center gap-4">
+                            {/* Distributor Dynamic Logo */}
+                            <div className="shrink-0 p-2.5 bg-background border border-border rounded-xl shadow-2xs">
+                                <EnergyDistributorLogo companyName={latestFullBill?.utility_company || "CEMIG"} size="md" />
+                            </div>
+                            <div className="space-y-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                        Distribuidora Concessionária
+                                    </span>
+                                    <span className="text-xs font-bold text-foreground px-2 py-0.5 rounded-md bg-muted">
+                                        {latestFullBill?.utility_company || "CEMIG"}
+                                    </span>
+                                    {latestFullBill?.reference_month_label && (
+                                        <span className="text-xs text-muted-foreground">
+                                            • Fatura Vigente: <strong className="text-foreground">{latestFullBill.reference_month_label}</strong>
+                                        </span>
+                                    )}
+                                </div>
+                                <p className="text-xs sm:text-sm text-muted-foreground">
+                                    Fatura atual da distribuidora ({latestFullBill?.utility_company || "CEMIG"}): você pode abrir o PDF original{" "}
+                                    {activePdfUrl ? (
+                                        <a
+                                            href={activePdfUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="font-bold text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 underline underline-offset-4 inline-flex items-center gap-1 transition-colors"
+                                        >
+                                            clicando aqui <ExternalLink className="w-3.5 h-3.5 inline" />
+                                        </a>
+                                    ) : (
+                                        <button
+                                            onClick={() => setIsUploadOpen(true)}
+                                            className="font-bold text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 underline underline-offset-4 inline-flex items-center gap-1 cursor-pointer transition-colors"
+                                        >
+                                            clicando aqui para enviar o PDF <ExternalLink className="w-3.5 h-3.5 inline" />
+                                        </button>
+                                    )}
+                                    . Mantemos arquivado apenas o PDF da fatura vigente, substituído automaticamente a cada novo ciclo.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Quick action button to view PDF */}
+                        {activePdfUrl && (
+                            <a
+                                href={activePdfUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 border border-amber-500/30 transition-all shrink-0 self-start md:self-auto shadow-2xs"
+                            >
+                                <FileText className="w-4 h-4 text-amber-600" />
+                                Abrir PDF da Fatura Atual
+                            </a>
+                        )}
+                    </div>
+
                     {/* Top 7 KPI Metric Summary Cards */}
                     {summary && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3.5">

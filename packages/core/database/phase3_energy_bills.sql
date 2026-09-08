@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS public.energy_bills (
     historical_consumption_raw JSONB DEFAULT '[]'::jsonb, -- Raw snapshot of the 13-month table
     items_breakdown JSONB DEFAULT '[]'::jsonb,     -- Full line item list from invoice
     extraction_confidence NUMERIC,
+    pdf_url TEXT,                                  -- Single current PDF bill public URL (overwritten on newest upload)
     notes TEXT,
 
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -131,3 +132,6 @@ AS $$
     WHERE property_id = p_property_id
     ORDER BY reference_month DESC;
 $$;
+
+-- 5. MIGRATION FOR EXISTING TABLES
+ALTER TABLE public.energy_bills ADD COLUMN IF NOT EXISTS pdf_url TEXT;
