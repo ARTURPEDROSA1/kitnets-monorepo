@@ -12,6 +12,7 @@ import {
     Loader2,
     Save,
     ArrowLeft,
+    ArrowRight,
     Search,
     CheckCircle2,
     AlertTriangle,
@@ -24,7 +25,11 @@ import {
     Trash2,
     ImageIcon,
     ExternalLink,
+    Shield,
+    Edit3,
+    Sparkles,
 } from 'lucide-react';
+import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import AgencyProfileCard from '@/components/imobiliaria/AgencyProfileCard';
@@ -124,6 +129,17 @@ function getStatusLabel(status: string): { label: string; variant: 'default' | '
     }
 }
 
+function getRoleLabel(role: string): string {
+    switch (role) {
+        case 'OWNER': return 'Proprietário';
+        case 'ADMIN': return 'Administrador';
+        case 'MANAGER': return 'Gerente';
+        case 'AGENT': return 'Corretor';
+        case 'VIEWER': return 'Visualizador';
+        default: return role;
+    }
+}
+
 // ── Component ────────────────────────────────────────────────────────
 
 interface ImobiliariaContentProps {
@@ -138,8 +154,9 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
     const [agencies, setAgencies] = useState<AgencyWithRole[]>([]);
     const [editingAgency, setEditingAgency] = useState<AgencyWithRole | null>(null);
 
-    // Accordion state — which agency is expanded
-    const [expandedId, setExpandedId] = useState<string | null>(null);
+    // Filter tab & detail modal states
+    const [filterTab, setFilterTab] = useState<'all' | 'active' | 'verified'>('all');
+    const [selectedAgencyForDetail, setSelectedAgencyForDetail] = useState<AgencyWithRole | null>(null);
 
     // Delete confirmation
     const [deletingAgency, setDeletingAgency] = useState<AgencyWithRole | null>(null);
@@ -184,11 +201,6 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
         fetchAgencies();
     }, [fetchAgencies]);
 
-    // ── Accordion toggle ─────────────────────────────────────────────
-
-    const toggleExpand = useCallback((id: string) => {
-        setExpandedId(prev => prev === id ? null : id);
-    }, []);
 
     // ── Form field handlers ──────────────────────────────────────────
 
@@ -493,8 +505,8 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
 
             // Remove from local state
             setAgencies(prev => prev.filter(a => a.id !== deletingAgency.id));
-            if (expandedId === deletingAgency.id) {
-                setExpandedId(null);
+            if (selectedAgencyForDetail?.id === deletingAgency.id) {
+                setSelectedAgencyForDetail(null);
             }
             setDeletingAgency(null);
         } catch {
@@ -502,7 +514,7 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
         } finally {
             setDeleteLoading(false);
         }
-    }, [deletingAgency, expandedId]);
+    }, [deletingAgency, selectedAgencyForDetail]);
 
     // ── Check if form has all required fields ────────────────────────
 
@@ -521,178 +533,415 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
     // Loading state
     if (pageState === 'loading') {
         return (
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <div className="text-center">
-                    <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mb-4" />
-                    <p className="text-muted-foreground">Carregando...</p>
-                </div>
+            <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-4">
+                <Loader2 className="w-8 h-8 animate-spin text-amber-600" />
+                <p className="text-sm font-medium text-muted-foreground">
+                    Carregando suas imobiliárias...
+                </p>
             </div>
         );
     }
 
+    // Counts for filter tabs
+    const activeCount = agencies.filter(a => a.status === 'ACTIVE').length;
+    const verifiedCount = agencies.filter(a => a.status === 'VERIFIED').length;
+
+    const filteredAgencies = agencies.filter(a => {
+        if (filterTab === 'active') return a.status === 'ACTIVE';
+        if (filterTab === 'verified') return a.status === 'VERIFIED';
+        return true;
+    });
+
     // ── List view ────────────────────────────────────────────────────
     if (pageState === 'list') {
         return (
-            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                {/* Page Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-                    <div>
-                        <h1 className="text-3xl font-bold text-foreground">Imobiliárias</h1>
-                        <p className="text-muted-foreground mt-1">
-                            Gerencie suas imobiliárias cadastradas.
-                        </p>
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+                {/* Top Navigation & Header */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="space-y-1.5">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Link
+                                href={lang === 'pt' ? '/dashboard' : `/${lang}/dashboard`}
+                                className="inline-flex items-center font-medium hover:text-foreground transition-colors"
+                            >
+                                <ArrowLeft className="w-4 h-4 mr-1.5" />
+                                Dashboard
+                            </Link>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <div className="p-2.5 bg-amber-100 dark:bg-amber-900/50 rounded-xl text-amber-600">
+                                <Building2 className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+                                    Gestão de Imobiliárias
+                                </h1>
+                                <p className="text-sm text-muted-foreground">
+                                    Selecione a imobiliária para visualizar detalhes, CRECI, contatos e gerenciar o cadastro
+                                </p>
+                            </div>
+                        </div>
                     </div>
-                    <Button onClick={startAdding} className="shrink-0">
-                        <Plus className="w-4 h-4 mr-2" />
-                        Adicionar imobiliária
-                    </Button>
+
+                    {/* Header Action Buttons */}
+                    <div className="flex flex-wrap items-center gap-2.5 self-start md:self-auto">
+                        <Button
+                            onClick={startAdding}
+                            className="bg-amber-600 hover:bg-amber-700 text-white gap-2 text-sm font-medium shadow-sm"
+                        >
+                            <Plus className="w-4 h-4" />
+                            Adicionar Imobiliária
+                        </Button>
+
+                        <Link href={lang === 'pt' ? '/imoveis' : `/${lang}/imoveis`}>
+                            <Button variant="outline" className="gap-2 text-sm font-medium">
+                                <Building2 className="w-4 h-4" />
+                                Meus Imóveis
+                            </Button>
+                        </Link>
+                    </div>
                 </div>
 
                 {/* Success message */}
                 {submitSuccess && (
-                    <div className="mb-6 flex items-center gap-2 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 px-4 py-3 rounded-xl text-sm">
+                    <div className="flex items-center gap-2 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 px-4 py-3 rounded-xl text-sm">
                         <CheckCircle2 className="w-4 h-4 shrink-0" />
                         Dados salvos com sucesso!
                     </div>
                 )}
 
-                {/* Empty state */}
-                {agencies.length === 0 ? (
-                    <div className="bg-card border border-border rounded-2xl p-12 text-center shadow-sm">
-                        <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                            <Building2 className="w-8 h-8 text-primary" />
-                        </div>
-                        <h2 className="text-lg font-semibold text-foreground mb-2">
-                            Nenhuma imobiliária cadastrada
-                        </h2>
-                        <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                            Cadastre sua primeira imobiliária para gerenciar imóveis, corretores e anúncios no Kitnets.com.
-                        </p>
-                        <Button onClick={startAdding}>
-                            <Plus className="w-4 h-4 mr-2" />
-                            Adicionar imobiliária
-                        </Button>
+                {/* Filter Tabs if user has agencies */}
+                {agencies.length > 0 && (
+                    <div className="flex items-center gap-2 border-b border-border pb-3">
+                        <button
+                            onClick={() => setFilterTab('all')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                                filterTab === 'all'
+                                    ? 'bg-foreground text-background shadow-xs'
+                                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                            }`}
+                        >
+                            Todas as Imobiliárias ({agencies.length})
+                        </button>
+                        <button
+                            onClick={() => setFilterTab('active')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                                filterTab === 'active'
+                                    ? 'bg-amber-600 text-white shadow-xs'
+                                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                            }`}
+                        >
+                            <Building2 className="w-3.5 h-3.5" />
+                            Ativas ({activeCount})
+                        </button>
+                        {verifiedCount > 0 && (
+                            <button
+                                onClick={() => setFilterTab('verified')}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                                    filterTab === 'verified'
+                                        ? 'bg-emerald-600 text-white shadow-xs'
+                                        : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                                }`}
+                            >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                Verificadas ({verifiedCount})
+                            </button>
+                        )}
                     </div>
-                ) : (
-                    /* Agency list */
-                    <div className="space-y-3">
-                        {agencies.map((agency) => {
-                            const isExpanded = expandedId === agency.id;
-                            const status = getStatusLabel(agency.status);
-                            const location = [agency.city, agency.state].filter(Boolean).join('/');
-                            const subtitle = [agency.trade_name, location].filter(Boolean).join(' — ');
+                )}
+
+                {/* Agencies Grid */}
+                {filteredAgencies.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {filteredAgencies.map((agency) => {
+                            const canEdit = agency.role === 'OWNER' || agency.role === 'ADMIN';
+                            const canDelete = agency.role === 'OWNER';
+
+                            const streetWithNumber = [agency.street, agency.street_number].filter(Boolean).join(', ');
+                            const addressParts = [
+                                streetWithNumber,
+                                agency.neighborhood,
+                                [agency.city, agency.state].filter(Boolean).join('/'),
+                            ].filter(Boolean);
+                            const formattedAddress = addressParts.join(' - ');
 
                             return (
-                                <div key={agency.id} className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm transition-shadow hover:shadow-md">
-                                    {/* Compact Row */}
-                                    <button
-                                        type="button"
-                                        onClick={() => toggleExpand(agency.id)}
-                                        className="w-full flex items-center gap-3 p-4 sm:p-5 text-left hover:bg-accent/50 transition-colors cursor-pointer"
-                                        aria-expanded={isExpanded}
-                                        aria-controls={`agency-detail-${agency.id}`}
-                                    >
-                                        {/* Expand/collapse icon */}
-                                        <div className="shrink-0 text-muted-foreground">
-                                            {isExpanded ? (
-                                                <ChevronUp className="w-5 h-5" />
+                                <div
+                                    key={agency.id}
+                                    className={`group relative flex flex-col justify-between rounded-2xl border bg-card p-6 shadow-xs transition-all duration-200 hover:shadow-md ${
+                                        agency.status === 'VERIFIED'
+                                            ? 'border-emerald-500/40 dark:border-emerald-500/30 hover:border-emerald-500'
+                                            : agency.status === 'ACTIVE'
+                                            ? 'border-amber-500/40 dark:border-amber-500/30 hover:border-amber-500'
+                                            : 'border-border hover:border-muted-foreground/40'
+                                    }`}
+                                >
+                                    <div className="space-y-4">
+                                        {/* Header: Name + Badges + Actions */}
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="space-y-1 flex-1">
+                                                <div className="flex items-center justify-between">
+                                                    <h3 className="font-semibold text-lg text-foreground group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors line-clamp-1">
+                                                        {agency.trade_name ? agency.trade_name.toUpperCase() : agency.name.toUpperCase()}
+                                                    </h3>
+
+                                                    {/* Quick Action Icons */}
+                                                    <div className="flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+                                                        {canEdit && (
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    startEditing(agency);
+                                                                }}
+                                                                className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                                                                title="Editar imobiliária"
+                                                                aria-label="Editar imobiliária"
+                                                            >
+                                                                <Edit3 className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        )}
+                                                        {canDelete && (
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    confirmDelete(agency);
+                                                                }}
+                                                                className="p-1.5 rounded-md text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                                                                title="Excluir imobiliária"
+                                                                aria-label="Excluir imobiliária"
+                                                            >
+                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Address */}
+                                                {formattedAddress ? (
+                                                    <p className="text-xs text-muted-foreground flex items-center gap-1 line-clamp-1">
+                                                        <MapPin className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                                                        {formattedAddress}
+                                                    </p>
+                                                ) : (
+                                                    <p className="text-xs text-muted-foreground italic flex items-center gap-1">
+                                                        <MapPin className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                                                        Endereço não cadastrado
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Tags Row */}
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            {/* Status Badge */}
+                                            {agency.status === 'VERIFIED' ? (
+                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800">
+                                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                                                    Imobiliária Verificada
+                                                </span>
+                                            ) : agency.status === 'ACTIVE' ? (
+                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800">
+                                                    <Building2 className="w-3.5 h-3.5 text-amber-500" />
+                                                    Cadastro Ativo
+                                                </span>
                                             ) : (
-                                                <ChevronDown className="w-5 h-5" />
+                                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-normal bg-muted text-muted-foreground">
+                                                    {agency.status === 'DRAFT' ? 'Rascunho' : agency.status}
+                                                </span>
+                                            )}
+
+                                            {/* CRECI Badge */}
+                                            {agency.creci_number && (
+                                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800">
+                                                    <Shield className="w-3.5 h-3.5 text-blue-500" />
+                                                    CRECI {agency.creci_number}{agency.creci_state ? `/${agency.creci_state}` : ''}{agency.creci_type ? ` (${agency.creci_type})` : ''}
+                                                </span>
+                                            )}
+
+                                            {/* CNPJ Monospace Badge (matching UC: ...) */}
+                                            {agency.cnpj && (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono bg-muted text-muted-foreground">
+                                                    CNPJ: {formatCNPJ(agency.cnpj)}
+                                                </span>
                                             )}
                                         </div>
 
-                                        {/* Logo thumbnail */}
-                                        {agency.logo_url ? (
-                                            agency.website ? (
-                                                <a
-                                                    href={agency.website}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    className="shrink-0 hidden sm:block"
-                                                    title={`Visitar ${agency.website.replace(/^https?:\/\//, '')}`}
-                                                >
-                                                    <img
-                                                        src={agency.logo_url}
-                                                        alt={`Logo ${agency.trade_name || agency.name}`}
-                                                        className="w-10 h-10 rounded-lg object-contain border border-border hover:border-primary transition-colors"
-                                                    />
-                                                </a>
-                                            ) : (
-                                                <img
-                                                    src={agency.logo_url}
-                                                    alt={`Logo ${agency.trade_name || agency.name}`}
-                                                    className="w-10 h-10 rounded-lg object-contain border border-border shrink-0 hidden sm:block"
-                                                />
-                                            )
+                                        {/* Notes / Razão Social */}
+                                        {agency.trade_name && agency.name !== agency.trade_name ? (
+                                            <p className="text-[11px] text-muted-foreground/80 line-clamp-1 italic">
+                                                Razão Social: {agency.name}
+                                            </p>
+                                        ) : agency.description ? (
+                                            <p className="text-[11px] text-muted-foreground/80 line-clamp-1 italic">
+                                                Obs: {agency.description}
+                                            </p>
                                         ) : null}
 
-                                        {/* Agency info */}
-                                        <div className="flex-1 min-w-0">
-                                            <p className="font-semibold text-foreground truncate">
-                                                {agency.name}
-                                            </p>
-                                            {subtitle && (
-                                                <p className="text-sm text-muted-foreground truncate mt-0.5">
-                                                    {subtitle}
-                                                </p>
-                                            )}
-                                        </div>
+                                        {/* Logo & Contact / WhatsApp Row */}
+                                        <div className="pt-2 border-t border-border/60 flex items-center justify-between text-xs text-muted-foreground">
+                                            <div className="flex items-center gap-2">
+                                                {agency.logo_url ? (
+                                                    <div className="px-2 py-1 bg-background border border-border rounded-lg flex items-center justify-center max-h-8">
+                                                        <img
+                                                            src={agency.logo_url}
+                                                            alt={agency.trade_name || agency.name}
+                                                            className="h-6 max-w-[90px] object-contain"
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <div className="px-2 py-1 bg-muted/30 border border-border rounded-lg flex items-center gap-1.5 text-foreground font-medium text-xs">
+                                                        <Building2 className="w-3.5 h-3.5 text-amber-500" />
+                                                        <span className="truncate max-w-[120px]">
+                                                            {agency.trade_name || agency.name}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
 
-                                        {/* WhatsApp link(s) */}
-                                        {((agency.main_phone_whatsapp && agency.main_phone) || (agency.additional_phone_whatsapp && agency.additional_phone)) && (
-                                            <div className="hidden sm:flex items-center gap-3 shrink-0">
-                                                {agency.main_phone_whatsapp && agency.main_phone && (
+                                            <div className="text-right">
+                                                {agency.main_phone_whatsapp && agency.main_phone ? (
                                                     <a
                                                         href={`https://wa.me/${agency.main_phone.replace(/\D/g, '')}`}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
                                                         onClick={(e) => e.stopPropagation()}
-                                                        className="inline-flex items-center gap-1.5 text-sm text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 transition-colors"
+                                                        className="text-foreground font-medium flex items-center gap-1 justify-end text-green-600 dark:text-green-400 hover:underline transition-colors"
                                                         title="Abrir WhatsApp"
                                                     >
-                                                        <MessageCircle className="w-4 h-4" />
+                                                        <MessageCircle className="w-3.5 h-3.5 text-green-600" />
                                                         <span>{formatPhone(agency.main_phone)}</span>
                                                     </a>
-                                                )}
-                                                {agency.additional_phone_whatsapp && agency.additional_phone && (
-                                                    <a
-                                                        href={`https://wa.me/${agency.additional_phone.replace(/\D/g, '')}`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        className="inline-flex items-center gap-1.5 text-sm text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 transition-colors"
-                                                        title="Abrir WhatsApp"
-                                                    >
-                                                        <MessageCircle className="w-4 h-4" />
-                                                        <span>{formatPhone(agency.additional_phone)}</span>
-                                                    </a>
+                                                ) : agency.main_phone ? (
+                                                    <span className="text-muted-foreground flex items-center gap-1 justify-end">
+                                                        <Phone className="w-3.5 h-3.5 text-muted-foreground" />
+                                                        {formatPhone(agency.main_phone)}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-muted-foreground flex items-center gap-1 justify-end">
+                                                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                                                        Sem telefone
+                                                    </span>
                                                 )}
                                             </div>
-                                        )}
-
-                                        {/* Status badge */}
-                                        <Badge variant={status.variant} className="shrink-0">
-                                            {status.label}
-                                        </Badge>
-                                    </button>
-
-                                    {/* Expanded detail card */}
-                                    {isExpanded && (
-                                        <div
-                                            id={`agency-detail-${agency.id}`}
-                                            className="border-t border-border p-4 sm:p-6"
-                                        >
-                                            <AgencyProfileCard
-                                                agency={agency}
-                                                onEdit={() => startEditing(agency)}
-                                                onDelete={() => confirmDelete(agency)}
-                                            />
                                         </div>
-                                    )}
+                                    </div>
+
+                                    {/* Bottom block: Responsável & Role + CTA Button */}
+                                    <div className="pt-4 mt-4 border-t border-border/60 space-y-3">
+                                        <div className="p-3 bg-muted/40 dark:bg-muted/20 border border-border/80 rounded-xl flex items-center justify-between">
+                                            <div className="space-y-0.5">
+                                                <span className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground flex items-center gap-1">
+                                                    <User className="w-3 h-3 text-amber-500" />
+                                                    Responsável Legal
+                                                </span>
+                                                <p className="text-xs font-semibold text-foreground truncate max-w-[140px] sm:max-w-[170px]">
+                                                    {agency.owner_name || 'Não informado'}
+                                                </p>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground block">
+                                                    Seu Perfil
+                                                </span>
+                                                <span className="text-xs font-bold text-foreground">
+                                                    {getRoleLabel(agency.role)}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* CTA Action */}
+                                        <Button
+                                            onClick={() => setSelectedAgencyForDetail(agency)}
+                                            className={`w-full justify-between group-hover:bg-amber-600 group-hover:text-white transition-all ${
+                                                agency.status === 'VERIFIED'
+                                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                                    : 'bg-amber-600 hover:bg-amber-700 text-white'
+                                            }`}
+                                        >
+                                            <span>Gerenciar Imobiliária</span>
+                                            <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
+                                        </Button>
+                                    </div>
                                 </div>
                             );
                         })}
+                    </div>
+                ) : (
+                    /* Empty state */
+                    <div className="border-2 border-dashed border-border rounded-3xl p-12 text-center bg-card space-y-4 max-w-xl mx-auto">
+                        <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/40 text-amber-600 rounded-2xl flex items-center justify-center mx-auto">
+                            <Building2 className="w-8 h-8" />
+                        </div>
+                        <div className="space-y-2">
+                            <h3 className="text-lg font-semibold text-foreground">
+                                {agencies.length === 0
+                                    ? 'Nenhuma imobiliária cadastrada'
+                                    : 'Nenhuma imobiliária encontrada nesta categoria'}
+                            </h3>
+                            <p className="text-sm text-muted-foreground">
+                                {agencies.length === 0
+                                    ? 'Cadastre sua primeira imobiliária para gerenciar imóveis, corretores e anúncios no Kitnets.com.'
+                                    : 'Alterne os filtros acima para visualizar suas imobiliárias cadastradas ou adicione uma nova.'}
+                            </p>
+                        </div>
+                        <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                            <Button
+                                onClick={startAdding}
+                                className="bg-amber-600 hover:bg-amber-700 text-white gap-2 font-medium"
+                            >
+                                <Plus className="w-4 h-4" />
+                                Adicionar Imobiliária
+                            </Button>
+                            <Link href={lang === 'pt' ? '/imoveis' : `/${lang}/imoveis`}>
+                                <Button variant="outline" className="gap-2 font-medium">
+                                    <Building2 className="w-4 h-4" />
+                                    Meus Imóveis
+                                </Button>
+                            </Link>
+                        </div>
+                    </div>
+                )}
+
+                {/* Detail View Modal */}
+                {selectedAgencyForDetail && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div
+                            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                            onClick={() => setSelectedAgencyForDetail(null)}
+                        />
+                        <div className="relative bg-card border border-border rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+                            <div className="flex items-center justify-between pb-4 mb-4 border-b border-border">
+                                <div className="flex items-center gap-2">
+                                    <Building2 className="w-5 h-5 text-amber-600" />
+                                    <h2 className="text-lg font-semibold text-foreground">
+                                        Detalhes da Imobiliária
+                                    </h2>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedAgencyForDetail(null)}
+                                    className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                                    aria-label="Fechar modal"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <AgencyProfileCard
+                                agency={selectedAgencyForDetail}
+                                onEdit={() => {
+                                    const agency = selectedAgencyForDetail;
+                                    setSelectedAgencyForDetail(null);
+                                    startEditing(agency);
+                                }}
+                                onDelete={() => {
+                                    const agency = selectedAgencyForDetail;
+                                    setSelectedAgencyForDetail(null);
+                                    confirmDelete(agency);
+                                }}
+                            />
+                        </div>
                     </div>
                 )}
 
@@ -777,19 +1026,29 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
     return (
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {/* Page Header */}
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-foreground">
-                    {isEditing ? 'Editar Imobiliária' : 'Cadastrar Imobiliária'}
-                </h1>
-                <p className="text-muted-foreground mt-2">
-                    {isEditing
-                        ? 'Atualize os dados da sua imobiliária.'
-                        : 'Cadastre os dados da sua imobiliária para gerenciar imóveis, corretores e anúncios no Kitnets.com.'
-                    }
-                </p>
-                <p className="text-xs text-muted-foreground mt-2">
-                    Campos marcados com <span className="text-red-500">*</span> são obrigatórios.
-                </p>
+            <div className="mb-8 space-y-4">
+                <button
+                    type="button"
+                    onClick={cancelForm}
+                    className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                >
+                    <ArrowLeft className="w-4 h-4 mr-1.5" />
+                    Voltar para a lista de imobiliárias
+                </button>
+                <div>
+                    <h1 className="text-3xl font-bold text-foreground">
+                        {isEditing ? 'Editar Imobiliária' : 'Cadastrar Imobiliária'}
+                    </h1>
+                    <p className="text-muted-foreground mt-2">
+                        {isEditing
+                            ? 'Atualize os dados da sua imobiliária.'
+                            : 'Cadastre os dados da sua imobiliária para gerenciar imóveis, corretores e anúncios no Kitnets.com.'
+                        }
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                        Campos marcados com <span className="text-red-500">*</span> são obrigatórios.
+                    </p>
+                </div>
             </div>
 
             {/* Global error */}
