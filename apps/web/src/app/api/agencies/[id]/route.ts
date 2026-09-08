@@ -99,32 +99,36 @@ export async function PUT(
             return NextResponse.json({ errors }, { status: 400 });
         }
 
-        // ── CNPJ uniqueness check (if changed) ──────────────────────
+        // ── CNPJ per-user duplicate check (if changed) ───────────────
         const cnpjDigits = body.cnpj?.trim() ? parseCNPJ(body.cnpj) : null;
         if (cnpjDigits && cnpjDigits.length === 14) {
-            // Check if an ACTIVE agency already has this CNPJ
-            const { data: existingCnpj } = await supabase
-                .from('agencies')
-                .select('id')
-                .eq('cnpj', cnpjDigits)
-                .neq('id', agencyId)
-                .is('deleted_at', null)
-                .maybeSingle();
+            const { data: userMemberships } = await supabase
+                .from('agency_members')
+                .select('agency_id')
+                .eq('user_id', profile.id);
 
-            if (existingCnpj) {
-                return NextResponse.json(
-                    { errors: { cnpj: 'Este CNPJ já está cadastrado por outra imobiliária.' } },
-                    { status: 409 }
-                );
+            if (userMemberships && userMemberships.length > 0) {
+                const userAgencyIds = userMemberships.map(m => m.agency_id);
+                const { data: userExistingCnpj } = await supabase
+                    .from('agencies')
+                    .select('id')
+                    .in('id', userAgencyIds)
+                    .eq('cnpj', cnpjDigits)
+                    .neq('id', agencyId)
+                    .is('deleted_at', null)
+                    .maybeSingle();
+
+                if (userExistingCnpj) {
+                    return NextResponse.json(
+                        {
+                            errors: {
+                                cnpj: 'Você já possui outra imobiliária com este CNPJ cadastrada em seu painel.',
+                            },
+                        },
+                        { status: 409 }
+                    );
+                }
             }
-
-            // If a soft-deleted agency is holding this CNPJ, release it so the DB unique constraint doesn't block
-            await supabase
-                .from('agencies')
-                .update({ cnpj: null })
-                .eq('cnpj', cnpjDigits)
-                .neq('id', agencyId)
-                .not('deleted_at', 'is', null);
         }
 
         // ── Normalize and update ─────────────────────────────────────
