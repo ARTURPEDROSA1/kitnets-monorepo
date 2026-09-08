@@ -19,6 +19,9 @@ import {
     Building2,
     Sparkles,
     FileText,
+    Share2,
+    LineChart,
+    ExternalLink,
 } from "lucide-react";
 import {
     EnergyBalanceChart,
@@ -28,6 +31,7 @@ import {
     EnergyChartPoint,
 } from "@/components/energy/EnergyCharts";
 import { EnergyBillUploadModal } from "@/components/energy/EnergyBillUploadModal";
+import { HistoricUnitPriceModal } from "@/components/energy/HistoricUnitPriceModal";
 
 export interface EnergyBillRecord {
     id: string;
@@ -91,6 +95,7 @@ export default function EnergyDashboardPage() {
     const [bills, setBills] = useState<EnergyBillRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [isUploadOpen, setIsUploadOpen] = useState(false);
+    const [isUnitPriceModalOpen, setIsUnitPriceModalOpen] = useState(false);
     const [filterMonths, setFilterMonths] = useState<number>(12);
     const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -161,12 +166,18 @@ export default function EnergyDashboardPage() {
 
         const currentBalance = latestFullBill.generation_balance_kwh || 0;
         const currentInjected = latestFullBill.solar_injected_kwh || 0;
+        const currentCompensated = latestFullBill.solar_compensated_kwh || 0;
+        const currentSurplus = Math.max(0, currentInjected - currentCompensated);
         const currentConsumption = latestFullBill.grid_consumption_kwh || 0;
         const currentDailyAvg = latestFullBill.daily_avg_kwh || (currentConsumption / (latestFullBill.billing_days || 30));
         const currentTotal = latestFullBill.total_amount || 0;
         const currentAvailability = latestFullBill.availability_cost_amount || 0;
         const currentUnitPrice = latestFullBill.unit_price || 0;
-        const currentSavings = latestFullBill.estimated_savings_amount || (currentInjected * currentUnitPrice);
+        
+        // Solar savings strictly realized from energy compensated/used locally (avoided tariff cost)
+        const currentSavings = currentCompensated > 0 && currentUnitPrice > 0
+            ? (currentCompensated * currentUnitPrice)
+            : Math.abs(latestFullBill.energy_compensated_amount || 0);
 
         // Period totals
         const totalConsumptionPeriod = filteredBills.reduce((acc, b) => acc + (Number(b.grid_consumption_kwh) || 0), 0);
@@ -175,6 +186,8 @@ export default function EnergyDashboardPage() {
         return {
             currentBalance,
             currentInjected,
+            currentCompensated,
+            currentSurplus,
             currentConsumption,
             currentDailyAvg,
             currentTotal,
@@ -189,20 +202,28 @@ export default function EnergyDashboardPage() {
     const chartData: EnergyChartPoint[] = useMemo(() => {
         return [...filteredBills]
             .sort((a, b) => a.reference_month.localeCompare(b.reference_month))
-            .map((b) => ({
-                reference_month: b.reference_month,
-                date_label: b.reference_month_label || formatMonthLabel(b.reference_month),
-                grid_consumption_kwh: Number(b.grid_consumption_kwh) || 0,
-                solar_injected_kwh: Number(b.solar_injected_kwh) || 0,
-                solar_compensated_kwh: Number(b.solar_compensated_kwh) || 0,
-                generation_balance_kwh: Number(b.generation_balance_kwh) || 0,
-                daily_avg_kwh: Number(b.daily_avg_kwh) || (Number(b.grid_consumption_kwh) / (b.billing_days || 30)),
-                total_amount: Number(b.total_amount) || 0,
-                availability_cost_amount: Number(b.availability_cost_amount) || 0,
-                estimated_savings: Number(b.estimated_savings_amount) || (Number(b.solar_injected_kwh) * (Number(b.unit_price) || 0)),
-                unit_price: Number(b.unit_price) || 0,
-                is_historical_only: b.is_historical_only,
-            }));
+            .map((b) => {
+                const compensatedKwh = Number(b.solar_compensated_kwh) || 0;
+                const unitPrice = Number(b.unit_price) || 0;
+                const calculatedSavings = compensatedKwh > 0 && unitPrice > 0
+                    ? (compensatedKwh * unitPrice)
+                    : Math.abs(Number(b.energy_compensated_amount) || 0);
+
+                return {
+                    reference_month: b.reference_month,
+                    date_label: b.reference_month_label || formatMonthLabel(b.reference_month),
+                    grid_consumption_kwh: Number(b.grid_consumption_kwh) || 0,
+                    solar_injected_kwh: Number(b.solar_injected_kwh) || 0,
+                    solar_compensated_kwh: compensatedKwh,
+                    generation_balance_kwh: Number(b.generation_balance_kwh) || 0,
+                    daily_avg_kwh: Number(b.daily_avg_kwh) || (Number(b.grid_consumption_kwh) / (b.billing_days || 30)),
+                    total_amount: Number(b.total_amount) || 0,
+                    availability_cost_amount: Number(b.availability_cost_amount) || 0,
+                    estimated_savings: calculatedSavings,
+                    unit_price: unitPrice,
+                    is_historical_only: b.is_historical_only,
+                };
+            });
     }, [filteredBills]);
 
     return (
@@ -284,22 +305,22 @@ export default function EnergyDashboardPage() {
             {/* Content when bills exist */}
             {bills.length > 0 && (
                 <>
-                    {/* Top 6 KPI Metric Summary Cards */}
+                    {/* Top 7 KPI Metric Summary Cards */}
                     {summary && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-                            {/* Card 1: SALDO ATUAL DE GERAÇÃO */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3.5">
+                            {/* Card 1: Saldo de Créditos */}
                             <div className="bg-card border border-emerald-300 dark:border-emerald-800/60 rounded-xl p-4 shadow-xs space-y-1 bg-gradient-to-br from-emerald-50/40 dark:from-emerald-950/20 to-transparent">
                                 <div className="flex items-center justify-between text-muted-foreground">
                                     <span className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-                                        Saldo de Geração
+                                        Saldo de Créditos
                                     </span>
                                     <BatteryCharging className="w-4 h-4 text-emerald-600" />
                                 </div>
                                 <p className="text-2xl font-black text-emerald-800 dark:text-emerald-200">
-                                    {formatNumber(summary.currentBalance)} <span className="text-sm font-normal">kWh</span>
+                                    {formatNumber(summary.currentBalance, 0)} <span className="text-sm font-normal">kWh</span>
                                 </p>
                                 <p className="text-[11px] text-emerald-600/90 dark:text-emerald-400">
-                                    Créditos acumulados na rede
+                                    Créditos históricos nesta UC
                                 </p>
                             </div>
 
@@ -312,30 +333,46 @@ export default function EnergyDashboardPage() {
                                     <Sun className="w-4 h-4 text-amber-500" />
                                 </div>
                                 <p className="text-2xl font-bold text-foreground">
-                                    {formatNumber(summary.currentInjected)} <span className="text-sm font-normal text-muted-foreground">kWh</span>
+                                    {formatNumber(summary.currentInjected, 0)} <span className="text-sm font-normal text-muted-foreground">kWh</span>
                                 </p>
                                 <p className="text-[11px] text-muted-foreground">
-                                    Exportado pelos painéis solares
+                                    Total gerado e enviado à rede
                                 </p>
                             </div>
 
-                            {/* Card 3: Consumo da Rede */}
+                            {/* Card 3: Compensação Local */}
                             <div className="bg-card border border-border rounded-xl p-4 shadow-xs space-y-1">
                                 <div className="flex items-center justify-between text-muted-foreground">
-                                    <span className="text-xs font-semibold uppercase tracking-wider text-blue-600">
-                                        Consumo da Rede
+                                    <span className="text-xs font-semibold uppercase tracking-wider text-sky-600">
+                                        Compensação Local
                                     </span>
-                                    <Zap className="w-4 h-4 text-blue-500" />
+                                    <Zap className="w-4 h-4 text-sky-500" />
                                 </div>
                                 <p className="text-2xl font-bold text-foreground">
-                                    {formatNumber(summary.currentConsumption)} <span className="text-sm font-normal text-muted-foreground">kWh</span>
+                                    {formatNumber(summary.currentCompensated, 0)} <span className="text-sm font-normal text-muted-foreground">kWh</span>
                                 </p>
                                 <p className="text-[11px] text-muted-foreground">
-                                    Média: {formatNumber(summary.currentDailyAvg, 2)} kWh/Dia
+                                    Abatido do consumo nesta UC
                                 </p>
                             </div>
 
-                            {/* Card 4: Valor a Pagar */}
+                            {/* Card 4: Excedente para Outras UCs */}
+                            <div className="bg-card border border-border rounded-xl p-4 shadow-xs space-y-1">
+                                <div className="flex items-center justify-between text-muted-foreground">
+                                    <span className="text-xs font-semibold uppercase tracking-wider text-purple-600">
+                                        Excedente p/ Outras UCs
+                                    </span>
+                                    <Share2 className="w-4 h-4 text-purple-500" />
+                                </div>
+                                <p className="text-2xl font-bold text-foreground">
+                                    {formatNumber(summary.currentSurplus, 0)} <span className="text-sm font-normal text-muted-foreground">kWh</span>
+                                </p>
+                                <p className="text-[11px] text-muted-foreground">
+                                    Injetada − Compensação Local
+                                </p>
+                            </div>
+
+                            {/* Card 5: Valor a Pagar */}
                             <div className="bg-card border border-border rounded-xl p-4 shadow-xs space-y-1">
                                 <div className="flex items-center justify-between text-muted-foreground">
                                     <span className="text-xs font-semibold uppercase tracking-wider">
@@ -351,23 +388,27 @@ export default function EnergyDashboardPage() {
                                 </p>
                             </div>
 
-                            {/* Card 5: Preço Unitário */}
-                            <div className="bg-card border border-border rounded-xl p-4 shadow-xs space-y-1">
+                            {/* Card 6: Preço Unitário (Clickable -> Opens Historical Chart Modal) */}
+                            <div
+                                onClick={() => setIsUnitPriceModalOpen(true)}
+                                className="bg-card border border-border hover:border-sky-500/60 rounded-xl p-4 shadow-xs space-y-1 cursor-pointer transition-all hover:shadow-md group relative"
+                                title="Clique para visualizar o gráfico histórico do Preço Unitário"
+                            >
                                 <div className="flex items-center justify-between text-muted-foreground">
-                                    <span className="text-xs font-semibold uppercase tracking-wider">
+                                    <span className="text-xs font-semibold uppercase tracking-wider group-hover:text-sky-600 transition-colors">
                                         Preço Unitário
                                     </span>
-                                    <FileText className="w-4 h-4 text-muted-foreground" />
+                                    <LineChart className="w-4 h-4 text-muted-foreground group-hover:text-sky-600 transition-colors" />
                                 </div>
                                 <p className="text-xl font-bold text-foreground font-mono">
                                     R$ {formatNumber(summary.currentUnitPrice, 4)}
                                 </p>
-                                <p className="text-[11px] text-muted-foreground">
-                                    Tarifa efetiva com tributos
+                                <p className="text-[11px] text-sky-600 dark:text-sky-400 flex items-center gap-1 font-medium">
+                                    Ver histórico <ExternalLink className="w-3 h-3 inline" />
                                 </p>
                             </div>
 
-                            {/* Card 6: Economia Solar Estimada */}
+                            {/* Card 7: Economia Solar */}
                             <div className="bg-card border border-border rounded-xl p-4 shadow-xs space-y-1 bg-gradient-to-br from-amber-50/40 dark:from-amber-950/20 to-transparent">
                                 <div className="flex items-center justify-between text-muted-foreground">
                                     <span className="text-xs font-semibold uppercase tracking-wider text-amber-600">
@@ -379,7 +420,7 @@ export default function EnergyDashboardPage() {
                                     {formatCurrency(summary.currentSavings)}
                                 </p>
                                 <p className="text-[11px] text-amber-700/80 dark:text-amber-400">
-                                    Economizado neste mês
+                                    {formatNumber(summary.currentCompensated, 0)} kWh compensados no mês
                                 </p>
                             </div>
                         </div>
@@ -443,9 +484,9 @@ export default function EnergyDashboardPage() {
                         <div className="bg-card border border-border rounded-xl p-5 shadow-xs space-y-3">
                             <div className="flex items-center justify-between">
                                 <h3 className="text-sm font-semibold text-foreground">
-                                    Comparativo Financeiro: Fatura Paga vs. Economia Solar (R$)
+                                    Comparativo Financeiro: Fatura Paga vs. Economia Solar Compensada (R$)
                                 </h3>
-                                <span className="text-xs text-muted-foreground">Impacto no Bolso</span>
+                                <span className="text-xs text-muted-foreground">Créditos Abatidos Localmente</span>
                             </div>
                             <FinancialAnalysisChart data={chartData} />
                         </div>
@@ -564,6 +605,14 @@ export default function EnergyDashboardPage() {
                 onSuccess={() => {
                     fetchBills();
                 }}
+            />
+
+            {/* Historic Unit Price Modal */}
+            <HistoricUnitPriceModal
+                isOpen={isUnitPriceModalOpen}
+                onClose={() => setIsUnitPriceModalOpen(false)}
+                bills={bills}
+                currentUnitPrice={summary?.currentUnitPrice}
             />
         </div>
     );
