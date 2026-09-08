@@ -157,14 +157,32 @@ export async function PUT(
             state: body.state.trim().toUpperCase(),
             country: body.country?.trim() || 'BR',
             description: body.description?.trim() || null,
+            service_agreement_url: body.service_agreement_url || null,
+            service_agreement_filename: body.service_agreement_filename?.trim() || null,
+            management_fee: body.management_fee ? parseFloat(body.management_fee) : null,
+            agreement_start_date: body.agreement_start_date || null,
+            agreement_end_date: body.agreement_end_date || null,
         };
 
-        const { data: agency, error: updateError } = await supabase
+        let { data: agency, error: updateError } = await supabase
             .from('agencies')
             .update(updateData)
             .eq('id', agencyId)
             .select()
             .single();
+
+        if (updateError && (updateError.code === '42703' || updateError.message?.includes('column'))) {
+            console.warn('[Agencies PUT] Column not found, retrying with core fields:', updateError.message);
+            const { service_agreement_url, service_agreement_filename, management_fee, agreement_start_date, agreement_end_date, ...coreData } = updateData;
+            const retryRes = await supabase
+                .from('agencies')
+                .update(coreData)
+                .eq('id', agencyId)
+                .select()
+                .single();
+            agency = retryRes.data;
+            updateError = retryRes.error;
+        }
 
         if (updateError) {
             console.error('[Agencies PUT] Update error:', updateError);

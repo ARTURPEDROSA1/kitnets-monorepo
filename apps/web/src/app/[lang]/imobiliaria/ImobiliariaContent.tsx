@@ -86,6 +86,12 @@ function getEmptyFormData(): AgencyFormData {
         city: '',
         state: '',
         country: 'BR',
+        description: '',
+        service_agreement_url: '',
+        service_agreement_filename: '',
+        management_fee: '',
+        agreement_start_date: '',
+        agreement_end_date: '',
     };
 }
 
@@ -112,6 +118,12 @@ function agencyToFormData(agency: AgencyWithRole): AgencyFormData {
         city: agency.city || '',
         state: agency.state || '',
         country: agency.country || 'BR',
+        description: agency.description || '',
+        service_agreement_url: agency.service_agreement_url || '',
+        service_agreement_filename: agency.service_agreement_filename || '',
+        management_fee: agency.management_fee !== undefined && agency.management_fee !== null ? String(agency.management_fee) : '',
+        agreement_start_date: agency.agreement_start_date || '',
+        agreement_end_date: agency.agreement_end_date || '',
     };
 }
 
@@ -181,6 +193,12 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
     const [logoFile, setLogoFile] = useState<File | null>(null);
     const [logoUploading, setLogoUploading] = useState(false);
     const [logoError, setLogoError] = useState<string | null>(null);
+
+    // Service agreement upload state
+    const [serviceAgreementFile, setServiceAgreementFile] = useState<File | null>(null);
+    const [serviceAgreementUploading, setServiceAgreementUploading] = useState(false);
+    const [serviceAgreementError, setServiceAgreementError] = useState<string | null>(null);
+    const serviceAgreementInputRef = useRef<HTMLInputElement>(null);
 
     // AI contract extraction & modal state
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -349,6 +367,33 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
         }
     }, [logoFile]);
 
+    // ── Service agreement upload helper ──────────────────────────────
+
+    const uploadServiceAgreement = useCallback(async (agencyId: string) => {
+        if (!serviceAgreementFile) return;
+
+        setServiceAgreementUploading(true);
+        setServiceAgreementError(null);
+        try {
+            const formData = new FormData();
+            formData.append('file', serviceAgreementFile);
+
+            const res = await fetch(`/api/agencies/${agencyId}/agreement`, {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                console.warn('[Imobiliária] Service agreement upload warning:', data.error);
+            }
+        } catch (err) {
+            console.warn('[Imobiliária] Service agreement upload error:', err);
+        } finally {
+            setServiceAgreementUploading(false);
+        }
+    }, [serviceAgreementFile]);
+
     // ── Submit handler ───────────────────────────────────────────────
 
     const handleSubmit = useCallback(async (e: React.FormEvent) => {
@@ -397,19 +442,32 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
 
             setSubmitSuccess(true);
 
+            const savedAgency = data.agency;
+            const targetAgencyId = savedAgency?.id || editingAgency?.id;
+
             // Upload logo if a new file was selected
-            if (logoFile && data.agency?.id) {
-                await uploadLogo(data.agency.id);
+            if (logoFile && targetAgencyId) {
+                await uploadLogo(targetAgencyId);
+            }
+
+            // Upload service agreement if a new file was selected
+            if (serviceAgreementFile && targetAgencyId) {
+                await uploadServiceAgreement(targetAgencyId);
             }
 
             // Refetch agencies list to get updated data
             await fetchAgencies();
+            setPageState('list');
+            setEditingAgency(null);
+            setIsAiExtracted(false);
+            setServiceAgreementFile(null);
+            setLogoFile(null);
         } catch {
             setSubmitError('Erro de conexão. Verifique sua internet e tente novamente.');
         } finally {
             setSubmitting(false);
         }
-    }, [form, validate, pageState, editingAgency, fetchAgencies, logoFile, uploadLogo]);
+    }, [form, validate, pageState, editingAgency, fetchAgencies, logoFile, uploadLogo, serviceAgreementFile, uploadServiceAgreement]);
 
     // ── AI Contract Extraction handlers ─────────────────────────────
 
@@ -518,7 +576,8 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
             const rawCep = data.postal_code ? parseCEP(String(data.postal_code)) : '';
             const formattedCep = rawCep.length === 8 ? formatCEP(rawCep) : (data.postal_code || '');
 
-            const formattedPhoneVal = data.main_phone ? formatPhone(String(data.main_phone)) : '';
+            const rawPhone = data.main_phone ? String(data.main_phone) : '';
+            const formattedPhoneVal = formatPhone(rawPhone);
             const formattedAddPhoneVal = data.additional_phone ? formatPhone(String(data.additional_phone)) : '';
 
             setForm({
@@ -543,9 +602,31 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                 city: data.city || '',
                 state: (data.state || '').toUpperCase(),
                 country: 'BR',
+                description: data.contract_notes || '',
+                service_agreement_url: '',
+                service_agreement_filename: file.name,
+                management_fee: data.management_fee !== undefined && data.management_fee !== null ? String(data.management_fee) : '',
+                agreement_start_date: data.agreement_start_date || '',
+                agreement_end_date: data.agreement_end_date || '',
             });
 
-            if (croppedLogoFile && croppedLogoUrl) {
+            // Automatically attach the uploaded contract file
+            setServiceAgreementFile(file);
+            setServiceAgreementError(null);
+
+            // Handle logo: prefer sharp-cropped logo_base64 from server
+            if (data.logo_base64) {
+                try {
+                    const blob = await fetch(data.logo_base64).then(r => r.blob());
+                    const logoFileObj = new File([blob], 'logo-extraido.png', { type: 'image/png' });
+                    setLogoFile(logoFileObj);
+                    setLogoPreview(data.logo_base64);
+                    setLogoError(null);
+                } catch (logoErr) {
+                    console.warn('[Imobiliária] Failed to convert logo base64:', logoErr);
+                    setLogoPreview(data.logo_base64);
+                }
+            } else if (croppedLogoFile && croppedLogoUrl) {
                 setLogoFile(croppedLogoFile);
                 setLogoPreview(croppedLogoUrl);
                 setLogoError(null);
@@ -591,6 +672,8 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
         setLogoPreview(null);
         setLogoFile(null);
         setLogoError(null);
+        setServiceAgreementFile(null);
+        setServiceAgreementError(null);
         setIsAiExtracted(false);
         setPageState('form');
     }, []);
@@ -605,9 +688,52 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
         setLogoPreview(agency.logo_url || null);
         setLogoFile(null);
         setLogoError(null);
+        setServiceAgreementFile(null);
+        setServiceAgreementError(null);
         setIsAiExtracted(false);
         setPageState('editing');
     }, []);
+
+    // ── Service Agreement File handlers ──────────────────────────────
+
+    const handleAgreementSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+        if (!allowed.includes(file.type)) {
+            setServiceAgreementError('Formato de arquivo não suportado. Use PDF, JPG, PNG ou WebP.');
+            return;
+        }
+        if (file.size > 15 * 1024 * 1024) {
+            setServiceAgreementError('Arquivo muito grande. Limite máximo: 15MB.');
+            return;
+        }
+
+        setServiceAgreementFile(file);
+        setForm(prev => ({
+            ...prev,
+            service_agreement_filename: file.name,
+        }));
+        setServiceAgreementError(null);
+    }, []);
+
+    const removeAgreementFile = useCallback(async () => {
+        if (editingAgency?.id && editingAgency.service_agreement_url) {
+            try {
+                await fetch(`/api/agencies/${editingAgency.id}/agreement`, { method: 'DELETE' });
+            } catch {
+                // Ignore
+            }
+        }
+        setServiceAgreementFile(null);
+        setForm(prev => ({
+            ...prev,
+            service_agreement_url: '',
+            service_agreement_filename: '',
+        }));
+        setServiceAgreementError(null);
+    }, [editingAgency]);
 
     // ── Logo upload handlers ─────────────────────────────────────────
 
@@ -946,18 +1072,39 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                                                     CNPJ: {formatCNPJ(agency.cnpj)}
                                                 </span>
                                             )}
+
+                                            {/* Taxa de Administração */}
+                                            {agency.management_fee && (
+                                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800">
+                                                    Taxa: {agency.management_fee}%
+                                                </span>
+                                            )}
+
+                                            {/* Contrato de Prestação de Serviços */}
+                                            {(agency.service_agreement_filename || agency.service_agreement_url) && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800">
+                                                    <FileText className="w-3 h-3 text-emerald-600" />
+                                                    Contrato Anexado
+                                                </span>
+                                            )}
                                         </div>
 
-                                        {/* Notes / Razão Social */}
-                                        {agency.trade_name && agency.name !== agency.trade_name ? (
+                                        {/* Razão Social (se diferente do Fantasia) */}
+                                        {agency.trade_name && agency.name !== agency.trade_name && (
                                             <p className="text-[11px] text-muted-foreground/80 line-clamp-1 italic">
                                                 Razão Social: {agency.name}
                                             </p>
-                                        ) : agency.description ? (
-                                            <p className="text-[11px] text-muted-foreground/80 line-clamp-1 italic">
-                                                Obs: {agency.description}
-                                            </p>
-                                        ) : null}
+                                        )}
+
+                                        {/* Observações / Comentários Card */}
+                                        {agency.description && (
+                                            <div className="p-2.5 rounded-xl bg-muted/40 border border-border/60 text-xs text-muted-foreground flex items-start gap-2">
+                                                <MessageCircle className="w-3.5 h-3.5 text-blue-500 mt-0.5 shrink-0" />
+                                                <p className="line-clamp-2 leading-relaxed">
+                                                    {agency.description}
+                                                </p>
+                                            </div>
+                                        )}
 
                                         {/* Logo & Contact / WhatsApp Row */}
                                         <div className="pt-2 border-t border-border/60 flex items-center justify-between text-xs text-muted-foreground">
@@ -1862,6 +2009,228 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                     </div>
                 </section>
 
+                {/* ── Section 4: Contrato de Prestação de Serviços ──────────── */}
+                <section className="bg-card border border-border rounded-2xl p-6 sm:p-8 mb-6 shadow-sm">
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                            <FileText className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-semibold text-foreground">
+                                Contrato de Prestação de Serviços
+                            </h2>
+                            <p className="text-xs text-muted-foreground">
+                                Armazene o contrato de administração, taxa de gestão acordada e período de vigência.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-5">
+                        {/* File Upload / Status Card */}
+                        <div>
+                            <Label>Documento do Contrato (PDF ou Imagem)</Label>
+                            <div className="mt-2">
+                                {(serviceAgreementFile || form.service_agreement_url || form.service_agreement_filename) ? (
+                                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-xl border border-amber-500/30 bg-amber-50/50 dark:bg-amber-950/20">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2.5 bg-amber-100 dark:bg-amber-900/50 rounded-xl text-amber-600 shrink-0">
+                                                <FileText className="w-6 h-6" />
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-sm font-semibold text-foreground truncate max-w-[240px] sm:max-w-md">
+                                                        {serviceAgreementFile?.name || form.service_agreement_filename || 'Contrato de Prestação de Serviços'}
+                                                    </p>
+                                                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                                                        {serviceAgreementFile ? 'Novo arquivo' : 'Anexado'}
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-muted-foreground mt-0.5">
+                                                    {serviceAgreementFile
+                                                        ? `${(serviceAgreementFile.size / (1024 * 1024)).toFixed(2)} MB • Será salvo ao enviar o formulário`
+                                                        : 'Arquivo armazenado com segurança no sistema'}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-2 self-end sm:self-center">
+                                            {form.service_agreement_url && !serviceAgreementFile && (
+                                                <a
+                                                    href={form.service_agreement_url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-input bg-background hover:bg-accent text-foreground transition-colors"
+                                                >
+                                                    <ExternalLink className="w-3.5 h-3.5" />
+                                                    Visualizar
+                                                </a>
+                                            )}
+                                            <label
+                                                htmlFor="replace-agreement-file"
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-input bg-background hover:bg-accent text-foreground cursor-pointer transition-colors"
+                                            >
+                                                <Upload className="w-3.5 h-3.5" />
+                                                Substituir
+                                            </label>
+                                            <input
+                                                id="replace-agreement-file"
+                                                type="file"
+                                                accept="application/pdf,image/jpeg,image/png,image/webp"
+                                                onChange={handleAgreementSelect}
+                                                className="hidden"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={removeAgreementFile}
+                                                className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
+                                                title="Remover contrato"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="border-2 border-dashed border-border rounded-xl p-6 text-center hover:border-amber-500/60 transition-colors bg-muted/20">
+                                        <div className="w-12 h-12 rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-600 flex items-center justify-center mx-auto mb-3">
+                                            <FileText className="w-6 h-6" />
+                                        </div>
+                                        <p className="text-sm font-medium text-foreground">
+                                            Anexar contrato de prestação de serviços
+                                        </p>
+                                        <p className="text-xs text-muted-foreground mt-1 mb-4">
+                                            PDF, JPG, PNG ou WebP de até 15MB
+                                        </p>
+                                        <label
+                                            htmlFor="service-agreement-upload"
+                                            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer shadow-xs transition-colors"
+                                        >
+                                            <Upload className="w-4 h-4" />
+                                            Selecionar Contrato
+                                        </label>
+                                        <input
+                                            id="service-agreement-upload"
+                                            ref={serviceAgreementInputRef}
+                                            type="file"
+                                            accept="application/pdf,image/jpeg,image/png,image/webp"
+                                            onChange={handleAgreementSelect}
+                                            className="hidden"
+                                        />
+                                    </div>
+                                )}
+                                {serviceAgreementError && (
+                                    <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                                        <AlertTriangle className="w-3.5 h-3.5" />
+                                        {serviceAgreementError}
+                                    </p>
+                                )}
+                                {serviceAgreementUploading && (
+                                    <p className="text-xs text-primary mt-1 flex items-center gap-1">
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                        Enviando contrato...
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Management Fee + Agreement Dates */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+                            {/* Management Fee */}
+                            <div>
+                                <Label htmlFor="agency-management-fee">
+                                    Taxa de Administração (%)
+                                </Label>
+                                <div className="relative mt-1">
+                                    <Input
+                                        id="agency-management-fee"
+                                        type="number"
+                                        step="0.1"
+                                        min="0"
+                                        max="100"
+                                        value={form.management_fee}
+                                        onChange={(e) => updateField('management_fee', e.target.value)}
+                                        placeholder="Ex: 10.0"
+                                        className="pr-8"
+                                    />
+                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">
+                                        %
+                                    </span>
+                                </div>
+                                <p className="text-[11px] text-muted-foreground mt-1">
+                                    Percentual cobrado para gestão
+                                </p>
+                            </div>
+
+                            {/* Agreement Start Date */}
+                            <div>
+                                <Label htmlFor="agency-start-date">
+                                    Início da Vigência
+                                </Label>
+                                <Input
+                                    id="agency-start-date"
+                                    type="date"
+                                    value={form.agreement_start_date}
+                                    onChange={(e) => updateField('agreement_start_date', e.target.value)}
+                                    className="mt-1"
+                                />
+                                <p className="text-[11px] text-muted-foreground mt-1">
+                                    Data de início da contratação
+                                </p>
+                            </div>
+
+                            {/* Agreement End Date */}
+                            <div>
+                                <Label htmlFor="agency-end-date">
+                                    Término da Vigência
+                                </Label>
+                                <Input
+                                    id="agency-end-date"
+                                    type="date"
+                                    value={form.agreement_end_date}
+                                    onChange={(e) => updateField('agreement_end_date', e.target.value)}
+                                    className="mt-1"
+                                />
+                                <p className="text-[11px] text-muted-foreground mt-1">
+                                    Data de renovação ou encerramento
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                {/* ── Section 5: Observações e Comentários ──────────── */}
+                <section className="bg-card border border-border rounded-2xl p-6 sm:p-8 mb-6 shadow-sm">
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
+                            <MessageCircle className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-semibold text-foreground">
+                                Observações e Comentários
+                            </h2>
+                            <p className="text-xs text-muted-foreground">
+                                Anotações internas sobre a imobiliária, regras de repasse, contatos especiais ou acordos particulares.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <Label htmlFor="agency-description">
+                            Notas Internas
+                        </Label>
+                        <textarea
+                            id="agency-description"
+                            rows={4}
+                            value={form.description}
+                            onChange={(e) => updateField('description', e.target.value)}
+                            placeholder="Adicione anotações internas sobre esta imobiliária (ex: dia do repasse de aluguel, cláusulas especiais, dados bancários de depósito, contatos de corretores parceiros)..."
+                            className="w-full mt-2 rounded-xl border border-input bg-background px-3.5 py-2.5 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        />
+                        <p className="text-[11px] text-muted-foreground mt-1.5">
+                            Visível apenas para você e administradores da sua conta.
+                        </p>
+                    </div>
+                </section>
+
                 {/* ── Form Footer ──────────────────────────────────────── */}
                 <div className="flex flex-col-reverse sm:flex-row sm:justify-between sm:items-center gap-3 pt-2">
                     <Button
@@ -1876,7 +2245,7 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
 
                     <Button
                         type="submit"
-                        disabled={submitting || !isFormValid}
+                        disabled={submitting}
                         className="min-w-[200px]"
                     >
                         {submitting ? (

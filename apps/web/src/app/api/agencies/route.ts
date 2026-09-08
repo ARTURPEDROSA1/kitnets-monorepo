@@ -221,15 +221,40 @@ export async function POST(request: Request) {
             city: body.city.trim(),
             state: body.state.trim().toUpperCase(),
             country: body.country?.trim() || 'BR',
+            description: body.description?.trim() || null,
+            service_agreement_url: body.service_agreement_url || null,
+            service_agreement_filename: body.service_agreement_filename?.trim() || null,
+            management_fee: body.management_fee ? parseFloat(body.management_fee) : null,
+            agreement_start_date: body.agreement_start_date || null,
+            agreement_end_date: body.agreement_end_date || null,
             status: 'ACTIVE',
         };
 
         // ── Insert agency ────────────────────────────────────────────
-        const { data: agency, error: insertError } = await supabase
+        let agency: any = null;
+        let insertError: any = null;
+
+        const res = await supabase
             .from('agencies')
             .insert(agencyData)
             .select()
             .single();
+
+        agency = res.data;
+        insertError = res.error;
+
+        // Fallback: if columns like service_agreement_* don't exist yet, insert without them
+        if (insertError && (insertError.code === '42703' || insertError.message?.includes('column'))) {
+            console.warn('[Agencies POST] Column not found, retrying with core fields:', insertError.message);
+            const { service_agreement_url, service_agreement_filename, management_fee, agreement_start_date, agreement_end_date, ...coreData } = agencyData;
+            const retryRes = await supabase
+                .from('agencies')
+                .insert(coreData)
+                .select()
+                .single();
+            agency = retryRes.data;
+            insertError = retryRes.error;
+        }
 
         if (insertError) {
             console.error('[Agencies POST] Insert error:', insertError);

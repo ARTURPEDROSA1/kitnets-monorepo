@@ -12,6 +12,7 @@ import {
     ExternalLink,
     MessageCircle,
     Trash2,
+    FileText,
 } from 'lucide-react';
 import { Button } from '@kitnets/ui';
 import { Badge } from '@/components/ui/badge';
@@ -57,6 +58,19 @@ function getRoleLabel(role: string): string {
 
 function getStateName(code: string): string {
     return BRAZILIAN_STATES.find(s => s.code === code)?.name || code;
+}
+
+function formatDateBR(dateStr?: string | null): string {
+    if (!dateStr) return '';
+    try {
+        const parts = dateStr.split('-');
+        if (parts.length === 3) {
+            return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        }
+        return dateStr;
+    } catch {
+        return dateStr;
+    }
 }
 
 export default function AgencyProfileCard({ agency, onEdit, onDelete }: AgencyProfileCardProps) {
@@ -269,15 +283,78 @@ export default function AgencyProfileCard({ agency, onEdit, onDelete }: AgencyPr
                         </div>
                     </div>
 
-                    {/* Description */}
+                    {/* Contrato de Prestação de Serviços */}
+                    {(agency.service_agreement_url || agency.service_agreement_filename || agency.management_fee || agency.agreement_start_date) && (
+                        <div className="mt-6 pt-6 border-t border-border">
+                            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                <FileText className="w-4 h-4 text-amber-600" />
+                                Contrato de Prestação de Serviços
+                            </h3>
+                            <div className="bg-muted/30 border border-border rounded-xl p-4 space-y-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    {agency.management_fee && (
+                                        <div>
+                                            <p className="text-xs text-muted-foreground">Taxa de Administração</p>
+                                            <p className="text-sm font-semibold text-foreground">
+                                                {agency.management_fee}%
+                                            </p>
+                                        </div>
+                                    )}
+                                    {agency.agreement_start_date && (
+                                        <div>
+                                            <p className="text-xs text-muted-foreground">Início da Vigência</p>
+                                            <p className="text-sm font-medium text-foreground">
+                                                {formatDateBR(agency.agreement_start_date)}
+                                            </p>
+                                        </div>
+                                    )}
+                                    {agency.agreement_end_date && (
+                                        <div>
+                                            <p className="text-xs text-muted-foreground">Término da Vigência</p>
+                                            <p className="text-sm font-medium text-foreground">
+                                                {formatDateBR(agency.agreement_end_date)}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {(agency.service_agreement_url || agency.service_agreement_filename) && (
+                                    <div className="pt-2 border-t border-border/60 flex items-center justify-between gap-3">
+                                        <div className="flex items-center gap-2">
+                                            <FileText className="w-4 h-4 text-amber-600 shrink-0" />
+                                            <span className="text-xs font-medium text-foreground truncate max-w-[200px] sm:max-w-xs">
+                                                {agency.service_agreement_filename || 'Contrato de Prestação de Serviços'}
+                                            </span>
+                                        </div>
+                                        {agency.service_agreement_url && (
+                                            <a
+                                                href={agency.service_agreement_url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                                            >
+                                                <ExternalLink className="w-3.5 h-3.5" />
+                                                Visualizar Contrato
+                                            </a>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Observações e Comentários */}
                     {agency.description && (
                         <div className="mt-6 pt-6 border-t border-border">
-                            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                                Sobre
+                            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                <MessageCircle className="w-4 h-4 text-blue-500" />
+                                Observações e Comentários
                             </h3>
-                            <p className="text-sm text-foreground whitespace-pre-line">
-                                {agency.description}
-                            </p>
+                            <div className="bg-muted/30 border border-border rounded-xl p-4">
+                                <p className="text-sm text-foreground whitespace-pre-line leading-relaxed">
+                                    {agency.description}
+                                </p>
+                            </div>
                         </div>
                     )}
                 </div>
