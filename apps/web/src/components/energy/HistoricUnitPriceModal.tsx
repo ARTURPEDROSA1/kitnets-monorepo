@@ -10,6 +10,8 @@ import {
     Calendar,
     ArrowUpRight,
     ArrowDownRight,
+    Maximize2,
+    Minimize2,
 } from "lucide-react";
 import {
     ResponsiveContainer,
@@ -51,6 +53,15 @@ export function HistoricUnitPriceModal({
     bills,
     currentUnitPrice,
 }: HistoricUnitPriceModalProps) {
+    const [isMaximized, setIsMaximized] = React.useState(false);
+
+    // Reset maximized state when closed
+    useEffect(() => {
+        if (!isOpen) {
+            setIsMaximized(false);
+        }
+    }, [isOpen]);
+
     // Close on Escape key
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -120,7 +131,11 @@ export function HistoricUnitPriceModal({
                 if (e.target === e.currentTarget) onClose();
             }}
         >
-            <div className="bg-card border border-border rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className={`bg-card border border-border rounded-2xl flex flex-col shadow-2xl overflow-hidden transition-all duration-200 ${
+                isMaximized
+                    ? "w-[96vw] max-w-7xl h-[94vh]"
+                    : "max-w-2xl w-full max-h-[90vh]"
+            }`}>
                 {/* Modal Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted/30">
                     <div className="flex items-center gap-3">
@@ -136,13 +151,28 @@ export function HistoricUnitPriceModal({
                             </p>
                         </div>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                        aria-label="Fechar modal"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                        <button
+                            onClick={() => setIsMaximized((prev) => !prev)}
+                            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                            title={isMaximized ? "Restaurar" : "Maximizar"}
+                            aria-label={isMaximized ? "Restaurar" : "Maximizar"}
+                        >
+                            {isMaximized ? (
+                                <Minimize2 className="w-4 h-4" />
+                            ) : (
+                                <Maximize2 className="w-4 h-4" />
+                            )}
+                        </button>
+                        <button
+                            onClick={onClose}
+                            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                            title="Fechar"
+                            aria-label="Fechar modal"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Modal Content */}
@@ -218,7 +248,7 @@ export function HistoricUnitPriceModal({
                         </div>
 
                         {tariffHistory.length > 0 ? (
-                            <div style={{ width: "100%", height: 260 }}>
+                            <div style={{ width: "100%", height: isMaximized ? 380 : 260 }}>
                                 <ResponsiveContainer>
                                     <AreaChart
                                         data={tariffHistory}
@@ -362,16 +392,6 @@ export function HistoricUnitPriceModal({
                             O <strong className="text-foreground">Preço Unitário (R$/kWh)</strong> representa o custo real médio da energia consumida na distribuidora, integrando a Tarifa de Energia (TE), Tarifa de Uso do Sistema de Distribuição (TUSD), impostos (ICMS, PIS/COFINS) e eventuais adicionais de bandeiras tarifárias. É esta mesma tarifa evitada que baliza o cálculo monetário da economia gerada pelos créditos solares compensados.
                         </p>
                     </div>
-                </div>
-
-                {/* Footer */}
-                <div className="px-6 py-3 border-t border-border bg-muted/20 flex justify-end">
-                    <button
-                        onClick={onClose}
-                        className="px-4 py-2 bg-muted hover:bg-muted/80 text-foreground rounded-xl text-xs font-medium transition-colors"
-                    >
-                        Fechar
-                    </button>
                 </div>
             </div>
         </div>
