@@ -126,15 +126,15 @@ export function HistoricUnitPriceModal({
 
     return (
         <div 
-            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
+            className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 sm:pl-[calc(16rem+1.5rem)] overflow-y-auto animate-in fade-in duration-200"
             onClick={(e) => {
                 if (e.target === e.currentTarget) onClose();
             }}
         >
             <div className={`bg-card border border-border rounded-2xl flex flex-col shadow-2xl overflow-hidden transition-all duration-200 ${
                 isMaximized
-                    ? "w-[96vw] max-w-7xl h-[94vh]"
-                    : "max-w-2xl w-full max-h-[90vh]"
+                    ? "w-full max-w-7xl h-[94vh]"
+                    : "w-full max-w-2xl max-h-[90vh]"
             }`}>
                 {/* Modal Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted/30">
