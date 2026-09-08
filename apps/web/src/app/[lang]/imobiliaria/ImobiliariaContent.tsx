@@ -29,6 +29,8 @@ import {
     Edit3,
     Sparkles,
     FileText,
+    Eye,
+    Pencil,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -2005,21 +2007,21 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                             <Label>Documento do Contrato (PDF ou Imagem)</Label>
                             <div className="mt-2">
                                 {(serviceAgreementFile || form.service_agreement_url || form.service_agreement_filename) ? (
-                                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-xl border border-amber-500/30 bg-amber-50/50 dark:bg-amber-950/20">
-                                        <div className="flex items-center gap-3">
+                                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-xl border border-amber-500/30 bg-amber-50/50 dark:bg-amber-950/20 overflow-hidden">
+                                        <div className="flex items-center gap-3 min-w-0 flex-1">
                                             <div className="p-2.5 bg-amber-100 dark:bg-amber-900/50 rounded-xl text-amber-600 shrink-0">
                                                 <FileText className="w-6 h-6" />
                                             </div>
-                                            <div>
-                                                <div className="flex items-center gap-2">
-                                                    <p className="text-sm font-semibold text-foreground truncate max-w-[240px] sm:max-w-md">
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                                                    <p className="text-sm font-semibold text-foreground truncate max-w-full">
                                                         {serviceAgreementFile?.name || form.service_agreement_filename || 'Contrato de Prestação de Serviços'}
                                                     </p>
-                                                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                                                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 shrink-0">
                                                         {serviceAgreementFile ? 'Novo arquivo' : 'Anexado'}
                                                     </span>
                                                 </div>
-                                                <p className="text-xs text-muted-foreground mt-0.5">
+                                                <p className="text-xs text-muted-foreground mt-0.5 truncate">
                                                     {serviceAgreementFile
                                                         ? `${(serviceAgreementFile.size / (1024 * 1024)).toFixed(2)} MB • Será salvo ao enviar o formulário`
                                                         : 'Arquivo armazenado com segurança no sistema'}
@@ -2027,24 +2029,27 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center gap-2 self-end sm:self-center">
-                                            {form.service_agreement_url && !serviceAgreementFile && (
+                                        {/* Actions: Eye, Pencil and Trash Can */}
+                                        <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                                            {(form.service_agreement_url || serviceAgreementFile) && (
                                                 <a
-                                                    href={form.service_agreement_url}
+                                                    href={form.service_agreement_url || (serviceAgreementFile ? URL.createObjectURL(serviceAgreementFile) : '#')}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-input bg-background hover:bg-accent text-foreground transition-colors"
+                                                    className="p-2 rounded-lg border border-input bg-background hover:bg-accent text-foreground hover:text-amber-600 dark:hover:text-amber-400 transition-colors flex items-center justify-center shadow-2xs"
+                                                    title="Visualizar documento"
+                                                    aria-label="Visualizar documento"
                                                 >
-                                                    <ExternalLink className="w-3.5 h-3.5" />
-                                                    Visualizar
+                                                    <Eye className="w-4 h-4" />
                                                 </a>
                                             )}
                                             <label
                                                 htmlFor="replace-agreement-file"
-                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-input bg-background hover:bg-accent text-foreground cursor-pointer transition-colors"
+                                                className="p-2 rounded-lg border border-input bg-background hover:bg-accent text-foreground hover:text-amber-600 dark:hover:text-amber-400 cursor-pointer transition-colors flex items-center justify-center shadow-2xs"
+                                                title="Substituir documento"
+                                                aria-label="Substituir documento"
                                             >
-                                                <Upload className="w-3.5 h-3.5" />
-                                                Substituir
+                                                <Pencil className="w-4 h-4" />
                                             </label>
                                             <input
                                                 id="replace-agreement-file"
@@ -2056,8 +2061,9 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                                             <button
                                                 type="button"
                                                 onClick={removeAgreementFile}
-                                                className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
-                                                title="Remover contrato"
+                                                className="p-2 rounded-lg border border-input bg-background text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/40 hover:border-red-200 dark:hover:border-red-900/50 transition-colors cursor-pointer flex items-center justify-center shadow-2xs"
+                                                title="Remover documento"
+                                                aria-label="Remover documento"
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
