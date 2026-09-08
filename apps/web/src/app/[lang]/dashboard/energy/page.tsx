@@ -362,31 +362,31 @@ export default function EnergyDashboardHubPage() {
                                 </div>
                             </div>
 
-                            {/* Bloco: Conta a Vencer (Valor a Pagar e Vencimento) */}
+                            {/* Bloco: Conta a Vencer (Vencimento e Pagar) */}
                             <div className="pt-4 mt-4 border-t border-border/60 space-y-3">
                                 {prop.latestDueDate || (prop.latestTotalAmount != null && prop.latestTotalAmount > 0) ? (
                                     <div className="p-3 bg-muted/40 dark:bg-muted/20 border border-border/80 rounded-xl flex items-center justify-between">
                                         <div className="space-y-0.5">
                                             <span className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground flex items-center gap-1">
                                                 <Calendar className="w-3 h-3 text-amber-500" />
-                                                Conta a Vencer {prop.latestMonthLabel ? `• ${prop.latestMonthLabel}` : ""}
+                                                Vencimento
                                             </span>
-                                            <p className="text-xs text-muted-foreground">
-                                                Vencimento: <strong className="text-foreground">{formatDueDate(prop.latestDueDate)}</strong>
-                                            </p>
+                                            <span className="text-xs sm:text-sm font-semibold text-foreground block">
+                                                {formatDueDate(prop.latestDueDate)}
+                                            </span>
                                         </div>
-                                        <div className="text-right">
+                                        <div className="text-right space-y-0.5">
                                             <span className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground block">
-                                                Valor a Pagar
+                                                Pagar
                                             </span>
-                                            <span className="text-base font-bold text-foreground">
+                                            <span className="text-sm sm:text-base font-bold text-foreground">
                                                 {formatCurrency(prop.latestTotalAmount || 0)}
                                             </span>
                                         </div>
                                     </div>
                                 ) : (
                                     <div className="p-2.5 bg-muted/20 border border-dashed border-border/60 rounded-xl flex items-center justify-between text-xs text-muted-foreground">
-                                        <span className="text-[11px] italic">Sem fatura a vencer no momento</span>
+                                        <span className="text-[11px] italic">Sem fatura a vencer</span>
                                         <span className="text-[11px] font-medium">-</span>
                                     </div>
                                 )}
