@@ -13,6 +13,7 @@ import {
     parseCEP,
     validateCEP,
 } from '@/lib/validators';
+import { unpackAgencyMetadata, packAgencyMetadata } from '@/lib/agency-metadata';
 
 function getServiceSupabase() {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -172,11 +173,28 @@ export async function PUT(
             .single();
 
         if (updateError && (updateError.code === '42703' || updateError.message?.includes('column'))) {
-            console.warn('[Agencies PUT] Column not found, retrying with core fields:', updateError.message);
+            console.warn('[Agencies PUT] Column not found, retrying with packed metadata in description:', updateError.message);
             const { service_agreement_url, service_agreement_filename, management_fee, agreement_start_date, agreement_end_date, ...coreData } = updateData;
+
+            // Fetch current description to preserve existing metadata if not specified in updateData
+            const { data: currentAgency } = await supabase
+                .from('agencies')
+                .select('description')
+                .eq('id', agencyId)
+                .maybeSingle();
+
+            const currentMeta = currentAgency ? unpackAgencyMetadata(currentAgency) : ({} as any);
+            const packedDescription = packAgencyMetadata(coreData.description !== undefined ? coreData.description : currentMeta.description, {
+                service_agreement_url: service_agreement_url !== undefined ? service_agreement_url : currentMeta.service_agreement_url,
+                service_agreement_filename: service_agreement_filename !== undefined ? service_agreement_filename : currentMeta.service_agreement_filename,
+                management_fee: management_fee !== undefined ? management_fee : currentMeta.management_fee,
+                agreement_start_date: agreement_start_date !== undefined ? agreement_start_date : currentMeta.agreement_start_date,
+                agreement_end_date: agreement_end_date !== undefined ? agreement_end_date : currentMeta.agreement_end_date,
+            });
+
             const retryRes = await supabase
                 .from('agencies')
-                .update(coreData)
+                .update({ ...coreData, description: packedDescription })
                 .eq('id', agencyId)
                 .select()
                 .single();
@@ -201,7 +219,7 @@ export async function PUT(
         console.log('[Agencies PUT] Updated agency:', agencyId);
         return NextResponse.json({
             success: true,
-            agency: { ...agency, role: membership.role },
+            agency: unpackAgencyMetadata({ ...agency, role: membership.role }),
         });
     } catch (err) {
         console.error('[Agencies PUT] Unexpected error:', err);

@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { currentUser } from '@clerk/nextjs/server';
+import { packAgencyMetadata, unpackAgencyMetadata } from '@/lib/agency-metadata';
 
 function getServiceSupabase() {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -21,8 +22,8 @@ const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15 MB
 
 /**
  * POST /api/agencies/[id]/agreement
- * Uploads a service agreement / contract file for an agency.
- * Expects multipart/form-data with a "file" field.
+ * Uploads a service agreement / contract file for an agency to Supabase Storage ('documents').
+ * Expects multipart/form-data with a "file" field, and optional fee and dates.
  * Returns { success: true, agreement_url: string, filename: string }
  */
 export async function POST(
@@ -66,6 +67,9 @@ export async function POST(
         // ── Parse multipart form data ────────────────────────────────
         const formData = await request.formData();
         const file = formData.get('file') as File | null;
+        const managementFee = formData.get('management_fee') as string | null;
+        const agreementStartDate = formData.get('agreement_start_date') as string | null;
+        const agreementEndDate = formData.get('agreement_end_date') as string | null;
 
         if (!file) {
             return NextResponse.json({ error: 'Nenhum arquivo enviado.' }, { status: 400 });
@@ -85,45 +89,73 @@ export async function POST(
             );
         }
 
-        // ── Upload to Supabase Storage ───────────────────────────────
-        const fileExt = file.name.split('.').pop()?.toLowerCase() || 'pdf';
+        // ── Upload to Supabase Storage ('documents' bucket) ──────────
         const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-        const fileName = `agreements/${agencyId}/${Date.now()}_${sanitizedName}`;
+        const fileName = `agencies/${agencyId}/agreements/${Date.now()}_${sanitizedName}`;
 
         const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
 
         const { error: uploadError } = await supabase.storage
-            .from('agency-logos')
+            .from('documents')
             .upload(fileName, buffer, {
                 contentType: file.type,
                 upsert: true,
             });
 
         if (uploadError) {
-            console.error('[Agreement Upload] Storage error:', uploadError);
+            console.error('[Agreement Upload] Storage error in documents bucket:', uploadError);
             return NextResponse.json(
-                { error: 'Erro ao fazer upload do documento.' },
+                { error: 'Erro ao fazer upload do documento no storage: ' + uploadError.message },
                 { status: 500 }
             );
         }
 
         // ── Get public URL ───────────────────────────────────────────
         const { data: { publicUrl } } = supabase.storage
-            .from('agency-logos')
+            .from('documents')
             .getPublicUrl(fileName);
 
-        // ── Update agency record ─────────────────────────────────────
-        try {
-            await supabase
+        // ── Update agency record (Native column or packed metadata fallback) ──
+        const updatePayload: Record<string, any> = {
+            service_agreement_url: publicUrl,
+            service_agreement_filename: file.name,
+        };
+        if (managementFee) updatePayload.management_fee = parseFloat(managementFee);
+        if (agreementStartDate) updatePayload.agreement_start_date = agreementStartDate;
+        if (agreementEndDate) updatePayload.agreement_end_date = agreementEndDate;
+
+        const { error: dbErr } = await supabase
+            .from('agencies')
+            .update(updatePayload)
+            .eq('id', agencyId);
+
+        if (dbErr && (dbErr.code === '42703' || dbErr.message?.includes('column'))) {
+            console.warn('[Agreement Upload] Native column not found (42703), storing metadata into description fallback');
+            const { data: currentAgency } = await supabase
                 .from('agencies')
-                .update({
-                    service_agreement_url: publicUrl,
-                    service_agreement_filename: file.name,
-                })
+                .select('description')
+                .eq('id', agencyId)
+                .maybeSingle();
+
+            const currentMeta = currentAgency ? unpackAgencyMetadata(currentAgency) : ({} as any);
+            const packedDescription = packAgencyMetadata(currentMeta.description, {
+                ...currentMeta,
+                service_agreement_url: publicUrl,
+                service_agreement_filename: file.name,
+                management_fee: managementFee ? parseFloat(managementFee) : currentMeta.management_fee,
+                agreement_start_date: agreementStartDate || currentMeta.agreement_start_date,
+                agreement_end_date: agreementEndDate || currentMeta.agreement_end_date,
+            });
+
+            const { error: metaErr } = await supabase
+                .from('agencies')
+                .update({ description: packedDescription })
                 .eq('id', agencyId);
-        } catch (dbErr) {
-            console.warn('[Agreement Upload] DB update warning (column might be missing):', dbErr);
+
+            if (metaErr) {
+                console.error('[Agreement Upload] Description metadata update error:', metaErr);
+            }
         }
 
         return NextResponse.json({
@@ -179,17 +211,34 @@ export async function DELETE(
             );
         }
 
-        // Clear service_agreement_url
-        try {
+        // Clear service_agreement_url (native or packed description)
+        const { error: dbErr } = await supabase
+            .from('agencies')
+            .update({
+                service_agreement_url: null,
+                service_agreement_filename: null,
+            })
+            .eq('id', agencyId);
+
+        if (dbErr && (dbErr.code === '42703' || dbErr.message?.includes('column'))) {
+            console.warn('[Agreement Delete] Native column not found, updating packed description');
+            const { data: currentAgency } = await supabase
+                .from('agencies')
+                .select('description')
+                .eq('id', agencyId)
+                .maybeSingle();
+
+            const currentMeta = currentAgency ? unpackAgencyMetadata(currentAgency) : ({} as any);
+            const packedDescription = packAgencyMetadata(currentMeta.description, {
+                ...currentMeta,
+                service_agreement_url: null,
+                service_agreement_filename: null,
+            });
+
             await supabase
                 .from('agencies')
-                .update({
-                    service_agreement_url: null,
-                    service_agreement_filename: null,
-                })
+                .update({ description: packedDescription })
                 .eq('id', agencyId);
-        } catch (dbErr) {
-            console.warn('[Agreement Delete] DB update warning:', dbErr);
         }
 
         return NextResponse.json({ success: true });
