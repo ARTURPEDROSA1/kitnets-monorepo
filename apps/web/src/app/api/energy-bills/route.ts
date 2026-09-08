@@ -139,10 +139,38 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
+        // Check if current PDF bill exists in Supabase Storage
+        let currentPdfUrl: string | null = null;
+        try {
+            const { data: files } = await supabase.storage
+                .from("energy-bills")
+                .list(resolvedPropertyId, { limit: 5 });
+            const currentFile = files?.find((f: any) => f.name.startsWith("current_bill"));
+            if (currentFile) {
+                const { data: pUrl } = supabase.storage
+                    .from("energy-bills")
+                    .getPublicUrl(`${resolvedPropertyId}/${currentFile.name}`);
+                if (pUrl?.publicUrl) {
+                    currentPdfUrl = `${pUrl.publicUrl}?t=${new Date(currentFile.updated_at || Date.now()).getTime()}`;
+                }
+            }
+        } catch (storageErr) {
+            console.warn("[Energy Bills GET] Storage list warning:", storageErr);
+        }
+
+        // Fallback: check if latest bill record has pdf_url stored
+        if (!currentPdfUrl && bills && bills.length > 0) {
+            const withPdf = bills.find((b: any) => b.pdf_url);
+            if (withPdf?.pdf_url) {
+                currentPdfUrl = withPdf.pdf_url;
+            }
+        }
+
         return NextResponse.json({
             success: true,
             bills: bills || [],
             propertyId: resolvedPropertyId,
+            currentPdfUrl,
         });
     } catch (err) {
         console.error("[Energy Bills GET] Critical error:", err);
@@ -153,7 +181,7 @@ export async function GET(request: Request) {
 
 /**
  * POST /api/energy-bills
- * Upserts a full energy bill and batch-seeds historical baseline records from the 13-month table
+ * Upserts a full energy bill, replaces single current PDF bill in storage, and batch-seeds historical baseline records
  */
 export async function POST(request: Request) {
     try {
@@ -162,8 +190,26 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
         }
 
-        const body = await request.json();
-        const { propertyId, billData, historicalConsumption } = body;
+        const contentType = request.headers.get("content-type") || "";
+        let propertyId: string;
+        let billData: any;
+        let historicalConsumption: any;
+        let uploadedFile: File | null = null;
+
+        if (contentType.includes("multipart/form-data")) {
+            const formData = await request.formData();
+            propertyId = formData.get("propertyId") as string;
+            const billDataRaw = formData.get("billData") as string;
+            billData = billDataRaw ? JSON.parse(billDataRaw) : null;
+            const histRaw = formData.get("historicalConsumption") as string;
+            historicalConsumption = histRaw ? JSON.parse(histRaw) : [];
+            uploadedFile = formData.get("file") as File | null;
+        } else {
+            const body = await request.json();
+            propertyId = body.propertyId;
+            billData = body.billData;
+            historicalConsumption = body.historicalConsumption;
+        }
 
         if (!propertyId) {
             return NextResponse.json({ error: "propertyId é obrigatório" }, { status: 400 });
@@ -176,8 +222,45 @@ export async function POST(request: Request) {
         const supabase = getServiceSupabase();
         const resolvedPropertyId = await resolvePropertyUuid(supabase, user.id, propertyId);
 
+        // Upload/replace current bill PDF in Supabase Storage keeping strictly one file
+        let pdfUrl: string | null = null;
+        if (uploadedFile && uploadedFile.size > 0) {
+            try {
+                const bucketName = "energy-bills";
+                const { data: buckets } = await supabase.storage.listBuckets();
+                if (!buckets?.some((b: any) => b.name === bucketName)) {
+                    await supabase.storage.createBucket(bucketName, { public: true });
+                }
+
+                const fileExt = uploadedFile.name.split(".").pop()?.toLowerCase() || "pdf";
+                const filePath = `${resolvedPropertyId}/current_bill.${fileExt}`;
+                const arrayBuffer = await uploadedFile.arrayBuffer();
+                const buffer = Buffer.from(arrayBuffer);
+
+                const { error: uploadError } = await supabase.storage
+                    .from(bucketName)
+                    .upload(filePath, buffer, {
+                        contentType: uploadedFile.type || "application/pdf",
+                        upsert: true,
+                    });
+
+                if (uploadError) {
+                    console.error("[Energy Bills Storage] Upload error:", uploadError);
+                } else {
+                    const { data: publicUrlData } = supabase.storage
+                        .from(bucketName)
+                        .getPublicUrl(filePath);
+                    if (publicUrlData?.publicUrl) {
+                        pdfUrl = `${publicUrlData.publicUrl}?t=${Date.now()}`;
+                    }
+                }
+            } catch (storageErr) {
+                console.error("[Energy Bills Storage] Exception during file upload:", storageErr);
+            }
+        }
+
         // 1. Prepare main bill payload
-        const mainBillPayload = {
+        const mainBillPayload: Record<string, any> = {
             property_id: resolvedPropertyId,
             utility_company: billData.utilityCompany || "CEMIG",
             consumer_unit: billData.consumerUnit || "Não informado",
@@ -219,12 +302,29 @@ export async function POST(request: Request) {
             updated_at: new Date().toISOString(),
         };
 
+        if (pdfUrl) {
+            mainBillPayload.pdf_url = pdfUrl;
+        }
+
         // 2. Upsert the main bill
-        const { data: savedBill, error: mainError } = await supabase
+        let { data: savedBill, error: mainError } = await supabase
             .from("energy_bills")
             .upsert(mainBillPayload, { onConflict: "property_id,reference_month" })
             .select()
             .single();
+
+        // Graceful fallback if pdf_url column hasn't been migrated yet
+        if (mainError && mainError.message?.includes("pdf_url")) {
+            console.warn("[Energy Bills POST] Column pdf_url not found in DB table, continuing without column:", mainError.message);
+            delete mainBillPayload.pdf_url;
+            const retryRes = await supabase
+                .from("energy_bills")
+                .upsert(mainBillPayload, { onConflict: "property_id,reference_month" })
+                .select()
+                .single();
+            savedBill = retryRes.data;
+            mainError = retryRes.error;
+        }
 
         if (mainError) {
             console.error("[Energy Bills POST] Error saving main bill:", mainError);

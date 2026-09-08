@@ -134,14 +134,17 @@ export function EnergyBillUploadModal({
         setError(null);
 
         try {
+            const formData = new FormData();
+            formData.append("propertyId", propertyId);
+            formData.append("billData", JSON.stringify(extracted));
+            formData.append("historicalConsumption", JSON.stringify(extracted.historicalConsumption || []));
+            if (file) {
+                formData.append("file", file);
+            }
+
             const res = await fetch("/api/energy-bills", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    propertyId,
-                    billData: extracted,
-                    historicalConsumption: extracted.historicalConsumption || [],
-                }),
+                body: formData,
             });
 
             const result = await res.json();
