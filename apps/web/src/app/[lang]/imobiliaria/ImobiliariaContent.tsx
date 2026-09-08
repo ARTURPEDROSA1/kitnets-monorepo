@@ -1089,23 +1089,6 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                                             )}
                                         </div>
 
-                                        {/* Razão Social (se diferente do Fantasia) */}
-                                        {agency.trade_name && agency.name !== agency.trade_name && (
-                                            <p className="text-[11px] text-muted-foreground/80 line-clamp-1 italic">
-                                                Razão Social: {agency.name}
-                                            </p>
-                                        )}
-
-                                        {/* Observações / Comentários Card */}
-                                        {agency.description && (
-                                            <div className="p-2.5 rounded-xl bg-muted/40 border border-border/60 text-xs text-muted-foreground flex items-start gap-2">
-                                                <MessageCircle className="w-3.5 h-3.5 text-blue-500 mt-0.5 shrink-0" />
-                                                <p className="line-clamp-2 leading-relaxed">
-                                                    {agency.description}
-                                                </p>
-                                            </div>
-                                        )}
-
                                         {/* Logo & Contact / WhatsApp Row */}
                                         <div className="pt-2 border-t border-border/60 flex items-center justify-between text-xs text-muted-foreground">
                                             <div className="flex items-center gap-2">
@@ -1155,7 +1138,7 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                                         </div>
                                     </div>
 
-                                    {/* Bottom block: Responsável & Role + CTA Button */}
+                                    {/* Bottom block: Responsável & Taxa Adm + CTA Button */}
                                     <div className="pt-4 mt-4 border-t border-border/60 space-y-3">
                                         <div className="p-3 bg-muted/40 dark:bg-muted/20 border border-border/80 rounded-xl flex items-center justify-between">
                                             <div className="space-y-0.5">
@@ -1169,10 +1152,10 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
                                             </div>
                                             <div className="text-right">
                                                 <span className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground block">
-                                                    Seu Perfil
+                                                    Taxa Adm
                                                 </span>
                                                 <span className="text-xs font-bold text-foreground">
-                                                    {getRoleLabel(agency.role)}
+                                                    {agency.management_fee ? `${agency.management_fee}%` : 'Não informada'}
                                                 </span>
                                             </div>
                                         </div>
