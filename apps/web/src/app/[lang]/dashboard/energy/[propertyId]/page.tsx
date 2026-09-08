@@ -13,6 +13,7 @@ import {
     TrendingUp,
     Calendar,
     Plus,
+    Pencil,
     Trash2,
     CheckCircle2,
     HelpCircle,
@@ -38,6 +39,7 @@ import { EnergyBillUploadModal } from "@/components/energy/EnergyBillUploadModal
 import { HistoricUnitPriceModal } from "@/components/energy/HistoricUnitPriceModal";
 import { EnergyDistributorLogo } from "@/components/energy/EnergyDistributorLogo";
 import { AddStandaloneUcModal } from "@/components/energy/AddStandaloneUcModal";
+import { EditEnergyBillModal } from "@/components/energy/EditEnergyBillModal";
 import type { OwnerPropertySummary } from "@/app/api/energy-bills/properties/route";
 
 export interface EnergyBillRecord {
@@ -107,6 +109,7 @@ export default function EnergyDashboardPage() {
     const [isUploadOpen, setIsUploadOpen] = useState(false);
     const [isAddUcOpen, setIsAddUcOpen] = useState(false);
     const [isUnitPriceModalOpen, setIsUnitPriceModalOpen] = useState(false);
+    const [editingBill, setEditingBill] = useState<EnergyBillRecord | null>(null);
     const [filterMonths, setFilterMonths] = useState<number>(12);
     const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -809,14 +812,23 @@ export default function EnergyDashboardPage() {
                                                     )}
                                                 </td>
                                                 <td className="py-3 px-4 text-center">
-                                                    <button
-                                                        onClick={() => handleDelete(b.id)}
-                                                        disabled={deletingId === b.id}
-                                                        className="p-1 rounded-md text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-                                                        title="Excluir registro"
-                                                    >
-                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                    </button>
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        <button
+                                                            onClick={() => setEditingBill(b)}
+                                                            className="p-1 rounded-md text-muted-foreground hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors"
+                                                            title="Editar registro"
+                                                        >
+                                                            <Pencil className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDelete(b.id)}
+                                                            disabled={deletingId === b.id}
+                                                            className="p-1 rounded-md text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                                                            title="Excluir registro"
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         );
@@ -853,6 +865,17 @@ export default function EnergyDashboardPage() {
                 onSuccess={(newProperty) => {
                     setProperties((prev) => [newProperty, ...prev]);
                     router.push(`/${lang}/dashboard/energy/${newProperty.id}`);
+                }}
+            />
+
+            {/* Edit Energy Bill Modal */}
+            <EditEnergyBillModal
+                isOpen={!!editingBill}
+                onClose={() => setEditingBill(null)}
+                bill={editingBill}
+                onSuccess={() => {
+                    setEditingBill(null);
+                    fetchBills();
                 }}
             />
         </div>

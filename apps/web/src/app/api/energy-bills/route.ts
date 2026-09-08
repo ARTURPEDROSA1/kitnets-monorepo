@@ -388,6 +388,106 @@ export async function POST(request: Request) {
 }
 
 /**
+ * PUT /api/energy-bills
+ * Updates an existing energy bill by id
+ */
+export async function PUT(request: Request) {
+    try {
+        const user = await currentUser();
+        if (!user) {
+            return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+        }
+
+        const body = await request.json();
+        const { id, billData } = body;
+
+        if (!id) {
+            return NextResponse.json({ error: "ID da fatura é obrigatório" }, { status: 400 });
+        }
+        if (!billData) {
+            return NextResponse.json({ error: "Dados da fatura são obrigatórios" }, { status: 400 });
+        }
+
+        const supabase = getServiceSupabase();
+
+        // 1. Fetch user profile
+        const { data: profile } = await supabase
+            .from("profiles")
+            .select("id")
+            .eq("clerk_id", user.id)
+            .maybeSingle();
+
+        if (!profile) {
+            return NextResponse.json({ error: "Perfil de usuário não encontrado" }, { status: 403 });
+        }
+
+        // 2. Fetch the existing bill and its property
+        const { data: existingBill, error: fetchErr } = await supabase
+            .from("energy_bills")
+            .select("id, property_id, properties(owner_id)")
+            .eq("id", id)
+            .maybeSingle();
+
+        if (fetchErr || !existingBill) {
+            return NextResponse.json({ error: "Fatura não encontrada" }, { status: 404 });
+        }
+
+        const prop = existingBill.properties as any;
+        if (prop && prop.owner_id && prop.owner_id !== profile.id) {
+            return NextResponse.json({ error: "Acesso não autorizado a esta fatura" }, { status: 403 });
+        }
+
+        // 3. Prepare payload
+        const gridConsumption = billData.grid_consumption_kwh != null ? Number(billData.grid_consumption_kwh) : undefined;
+        const billingDays = billData.billing_days != null ? Number(billData.billing_days) : undefined;
+
+        let dailyAvg = billData.daily_avg_kwh != null ? Number(billData.daily_avg_kwh) : undefined;
+        if ((dailyAvg == null || dailyAvg === 0) && gridConsumption != null && billingDays && billingDays > 0) {
+            dailyAvg = Math.round((gridConsumption / billingDays) * 100) / 100;
+        }
+
+        const updatePayload: Record<string, any> = {
+            updated_at: new Date().toISOString(),
+        };
+
+        if (billData.reference_month !== undefined) updatePayload.reference_month = billData.reference_month;
+        if (billData.reference_month_label !== undefined) updatePayload.reference_month_label = billData.reference_month_label;
+        if (billData.due_date !== undefined) updatePayload.due_date = billData.due_date || null;
+        if (billingDays !== undefined) updatePayload.billing_days = billingDays;
+        if (gridConsumption !== undefined) updatePayload.grid_consumption_kwh = gridConsumption;
+        if (dailyAvg !== undefined) updatePayload.daily_avg_kwh = dailyAvg;
+        if (billData.solar_injected_kwh !== undefined) updatePayload.solar_injected_kwh = Number(billData.solar_injected_kwh) || 0;
+        if (billData.solar_compensated_kwh !== undefined) updatePayload.solar_compensated_kwh = Number(billData.solar_compensated_kwh) || 0;
+        if (billData.generation_balance_kwh !== undefined) updatePayload.generation_balance_kwh = Number(billData.generation_balance_kwh) || 0;
+        if (billData.total_amount !== undefined) updatePayload.total_amount = Number(billData.total_amount) || 0;
+        if (billData.availability_cost_amount !== undefined) updatePayload.availability_cost_amount = Number(billData.availability_cost_amount) || 0;
+        if (billData.unit_price !== undefined) updatePayload.unit_price = billData.unit_price != null ? Number(billData.unit_price) : null;
+        if (billData.consumer_unit !== undefined) updatePayload.consumer_unit = billData.consumer_unit;
+        if (billData.utility_company !== undefined) updatePayload.utility_company = billData.utility_company;
+        if (billData.installation_class !== undefined) updatePayload.installation_class = billData.installation_class;
+        if (billData.notes !== undefined) updatePayload.notes = billData.notes;
+
+        const { data: updated, error: updateErr } = await supabase
+            .from("energy_bills")
+            .update(updatePayload)
+            .eq("id", id)
+            .select()
+            .single();
+
+        if (updateErr) {
+            console.error("[Energy Bills PUT] Error updating bill:", updateErr);
+            return NextResponse.json({ error: updateErr.message }, { status: 500 });
+        }
+
+        return NextResponse.json({ success: true, bill: updated });
+    } catch (err) {
+        console.error("[Energy Bills PUT] Critical error:", err);
+        const message = err instanceof Error ? err.message : "Erro interno do servidor";
+        return NextResponse.json({ error: message }, { status: 500 });
+    }
+}
+
+/**
  * DELETE /api/energy-bills?id=xxx
  */
 export async function DELETE(request: Request) {
