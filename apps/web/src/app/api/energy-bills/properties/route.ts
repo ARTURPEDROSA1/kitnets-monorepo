@@ -474,13 +474,51 @@ export async function DELETE(request: Request) {
             return NextResponse.json({ error: "Propriedade não encontrada ou não autorizada" }, { status: 404 });
         }
 
-        // 1. Delete associated energy bills
+        // 1. Unlink gateways
+        await supabase
+            .from("gateways")
+            .update({ property_id: null })
+            .eq("property_id", propertyId);
+
+        // 2. Find and delete leases (and their dependent charges, tenants, documents)
+        const { data: propLeases } = await supabase
+            .from("leases")
+            .select("id")
+            .eq("property_id", propertyId);
+
+        if (propLeases && propLeases.length > 0) {
+            const leaseIds = propLeases.map((l: any) => l.id);
+            await supabase.from("lease_charges").delete().in("lease_id", leaseIds);
+            await supabase.from("lease_tenants").delete().in("lease_id", leaseIds);
+            await supabase.from("lease_documents").delete().in("lease_id", leaseIds);
+            await supabase.from("leases").delete().eq("property_id", propertyId);
+        }
+
+        // 3. Delete tenants for this property
+        const { data: propTenants } = await supabase
+            .from("tenants")
+            .select("id")
+            .eq("property_id", propertyId);
+
+        if (propTenants && propTenants.length > 0) {
+            const tenantIds = propTenants.map((t: any) => t.id);
+            await supabase.from("lease_tenants").delete().in("tenant_id", tenantIds);
+            await supabase.from("tenants").delete().eq("property_id", propertyId);
+        }
+
+        // 4. Delete water bills
+        await supabase
+            .from("water_bills")
+            .delete()
+            .eq("property_id", propertyId);
+
+        // 5. Delete associated energy bills
         await supabase
             .from("energy_bills")
             .delete()
             .eq("property_id", propertyId);
 
-        // 2. Remove files from storage
+        // 6. Remove files from storage
         try {
             const { data: files } = await supabase.storage
                 .from("energy-bills")
@@ -493,7 +531,7 @@ export async function DELETE(request: Request) {
             console.warn("[Energy Properties DELETE] Storage cleanup warning:", storageErr);
         }
 
-        // 3. Delete property record
+        // 7. Delete property record
         const { error: delErr } = await supabase
             .from("properties")
             .delete()

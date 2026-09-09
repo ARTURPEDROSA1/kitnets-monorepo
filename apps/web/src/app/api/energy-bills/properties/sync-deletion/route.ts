@@ -151,30 +151,70 @@ export async function POST(request: Request) {
         } else {
             // action === "delete_all"
             if (matchedProp) {
-                // 1. Delete associated energy bills
+                const targetId = matchedProp.id;
+
+                // 1. Unlink gateways
+                await supabase
+                    .from("gateways")
+                    .update({ property_id: null })
+                    .eq("property_id", targetId);
+
+                // 2. Find and delete leases (and their dependent charges, tenants, documents)
+                const { data: propLeases } = await supabase
+                    .from("leases")
+                    .select("id")
+                    .eq("property_id", targetId);
+
+                if (propLeases && propLeases.length > 0) {
+                    const leaseIds = propLeases.map((l: any) => l.id);
+                    await supabase.from("lease_charges").delete().in("lease_id", leaseIds);
+                    await supabase.from("lease_tenants").delete().in("lease_id", leaseIds);
+                    await supabase.from("lease_documents").delete().in("lease_id", leaseIds);
+                    await supabase.from("leases").delete().eq("property_id", targetId);
+                }
+
+                // 3. Delete tenants for this property
+                const { data: propTenants } = await supabase
+                    .from("tenants")
+                    .select("id")
+                    .eq("property_id", targetId);
+
+                if (propTenants && propTenants.length > 0) {
+                    const tenantIds = propTenants.map((t: any) => t.id);
+                    await supabase.from("lease_tenants").delete().in("tenant_id", tenantIds);
+                    await supabase.from("tenants").delete().eq("property_id", targetId);
+                }
+
+                // 4. Delete water bills
+                await supabase
+                    .from("water_bills")
+                    .delete()
+                    .eq("property_id", targetId);
+
+                // 5. Delete associated energy bills
                 await supabase
                     .from("energy_bills")
                     .delete()
-                    .eq("property_id", matchedProp.id);
+                    .eq("property_id", targetId);
 
-                // 2. Remove files from storage
+                // 6. Remove files from storage
                 try {
                     const { data: files } = await supabase.storage
                         .from("energy-bills")
-                        .list(matchedProp.id);
+                        .list(targetId);
                     if (files && files.length > 0) {
-                        const paths = files.map(f => `${matchedProp!.id}/${f.name}`);
+                        const paths = files.map(f => `${targetId}/${f.name}`);
                         await supabase.storage.from("energy-bills").remove(paths);
                     }
                 } catch (storageErr) {
                     console.warn("[sync-deletion] Storage cleanup warning:", storageErr);
                 }
 
-                // 3. Delete property record
+                // 7. Delete property record
                 const { error: delErr } = await supabase
                     .from("properties")
                     .delete()
-                    .eq("id", matchedProp.id);
+                    .eq("id", targetId);
 
                 if (delErr) {
                     console.error("[sync-deletion] Properties delete error:", delErr);
@@ -184,7 +224,7 @@ export async function POST(request: Request) {
                 return NextResponse.json({
                     success: true,
                     action: "deleted",
-                    propertyId: matchedProp.id,
+                    propertyId: targetId,
                 });
             }
 
