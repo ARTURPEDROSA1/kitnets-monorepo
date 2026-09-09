@@ -40,6 +40,13 @@ export interface PropertyDetails {
     laundry?: "none" | "individual" | "shared";
     ac?: "none" | "cold" | "cold_hot";
     cooktop?: "none" | "gas" | "electric" | "induction";
+    // Cost Center & Financial Metrics
+    monthlyRentEstimate?: string;
+    iptuMonthly?: string;
+    condoMonthly?: string;
+    maintenanceMonthly?: string;
+    managementFeePercent?: string;
+    otherExpensesMonthly?: string;
 }
 
 export type UnitType = 'kitnet' | 'studio' | 'apartment' | 'house' | 'bedroom' | 'commercial_room' | 'garage' | 'other' | '';
@@ -70,6 +77,11 @@ export interface SubUnit {
     videos: string[];      // URLs of saved videos (max 2)
     newPhotos: File[];     // New photos pending upload
     newVideos: File[];     // New videos pending upload
+    rentValue?: string;
+    status?: 'rented' | 'vacant' | 'maintenance';
+    tenantName?: string;
+    contractStart?: string;
+    contractEnd?: string;
 }
 
 export const defaultSubUnit = (index: number): SubUnit => ({
