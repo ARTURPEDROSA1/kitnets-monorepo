@@ -544,12 +544,12 @@ export function EnergyBillUploadModal({
                                     </div>
                                     <div className="max-h-32 overflow-y-auto border border-border rounded-lg">
                                         <table className="w-full text-xs text-left">
-                                            <thead className="bg-muted/60 text-muted-foreground sticky top-0">
-                                                <tr>
-                                                    <th className="py-1.5 px-3 font-medium">MÊS/ANO</th>
-                                                    <th className="py-1.5 px-3 font-medium text-right">Cons. kWh</th>
-                                                    <th className="py-1.5 px-3 font-medium text-right">Média kWh/Dia</th>
-                                                    <th className="py-1.5 px-3 font-medium text-right">Dias</th>
+                                            <thead className="sticky top-0 z-10 shadow-2xs">
+                                                <tr className="border-b border-border">
+                                                    <th className="py-2 px-3 font-semibold text-foreground bg-muted">MÊS/ANO</th>
+                                                    <th className="py-2 px-3 font-semibold text-right text-foreground bg-muted">Cons. kWh</th>
+                                                    <th className="py-2 px-3 font-semibold text-right text-foreground bg-muted">Média kWh/Dia</th>
+                                                    <th className="py-2 px-3 font-semibold text-right text-foreground bg-muted">Dias</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-border">
