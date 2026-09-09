@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +14,12 @@ import {
     DollarSign,
     FileText,
     TrendingUp,
+    ChevronDown,
+    ChevronUp,
+    Sparkles,
+    Calendar,
+    Zap,
+    Pencil,
 } from "lucide-react";
 import type { ExtractedEnergyBill } from "@/app/api/energy-bills/extract/route";
 
@@ -22,6 +28,22 @@ interface UploadModalProps {
     onClose: () => void;
     propertyId: string;
     onSuccess: () => void;
+}
+
+const formatCurrency = (val?: number | null) =>
+    (val || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+const formatNumber = (val?: number | null, decimals = 1) =>
+    (val || 0).toLocaleString("pt-BR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+
+function formatDueDate(dateStr?: string | null): string {
+    if (!dateStr) return "-";
+    const clean = dateStr.slice(0, 10);
+    const parts = clean.split("-");
+    if (parts.length === 3) {
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return dateStr;
 }
 
 export function EnergyBillUploadModal({
@@ -36,8 +58,35 @@ export function EnergyBillUploadModal({
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [extracted, setExtracted] = useState<ExtractedEnergyBill | null>(null);
+    const [showAdvancedEdit, setShowAdvancedEdit] = useState(false);
     const [dragActive, setDragActive] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const resetState = () => {
+        setFile(null);
+        setPreviewUrl(null);
+        setLoading(false);
+        setSaving(false);
+        setError(null);
+        setExtracted(null);
+        setShowAdvancedEdit(false);
+        setDragActive(false);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
+    };
+
+    // Ensure state is completely wiped whenever modal opens
+    useEffect(() => {
+        if (isOpen) {
+            resetState();
+        }
+    }, [isOpen]);
+
+    const handleClose = () => {
+        resetState();
+        onClose();
+    };
 
     if (!isOpen) return null;
 
@@ -153,6 +202,7 @@ export function EnergyBillUploadModal({
             }
 
             onSuccess();
+            resetState();
             onClose();
         } catch (err) {
             console.error("[UploadModal] Save error:", err);
@@ -179,11 +229,13 @@ export function EnergyBillUploadModal({
                         </div>
                         <div>
                             <h3 className="text-lg font-semibold text-foreground">Importar Fatura de Energia Solar</h3>
-                            <p className="text-xs text-muted-foreground">Extração instantânea por IA com leitura de histórico (Sem armazenar o arquivo PDF)</p>
+                            <p className="text-xs text-muted-foreground">
+                                Extração instantânea por IA com leitura de histórico (Sem armazenar o arquivo PDF)
+                            </p>
                         </div>
                     </div>
                     <button
-                        onClick={onClose}
+                        onClick={handleClose}
                         className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                     >
                         <X className="w-5 h-5" />
@@ -199,7 +251,7 @@ export function EnergyBillUploadModal({
                         </div>
                     )}
 
-                    {/* Step 1: Upload Dropzone (if no extraction yet) */}
+                    {/* Step 1: Upload Dropzone (when no extracted data yet) */}
                     {!extracted && !loading && (
                         <div
                             onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
@@ -236,9 +288,6 @@ export function EnergyBillUploadModal({
                             <p className="text-xs text-muted-foreground mt-1.5 max-w-sm mx-auto">
                                 Suporta faturas da CEMIG e outras concessionárias brasileiras com Geração Distribuída (GD).
                             </p>
-                            <div className="mt-4 inline-flex items-center gap-1.5 px-3 py-1 bg-muted rounded-full text-[11px] text-muted-foreground">
-                                <span>🔒 Privacidade garantida: o PDF não é armazenado na nuvem.</span>
-                            </div>
                         </div>
                     )}
 
@@ -255,9 +304,10 @@ export function EnergyBillUploadModal({
                         </div>
                     )}
 
-                    {/* Step 3: Extracted Data Review Form */}
+                    {/* Step 3: Extracted Data Import Preview & Confirmation */}
                     {extracted && !loading && (
                         <div className="space-y-6">
+                            {/* File and Status Header */}
                             <div className="flex items-center justify-between p-3.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 rounded-xl">
                                 <div className="flex items-center gap-3">
                                     {previewUrl && (
@@ -269,7 +319,7 @@ export function EnergyBillUploadModal({
                                     <div className="text-emerald-800 dark:text-emerald-300 text-sm font-medium">
                                         <div className="flex items-center gap-1.5">
                                             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                                            <span>Dados extraídos com sucesso! Revise os campos antes de confirmar.</span>
+                                            <span>Fatura lida com sucesso! Confira o resumo antes de gravar.</span>
                                         </div>
                                         {file && <p className="text-xs text-emerald-600/80 font-normal">{file.name}</p>}
                                     </div>
@@ -277,53 +327,154 @@ export function EnergyBillUploadModal({
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => {
-                                        setExtracted(null);
-                                        setFile(null);
-                                        setPreviewUrl(null);
-                                    }}
+                                    onClick={() => resetState()}
                                     className="text-xs h-7"
                                 >
                                     Enviar outro arquivo
                                 </Button>
                             </div>
 
-                            {/* Form Sections */}
+                            {/* Clean Read-Only Cards Summary */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                {/* Section 1: Identificação & Período */}
-                                <div className="space-y-3.5 p-4 bg-muted/20 border border-border rounded-xl">
-                                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                                        <FileText className="w-3.5 h-3.5 text-blue-500" />
-                                        Identificação & Ciclo
-                                    </h4>
-                                    <div className="space-y-1">
-                                        <Label className="text-xs">Unidade Consumidora (UC)</Label>
-                                        <Input
-                                            value={extracted.consumerUnit || ""}
-                                            onChange={(e) => updateField("consumerUnit", e.target.value)}
-                                            placeholder="ex: 2.777.942.018-25"
-                                        />
+                                {/* Card 1: Identificação & Ciclo */}
+                                <div className="p-4 bg-muted/30 border border-border/80 rounded-xl space-y-3">
+                                    <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                        <FileText className="w-4 h-4 text-blue-500" />
+                                        <span>Identificação & Ciclo</span>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <div className="space-y-1">
+                                    <div className="space-y-1.5 text-xs">
+                                        <div className="flex justify-between py-1 border-b border-border/40">
+                                            <span className="text-muted-foreground">Mês de Referência:</span>
+                                            <span className="font-bold text-foreground">
+                                                {extracted.referenceMonthLabel || extracted.referenceMonth || "-"}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between py-1 border-b border-border/40">
+                                            <span className="text-muted-foreground">Vencimento:</span>
+                                            <span className="font-semibold text-foreground">
+                                                {formatDueDate(extracted.dueDate)}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between py-1 border-b border-border/40">
+                                            <span className="text-muted-foreground">Unidade Consumidora:</span>
+                                            <span className="font-mono text-foreground font-semibold">
+                                                {extracted.consumerUnit || "-"}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between py-1">
+                                            <span className="text-muted-foreground">Dias Faturados:</span>
+                                            <span className="text-foreground">
+                                                {extracted.billingDays || 30} dias
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Card 2: Consumo & Solar GD */}
+                                <div className="p-4 bg-muted/30 border border-border/80 rounded-xl space-y-3">
+                                    <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                        <Sun className="w-4 h-4 text-amber-500" />
+                                        <span>Consumo & Energia Solar</span>
+                                    </div>
+                                    <div className="space-y-1.5 text-xs">
+                                        <div className="flex justify-between py-1 border-b border-border/40">
+                                            <span className="text-muted-foreground">Consumo da Rede:</span>
+                                            <span className="font-semibold text-foreground">
+                                                {formatNumber(extracted.gridConsumptionKwh, 0)} kWh
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between py-1 border-b border-border/40">
+                                            <span className="text-muted-foreground">Energia Injetada:</span>
+                                            <span className="font-semibold text-amber-600 dark:text-amber-400">
+                                                {formatNumber(extracted.solarInjectedKwh, 0)} kWh
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between py-1 border-b border-border/40">
+                                            <span className="text-muted-foreground">Compensada GD:</span>
+                                            <span className="font-semibold text-sky-600 dark:text-sky-400">
+                                                {formatNumber(extracted.solarCompensatedKwh, 0)} kWh
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between py-1 bg-emerald-50 dark:bg-emerald-950/40 px-2 rounded-md">
+                                            <span className="font-bold text-emerald-700 dark:text-emerald-300">
+                                                Saldo Atual de Créditos:
+                                            </span>
+                                            <span className="font-bold text-emerald-800 dark:text-emerald-200 font-mono">
+                                                {formatNumber(extracted.generationBalanceKwh, 2)} kWh
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Card 3: Faturamento & Valores */}
+                                <div className="p-4 bg-muted/30 border border-border/80 rounded-xl space-y-3">
+                                    <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                        <DollarSign className="w-4 h-4 text-emerald-500" />
+                                        <span>Valores & Tarifas</span>
+                                    </div>
+                                    <div className="space-y-1.5 text-xs">
+                                        <div className="flex justify-between py-1.5 border-b border-border/40 bg-muted/50 px-2 rounded-md">
+                                            <span className="font-bold text-foreground">Total a Pagar:</span>
+                                            <span className="font-extrabold text-base text-foreground">
+                                                {formatCurrency(extracted.totalAmount)}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between py-1 border-b border-border/40">
+                                            <span className="text-muted-foreground">Custo de Disponibilidade:</span>
+                                            <span className="font-medium text-foreground">
+                                                {formatCurrency(extracted.availabilityCostAmount)}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between py-1">
+                                            <span className="text-muted-foreground">Preço Unitário (kWh):</span>
+                                            <span className="font-mono text-foreground">
+                                                {extracted.unitPrice ? `R$ ${formatNumber(extracted.unitPrice, 4)}` : "-"}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Informative Guidance Banner */}
+                            <div className="p-3.5 bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl flex items-start gap-2.5 text-xs text-amber-900 dark:text-amber-200">
+                                <Sparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                                <div>
+                                    <p className="font-semibold">Importação Rápida & Prática</p>
+                                    <p className="text-amber-800/90 dark:text-amber-300/90 mt-0.5 leading-relaxed">
+                                        Ao confirmar, os dados desta fatura e o histórico serão gravados. Caso queira editar ou ajustar qualquer valor no futuro, basta rolar até a tabela no final da página e clicar no ícone do lápis ✏️.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Optional: Collapsible Advanced Adjustments if user wants to tweak before saving */}
+                            <div className="border border-border/70 rounded-xl overflow-hidden bg-card">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAdvancedEdit(!showAdvancedEdit)}
+                                    className="w-full flex items-center justify-between p-3 text-xs font-semibold text-muted-foreground hover:text-foreground bg-muted/20 hover:bg-muted/40 transition-colors"
+                                >
+                                    <span className="flex items-center gap-1.5">
+                                        <Pencil className="w-3.5 h-3.5 text-amber-500" />
+                                        Deseja ajustar algum campo antes de confirmar? (Opcional)
+                                    </span>
+                                    {showAdvancedEdit ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                </button>
+
+                                {showAdvancedEdit && (
+                                    <div className="p-4 border-t border-border/60 grid grid-cols-1 md:grid-cols-3 gap-4 bg-muted/10">
+                                        <div className="space-y-2">
                                             <Label className="text-xs">Mês Ref. (YYYY-MM)</Label>
                                             <Input
                                                 value={extracted.referenceMonth || ""}
                                                 onChange={(e) => updateField("referenceMonth", e.target.value)}
                                                 placeholder="2026-08"
                                             />
-                                        </div>
-                                        <div className="space-y-1">
                                             <Label className="text-xs">Rótulo Mês</Label>
                                             <Input
                                                 value={extracted.referenceMonthLabel || ""}
                                                 onChange={(e) => updateField("referenceMonthLabel", e.target.value)}
                                                 placeholder="AGO/2026"
                                             />
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <div className="space-y-1">
                                             <Label className="text-xs">Vencimento</Label>
                                             <Input
                                                 type="date"
@@ -331,131 +482,35 @@ export function EnergyBillUploadModal({
                                                 onChange={(e) => updateField("dueDate", e.target.value)}
                                             />
                                         </div>
-                                        <div className="space-y-1">
-                                            <Label className="text-xs">Dias</Label>
-                                            <Input
-                                                type="number"
-                                                value={extracted.billingDays || 30}
-                                                onChange={(e) => updateField("billingDays", parseInt(e.target.value) || 30)}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label className="text-xs">Classe da Ligação</Label>
-                                        <Input
-                                            value={extracted.installationClass || ""}
-                                            onChange={(e) => updateField("installationClass", e.target.value)}
-                                            placeholder="Residencial Monofásico"
-                                        />
-                                    </div>
-                                    <div className="space-y-1 pt-1 border-t border-border/50">
-                                        <Label className="text-xs font-semibold">Endereço da Instalação</Label>
-                                        <Input
-                                            value={extracted.installationAddress || ""}
-                                            onChange={(e) => updateField("installationAddress", e.target.value)}
-                                            placeholder="Rua, número e bairro"
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <div className="space-y-1">
-                                            <Label className="text-xs">Cidade</Label>
-                                            <Input
-                                                value={extracted.installationCity || ""}
-                                                onChange={(e) => updateField("installationCity", e.target.value)}
-                                                placeholder="Cidade"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label className="text-xs">UF</Label>
-                                            <Input
-                                                value={extracted.installationState || ""}
-                                                onChange={(e) => updateField("installationState", e.target.value)}
-                                                placeholder="MG"
-                                                maxLength={2}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Section 2: Consumo & Solar GD */}
-                                <div className="space-y-3.5 p-4 bg-muted/20 border border-border rounded-xl">
-                                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                                        <Sun className="w-3.5 h-3.5 text-amber-500" />
-                                        Consumo & Energia Solar
-                                    </h4>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <div className="space-y-1">
+                                        <div className="space-y-2">
                                             <Label className="text-xs">Consumo (kWh)</Label>
                                             <Input
                                                 type="number"
                                                 value={extracted.gridConsumptionKwh ?? ""}
                                                 onChange={(e) => updateField("gridConsumptionKwh", parseFloat(e.target.value) || 0)}
                                             />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label className="text-xs">Média kWh/Dia</Label>
-                                            <Input
-                                                type="number"
-                                                step="0.01"
-                                                value={extracted.dailyAvgKwh ?? ""}
-                                                onChange={(e) => updateField("dailyAvgKwh", parseFloat(e.target.value) || 0)}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <div className="space-y-1">
-                                            <Label className="text-xs text-amber-600 font-semibold">Energia Injetada (kWh)</Label>
+                                            <Label className="text-xs">Energia Injetada (kWh)</Label>
                                             <Input
                                                 type="number"
                                                 value={extracted.solarInjectedKwh ?? ""}
                                                 onChange={(e) => updateField("solarInjectedKwh", parseFloat(e.target.value) || 0)}
                                             />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label className="text-xs">Compensada GD (kWh)</Label>
+                                            <Label className="text-xs">Saldo Atual de Geração (kWh)</Label>
                                             <Input
                                                 type="number"
-                                                value={extracted.solarCompensatedKwh ?? ""}
-                                                onChange={(e) => updateField("solarCompensatedKwh", parseFloat(e.target.value) || 0)}
+                                                step="0.01"
+                                                value={extracted.generationBalanceKwh ?? ""}
+                                                onChange={(e) => updateField("generationBalanceKwh", parseFloat(e.target.value) || 0)}
                                             />
                                         </div>
-                                    </div>
-                                    <div className="space-y-1 p-2.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 rounded-lg">
-                                        <Label className="text-xs font-bold text-emerald-700 dark:text-emerald-300">
-                                            SALDO ATUAL DE GERAÇÃO (kWh)
-                                        </Label>
-                                        <Input
-                                            type="number"
-                                            step="0.01"
-                                            className="font-bold text-emerald-800 dark:text-emerald-200"
-                                            value={extracted.generationBalanceKwh ?? ""}
-                                            onChange={(e) => updateField("generationBalanceKwh", parseFloat(e.target.value) || 0)}
-                                            placeholder="ex: 441.24"
-                                        />
-                                        <p className="text-[10px] text-emerald-600 dark:text-emerald-400">
-                                            Créditos acumulados junto à concessionária
-                                        </p>
-                                    </div>
-                                </div>
-
-                                {/* Section 3: Valores & Tarifas */}
-                                <div className="space-y-3.5 p-4 bg-muted/20 border border-border rounded-xl">
-                                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                                        <DollarSign className="w-3.5 h-3.5 text-emerald-500" />
-                                        Valores & Tarifas
-                                    </h4>
-                                    <div className="space-y-1">
-                                        <Label className="text-xs font-bold text-foreground">Total a Pagar (R$)</Label>
-                                        <Input
-                                            type="number"
-                                            step="0.01"
-                                            className="font-bold text-base"
-                                            value={extracted.totalAmount ?? ""}
-                                            onChange={(e) => updateField("totalAmount", parseFloat(e.target.value) || 0)}
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <div className="space-y-1">
+                                        <div className="space-y-2">
+                                            <Label className="text-xs">Total a Pagar (R$)</Label>
+                                            <Input
+                                                type="number"
+                                                step="0.01"
+                                                value={extracted.totalAmount ?? ""}
+                                                onChange={(e) => updateField("totalAmount", parseFloat(e.target.value) || 0)}
+                                            />
                                             <Label className="text-xs">Custo Disp. (R$)</Label>
                                             <Input
                                                 type="number"
@@ -463,8 +518,6 @@ export function EnergyBillUploadModal({
                                                 value={extracted.availabilityCostAmount ?? ""}
                                                 onChange={(e) => updateField("availabilityCostAmount", parseFloat(e.target.value) || 0)}
                                             />
-                                        </div>
-                                        <div className="space-y-1">
                                             <Label className="text-xs">Preço Unit. (R$)</Label>
                                             <Input
                                                 type="number"
@@ -474,56 +527,38 @@ export function EnergyBillUploadModal({
                                             />
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <div className="space-y-1">
-                                            <Label className="text-xs">Bandeira</Label>
-                                            <Input
-                                                value={extracted.flagType || "Verde"}
-                                                onChange={(e) => updateField("flagType", e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label className="text-xs">Valor Band. (R$)</Label>
-                                            <Input
-                                                type="number"
-                                                step="0.01"
-                                                value={extracted.flagAmount ?? 0}
-                                                onChange={(e) => updateField("flagAmount", parseFloat(e.target.value) || 0)}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
+                                )}
                             </div>
 
-                            {/* Section 4: Extracted 13-Month History Preview */}
+                            {/* Historical Consumption Detection Preview */}
                             {extracted.historicalConsumption && extracted.historicalConsumption.length > 0 && (
-                                <div className="space-y-2 p-4 bg-muted/10 border border-border rounded-xl">
+                                <div className="space-y-2 p-3.5 bg-muted/20 border border-border/80 rounded-xl">
                                     <div className="flex items-center justify-between">
                                         <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                                             <TrendingUp className="w-3.5 h-3.5 text-violet-500" />
-                                            Histórico de Consumo Detectado na Fatura ({extracted.historicalConsumption.length} meses)
+                                            Histórico de Consumo Detectado ({extracted.historicalConsumption.length} meses)
                                         </h4>
                                         <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-                                            Será importado automaticamente como histórico base
+                                            Será importado automaticamente
                                         </span>
                                     </div>
-                                    <div className="max-h-40 overflow-y-auto border border-border rounded-lg">
+                                    <div className="max-h-32 overflow-y-auto border border-border rounded-lg">
                                         <table className="w-full text-xs text-left">
                                             <thead className="bg-muted/60 text-muted-foreground sticky top-0">
                                                 <tr>
                                                     <th className="py-1.5 px-3 font-medium">MÊS/ANO</th>
-                                                    <th className="py-1.5 px-3 font-medium">Cons. kWh</th>
-                                                    <th className="py-1.5 px-3 font-medium">Média kWh/Dia</th>
-                                                    <th className="py-1.5 px-3 font-medium">Dias</th>
+                                                    <th className="py-1.5 px-3 font-medium text-right">Cons. kWh</th>
+                                                    <th className="py-1.5 px-3 font-medium text-right">Média kWh/Dia</th>
+                                                    <th className="py-1.5 px-3 font-medium text-right">Dias</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-border">
                                                 {extracted.historicalConsumption.map((h, i) => (
                                                     <tr key={i} className="hover:bg-muted/30">
                                                         <td className="py-1.5 px-3 font-medium text-foreground">{h.month}</td>
-                                                        <td className="py-1.5 px-3">{h.consumptionKwh}</td>
-                                                        <td className="py-1.5 px-3">{h.dailyAvgKwh}</td>
-                                                        <td className="py-1.5 px-3">{h.days}</td>
+                                                        <td className="py-1.5 px-3 text-right">{h.consumptionKwh}</td>
+                                                        <td className="py-1.5 px-3 text-right">{h.dailyAvgKwh}</td>
+                                                        <td className="py-1.5 px-3 text-right">{h.days}</td>
                                                     </tr>
                                                 ))}
                                             </tbody>
@@ -537,7 +572,7 @@ export function EnergyBillUploadModal({
 
                 {/* Footer */}
                 <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border bg-muted/30">
-                    <Button variant="ghost" onClick={onClose} disabled={saving}>
+                    <Button variant="ghost" onClick={handleClose} disabled={saving}>
                         Cancelar
                     </Button>
                     {extracted && (
