@@ -739,14 +739,17 @@ export default function EnergyDashboardPage() {
 
                     {/* Histórico de Consumo (Interactive Data Table) */}
                     <div className="bg-card border border-border rounded-xl shadow-xs overflow-hidden space-y-0">
-                        <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-muted/20">
+                        <div className="px-6 py-4 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-muted/20">
                             <div>
                                 <h3 className="text-base font-semibold text-foreground">Histórico de Consumo Detalhado</h3>
-                                <p className="text-xs text-muted-foreground">
-                                    Registros de consumo, injeção solar, saldo de créditos e custos por ciclo de faturamento
+                                <p className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap mt-0.5">
+                                    <span>Registros de consumo, injeção solar, saldo de créditos e custos.</span>
+                                    <span className="text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800 font-medium inline-flex items-center gap-1">
+                                        <Pencil className="w-3 h-3 text-amber-600" /> Clique no lápis na coluna Ações para editar qualquer fatura
+                                    </span>
                                 </p>
                             </div>
-                            <span className="text-xs font-mono text-muted-foreground bg-muted px-2.5 py-1 rounded-md">
+                            <span className="text-xs font-mono text-muted-foreground bg-muted px-2.5 py-1 rounded-md self-start sm:self-auto">
                                 {filteredBills.length} {filteredBills.length === 1 ? "registro" : "registros"}
                             </span>
                         </div>
@@ -803,7 +806,7 @@ export default function EnergyDashboardPage() {
                                                 <td className="py-3 px-4 text-center">
                                                     {b.is_historical_only ? (
                                                         <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-medium bg-muted text-muted-foreground">
-                                                            Histórico Base
+                                                             Histórico Base
                                                         </span>
                                                     ) : (
                                                         <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
@@ -812,19 +815,21 @@ export default function EnergyDashboardPage() {
                                                     )}
                                                 </td>
                                                 <td className="py-3 px-4 text-center">
-                                                    <div className="flex items-center justify-center gap-1">
+                                                    <div className="flex items-center justify-center gap-1.5">
                                                         <button
                                                             onClick={() => setEditingBill(b)}
-                                                            className="p-1 rounded-md text-muted-foreground hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors"
-                                                            title="Editar registro"
+                                                            className="p-1.5 rounded-lg text-amber-600 dark:text-amber-400 hover:text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/60 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 transition-colors shadow-2xs"
+                                                            title="Editar valores desta fatura"
+                                                            aria-label="Editar fatura"
                                                         >
                                                             <Pencil className="w-3.5 h-3.5" />
                                                         </button>
                                                         <button
                                                             onClick={() => handleDelete(b.id)}
                                                             disabled={deletingId === b.id}
-                                                            className="p-1 rounded-md text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                                                            className="p-1.5 rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
                                                             title="Excluir registro"
+                                                            aria-label="Excluir registro"
                                                         >
                                                             <Trash2 className="w-3.5 h-3.5" />
                                                         </button>
@@ -840,15 +845,18 @@ export default function EnergyDashboardPage() {
                 </>
             )}
 
-            {/* Zero-Storage Upload Modal */}
-            <EnergyBillUploadModal
-                isOpen={isUploadOpen}
-                onClose={() => setIsUploadOpen(false)}
-                propertyId={resolvedPropertyId || propertyId}
-                onSuccess={() => {
-                    fetchBills();
-                }}
-            />
+            {/* Zero-Storage Upload Modal - Strictly for Importing New Bills */}
+            {isUploadOpen && (
+                <EnergyBillUploadModal
+                    isOpen={isUploadOpen}
+                    onClose={() => setIsUploadOpen(false)}
+                    propertyId={resolvedPropertyId || propertyId}
+                    onSuccess={() => {
+                        setIsUploadOpen(false);
+                        fetchBills();
+                    }}
+                />
+            )}
 
             {/* Historic Unit Price Modal */}
             <HistoricUnitPriceModal
@@ -868,16 +876,19 @@ export default function EnergyDashboardPage() {
                 }}
             />
 
-            {/* Edit Energy Bill Modal */}
-            <EditEnergyBillModal
-                isOpen={!!editingBill}
-                onClose={() => setEditingBill(null)}
-                bill={editingBill}
-                onSuccess={() => {
-                    setEditingBill(null);
-                    fetchBills();
-                }}
-            />
+            {/* Edit Energy Bill Modal - Dedicated for Bottom Table Editing */}
+            {editingBill && (
+                <EditEnergyBillModal
+                    isOpen={!!editingBill}
+                    onClose={() => setEditingBill(null)}
+                    bill={editingBill}
+                    onSuccess={() => {
+                        setEditingBill(null);
+                        fetchBills();
+                    }}
+                />
+            )}
         </div>
     );
 }
+
