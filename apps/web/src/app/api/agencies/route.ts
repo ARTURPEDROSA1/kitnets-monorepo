@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
-import { currentUser } from '@clerk/nextjs/server';
+import { auth } from '@clerk/nextjs/server';
 import {
     validateCNPJ,
     parseCNPJ,
@@ -28,8 +28,8 @@ function getServiceSupabase() {
  */
 export async function GET() {
     try {
-        const user = await currentUser();
-        if (!user) {
+        const { userId } = await auth();
+        if (!userId) {
             return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
         }
 
@@ -39,44 +39,36 @@ export async function GET() {
         const { data: profile } = await supabase
             .from('profiles')
             .select('id')
-            .eq('clerk_id', user.id)
+            .eq('clerk_id', userId)
             .maybeSingle();
 
         if (!profile) {
             return NextResponse.json({ agencies: [] });
         }
 
-        // Find ALL user's agency memberships
+        // Fetch all agencies for user's memberships joined in one query
         const { data: memberships, error: memberError } = await supabase
             .from('agency_members')
-            .select('agency_id, role')
-            .eq('user_id', profile.id);
+            .select(`
+                role,
+                agencies!inner(*)
+            `)
+            .eq('user_id', profile.id)
+            .is('agencies.deleted_at', null);
 
         if (memberError || !memberships || memberships.length === 0) {
             return NextResponse.json({ agencies: [] });
         }
 
-        // Fetch all agencies for user's memberships (exclude soft-deleted)
-        const agencyIds = memberships.map(m => m.agency_id);
-        const { data: agencies, error: agencyError } = await supabase
-            .from('agencies')
-            .select('*')
-            .in('id', agencyIds)
-            .is('deleted_at', null)
-            .order('created_at', { ascending: false });
-
-        if (agencyError || !agencies) {
-            return NextResponse.json({ agencies: [] });
-        }
-
-        // Merge role into each agency and unpack metadata if stored in description
-        const roleMap = new Map(memberships.map(m => [m.agency_id, m.role]));
-        const agenciesWithRole = agencies.map(a =>
-            unpackAgencyMetadata({
-                ...a,
-                role: roleMap.get(a.id) || 'VIEWER',
+        const agenciesWithRole = memberships
+            .map((m: any) => {
+                if (!m.agencies) return null;
+                return unpackAgencyMetadata({
+                    ...m.agencies,
+                    role: m.role || 'VIEWER',
+                });
             })
-        );
+            .filter(Boolean);
 
         return NextResponse.json({ agencies: agenciesWithRole });
     } catch (err) {
@@ -91,8 +83,8 @@ export async function GET() {
  */
 export async function POST(request: Request) {
     try {
-        const user = await currentUser();
-        if (!user) {
+        const { userId } = await auth();
+        if (!userId) {
             return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
         }
 
@@ -155,7 +147,7 @@ export async function POST(request: Request) {
         const { data: profile } = await supabase
             .from('profiles')
             .select('id')
-            .eq('clerk_id', user.id)
+            .eq('clerk_id', userId)
             .maybeSingle();
 
         if (!profile) {
