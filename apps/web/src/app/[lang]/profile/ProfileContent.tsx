@@ -1,17 +1,20 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import Link from 'next/link';
 import { Button } from '@kitnets/ui';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Image from 'next/image';
-import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera, Video, Sparkles, Save, UploadCloud, Home, Building2, User, ShieldCheck, Fingerprint, ChevronDown, ChevronUp, Wand2, Plus, ArrowRight, Minus, Edit3, X } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera, Video, Sparkles, Save, UploadCloud, Home, Building2, User, ShieldCheck, Fingerprint, ChevronDown, ChevronUp, Wand2, Plus, ArrowRight, Minus, Edit3, X, Search, Sun, ArrowLeft } from 'lucide-react';
 import PropertyDetailsCard, { PropertyDetails, SubUnit, SubUnitsSection, Checkbox as DetailCheckbox, defaultSubUnit } from '@/components/profile/PropertyDetailsCard';
 import PropertyDocumentsCard, { DocCategory } from '@/components/profile/PropertyDocumentsCard';
 import { DeletePropertyModal } from '@/components/profile/DeletePropertyModal';
+import PropertySquareCard from '@/components/properties/PropertySquareCard';
+import PropertyCostCenterDashboard from '@/components/properties/PropertyCostCenterDashboard';
 import { cn } from '@/lib/utils';
 import { useUser, useAuth } from '@clerk/nextjs';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { deleteAccount } from './actions';
 import { Dictionary } from '@/dictionaries';
@@ -297,6 +300,14 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
     };
 
 
+    // Imóveis View Mode ('grid' | 'manage' | 'wizard')
+    const params = useParams();
+    const lang = (params?.lang as string) || 'pt';
+    const [imoveisViewMode, setImoveisViewMode] = useState<'grid' | 'manage' | 'wizard'>('grid');
+    const [selectedPropertyIdx, setSelectedPropertyIdx] = useState<number | null>(null);
+    const [imoveisFilterTab, setImoveisFilterTab] = useState<'all' | 'multi' | 'single' | 'solar'>('all');
+    const [imoveisSearch, setImoveisSearch] = useState('');
+
     // Add Property modal + wizard
     const MAX_PROPERTIES = 30;
     const [showAddPropertyModal, setShowAddPropertyModal] = useState(false);
@@ -306,8 +317,17 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
     useEffect(() => {
         if (searchParams.get('add') === 'true') {
             setActiveTab('ownership');
+            setImoveisViewMode('wizard');
             // Small delay to let the tab switch render, then show modal
             setTimeout(() => setShowAddPropertyModal(true), 100);
+        }
+        const idParam = searchParams.get('id');
+        if (idParam !== null) {
+            const parsed = parseInt(idParam, 10);
+            if (!isNaN(parsed)) {
+                setSelectedPropertyIdx(parsed);
+                setImoveisViewMode('manage');
+            }
         }
     }, [searchParams]);
     const propertyCreated = properties.length > 0;
@@ -1741,6 +1761,13 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
             setExpandedPropertyIdx(expandedPropertyIdx - 1);
         }
 
+        if (selectedPropertyIdx === propIdx) {
+            setSelectedPropertyIdx(null);
+            setImoveisViewMode('grid');
+        } else if (selectedPropertyIdx !== null && selectedPropertyIdx > propIdx) {
+            setSelectedPropertyIdx(selectedPropertyIdx - 1);
+        }
+
         // 4. Persist deletion in profiles table
         await handleSave(true, remainingProperties);
         setPropertyToDelete(null);
@@ -1828,8 +1855,1127 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
         window.location.href = `/pt/anunciar?step=review&hydrate=true`;
     };
 
+    const propertyCounts = useMemo(() => {
+        const multi = properties.filter(p => p.propertyType === 'multi').length;
+        const single = properties.filter(p => p.propertyType === 'single').length;
+        const solar = properties.filter(p => p.details?.solarEnergy).length;
+        return { all: properties.length, multi, single, solar };
+    }, [properties]);
+
+    const filteredProperties = useMemo(() => {
+        return properties
+            .map((prop, originalIdx) => ({ prop, originalIdx }))
+            .filter(({ prop }) => {
+                if (imoveisFilterTab === 'multi' && prop.propertyType !== 'multi') return false;
+                if (imoveisFilterTab === 'single' && prop.propertyType !== 'single') return false;
+                if (imoveisFilterTab === 'solar' && !prop.details?.solarEnergy) return false;
+
+                if (imoveisSearch.trim()) {
+                    const query = imoveisSearch.toLowerCase().trim();
+                    const name = (prop.details?.propertyName || 'Propriedade').toLowerCase();
+                    const street = (prop.address?.street || '').toLowerCase();
+                    const city = (prop.address?.city || '').toLowerCase();
+                    const neighborhood = (prop.address?.neighborhood || '').toLowerCase();
+                    const cep = (prop.address?.cep || '').toLowerCase();
+                    return name.includes(query) || street.includes(query) || city.includes(query) || neighborhood.includes(query) || cep.includes(query);
+                }
+                return true;
+            });
+    }, [properties, imoveisFilterTab, imoveisSearch]);
+
+    const renderPropertyDetailCards = (propIdx: number, mode: 'wizard' | 'manage' | 'accordion' = 'accordion') => {
+        const prop = properties[propIdx];
+        if (!prop) return null;
+
+        const isExpanded = mode === 'accordion' ? expandedPropertyIdx === propIdx : true;
+        const propComplete = isPropertyComplete(prop);
+        const propLabel = prop.details?.propertyName || `Propriedade ${propIdx + 1}`;
+        const propIcon = prop.propertyType === 'single' ? <Home className="w-4 h-4" /> : <Building2 className="w-4 h-4" />;
+        const propTypeName = prop.propertyType === 'single' ? 'Unifamiliar' : 'Multifamiliar';
+
+        // Per-property local aliases
+        const pAddr = prop.address;
+        const pDetails = prop.details;
+        const pSubUnits = prop.subUnits;
+        const pType = prop.propertyType;
+        const pPhotos = prop.photos;
+        const pSavedPhotos = prop.savedPhotos;
+        const pVideos = prop.videos;
+        const pSavedVideos = prop.savedVideos;
+        const pOwnershipFiles = prop.ownershipFiles;
+        const pSavedProofs = prop.savedProofs;
+        const pOwnershipOpen = prop.ownershipSectionOpen;
+        const pAddressOpen = prop.addressSectionOpen;
+        const pPhotosOpen = prop.photosSectionOpen;
+        const pDescOpen = prop.descriptionSectionOpen;
+        const pDetailsOpen = prop.detailsInitialOpen;
+
+        const hasDocsData = (pSavedProofs.length > 0 || pOwnershipFiles.length > 0);
+        const hasAddressData = Boolean(pAddr.street || pAddr.cep || pAddr.city);
+        const hasDetailsData = Boolean(pDetails.propertyName || pDetails.totalSqMeters || pDetails.areaEdificada);
+        const hasPhotosData = (pSavedPhotos.length + pPhotos.length > 0 || pSavedVideos.length + pVideos.length > 0);
+        const hasDescriptionData = Boolean(pAddr.description?.trim());
+
+        const isAddressCardVisible = mode === 'manage' ? true : (prop.showAddressCard ?? (hasDocsData || hasAddressData || hasDetailsData || hasPhotosData || hasDescriptionData));
+        const isDetailsCardVisible = mode === 'manage' ? true : (prop.showDetailsCard ?? (hasAddressData || hasDetailsData || hasPhotosData || hasDescriptionData));
+        const isPhotosCardVisible = mode === 'manage' ? true : (prop.showPhotosCard ?? (hasDetailsData || hasPhotosData || hasDescriptionData));
+        const isDescriptionCardVisible = mode === 'manage' ? true : (prop.showDescriptionCard ?? (hasPhotosData || hasDescriptionData));
+
+        const setPropField = <K extends keyof PropertyState>(field: K, val: PropertyState[K] | ((prev: PropertyState[K]) => PropertyState[K])) => {
+            updateProperty(propIdx, prev => ({
+                ...prev,
+                [field]: typeof val === 'function' ? (val as (prev: PropertyState[K]) => PropertyState[K])(prev[field]) : val
+            }));
+        };
+        const setPOwnershipOpen = (v: boolean | ((p: boolean) => boolean)) => setPropField('ownershipSectionOpen', v);
+        const setPAddressOpen = (v: boolean | ((p: boolean) => boolean)) => setPropField('addressSectionOpen', v);
+        const setPPhotosOpen = (v: boolean | ((p: boolean) => boolean)) => setPropField('photosSectionOpen', v);
+        const setPDescOpen = (v: boolean | ((p: boolean) => boolean)) => setPropField('descriptionSectionOpen', v);
+        const setPDetailsOpen = (v: boolean | ((p: boolean) => boolean)) => setPropField('detailsInitialOpen', v);
+        const setPDetails = (v: PropertyDetails | ((p: PropertyDetails) => PropertyDetails)) => setPropField('details', v);
+        const setPSubUnits = (v: SubUnit[] | ((p: SubUnit[]) => SubUnit[])) => setPropField('subUnits', v);
+        const setPPhotos = (v: File[] | ((p: File[]) => File[])) => setPropField('photos', v);
+        const setPSavedPhotos = (v: string[] | ((p: string[]) => string[])) => setPropField('savedPhotos', v);
+        const setPVideos = (v: File[] | ((p: File[]) => File[])) => setPropField('videos', v);
+        const setPSavedVideos = (v: string[] | ((p: string[]) => string[])) => setPropField('savedVideos', v);
+        const setPOwnershipFiles = (v: File[] | ((p: File[]) => File[])) => setPropField('ownershipFiles', v);
+        const isDocVerified = pSavedProofs.length > 0 || pOwnershipFiles.some(f => fileAnalysisStatus[f.name] === 'success');
+        const isUnitsTreeOpen = pType === 'multi' ? !collapsedUnitsTrees[propIdx] : false;
+        const toggleUnitsTree = (e?: React.MouseEvent) => {
+            e?.stopPropagation();
+            setCollapsedUnitsTrees(prev => ({
+                ...prev,
+                [propIdx]: !prev[propIdx]
+            }));
+        };
+
+        const handlePropAddrChange = (field: string, value: string) => {
+            if (field === 'cep') {
+                const formatted = value.replace(/\D/g, '').replace(/(\d{5})(\d)/, '$1-$2').slice(0, 9);
+                updateProperty(propIdx, prev => ({ ...prev, address: { ...prev.address, cep: formatted } }));
+                if (formatted.replace(/\D/g, '').length === 8) {
+                    fetchAddress('propertyAddress', formatted, propIdx);
+                }
+            } else {
+                updateProperty(propIdx, prev => ({ ...prev, address: { ...prev.address, [field]: value } }));
+            }
+        };
+
+        const handlePropDocUpload = async (files: File[], category?: DocCategory, year?: number) => {
+            if (!files || files.length === 0) return;
+
+            const processedFiles: File[] = [];
+            for (const file of files) {
+                let newName = file.name;
+                if (category === 'iptu') {
+                    const y = year || new Date().getFullYear();
+                    if (!file.name.toLowerCase().includes('iptu') || !file.name.includes(String(y))) {
+                        newName = `[IPTU ${y}] ${file.name}`;
+                    }
+                } else if (category && category !== 'outros') {
+                    const catTag = category.replace('_', ' ');
+                    if (!file.name.toLowerCase().includes(catTag)) {
+                        newName = `[${category}] ${file.name}`;
+                    }
+                }
+                processedFiles.push(new File([file], newName, { type: file.type }));
+            }
+
+            if (profileId) {
+                try {
+                    const sbUpload = await getSupabase();
+                    const propStoragePrefix = propIdx === 0 ? profileId : `${profileId}/prop-${propIdx}`;
+                    const newProofEntries: ProofData[] = [];
+
+                    for (const file of processedFiles) {
+                        const fileExt = file.name.split('.').pop();
+                        const fileName = `${propStoragePrefix}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+                        const { error: uploadError } = await sbUpload.storage
+                            .from('documents')
+                            .upload(fileName, file);
+
+                        if (uploadError) {
+                            console.error('Doc upload error:', uploadError);
+                            alert(`Erro ao enviar documento ${file.name}: ${uploadError.message}`);
+                            continue;
+                        }
+
+                        const { data: insertedProof, error: proofError } = await sbUpload
+                            .from('ownership_proofs')
+                            .insert({
+                                profile_id: profileId,
+                                property_index: propIdx,
+                                file_url: fileName,
+                                original_name: file.name,
+                                file_size: file.size,
+                                mime_type: file.type,
+                                status: 'pending',
+                            })
+                            .select()
+                            .single();
+
+                        if (proofError) {
+                            console.error('Failed to insert ownership proof:', proofError);
+                        } else if (insertedProof) {
+                            newProofEntries.push(insertedProof as ProofData);
+                        }
+                    }
+
+                    if (newProofEntries.length > 0) {
+                        const updatedProofs = dedupeProofs([...pSavedProofs, ...newProofEntries]);
+                        setPropField('savedProofs', updatedProofs);
+
+                        if (propIdx > 0) {
+                            const { data: prof } = await sbUpload.from('profiles').select('additional_properties').eq('id', profileId).single();
+                            if (prof?.additional_properties && Array.isArray(prof.additional_properties)) {
+                                const addProps = [...(prof.additional_properties as Record<string, unknown>[])];
+                                if (addProps[propIdx - 1]) {
+                                    addProps[propIdx - 1] = {
+                                        ...addProps[propIdx - 1],
+                                        savedProofs: updatedProofs,
+                                    };
+                                    await sbUpload.from('profiles').update({ additional_properties: addProps }).eq('id', profileId);
+                                }
+                            }
+                        }
+                    }
+
+                    if (!pAddr.street) {
+                        for (const file of processedFiles) {
+                            analyzeDocument(file, propIdx);
+                        }
+                    }
+                } catch (err) {
+                    console.error('Direct doc upload error:', err);
+                    setPOwnershipFiles(prev => [...prev, ...processedFiles]);
+                }
+            } else {
+                setTemporaryExtractedInfo(null);
+                setPOwnershipFiles(prev => [...prev, ...processedFiles]);
+                updateProperty(propIdx, prev => ({
+                    ...prev,
+                    showAddressCard: true,
+                    addressSectionOpen: true,
+                }));
+                for (const file of processedFiles) {
+                    analyzeDocument(file, propIdx);
+                }
+            }
+        };
+
+        const handlePropPhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+            if (e.target.files && e.target.files.length > 0) {
+                const total = pSavedPhotos.length + pPhotos.length;
+                const remaining = 10 - total;
+                if (remaining <= 0) { alert('Máximo de 10 fotos por propriedade.'); return; }
+                const newPhotos = Array.from(e.target.files).slice(0, remaining);
+
+                if (profileId) {
+                    try {
+                        const sbUpload = await getSupabase();
+                        const propStoragePrefix = propIdx === 0 ? profileId : `${profileId}/prop-${propIdx}`;
+                        const uploadedUrls: string[] = [];
+                        for (const file of newPhotos) {
+                            const fileExt = file.name.split('.').pop();
+                            const fileName = `photos/${propStoragePrefix}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+                            const { error: uploadError } = await sbUpload.storage.from('documents').upload(fileName, file);
+                            if (uploadError) { console.error('Photo upload error:', uploadError); continue; }
+                            const { data: { publicUrl } } = sbUpload.storage.from('documents').getPublicUrl(fileName);
+                            uploadedUrls.push(publicUrl);
+                        }
+                        if (uploadedUrls.length > 0) {
+                            const allPhotos = [...pSavedPhotos, ...uploadedUrls];
+                            const currentProfilePhoto = prop.profilePhotoUrl;
+                            const newProfilePhoto = (currentProfilePhoto && allPhotos.includes(currentProfilePhoto))
+                                ? currentProfilePhoto
+                                : allPhotos[0];
+
+                            setPSavedPhotos(allPhotos);
+                            updateProperty(propIdx, prev => ({
+                                ...prev,
+                                savedPhotos: allPhotos,
+                                profilePhotoUrl: newProfilePhoto,
+                            }));
+
+                            if (propIdx === 0) {
+                                await sbUpload.from('profiles').update({
+                                    property_photos: allPhotos,
+                                    profile_photo_url: newProfilePhoto,
+                                }).eq('id', profileId);
+                            } else {
+                                const { data: profile } = await sbUpload.from('profiles').select('additional_properties').eq('id', profileId).single();
+                                if (profile?.additional_properties) {
+                                    const addProps = [...(profile.additional_properties as Record<string, unknown>[])];
+                                    if (addProps[propIdx - 1]) {
+                                        addProps[propIdx - 1] = {
+                                            ...addProps[propIdx - 1],
+                                            savedPhotos: allPhotos,
+                                            profilePhotoUrl: newProfilePhoto,
+                                        };
+                                        await sbUpload.from('profiles').update({ additional_properties: addProps }).eq('id', profileId);
+                                    }
+                                }
+                            }
+                        }
+                    } catch (err) {
+                        console.error('Photo upload failed:', err);
+                        setPPhotos(prev => [...prev, ...newPhotos]);
+                    }
+                } else {
+                    setPPhotos(prev => [...prev, ...newPhotos]);
+                }
+            }
+        };
+
+        const removePropPhoto = (idx: number) => setPPhotos(prev => prev.filter((_, i) => i !== idx));
+
+        const handlePropVideoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+            if (e.target.files && e.target.files.length > 0) {
+                const total = pSavedVideos.length + pVideos.length;
+                if (total >= 2) { alert('Máximo de 2 vídeos por propriedade.'); return; }
+                const videoFile = Array.from(e.target.files)[0];
+
+                if (profileId) {
+                    try {
+                        const sbUpload = await getSupabase();
+                        const propStoragePrefix = propIdx === 0 ? profileId : `${profileId}/prop-${propIdx}`;
+                        const fileExt = videoFile.name.split('.').pop();
+                        const fileName = `videos/${propStoragePrefix}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+                        const { error: uploadError } = await sbUpload.storage.from('documents').upload(fileName, videoFile);
+                        if (uploadError) { console.error('Video upload error:', uploadError); setPVideos(prev => [...prev, videoFile]); return; }
+                        const { data: { publicUrl } } = sbUpload.storage.from('documents').getPublicUrl(fileName);
+                        const allVideos = [...pSavedVideos, publicUrl];
+                        setPSavedVideos(allVideos);
+                        if (propIdx === 0) {
+                            await sbUpload.from('profiles').update({ property_videos: allVideos }).eq('id', profileId);
+                        } else {
+                            const { data: profile } = await sbUpload.from('profiles').select('additional_properties').eq('id', profileId).single();
+                            if (profile?.additional_properties) {
+                                const addProps = [...(profile.additional_properties as Record<string, unknown>[])];
+                                if (addProps[propIdx - 1]) {
+                                    addProps[propIdx - 1] = { ...addProps[propIdx - 1], savedVideos: allVideos };
+                                    await sbUpload.from('profiles').update({ additional_properties: addProps }).eq('id', profileId);
+                                }
+                            }
+                        }
+                    } catch (err) {
+                        console.error('Video upload failed:', err);
+                        setPVideos(prev => [...prev, videoFile]);
+                    }
+                } else {
+                    setPVideos(prev => [...prev, videoFile]);
+                }
+            }
+        };
+
+        const removePropVideo = (idx: number) => setPVideos(prev => prev.filter((_, i) => i !== idx));
+
+        const removePropSavedPhoto = async (url: string) => {
+            const remaining = pSavedPhotos.filter(u => u !== url);
+            const currentProfilePhoto = prop.profilePhotoUrl || (pSavedPhotos.length > 0 ? pSavedPhotos[0] : null);
+            const newProfilePhoto = currentProfilePhoto === url
+                ? (remaining.length > 0 ? remaining[0] : null)
+                : currentProfilePhoto;
+
+            setPSavedPhotos(remaining);
+            updateProperty(propIdx, prev => ({
+                ...prev,
+                savedPhotos: remaining,
+                profilePhotoUrl: newProfilePhoto,
+            }));
+
+            if (profileId) {
+                try {
+                    const sb = await getSupabase();
+                    if (propIdx === 0) {
+                        await sb.from('profiles').update({
+                            property_photos: remaining,
+                            profile_photo_url: newProfilePhoto,
+                        }).eq('id', profileId);
+                    } else {
+                        const { data: profile } = await sb.from('profiles').select('additional_properties').eq('id', profileId).single();
+                        if (profile?.additional_properties) {
+                            const addProps = [...(profile.additional_properties as Record<string, unknown>[])];
+                            if (addProps[propIdx - 1]) {
+                                addProps[propIdx - 1] = {
+                                    ...addProps[propIdx - 1],
+                                    savedPhotos: remaining,
+                                    profilePhotoUrl: newProfilePhoto,
+                                };
+                                await sb.from('profiles').update({ additional_properties: addProps }).eq('id', profileId);
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.error('Failed to update photos after deletion:', err);
+                }
+            }
+        };
+
+        const removePropSavedVideo = (url: string) => {
+            setPSavedVideos(prev => prev.filter(u => u !== url));
+        };
+
+        const removePropSavedProof = async (proofId: string) => {
+            const proofToDelete = pSavedProofs.find(p => p.id === proofId);
+            const updatedProofs = pSavedProofs.filter(p => p.id !== proofId);
+            updateProperty(propIdx, prev => ({
+                ...prev,
+                savedProofs: updatedProofs
+            }));
+
+            try {
+                const sb = await getSupabase();
+                await sb.from('ownership_proofs').delete().eq('id', proofId);
+                if (proofToDelete?.file_url) {
+                    await sb.storage.from('documents').remove([proofToDelete.file_url]);
+                }
+                if (propIdx > 0 && profileId) {
+                    const { data: prof } = await sb.from('profiles').select('additional_properties').eq('id', profileId).single();
+                    if (prof?.additional_properties && Array.isArray(prof.additional_properties)) {
+                        const addProps = [...(prof.additional_properties as Record<string, unknown>[])];
+                        if (addProps[propIdx - 1]) {
+                            addProps[propIdx - 1] = {
+                                ...addProps[propIdx - 1],
+                                savedProofs: updatedProofs
+                            };
+                            await sb.from('profiles').update({ additional_properties: addProps }).eq('id', profileId);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to delete ownership proof:', err);
+            }
+        };
+
+        const removePropFile = (idx: number) => {
+            setPOwnershipFiles(prev => {
+                const removed = prev[idx];
+                if (removed) {
+                    setFileAnalysisStatus(s => {
+                        const next = { ...s };
+                        delete next[removed.name];
+                        return next;
+                    });
+                }
+                return prev.filter((_, i) => i !== idx);
+            });
+        };
+
+        // 5 cards content
+        const cardsContent = (
+            <div className="space-y-6">
+                {/* 1. Documentation Section */}
+                <PropertyDocumentsCard
+                    propIdx={propIdx}
+                    savedProofs={pSavedProofs}
+                    ownershipFiles={pOwnershipFiles}
+                    fileAnalysisStatus={fileAnalysisStatus}
+                    profileId={profileId}
+                    isDocVerified={isDocVerified}
+                    extractedAddressInfo={extractedAddressInfo}
+                    isOwnershipOpen={pOwnershipOpen}
+                    isAddressCardVisible={isAddressCardVisible}
+                    isAddressFilled={Boolean(pAddr.street?.trim() || pAddr.cep?.trim())}
+                    isPropertySaved={Boolean(prop.isSavedProperty || prop.address.description?.trim())}
+                    isSaving={isSaving}
+                    onToggleOpen={() => setPOwnershipOpen(prev => !prev)}
+                    onUploadFiles={handlePropDocUpload}
+                    onRemoveSavedProof={removePropSavedProof}
+                    onRemovePendingFile={removePropFile}
+                    onManualAddress={() => {
+                        updateProperty(propIdx, prev => ({
+                            ...prev,
+                            showAddressCard: true,
+                            ownershipSectionOpen: false,
+                            addressSectionOpen: true,
+                        }));
+                        setTimeout(() => {
+                            document.getElementById(`prop-${propIdx}-address`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }, 150);
+                    }}
+                    onConfirm={() => {
+                        handleSave(true);
+                        updateProperty(propIdx, prev => ({
+                            ...prev,
+                            showAddressCard: true,
+                            ownershipSectionOpen: false,
+                            addressSectionOpen: true,
+                        }));
+                        setTimeout(() => {
+                            document.getElementById(`prop-${propIdx}-address`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }, 150);
+                    }}
+                    getSupabase={getSupabase}
+                />
+
+                {/* Extraction feedback banner */}
+                {extractedAddressInfo && (
+                    <div className={`flex items-center justify-between gap-3 p-4 rounded-xl border text-sm font-medium transition-all duration-300 animate-in fade-in slide-in-from-top-2 ${extractedAddressInfo.startsWith('✅')
+                        ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
+                        : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300'
+                        }`}>
+                        <div className="flex items-center gap-3 min-w-0">
+                            {extractedAddressInfo.startsWith('✅')
+                                ? <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+                                : <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+                            }
+                            <span>{extractedAddressInfo}</span>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setTemporaryExtractedInfo(null)}
+                            className="text-current opacity-60 hover:opacity-100 p-1 rounded-md transition-opacity flex-shrink-0"
+                            aria-label="Fechar mensagem"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                )}
+
+                {/* 2. Address Section */}
+                {isAddressCardVisible && (
+                    <div id={`prop-${propIdx}-address`} className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
+                        <button
+                            type="button"
+                            onClick={() => setPAddressOpen(prev => !prev)}
+                            className="flex items-center justify-between w-full"
+                        >
+                            <div className="flex items-center gap-2">
+                                <div className="p-2 bg-emerald-100 dark:bg-emerald-900/50 rounded-lg text-emerald-600">
+                                    <MapPin className="w-5 h-5" />
+                                </div>
+                                <h3 className="text-lg font-semibold text-foreground">{p.basics.addressTitle}</h3>
+                                {!pAddressOpen && pAddr.street && (
+                                    <span className="ml-2 text-xs bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full">Preenchido ✓</span>
+                                )}
+                            </div>
+                            {pAddressOpen ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
+                        </button>
+
+                        {pAddressOpen && (
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div className="space-y-2">
+                                    <Label>{p.basics.cep}</Label>
+                                    <div className="relative">
+                                        <Input
+                                            value={pAddr.cep || ''}
+                                            onChange={(e) => handlePropAddrChange('cep', e.target.value)}
+                                            placeholder="00000-000"
+                                            maxLength={9}
+                                        />
+                                        {isLoadingAddress && <Loader2 className="absolute right-3 top-2.5 w-4 h-4 animate-spin text-muted-foreground" />}
+                                    </div>
+                                    {cepError && <p className="text-xs text-red-500">{cepError}</p>}
+                                </div>
+                                <div className="md:col-span-3 space-y-2">
+                                    <Label>Cidade / UF</Label>
+                                    <div className="flex gap-2">
+                                        <Input value={pAddr.city || ''} onChange={(e) => handlePropAddrChange('city', e.target.value)} placeholder="Cidade" />
+                                        <Input value={pAddr.state || ''} onChange={(e) => handlePropAddrChange('state', e.target.value)} placeholder="UF" className="w-20" maxLength={2} />
+                                    </div>
+                                </div>
+                                <div className="md:col-span-3 space-y-2">
+                                    <Label>{p.basics.street}</Label>
+                                    <Input value={pAddr.street || ''} onChange={(e) => handlePropAddrChange('street', e.target.value)} placeholder="Rua / Avenida" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>{p.basics.number}</Label>
+                                    <Input value={pAddr.number || ''} onChange={(e) => handlePropAddrChange('number', e.target.value)} placeholder="123" />
+                                </div>
+                                <div className="md:col-span-2 space-y-2">
+                                    <Label>{p.basics.neighborhood}</Label>
+                                    <Input value={pAddr.neighborhood || ''} onChange={(e) => handlePropAddrChange('neighborhood', e.target.value)} placeholder="Bairro" />
+                                </div>
+                                <div className="md:col-span-2 space-y-2">
+                                    <Label>{p.basics.complement}</Label>
+                                    <Input value={pAddr.complement || ''} onChange={(e) => handlePropAddrChange('complement', e.target.value)} placeholder={p.basics.complement} />
+                                </div>
+                            </div>
+                        )}
+
+                        {pAddressOpen && (
+                            <div className="flex justify-end pt-2">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={isSaving || (!pAddr.street && !pAddr.cep)}
+                                    className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                                    onClick={() => {
+                                        const bairro = pAddr.neighborhood?.trim();
+                                        const updatedProps = properties.map((pItem, i) => {
+                                            if (i !== propIdx) return pItem;
+                                            const currentName = pItem.details?.propertyName?.trim();
+                                            return {
+                                                ...pItem,
+                                                showDetailsCard: true,
+                                                addressSectionOpen: false,
+                                                detailsInitialOpen: true,
+                                                details: {
+                                                    ...pItem.details,
+                                                    propertyName: currentName || bairro || '',
+                                                }
+                                            };
+                                        });
+                                        setProperties(updatedProps);
+                                        handleSave(true, updatedProps);
+                                        setTimeout(() => document.getElementById(`prop-${propIdx}-details`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+                                    }}
+                                >
+                                    Confirmar <ArrowRight className="w-4 h-4" />
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* 3. Details Section */}
+                {isDetailsCardVisible && (
+                    <>
+                        <div id={`prop-${propIdx}-details`} />
+                        <PropertyDetailsCard
+                            key={`details-${propIdx}-${pDetailsOpen}`}
+                            details={pDetails}
+                            units={pSubUnits}
+                            onDetailsChange={setPDetails}
+                            onUnitsChange={setPSubUnits}
+                            propertyType={pType}
+                            initialOpen={pDetailsOpen}
+                            onOpenChange={(open) => setPDetailsOpen(open)}
+                            onContinue={() => {
+                                updateProperty(propIdx, prev => ({
+                                    ...prev,
+                                    showPhotosCard: true,
+                                    detailsInitialOpen: false,
+                                    photosSectionOpen: true,
+                                }));
+                                handleSave(true);
+                                setTimeout(() => document.getElementById(`prop-${propIdx}-photos`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+                            }}
+                        />
+                    </>
+                )}
+
+                {/* 4. Photos & Videos Section */}
+                {isPhotosCardVisible && (
+                    <div id={`prop-${propIdx}-photos`} className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
+                        <button
+                            type="button"
+                            onClick={() => setPPhotosOpen(prev => !prev)}
+                            className="flex items-center justify-between w-full"
+                        >
+                            <div className="flex items-center gap-2">
+                                <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded-lg text-amber-600">
+                                    <Camera className="w-5 h-5" />
+                                </div>
+                                <h3 className="text-lg font-semibold text-foreground">Fotos e Vídeos do Imóvel</h3>
+                                {!pPhotosOpen && (pSavedPhotos.length > 0 || pPhotos.length > 0 || pSavedVideos.length > 0 || pVideos.length > 0) && (
+                                    <span className="ml-2 text-xs bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full">
+                                        {pSavedPhotos.length + pPhotos.length} fotos · {pSavedVideos.length + pVideos.length} vídeos
+                                    </span>
+                                )}
+                            </div>
+                            {pPhotosOpen ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
+                        </button>
+
+                        {pPhotosOpen && (
+                            <>
+                                <div className="bg-muted/30 p-4 rounded-lg border border-border flex gap-3 items-start">
+                                    <Sparkles className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
+                                    <div>
+                                        <p className="text-sm font-medium text-foreground mb-1">Dica Profissional</p>
+                                        <p className="text-sm text-muted-foreground">Imóveis com pelo menos 5 fotos recebem 4x mais visualizações! Capriche na iluminação.</p>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                                            <Camera className="w-4 h-4 text-muted-foreground" />
+                                            Fotos
+                                        </p>
+                                        <span className="text-xs text-muted-foreground">{pSavedPhotos.length + pPhotos.length}/10</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                        {pSavedPhotos.map((url, idx) => {
+                                            const effectiveProfilePhoto = prop.profilePhotoUrl || (pSavedPhotos.length > 0 ? pSavedPhotos[0] : null);
+                                            const isProfilePhoto = effectiveProfilePhoto === url;
+                                            return (
+                                                <div
+                                                    key={`saved-p-${idx}`}
+                                                    className={cn(
+                                                        "aspect-square rounded-lg border relative group overflow-hidden cursor-pointer transition-all",
+                                                        isProfilePhoto
+                                                            ? "border-emerald-500 border-2 ring-2 ring-emerald-200 dark:ring-emerald-800 shadow-sm"
+                                                            : "border-border hover:border-emerald-300"
+                                                    )}
+                                                    onClick={() => {
+                                                        updateProperty(propIdx, prev => ({ ...prev, profilePhotoUrl: url }));
+                                                        if (profileId) {
+                                                            getSupabase().then(sb => {
+                                                                if (propIdx === 0) {
+                                                                    sb.from('profiles').update({ profile_photo_url: url }).eq('id', profileId);
+                                                                } else {
+                                                                    sb.from('profiles').select('additional_properties').eq('id', profileId).single().then(({ data: prof }) => {
+                                                                        if (prof?.additional_properties) {
+                                                                            const addProps = [...(prof.additional_properties as Record<string, unknown>[])];
+                                                                            if (addProps[propIdx - 1]) {
+                                                                                addProps[propIdx - 1] = { ...addProps[propIdx - 1], profilePhotoUrl: url };
+                                                                                sb.from('profiles').update({ additional_properties: addProps }).eq('id', profileId);
+                                                                            }
+                                                                        }
+                                                                    });
+                                                                }
+                                                            }).catch(console.error);
+                                                        }
+                                                    }}
+                                                >
+                                                    <Image src={url} alt="Property" width={200} height={200} className="w-full h-full object-cover" />
+                                                    <div className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <Button
+                                                            size="icon"
+                                                            variant="destructive"
+                                                            className="h-6 w-6"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                removePropSavedPhoto(url);
+                                                            }}
+                                                        >
+                                                            <Trash2 className="w-3 h-3" />
+                                                        </Button>
+                                                    </div>
+                                                    <div
+                                                        className={cn(
+                                                            "absolute bottom-0 inset-x-0 flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-medium transition-colors select-none",
+                                                            isProfilePhoto
+                                                                ? "bg-emerald-600 text-white font-semibold"
+                                                                : "bg-black/60 text-white opacity-0 group-hover:opacity-100"
+                                                        )}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isProfilePhoto}
+                                                            readOnly
+                                                            className="w-3.5 h-3.5 accent-emerald-500 rounded cursor-pointer pointer-events-none"
+                                                        />
+                                                        <span>{isProfilePhoto ? 'Foto Principal' : 'Definir como principal'}</span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+
+                                        {pPhotos.map((file, idx) => (
+                                            <PhotoPreview key={`new-p-${idx}`} file={file} onRemove={() => removePropPhoto(idx)} />
+                                        ))}
+
+                                        {pSavedPhotos.length + pPhotos.length < 10 && (
+                                            <div className="aspect-square rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors relative">
+                                                <input
+                                                    type="file"
+                                                    multiple
+                                                    accept="image/*"
+                                                    onChange={handlePropPhotoSelect}
+                                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                                />
+                                                <Camera className="w-8 h-8 text-muted-foreground mb-2" />
+                                                <span className="text-xs text-muted-foreground">Adicionar Fotos</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2 pt-3 border-t border-border">
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                                            <Video className="w-4 h-4 text-muted-foreground" />
+                                            Vídeos
+                                        </p>
+                                        <span className="text-xs text-muted-foreground">{pSavedVideos.length + pVideos.length}/2</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                        {pSavedVideos.map((url, idx) => (
+                                            <div key={`saved-v-${idx}`} className="aspect-square rounded-lg border border-border relative group overflow-hidden">
+                                                <video src={url} className="w-full h-full object-cover" muted />
+                                                <div className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <Button size="icon" variant="destructive" className="h-6 w-6" onClick={() => removePropSavedVideo(url)}>
+                                                        <Trash2 className="w-3 h-3" />
+                                                    </Button>
+                                                </div>
+                                                <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[10px] p-1 text-center flex items-center justify-center gap-1">
+                                                    <Video className="w-3 h-3" /> Vídeo
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                        {pVideos.map((file, idx) => (
+                                            <div key={`new-v-${idx}`} className="aspect-square rounded-lg border border-border relative group overflow-hidden bg-muted">
+                                                <video src={URL.createObjectURL(file)} className="w-full h-full object-cover" muted />
+                                                <div className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <Button size="icon" variant="destructive" className="h-6 w-6" onClick={() => removePropVideo(idx)}>
+                                                        <Trash2 className="w-3 h-3" />
+                                                    </Button>
+                                                </div>
+                                                <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[10px] p-1 text-center flex items-center justify-center gap-1">
+                                                    <Video className="w-3 h-3" /> {file.name}
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                        {pSavedVideos.length + pVideos.length < 2 && (
+                                            <div className="aspect-square rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors relative">
+                                                <input
+                                                    type="file"
+                                                    accept="video/*"
+                                                    onChange={handlePropVideoSelect}
+                                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                                />
+                                                <Video className="w-8 h-8 text-muted-foreground mb-2" />
+                                                <span className="text-xs text-muted-foreground">Adicionar Vídeo</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-end pt-4">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={isSaving}
+                                        className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                                        onClick={() => {
+                                            const defaultProfilePhoto = prop.profilePhotoUrl || (pSavedPhotos.length > 0 ? pSavedPhotos[0] : null);
+                                            const updatedProps = properties.map((pItem, i) => {
+                                                if (i !== propIdx) return pItem;
+                                                return {
+                                                    ...pItem,
+                                                    showDescriptionCard: true,
+                                                    photosSectionOpen: false,
+                                                    descriptionSectionOpen: true,
+                                                    profilePhotoUrl: defaultProfilePhoto,
+                                                };
+                                            });
+                                            setProperties(updatedProps);
+                                            handleSave(true, updatedProps);
+                                            setTimeout(() => document.getElementById(`prop-${propIdx}-description`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+                                        }}
+                                    >
+                                        Confirmar <ArrowRight className="w-4 h-4" />
+                                    </Button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                )}
+
+                {/* 5. Description Section */}
+                {isDescriptionCardVisible && (
+                    <div id={`prop-${propIdx}-description`} className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
+                        <button
+                            type="button"
+                            onClick={() => setPDescOpen(prev => !prev)}
+                            className="flex items-center justify-between w-full"
+                        >
+                            <div className="flex items-center gap-2">
+                                <div className="p-2 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg text-indigo-600">
+                                    <FileText className="w-5 h-5" />
+                                </div>
+                                <h3 className="text-lg font-semibold text-foreground">Descrição do Imóvel</h3>
+                                {!pDescOpen && pAddr.description && (
+                                    <span className="ml-2 text-xs bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full">Preenchido ✓</span>
+                                )}
+                            </div>
+                            {pDescOpen ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
+                        </button>
+                        {pDescOpen && (
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <Label>Descreva seu imóvel em detalhes <span className="text-red-500">*</span></Label>
+                                </div>
+                                <div className="flex items-center gap-4 flex-wrap">
+                                    <span className="text-sm font-medium text-foreground">Finalidade da descrição:</span>
+                                    <DetailCheckbox
+                                        checked={descriptionPurpose.aluguel}
+                                        onChange={(val) => setDescriptionPurpose(prev => ({ ...prev, aluguel: val }))}
+                                        label="Aluguel"
+                                    />
+                                    <DetailCheckbox
+                                        checked={descriptionPurpose.venda}
+                                        onChange={(val) => setDescriptionPurpose(prev => ({ ...prev, venda: val }))}
+                                        label="Venda"
+                                    />
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 text-xs gap-1 text-violet-600 border-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/20 ml-auto"
+                                        onClick={() => generateMainDescription(propIdx)}
+                                        disabled={generatingMainDescription || (!descriptionPurpose.venda && !descriptionPurpose.aluguel)}
+                                    >
+                                        {generatingMainDescription ? (
+                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                        ) : (
+                                            <Wand2 className="w-3.5 h-3.5" />
+                                        )}
+                                        {generatingMainDescription ? 'Gerando...' : 'Gerar com IA'}
+                                    </Button>
+                                </div>
+                                <textarea
+                                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[120px]"
+                                    placeholder="Ex: Excelente apartamento com varanda gourmet, vista livre, armários planejados na cozinha e banheiros..."
+                                    value={pAddr.description || ''}
+                                    onChange={(e) => handlePropAddrChange('description', e.target.value)}
+                                />
+                                <span className="text-xs text-muted-foreground">Esta descrição será exibida no anúncio do imóvel principal.</span>
+
+                                <div className="flex justify-end pt-4">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={isSaving}
+                                        className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                                        onClick={async () => {
+                                            const updatedProps = properties.map((pItem, i) => {
+                                                if (i !== propIdx) return pItem;
+                                                return {
+                                                    ...pItem,
+                                                    descriptionSectionOpen: false,
+                                                    isSavedProperty: true,
+                                                };
+                                            });
+                                            setProperties(updatedProps);
+                                            await handleSave(true, updatedProps);
+                                            setExpandedPropertyIdx(null);
+                                            setTemporaryExtractedInfo(null);
+                                            if (view === 'imoveis') {
+                                                setSelectedPropertyIdx(propIdx);
+                                                setImoveisViewMode('manage');
+                                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                                            } else {
+                                                setTimeout(() => {
+                                                    document.getElementById(`prop-${propIdx}-card`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                                                }, 100);
+                                            }
+                                        }}
+                                    >
+                                        {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : <CheckCircle2 className="w-4 h-4 mr-1.5" />}
+                                        Confirmar
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Subunits for multi-family in manage or wizard mode */}
+                {pType === 'multi' && (mode === 'manage' || mode === 'wizard') && (
+                    <div className="pt-4 border-t border-border space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h4 className="text-base font-semibold text-foreground flex items-center gap-2">
+                                <Building2 className="w-4 h-4 text-violet-600" />
+                                Unidades Locáveis ({pSubUnits.length})
+                            </h4>
+                        </div>
+                        <SubUnitsSection
+                            key={`subunits-${propIdx}-${prop.subUnitOpenIdx}`}
+                            details={pDetails}
+                            units={pSubUnits}
+                            onDetailsChange={setPDetails}
+                            onUnitsChange={setPSubUnits}
+                            onGenerateDescription={(unitIdx) => generateUnitDescription(propIdx, unitIdx)}
+                            generatingDescriptionIdx={generatingUnitDescriptionIdx}
+                            onImportContract={(unitIdx, file) => importContract(propIdx, unitIdx, file)}
+                            importingContractIdx={importingContractIdx}
+                            initialOpenIdx={prop.subUnitOpenIdx}
+                            propertyIndex={propIdx}
+                        />
+                    </div>
+                )}
+            </div>
+        );
+
+        if (mode === 'manage' || mode === 'wizard') {
+            return (
+                <div key={`prop-detail-${propIdx}-${mode}`} className="space-y-6">
+                    {cardsContent}
+                </div>
+            );
+        }
+
+        // Mode 'accordion' (for Profile / Proprietário view)
+        return (
+            <div key={propIdx} id={`prop-${propIdx}-card`} className="space-y-3">
+                <div className="border border-border rounded-xl shadow-sm overflow-hidden transition-all duration-200">
+                    <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => {
+                            setTemporaryExtractedInfo(null);
+                            if (isExpanded) {
+                                setExpandedPropertyIdx(null);
+                            } else {
+                                const keepDocsOpen = !isAddressCardVisible;
+                                updateProperty(propIdx, prev => ({
+                                    ...prev,
+                                    ownershipSectionOpen: keepDocsOpen,
+                                    addressSectionOpen: false,
+                                    photosSectionOpen: false,
+                                    descriptionSectionOpen: false,
+                                    detailsInitialOpen: false,
+                                    subUnitOpenIdx: null,
+                                }));
+                                setExpandedPropertyIdx(propIdx);
+                            }
+                        }}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                setTemporaryExtractedInfo(null);
+                                if (isExpanded) setExpandedPropertyIdx(null);
+                                else setExpandedPropertyIdx(propIdx);
+                            }
+                        }}
+                        className={cn(
+                            "flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 w-full px-5 py-4 transition-colors cursor-pointer select-none",
+                            isExpanded ? "bg-card" : "bg-muted/30 hover:bg-muted/50"
+                        )}
+                    >
+                        <div className="flex items-center gap-3 min-w-0">
+                            {pType === 'multi' ? (
+                                <button
+                                    type="button"
+                                    aria-label={isUnitsTreeOpen ? "Recolher unidades" : "Expandir unidades"}
+                                    title={isUnitsTreeOpen ? "Recolher unidades (-)" : "Expandir unidades (+)"}
+                                    className="w-7 h-7 rounded-md border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors shadow-2xs flex-shrink-0"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleUnitsTree(e);
+                                    }}
+                                >
+                                    {isUnitsTreeOpen ? <Minus className="w-4 h-4 stroke-[2.5]" /> : <Plus className="w-4 h-4 stroke-[2.5]" />}
+                                </button>
+                            ) : (
+                                <div className="w-7 h-7 flex-shrink-0" aria-hidden="true" />
+                            )}
+
+                            {!isExpanded && (prop.profilePhotoUrl || (pSavedPhotos.length > 0 ? pSavedPhotos[0] : null)) ? (
+                                <div className="w-10 h-10 rounded-lg overflow-hidden border border-border flex-shrink-0">
+                                    <Image src={prop.profilePhotoUrl || pSavedPhotos[0]} alt={propLabel} width={40} height={40} className="w-full h-full object-cover" />
+                                </div>
+                            ) : (
+                                <div className={cn(
+                                    "p-2 rounded-lg flex-shrink-0",
+                                    prop.propertyType === 'single'
+                                        ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600"
+                                        : "bg-violet-100 dark:bg-violet-900/50 text-violet-600"
+                                )}>
+                                    {propIcon}
+                                </div>
+                            )}
+                            <div className="text-left min-w-0">
+                                <div className="flex items-center gap-2">
+                                    <span className="font-semibold text-foreground text-sm truncate">{propLabel}</span>
+                                    <span className="text-xs text-muted-foreground whitespace-nowrap">({propTypeName})</span>
+                                </div>
+                                {!isExpanded && pAddr.street && (
+                                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                                        {[pAddr.street, pAddr.number, pAddr.neighborhood, pAddr.city, pAddr.state, pAddr.cep].filter(Boolean).join(', ')}
+                                    </p>
+                                )}
+                                {propComplete && !isExpanded && (
+                                    <span className="text-xs text-emerald-600 flex items-center gap-1 mt-0.5">
+                                        <CheckCircle2 className="w-3 h-3" /> Preenchido
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+
+                        {isExpanded && (
+                            <div
+                                className="flex items-center gap-2 flex-wrap order-3 sm:order-2 w-full sm:w-auto mt-2 sm:mt-0 justify-start sm:justify-center"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <Button
+                                    size="sm"
+                                    type="button"
+                                    className="h-8 text-xs flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-xs"
+                                    onClick={() => handleQuickPublish('rent', propIdx)}
+                                >
+                                    <Home className="w-3.5 h-3.5" />
+                                    Anunciar Aluguel
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    type="button"
+                                    className="h-8 text-xs flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-xs"
+                                    onClick={() => handleQuickPublish('sale', propIdx)}
+                                >
+                                    <Sparkles className="w-3.5 h-3.5" />
+                                    Anunciar Venda
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    type="button"
+                                    variant="outline"
+                                    className="h-8 text-xs flex items-center gap-1.5 font-medium shadow-xs"
+                                    onClick={() => window.location.href = '/dashboard'}
+                                >
+                                    <FileText className="w-3.5 h-3.5" />
+                                    Gerenciar Aluguel
+                                </Button>
+                            </div>
+                        )}
+
+                        <div className="flex items-center gap-2 flex-shrink-0 order-2 sm:order-3">
+                            <span
+                                role="button"
+                                tabIndex={0}
+                                className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPropertyToDelete({ idx: propIdx, label: propLabel });
+                                }}
+                                onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }}
+                            >
+                                <Trash2 className="w-4 h-4" />
+                            </span>
+                            {isExpanded ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
+                        </div>
+                    </div>
+
+                    {isExpanded && (
+                        <div className="p-6 space-y-6 border-t border-border bg-card">
+                            {cardsContent}
+                        </div>
+                    )}
+                </div>
+
+                {pType === 'multi' && isUnitsTreeOpen && (
+                    <div className="ml-4 sm:ml-10 pl-4 sm:pl-6 border-l-2 border-border/70 space-y-3">
+                        <div id={`prop-${propIdx}-subunits`} />
+                        <SubUnitsSection
+                            key={`subunits-${propIdx}-${prop.subUnitOpenIdx}`}
+                            details={pDetails}
+                            units={pSubUnits}
+                            onDetailsChange={setPDetails}
+                            onUnitsChange={setPSubUnits}
+                            onGenerateDescription={(unitIdx) => generateUnitDescription(propIdx, unitIdx)}
+                            generatingDescriptionIdx={generatingUnitDescriptionIdx}
+                            onImportContract={(unitIdx, file) => importContract(propIdx, unitIdx, file)}
+                            importingContractIdx={importingContractIdx}
+                            initialOpenIdx={prop.subUnitOpenIdx}
+                            propertyIndex={propIdx}
+                        />
+                    </div>
+                )}
+            </div>
+        );
+    };
+
     return (
-        <div className="max-w-5xl mx-auto p-6 space-y-8">
+        <div className={cn("mx-auto p-4 sm:p-6 space-y-8", view === 'imoveis' ? "max-w-7xl" : "max-w-5xl")}>
             {/* Profile Load Error Banner */}
             {profileLoadError && (
                 <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 px-6 py-4 rounded-xl shadow flex items-center gap-3">
@@ -1852,1206 +2998,364 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                 </div>
             )}
 
-            {/* Page Header for imoveis view */}
+            {/* ═════════════════════════════════════════════════════════════════════ */}
+            {/* VIEW === 'imoveis': Modern Hub, Cost & Result Center Dashboard        */}
+            {/* ═════════════════════════════════════════════════════════════════════ */}
             {view === 'imoveis' && (
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <div>
-                        <h1 className="text-3xl font-bold text-foreground">Imóveis</h1>
-                        <p className="text-muted-foreground mt-1">
-                            Gerencie seus imóveis cadastrados.
-                        </p>
-                    </div>
-                </div>
-            )}
-
-            {/* Header / Overview — shown on profile/proprietario view */}
-            {view !== 'imoveis' && (
-                <div className="flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <div className="relative group w-20 h-20 rounded-full bg-slate-200 border-4 border-white dark:bg-slate-800 dark:border-slate-700 shadow-sm flex items-center justify-center overflow-hidden">
-                            <Image
-                                src={user.imageUrl}
-                                alt={user.fullName || ''}
-                                width={80}
-                                height={80}
-                                className="w-full h-full object-cover"
-                            />
-                            <label className="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity text-xs font-medium text-center">
-                                {p.header.changePhoto}
-                                <input type="file" className="hidden" accept="image/*" onChange={handleProfileImageUpload} />
-                            </label>
-                        </div>
-                        <div>
-                            <h1 className="text-2xl font-bold text-foreground">{formData.name || user.fullName}</h1>
-                            <p className="text-muted-foreground">{user.primaryEmailAddress?.emailAddress}</p>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-
-
-
-            {/* Navigation Tabs — only show when more than 1 tab */}
-            {tabs.length > 1 && (
-                <div className="border-b border-border flex overflow-x-auto">
-                    {tabs.map((tab: { id: string; label: string }) => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                            className={cn(
-                                "px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
-                                activeTab === tab.id
-                                    ? "border-emerald-500 text-emerald-600 dark:text-emerald-400"
-                                    : "border-transparent text-muted-foreground hover:text-foreground"
-                            )}
-                        >
-                            {tab.label}
-                        </button>
-                    ))}
-                </div>
-            )}
-
-            {/* Content Area */}
-            <div className="min-h-[400px]">
-
-                {/* OWNERSHIP TAB */}
-                {activeTab === 'ownership' && (
-                    <div className="space-y-8 max-w-4xl">
-
-                        {/* Add property button (when properties exist) */}
-                        {propertyCreated && (
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2 sm:gap-3">
-                                    <h3 className="text-lg font-semibold text-foreground">
-                                        {properties.length === 1 ? 'Propriedade' : 'Propriedades'} ({properties.length})
-                                    </h3>
-                                    <span className="text-muted-foreground font-normal">·</span>
-                                    <h3 className="text-lg font-semibold text-muted-foreground">
-                                        {totalUnits === 1 ? 'Unidade' : 'Unidades'} ({totalUnits})
-                                    </h3>
+                <div className="space-y-8">
+                    {imoveisViewMode === 'grid' && (
+                        <div className="space-y-6">
+                            {/* Page Header matching /pt/imobiliaria & /pt/dashboard/energy */}
+                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                                <div>
+                                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
+                                        <Building2 className="w-7 h-7 sm:w-8 sm:h-8 text-emerald-600" />
+                                        Gestão de Imóveis & Centros de Resultados
+                                    </h1>
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                        Portfólio imobiliário, centros de custos e lucros segregados por imóvel.
+                                    </p>
                                 </div>
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    disabled={properties.length >= MAX_PROPERTIES}
-                                    className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                    onClick={() => setShowAddPropertyModal(true)}
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    Adicionar Propriedade
-                                </Button>
-                            </div>
-                        )}
 
-                        {/* Empty state */}
-                        {!propertyCreated && (
-                            <div className="flex flex-col items-center justify-center py-10 gap-4">
-                                <div className="text-center space-y-2">
-                                    <h3 className="text-lg font-semibold text-foreground">Nenhuma propriedade cadastrada</h3>
-                                    <p className="text-sm text-muted-foreground max-w-md">Adicione uma propriedade para começar a preencher os dados do imóvel.</p>
+                                <div className="flex items-center gap-3">
+                                    <Button
+                                        size="default"
+                                        disabled={properties.length >= MAX_PROPERTIES}
+                                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm gap-2"
+                                        onClick={() => setShowAddPropertyModal(true)}
+                                    >
+                                        <Plus className="w-4 h-4 stroke-[2.5]" />
+                                        Adicionar Propriedade
+                                    </Button>
                                 </div>
-                                <Button
-                                    size="lg"
-                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-lg shadow-emerald-900/20 gap-2 px-8"
-                                    onClick={() => setShowAddPropertyModal(true)}
-                                >
-                                    <Plus className="w-5 h-5" />
-                                    Adicionar Propriedade
-                                </Button>
                             </div>
-                        )}
 
-                        {/* Property cards */}
-                        {properties.map((prop, propIdx) => {
-                            const isExpanded = expandedPropertyIdx === propIdx;
-                            const propComplete = isPropertyComplete(prop);
-                            const propLabel = prop.details.propertyName || `Propriedade ${propIdx + 1}`;
-                            const propIcon = prop.propertyType === 'single' ? <Home className="w-4 h-4" /> : <Building2 className="w-4 h-4" />;
-                            const propTypeName = prop.propertyType === 'single' ? 'Unifamiliar' : 'Multifamiliar';
-
-                            // ── Per-property local aliases ──
-                            const pAddr = prop.address;
-                            const pDetails = prop.details;
-                            const pSubUnits = prop.subUnits;
-                            const pType = prop.propertyType;
-                            const pPhotos = prop.photos;
-                            const pSavedPhotos = prop.savedPhotos;
-                            const pVideos = prop.videos;
-                            const pSavedVideos = prop.savedVideos;
-                            const pOwnershipFiles = prop.ownershipFiles;
-                            const pSavedProofs = prop.savedProofs;
-                            const pOwnershipOpen = prop.ownershipSectionOpen;
-                            const pAddressOpen = prop.addressSectionOpen;
-                            const pPhotosOpen = prop.photosSectionOpen;
-                            const pDescOpen = prop.descriptionSectionOpen;
-                            const pDetailsOpen = prop.detailsInitialOpen;
-
-                            // Sequential wizard card visibility calculations
-                            const hasDocsData = (pSavedProofs.length > 0 || pOwnershipFiles.length > 0);
-                            const hasAddressData = Boolean(pAddr.street || pAddr.cep || pAddr.city);
-                            const hasDetailsData = Boolean(pDetails.propertyName || pDetails.totalSqMeters || pDetails.areaEdificada);
-                            const hasPhotosData = (pSavedPhotos.length + pPhotos.length > 0 || pSavedVideos.length + pVideos.length > 0);
-                            const hasDescriptionData = Boolean(pAddr.description?.trim());
-
-                            const isAddressCardVisible = prop.showAddressCard ?? (hasDocsData || hasAddressData || hasDetailsData || hasPhotosData || hasDescriptionData);
-                            const isDetailsCardVisible = prop.showDetailsCard ?? (hasAddressData || hasDetailsData || hasPhotosData || hasDescriptionData);
-                            const isPhotosCardVisible = prop.showPhotosCard ?? (hasDetailsData || hasPhotosData || hasDescriptionData);
-                            const isDescriptionCardVisible = prop.showDescriptionCard ?? (hasPhotosData || hasDescriptionData);
-
-                            // ── Per-property setter factories ──
-                            const setPropField = <K extends keyof PropertyState>(field: K, val: PropertyState[K] | ((prev: PropertyState[K]) => PropertyState[K])) => {
-                                updateProperty(propIdx, prev => ({
-                                    ...prev,
-                                    [field]: typeof val === 'function' ? (val as (prev: PropertyState[K]) => PropertyState[K])(prev[field]) : val
-                                }));
-                            };
-                            const setPOwnershipOpen = (v: boolean | ((p: boolean) => boolean)) => setPropField('ownershipSectionOpen', v);
-                            const setPAddressOpen = (v: boolean | ((p: boolean) => boolean)) => setPropField('addressSectionOpen', v);
-                            const setPPhotosOpen = (v: boolean | ((p: boolean) => boolean)) => setPropField('photosSectionOpen', v);
-                            const setPDescOpen = (v: boolean | ((p: boolean) => boolean)) => setPropField('descriptionSectionOpen', v);
-                            const setPDetailsOpen = (v: boolean | ((p: boolean) => boolean)) => setPropField('detailsInitialOpen', v);
-                            const setPDetails = (v: PropertyDetails | ((p: PropertyDetails) => PropertyDetails)) => setPropField('details', v);
-                            const setPSubUnits = (v: SubUnit[] | ((p: SubUnit[]) => SubUnit[])) => setPropField('subUnits', v);
-                            const setPPhotos = (v: File[] | ((p: File[]) => File[])) => setPropField('photos', v);
-                            const setPSavedPhotos = (v: string[] | ((p: string[]) => string[])) => setPropField('savedPhotos', v);
-                            const setPVideos = (v: File[] | ((p: File[]) => File[])) => setPropField('videos', v);
-                            const setPSavedVideos = (v: string[] | ((p: string[]) => string[])) => setPropField('savedVideos', v);
-                            const setPOwnershipFiles = (v: File[] | ((p: File[]) => File[])) => setPropField('ownershipFiles', v);
-                            const isDocVerified = pSavedProofs.length > 0 || pOwnershipFiles.some(f => fileAnalysisStatus[f.name] === 'success');
-                            const isUnitsTreeOpen = pType === 'multi' ? !collapsedUnitsTrees[propIdx] : false;
-                            const toggleUnitsTree = (e?: React.MouseEvent) => {
-                                e?.stopPropagation();
-                                setCollapsedUnitsTrees(prev => ({
-                                    ...prev,
-                                    [propIdx]: !prev[propIdx]
-                                }));
-                            };
-                            const handlePropAddrChange = (field: string, value: string) => {
-                                if (field === 'cep') {
-                                    const formatted = value.replace(/\D/g, '').replace(/(\d{5})(\d)/, '$1-$2').slice(0, 9);
-                                    updateProperty(propIdx, prev => ({ ...prev, address: { ...prev.address, cep: formatted } }));
-                                    if (formatted.replace(/\D/g, '').length === 8) {
-                                        fetchAddress('propertyAddress', formatted, propIdx);
-                                    }
-                                } else {
-                                    updateProperty(propIdx, prev => ({ ...prev, address: { ...prev.address, [field]: value } }));
-                                }
-                            };
-                            // File upload for this property documents
-                            const handlePropDocUpload = async (files: File[], category?: DocCategory, year?: number) => {
-                                if (!files || files.length === 0) return;
-
-                                // Process files to encode category/year tag if specified
-                                const processedFiles: File[] = [];
-                                for (const file of files) {
-                                    let newName = file.name;
-                                    if (category === 'iptu') {
-                                        const y = year || new Date().getFullYear();
-                                        if (!file.name.toLowerCase().includes('iptu') || !file.name.includes(String(y))) {
-                                            newName = `[IPTU ${y}] ${file.name}`;
-                                        }
-                                    } else if (category && category !== 'outros') {
-                                        const catTag = category.replace('_', ' ');
-                                        if (!file.name.toLowerCase().includes(catTag)) {
-                                            newName = `[${category}] ${file.name}`;
-                                        }
-                                    }
-                                    processedFiles.push(new File([file], newName, { type: file.type }));
-                                }
-
-                                if (profileId) {
-                                    try {
-                                        const sbUpload = await getSupabase();
-                                        const propStoragePrefix = propIdx === 0 ? profileId : `${profileId}/prop-${propIdx}`;
-                                        const newProofEntries: ProofData[] = [];
-
-                                        for (const file of processedFiles) {
-                                            const fileExt = file.name.split('.').pop();
-                                            const fileName = `${propStoragePrefix}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-
-                                            const { error: uploadError } = await sbUpload.storage
-                                                .from('documents')
-                                                .upload(fileName, file);
-
-                                            if (uploadError) {
-                                                console.error('Doc upload error:', uploadError);
-                                                alert(`Erro ao enviar documento ${file.name}: ${uploadError.message}`);
-                                                continue;
-                                            }
-
-                                            const { data: insertedProof, error: proofError } = await sbUpload
-                                                .from('ownership_proofs')
-                                                .insert({
-                                                    profile_id: profileId,
-                                                    property_index: propIdx,
-                                                    file_url: fileName,
-                                                    original_name: file.name,
-                                                    file_size: file.size,
-                                                    mime_type: file.type,
-                                                    status: 'pending',
-                                                })
-                                                .select()
-                                                .single();
-
-                                            if (proofError) {
-                                                console.error('Failed to insert ownership proof:', proofError);
-                                            } else if (insertedProof) {
-                                                newProofEntries.push(insertedProof as ProofData);
-                                            }
-                                        }
-
-                                        if (newProofEntries.length > 0) {
-                                            const updatedProofs = dedupeProofs([...pSavedProofs, ...newProofEntries]);
-                                            setPropField('savedProofs', updatedProofs);
-
-                                            // Update additional_properties JSON in database if property_index > 0
-                                            if (propIdx > 0) {
-                                                const { data: prof } = await sbUpload.from('profiles').select('additional_properties').eq('id', profileId).single();
-                                                if (prof?.additional_properties && Array.isArray(prof.additional_properties)) {
-                                                    const addProps = [...(prof.additional_properties as Record<string, unknown>[])];
-                                                    if (addProps[propIdx - 1]) {
-                                                        addProps[propIdx - 1] = {
-                                                            ...addProps[propIdx - 1],
-                                                            savedProofs: updatedProofs,
-                                                        };
-                                                        await sbUpload.from('profiles').update({ additional_properties: addProps }).eq('id', profileId);
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        // Run AI analysis if address is missing
-                                        if (!pAddr.street) {
-                                            for (const file of processedFiles) {
-                                                analyzeDocument(file, propIdx);
-                                            }
-                                        }
-                                    } catch (err) {
-                                        console.error('Direct doc upload error:', err);
-                                        setPOwnershipFiles(prev => [...prev, ...processedFiles]);
-                                    }
-                                } else {
-                                    // Drafting property
-                                    setTemporaryExtractedInfo(null);
-                                    setPOwnershipFiles(prev => [...prev, ...processedFiles]);
-                                    updateProperty(propIdx, prev => ({
-                                        ...prev,
-                                        showAddressCard: true,
-                                        addressSectionOpen: true,
-                                    }));
-                                    for (const file of processedFiles) {
-                                        analyzeDocument(file, propIdx);
-                                    }
-                                }
-                            };
-
-                            const handlePropFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-                                if (e.target.files && e.target.files.length > 0) {
-                                    handlePropDocUpload(Array.from(e.target.files));
-                                    e.target.value = '';
-                                }
-                            };
-                            const handlePropPhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-                                if (e.target.files && e.target.files.length > 0) {
-                                    const total = pSavedPhotos.length + pPhotos.length;
-                                    const remaining = 10 - total;
-                                    if (remaining <= 0) { alert('Máximo de 10 fotos por propriedade.'); return; }
-                                    const newPhotos = Array.from(e.target.files).slice(0, remaining);
-
-                                    // Upload directly to storage and add as savedPhotos
-                                    if (profileId) {
-                                        try {
-                                            const sbUpload = await getSupabase();
-                                            const propStoragePrefix = propIdx === 0 ? profileId : `${profileId}/prop-${propIdx}`;
-                                            const uploadedUrls: string[] = [];
-                                            for (const file of newPhotos) {
-                                                const fileExt = file.name.split('.').pop();
-                                                const fileName = `photos/${propStoragePrefix}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-                                                const { error: uploadError } = await sbUpload.storage.from('documents').upload(fileName, file);
-                                                if (uploadError) { console.error('Photo upload error:', uploadError); continue; }
-                                                const { data: { publicUrl } } = sbUpload.storage.from('documents').getPublicUrl(fileName);
-                                                uploadedUrls.push(publicUrl);
-                                            }
-                                            if (uploadedUrls.length > 0) {
-                                                const allPhotos = [...pSavedPhotos, ...uploadedUrls];
-                                                const currentProfilePhoto = prop.profilePhotoUrl;
-                                                const newProfilePhoto = (currentProfilePhoto && allPhotos.includes(currentProfilePhoto))
-                                                    ? currentProfilePhoto
-                                                    : allPhotos[0];
-
-                                                setPSavedPhotos(allPhotos);
-                                                updateProperty(propIdx, prev => ({
-                                                    ...prev,
-                                                    savedPhotos: allPhotos,
-                                                    profilePhotoUrl: newProfilePhoto,
-                                                }));
-
-                                                // Persist directly to DB without handleSave (avoids stale closure)
-                                                if (propIdx === 0) {
-                                                    await sbUpload.from('profiles').update({
-                                                        property_photos: allPhotos,
-                                                        profile_photo_url: newProfilePhoto,
-                                                    }).eq('id', profileId);
-                                                } else {
-                                                    // For additional properties, update the JSON column
-                                                    const { data: profile } = await sbUpload.from('profiles').select('additional_properties').eq('id', profileId).single();
-                                                    if (profile?.additional_properties) {
-                                                        const addProps = [...(profile.additional_properties as Record<string, unknown>[])];
-                                                        if (addProps[propIdx - 1]) {
-                                                            addProps[propIdx - 1] = {
-                                                                ...addProps[propIdx - 1],
-                                                                savedPhotos: allPhotos,
-                                                                profilePhotoUrl: newProfilePhoto,
-                                                            };
-                                                            await sbUpload.from('profiles').update({ additional_properties: addProps }).eq('id', profileId);
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        } catch (err) {
-                                            console.error('Photo upload failed:', err);
-                                            // Fallback: add as pending photos
-                                            setPPhotos(prev => [...prev, ...newPhotos]);
-                                        }
-                                    } else {
-                                        // No profile yet, add as pending
-                                        setPPhotos(prev => [...prev, ...newPhotos]);
-                                    }
-                                }
-                            };
-                            const removePropPhoto = (idx: number) => setPPhotos(prev => prev.filter((_, i) => i !== idx));
-                            const handlePropVideoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-                                if (e.target.files && e.target.files.length > 0) {
-                                    const total = pSavedVideos.length + pVideos.length;
-                                    if (total >= 2) { alert('Máximo de 2 vídeos por propriedade.'); return; }
-                                    const videoFile = Array.from(e.target.files)[0];
-
-                                    // Upload directly to storage and add as savedVideos
-                                    if (profileId) {
-                                        try {
-                                            const sbUpload = await getSupabase();
-                                            const propStoragePrefix = propIdx === 0 ? profileId : `${profileId}/prop-${propIdx}`;
-                                            const fileExt = videoFile.name.split('.').pop();
-                                            const fileName = `videos/${propStoragePrefix}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-                                            const { error: uploadError } = await sbUpload.storage.from('documents').upload(fileName, videoFile);
-                                            if (uploadError) { console.error('Video upload error:', uploadError); setPVideos(prev => [...prev, videoFile]); return; }
-                                            const { data: { publicUrl } } = sbUpload.storage.from('documents').getPublicUrl(fileName);
-                                            const allVideos = [...pSavedVideos, publicUrl];
-                                            setPSavedVideos(allVideos);
-                                            // Persist directly to DB without handleSave
-                                            if (propIdx === 0) {
-                                                await sbUpload.from('profiles').update({ property_videos: allVideos }).eq('id', profileId);
-                                            } else {
-                                                const { data: profile } = await sbUpload.from('profiles').select('additional_properties').eq('id', profileId).single();
-                                                if (profile?.additional_properties) {
-                                                    const addProps = [...(profile.additional_properties as Record<string, unknown>[])];
-                                                    if (addProps[propIdx - 1]) {
-                                                        addProps[propIdx - 1] = { ...addProps[propIdx - 1], savedVideos: allVideos };
-                                                        await sbUpload.from('profiles').update({ additional_properties: addProps }).eq('id', profileId);
-                                                    }
-                                                }
-                                            }
-                                        } catch (err) {
-                                            console.error('Video upload failed:', err);
-                                            setPVideos(prev => [...prev, videoFile]);
-                                        }
-                                    } else {
-                                        setPVideos(prev => [...prev, videoFile]);
-                                    }
-                                }
-                            };
-                            const removePropVideo = (idx: number) => setPVideos(prev => prev.filter((_, i) => i !== idx));
-                            const removePropSavedPhoto = async (url: string) => {
-                                const remaining = pSavedPhotos.filter(u => u !== url);
-                                const currentProfilePhoto = prop.profilePhotoUrl || (pSavedPhotos.length > 0 ? pSavedPhotos[0] : null);
-                                const newProfilePhoto = currentProfilePhoto === url
-                                    ? (remaining.length > 0 ? remaining[0] : null)
-                                    : currentProfilePhoto;
-
-                                setPSavedPhotos(remaining);
-                                updateProperty(propIdx, prev => ({
-                                    ...prev,
-                                    savedPhotos: remaining,
-                                    profilePhotoUrl: newProfilePhoto,
-                                }));
-
-                                if (profileId) {
-                                    try {
-                                        const sb = await getSupabase();
-                                        if (propIdx === 0) {
-                                            await sb.from('profiles').update({
-                                                property_photos: remaining,
-                                                profile_photo_url: newProfilePhoto,
-                                            }).eq('id', profileId);
-                                        } else {
-                                            const { data: profile } = await sb.from('profiles').select('additional_properties').eq('id', profileId).single();
-                                            if (profile?.additional_properties) {
-                                                const addProps = [...(profile.additional_properties as Record<string, unknown>[])];
-                                                if (addProps[propIdx - 1]) {
-                                                    addProps[propIdx - 1] = {
-                                                        ...addProps[propIdx - 1],
-                                                        savedPhotos: remaining,
-                                                        profilePhotoUrl: newProfilePhoto,
-                                                    };
-                                                    await sb.from('profiles').update({ additional_properties: addProps }).eq('id', profileId);
-                                                }
-                                            }
-                                        }
-                                    } catch (err) {
-                                        console.error('Failed to update photos after deletion:', err);
-                                    }
-                                }
-                            };
-                            const removePropSavedVideo = (url: string) => {
-                                setPSavedVideos(prev => prev.filter(u => u !== url));
-                            };
-                            const removePropSavedProof = async (proofId: string) => {
-                                const proofToDelete = pSavedProofs.find(p => p.id === proofId);
-                                const updatedProofs = pSavedProofs.filter(p => p.id !== proofId);
-                                updateProperty(propIdx, prev => ({
-                                    ...prev,
-                                    savedProofs: updatedProofs
-                                }));
-
-                                try {
-                                    const sb = await getSupabase();
-                                    // 1. Delete from ownership_proofs table
-                                    await sb.from('ownership_proofs').delete().eq('id', proofId);
-
-                                    // 2. Delete file from storage if file_url is available
-                                    if (proofToDelete?.file_url) {
-                                        await sb.storage.from('documents').remove([proofToDelete.file_url]);
-                                    }
-
-                                    // 3. If additional property, update JSON column in profiles table
-                                    if (propIdx > 0 && profileId) {
-                                        const { data: prof } = await sb.from('profiles').select('additional_properties').eq('id', profileId).single();
-                                        if (prof?.additional_properties && Array.isArray(prof.additional_properties)) {
-                                            const addProps = [...(prof.additional_properties as Record<string, unknown>[])];
-                                            if (addProps[propIdx - 1]) {
-                                                addProps[propIdx - 1] = {
-                                                    ...addProps[propIdx - 1],
-                                                    savedProofs: updatedProofs
-                                                };
-                                                await sb.from('profiles').update({ additional_properties: addProps }).eq('id', profileId);
-                                            }
-                                        }
-                                    }
-                                } catch (err) {
-                                    console.error('Failed to delete ownership proof:', err);
-                                }
-                            };
-                            const removePropFile = (idx: number) => {
-                                setPOwnershipFiles(prev => {
-                                    const removed = prev[idx];
-                                    if (removed) {
-                                        setFileAnalysisStatus(s => {
-                                            const next = { ...s };
-                                            delete next[removed.name];
-                                            return next;
-                                        });
-                                    }
-                                    return prev.filter((_, i) => i !== idx);
-                                });
-                            };
-
-                            return (
-                                <div key={propIdx} id={`prop-${propIdx}-card`} className="space-y-3">
-                                    <div className="border border-border rounded-xl shadow-sm overflow-hidden transition-all duration-200">
-                                        {/* Collapsible header */}
-                                        <div
-                                            role="button"
-                                            tabIndex={0}
-                                            onClick={() => {
-                                                setTemporaryExtractedInfo(null);
-                                                if (isExpanded) {
-                                                    setExpandedPropertyIdx(null);
-                                                } else {
-                                                    // When expanding property: keep Documentos open if it's the only unlocked card
-                                                    const keepDocsOpen = !isAddressCardVisible;
-                                                    updateProperty(propIdx, prev => ({
-                                                        ...prev,
-                                                        ownershipSectionOpen: keepDocsOpen,
-                                                        addressSectionOpen: false,
-                                                        photosSectionOpen: false,
-                                                        descriptionSectionOpen: false,
-                                                        detailsInitialOpen: false,
-                                                        subUnitOpenIdx: null,
-                                                    }));
-                                                    setExpandedPropertyIdx(propIdx);
-                                                }
-                                            }}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter' || e.key === ' ') {
-                                                    e.preventDefault();
-                                                    setTemporaryExtractedInfo(null);
-                                                    if (isExpanded) setExpandedPropertyIdx(null);
-                                                    else setExpandedPropertyIdx(propIdx);
-                                                }
-                                            }}
+                            {/* Filters & Search Bar */}
+                            {properties.length > 0 && (
+                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pt-2">
+                                    {/* Tab Pills */}
+                                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+                                        <button
+                                            type="button"
+                                            onClick={() => setImoveisFilterTab('all')}
                                             className={cn(
-                                                "flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 w-full px-5 py-4 transition-colors cursor-pointer select-none",
-                                                isExpanded ? "bg-card" : "bg-muted/30 hover:bg-muted/50"
+                                                "px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap",
+                                                imoveisFilterTab === 'all'
+                                                    ? "bg-emerald-600 text-white shadow-xs"
+                                                    : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80"
                                             )}
                                         >
-                                            <div className="flex items-center gap-3 min-w-0">
-                                                {/* For multi-family: Tree toggle (-) / (+) to expand/collapse sub-units */}
-                                                {pType === 'multi' ? (
-                                                    <button
-                                                        type="button"
-                                                        aria-label={isUnitsTreeOpen ? "Recolher unidades" : "Expandir unidades"}
-                                                        title={isUnitsTreeOpen ? "Recolher unidades (-)" : "Expandir unidades (+)"}
-                                                        className="w-7 h-7 rounded-md border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors shadow-2xs flex-shrink-0"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            toggleUnitsTree(e);
-                                                        }}
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === 'Enter' || e.key === ' ') {
-                                                                e.stopPropagation();
-                                                                e.preventDefault();
-                                                                toggleUnitsTree();
-                                                            }
-                                                        }}
-                                                    >
-                                                        {isUnitsTreeOpen ? <Minus className="w-4 h-4 stroke-[2.5]" /> : <Plus className="w-4 h-4 stroke-[2.5]" />}
-                                                    </button>
-                                                ) : (
-                                                    <div className="w-7 h-7 flex-shrink-0" aria-hidden="true" />
-                                                )}
-
-                                                {/* Profile photo thumbnail on collapsed card */}
-                                                {!isExpanded && (prop.profilePhotoUrl || (pSavedPhotos.length > 0 ? pSavedPhotos[0] : null)) ? (
-                                                    <div className="w-10 h-10 rounded-lg overflow-hidden border border-border flex-shrink-0">
-                                                        <Image src={prop.profilePhotoUrl || pSavedPhotos[0]} alt={propLabel} width={40} height={40} className="w-full h-full object-cover" />
-                                                    </div>
-                                                ) : (
-                                                    <div className={cn(
-                                                        "p-2 rounded-lg flex-shrink-0",
-                                                        prop.propertyType === 'single'
-                                                            ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600"
-                                                            : "bg-violet-100 dark:bg-violet-900/50 text-violet-600"
-                                                    )}>
-                                                        {propIcon}
-                                                    </div>
-                                                )}
-                                                <div className="text-left min-w-0">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="font-semibold text-foreground text-sm truncate">{propLabel}</span>
-                                                        <span className="text-xs text-muted-foreground whitespace-nowrap">({propTypeName})</span>
-                                                    </div>
-                                                    {!isExpanded && pAddr.street && (
-                                                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                                                            {[pAddr.street, pAddr.number, pAddr.neighborhood, pAddr.city, pAddr.state, pAddr.cep].filter(Boolean).join(', ')}
-                                                        </p>
-                                                    )}
-                                                    {propComplete && !isExpanded && (
-                                                        <span className="text-xs text-emerald-600 flex items-center gap-1 mt-0.5">
-                                                            <CheckCircle2 className="w-3 h-3" /> Preenchido
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            {/* Quick Actions at the very top of property card on expanded mode */}
-                                            {isExpanded && (
-                                                <div
-                                                    className="flex items-center gap-2 flex-wrap order-3 sm:order-2 w-full sm:w-auto mt-2 sm:mt-0 justify-start sm:justify-center"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                >
-                                                    <Button
-                                                        size="sm"
-                                                        type="button"
-                                                        className="h-8 text-xs flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-xs"
-                                                        onClick={() => handleQuickPublish('rent', propIdx)}
-                                                    >
-                                                        <Home className="w-3.5 h-3.5" />
-                                                        Anunciar Aluguel
-                                                    </Button>
-                                                    <Button
-                                                        size="sm"
-                                                        type="button"
-                                                        className="h-8 text-xs flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-xs"
-                                                        onClick={() => handleQuickPublish('sale', propIdx)}
-                                                    >
-                                                        <Sparkles className="w-3.5 h-3.5" />
-                                                        Anunciar Venda
-                                                    </Button>
-                                                    <Button
-                                                        size="sm"
-                                                        type="button"
-                                                        variant="outline"
-                                                        className="h-8 text-xs flex items-center gap-1.5 font-medium shadow-xs"
-                                                        onClick={() => window.location.href = '/dashboard'}
-                                                    >
-                                                        <FileText className="w-3.5 h-3.5" />
-                                                        Gerenciar Aluguel
-                                                    </Button>
-                                                </div>
+                                            Todos ({propertyCounts.all})
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setImoveisFilterTab('multi')}
+                                            className={cn(
+                                                "px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap",
+                                                imoveisFilterTab === 'multi'
+                                                    ? "bg-violet-600 text-white shadow-xs"
+                                                    : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80"
                                             )}
-
-                                            <div className="flex items-center gap-2 flex-shrink-0 order-2 sm:order-3">
-                                                {(
-                                                    <span
-                                                        role="button"
-                                                        tabIndex={0}
-                                                        className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setPropertyToDelete({ idx: propIdx, label: propLabel });
-                                                        }}
-                                                        onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }}
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </span>
-                                                )}
-
-                                                {isExpanded ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
-                                            </div>
-                                        </div>
-
-                                    {/* Expanded wizard content for any property */}
-                                    {isExpanded && (
-                                        <div className="p-6 space-y-6 border-t border-border bg-card">
-
-                                            {/* 1. Documentation Section (ownership verification & documents manager) */}
-                                            <PropertyDocumentsCard
-                                                propIdx={propIdx}
-                                                savedProofs={pSavedProofs}
-                                                ownershipFiles={pOwnershipFiles}
-                                                fileAnalysisStatus={fileAnalysisStatus}
-                                                profileId={profileId}
-                                                isDocVerified={isDocVerified}
-                                                extractedAddressInfo={extractedAddressInfo}
-                                                isOwnershipOpen={pOwnershipOpen}
-                                                isAddressCardVisible={isAddressCardVisible}
-                                                isAddressFilled={Boolean(pAddr.street?.trim() || pAddr.cep?.trim())}
-                                                isPropertySaved={Boolean(prop.isSavedProperty || prop.address.description?.trim())}
-                                                isSaving={isSaving}
-                                                onToggleOpen={() => setPOwnershipOpen(prev => !prev)}
-                                                onUploadFiles={handlePropDocUpload}
-                                                onRemoveSavedProof={removePropSavedProof}
-                                                onRemovePendingFile={removePropFile}
-                                                onManualAddress={() => {
-                                                    updateProperty(propIdx, prev => ({
-                                                        ...prev,
-                                                        showAddressCard: true,
-                                                        ownershipSectionOpen: false,
-                                                        addressSectionOpen: true,
-                                                    }));
-                                                    setTimeout(() => {
-                                                        document.getElementById(`prop-${propIdx}-address`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                                    }, 150);
-                                                }}
-                                                onConfirm={() => {
-                                                    handleSave(true);
-                                                    updateProperty(propIdx, prev => ({
-                                                        ...prev,
-                                                        showAddressCard: true,
-                                                        ownershipSectionOpen: false,
-                                                        addressSectionOpen: true,
-                                                    }));
-                                                    setTimeout(() => {
-                                                        document.getElementById(`prop-${propIdx}-address`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                                    }, 150);
-                                                }}
-                                                getSupabase={getSupabase}
-                                            />
-
-                                            {/* Extraction feedback banner */}
-                                            {extractedAddressInfo && (
-                                                <div className={`flex items-center justify-between gap-3 p-4 rounded-xl border text-sm font-medium transition-all duration-300 animate-in fade-in slide-in-from-top-2 ${extractedAddressInfo.startsWith('✅')
-                                                    ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
-                                                    : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300'
-                                                    }`}>
-                                                    <div className="flex items-center gap-3 min-w-0">
-                                                        {extractedAddressInfo.startsWith('✅')
-                                                            ? <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
-                                                            : <AlertTriangle className="w-5 h-5 flex-shrink-0" />
-                                                        }
-                                                        <span>{extractedAddressInfo}</span>
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setTemporaryExtractedInfo(null)}
-                                                        className="text-current opacity-60 hover:opacity-100 p-1 rounded-md transition-opacity flex-shrink-0"
-                                                        aria-label="Fechar mensagem"
-                                                    >
-                                                        <X className="w-4 h-4" />
-                                                    </button>
-                                                </div>
+                                        >
+                                            Multifamiliar ({propertyCounts.multi})
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setImoveisFilterTab('single')}
+                                            className={cn(
+                                                "px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap",
+                                                imoveisFilterTab === 'single'
+                                                    ? "bg-blue-600 text-white shadow-xs"
+                                                    : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80"
                                             )}
-
-                                            {/* 2. Address Section — Collapsible */}
-                                            {isAddressCardVisible && (
-                                                <div id={`prop-${propIdx}-address`} className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setPAddressOpen(prev => !prev)}
-                                                        className="flex items-center justify-between w-full"
-                                                    >
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="p-2 bg-emerald-100 dark:bg-emerald-900/50 rounded-lg text-emerald-600">
-                                                                <MapPin className="w-5 h-5" />
-                                                            </div>
-                                                            <h3 className="text-lg font-semibold text-foreground">{p.basics.addressTitle}</h3>
-                                                            {!pAddressOpen && pAddr.street && (
-                                                                <span className="ml-2 text-xs bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full">Preenchido ✓</span>
-                                                            )}
-                                                        </div>
-                                                        {pAddressOpen ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
-                                                    </button>
-
-                                                    {pAddressOpen && (
-                                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                                            <div className="space-y-2">
-                                                                <Label>{p.basics.cep}</Label>
-                                                                <div className="relative">
-                                                                    <Input
-                                                                        value={pAddr.cep || ''}
-                                                                        onChange={(e) => handlePropAddrChange('cep', e.target.value)}
-                                                                        placeholder="00000-000"
-                                                                        maxLength={9}
-                                                                    />
-                                                                    {isLoadingAddress && <Loader2 className="absolute right-3 top-2.5 w-4 h-4 animate-spin text-muted-foreground" />}
-                                                                </div>
-                                                                {cepError && <p className="text-xs text-red-500">{cepError}</p>}
-                                                            </div>
-                                                            <div className="md:col-span-3 space-y-2">
-                                                                <Label>Cidade / UF</Label>
-                                                                <div className="flex gap-2">
-                                                                    <Input value={pAddr.city || ''} onChange={(e) => handlePropAddrChange('city', e.target.value)} placeholder="Cidade" />
-                                                                    <Input value={pAddr.state || ''} onChange={(e) => handlePropAddrChange('state', e.target.value)} placeholder="UF" className="w-20" maxLength={2} />
-                                                                </div>
-                                                            </div>
-                                                            <div className="md:col-span-3 space-y-2">
-                                                                <Label>{p.basics.street}</Label>
-                                                                <Input value={pAddr.street || ''} onChange={(e) => handlePropAddrChange('street', e.target.value)} placeholder="Rua / Avenida" />
-                                                            </div>
-                                                            <div className="space-y-2">
-                                                                <Label>{p.basics.number}</Label>
-                                                                <Input value={pAddr.number || ''} onChange={(e) => handlePropAddrChange('number', e.target.value)} placeholder="123" />
-                                                            </div>
-                                                            <div className="md:col-span-2 space-y-2">
-                                                                <Label>{p.basics.neighborhood}</Label>
-                                                                <Input value={pAddr.neighborhood || ''} onChange={(e) => handlePropAddrChange('neighborhood', e.target.value)} placeholder="Bairro" />
-                                                            </div>
-                                                            <div className="md:col-span-2 space-y-2">
-                                                                <Label>{p.basics.complement}</Label>
-                                                                <Input value={pAddr.complement || ''} onChange={(e) => handlePropAddrChange('complement', e.target.value)} placeholder={p.basics.complement} />
-                                                            </div>
-                                                        </div>
-                                                    )}
-
-                                                    {/* Confirmar button for Address → Details */}
-                                                    {pAddressOpen && (
-                                                        <div className="flex justify-end pt-2">
-                                                            <Button
-                                                                type="button"
-                                                                variant="outline"
-                                                                size="sm"
-                                                                disabled={isSaving || (!pAddr.street && !pAddr.cep)}
-                                                                className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                                                onClick={() => {
-                                                                    const bairro = pAddr.neighborhood?.trim();
-                                                                    const updatedProps = properties.map((pItem, i) => {
-                                                                        if (i !== propIdx) return pItem;
-                                                                        const currentName = pItem.details?.propertyName?.trim();
-                                                                        return {
-                                                                            ...pItem,
-                                                                            showDetailsCard: true,
-                                                                            addressSectionOpen: false,
-                                                                            detailsInitialOpen: true,
-                                                                            details: {
-                                                                                ...pItem.details,
-                                                                                propertyName: currentName || bairro || '',
-                                                                            }
-                                                                        };
-                                                                    });
-                                                                    setProperties(updatedProps);
-                                                                    handleSave(true, updatedProps);
-                                                                    setTimeout(() => document.getElementById(`prop-${propIdx}-details`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
-                                                                }}
-                                                            >
-                                                                Confirmar <ArrowRight className="w-4 h-4" />
-                                                            </Button>
-                                                        </div>
-                                                    )}
-                                                </div>
+                                        >
+                                            Unifamiliar ({propertyCounts.single})
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setImoveisFilterTab('solar')}
+                                            className={cn(
+                                                "px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap flex items-center gap-1",
+                                                imoveisFilterTab === 'solar'
+                                                    ? "bg-amber-600 text-white shadow-xs"
+                                                    : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80"
                                             )}
-
-                                            {/* 3. Detalhes Section */}
-                                            {isDetailsCardVisible && (
-                                                <>
-                                                    <div id={`prop-${propIdx}-details`} />
-                                                    <PropertyDetailsCard
-                                                        key={`details-${propIdx}-${pDetailsOpen}`}
-                                                        details={pDetails}
-                                                        units={pSubUnits}
-                                                        onDetailsChange={setPDetails}
-                                                        onUnitsChange={setPSubUnits}
-                                                        propertyType={pType}
-                                                        initialOpen={pDetailsOpen}
-                                                        onOpenChange={(open) => setPDetailsOpen(open)}
-                                                        onContinue={() => {
-                                                            updateProperty(propIdx, prev => ({
-                                                                ...prev,
-                                                                showPhotosCard: true,
-                                                                detailsInitialOpen: false,
-                                                                photosSectionOpen: true,
-                                                            }));
-                                                            handleSave(true);
-                                                            setTimeout(() => document.getElementById(`prop-${propIdx}-photos`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
-                                                        }}
-                                                    />
-                                                </>
-                                            )}
-
-                                            {/* 4. Photos & Videos Section — Main Property — Collapsible */}
-                                            {isPhotosCardVisible && (
-                                                <div id={`prop-${propIdx}-photos`} className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setPPhotosOpen(prev => !prev)}
-                                                        className="flex items-center justify-between w-full"
-                                                    >
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded-lg text-amber-600">
-                                                                <Camera className="w-5 h-5" />
-                                                            </div>
-                                                            <h3 className="text-lg font-semibold text-foreground">Fotos e Vídeos do Imóvel</h3>
-                                                            {!pPhotosOpen && (pSavedPhotos.length > 0 || pPhotos.length > 0 || pSavedVideos.length > 0 || pVideos.length > 0) && (
-                                                                <span className="ml-2 text-xs bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full">
-                                                                    {pSavedPhotos.length + pPhotos.length} fotos · {pSavedVideos.length + pVideos.length} vídeos
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        {pPhotosOpen ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
-                                                    </button>
-
-                                                    {pPhotosOpen && (
-                                                        <>
-                                                            <div className="bg-muted/30 p-4 rounded-lg border border-border flex gap-3 items-start">
-                                                                <Sparkles className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
-                                                                <div>
-                                                                    <p className="text-sm font-medium text-foreground mb-1">Dica Profissional</p>
-                                                                    <p className="text-sm text-muted-foreground">Imóveis com pelo menos 5 fotos recebem 4x mais visualizações! Capriche na iluminação.</p>
-                                                                </div>
-                                                            </div>
-
-                                                            {/* Photos (up to 10) */}
-                                                            <div className="space-y-2">
-                                                                <div className="flex items-center justify-between">
-                                                                    <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                                                                        <Camera className="w-4 h-4 text-muted-foreground" />
-                                                                        Fotos
-                                                                    </p>
-                                                                    <span className="text-xs text-muted-foreground">{pSavedPhotos.length + pPhotos.length}/10</span>
-                                                                </div>
-                                                                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                                                                    {/* Saved Photos */}
-                                                                    {pSavedPhotos.map((url, idx) => {
-                                                                        const effectiveProfilePhoto = prop.profilePhotoUrl || (pSavedPhotos.length > 0 ? pSavedPhotos[0] : null);
-                                                                        const isProfilePhoto = effectiveProfilePhoto === url;
-                                                                        return (
-                                                                            <div
-                                                                                key={`saved-p-${idx}`}
-                                                                                className={cn(
-                                                                                    "aspect-square rounded-lg border relative group overflow-hidden cursor-pointer transition-all",
-                                                                                    isProfilePhoto
-                                                                                        ? "border-emerald-500 border-2 ring-2 ring-emerald-200 dark:ring-emerald-800 shadow-sm"
-                                                                                        : "border-border hover:border-emerald-300"
-                                                                                )}
-                                                                                onClick={() => {
-                                                                                    updateProperty(propIdx, prev => ({ ...prev, profilePhotoUrl: url }));
-                                                                                    if (profileId) {
-                                                                                        getSupabase().then(sb => {
-                                                                                            if (propIdx === 0) {
-                                                                                                sb.from('profiles').update({ profile_photo_url: url }).eq('id', profileId);
-                                                                                            } else {
-                                                                                                sb.from('profiles').select('additional_properties').eq('id', profileId).single().then(({ data: prof }) => {
-                                                                                                    if (prof?.additional_properties) {
-                                                                                                        const addProps = [...(prof.additional_properties as Record<string, unknown>[])];
-                                                                                                        if (addProps[propIdx - 1]) {
-                                                                                                            addProps[propIdx - 1] = { ...addProps[propIdx - 1], profilePhotoUrl: url };
-                                                                                                            sb.from('profiles').update({ additional_properties: addProps }).eq('id', profileId);
-                                                                                                        }
-                                                                                                    }
-                                                                                                });
-                                                                                            }
-                                                                                        }).catch(console.error);
-                                                                                    }
-                                                                                }}
-                                                                            >
-                                                                                <Image src={url} alt="Property" width={200} height={200} className="w-full h-full object-cover" />
-                                                                                <div className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                                    <Button
-                                                                                        size="icon"
-                                                                                        variant="destructive"
-                                                                                        className="h-6 w-6"
-                                                                                        onClick={(e) => {
-                                                                                            e.stopPropagation();
-                                                                                            removePropSavedPhoto(url);
-                                                                                        }}
-                                                                                    >
-                                                                                        <Trash2 className="w-3 h-3" />
-                                                                                    </Button>
-                                                                                </div>
-                                                                                {/* Profile photo selection badge */}
-                                                                                <div
-                                                                                    className={cn(
-                                                                                        "absolute bottom-0 inset-x-0 flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-medium transition-colors select-none",
-                                                                                        isProfilePhoto
-                                                                                            ? "bg-emerald-600 text-white font-semibold"
-                                                                                            : "bg-black/60 text-white opacity-0 group-hover:opacity-100"
-                                                                                    )}
-                                                                                >
-                                                                                    <input
-                                                                                        type="checkbox"
-                                                                                        checked={isProfilePhoto}
-                                                                                        readOnly
-                                                                                        className="w-3.5 h-3.5 accent-emerald-500 rounded cursor-pointer pointer-events-none"
-                                                                                    />
-                                                                                    <span>{isProfilePhoto ? 'Foto Principal' : 'Definir como principal'}</span>
-                                                                                </div>
-                                                                            </div>
-                                                                        );
-                                                                    })}
-
-                                                                    {/* New Photos (pending upload) */}
-                                                                    {pPhotos.map((file, idx) => (
-                                                                        <PhotoPreview key={`new-p-${idx}`} file={file} onRemove={() => removePropPhoto(idx)} />
-                                                                    ))}
-
-                                                                    {/* Upload Button — appears last when photos exist */}
-                                                                    {pSavedPhotos.length + pPhotos.length < 10 && (
-                                                                        <div className="aspect-square rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors relative">
-                                                                            <input
-                                                                                type="file"
-                                                                                multiple
-                                                                                accept="image/*"
-                                                                                onChange={handlePropPhotoSelect}
-                                                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                                                            />
-                                                                            <Camera className="w-8 h-8 text-muted-foreground mb-2" />
-                                                                            <span className="text-xs text-muted-foreground">Adicionar Fotos</span>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-
-                                                            {/* Videos (up to 2) */}
-                                                            <div className="space-y-2 pt-3 border-t border-border">
-                                                                <div className="flex items-center justify-between">
-                                                                    <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                                                                        <Video className="w-4 h-4 text-muted-foreground" />
-                                                                        Vídeos
-                                                                    </p>
-                                                                    <span className="text-xs text-muted-foreground">{pSavedVideos.length + pVideos.length}/2</span>
-                                                                </div>
-                                                                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                                                                    {/* Saved Videos */}
-                                                                    {pSavedVideos.map((url, idx) => (
-                                                                        <div key={`saved-v-${idx}`} className="aspect-square rounded-lg border border-border relative group overflow-hidden">
-                                                                            <video src={url} className="w-full h-full object-cover" muted />
-                                                                            <div className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                                <Button size="icon" variant="destructive" className="h-6 w-6" onClick={() => removePropSavedVideo(url)}>
-                                                                                    <Trash2 className="w-3 h-3" />
-                                                                                </Button>
-                                                                            </div>
-                                                                            <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[10px] p-1 text-center flex items-center justify-center gap-1">
-                                                                                <Video className="w-3 h-3" /> Vídeo
-                                                                            </div>
-                                                                        </div>
-                                                                    ))}
-
-                                                                    {/* New Videos */}
-                                                                    {pVideos.map((file, idx) => (
-                                                                        <div key={`new-v-${idx}`} className="aspect-square rounded-lg border border-border relative group overflow-hidden bg-muted">
-                                                                            <video src={URL.createObjectURL(file)} className="w-full h-full object-cover" muted />
-                                                                            <div className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                                <Button size="icon" variant="destructive" className="h-6 w-6" onClick={() => removePropVideo(idx)}>
-                                                                                    <Trash2 className="w-3 h-3" />
-                                                                                </Button>
-                                                                            </div>
-                                                                            <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[10px] p-1 text-center flex items-center justify-center gap-1">
-                                                                                <Video className="w-3 h-3" /> {file.name}
-                                                                            </div>
-                                                                        </div>
-                                                                    ))}
-
-                                                                    {/* Upload Button — appears last when videos exist */}
-                                                                    {pSavedVideos.length + pVideos.length < 2 && (
-                                                                        <div className="aspect-square rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors relative">
-                                                                            <input
-                                                                                type="file"
-                                                                                accept="video/*"
-                                                                                onChange={handlePropVideoSelect}
-                                                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                                                            />
-                                                                            <Video className="w-8 h-8 text-muted-foreground mb-2" />
-                                                                            <span className="text-xs text-muted-foreground">Adicionar Vídeo</span>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                            {/* Confirmar button for Photos → Description */}
-                                                            <div className="flex justify-end pt-4">
-                                                                <Button
-                                                                    type="button"
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    disabled={isSaving}
-                                                                    className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                                                    onClick={() => {
-                                                                        const defaultProfilePhoto = prop.profilePhotoUrl || (pSavedPhotos.length > 0 ? pSavedPhotos[0] : null);
-                                                                        const updatedProps = properties.map((pItem, i) => {
-                                                                            if (i !== propIdx) return pItem;
-                                                                            return {
-                                                                                ...pItem,
-                                                                                showDescriptionCard: true,
-                                                                                photosSectionOpen: false,
-                                                                                descriptionSectionOpen: true,
-                                                                                profilePhotoUrl: defaultProfilePhoto,
-                                                                            };
-                                                                        });
-                                                                        setProperties(updatedProps);
-                                                                        handleSave(true, updatedProps);
-                                                                        setTimeout(() => document.getElementById(`prop-${propIdx}-description`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
-                                                                    }}
-                                                                >
-                                                                    Confirmar <ArrowRight className="w-4 h-4" />
-                                                                </Button>
-                                                            </div>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            )}
-
-                                            {/* 5. Description Section — Main Property — Collapsible */}
-                                            {isDescriptionCardVisible && (
-                                                <div id={`prop-${propIdx}-description`} className="bg-card border border-border p-6 rounded-xl shadow-sm space-y-4">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setPDescOpen(prev => !prev)}
-                                                        className="flex items-center justify-between w-full"
-                                                    >
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="p-2 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg text-indigo-600">
-                                                                <FileText className="w-5 h-5" />
-                                                            </div>
-                                                            <h3 className="text-lg font-semibold text-foreground">Descrição do Imóvel</h3>
-                                                            {!pDescOpen && pAddr.description && (
-                                                                <span className="ml-2 text-xs bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full">Preenchido ✓</span>
-                                                            )}
-                                                        </div>
-                                                        {pDescOpen ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
-                                                    </button>
-                                                    {pDescOpen && (
-                                                        <div className="space-y-3">
-                                                            <div className="flex items-center justify-between">
-                                                                <Label>Descreva seu imóvel em detalhes <span className="text-red-500">*</span></Label>
-                                                            </div>
-                                                            <div className="flex items-center gap-4 flex-wrap">
-                                                                <span className="text-sm font-medium text-foreground">Finalidade da descrição:</span>
-                                                                <DetailCheckbox
-                                                                    checked={descriptionPurpose.aluguel}
-                                                                    onChange={(val) => setDescriptionPurpose(prev => ({ ...prev, aluguel: val }))}
-                                                                    label="Aluguel"
-                                                                />
-                                                                <DetailCheckbox
-                                                                    checked={descriptionPurpose.venda}
-                                                                    onChange={(val) => setDescriptionPurpose(prev => ({ ...prev, venda: val }))}
-                                                                    label="Venda"
-                                                                />
-                                                                <Button
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    className="h-7 text-xs gap-1 text-violet-600 border-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/20 ml-auto"
-                                                                    onClick={() => generateMainDescription(propIdx)}
-                                                                    disabled={generatingMainDescription || (!descriptionPurpose.venda && !descriptionPurpose.aluguel)}
-                                                                >
-                                                                    {generatingMainDescription ? (
-                                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                                    ) : (
-                                                                        <Wand2 className="w-3.5 h-3.5" />
-                                                                    )}
-                                                                    {generatingMainDescription ? 'Gerando...' : 'Gerar com IA'}
-                                                                </Button>
-                                                            </div>
-                                                            <textarea
-                                                                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[120px]"
-                                                                placeholder="Ex: Excelente apartamento com varanda gourmet, vista livre, armários planejados na cozinha e banheiros..."
-                                                                value={pAddr.description || ''}
-                                                                onChange={(e) => handlePropAddrChange('description', e.target.value)}
-                                                            />
-                                                            <span className="text-xs text-muted-foreground">Esta descrição será exibida no anúncio do imóvel principal.</span>
-
-                                                            {/* Confirmar button for Description */}
-                                                            <div className="flex justify-end pt-4">
-                                                                <Button
-                                                                    type="button"
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    disabled={isSaving}
-                                                                    className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                                                    onClick={async () => {
-                                                                        const updatedProps = properties.map((pItem, i) => {
-                                                                            if (i !== propIdx) return pItem;
-                                                                            return {
-                                                                                ...pItem,
-                                                                                descriptionSectionOpen: false,
-                                                                                isSavedProperty: true,
-                                                                            };
-                                                                        });
-                                                                        setProperties(updatedProps);
-                                                                        await handleSave(true, updatedProps);
-                                                                        setExpandedPropertyIdx(null);
-                                                                        setTemporaryExtractedInfo(null);
-                                                                        setTimeout(() => {
-                                                                            document.getElementById(`prop-${propIdx}-card`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                                                                        }, 100);
-                                                                    }}
-                                                                >
-                                                                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : <CheckCircle2 className="w-4 h-4 mr-1.5" />}
-                                                                    Confirmar
-                                                                </Button>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
+                                        >
+                                            <Sun className="w-3 h-3" />
+                                            Solar ({propertyCounts.solar})
+                                        </button>
                                     </div>
 
-                                    {/* Indented Units Tree (for multi property) */}
-                                    {pType === 'multi' && isUnitsTreeOpen && (
-                                        <div className="ml-4 sm:ml-10 pl-4 sm:pl-6 border-l-2 border-border/70 space-y-3">
-                                            <div id={`prop-${propIdx}-subunits`} />
-                                            <SubUnitsSection
-                                                key={`subunits-${propIdx}-${prop.subUnitOpenIdx}`}
-                                                details={pDetails}
-                                                units={pSubUnits}
-                                                onDetailsChange={setPDetails}
-                                                onUnitsChange={setPSubUnits}
-                                                onGenerateDescription={(unitIdx) => generateUnitDescription(propIdx, unitIdx)}
-                                                generatingDescriptionIdx={generatingUnitDescriptionIdx}
-                                                onImportContract={(unitIdx, file) => importContract(propIdx, unitIdx, file)}
-                                                importingContractIdx={importingContractIdx}
-                                                initialOpenIdx={prop.subUnitOpenIdx}
-                                                propertyIndex={propIdx}
-                                            />
-                                        </div>
-                                    )}
+                                    {/* Search Input */}
+                                    <div className="relative w-full sm:w-72">
+                                        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                                        <Input
+                                            type="text"
+                                            placeholder="Buscar por nome, rua, cidade..."
+                                            value={imoveisSearch}
+                                            onChange={(e) => setImoveisSearch(e.target.value)}
+                                            className="pl-9 pr-8 text-xs h-9"
+                                        />
+                                        {imoveisSearch && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setImoveisSearch('')}
+                                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                            >
+                                                <X className="w-3.5 h-3.5" />
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
-                            );
-                        })}
+                            )}
 
+                            {/* Empty State when no properties exist */}
+                            {properties.length === 0 && (
+                                <div className="flex flex-col items-center justify-center py-16 px-4 text-center rounded-2xl border-2 border-dashed border-border bg-card/50">
+                                    <div className="w-14 h-14 rounded-2xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 flex items-center justify-center mb-4 shadow-xs">
+                                        <Building2 className="w-7 h-7" />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-foreground">Nenhuma propriedade cadastrada</h3>
+                                    <p className="text-sm text-muted-foreground max-w-md mt-1 mb-6">
+                                        Cadastre seu primeiro imóvel para visualizar métricas financeiras, centro de custos, balanço solar e controle de unidades.
+                                    </p>
+                                    <Button
+                                        size="lg"
+                                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-lg shadow-emerald-900/20 gap-2 px-8"
+                                        onClick={() => setShowAddPropertyModal(true)}
+                                    >
+                                        <Plus className="w-5 h-5 stroke-[2.5]" />
+                                        Adicionar Primeira Propriedade
+                                    </Button>
+                                </div>
+                            )}
+
+                            {/* Search / Filter Empty State */}
+                            {properties.length > 0 && filteredProperties.length === 0 && (
+                                <div className="flex flex-col items-center justify-center py-12 px-4 text-center rounded-2xl border border-border bg-card">
+                                    <p className="text-base font-semibold text-foreground">Nenhum imóvel encontrado</p>
+                                    <p className="text-xs text-muted-foreground mt-1 mb-4">Tente ajustar sua busca ou filtro.</p>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => { setImoveisFilterTab('all'); setImoveisSearch(''); }}
+                                    >
+                                        Limpar Filtros
+                                    </Button>
+                                </div>
+                            )}
+
+                            {/* Responsive Square Cards Grid */}
+                            {filteredProperties.length > 0 && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {filteredProperties.map(({ prop, originalIdx }) => (
+                                        <PropertySquareCard
+                                            key={`prop-sq-${originalIdx}`}
+                                            property={{
+                                                index: originalIdx,
+                                                propertyType: prop.propertyType,
+                                                details: prop.details,
+                                                subUnits: prop.subUnits,
+                                                address: prop.address,
+                                                savedPhotos: prop.savedPhotos,
+                                                profilePhotoUrl: prop.profilePhotoUrl,
+                                                isComplete: isPropertyComplete(prop),
+                                            }}
+                                            onSelect={() => {
+                                                setSelectedPropertyIdx(originalIdx);
+                                                setImoveisViewMode('manage');
+                                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                                            }}
+                                            onDelete={(e) => {
+                                                e.stopPropagation();
+                                                setPropertyToDelete({
+                                                    idx: originalIdx,
+                                                    label: prop.details?.propertyName || `Propriedade ${originalIdx + 1}`,
+                                                });
+                                                setShowDeleteModal(true);
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {imoveisViewMode === 'manage' && selectedPropertyIdx !== null && properties[selectedPropertyIdx] && (
+                        <div className="space-y-8">
+                            {/* 1. TOP DASHBOARD & METRICS (Cost Center & Result Center) */}
+                            <PropertyCostCenterDashboard
+                                propertyIndex={selectedPropertyIdx}
+                                propertyType={properties[selectedPropertyIdx].propertyType}
+                                details={properties[selectedPropertyIdx].details}
+                                subUnits={properties[selectedPropertyIdx].subUnits}
+                                address={properties[selectedPropertyIdx].address}
+                                lang={lang}
+                                onBack={() => {
+                                    setImoveisViewMode('grid');
+                                    setSelectedPropertyIdx(null);
+                                }}
+                                onQuickPublish={(mode) => handleQuickPublish(mode, selectedPropertyIdx)}
+                                onUpdateDetails={(updatedDetails) => {
+                                    updateProperty(selectedPropertyIdx, prev => ({ ...prev, details: updatedDetails }));
+                                    handleSave(true);
+                                }}
+                            />
+
+                            {/* 2. SCROLLING DOWN: ALL PROPERTY DATA & DOCUMENTS */}
+                            <div className="space-y-6 pt-6 border-t border-border">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                    <div>
+                                        <h3 className="text-xl font-bold text-foreground flex items-center gap-2">
+                                            <FileText className="w-5 h-5 text-emerald-600" />
+                                            Dados Cadastrais & Documentação
+                                        </h3>
+                                        <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+                                            Documentos comprobatórios (IPTU, matrícula, escritura), endereço, fotos, medidores e unidades.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {renderPropertyDetailCards(selectedPropertyIdx, 'manage')}
+                            </div>
+                        </div>
+                    )}
+
+                    {imoveisViewMode === 'wizard' && (
+                        <div className="space-y-6">
+                            {/* Wizard Header */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
+                                <div className="flex items-center gap-3">
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                            setImoveisViewMode('grid');
+                                            setSelectedPropertyIdx(null);
+                                        }}
+                                        className="gap-1.5 text-muted-foreground hover:text-foreground"
+                                    >
+                                        <ArrowLeft className="w-4 h-4" />
+                                        Voltar para Imóveis
+                                    </Button>
+                                    <div>
+                                        <h2 className="text-xl font-bold text-foreground">
+                                            {properties[selectedPropertyIdx ?? properties.length - 1]?.details?.propertyName ||
+                                                `Cadastrar Imóvel (${properties[selectedPropertyIdx ?? properties.length - 1]?.propertyType === 'multi' ? 'Multifamiliar' : 'Unifamiliar'})`}
+                                        </h2>
+                                        <p className="text-xs text-muted-foreground">
+                                            Preencha os dados passo a passo para gerar o centro de custos e o painel financeiro.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {renderPropertyDetailCards(selectedPropertyIdx ?? properties.length - 1, 'wizard')}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ═════════════════════════════════════════════════════════════════════ */}
+            {/* VIEW !== 'imoveis': Profile & Proprietário Views                     */}
+            {/* ═════════════════════════════════════════════════════════════════════ */}
+            {view !== 'imoveis' && (
+                <>
+                    {/* Header / Overview — shown on profile/proprietario view */}
+                    <div className="flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <div className="relative group w-20 h-20 rounded-full bg-slate-200 border-4 border-white dark:bg-slate-800 dark:border-slate-700 shadow-sm flex items-center justify-center overflow-hidden">
+                                <Image
+                                    src={user.imageUrl}
+                                    alt={user.fullName || ''}
+                                    width={80}
+                                    height={80}
+                                    className="w-full h-full object-cover"
+                                />
+                                <label className="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity text-xs font-medium text-center">
+                                    {p.header.changePhoto}
+                                    <input type="file" className="hidden" accept="image/*" onChange={handleProfileImageUpload} />
+                                </label>
+                            </div>
+                            <div>
+                                <h1 className="text-2xl font-bold text-foreground">{formData.name || user.fullName}</h1>
+                                <p className="text-muted-foreground">{user.primaryEmailAddress?.emailAddress}</p>
+                            </div>
+                        </div>
                     </div>
-                )}
 
+                    {/* Navigation Tabs — only show when more than 1 tab */}
+                    {tabs.length > 1 && (
+                        <div className="border-b border-border flex overflow-x-auto">
+                            {tabs.map((tab: { id: string; label: string }) => (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                                    className={cn(
+                                        "px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
+                                        activeTab === tab.id
+                                            ? "border-emerald-500 text-emerald-600 dark:text-emerald-400"
+                                            : "border-transparent text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    {tab.label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Content Area */}
+                    <div className="min-h-[400px]">
+                        {/* OWNERSHIP TAB */}
+                        {activeTab === 'ownership' && (
+                            <div className="space-y-8 max-w-4xl">
+                                {/* Add property button (when properties exist) */}
+                                {propertyCreated && (
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2 sm:gap-3">
+                                            <h3 className="text-lg font-semibold text-foreground">
+                                                {properties.length === 1 ? 'Propriedade' : 'Propriedades'} ({properties.length})
+                                            </h3>
+                                            <span className="text-muted-foreground font-normal">·</span>
+                                            <h3 className="text-lg font-semibold text-muted-foreground">
+                                                {totalUnits === 1 ? 'Unidade' : 'Unidades'} ({totalUnits})
+                                            </h3>
+                                        </div>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            disabled={properties.length >= MAX_PROPERTIES}
+                                            className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                                            onClick={() => setShowAddPropertyModal(true)}
+                                        >
+                                            <Plus className="w-4 h-4" />
+                                            Adicionar Propriedade
+                                        </Button>
+                                    </div>
+                                )}
+
+                                {/* Empty state */}
+                                {!propertyCreated && (
+                                    <div className="flex flex-col items-center justify-center py-10 gap-4">
+                                        <div className="text-center space-y-2">
+                                            <h3 className="text-lg font-semibold text-foreground">Nenhuma propriedade cadastrada</h3>
+                                            <p className="text-sm text-muted-foreground max-w-md">Adicione uma propriedade para começar a preencher os dados do imóvel.</p>
+                                        </div>
+                                        <Button
+                                            size="lg"
+                                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-lg shadow-emerald-900/20 gap-2 px-8"
+                                            onClick={() => setShowAddPropertyModal(true)}
+                                        >
+                                            <Plus className="w-5 h-5" />
+                                            Adicionar Propriedade
+                                        </Button>
+                                    </div>
+                                )}
+
+                                {/* Property cards in accordion mode */}
+                                {properties.map((_, propIdx) => renderPropertyDetailCards(propIdx, 'accordion'))}
+                            </div>
+                        )}
 
                 {/* BASICS TAB - Profile Info with PF/PJ Toggle */}
                 {activeTab === 'basics' && (
@@ -3639,7 +3943,9 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                     </div>
                 )}
 
-            </div>
+                    </div>
+                </>
+            )}
 
             {/* Delete Account Modal (Simple Overlay) */}
             {
@@ -3678,8 +3984,13 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                     type="button"
                                     onClick={() => {
                                         const newProp = createEmptyProperty('single');
+                                        const newIdx = properties.length;
                                         setProperties(prev => [...prev, newProp]);
-                                        setExpandedPropertyIdx(properties.length); // expand the newly added
+                                        setSelectedPropertyIdx(newIdx);
+                                        setExpandedPropertyIdx(newIdx);
+                                        if (view === 'imoveis') {
+                                            setImoveisViewMode('wizard');
+                                        }
                                         setShowAddPropertyModal(false);
                                     }}
                                     className="group flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-border hover:border-emerald-400 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/20 transition-all duration-200 text-center"
@@ -3696,8 +4007,13 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                     type="button"
                                     onClick={() => {
                                         const newProp = createEmptyProperty('multi');
+                                        const newIdx = properties.length;
                                         setProperties(prev => [...prev, newProp]);
-                                        setExpandedPropertyIdx(properties.length); // expand the newly added
+                                        setSelectedPropertyIdx(newIdx);
+                                        setExpandedPropertyIdx(newIdx);
+                                        if (view === 'imoveis') {
+                                            setImoveisViewMode('wizard');
+                                        }
                                         setShowAddPropertyModal(false);
                                     }}
                                     className="group flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-border hover:border-violet-400 hover:bg-violet-50/50 dark:hover:bg-violet-900/20 transition-all duration-200 text-center"
