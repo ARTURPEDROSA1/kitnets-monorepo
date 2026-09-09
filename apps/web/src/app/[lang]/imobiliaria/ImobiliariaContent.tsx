@@ -159,14 +159,15 @@ function getRoleLabel(role: string): string {
 
 interface ImobiliariaContentProps {
     lang: string;
+    initialAgencies?: AgencyWithRole[];
 }
 
-export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
+export default function ImobiliariaContent({ lang, initialAgencies }: ImobiliariaContentProps) {
     const router = useRouter();
 
-    // Page state
-    const [pageState, setPageState] = useState<PageState>('loading');
-    const [agencies, setAgencies] = useState<AgencyWithRole[]>([]);
+    // Page state: if initialAgencies were passed from server, start directly in 'list' state!
+    const [pageState, setPageState] = useState<PageState>(initialAgencies !== undefined ? 'list' : 'loading');
+    const [agencies, setAgencies] = useState<AgencyWithRole[]>(initialAgencies || []);
     const [editingAgency, setEditingAgency] = useState<AgencyWithRole | null>(null);
 
     // Filter tab & detail modal states
@@ -229,8 +230,10 @@ export default function ImobiliariaContent({ lang }: ImobiliariaContentProps) {
     }, []);
 
     useEffect(() => {
-        fetchAgencies();
-    }, [fetchAgencies]);
+        if (initialAgencies === undefined) {
+            fetchAgencies();
+        }
+    }, [fetchAgencies, initialAgencies]);
 
 
     // ── Form field handlers ──────────────────────────────────────────

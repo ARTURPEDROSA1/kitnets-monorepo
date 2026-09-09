@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server";
 
 export const dynamic = "force-dynamic";
 
@@ -58,9 +58,14 @@ async function resolvePropertyUuid(
         return ownerProp.id;
     }
 
-    // 3. Fallback: Auto-create property in public.properties from profile
+    // 3. Fallback: Auto-create property in public.properties from profile ONLY IF configured
     const addr = profile.property_address as Record<string, string> | null;
     const details = profile.property_details as Record<string, string> | null;
+    const hasRealProp = Boolean(details?.propertyName?.trim() || addr?.street?.trim());
+    if (!hasRealProp) {
+        throw new Error("Nenhum imóvel cadastrado para este usuário");
+    }
+
     const propName = details?.propertyName || (addr?.street ? `${addr.street}, ${addr.number || ""}`.trim() : (profile.full_name ? `Imóvel de ${profile.full_name}` : "Meu Imóvel"));
 
     const { data: newProp, error: propError } = await supabase
@@ -112,8 +117,8 @@ function parseMonthLabelToIso(label: string): string | null {
  */
 export async function GET(request: Request) {
     try {
-        const user = await currentUser();
-        if (!user) {
+        const { userId } = await auth();
+        if (!userId) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
         }
 
@@ -125,7 +130,7 @@ export async function GET(request: Request) {
         }
 
         const supabase = getServiceSupabase();
-        const resolvedPropertyId = await resolvePropertyUuid(supabase, user.id, propertyId);
+        const resolvedPropertyId = await resolvePropertyUuid(supabase, userId, propertyId);
 
         // Fetch bills for property
         const { data: bills, error } = await supabase
@@ -185,8 +190,8 @@ export async function GET(request: Request) {
  */
 export async function POST(request: Request) {
     try {
-        const user = await currentUser();
-        if (!user) {
+        const { userId } = await auth();
+        if (!userId) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
         }
 
@@ -220,7 +225,7 @@ export async function POST(request: Request) {
         }
 
         const supabase = getServiceSupabase();
-        const resolvedPropertyId = await resolvePropertyUuid(supabase, user.id, propertyId);
+        const resolvedPropertyId = await resolvePropertyUuid(supabase, userId, propertyId);
 
         // Upload/replace current bill PDF in Supabase Storage keeping strictly one file
         let pdfUrl: string | null = null;
@@ -430,8 +435,8 @@ export async function POST(request: Request) {
  */
 export async function PUT(request: Request) {
     try {
-        const user = await currentUser();
-        if (!user) {
+        const { userId } = await auth();
+        if (!userId) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
         }
 
@@ -451,7 +456,7 @@ export async function PUT(request: Request) {
         const { data: profile } = await supabase
             .from("profiles")
             .select("id")
-            .eq("clerk_id", user.id)
+            .eq("clerk_id", userId)
             .maybeSingle();
 
         if (!profile) {
@@ -550,8 +555,8 @@ export async function PUT(request: Request) {
  */
 export async function DELETE(request: Request) {
     try {
-        const user = await currentUser();
-        if (!user) {
+        const { userId } = await auth();
+        if (!userId) {
             return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
         }
 
