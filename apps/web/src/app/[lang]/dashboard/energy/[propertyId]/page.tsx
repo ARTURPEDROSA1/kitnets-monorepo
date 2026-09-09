@@ -742,11 +742,8 @@ export default function EnergyDashboardPage() {
                         <div className="px-6 py-4 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-muted/20">
                             <div>
                                 <h3 className="text-base font-semibold text-foreground">Histórico de Consumo Detalhado</h3>
-                                <p className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap mt-0.5">
-                                    <span>Registros de consumo, injeção solar, saldo de créditos e custos.</span>
-                                    <span className="text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800 font-medium inline-flex items-center gap-1">
-                                        <Pencil className="w-3 h-3 text-amber-600" /> Clique no lápis na coluna Ações para editar qualquer fatura
-                                    </span>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                    Registros de consumo, injeção solar, saldo de créditos e custos por ciclo de faturamento
                                 </p>
                             </div>
                             <span className="text-xs font-mono text-muted-foreground bg-muted px-2.5 py-1 rounded-md self-start sm:self-auto">
