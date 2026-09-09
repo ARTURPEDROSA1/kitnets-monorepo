@@ -978,6 +978,21 @@
             "cancel": "Cancelar",
             "confirm": "Sim, Excluir Tudo"
         },
+        "deletePropertyModal": {
+            "title": "Excluir Imóvel",
+            "subtitle": "Tem certeza que deseja remover este imóvel do seu portfólio?",
+            "energyQuestion": "O que você deseja fazer com a gestão de energia solar deste imóvel?",
+            "deleteAllTitle": "Excluir imóvel e apagar dados de energia",
+            "deleteAllDesc": "O imóvel e todos os dados associados (geração solar, faturas e histórico de consumo) serão removidos permanentemente.",
+            "keepEnergyTitle": "Excluir imóvel mas MANTER dados de energia",
+            "keepEnergyDesc": "Remove o imóvel dos anúncios de locação, mas mantém o cadastro e as faturas como uma UC Avulsa na aba Energia Solar.",
+            "cancel": "Cancelar",
+            "confirmDeleteAll": "Excluir Imóvel e Dados de Energia",
+            "confirmKeepEnergy": "Excluir Imóvel e Manter Energia",
+            "deleting": "Excluindo...",
+            "badgeStandalone": "UC Avulsa",
+            "badgeDeleteAll": "Apagar Tudo"
+        },
         "alerts": {
             "photoUpdated": "Foto de perfil atualizada!",
             "photoError": "Erro ao atualizar foto.",

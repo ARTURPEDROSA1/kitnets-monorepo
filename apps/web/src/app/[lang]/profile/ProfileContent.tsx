@@ -8,6 +8,7 @@ import Image from 'next/image';
 import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera, Video, Sparkles, Save, UploadCloud, Home, Building2, User, ShieldCheck, Fingerprint, ChevronDown, ChevronUp, Wand2, Plus, ArrowRight, Minus, Edit3, X } from 'lucide-react';
 import PropertyDetailsCard, { PropertyDetails, SubUnit, SubUnitsSection, Checkbox as DetailCheckbox, defaultSubUnit } from '@/components/profile/PropertyDetailsCard';
 import PropertyDocumentsCard, { DocCategory } from '@/components/profile/PropertyDocumentsCard';
+import { DeletePropertyModal } from '@/components/profile/DeletePropertyModal';
 import { cn } from '@/lib/utils';
 import { useUser, useAuth } from '@clerk/nextjs';
 import { useSearchParams } from 'next/navigation';
@@ -140,6 +141,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
     const [cepError, setCepError] = useState("");
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [propertyToDelete, setPropertyToDelete] = useState<{ idx: number; label: string } | null>(null);
     const [profileLoadError, setProfileLoadError] = useState<string | null>(null);
 
     // Success State
@@ -1693,6 +1695,57 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
         }
     };
 
+    const handleConfirmDeleteProperty = async (action: "delete_all" | "keep_energy") => {
+        if (propertyToDelete === null) return;
+        const propIdx = propertyToDelete.idx;
+        const deletedProp = properties[propIdx];
+        if (!deletedProp) return;
+
+        // 1. Sync deletion or conversion to standalone UC in backend properties table
+        try {
+            const propName = deletedProp.details?.propertyName || (deletedProp.address?.street ? `${deletedProp.address.street}, ${deletedProp.address.number || ''}`.trim() : null);
+            const propAddress = deletedProp.address?.street ? `${deletedProp.address.street}, ${deletedProp.address.number || ''} - ${deletedProp.address.neighborhood || ''}`.trim() : null;
+
+            await fetch('/api/energy-bills/properties/sync-deletion', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: propName,
+                    address: propAddress,
+                    action: action,
+                }),
+            });
+        } catch (syncErr) {
+            console.error('[Profile] Error syncing property deletion with energy module:', syncErr);
+        }
+
+        // 2. Clean up ownership proofs for deleted property
+        if (deletedProp?.savedProofs && deletedProp.savedProofs.length > 0) {
+            try {
+                const sb = await getSupabase();
+                for (const proof of deletedProp.savedProofs) {
+                    if (proof?.id) {
+                        await sb.from('ownership_proofs').delete().eq('id', proof.id);
+                    }
+                }
+            } catch (err) {
+                console.error('[Profile] Error deleting ownership proofs for removed property:', err);
+            }
+        }
+
+        // 3. Update remaining properties state
+        const remainingProperties = properties.filter((_, i) => i !== propIdx);
+        setProperties(remainingProperties);
+        if (expandedPropertyIdx === propIdx) setExpandedPropertyIdx(null);
+        else if (expandedPropertyIdx !== null && expandedPropertyIdx > propIdx) {
+            setExpandedPropertyIdx(expandedPropertyIdx - 1);
+        }
+
+        // 4. Persist deletion in profiles table
+        await handleSave(true, remainingProperties);
+        setPropertyToDelete(null);
+    };
+
     if (!isLoaded || !user) return <div className="p-8 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-emerald-600" /></div>;
 
     const handleQuickPublish = (intent: 'rent' | 'sale', targetPropIdx: number = 0) => {
@@ -2446,32 +2499,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                         className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            if (confirm(`Remover "${propLabel}"? Esta ação não pode ser desfeita.`)) {
-                                                                const deletedProp = properties[propIdx];
-                                                                const remainingProperties = properties.filter((_, i) => i !== propIdx);
-                                                                setProperties(remainingProperties);
-                                                                if (expandedPropertyIdx === propIdx) setExpandedPropertyIdx(null);
-                                                                else if (expandedPropertyIdx !== null && expandedPropertyIdx > propIdx) {
-                                                                    setExpandedPropertyIdx(expandedPropertyIdx - 1);
-                                                                }
-                                                                // Clean up ownership proofs for deleted property from ownership_proofs table
-                                                                if (deletedProp?.savedProofs && deletedProp.savedProofs.length > 0) {
-                                                                    (async () => {
-                                                                        try {
-                                                                            const sb = await getSupabase();
-                                                                            for (const proof of deletedProp.savedProofs) {
-                                                                                if (proof?.id) {
-                                                                                    await sb.from('ownership_proofs').delete().eq('id', proof.id);
-                                                                                }
-                                                                            }
-                                                                        } catch (err) {
-                                                                            console.error('[Profile] Error deleting ownership proofs for removed property:', err);
-                                                                        }
-                                                                    })();
-                                                                }
-                                                                // Persist deletion to DB using the already-filtered list
-                                                                handleSave(true, remainingProperties);
-                                                            }
+                                                            setPropertyToDelete({ idx: propIdx, label: propLabel });
                                                         }}
                                                         onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }}
                                                     >
@@ -3692,6 +3720,18 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                     </div>
                 )
             }
+
+            {/* Delete Property Modal with Energy Decision */}
+            {propertyToDelete && (
+                <DeletePropertyModal
+                    isOpen={Boolean(propertyToDelete)}
+                    onClose={() => setPropertyToDelete(null)}
+                    propertyLabel={propertyToDelete.label}
+                    propertyIndex={propertyToDelete.idx}
+                    dict={dict}
+                    onConfirm={handleConfirmDeleteProperty}
+                />
+            )}
 
         </div >
     );

@@ -79,11 +79,15 @@ export default function EnergyDashboardHubPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [lang, router]);
 
-    const handleDeleteUc = async (id: string, name: string, e: React.MouseEvent) => {
+    const handleDeleteUc = async (id: string, name: string, e: React.MouseEvent, isOrphaned?: boolean) => {
         e.preventDefault();
         e.stopPropagation();
 
-        if (!confirm(`Tem certeza que deseja remover a UC avulsa "${name}" e todo seu histórico de faturas?`)) {
+        const confirmMsg = isOrphaned
+            ? `Remover esta unidade "${name}" da Gestão de Energia? O imóvel não está mais no seu portfólio de aluguel.`
+            : `Tem certeza que deseja remover a UC avulsa "${name}" e todo seu histórico de faturas?`;
+
+        if (!confirm(confirmMsg)) {
             return;
         }
 
@@ -107,17 +111,17 @@ export default function EnergyDashboardHubPage() {
     };
 
     const rentalCount = useMemo(
-        () => properties.filter((p) => !p.isStandaloneUc).length,
+        () => properties.filter((p) => !p.isStandaloneUc && !p.isOrphaned).length,
         [properties]
     );
     const standaloneCount = useMemo(
-        () => properties.filter((p) => p.isStandaloneUc).length,
+        () => properties.filter((p) => p.isStandaloneUc || p.isOrphaned).length,
         [properties]
     );
 
     const filteredProperties = useMemo(() => {
-        if (filterTab === "rental") return properties.filter((p) => !p.isStandaloneUc);
-        if (filterTab === "standalone") return properties.filter((p) => p.isStandaloneUc);
+        if (filterTab === "rental") return properties.filter((p) => !p.isStandaloneUc && !p.isOrphaned);
+        if (filterTab === "standalone") return properties.filter((p) => p.isStandaloneUc || p.isOrphaned);
         return properties;
     }, [properties, filterTab]);
 
@@ -241,13 +245,13 @@ export default function EnergyDashboardHubPage() {
                                                 {prop.name}
                                             </h3>
 
-                                            {/* Standalone UC Delete Button */}
-                                            {prop.isStandaloneUc && (
+                                            {/* Standalone UC / Orphaned Delete Button */}
+                                            {(prop.isStandaloneUc || prop.isOrphaned) && (
                                                 <button
-                                                    onClick={(e) => handleDeleteUc(prop.id, prop.name, e)}
+                                                    onClick={(e) => handleDeleteUc(prop.id, prop.name, e, prop.isOrphaned)}
                                                     disabled={deletingId === prop.id}
                                                     className="p-1 rounded-md text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors opacity-70 group-hover:opacity-100"
-                                                    title="Excluir esta UC Avulsa"
+                                                    title={prop.isOrphaned ? "Remover unidade desvinculada" : "Excluir esta UC Avulsa"}
                                                     aria-label="Excluir UC"
                                                 >
                                                     {deletingId === prop.id ? (
@@ -276,28 +280,34 @@ export default function EnergyDashboardHubPage() {
 
                                 {/* Tags Row */}
                                 <div className="flex flex-wrap items-center gap-2">
-                                    {/* Standalone UC badge */}
+                                    {/* Standalone UC / Orphaned badge */}
                                     {prop.isStandaloneUc ? (
                                         <>
-                                            {prop.ucCategory === "residencia_propria" && (
+                                            {prop.isOrphaned && (
+                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800">
+                                                    <Building2 className="w-3.5 h-3.5 text-rose-500" />
+                                                    Desvinculado de Imóveis
+                                                </span>
+                                            )}
+                                            {!prop.isOrphaned && prop.ucCategory === "residencia_propria" && (
                                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800">
                                                     <Home className="w-3.5 h-3.5 text-blue-500" />
                                                     Residência Própria
                                                 </span>
                                             )}
-                                            {prop.ucCategory === "parente" && (
+                                            {!prop.isOrphaned && prop.ucCategory === "parente" && (
                                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800">
                                                     <Users className="w-3.5 h-3.5 text-emerald-500" />
                                                     Casa de Parente (Fornecimento)
                                                 </span>
                                             )}
-                                            {prop.ucCategory === "beneficiaria" && (
+                                            {!prop.isOrphaned && prop.ucCategory === "beneficiaria" && (
                                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800">
                                                     <Zap className="w-3.5 h-3.5 text-amber-500" />
                                                     Unidade Beneficiária (GD)
                                                 </span>
                                             )}
-                                            {(!prop.ucCategory || prop.ucCategory === "outro") && (
+                                            {!prop.isOrphaned && (!prop.ucCategory || prop.ucCategory === "outro") && (
                                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800">
                                                     <Building2 className="w-3.5 h-3.5 text-purple-500" />
                                                     UC Avulsa
