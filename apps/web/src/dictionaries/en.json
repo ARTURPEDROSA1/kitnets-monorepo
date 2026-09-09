@@ -764,6 +764,21 @@
             "cancel": "Cancel",
             "confirm": "Yes, Delete Everything"
         },
+        "deletePropertyModal": {
+            "title": "Delete Property",
+            "subtitle": "Are you sure you want to remove this property from your portfolio?",
+            "energyQuestion": "What would you like to do with the solar energy management data for this property?",
+            "deleteAllTitle": "Delete property and erase energy data",
+            "deleteAllDesc": "The property and all linked data (solar generation, utility bills, and consumption history) will be permanently removed.",
+            "keepEnergyTitle": "Delete property but KEEP energy data",
+            "keepEnergyDesc": "Removes the property from rental listings, but keeps utility bills and solar history as a Standalone UC in the Solar Energy tab.",
+            "cancel": "Cancel",
+            "confirmDeleteAll": "Delete Property & Energy Data",
+            "confirmKeepEnergy": "Delete Property & Keep Energy",
+            "deleting": "Deleting...",
+            "badgeStandalone": "Standalone UC",
+            "badgeDeleteAll": "Delete Everything"
+        },
         "alerts": {
             "photoUpdated": "Profile photo updated!",
             "photoError": "Error updating photo.",

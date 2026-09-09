@@ -30,6 +30,8 @@ export interface OwnerPropertySummary {
     latestDueDate?: string | null;
     latestTotalAmount?: number | null;
     isStandaloneUc: boolean;
+    isOrphaned?: boolean;
+    hasRentalListing?: boolean;
     ucCategory: UcCategory | null;
     notes?: string | null;
 }
@@ -216,24 +218,46 @@ export async function GET() {
             }
 
             // Check if matches primary rental property in profile
-            const isPrimary = (idx === 0) || (primaryDetails?.propertyName && primaryDetails.propertyName.trim().toLowerCase() === prop.name.trim().toLowerCase());
+            const hasPrimaryInProfile = Boolean(
+                primaryDetails?.propertyName ||
+                primaryAddress?.street ||
+                (primaryAddress && Object.values(primaryAddress).some(Boolean))
+            );
+            const isPrimary = hasPrimaryInProfile && (
+                (primaryDetails?.propertyName && primaryDetails.propertyName.trim().toLowerCase() === prop.name.trim().toLowerCase()) ||
+                (primaryAddress?.street && prop.name.trim().toLowerCase().includes(primaryAddress.street.trim().toLowerCase())) ||
+                (idx === 0)
+            );
+
+            let matchingAp: any = null;
+            if (profile.additional_properties && Array.isArray(profile.additional_properties)) {
+                matchingAp = profile.additional_properties.find((ap: any) => {
+                    const apName = ap?.details?.propertyName;
+                    const apStreet = ap?.address?.street;
+                    if (apName && apName.trim().toLowerCase() === prop.name.trim().toLowerCase()) return true;
+                    if (apStreet && prop.name.trim().toLowerCase().includes(apStreet.trim().toLowerCase())) return true;
+                    return false;
+                });
+            }
+
+            const hasRentalListing = isPrimary || Boolean(matchingAp);
+
+            // An orphaned property is one in public.properties that is no longer in the user's rental portfolio
+            // and was not explicitly created as a standalone UC
+            const isOrphaned = !isStandaloneUc && !hasRentalListing;
+
+            // If it has no rental listing, it behaves as a standalone UC in the Energy Hub
+            const effectiveStandaloneUc = isStandaloneUc || isOrphaned;
+
             let solarEnergy = false;
             let solarKwp: string | null = null;
 
-            if (!isStandaloneUc) {
-                if (isPrimary && primaryDetails) {
-                    solarEnergy = Boolean(primaryDetails.solarEnergy);
-                    solarKwp = primaryDetails.solarKwp ? String(primaryDetails.solarKwp) : null;
-                } else if (profile.additional_properties && Array.isArray(profile.additional_properties)) {
-                    const matchingAp = profile.additional_properties.find((ap: any) => {
-                        const apName = ap?.details?.propertyName;
-                        return apName && apName.trim().toLowerCase() === prop.name.trim().toLowerCase();
-                    });
-                    if (matchingAp?.details) {
-                        solarEnergy = Boolean(matchingAp.details.solarEnergy);
-                        solarKwp = matchingAp.details.solarKwp ? String(matchingAp.details.solarKwp) : null;
-                    }
-                }
+            if (isPrimary && primaryDetails) {
+                solarEnergy = Boolean(primaryDetails.solarEnergy);
+                solarKwp = primaryDetails.solarKwp ? String(primaryDetails.solarKwp) : null;
+            } else if (matchingAp?.details) {
+                solarEnergy = Boolean(matchingAp.details.solarEnergy);
+                solarKwp = matchingAp.details.solarKwp ? String(matchingAp.details.solarKwp) : null;
             }
 
             // Auto-backfill address for Mae or UC 2.778.206.018-17 if address is not registered
@@ -268,8 +292,8 @@ export async function GET() {
                 })();
             }
 
-            // A standalone UC always participates in the Energy Hub
-            const hasSolar = isStandaloneUc || solarEnergy || billStats.count > 0;
+            // A standalone UC or orphaned property always participates in the Energy Hub
+            const hasSolar = effectiveStandaloneUc || solarEnergy || billStats.count > 0;
 
             return {
                 id: prop.id,
@@ -287,9 +311,11 @@ export async function GET() {
                 latestMonthLabel: billStats.latestMonthLabel,
                 latestDueDate: billStats.latestDueDate,
                 latestTotalAmount: billStats.latestTotalAmount,
-                isStandaloneUc,
-                ucCategory,
-                notes: savedNotes,
+                isStandaloneUc: effectiveStandaloneUc,
+                isOrphaned,
+                hasRentalListing,
+                ucCategory: ucCategory || (isOrphaned ? "outro" : null),
+                notes: savedNotes || (isOrphaned ? "Imóvel desvinculado do portfólio de aluguel" : null),
             };
         });
 

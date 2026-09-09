@@ -742,6 +742,21 @@
             "cancel": "Cancelar",
             "confirm": "Sí, Eliminar Todo"
         },
+        "deletePropertyModal": {
+            "title": "Eliminar Propiedad",
+            "subtitle": "¿Está seguro de que desea eliminar esta propiedad de su portafolio?",
+            "energyQuestion": "¿Qué desea hacer con los datos de gestión de energía solar de esta propiedad?",
+            "deleteAllTitle": "Eliminar propiedad y borrar datos de energía",
+            "deleteAllDesc": "La propiedad y todos los datos vinculados (generación solar, facturas e historial de consumo) se eliminarán permanentemente.",
+            "keepEnergyTitle": "Eliminar propiedad pero MANTENER datos de energía",
+            "keepEnergyDesc": "Elimina la propiedad de los anuncios de alquiler, pero conserva las facturas y el historial solar como una UC Independiente en la pestaña Energía Solar.",
+            "cancel": "Cancelar",
+            "confirmDeleteAll": "Eliminar Propiedad y Datos de Energía",
+            "confirmKeepEnergy": "Eliminar Propiedad y Mantener Energía",
+            "deleting": "Eliminando...",
+            "badgeStandalone": "UC Independiente",
+            "badgeDeleteAll": "Eliminar Todo"
+        },
         "alerts": {
             "photoUpdated": "¡Foto de perfil actualizada!",
             "photoError": "Error al actualizar foto.",
