@@ -16,6 +16,8 @@ import {
     ExternalLink,
     ChevronLeft,
     ChevronRight,
+    Share,
+    Check,
 } from "lucide-react";
 
 export interface PdfViewerModalProps {
@@ -259,6 +261,66 @@ export function PdfViewerModal({
         }
     };
 
+    const [shareSuccess, setShareSuccess] = useState(false);
+
+    // Share handler using Web Share API (native share sheet on iOS/Android/Desktop Chrome) with clipboard fallback
+    const handleShare = async () => {
+        const cleanFileName = fileName.endsWith(".pdf") ? fileName : `${fileName}.pdf`;
+        const shareTitle = title || cleanFileName;
+        const targetShareUrl = url?.startsWith("http") ? url : `${typeof window !== "undefined" ? window.location.origin : ""}${url}`;
+
+        try {
+            // Priority 1: Share actual PDF file blob (supports Google Drive, WhatsApp, Mail, Save to Files, etc.)
+            if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+                let fileToShare: File | null = null;
+                if (pdfData) {
+                    fileToShare = new File([pdfData], cleanFileName, { type: "application/pdf" });
+                } else if (url) {
+                    try {
+                        const res = await fetch(proxyUrl || url);
+                        const blob = await res.blob();
+                        fileToShare = new File([blob], cleanFileName, { type: "application/pdf" });
+                    } catch {
+                        // Fall through to URL share
+                    }
+                }
+
+                if (fileToShare && typeof navigator.canShare === "function" && navigator.canShare({ files: [fileToShare] })) {
+                    await navigator.share({
+                        title: shareTitle,
+                        files: [fileToShare],
+                    });
+                    return;
+                }
+
+                // Priority 2: Share URL via native share sheet
+                await navigator.share({
+                    title: shareTitle,
+                    text: shareTitle,
+                    url: targetShareUrl,
+                });
+                return;
+            }
+
+            // Priority 3: Clipboard fallback
+            await navigator.clipboard.writeText(targetShareUrl);
+            setShareSuccess(true);
+            setTimeout(() => setShareSuccess(false), 2500);
+        } catch (err: any) {
+            // Dismissing native share sheet throws AbortError; safely ignore
+            if (err?.name !== "AbortError") {
+                console.warn("[PdfViewer] Web Share failed, copying to clipboard:", err);
+                try {
+                    await navigator.clipboard.writeText(targetShareUrl);
+                    setShareSuccess(true);
+                    setTimeout(() => setShareSuccess(false), 2500);
+                } catch {
+                    if (url) window.open(targetShareUrl, "_blank");
+                }
+            }
+        }
+    };
+
     // Print handler
     const handlePrint = () => {
         if (viewMode === "iframe") {
@@ -313,8 +375,8 @@ export function PdfViewerModal({
                         </div>
                     </div>
 
-                    {/* Center: Controls (Zoom, Pages) */}
-                    <div className="flex items-center gap-1 sm:gap-1.5">
+                    {/* Center: Controls (Zoom, Pages - hidden on mobile since touchscreens use 2-finger pinch) */}
+                    <div className="hidden sm:flex items-center gap-1 sm:gap-1.5">
                         {viewMode === "canvas" && (
                             <>
                                 <button
@@ -360,11 +422,23 @@ export function PdfViewerModal({
 
                     {/* Right: Actions & Close */}
                     <div className="flex items-center gap-1 sm:gap-1.5">
-                        {/* Download button */}
+                        {/* Share button (Up Arrow for native sharing to Google Drive, WhatsApp, etc.) */}
+                        <button
+                            onClick={handleShare}
+                            className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                            title="Compartilhar fatura (Google Drive, WhatsApp, etc.)"
+                            aria-label="Compartilhar fatura"
+                        >
+                            {shareSuccess ? <Check className="w-3.5 h-3.5" /> : <Share className="w-3.5 h-3.5" />}
+                            <span className="hidden sm:inline">{shareSuccess ? "Copiado!" : "Compartilhar"}</span>
+                        </button>
+
+                        {/* Download button (Down Arrow) */}
                         <button
                             onClick={handleDownload}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition-colors"
+                            className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
                             title="Baixar PDF para o dispositivo"
+                            aria-label="Baixar fatura"
                         >
                             <Download className="w-3.5 h-3.5" />
                             <span className="hidden sm:inline">Baixar</span>
@@ -403,8 +477,14 @@ export function PdfViewerModal({
                 {/* Document Canvas / Iframe Body */}
                 <div
                     ref={containerRef}
-                    className="flex-1 overflow-auto bg-neutral-900/95 dark:bg-neutral-950 p-2 sm:p-6 flex flex-col items-center justify-start relative overscroll-contain"
+                    className="flex-1 overflow-auto bg-neutral-900/95 dark:bg-neutral-950 p-2 sm:p-6 flex flex-col items-center justify-start relative overscroll-contain touch-pan-x touch-pan-y"
                 >
+                    {shareSuccess && (
+                        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-neutral-900 text-white border border-border px-3.5 py-1.5 rounded-full text-xs font-semibold shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
+                            <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>Link copiado para a área de transferência!</span>
+                        </div>
+                    )}
                     {loading && (
                         <div className="my-auto flex flex-col items-center justify-center p-8 text-center space-y-3">
                             <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
