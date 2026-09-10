@@ -85,6 +85,18 @@ function getFlagBadge(flagType?: string | null) {
     );
 }
 
+type RangeFilter = "YTD" | "1Y" | "2Y" | "3Y" | "4Y" | "5Y" | "ALL";
+
+const RANGE_OPTIONS: { key: RangeFilter; label: string }[] = [
+    { key: "YTD", label: "YTD" },
+    { key: "1Y", label: "1 Year" },
+    { key: "2Y", label: "2 Year" },
+    { key: "3Y", label: "3 Year" },
+    { key: "4Y", label: "4 Year" },
+    { key: "5Y", label: "5 Year" },
+    { key: "ALL", label: "All" },
+];
+
 export function HistoricUnitPriceModal({
     isOpen,
     onClose,
@@ -92,11 +104,13 @@ export function HistoricUnitPriceModal({
     currentUnitPrice,
 }: HistoricUnitPriceModalProps) {
     const [isMaximized, setIsMaximized] = React.useState(false);
+    const [rangeFilter, setRangeFilter] = React.useState<RangeFilter>("ALL");
 
-    // Reset maximized state when closed
+    // Reset maximized and filter states when closed
     useEffect(() => {
         if (!isOpen) {
             setIsMaximized(false);
+            setRangeFilter("ALL");
         }
     }, [isOpen]);
 
@@ -112,7 +126,7 @@ export function HistoricUnitPriceModal({
     }, [isOpen, onClose]);
 
     // Filter bills that have a valid unit price and sort chronologically
-    const tariffHistory = useMemo(() => {
+    const allTariffHistory = useMemo(() => {
         const valid = bills
             .filter((b) => typeof b.unit_price === "number" && b.unit_price > 0)
             .sort((a, b) => a.reference_month.localeCompare(b.reference_month))
@@ -128,6 +142,41 @@ export function HistoricUnitPriceModal({
 
         return valid;
     }, [bills]);
+
+    // Filter by selected range: YTD, 1 Year, 2 Year, 3 Year, 4 Year, 5 Year, All
+    const tariffHistory = useMemo(() => {
+        if (allTariffHistory.length === 0 || rangeFilter === "ALL") {
+            return allTariffHistory;
+        }
+
+        const latest = allTariffHistory[allTariffHistory.length - 1];
+        const [latestYear, latestMonth] = latest.reference_month.split("-").map(Number);
+
+        if (rangeFilter === "YTD") {
+            const cutoff = `${latestYear}-01`;
+            const filtered = allTariffHistory.filter((item) => item.reference_month >= cutoff);
+            return filtered.length > 0 ? filtered : allTariffHistory;
+        }
+
+        const yearsMap: Record<"1Y" | "2Y" | "3Y" | "4Y" | "5Y", number> = {
+            "1Y": 1,
+            "2Y": 2,
+            "3Y": 3,
+            "4Y": 4,
+            "5Y": 5,
+        };
+
+        const years = yearsMap[rangeFilter as "1Y" | "2Y" | "3Y" | "4Y" | "5Y"];
+        if (years) {
+            const cutoffYear = latestYear - years;
+            const cutoffMonth = String(latestMonth).padStart(2, "0");
+            const cutoff = `${cutoffYear}-${cutoffMonth}`;
+            const filtered = allTariffHistory.filter((item) => item.reference_month >= cutoff);
+            return filtered.length > 0 ? filtered : allTariffHistory;
+        }
+
+        return allTariffHistory;
+    }, [allTariffHistory, rangeFilter]);
 
     // Compute key statistics
     const stats = useMemo(() => {
@@ -264,25 +313,45 @@ export function HistoricUnitPriceModal({
 
                     {/* Chart Container */}
                     <div className="bg-card border border-border rounded-xl p-4 shadow-xs space-y-3">
-                        <div className="flex items-center justify-between">
-                            <h4 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                                <TrendingUp className="w-4 h-4 text-blue-500" />
-                                Curva de Variação Tarifária (R$/kWh)
-                            </h4>
-                            {stats.deltaPercent !== 0 && (
-                                <span className={`text-xs font-semibold px-2 py-0.5 rounded-md flex items-center gap-0.5 ${
-                                    stats.deltaPercent > 0
-                                        ? "text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950"
-                                        : "text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950"
-                                }`}>
-                                    {stats.deltaPercent > 0 ? (
-                                        <ArrowUpRight className="w-3.5 h-3.5" />
-                                    ) : (
-                                        <ArrowDownRight className="w-3.5 h-3.5" />
-                                    )}
-                                    {stats.deltaPercent > 0 ? "+" : ""}{stats.deltaPercent.toFixed(2)}%
-                                </span>
-                            )}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <h4 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                                    <TrendingUp className="w-4 h-4 text-blue-500" />
+                                    Curva de Variação Tarifária (R$/kWh)
+                                </h4>
+                                {stats.deltaPercent !== 0 && (
+                                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-md flex items-center gap-0.5 ${
+                                        stats.deltaPercent > 0
+                                            ? "text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950"
+                                            : "text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950"
+                                    }`}>
+                                        {stats.deltaPercent > 0 ? (
+                                            <ArrowUpRight className="w-3.5 h-3.5" />
+                                        ) : (
+                                            <ArrowDownRight className="w-3.5 h-3.5" />
+                                        )}
+                                        {stats.deltaPercent > 0 ? "+" : ""}{stats.deltaPercent.toFixed(2)}%
+                                    </span>
+                                )}
+                            </div>
+
+                            {/* Range Filters */}
+                            <div className="flex items-center bg-muted/70 p-1 rounded-xl gap-0.5 text-xs overflow-x-auto scrollbar-none max-w-full">
+                                {RANGE_OPTIONS.map((opt) => (
+                                    <button
+                                        key={opt.key}
+                                        type="button"
+                                        onClick={() => setRangeFilter(opt.key)}
+                                        className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
+                                            rangeFilter === opt.key
+                                                ? "bg-background text-foreground shadow-xs font-bold"
+                                                : "text-muted-foreground hover:text-foreground"
+                                        }`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
 
                         {tariffHistory.length > 0 ? (
