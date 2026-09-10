@@ -213,23 +213,32 @@ export async function GET(request: Request) {
             console.warn("[Energy Bills GET] Storage list warning:", storageErr);
         }
 
-        // Map bills with their respective pdf_url from storage or existing column
-        const mappedBills = (bills || []).map((b: any) => {
+        // Determine which bill is the latest (sorted DESC, first non-historical)
+        const sortedBills = bills || [];
+        const latestFullBillRef = sortedBills.find((b: any) => !b.is_historical_only) || sortedBills[0] || null;
+        const currentBillStorageUrl = fileMap.get("current_bill") || null;
+
+        // Map bills with their respective pdf_url from storage
+        // If the latest bill has no month-specific PDF, assign current_bill.pdf to it
+        // (current_bill.pdf is always the most recently uploaded PDF)
+        const mappedBills = sortedBills.map((b: any) => {
             const matchedStorageUrl = fileMap.get(b.reference_month);
+            let resolvedPdfUrl = matchedStorageUrl || null;
+
+            // For the latest bill: if no month-specific file, use current_bill.pdf
+            if (!resolvedPdfUrl && latestFullBillRef && b.reference_month === latestFullBillRef.reference_month) {
+                resolvedPdfUrl = currentBillStorageUrl;
+            }
+
             return {
                 ...b,
-                pdf_url: matchedStorageUrl || b.pdf_url || null,
+                pdf_url: resolvedPdfUrl,
             };
         });
 
-        // Determine currentPdfUrl for the latest bill
-        const latestFullBill = mappedBills.find((b: any) => !b.is_historical_only) || mappedBills[0] || null;
-        let currentPdfUrl: string | null = null;
-        if (latestFullBill?.pdf_url) {
-            currentPdfUrl = latestFullBill.pdf_url;
-        } else if (fileMap.get("current_bill")) {
-            currentPdfUrl = fileMap.get("current_bill") || null;
-        }
+        // currentPdfUrl = the latest bill's resolved PDF
+        const latestMapped = mappedBills.find((b: any) => !b.is_historical_only) || mappedBills[0] || null;
+        const currentPdfUrl = latestMapped?.pdf_url || currentBillStorageUrl || null;
 
         return NextResponse.json({
             success: true,
@@ -390,9 +399,7 @@ export async function POST(request: Request) {
             updated_at: new Date().toISOString(),
         };
 
-        if (pdfUrl) {
-            mainBillPayload.pdf_url = pdfUrl;
-        }
+        // Note: pdf_url is NOT a DB column — PDFs are resolved from Supabase Storage at read time
 
         // 2. Upsert the main bill
         let { data: savedBill, error: mainError } = await supabase
