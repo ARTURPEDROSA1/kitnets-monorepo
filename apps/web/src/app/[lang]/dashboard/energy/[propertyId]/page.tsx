@@ -230,9 +230,9 @@ export default function EnergyDashboardPage() {
         return bills.find((b) => !b.is_historical_only) || bills[0] || null;
     }, [bills]);
 
-    // Active current PDF URL (from Supabase Storage single-file store or latest bill)
+    // Active current PDF URL (from latest full bill or currentPdfUrl fallback)
     const activePdfUrl = useMemo(() => {
-        return currentPdfUrl || latestFullBill?.pdf_url || null;
+        return latestFullBill?.pdf_url || currentPdfUrl || null;
     }, [currentPdfUrl, latestFullBill]);
 
     // Formatted due date (Vencimento ex: 17/09/2026)
