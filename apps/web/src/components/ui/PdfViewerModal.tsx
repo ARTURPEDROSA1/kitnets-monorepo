@@ -28,11 +28,6 @@ export interface PdfViewerModalProps {
     fileName?: string;
 }
 
-interface RenderedPage {
-    pageNumber: number;
-    canvas: HTMLCanvasElement;
-}
-
 export function PdfViewerModal({
     isOpen,
     onClose,
@@ -41,24 +36,22 @@ export function PdfViewerModal({
     fileName = "documento.pdf",
 }: PdfViewerModalProps) {
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
     const [numPages, setNumPages] = useState<number>(0);
     const [currentPage, setCurrentPage] = useState<number>(1);
-    const [scale, setScale] = useState<number>(1.1);
     const [rotation, setRotation] = useState<number>(0);
     const [isMaximized, setIsMaximized] = useState<boolean>(false);
     const [viewMode, setViewMode] = useState<"canvas" | "iframe">("canvas");
     const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
+    const [zoom, setZoom] = useState<number>(1);
+    const [shareSuccess, setShareSuccess] = useState(false);
 
-    const containerRef = useRef<HTMLDivElement>(null);
+    const viewportRef = useRef<HTMLDivElement>(null);
     const canvasContainerRef = useRef<HTMLDivElement>(null);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const pdfDocRef = useRef<any>(null);
-    const currentScaleRef = useRef(scale);
 
-    useEffect(() => {
-        currentScaleRef.current = scale;
-    }, [scale]);
+    // Transform state for 60/120 FPS hardware-accelerated pan and zoom
+    const transformRef = useRef({ scale: 1, x: 0, y: 0 });
 
     // Compute proxy URL for iframe fallback or same-origin safety
     const proxyUrl = url
@@ -88,10 +81,9 @@ export function PdfViewerModal({
         }
     }, [isOpen]);
 
-    // Fetch PDF data as Blob (immutable and never detached by web workers)
+    // Fetch PDF data as Blob (immutable, never detached by web workers)
     const fetchPdfData = useCallback(async (targetUrl: string): Promise<Blob | null> => {
         setLoading(true);
-        setError(null);
         try {
             const fetchUrl = targetUrl.startsWith("blob:") || targetUrl.startsWith("data:")
                 ? targetUrl
@@ -99,7 +91,6 @@ export function PdfViewerModal({
 
             let res = await fetch(fetchUrl);
             if (!res.ok) {
-                // Fallback attempt: try direct targetUrl if proxy failed
                 res = await fetch(targetUrl);
                 if (!res.ok) {
                     throw new Error(`Falha ao carregar documento (Status ${res.status})`);
@@ -123,8 +114,9 @@ export function PdfViewerModal({
             pdfDocRef.current = null;
             setNumPages(0);
             setCurrentPage(1);
-            setScale(1.1);
+            setZoom(1);
             setRotation(0);
+            transformRef.current = { scale: 1, x: 0, y: 0 };
             return;
         }
 
@@ -138,7 +130,7 @@ export function PdfViewerModal({
                 const pdfjsLib = await import("pdfjs-dist");
                 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
-                // Convert blob to ArrayBuffer and slice a clone for the worker so original is never detached
+                // Convert blob to ArrayBuffer and pass a slice clone so original blob is never detached
                 const rawBuffer = await blob.arrayBuffer();
                 const workerBuffer = rawBuffer.slice(0);
 
@@ -171,7 +163,57 @@ export function PdfViewerModal({
         };
     }, [isOpen, url, fetchPdfData]);
 
-    // Render pages to canvas container
+    // Position clamping utility to keep document visible in viewport
+    const clampPosition = useCallback((scale: number, x: number, y: number) => {
+        const viewport = viewportRef.current;
+        const content = canvasContainerRef.current;
+        if (!viewport || !content) return { x, y };
+
+        const vWidth = viewport.clientWidth;
+        const vHeight = viewport.clientHeight;
+        const cWidth = content.offsetWidth * scale;
+        const cHeight = content.offsetHeight * scale;
+
+        let clampedX = x;
+        let clampedY = y;
+
+        if (cWidth <= vWidth) {
+            clampedX = (vWidth - cWidth) / 2;
+        } else {
+            const minX = vWidth - cWidth;
+            const maxX = 0;
+            clampedX = Math.min(Math.max(x, minX), maxX);
+        }
+
+        if (cHeight <= vHeight) {
+            clampedY = (vHeight - cHeight) / 2;
+        } else {
+            const minY = vHeight - cHeight;
+            const maxY = 0;
+            clampedY = Math.min(Math.max(y, minY), maxY);
+        }
+
+        return { x: clampedX, y: clampedY };
+    }, []);
+
+    // Apply CSS 3D transform with hardware acceleration
+    const updateTransform = useCallback((scale: number, x: number, y: number, animate = false) => {
+        const content = canvasContainerRef.current;
+        if (!content) return;
+
+        content.style.transition = animate ? "transform 0.25s cubic-bezier(0.15, 0.9, 0.3, 1)" : "none";
+        content.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale})`;
+        transformRef.current = { scale, x, y };
+        setZoom(scale);
+    }, []);
+
+    // Reset zoom and center
+    const resetZoom = useCallback(() => {
+        const clamped = clampPosition(1.0, 0, 0);
+        updateTransform(1.0, clamped.x, clamped.y, true);
+    }, [clampPosition, updateTransform]);
+
+    // Render pages ONCE with high-DPI supersampling
     useEffect(() => {
         if (!pdfDocRef.current || viewMode !== "canvas" || loading) return;
 
@@ -179,13 +221,16 @@ export function PdfViewerModal({
         const currentContainer = canvasContainerRef.current;
         if (!currentContainer) return;
 
-        // Clear existing canvases
         currentContainer.innerHTML = "";
 
         async function renderAllPages() {
             const pdf = pdfDocRef.current;
             const targetContainer = canvasContainerRef.current;
+            const viewportEl = viewportRef.current;
             if (!pdf || !targetContainer) return;
+
+            // Fit initial width nicely to viewport
+            const availableWidth = viewportEl ? Math.min(viewportEl.clientWidth - 20, 800) : 600;
 
             for (let i = 1; i <= pdf.numPages; i++) {
                 if (isCancelled) break;
@@ -194,19 +239,25 @@ export function PdfViewerModal({
                     const page = await pdf.getPage(i);
                     if (isCancelled) break;
 
-                    const dpr = window.devicePixelRatio || 1;
-                    const viewport = page.getViewport({ scale: scale * dpr, rotation });
-                    const cssWidth = viewport.width / dpr;
-                    const cssHeight = viewport.height / dpr;
+                    const unscaledViewport = page.getViewport({ scale: 1, rotation });
+                    const fitScale = Math.max(availableWidth / unscaledViewport.width, 0.9);
+
+                    // High-DPI render: 2.0x supersampling so zooming in 2x-4x stays razor sharp
+                    const dpr = Math.min(typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1, 3);
+                    const renderDpr = dpr * 1.5;
+
+                    const viewport = page.getViewport({ scale: fitScale * renderDpr, rotation });
+                    const cssWidth = viewport.width / renderDpr;
+                    const cssHeight = viewport.height / renderDpr;
 
                     // Wrapper card
                     const pageWrapper = document.createElement("div");
-                    pageWrapper.className = "flex flex-col items-center my-3 relative group";
+                    pageWrapper.className = "flex flex-col items-center my-2 sm:my-3 relative";
                     pageWrapper.dataset.pageNumber = String(i);
 
                     // Page label badge
                     const badge = document.createElement("div");
-                    badge.className = "self-start mb-1.5 px-2 py-0.5 rounded text-[11px] font-medium bg-muted/80 text-muted-foreground border border-border/50";
+                    badge.className = "self-start mb-1 px-2 py-0.5 rounded text-[11px] font-medium bg-muted/80 text-muted-foreground border border-border/50";
                     badge.textContent = `Página ${i} de ${pdf.numPages}`;
                     pageWrapper.appendChild(badge);
 
@@ -216,9 +267,9 @@ export function PdfViewerModal({
                     canvas.height = viewport.height;
                     canvas.style.width = `${cssWidth}px`;
                     canvas.style.height = `${cssHeight}px`;
-                    canvas.className = "rounded-lg shadow-xl border border-border/60 bg-white max-w-full transition-all";
+                    canvas.className = "rounded-lg border border-border/60 bg-white shadow-xl";
 
-                    const ctx = canvas.getContext("2d");
+                    const ctx = canvas.getContext("2d", { alpha: false });
                     if (ctx) {
                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         await page.render({ canvasContext: ctx, viewport, canvas } as any).promise;
@@ -230,6 +281,11 @@ export function PdfViewerModal({
                     console.error(`[PdfViewer] Error rendering page ${i}:`, pageErr);
                 }
             }
+
+            // Center document initially
+            setTimeout(() => {
+                resetZoom();
+            }, 50);
         }
 
         renderAllPages();
@@ -237,93 +293,185 @@ export function PdfViewerModal({
         return () => {
             isCancelled = true;
         };
-    }, [numPages, scale, rotation, viewMode, loading]);
+    }, [numPages, rotation, viewMode, loading, resetZoom]);
 
-    // Pinch to Zoom and Double Tap gestures on mobile/touch screens
+    // Native-feeling Touch Gestures: Focal-Point Pinch-to-Zoom + 2D Free Pan + Double Tap
     useEffect(() => {
-        const container = containerRef.current;
-        const canvasContainer = canvasContainerRef.current;
-        if (!container || viewMode !== "canvas") return;
+        const viewport = viewportRef.current;
+        const content = canvasContainerRef.current;
+        if (!viewport || !content || viewMode !== "canvas") return;
 
-        let initialDistance = 0;
-        let initialScale = currentScaleRef.current;
         let isPinching = false;
-        let lastRatio = 1;
+        let isPanning = false;
+        let initialDist = 0;
+        let startScale = 1;
+        let focalPoint = { x: 0, y: 0 };
+        let startPos = { x: 0, y: 0 };
+        let panStart = { x: 0, y: 0 };
         let lastTap = 0;
 
         const onTouchStart = (e: TouchEvent) => {
+            const vRect = viewport.getBoundingClientRect();
+
             if (e.touches.length === 2) {
+                // Two-finger pinch start
                 isPinching = true;
-                initialScale = currentScaleRef.current;
-                initialDistance = Math.hypot(
+                isPanning = false;
+                startScale = transformRef.current.scale;
+                initialDist = Math.hypot(
                     e.touches[0].clientX - e.touches[1].clientX,
                     e.touches[0].clientY - e.touches[1].clientY
                 );
-                lastRatio = 1;
-                if (canvasContainer) {
-                    canvasContainer.style.transition = "none";
-                }
+                focalPoint = {
+                    x: (e.touches[0].clientX + e.touches[1].clientX) / 2 - vRect.left,
+                    y: (e.touches[0].clientY + e.touches[1].clientY) / 2 - vRect.top,
+                };
+                startPos = {
+                    x: transformRef.current.x,
+                    y: transformRef.current.y,
+                };
+                content.style.transition = "none";
             } else if (e.touches.length === 1) {
                 const now = Date.now();
                 if (now - lastTap < 300) {
-                    // Double tap to toggle zoom
-                    setScale((prev) => (prev > 1.3 ? 1.1 : 1.8));
+                    // Double-tap zoom toggle
+                    e.preventDefault();
                     lastTap = 0;
-                } else {
-                    lastTap = now;
+                    const tapX = e.touches[0].clientX - vRect.left;
+                    const tapY = e.touches[0].clientY - vRect.top;
+
+                    if (transformRef.current.scale > 1.2) {
+                        resetZoom();
+                    } else {
+                        // Zoom into tapped spot at 2.5x
+                        const targetScale = 2.5;
+                        const targetX = tapX - (tapX - transformRef.current.x) * (targetScale / transformRef.current.scale);
+                        const targetY = tapY - (tapY - transformRef.current.y) * (targetScale / transformRef.current.scale);
+                        const clamped = clampPosition(targetScale, targetX, targetY);
+                        updateTransform(targetScale, clamped.x, clamped.y, true);
+                    }
+                    return;
                 }
+                lastTap = now;
+
+                // Single-finger 2D pan
+                isPanning = true;
+                isPinching = false;
+                panStart = {
+                    x: e.touches[0].clientX - transformRef.current.x,
+                    y: e.touches[0].clientY - transformRef.current.y,
+                };
+                content.style.transition = "none";
             }
         };
 
         const onTouchMove = (e: TouchEvent) => {
+            const vRect = viewport.getBoundingClientRect();
+
             if (isPinching && e.touches.length === 2) {
-                // Prevent browser's native window scrolling/bouncing during pinch
                 e.preventDefault();
-                const currentDistance = Math.hypot(
+                if (initialDist <= 0) return;
+
+                const currentDist = Math.hypot(
                     e.touches[0].clientX - e.touches[1].clientX,
                     e.touches[0].clientY - e.touches[1].clientY
                 );
-                if (initialDistance > 0) {
-                    lastRatio = currentDistance / initialDistance;
-                    if (canvasContainer) {
-                        canvasContainer.style.transform = `scale(${lastRatio})`;
-                        canvasContainer.style.transformOrigin = "center top";
-                    }
+                const factor = currentDist / initialDist;
+                const newScale = Math.min(Math.max(startScale * factor, 0.8), 5.0);
+
+                const currentMidX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - vRect.left;
+                const currentMidY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - vRect.top;
+
+                // Focal-point zoom: expands directly from the point between fingers
+                const newX = currentMidX - (focalPoint.x - startPos.x) * (newScale / startScale);
+                const newY = currentMidY - (focalPoint.y - startPos.y) * (newScale / startScale);
+
+                updateTransform(newScale, newX, newY, false);
+            } else if (isPanning && e.touches.length === 1) {
+                e.preventDefault();
+                const newX = e.touches[0].clientX - panStart.x;
+                const newY = e.touches[0].clientY - panStart.y;
+
+                const cWidth = content.offsetWidth * transformRef.current.scale;
+                let targetX = newX;
+                if (cWidth <= vRect.width) {
+                    targetX = (vRect.width - cWidth) / 2;
                 }
+
+                updateTransform(transformRef.current.scale, targetX, newY, false);
             }
         };
 
         const onTouchEnd = (e: TouchEvent) => {
             if (isPinching && e.touches.length < 2) {
                 isPinching = false;
-                if (canvasContainer) {
-                    canvasContainer.style.transition = "transform 0.15s ease-out";
-                    canvasContainer.style.transform = "scale(1)";
-                }
-                const targetScale = Math.min(Math.max(initialScale * lastRatio, 0.6), 3.0);
-                if (Math.abs(targetScale - currentScaleRef.current) > 0.05) {
-                    setScale(Number(targetScale.toFixed(2)));
-                }
-                setTimeout(() => {
-                    if (canvasContainer) {
-                        canvasContainer.style.transition = "";
-                    }
-                }, 150);
+                let targetScale = Math.min(Math.max(transformRef.current.scale, 1.0), 4.5);
+                const clamped = clampPosition(targetScale, transformRef.current.x, transformRef.current.y);
+                updateTransform(targetScale, clamped.x, clamped.y, true);
+            } else if (isPanning && e.touches.length === 0) {
+                isPanning = false;
+                const clamped = clampPosition(transformRef.current.scale, transformRef.current.x, transformRef.current.y);
+                updateTransform(transformRef.current.scale, clamped.x, clamped.y, true);
             }
         };
 
-        container.addEventListener("touchstart", onTouchStart, { passive: true });
-        container.addEventListener("touchmove", onTouchMove, { passive: false });
-        container.addEventListener("touchend", onTouchEnd, { passive: true });
-        container.addEventListener("touchcancel", onTouchEnd, { passive: true });
+        // Desktop mouse wheel zoom into cursor position
+        const onWheel = (e: WheelEvent) => {
+            e.preventDefault();
+            const vRect = viewport.getBoundingClientRect();
+            const mouseX = e.clientX - vRect.left;
+            const mouseY = e.clientY - vRect.top;
+            const current = transformRef.current;
+
+            const delta = e.deltaY < 0 ? 1.15 : 0.85;
+            const targetScale = Math.min(Math.max(current.scale * delta, 1.0), 4.5);
+
+            const targetX = mouseX - (mouseX - current.x) * (targetScale / current.scale);
+            const targetY = mouseY - (mouseY - current.y) * (targetScale / current.scale);
+
+            const clamped = clampPosition(targetScale, targetX, targetY);
+            updateTransform(targetScale, clamped.x, clamped.y, true);
+        };
+
+        viewport.addEventListener("touchstart", onTouchStart, { passive: false });
+        viewport.addEventListener("touchmove", onTouchMove, { passive: false });
+        viewport.addEventListener("touchend", onTouchEnd, { passive: false });
+        viewport.addEventListener("touchcancel", onTouchEnd, { passive: false });
+        viewport.addEventListener("wheel", onWheel, { passive: false });
 
         return () => {
-            container.removeEventListener("touchstart", onTouchStart);
-            container.removeEventListener("touchmove", onTouchMove);
-            container.removeEventListener("touchend", onTouchEnd);
-            container.removeEventListener("touchcancel", onTouchEnd);
+            viewport.removeEventListener("touchstart", onTouchStart);
+            viewport.removeEventListener("touchmove", onTouchMove);
+            viewport.removeEventListener("touchend", onTouchEnd);
+            viewport.removeEventListener("touchcancel", onTouchEnd);
+            viewport.removeEventListener("wheel", onWheel);
         };
-    }, [viewMode]);
+    }, [viewMode, clampPosition, updateTransform, resetZoom]);
+
+    // Zoom buttons
+    const zoomIn = () => {
+        const current = transformRef.current;
+        const targetScale = Math.min(current.scale + 0.4, 4.5);
+        const vWidth = viewportRef.current?.clientWidth || 400;
+        const vHeight = viewportRef.current?.clientHeight || 600;
+        const targetX = vWidth / 2 - (vWidth / 2 - current.x) * (targetScale / current.scale);
+        const targetY = vHeight / 2 - (vHeight / 2 - current.y) * (targetScale / current.scale);
+        const clamped = clampPosition(targetScale, targetX, targetY);
+        updateTransform(targetScale, clamped.x, clamped.y, true);
+    };
+
+    const zoomOut = () => {
+        const current = transformRef.current;
+        const targetScale = Math.max(current.scale - 0.4, 1.0);
+        const vWidth = viewportRef.current?.clientWidth || 400;
+        const vHeight = viewportRef.current?.clientHeight || 600;
+        const targetX = vWidth / 2 - (vWidth / 2 - current.x) * (targetScale / current.scale);
+        const targetY = vHeight / 2 - (vHeight / 2 - current.y) * (targetScale / current.scale);
+        const clamped = clampPosition(targetScale, targetX, targetY);
+        updateTransform(targetScale, clamped.x, clamped.y, true);
+    };
+
+    const rotate = () => setRotation((prev) => (prev + 90) % 360);
 
     // Direct download without leaving the application
     const handleDownload = async () => {
@@ -359,16 +507,13 @@ export function PdfViewerModal({
         }
     };
 
-    const [shareSuccess, setShareSuccess] = useState(false);
-
-    // Share handler using Web Share API (native share sheet on iOS/Android/Desktop Chrome) with clipboard fallback
+    // Share handler using Web Share API (native share sheet on iOS/Android/Desktop Chrome)
     const handleShare = async () => {
         const cleanFileName = fileName.endsWith(".pdf") ? fileName : `${fileName}.pdf`;
         const shareTitle = title || cleanFileName;
         const targetShareUrl = url?.startsWith("http") ? url : `${typeof window !== "undefined" ? window.location.origin : ""}${url}`;
 
         try {
-            // Priority 1: Ensure we have a valid, non-empty Blob
             let targetBlob: Blob | null = pdfBlob;
             if (!targetBlob || targetBlob.size === 0) {
                 try {
@@ -385,14 +530,12 @@ export function PdfViewerModal({
                 }
             }
 
-            // Share actual File if blob is valid and navigator.canShare supports files
+            // Share actual File blob
             if (targetBlob && targetBlob.size > 0) {
                 const fileToShare = new File([targetBlob], cleanFileName, {
                     type: "application/pdf",
                     lastModified: Date.now(),
                 });
-
-                console.log("[PdfViewer] Sharing file:", cleanFileName, "size:", fileToShare.size);
 
                 if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
                     if (typeof navigator.canShare === "function" && navigator.canShare({ files: [fileToShare] })) {
@@ -405,7 +548,7 @@ export function PdfViewerModal({
                 }
             }
 
-            // Priority 2: Share URL via native share sheet
+            // Fallback: Share URL via native share sheet
             if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
                 await navigator.share({
                     title: shareTitle,
@@ -415,12 +558,11 @@ export function PdfViewerModal({
                 return;
             }
 
-            // Priority 3: Clipboard fallback
+            // Fallback: Clipboard copy
             await navigator.clipboard.writeText(targetShareUrl);
             setShareSuccess(true);
             setTimeout(() => setShareSuccess(false), 2500);
         } catch (err: any) {
-            // Dismissing native share sheet throws AbortError; safely ignore
             if (err?.name !== "AbortError") {
                 console.warn("[PdfViewer] Web Share failed, copying to clipboard:", err);
                 try {
@@ -433,26 +575,6 @@ export function PdfViewerModal({
             }
         }
     };
-
-    // Print handler
-    const handlePrint = () => {
-        if (viewMode === "iframe") {
-            const iframe = document.getElementById("kitnets-pdf-iframe") as HTMLIFrameElement;
-            iframe?.contentWindow?.print();
-        } else if (pdfBlob && pdfBlob.size > 0) {
-            const printUrl = URL.createObjectURL(pdfBlob);
-            const printWin = window.open(printUrl, "_blank");
-            printWin?.addEventListener("load", () => {
-                printWin.print();
-            });
-        }
-    };
-
-    // Zoom controls
-    const zoomIn = () => setScale((prev) => Math.min(prev + 0.2, 3.0));
-    const zoomOut = () => setScale((prev) => Math.max(prev - 0.2, 0.5));
-    const resetZoom = () => setScale(1.1);
-    const rotate = () => setRotation((prev) => (prev + 90) % 360);
 
     if (!isOpen || !url) return null;
 
@@ -478,7 +600,7 @@ export function PdfViewerModal({
                             K
                         </div>
                         <div className="min-w-0">
-                            <h3 className="text-xs sm:text-sm font-bold text-foreground truncate max-w-[160px] sm:max-w-xs md:max-w-md">
+                            <h3 className="text-xs sm:text-sm font-bold text-foreground truncate max-w-[140px] xs:max-w-[190px] sm:max-w-xs md:max-w-md">
                                 {title}
                             </h3>
                             <p className="text-[10px] sm:text-[11px] text-muted-foreground truncate hidden xs:block">
@@ -487,13 +609,13 @@ export function PdfViewerModal({
                         </div>
                     </div>
 
-                    {/* Center: Controls (Zoom, Pages - hidden on mobile since touchscreens use 2-finger pinch) */}
+                    {/* Center: Controls (Zoom, Pages - hidden on mobile screens) */}
                     <div className="hidden sm:flex items-center gap-1 sm:gap-1.5">
                         {viewMode === "canvas" && (
                             <>
                                 <button
                                     onClick={zoomOut}
-                                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
                                     title="Diminuir Zoom"
                                     aria-label="Diminuir Zoom"
                                 >
@@ -501,14 +623,14 @@ export function PdfViewerModal({
                                 </button>
                                 <button
                                     onClick={resetZoom}
-                                    className="px-2 py-1 rounded-md text-[11px] font-mono font-semibold bg-muted hover:bg-muted/80 text-foreground transition-colors min-w-[50px] text-center"
-                                    title="Restaurar Zoom"
+                                    className="px-2 py-1 rounded-md text-[11px] font-mono font-semibold bg-muted hover:bg-muted/80 text-foreground transition-colors min-w-[50px] text-center cursor-pointer"
+                                    title="Restaurar Zoom (100%)"
                                 >
-                                    {Math.round((scale / 1.1) * 100)}%
+                                    {Math.round(zoom * 100)}%
                                 </button>
                                 <button
                                     onClick={zoomIn}
-                                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
                                     title="Aumentar Zoom"
                                     aria-label="Aumentar Zoom"
                                 >
@@ -516,7 +638,7 @@ export function PdfViewerModal({
                                 </button>
                                 <button
                                     onClick={rotate}
-                                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors hidden sm:inline-flex"
+                                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors hidden sm:inline-flex cursor-pointer"
                                     title="Girar 90°"
                                     aria-label="Girar 90 graus"
                                 >
@@ -534,6 +656,19 @@ export function PdfViewerModal({
 
                     {/* Right: Actions & Close */}
                     <div className="flex items-center gap-1 sm:gap-1.5">
+                        {/* Native Safari / QuickLook direct button (exact WhatsApp iPhone experience) */}
+                        <a
+                            href={proxyUrl || url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground text-xs font-semibold shadow-xs transition-colors cursor-pointer border border-border/60"
+                            title="Abrir no visualizador nativo do iPhone / Safari"
+                            aria-label="Abrir no visualizador nativo"
+                        >
+                            <ExternalLink className="w-3.5 h-3.5 text-blue-500" />
+                            <span className="hidden xs:inline">Nativo</span>
+                        </a>
+
                         {/* Share button (Up Arrow for native sharing to Google Drive, WhatsApp, etc.) */}
                         <button
                             onClick={handleShare}
@@ -559,7 +694,7 @@ export function PdfViewerModal({
                         {/* View mode toggle (Canvas vs Iframe) */}
                         <button
                             onClick={() => setViewMode(viewMode === "canvas" ? "iframe" : "canvas")}
-                            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors hidden sm:inline-flex"
+                            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors hidden sm:inline-flex cursor-pointer"
                             title={viewMode === "canvas" ? "Alternar para modo navegador" : "Alternar para modo canvas"}
                         >
                             <RefreshCw className="w-4 h-4" />
@@ -568,7 +703,7 @@ export function PdfViewerModal({
                         {/* Maximize / Minimize (Desktop) */}
                         <button
                             onClick={() => setIsMaximized(!isMaximized)}
-                            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors hidden md:inline-flex"
+                            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors hidden md:inline-flex cursor-pointer"
                             title={isMaximized ? "Restaurar tamanho" : "Maximizar"}
                         >
                             {isMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
@@ -577,7 +712,7 @@ export function PdfViewerModal({
                         {/* Close button */}
                         <button
                             onClick={onClose}
-                            className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors ml-1"
+                            className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors ml-1 cursor-pointer"
                             title="Fechar (Esc)"
                             aria-label="Fechar visualizador"
                         >
@@ -586,19 +721,21 @@ export function PdfViewerModal({
                     </div>
                 </header>
 
-                {/* Document Canvas / Iframe Body */}
+                {/* Document Viewport with GPU Transform Pan & Zoom */}
                 <div
-                    ref={containerRef}
-                    className="flex-1 overflow-auto bg-neutral-900/95 dark:bg-neutral-950 p-2 sm:p-6 flex flex-col items-center justify-start relative overscroll-contain"
+                    ref={viewportRef}
+                    className="flex-1 w-full h-full overflow-hidden bg-neutral-900/95 dark:bg-neutral-950 relative select-none"
+                    style={{ touchAction: "none" }}
                 >
                     {shareSuccess && (
-                        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-neutral-900 text-white border border-border px-3.5 py-1.5 rounded-full text-xs font-semibold shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
+                        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-neutral-900 text-white border border-border px-3.5 py-1.5 rounded-full text-xs font-semibold shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2 pointer-events-none">
                             <Check className="w-3.5 h-3.5 text-emerald-400" />
                             <span>Link copiado para a área de transferência!</span>
                         </div>
                     )}
+
                     {loading && (
-                        <div className="my-auto flex flex-col items-center justify-center p-8 text-center space-y-3">
+                        <div className="h-full w-full flex flex-col items-center justify-center p-8 text-center space-y-3">
                             <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
                             <p className="text-sm font-medium text-neutral-300">
                                 Carregando documento dentro do Kitnets...
@@ -610,36 +747,14 @@ export function PdfViewerModal({
                     )}
 
                     {!loading && viewMode === "canvas" && (
-                        <>
-                            <div ref={canvasContainerRef} className="flex flex-col items-center w-full" />
-
-                            {/* Mobile Floating Quick Zoom Controls */}
-                            <div className="sm:hidden absolute bottom-4 right-4 z-40 bg-card/90 backdrop-blur-md border border-border rounded-full shadow-lg flex items-center p-1 gap-1 select-none">
-                                <button
-                                    onClick={zoomOut}
-                                    className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted active:scale-90 transition-all cursor-pointer"
-                                    title="Diminuir Zoom"
-                                    aria-label="Diminuir Zoom"
-                                >
-                                    <ZoomOut className="w-4 h-4" />
-                                </button>
-                                <button
-                                    onClick={resetZoom}
-                                    className="px-1.5 text-[11px] font-mono font-semibold text-foreground cursor-pointer"
-                                    title="Restaurar Zoom"
-                                >
-                                    {Math.round((scale / 1.1) * 100)}%
-                                </button>
-                                <button
-                                    onClick={zoomIn}
-                                    className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted active:scale-90 transition-all cursor-pointer"
-                                    title="Aumentar Zoom"
-                                    aria-label="Aumentar Zoom"
-                                >
-                                    <ZoomIn className="w-4 h-4" />
-                                </button>
-                            </div>
-                        </>
+                        <div
+                            ref={canvasContainerRef}
+                            className="w-full flex flex-col items-center py-4"
+                            style={{
+                                transformOrigin: "0 0",
+                                willChange: "transform",
+                            }}
+                        />
                     )}
 
                     {!loading && viewMode === "iframe" && (
