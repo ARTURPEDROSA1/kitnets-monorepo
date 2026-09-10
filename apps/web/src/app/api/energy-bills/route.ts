@@ -190,55 +190,31 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
-        // Check files in Supabase Storage for this property
-        const fileMap = new Map<string, string>();
+        // Get current_bill.pdf URL from storage (only 1 PDF stored per property)
+        let currentPdfUrl: string | null = null;
         try {
-            const { data: files } = await supabase.storage
+            const { data: pUrl } = supabase.storage
                 .from("energy-bills")
-                .list(resolvedPropertyId, { limit: 100 });
-
-            if (files && Array.isArray(files)) {
-                for (const f of files) {
-                    const { data: pUrl } = supabase.storage
-                        .from("energy-bills")
-                        .getPublicUrl(`${resolvedPropertyId}/${f.name}`);
-                    if (pUrl?.publicUrl) {
-                        const baseName = f.name.replace(/\.[^/.]+$/, "");
-                        const urlWithTimestamp = `${pUrl.publicUrl}?t=${new Date(f.updated_at || Date.now()).getTime()}`;
-                        fileMap.set(baseName, urlWithTimestamp);
-                    }
+                .getPublicUrl(`${resolvedPropertyId}/current_bill.pdf`);
+            if (pUrl?.publicUrl) {
+                // Check if the file actually exists by listing the folder
+                const { data: files } = await supabase.storage
+                    .from("energy-bills")
+                    .list(resolvedPropertyId, { limit: 10, search: "current_bill" });
+                if (files?.some((f: any) => f.name === "current_bill.pdf")) {
+                    currentPdfUrl = `${pUrl.publicUrl}?t=${Date.now()}`;
                 }
             }
         } catch (storageErr) {
-            console.warn("[Energy Bills GET] Storage list warning:", storageErr);
+            console.warn("[Energy Bills GET] Storage lookup warning:", storageErr);
         }
 
-        // Determine which bill is the latest (sorted DESC, first non-historical)
+        // Map bills — only the latest bill gets the PDF URL
         const sortedBills = bills || [];
-        const latestFullBillRef = sortedBills.find((b: any) => !b.is_historical_only) || sortedBills[0] || null;
-        const currentBillStorageUrl = fileMap.get("current_bill") || null;
-
-        // Map bills with their respective pdf_url from storage
-        // If the latest bill has no month-specific PDF, assign current_bill.pdf to it
-        // (current_bill.pdf is always the most recently uploaded PDF)
-        const mappedBills = sortedBills.map((b: any) => {
-            const matchedStorageUrl = fileMap.get(b.reference_month);
-            let resolvedPdfUrl = matchedStorageUrl || null;
-
-            // For the latest bill: if no month-specific file, use current_bill.pdf
-            if (!resolvedPdfUrl && latestFullBillRef && b.reference_month === latestFullBillRef.reference_month) {
-                resolvedPdfUrl = currentBillStorageUrl;
-            }
-
-            return {
-                ...b,
-                pdf_url: resolvedPdfUrl,
-            };
-        });
-
-        // currentPdfUrl = the latest bill's resolved PDF
-        const latestMapped = mappedBills.find((b: any) => !b.is_historical_only) || mappedBills[0] || null;
-        const currentPdfUrl = latestMapped?.pdf_url || currentBillStorageUrl || null;
+        const mappedBills = sortedBills.map((b: any, idx: number) => ({
+            ...b,
+            pdf_url: idx === 0 && currentPdfUrl ? currentPdfUrl : null,
+        }));
 
         return NextResponse.json({
             success: true,
@@ -296,8 +272,9 @@ export async function POST(request: Request) {
         const supabase = getServiceSupabase();
         const resolvedPropertyId = await resolvePropertyUuid(supabase, userId, propertyId);
 
-        // Upload PDF in Supabase Storage with month reference, preserving historical files
-        let pdfUrl: string | null = null;
+        // Upload PDF as current_bill.pdf in Supabase Storage (replaces previous bill)
+        // Only 1 PDF is stored per property — the current/latest bill for viewing
+        // AI extracts all data into the DB; historical PDFs are not archived
         if (uploadedFile && uploadedFile.size > 0) {
             try {
                 const bucketName = "energy-bills";
@@ -306,50 +283,19 @@ export async function POST(request: Request) {
                     await supabase.storage.createBucket(bucketName, { public: true });
                 }
 
-                const fileExt = uploadedFile.name.split(".").pop()?.toLowerCase() || "pdf";
-                const monthFilePath = `${resolvedPropertyId}/${billData.referenceMonth}.${fileExt}`;
                 const arrayBuffer = await uploadedFile.arrayBuffer();
                 const buffer = Buffer.from(arrayBuffer);
+                const filePath = `${resolvedPropertyId}/current_bill.pdf`;
 
-                // 1. Always save under reference month (e.g. 2026-08.pdf)
                 const { error: uploadError } = await supabase.storage
                     .from(bucketName)
-                    .upload(monthFilePath, buffer, {
+                    .upload(filePath, buffer, {
                         contentType: uploadedFile.type || "application/pdf",
                         upsert: true,
                     });
 
                 if (uploadError) {
-                    console.error("[Energy Bills Storage] Upload error for month file:", uploadError);
-                } else {
-                    const { data: publicUrlData } = supabase.storage
-                        .from(bucketName)
-                        .getPublicUrl(monthFilePath);
-                    if (publicUrlData?.publicUrl) {
-                        pdfUrl = `${publicUrlData.publicUrl}?t=${Date.now()}`;
-                    }
-                }
-
-                // 2. Check if this uploaded bill is newer than or equal to existing bills for this property
-                const { data: latestExistingBill } = await supabase
-                    .from("energy_bills")
-                    .select("reference_month")
-                    .eq("property_id", resolvedPropertyId)
-                    .order("reference_month", { ascending: false })
-                    .limit(1)
-                    .maybeSingle();
-
-                const isLatestOrNewer = !latestExistingBill || billData.referenceMonth >= latestExistingBill.reference_month;
-
-                // 3. Only update current_bill.pdf if this uploaded bill is the latest
-                if (isLatestOrNewer) {
-                    const currentFilePath = `${resolvedPropertyId}/current_bill.${fileExt}`;
-                    await supabase.storage
-                        .from(bucketName)
-                        .upload(currentFilePath, buffer, {
-                            contentType: uploadedFile.type || "application/pdf",
-                            upsert: true,
-                        });
+                    console.error("[Energy Bills Storage] Upload error:", uploadError);
                 }
             } catch (storageErr) {
                 console.error("[Energy Bills Storage] Exception during file upload:", storageErr);
