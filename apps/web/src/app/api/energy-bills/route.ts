@@ -272,31 +272,44 @@ export async function POST(request: Request) {
         const supabase = getServiceSupabase();
         const resolvedPropertyId = await resolvePropertyUuid(supabase, userId, propertyId);
 
-        // Upload PDF as current_bill.pdf in Supabase Storage (replaces previous bill)
-        // Only 1 PDF is stored per property — the current/latest bill for viewing
-        // AI extracts all data into the DB; historical PDFs are not archived
+        // Upload PDF as current_bill.pdf ONLY if this is the latest/newest bill
+        // Older/historical bills: AI extracts data, PDF is discarded
         if (uploadedFile && uploadedFile.size > 0) {
             try {
-                const bucketName = "energy-bills";
-                const { data: buckets } = await supabase.storage.listBuckets();
-                if (!buckets?.some((b: any) => b.name === bucketName)) {
-                    await supabase.storage.createBucket(bucketName, { public: true });
+                // Check if this bill is the latest or newer than existing bills
+                const { data: latestExistingBill } = await supabase
+                    .from("energy_bills")
+                    .select("reference_month")
+                    .eq("property_id", resolvedPropertyId)
+                    .order("reference_month", { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+
+                const isLatestOrNewer = !latestExistingBill || billData.referenceMonth >= latestExistingBill.reference_month;
+
+                if (isLatestOrNewer) {
+                    const bucketName = "energy-bills";
+                    const { data: buckets } = await supabase.storage.listBuckets();
+                    if (!buckets?.some((b: any) => b.name === bucketName)) {
+                        await supabase.storage.createBucket(bucketName, { public: true });
+                    }
+
+                    const arrayBuffer = await uploadedFile.arrayBuffer();
+                    const buffer = Buffer.from(arrayBuffer);
+                    const filePath = `${resolvedPropertyId}/current_bill.pdf`;
+
+                    const { error: uploadError } = await supabase.storage
+                        .from(bucketName)
+                        .upload(filePath, buffer, {
+                            contentType: uploadedFile.type || "application/pdf",
+                            upsert: true,
+                        });
+
+                    if (uploadError) {
+                        console.error("[Energy Bills Storage] Upload error:", uploadError);
+                    }
                 }
-
-                const arrayBuffer = await uploadedFile.arrayBuffer();
-                const buffer = Buffer.from(arrayBuffer);
-                const filePath = `${resolvedPropertyId}/current_bill.pdf`;
-
-                const { error: uploadError } = await supabase.storage
-                    .from(bucketName)
-                    .upload(filePath, buffer, {
-                        contentType: uploadedFile.type || "application/pdf",
-                        upsert: true,
-                    });
-
-                if (uploadError) {
-                    console.error("[Energy Bills Storage] Upload error:", uploadError);
-                }
+                // else: older bill — PDF discarded, only extracted data saved to DB
             } catch (storageErr) {
                 console.error("[Energy Bills Storage] Exception during file upload:", storageErr);
             }
