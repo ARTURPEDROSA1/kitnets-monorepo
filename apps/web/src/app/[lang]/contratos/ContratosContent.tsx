@@ -27,10 +27,12 @@ import {
     Users,
     Ban,
     PenLine,
+    Eye,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import LeaseProfileCard from '@/components/contratos/LeaseProfileCard';
+import { PdfViewerModal } from '@/components/ui/PdfViewerModal';
 import { Badge } from '@/components/ui/badge';
 import type {
     LeaseWithDetails,
@@ -203,6 +205,7 @@ export default function ContratosContent({ lang }: { lang: string }) {
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<LeaseWithDetails | null>(null);
     const [warning, setWarning] = useState<string | null>(null);
+    const [viewingDoc, setViewingDoc] = useState<{ url: string; title: string; fileName: string } | null>(null);
 
     // Dropdowns
     const [properties, setProperties] = useState<LeasePropertyOption[]>([]);
@@ -1164,19 +1167,36 @@ export default function ContratosContent({ lang }: { lang: string }) {
                             <div className="mt-3 space-y-2">
                                 {existingDocuments.map(doc => (
                                     <div key={doc.id} className="flex items-center justify-between rounded-lg border border-border p-2.5">
-                                        <div className="flex items-center gap-2 text-sm">
-                                            <FileText className="h-4 w-4 text-muted-foreground" />
-                                            <span className="font-medium">{doc.file_name}</span>
-                                            <Badge variant="outline" className="text-xs">
+                                        <button
+                                            type="button"
+                                            onClick={() => setViewingDoc({
+                                                url: doc.file_url,
+                                                title: doc.file_name || 'Documento do Contrato',
+                                                fileName: doc.file_name ? (doc.file_name.toLowerCase().endsWith('.pdf') ? doc.file_name : `${doc.file_name}.pdf`) : 'contrato.pdf',
+                                            })}
+                                            className="flex items-center gap-2 text-sm hover:underline text-left cursor-pointer flex-1 min-w-0 mr-2"
+                                        >
+                                            <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                                            <span className="font-medium truncate">{doc.file_name}</span>
+                                            <Badge variant="outline" className="text-xs shrink-0">
                                                 {DOCUMENT_TYPE_OPTIONS.find(d => d.value === doc.document_type)?.label || doc.document_type}
                                             </Badge>
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                            <a href={doc.file_url} target="_blank" rel="noreferrer">
-                                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                                    <Download className="h-4 w-4" />
-                                                </Button>
-                                            </a>
+                                        </button>
+                                        <div className="flex items-center gap-1 shrink-0">
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 text-primary hover:bg-primary/10"
+                                                title="Visualizar documento dentro do Kitnets"
+                                                onClick={() => setViewingDoc({
+                                                    url: doc.file_url,
+                                                    title: doc.file_name || 'Documento do Contrato',
+                                                    fileName: doc.file_name ? (doc.file_name.toLowerCase().endsWith('.pdf') ? doc.file_name : `${doc.file_name}.pdf`) : 'contrato.pdf',
+                                                })}
+                                            >
+                                                <Eye className="h-4 w-4" />
+                                            </Button>
                                             <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-700" onClick={() => handleDocDelete(doc.id)}>
                                                 <Trash2 className="h-4 w-4" />
                                             </Button>
@@ -1463,6 +1483,17 @@ export default function ContratosContent({ lang }: { lang: string }) {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* In-App PDF Document Viewer */}
+            {viewingDoc && (
+                <PdfViewerModal
+                    isOpen={!!viewingDoc}
+                    onClose={() => setViewingDoc(null)}
+                    url={viewingDoc.url}
+                    title={viewingDoc.title}
+                    fileName={viewingDoc.fileName}
+                />
             )}
         </div>
     );

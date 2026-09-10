@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@kitnets/ui';
 import { Badge } from '@/components/ui/badge';
+import { PdfViewerModal } from '@/components/ui/PdfViewerModal';
 import type { AgencyWithRole } from '@/types/agency';
 import {
     formatCNPJ,
@@ -74,6 +75,7 @@ function formatDateBR(dateStr?: string | null): string {
 }
 
 export default function AgencyProfileCard({ agency, onEdit, onDelete }: AgencyProfileCardProps) {
+    const [viewingDoc, setViewingDoc] = React.useState<{ url: string; title: string; fileName: string } | null>(null);
     const status = getStatusLabel(agency.status);
     const canEdit = agency.role === 'OWNER' || agency.role === 'ADMIN';
     const canDelete = agency.role === 'OWNER';
@@ -327,15 +329,22 @@ export default function AgencyProfileCard({ agency, onEdit, onDelete }: AgencyPr
                                             </span>
                                         </div>
                                         {agency.service_agreement_url && (
-                                            <a
-                                                href={agency.service_agreement_url}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setViewingDoc({
+                                                        url: agency.service_agreement_url!,
+                                                        title: agency.service_agreement_filename || 'Contrato de Prestação de Serviços',
+                                                        fileName: agency.service_agreement_filename
+                                                            ? (agency.service_agreement_filename.toLowerCase().endsWith('.pdf') ? agency.service_agreement_filename : `${agency.service_agreement_filename}.pdf`)
+                                                            : 'contrato-imobiliaria.pdf',
+                                                    });
+                                                }}
+                                                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline cursor-pointer"
                                             >
-                                                <ExternalLink className="w-3.5 h-3.5" />
+                                                <FileText className="w-3.5 h-3.5" />
                                                 Visualizar Contrato
-                                            </a>
+                                            </button>
                                         )}
                                     </div>
                                 )}
@@ -359,6 +368,17 @@ export default function AgencyProfileCard({ agency, onEdit, onDelete }: AgencyPr
                     )}
                 </div>
             </div>
+
+            {/* In-App PDF Document Viewer */}
+            {viewingDoc && (
+                <PdfViewerModal
+                    isOpen={!!viewingDoc}
+                    onClose={() => setViewingDoc(null)}
+                    url={viewingDoc.url}
+                    title={viewingDoc.title}
+                    fileName={viewingDoc.fileName}
+                />
+            )}
         </div>
     );
 }
