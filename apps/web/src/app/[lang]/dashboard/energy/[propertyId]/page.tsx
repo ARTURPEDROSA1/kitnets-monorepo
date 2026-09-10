@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@kitnets/ui";
 import {
@@ -99,6 +99,7 @@ function formatMonthLabel(isoMonth: string): string {
 export default function EnergyDashboardPage() {
     const params = useParams();
     const router = useRouter();
+    const searchParams = useSearchParams();
     const lang = (params.lang as string) || "pt";
     const propertyId = params.propertyId as string;
     const [resolvedPropertyId, setResolvedPropertyId] = useState<string>(propertyId);
@@ -158,6 +159,12 @@ export default function EnergyDashboardPage() {
     useEffect(() => {
         fetchProperties();
     }, []);
+
+    useEffect(() => {
+        if (searchParams.get("upload") === "true") {
+            setIsUploadOpen(true);
+        }
+    }, [searchParams]);
 
     useEffect(() => {
         if (propertyId) {
