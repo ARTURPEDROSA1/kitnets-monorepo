@@ -224,6 +224,8 @@ interface DetailsProps {
     initialOpen?: boolean;
     onOpenChange?: (open: boolean) => void;
     onContinue?: () => void;
+    onViewEnergyDashboard?: () => void;
+    lang?: string;
 }
 
 export default function PropertyDetailsCard({
@@ -236,6 +238,8 @@ export default function PropertyDetailsCard({
     initialOpen = true,
     onOpenChange,
     onContinue,
+    onViewEnergyDashboard,
+    lang = "pt",
 }: DetailsProps) {
     const [isOpen, setIsOpen] = useState(initialOpen);
 
@@ -547,12 +551,22 @@ export default function PropertyDetailsCard({
                                                 Gestão de Energia Solar & Consumo
                                             </span>
                                         </div>
-                                        <Link
-                                            href={`/pt/dashboard/energy/${propertyId || 'primary'}`}
-                                            className="inline-flex items-center text-xs font-semibold text-amber-700 dark:text-amber-400 hover:text-amber-800 hover:underline gap-1 shrink-0"
-                                        >
-                                            Ver Painel & Histórico →
-                                        </Link>
+                                        {onViewEnergyDashboard ? (
+                                            <button
+                                                type="button"
+                                                onClick={onViewEnergyDashboard}
+                                                className="inline-flex items-center text-xs font-semibold text-amber-700 dark:text-amber-400 hover:text-amber-800 hover:underline gap-1 shrink-0 cursor-pointer"
+                                            >
+                                                Ver Painel & Histórico →
+                                            </button>
+                                        ) : (
+                                            <Link
+                                                href={`/${lang}/dashboard/energy/${propertyId || 'primary'}`}
+                                                className="inline-flex items-center text-xs font-semibold text-amber-700 dark:text-amber-400 hover:text-amber-800 hover:underline gap-1 shrink-0"
+                                            >
+                                                Ver Painel & Histórico →
+                                            </Link>
+                                        )}
                                     </div>
                                     <p className="text-[11px] text-amber-800/80 dark:text-amber-300/80 leading-relaxed">
                                         Importe faturas de luz (CEMIG), acompanhe consumo kWh, energia injetada, saldo de geração e gráficos interativos.

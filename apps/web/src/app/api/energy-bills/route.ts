@@ -37,7 +37,7 @@ async function resolvePropertyUuid(
     // 1. Find user's profile
     const { data: profile } = await supabase
         .from("profiles")
-        .select("id, full_name, property_address, property_details")
+        .select("id, full_name, property_address, property_details, additional_properties")
         .eq("clerk_id", clerkUserId)
         .maybeSingle();
 
@@ -45,34 +45,77 @@ async function resolvePropertyUuid(
         throw new Error("Perfil de usuário não encontrado");
     }
 
-    // 2. Find existing property linked to this owner
-    const { data: ownerProp } = await supabase
+    // Fetch all existing properties for this owner
+    const { data: allOwnerProps } = await supabase
         .from("properties")
-        .select("id")
+        .select("id, name, address, electronic_id, created_at")
         .eq("owner_id", profile.id)
-        .order("created_at", { ascending: true })
-        .limit(1)
-        .maybeSingle();
+        .order("created_at", { ascending: true });
 
-    if (ownerProp?.id) {
-        return ownerProp.id;
-    }
+    const existingProps = allOwnerProps || [];
 
-    // 3. Fallback: Auto-create property in public.properties from profile ONLY IF configured
+    // Filter non-standalone rental properties (standalone UCs have isStandaloneUc: true)
+    const rentalProps = existingProps.filter((p) => {
+        if (!p.electronic_id) return true;
+        try {
+            const parsed = JSON.parse(p.electronic_id);
+            return !parsed.isStandaloneUc;
+        } catch {
+            return true;
+        }
+    });
+
     const addr = profile.property_address as Record<string, string> | null;
     const details = profile.property_details as Record<string, string> | null;
-    const hasRealProp = Boolean(details?.propertyName?.trim() || addr?.street?.trim());
-    if (!hasRealProp) {
-        throw new Error("Nenhum imóvel cadastrado para este usuário");
+    const primaryName = details?.propertyName?.trim() || (addr?.street ? `${addr.street}, ${addr.number || ""}`.trim() : (profile.full_name ? `Imóvel de ${profile.full_name}` : "Meu Imóvel"));
+
+    // Check if inputId is an index like "prop-0", "0", "prop-1", "1"
+    const matchIndex = inputId?.match(/^(?:prop-)?(\d+)$/);
+    if (matchIndex) {
+        const idx = parseInt(matchIndex[1], 10);
+        if (idx === 0) {
+            // Target is primary rental property
+            const match = rentalProps.find(p => p.name.trim().toLowerCase() === primaryName.trim().toLowerCase()) || rentalProps[0];
+            if (match) return match.id;
+        } else if (profile.additional_properties && Array.isArray(profile.additional_properties)) {
+            const ap = profile.additional_properties[idx - 1];
+            if (ap) {
+                const apDetails = ap.details as Record<string, any> | null;
+                const apAddr = ap.address as Record<string, any> | null;
+                const apName = apDetails?.propertyName?.trim() || (apAddr?.street ? `${apAddr.street}, ${apAddr.number || ""}`.trim() : `Imóvel ${idx + 1}`);
+                const matchAp = rentalProps.find(p => p.name.trim().toLowerCase() === apName.trim().toLowerCase());
+                if (matchAp) return matchAp.id;
+
+                const { data: newAp } = await supabase
+                    .from("properties")
+                    .insert({
+                        owner_id: profile.id,
+                        name: apName,
+                        address: apAddr?.street ? `${apAddr.street}, ${apAddr.number || ""} - ${apAddr.neighborhood || ""}`.trim() : null,
+                        city: apAddr?.city || null,
+                        state: apAddr?.state || null,
+                        zip: apAddr?.cep || null,
+                    })
+                    .select("id")
+                    .single();
+
+                if (newAp?.id) return newAp.id;
+            }
+        }
     }
 
-    const propName = details?.propertyName || (addr?.street ? `${addr.street}, ${addr.number || ""}`.trim() : (profile.full_name ? `Imóvel de ${profile.full_name}` : "Meu Imóvel"));
+    // 2. Check if a non-standalone rental property already exists matching primary
+    const matchPrimary = rentalProps.find(p => p.name.trim().toLowerCase() === primaryName.trim().toLowerCase()) || rentalProps[0];
+    if (matchPrimary?.id) {
+        return matchPrimary.id;
+    }
 
+    // 3. Auto-create primary rental property in public.properties from profile
     const { data: newProp, error: propError } = await supabase
         .from("properties")
         .insert({
             owner_id: profile.id,
-            name: propName,
+            name: primaryName,
             address: addr?.street ? `${addr.street}, ${addr.number || ""} - ${addr.neighborhood || ""}`.trim() : null,
             city: addr?.city || null,
             state: addr?.state || null,
@@ -83,6 +126,9 @@ async function resolvePropertyUuid(
 
     if (propError || !newProp?.id) {
         console.error("[resolvePropertyUuid] Error creating property:", propError);
+        if (existingProps.length > 0) {
+            return existingProps[0].id;
+        }
         throw new Error("Não foi possível identificar nem criar o imóvel vinculado.");
     }
 

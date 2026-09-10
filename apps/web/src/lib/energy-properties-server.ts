@@ -75,24 +75,38 @@ export async function getOwnerPropertiesSummary(userId: string): Promise<OwnerPr
             return [];
         }
 
-        // 3. Ensure primary property from profile has a row in properties ONLY IF real property exists
-        if (dbProperties.length === 0 && hasRealPrimary) {
+        // 3. Ensure primary property from profile has a row in properties if real property exists
+        if (hasRealPrimary) {
             const primaryName = primaryDetails?.propertyName?.trim() || (primaryAddress?.street ? `${primaryAddress.street}, ${primaryAddress.number || ""}`.trim() : (profile.full_name ? `Imóvel de ${profile.full_name}` : "Meu Imóvel"));
-            const { data: newPrimary } = await supabase
-                .from("properties")
-                .insert({
-                    owner_id: profile.id,
-                    name: primaryName,
-                    address: primaryAddress?.street ? `${primaryAddress.street}, ${primaryAddress.number || ""} - ${primaryAddress.neighborhood || ""}`.trim() : null,
-                    city: primaryAddress?.city || null,
-                    state: primaryAddress?.state || null,
-                    zip: primaryAddress?.cep || null,
-                })
-                .select("id, name, address, city, state, zip, electronic_id")
-                .single();
+            const exists = dbProperties.find(p => {
+                let isUc = false;
+                if (p.electronic_id) {
+                    try {
+                        const parsed = JSON.parse(p.electronic_id);
+                        if (parsed.isStandaloneUc) isUc = true;
+                    } catch {}
+                }
+                if (isUc) return false;
+                return p.name.trim().toLowerCase() === primaryName.trim().toLowerCase();
+            });
 
-            if (newPrimary) {
-                dbProperties.push(newPrimary);
+            if (!exists) {
+                const { data: newPrimary } = await supabase
+                    .from("properties")
+                    .insert({
+                        owner_id: profile.id,
+                        name: primaryName,
+                        address: primaryAddress?.street ? `${primaryAddress.street}, ${primaryAddress.number || ""} - ${primaryAddress.neighborhood || ""}`.trim() : null,
+                        city: primaryAddress?.city || null,
+                        state: primaryAddress?.state || null,
+                        zip: primaryAddress?.cep || null,
+                    })
+                    .select("id, name, address, city, state, zip, electronic_id")
+                    .single();
+
+                if (newPrimary) {
+                    dbProperties.unshift(newPrimary);
+                }
             }
         }
 
@@ -104,9 +118,17 @@ export async function getOwnerPropertiesSummary(userId: string): Promise<OwnerPr
                 const apName = apDetails?.propertyName?.trim() || (apAddr?.street ? `${apAddr.street}, ${apAddr.number || ""}`.trim() : null);
 
                 if (apName) {
-                    const exists = dbProperties.find(
-                        p => p.name.trim().toLowerCase() === apName.trim().toLowerCase()
-                    );
+                    const exists = dbProperties.find(p => {
+                        let isUc = false;
+                        if (p.electronic_id) {
+                            try {
+                                const parsed = JSON.parse(p.electronic_id);
+                                if (parsed.isStandaloneUc) isUc = true;
+                            } catch {}
+                        }
+                        if (isUc) return false;
+                        return p.name.trim().toLowerCase() === apName.trim().toLowerCase();
+                    });
                     if (!exists) {
                         const { data: createdAp } = await supabase
                             .from("properties")
@@ -225,10 +247,17 @@ export async function getOwnerPropertiesSummary(userId: string): Promise<OwnerPr
                 primaryAddress?.street ||
                 (primaryAddress && Object.values(primaryAddress).some(Boolean))
             );
-            const isPrimary = hasPrimaryInProfile && (
+            const isPrimary = !isStandaloneUc && hasPrimaryInProfile && (
                 (primaryDetails?.propertyName && primaryDetails.propertyName.trim().toLowerCase() === prop.name.trim().toLowerCase()) ||
                 (primaryAddress?.street && prop.name.trim().toLowerCase().includes(primaryAddress.street.trim().toLowerCase())) ||
-                (idx === 0)
+                (!dbProperties.some(p => {
+                    if (p.id === prop.id) return false;
+                    try {
+                        const parsed = p.electronic_id ? JSON.parse(p.electronic_id) : null;
+                        if (parsed?.isStandaloneUc) return false;
+                    } catch {}
+                    return true;
+                }))
             );
 
             let matchingAp: any = null;

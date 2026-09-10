@@ -14,7 +14,7 @@ import PropertySquareCard from '@/components/properties/PropertySquareCard';
 import PropertyCostCenterDashboard from '@/components/properties/PropertyCostCenterDashboard';
 import { cn } from '@/lib/utils';
 import { useUser, useAuth } from '@clerk/nextjs';
-import { useSearchParams, useParams } from 'next/navigation';
+import { useSearchParams, useParams, useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { deleteAccount } from './actions';
 import { Dictionary } from '@/dictionaries';
@@ -63,6 +63,7 @@ export const dedupeProofs = (proofsList: ProofData[]): ProofData[] => {
 
 // Per-property bundled state
 interface PropertyState {
+    id?: string;
     propertyType: 'single' | 'multi';
     details: PropertyDetails;
     subUnits: SubUnit[];
@@ -302,6 +303,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
 
     // Imóveis View Mode ('grid' | 'manage' | 'wizard')
     const params = useParams();
+    const router = useRouter();
     const lang = (params?.lang as string) || 'pt';
     const [imoveisViewMode, setImoveisViewMode] = useState<'grid' | 'manage' | 'wizard'>('grid');
     const [selectedPropertyIdx, setSelectedPropertyIdx] = useState<number | null>(null);
@@ -532,6 +534,31 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                         allProofs.filter(p => getProofPropertyIndex(p) === 0 && !additionalProofIds.has(p.id))
                     );
 
+                    // Fetch properties from public.properties to enrich PropertyState with database UUIDs
+                    let dbPropsList: Array<{ id: string; name: string; electronic_id?: any; created_at?: string }> = [];
+                    try {
+                        const { data: dbProps } = await sb
+                            .from('properties')
+                            .select('id, name, electronic_id, created_at')
+                            .eq('owner_id', profile.id)
+                            .order('created_at', { ascending: true });
+                        if (dbProps) dbPropsList = dbProps;
+                    } catch (dbErr) {
+                        console.warn('[Profile] Could not fetch db properties:', dbErr);
+                    }
+
+                    // Filter out standalone auxiliary UCs
+                    const nonStandaloneDbProps = dbPropsList.filter(p => {
+                        let isUc = false;
+                        if (p.electronic_id) {
+                            try {
+                                const parsed = typeof p.electronic_id === 'string' ? JSON.parse(p.electronic_id) : p.electronic_id;
+                                if (parsed && parsed.isStandaloneUc) isUc = true;
+                            } catch {}
+                        }
+                        return !isUc;
+                    });
+
                     const primaryPropAddr = profile.property_address || emptyPropertyAddress();
                     const primaryPropDetails = profile.property_details as PropertyDetails | null;
                     const primaryPhotos = Array.isArray(profile.property_photos) ? profile.property_photos as string[] : [];
@@ -539,7 +566,11 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                     const primarySubUnits = Array.isArray(profile.sub_units) ? profile.sub_units as SubUnit[] : [];
 
                     const primaryProfilePhoto = (profile.profile_photo_url as string) || (primaryPhotos.length > 0 ? primaryPhotos[0] : null);
+                    const primaryName = primaryPropDetails?.propertyName?.trim() || (primaryPropAddr?.street ? `${primaryPropAddr.street}, ${primaryPropAddr.number || ""}`.trim() : (profile.full_name ? `Imóvel de ${profile.full_name}` : "Meu Imóvel"));
+                    const matchedPrimary = nonStandaloneDbProps.find(p => p.name.trim().toLowerCase() === primaryName.trim().toLowerCase()) || (nonStandaloneDbProps.length > 0 ? nonStandaloneDbProps[0] : undefined);
+
                     const primaryProperty: PropertyState = {
+                        id: matchedPrimary?.id,
                         propertyType: (profile.property_type as 'single' | 'multi') || 'single',
                         details: primaryPropDetails ? {
                             propertyName: primaryPropDetails.propertyName || '',
@@ -608,7 +639,20 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             const apDetails = apTyped.details as PropertyDetails | undefined;
                             const apUnits = Array.isArray(apTyped.subUnits) ? apTyped.subUnits as SubUnit[] : [];
 
+                            let propId = typeof apTyped.id === 'string' ? apTyped.id : undefined;
+                            if (!propId) {
+                                const apName = apDetails?.propertyName?.trim() || (apTyped.address && (apTyped.address as PropertyState['address'])?.street ? `${(apTyped.address as PropertyState['address']).street}, ${(apTyped.address as PropertyState['address']).number || ""}`.trim() : null);
+                                if (apName) {
+                                    const matched = nonStandaloneDbProps.find(p => p.id !== matchedPrimary?.id && p.name.trim().toLowerCase() === apName.trim().toLowerCase());
+                                    if (matched) propId = matched.id;
+                                }
+                                if (!propId && nonStandaloneDbProps[targetPropIdx]) {
+                                    propId = nonStandaloneDbProps[targetPropIdx].id;
+                                }
+                            }
+
                             additionalProps.push({
+                                id: propId,
                                 propertyType: propType,
                                 details: apDetails ? {
                                     ...emptyPropertyDetails(propType),
@@ -1388,6 +1432,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                 role: 'landlord',
                 // Persist additional properties (index 1+) as JSON
                 additional_properties: props.slice(1).map(prop => ({
+                    id: prop.id,
                     propertyType: prop.propertyType,
                     details: prop.details,
                     subUnits: prop.subUnits,
@@ -1654,6 +1699,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                         sub_units: subUnitsForDB,
                         // Also update additional_properties with uploaded URLs
                         additional_properties: updatedProperties.slice(1).map(prop => ({
+                            id: prop.id,
                             propertyType: prop.propertyType,
                             details: prop.details,
                             subUnits: prop.subUnits.map(u => {
@@ -2442,6 +2488,8 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             onDetailsChange={setPDetails}
                             onUnitsChange={setPSubUnits}
                             propertyType={pType}
+                            propertyId={prop.id}
+                            lang={lang}
                             initialOpen={pDetailsOpen}
                             onOpenChange={(open) => setPDetailsOpen(open)}
                             onContinue={() => {
@@ -2453,6 +2501,47 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                 }));
                                 handleSave(true);
                                 setTimeout(() => document.getElementById(`prop-${propIdx}-photos`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+                            }}
+                            onViewEnergyDashboard={async () => {
+                                const updatedProps = properties.map((pItem, i) => {
+                                    if (i !== propIdx) return pItem;
+                                    return {
+                                        ...pItem,
+                                        details: pDetails,
+                                        subUnits: pSubUnits,
+                                    };
+                                });
+                                setProperties(updatedProps);
+                                await handleSave(true, updatedProps);
+
+                                try {
+                                    const res = await fetch('/api/energy-bills/properties');
+                                    const data = await res.json();
+                                    if (data.success && Array.isArray(data.properties)) {
+                                        const rentalProps = data.properties.filter((p: any) => !p.isStandaloneUc && !p.isOrphaned);
+                                        const currentName = pDetails.propertyName?.trim() || (pAddr.street ? `${pAddr.street}, ${pAddr.number || ''}`.trim() : null);
+
+                                        let matched = rentalProps.find((p: any) =>
+                                            currentName && p.name.trim().toLowerCase() === currentName.toLowerCase()
+                                        );
+
+                                        if (!matched && rentalProps[propIdx]) {
+                                            matched = rentalProps[propIdx];
+                                        } else if (!matched && propIdx === 0 && rentalProps.length > 0) {
+                                            matched = rentalProps[0];
+                                        }
+
+                                        if (matched?.id) {
+                                            router.push(`/${lang}/dashboard/energy/${matched.id}?upload=true`);
+                                            return;
+                                        }
+                                    }
+                                } catch (err) {
+                                    console.error('[ProfileContent] Error resolving property for energy dashboard:', err);
+                                }
+
+                                const targetParam = propIdx === 0 ? 'primary' : `prop-${propIdx}`;
+                                router.push(`/${lang}/dashboard/energy/${targetParam}?upload=true`);
                             }}
                         />
                     </>
