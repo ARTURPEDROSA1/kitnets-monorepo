@@ -25,6 +25,7 @@ import {
     Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PdfViewerModal } from '@/components/ui/PdfViewerModal';
 import type { ProofData } from '@/app/[lang]/profile/ProfileContent';
 
 export type DocCategory =
@@ -280,6 +281,9 @@ export const PropertyDocumentsCard: React.FC<PropertyDocumentsCardProps> = ({
     // Active folder state: null = root view (all folders grid), string = opened folder
     const [openFolder, setOpenFolder] = useState<DocCategory | null>(null);
 
+    // In-App document viewer state
+    const [viewingDoc, setViewingDoc] = useState<{ url: string; title: string; fileName: string } | null>(null);
+
     // Upload state inside component
     const [isUploading, setIsUploading] = useState<boolean>(false);
     const folderFileInputRef = useRef<HTMLInputElement>(null);
@@ -287,36 +291,46 @@ export const PropertyDocumentsCard: React.FC<PropertyDocumentsCardProps> = ({
     // Total documents count
     const totalDocsCount = unifiedDocs.length;
 
-    // Open/view document in new window
+    // Open/view document inside Kitnets
     const handleViewDocument = async (doc: UnifiedDocItem) => {
+        let targetUrl: string | null = null;
+
         if (doc.rawFile) {
-            const objectUrl = URL.createObjectURL(doc.rawFile);
-            window.open(objectUrl, '_blank');
-            return;
-        }
-        if (!doc.fileUrl) {
+            targetUrl = URL.createObjectURL(doc.rawFile);
+        } else if (!doc.fileUrl) {
             alert('Arquivo indisponível para visualização.');
             return;
-        }
-        if (doc.fileUrl.startsWith('http://') || doc.fileUrl.startsWith('https://')) {
-            window.open(doc.fileUrl, '_blank');
-            return;
-        }
-        try {
-            const sb = await getSupabase();
-            const { data, error } = await sb.storage.from('documents').createSignedUrl(doc.fileUrl, 3600);
-            if (data?.signedUrl) {
-                window.open(data.signedUrl, '_blank');
-            } else if (!error) {
-                const { data: pub } = sb.storage.from('documents').getPublicUrl(doc.fileUrl);
-                if (pub?.publicUrl) window.open(pub.publicUrl, '_blank');
-            } else {
-                console.error('Signed URL error:', error);
-                alert('Não foi possível gerar link para visualizar o arquivo.');
+        } else if (doc.fileUrl.startsWith('http://') || doc.fileUrl.startsWith('https://')) {
+            targetUrl = doc.fileUrl;
+        } else {
+            try {
+                const sb = await getSupabase();
+                const { data, error } = await sb.storage.from('documents').createSignedUrl(doc.fileUrl, 3600);
+                if (data?.signedUrl) {
+                    targetUrl = data.signedUrl;
+                } else if (!error) {
+                    const { data: pub } = sb.storage.from('documents').getPublicUrl(doc.fileUrl);
+                    if (pub?.publicUrl) targetUrl = pub.publicUrl;
+                } else {
+                    console.error('Signed URL error:', error);
+                    alert('Não foi possível gerar link para visualizar o arquivo.');
+                    return;
+                }
+            } catch (err) {
+                console.error('Error opening doc:', err);
+                alert('Erro ao abrir documento.');
+                return;
             }
-        } catch (err) {
-            console.error('Error opening doc:', err);
-            alert('Erro ao abrir documento.');
+        }
+
+        if (targetUrl) {
+            setViewingDoc({
+                url: targetUrl,
+                title: doc.displayName || 'Documento do Imóvel',
+                fileName: doc.displayName
+                    ? (doc.displayName.toLowerCase().endsWith('.pdf') ? doc.displayName : `${doc.displayName}.pdf`)
+                    : 'documento.pdf',
+            });
         }
     };
 
@@ -794,6 +808,17 @@ export const PropertyDocumentsCard: React.FC<PropertyDocumentsCardProps> = ({
                         )}
                     </div>
                 </div>
+            )}
+
+            {/* In-App Document Viewer */}
+            {viewingDoc && (
+                <PdfViewerModal
+                    isOpen={!!viewingDoc}
+                    onClose={() => setViewingDoc(null)}
+                    url={viewingDoc.url}
+                    title={viewingDoc.title}
+                    fileName={viewingDoc.fileName}
+                />
             )}
         </div>
     );

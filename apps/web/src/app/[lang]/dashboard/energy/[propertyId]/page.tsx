@@ -40,6 +40,7 @@ import { HistoricUnitPriceModal } from "@/components/energy/HistoricUnitPriceMod
 import { EnergyDistributorLogo } from "@/components/energy/EnergyDistributorLogo";
 import { AddStandaloneUcModal } from "@/components/energy/AddStandaloneUcModal";
 import { EditEnergyBillModal } from "@/components/energy/EditEnergyBillModal";
+import { PdfViewerModal } from "@/components/ui/PdfViewerModal";
 import type { OwnerPropertySummary } from "@/app/api/energy-bills/properties/route";
 
 export interface EnergyBillRecord {
@@ -112,6 +113,10 @@ export default function EnergyDashboardPage() {
     const [editingBill, setEditingBill] = useState<EnergyBillRecord | null>(null);
     const [filterMonths, setFilterMonths] = useState<number>(12);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [isPdfViewerOpen, setIsPdfViewerOpen] = useState(false);
+    const [pdfViewerUrl, setPdfViewerUrl] = useState<string | null>(null);
+    const [pdfViewerTitle, setPdfViewerTitle] = useState<string>("Fatura de Energia");
+    const [pdfViewerFileName, setPdfViewerFileName] = useState<string>("fatura-energia.pdf");
 
     const fetchProperties = async () => {
         try {
@@ -518,14 +523,18 @@ export default function EnergyDashboardPage() {
                             <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1.5 flex-wrap">
                                 <span>Visualizar fatura original em PDF</span>
                                 {activePdfUrl ? (
-                                    <a
-                                        href={activePdfUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 underline underline-offset-4 inline-flex items-center gap-1 transition-colors"
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setPdfViewerUrl(activePdfUrl);
+                                            setPdfViewerTitle(`Fatura de Energia - ${currentProperty?.consumerUnit || latestFullBill?.consumer_unit || "CEMIG"} - ${latestFullBill?.reference_month_label || formatMonthLabel(latestFullBill?.reference_month || "")}`);
+                                            setPdfViewerFileName(`fatura-energia-${latestFullBill?.reference_month || "atual"}.pdf`);
+                                            setIsPdfViewerOpen(true);
+                                        }}
+                                        className="font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 underline underline-offset-4 inline-flex items-center gap-1 cursor-pointer transition-colors"
                                     >
-                                        clicando aqui <ExternalLink className="w-3.5 h-3.5 inline" />
-                                    </a>
+                                        clicando aqui <FileText className="w-3.5 h-3.5 inline" />
+                                    </button>
                                 ) : (
                                     <button
                                         onClick={() => setIsUploadOpen(true)}
@@ -835,6 +844,24 @@ export default function EnergyDashboardPage() {
                                                 </td>
                                                 <td className="py-3 px-4 text-center border-b border-border whitespace-nowrap">
                                                     <div className="flex items-center justify-center gap-1.5">
+                                                        {(b.pdf_url || (b.id === latestFullBill?.id && activePdfUrl)) && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    const billPdf = b.pdf_url || activePdfUrl;
+                                                                    if (billPdf) {
+                                                                        setPdfViewerUrl(billPdf);
+                                                                        setPdfViewerTitle(`Fatura de Energia - ${b.reference_month_label || formatMonthLabel(b.reference_month)}`);
+                                                                        setPdfViewerFileName(`fatura-${b.reference_month}.pdf`);
+                                                                        setIsPdfViewerOpen(true);
+                                                                    }
+                                                                }}
+                                                                className="p-1.5 rounded-lg text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 transition-colors shadow-2xs"
+                                                                title="Visualizar fatura em PDF dentro do Kitnets"
+                                                                aria-label="Visualizar fatura em PDF"
+                                                            >
+                                                                <FileText className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        )}
                                                         <button
                                                             onClick={() => setEditingBill(b)}
                                                             className="p-1.5 rounded-lg text-amber-600 dark:text-amber-400 hover:text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/60 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 transition-colors shadow-2xs"
@@ -905,6 +932,16 @@ export default function EnergyDashboardPage() {
                         setEditingBill(null);
                         fetchBills();
                     }}
+                />
+            )}
+            {/* In-App PDF Document Viewer */}
+            {isPdfViewerOpen && pdfViewerUrl && (
+                <PdfViewerModal
+                    isOpen={isPdfViewerOpen}
+                    onClose={() => setIsPdfViewerOpen(false)}
+                    url={pdfViewerUrl}
+                    title={pdfViewerTitle}
+                    fileName={pdfViewerFileName}
                 />
             )}
         </div>

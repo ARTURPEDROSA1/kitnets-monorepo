@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
+import { PdfViewerModal } from '@/components/ui/PdfViewerModal';
 import {
     Home,
     Users,
@@ -125,6 +126,7 @@ export default function LeaseProfileCard({
     agencies: LeaseAgencyOption[];
     agents: LeaseAgentOption[];
 }) {
+    const [viewingDoc, setViewingDoc] = React.useState<{ url: string; title: string; fileName: string } | null>(null);
     const statusInfo = getStatusLabel(lease.status);
 
     return (
@@ -245,19 +247,24 @@ export default function LeaseProfileCard({
                 <Section title="Documentos" icon={<FileText className="h-4 w-4" />}>
                     <div className="space-y-2">
                         {lease.documents.map(doc => (
-                            <a
+                            <button
                                 key={doc.id}
-                                href={doc.file_url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="flex items-center gap-2 rounded-lg border border-border p-2.5 text-sm hover:bg-accent transition"
+                                type="button"
+                                onClick={() => {
+                                    setViewingDoc({
+                                        url: doc.file_url,
+                                        title: doc.file_name || 'Documento do Contrato',
+                                        fileName: doc.file_name ? (doc.file_name.toLowerCase().endsWith('.pdf') ? doc.file_name : `${doc.file_name}.pdf`) : 'contrato.pdf',
+                                    });
+                                }}
+                                className="w-full flex items-center gap-2 rounded-lg border border-border p-2.5 text-sm hover:bg-accent transition text-left cursor-pointer"
                             >
                                 <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
                                 <span className="flex-1 truncate font-medium">{doc.file_name}</span>
                                 <Badge variant="outline" className="text-xs shrink-0">
                                     {getDocTypeLabel(doc.document_type)}
                                 </Badge>
-                            </a>
+                            </button>
                         ))}
                     </div>
                 </Section>
@@ -289,6 +296,17 @@ export default function LeaseProfileCard({
                     <Clock className="h-3.5 w-3.5" /> Atualizado em: {formatDate(lease.updated_at)}
                 </span>
             </div>
+
+            {/* In-App PDF Document Viewer */}
+            {viewingDoc && (
+                <PdfViewerModal
+                    isOpen={!!viewingDoc}
+                    onClose={() => setViewingDoc(null)}
+                    url={viewingDoc.url}
+                    title={viewingDoc.title}
+                    fileName={viewingDoc.fileName}
+                />
+            )}
         </div>
     );
 }
