@@ -48,12 +48,17 @@ export function PdfViewerModal({
     const [rotation, setRotation] = useState<number>(0);
     const [isMaximized, setIsMaximized] = useState<boolean>(false);
     const [viewMode, setViewMode] = useState<"canvas" | "iframe">("canvas");
-    const [pdfData, setPdfData] = useState<ArrayBuffer | null>(null);
+    const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
 
     const containerRef = useRef<HTMLDivElement>(null);
     const canvasContainerRef = useRef<HTMLDivElement>(null);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const pdfDocRef = useRef<any>(null);
+    const currentScaleRef = useRef(scale);
+
+    useEffect(() => {
+        currentScaleRef.current = scale;
+    }, [scale]);
 
     // Compute proxy URL for iframe fallback or same-origin safety
     const proxyUrl = url
@@ -83,32 +88,28 @@ export function PdfViewerModal({
         }
     }, [isOpen]);
 
-    // Fetch PDF data
-    const fetchPdfData = useCallback(async (targetUrl: string) => {
+    // Fetch PDF data as Blob (immutable and never detached by web workers)
+    const fetchPdfData = useCallback(async (targetUrl: string): Promise<Blob | null> => {
         setLoading(true);
         setError(null);
         try {
-            // First attempt: fetch via proxy or directly
             const fetchUrl = targetUrl.startsWith("blob:") || targetUrl.startsWith("data:")
                 ? targetUrl
                 : `/api/pdf-proxy?url=${encodeURIComponent(targetUrl)}`;
 
-            const res = await fetch(fetchUrl);
+            let res = await fetch(fetchUrl);
             if (!res.ok) {
                 // Fallback attempt: try direct targetUrl if proxy failed
-                const fallbackRes = await fetch(targetUrl);
-                if (!fallbackRes.ok) {
+                res = await fetch(targetUrl);
+                if (!res.ok) {
                     throw new Error(`Falha ao carregar documento (Status ${res.status})`);
                 }
-                const buf = await fallbackRes.arrayBuffer();
-                setPdfData(buf);
-                return buf;
             }
-            const buf = await res.arrayBuffer();
-            setPdfData(buf);
-            return buf;
+            const blob = await res.blob();
+            setPdfBlob(blob);
+            return blob;
         } catch (err: any) {
-            console.warn("[PdfViewer] Failed to fetch raw PDF buffer, falling back to iframe:", err);
+            console.warn("[PdfViewer] Failed to fetch raw PDF blob, falling back to iframe:", err);
             setViewMode("iframe");
             setLoading(false);
             return null;
@@ -118,7 +119,7 @@ export function PdfViewerModal({
     // Load PDF using PDF.js
     useEffect(() => {
         if (!isOpen || !url) {
-            setPdfData(null);
+            setPdfBlob(null);
             pdfDocRef.current = null;
             setNumPages(0);
             setCurrentPage(1);
@@ -131,14 +132,18 @@ export function PdfViewerModal({
 
         async function initPdf() {
             try {
-                const buf = await fetchPdfData(url!);
-                if (!buf || isCancelled) return;
+                const blob = await fetchPdfData(url!);
+                if (!blob || isCancelled) return;
 
                 const pdfjsLib = await import("pdfjs-dist");
                 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
+                // Convert blob to ArrayBuffer and slice a clone for the worker so original is never detached
+                const rawBuffer = await blob.arrayBuffer();
+                const workerBuffer = rawBuffer.slice(0);
+
                 const loadingTask = pdfjsLib.getDocument({
-                    data: new Uint8Array(buf),
+                    data: new Uint8Array(workerBuffer),
                     cMapUrl: `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/cmaps/`,
                     cMapPacked: true,
                 });
@@ -234,27 +239,120 @@ export function PdfViewerModal({
         };
     }, [numPages, scale, rotation, viewMode, loading]);
 
+    // Pinch to Zoom and Double Tap gestures on mobile/touch screens
+    useEffect(() => {
+        const container = containerRef.current;
+        const canvasContainer = canvasContainerRef.current;
+        if (!container || viewMode !== "canvas") return;
+
+        let initialDistance = 0;
+        let initialScale = currentScaleRef.current;
+        let isPinching = false;
+        let lastRatio = 1;
+        let lastTap = 0;
+
+        const onTouchStart = (e: TouchEvent) => {
+            if (e.touches.length === 2) {
+                isPinching = true;
+                initialScale = currentScaleRef.current;
+                initialDistance = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+                lastRatio = 1;
+                if (canvasContainer) {
+                    canvasContainer.style.transition = "none";
+                }
+            } else if (e.touches.length === 1) {
+                const now = Date.now();
+                if (now - lastTap < 300) {
+                    // Double tap to toggle zoom
+                    setScale((prev) => (prev > 1.3 ? 1.1 : 1.8));
+                    lastTap = 0;
+                } else {
+                    lastTap = now;
+                }
+            }
+        };
+
+        const onTouchMove = (e: TouchEvent) => {
+            if (isPinching && e.touches.length === 2) {
+                // Prevent browser's native window scrolling/bouncing during pinch
+                e.preventDefault();
+                const currentDistance = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+                if (initialDistance > 0) {
+                    lastRatio = currentDistance / initialDistance;
+                    if (canvasContainer) {
+                        canvasContainer.style.transform = `scale(${lastRatio})`;
+                        canvasContainer.style.transformOrigin = "center top";
+                    }
+                }
+            }
+        };
+
+        const onTouchEnd = (e: TouchEvent) => {
+            if (isPinching && e.touches.length < 2) {
+                isPinching = false;
+                if (canvasContainer) {
+                    canvasContainer.style.transition = "transform 0.15s ease-out";
+                    canvasContainer.style.transform = "scale(1)";
+                }
+                const targetScale = Math.min(Math.max(initialScale * lastRatio, 0.6), 3.0);
+                if (Math.abs(targetScale - currentScaleRef.current) > 0.05) {
+                    setScale(Number(targetScale.toFixed(2)));
+                }
+                setTimeout(() => {
+                    if (canvasContainer) {
+                        canvasContainer.style.transition = "";
+                    }
+                }, 150);
+            }
+        };
+
+        container.addEventListener("touchstart", onTouchStart, { passive: true });
+        container.addEventListener("touchmove", onTouchMove, { passive: false });
+        container.addEventListener("touchend", onTouchEnd, { passive: true });
+        container.addEventListener("touchcancel", onTouchEnd, { passive: true });
+
+        return () => {
+            container.removeEventListener("touchstart", onTouchStart);
+            container.removeEventListener("touchmove", onTouchMove);
+            container.removeEventListener("touchend", onTouchEnd);
+            container.removeEventListener("touchcancel", onTouchEnd);
+        };
+    }, [viewMode]);
+
     // Direct download without leaving the application
     const handleDownload = async () => {
         try {
-            let blob: Blob;
-            if (pdfData) {
-                blob = new Blob([pdfData], { type: "application/pdf" });
-            } else if (url) {
-                const res = await fetch(proxyUrl || url);
-                blob = await res.blob();
-            } else {
-                return;
+            let targetBlob: Blob | null = pdfBlob;
+            if (!targetBlob || targetBlob.size === 0) {
+                const fetchUrl = url?.startsWith("blob:") || url?.startsWith("data:")
+                    ? url
+                    : `/api/pdf-proxy?url=${encodeURIComponent(url || "")}`;
+                const res = await fetch(fetchUrl);
+                if (res.ok) {
+                    targetBlob = await res.blob();
+                    setPdfBlob(targetBlob);
+                }
             }
 
-            const downloadUrl = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = downloadUrl;
-            a.download = fileName.endsWith(".pdf") ? fileName : `${fileName}.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(downloadUrl);
+            if (targetBlob && targetBlob.size > 0) {
+                const cleanFileName = fileName.endsWith(".pdf") ? fileName : `${fileName}.pdf`;
+                const downloadUrl = URL.createObjectURL(targetBlob);
+                const a = document.createElement("a");
+                a.href = downloadUrl;
+                a.download = cleanFileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(downloadUrl);
+            } else if (url) {
+                window.open(url, "_blank");
+            }
         } catch (err) {
             console.error("[PdfViewer] Download error:", err);
             if (url) window.open(url, "_blank");
@@ -270,30 +368,45 @@ export function PdfViewerModal({
         const targetShareUrl = url?.startsWith("http") ? url : `${typeof window !== "undefined" ? window.location.origin : ""}${url}`;
 
         try {
-            // Priority 1: Share actual PDF file blob (supports Google Drive, WhatsApp, Mail, Save to Files, etc.)
-            if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
-                let fileToShare: File | null = null;
-                if (pdfData) {
-                    fileToShare = new File([pdfData], cleanFileName, { type: "application/pdf" });
-                } else if (url) {
-                    try {
-                        const res = await fetch(proxyUrl || url);
-                        const blob = await res.blob();
-                        fileToShare = new File([blob], cleanFileName, { type: "application/pdf" });
-                    } catch {
-                        // Fall through to URL share
+            // Priority 1: Ensure we have a valid, non-empty Blob
+            let targetBlob: Blob | null = pdfBlob;
+            if (!targetBlob || targetBlob.size === 0) {
+                try {
+                    const fetchUrl = url?.startsWith("blob:") || url?.startsWith("data:")
+                        ? url
+                        : `/api/pdf-proxy?url=${encodeURIComponent(url || "")}`;
+                    const res = await fetch(fetchUrl);
+                    if (res.ok) {
+                        targetBlob = await res.blob();
+                        setPdfBlob(targetBlob);
+                    }
+                } catch (blobErr) {
+                    console.warn("[PdfViewer] Fetch blob for share error:", blobErr);
+                }
+            }
+
+            // Share actual File if blob is valid and navigator.canShare supports files
+            if (targetBlob && targetBlob.size > 0) {
+                const fileToShare = new File([targetBlob], cleanFileName, {
+                    type: "application/pdf",
+                    lastModified: Date.now(),
+                });
+
+                console.log("[PdfViewer] Sharing file:", cleanFileName, "size:", fileToShare.size);
+
+                if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+                    if (typeof navigator.canShare === "function" && navigator.canShare({ files: [fileToShare] })) {
+                        await navigator.share({
+                            title: shareTitle,
+                            files: [fileToShare],
+                        });
+                        return;
                     }
                 }
+            }
 
-                if (fileToShare && typeof navigator.canShare === "function" && navigator.canShare({ files: [fileToShare] })) {
-                    await navigator.share({
-                        title: shareTitle,
-                        files: [fileToShare],
-                    });
-                    return;
-                }
-
-                // Priority 2: Share URL via native share sheet
+            // Priority 2: Share URL via native share sheet
+            if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
                 await navigator.share({
                     title: shareTitle,
                     text: shareTitle,
@@ -326,9 +439,8 @@ export function PdfViewerModal({
         if (viewMode === "iframe") {
             const iframe = document.getElementById("kitnets-pdf-iframe") as HTMLIFrameElement;
             iframe?.contentWindow?.print();
-        } else if (pdfData) {
-            const blob = new Blob([pdfData], { type: "application/pdf" });
-            const printUrl = URL.createObjectURL(blob);
+        } else if (pdfBlob && pdfBlob.size > 0) {
+            const printUrl = URL.createObjectURL(pdfBlob);
             const printWin = window.open(printUrl, "_blank");
             printWin?.addEventListener("load", () => {
                 printWin.print();
@@ -477,7 +589,7 @@ export function PdfViewerModal({
                 {/* Document Canvas / Iframe Body */}
                 <div
                     ref={containerRef}
-                    className="flex-1 overflow-auto bg-neutral-900/95 dark:bg-neutral-950 p-2 sm:p-6 flex flex-col items-center justify-start relative overscroll-contain touch-pan-x touch-pan-y"
+                    className="flex-1 overflow-auto bg-neutral-900/95 dark:bg-neutral-950 p-2 sm:p-6 flex flex-col items-center justify-start relative overscroll-contain"
                 >
                     {shareSuccess && (
                         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-neutral-900 text-white border border-border px-3.5 py-1.5 rounded-full text-xs font-semibold shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
@@ -498,7 +610,36 @@ export function PdfViewerModal({
                     )}
 
                     {!loading && viewMode === "canvas" && (
-                        <div ref={canvasContainerRef} className="flex flex-col items-center w-full" />
+                        <>
+                            <div ref={canvasContainerRef} className="flex flex-col items-center w-full" />
+
+                            {/* Mobile Floating Quick Zoom Controls */}
+                            <div className="sm:hidden absolute bottom-4 right-4 z-40 bg-card/90 backdrop-blur-md border border-border rounded-full shadow-lg flex items-center p-1 gap-1 select-none">
+                                <button
+                                    onClick={zoomOut}
+                                    className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted active:scale-90 transition-all cursor-pointer"
+                                    title="Diminuir Zoom"
+                                    aria-label="Diminuir Zoom"
+                                >
+                                    <ZoomOut className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={resetZoom}
+                                    className="px-1.5 text-[11px] font-mono font-semibold text-foreground cursor-pointer"
+                                    title="Restaurar Zoom"
+                                >
+                                    {Math.round((scale / 1.1) * 100)}%
+                                </button>
+                                <button
+                                    onClick={zoomIn}
+                                    className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted active:scale-90 transition-all cursor-pointer"
+                                    title="Aumentar Zoom"
+                                    aria-label="Aumentar Zoom"
+                                >
+                                    <ZoomIn className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </>
                     )}
 
                     {!loading && viewMode === "iframe" && (
