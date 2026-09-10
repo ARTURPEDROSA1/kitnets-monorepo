@@ -47,6 +47,44 @@ function formatMonthLabel(isoMonth: string): string {
     return `${MONTH_NAMES[m - 1] || parts[1]}/${parts[0].substring(2)}`;
 }
 
+function getFlagBadge(flagType?: string | null) {
+    const raw = (flagType || "").trim();
+    const lower = raw.toLowerCase();
+
+    if (lower.includes("verde") || lower.includes("green")) {
+        return (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 shadow-2xs whitespace-nowrap">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                {raw || "Verde"}
+            </span>
+        );
+    }
+
+    if (lower.includes("amarel") || lower.includes("yellow")) {
+        return (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-300 dark:border-amber-700 shadow-2xs whitespace-nowrap">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                {raw || "Amarela"}
+            </span>
+        );
+    }
+
+    if (lower.includes("vermelh") || lower.includes("red") || lower.includes("escassez")) {
+        return (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/70 dark:text-rose-300 border border-rose-300 dark:border-rose-800 shadow-2xs whitespace-nowrap">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+                {raw || "Vermelha"}
+            </span>
+        );
+    }
+
+    return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-muted text-muted-foreground border border-border whitespace-nowrap">
+            {raw || "Normal"}
+        </span>
+    );
+}
+
 export function HistoricUnitPriceModal({
     isOpen,
     onClose,
@@ -346,35 +384,43 @@ export function HistoricUnitPriceModal({
                             <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                                 Registros Faturados ({tariffHistory.length})
                             </h4>
-                            <div className="overflow-x-auto border border-border rounded-xl">
-                                <table className="w-full text-xs text-left">
-                                    <thead className="bg-muted/50 text-muted-foreground border-b border-border">
+                            <div className="overflow-auto max-h-[340px] border border-border rounded-xl relative shadow-2xs">
+                                <table className="w-full text-xs text-left border-separate border-spacing-0">
+                                    <thead>
                                         <tr>
-                                            <th className="py-2.5 px-3.5 font-semibold">Mês/Ano</th>
-                                            <th className="py-2.5 px-3.5 font-semibold text-right">Tarifa Efetiva</th>
-                                            <th className="py-2.5 px-3.5 font-semibold text-center">Bandeira</th>
-                                            <th className="py-2.5 px-3.5 font-semibold text-right">Consumo</th>
-                                            <th className="py-2.5 px-3.5 font-semibold text-right">Valor Pago</th>
+                                            <th className="sticky top-0 left-0 z-30 bg-muted border-b border-r border-border py-2.5 px-3.5 font-semibold text-muted-foreground min-w-[95px] shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)]">
+                                                Mês/Ano
+                                            </th>
+                                            <th className="sticky top-0 z-20 bg-muted border-b border-border py-2.5 px-3.5 font-semibold text-muted-foreground text-right whitespace-nowrap">
+                                                Tarifa Efetiva
+                                            </th>
+                                            <th className="sticky top-0 z-20 bg-muted border-b border-border py-2.5 px-3.5 font-semibold text-muted-foreground text-center whitespace-nowrap">
+                                                Bandeira
+                                            </th>
+                                            <th className="sticky top-0 z-20 bg-muted border-b border-border py-2.5 px-3.5 font-semibold text-muted-foreground text-right whitespace-nowrap">
+                                                Consumo
+                                            </th>
+                                            <th className="sticky top-0 z-20 bg-muted border-b border-border py-2.5 px-3.5 font-semibold text-muted-foreground text-right whitespace-nowrap">
+                                                Valor Pago
+                                            </th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-border">
+                                    <tbody>
                                         {[...tariffHistory].reverse().map((item) => (
-                                            <tr key={item.reference_month} className="hover:bg-muted/20 transition-colors">
-                                                <td className="py-2.5 px-3.5 font-bold text-foreground">
+                                            <tr key={item.reference_month} className="group hover:bg-muted/20 transition-colors">
+                                                <td className="sticky left-0 z-10 bg-card group-hover:bg-muted/40 border-b border-r border-border py-2.5 px-3.5 font-bold text-foreground min-w-[95px] whitespace-nowrap shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)]">
                                                     {item.label}
                                                 </td>
-                                                <td className="py-2.5 px-3.5 text-right font-mono font-bold text-sky-700 dark:text-sky-300">
+                                                <td className="py-2.5 px-3.5 text-right font-mono font-bold text-sky-700 dark:text-sky-300 border-b border-border whitespace-nowrap">
                                                     R$ {formatNumber(item.unit_price, 4)}
                                                 </td>
-                                                <td className="py-2.5 px-3.5 text-center">
-                                                    <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-medium bg-muted text-muted-foreground">
-                                                        {item.flag_type}
-                                                    </span>
+                                                <td className="py-2.5 px-3.5 text-center border-b border-border whitespace-nowrap">
+                                                    {getFlagBadge(item.flag_type)}
                                                 </td>
-                                                <td className="py-2.5 px-3.5 text-right text-muted-foreground">
+                                                <td className="py-2.5 px-3.5 text-right text-muted-foreground border-b border-border whitespace-nowrap">
                                                     {item.grid_consumption_kwh > 0 ? `${item.grid_consumption_kwh} kWh` : "-"}
                                                 </td>
-                                                <td className="py-2.5 px-3.5 text-right font-medium text-foreground">
+                                                <td className="py-2.5 px-3.5 text-right font-medium text-foreground border-b border-border whitespace-nowrap">
                                                     {item.total_amount > 0 ? formatCurrency(item.total_amount) : "-"}
                                                 </td>
                                             </tr>

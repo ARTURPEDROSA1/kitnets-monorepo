@@ -751,56 +751,78 @@ export default function EnergyDashboardPage() {
                             </span>
                         </div>
 
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-xs text-left">
-                                <thead className="bg-muted/50 text-muted-foreground border-b border-border">
+                        <div className="overflow-auto max-h-[600px] relative">
+                            <table className="w-full text-xs text-left border-separate border-spacing-0">
+                                <thead>
                                     <tr>
-                                        <th className="py-3 px-4 font-semibold">MÊS/ANO</th>
-                                        <th className="py-3 px-4 font-semibold text-right">Cons. kWh</th>
-                                        <th className="py-3 px-4 font-semibold text-right">kWh/Dia</th>
-                                        <th className="py-3 px-4 font-semibold text-right">Dias</th>
-                                        <th className="py-3 px-4 font-semibold text-right text-emerald-600">Saldo Atual Geração</th>
-                                        <th className="py-3 px-4 font-semibold text-right text-amber-600">Energia Injetada</th>
-                                        <th className="py-3 px-4 font-semibold text-right">Custo Disponibilidade</th>
-                                        <th className="py-3 px-4 font-semibold text-right">Preço Unit.</th>
-                                        <th className="py-3 px-4 font-semibold text-right">Valor a Pagar</th>
-                                        <th className="py-3 px-4 font-semibold text-center">Origem</th>
-                                        <th className="py-3 px-4 font-semibold text-center">Ações</th>
+                                        <th className="sticky top-0 left-0 z-30 bg-muted border-b border-r border-border py-3 px-4 font-semibold text-muted-foreground min-w-[110px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.12)]">
+                                            MÊS/ANO
+                                        </th>
+                                        <th className="sticky top-0 z-20 bg-muted border-b border-border py-3 px-4 font-semibold text-muted-foreground text-right whitespace-nowrap">
+                                            Cons. kWh
+                                        </th>
+                                        <th className="sticky top-0 z-20 bg-muted border-b border-border py-3 px-4 font-semibold text-muted-foreground text-right whitespace-nowrap">
+                                            kWh/Dia
+                                        </th>
+                                        <th className="sticky top-0 z-20 bg-muted border-b border-border py-3 px-4 font-semibold text-muted-foreground text-right whitespace-nowrap">
+                                            Dias
+                                        </th>
+                                        <th className="sticky top-0 z-20 bg-muted border-b border-border py-3 px-4 font-semibold text-emerald-600 dark:text-emerald-400 text-right whitespace-nowrap">
+                                            Saldo Atual Geração
+                                        </th>
+                                        <th className="sticky top-0 z-20 bg-muted border-b border-border py-3 px-4 font-semibold text-amber-600 dark:text-amber-400 text-right whitespace-nowrap">
+                                            Energia Injetada
+                                        </th>
+                                        <th className="sticky top-0 z-20 bg-muted border-b border-border py-3 px-4 font-semibold text-muted-foreground text-right whitespace-nowrap">
+                                            Custo Disponibilidade
+                                        </th>
+                                        <th className="sticky top-0 z-20 bg-muted border-b border-border py-3 px-4 font-semibold text-muted-foreground text-right whitespace-nowrap">
+                                            Preço Unit.
+                                        </th>
+                                        <th className="sticky top-0 z-20 bg-muted border-b border-border py-3 px-4 font-semibold text-muted-foreground text-right whitespace-nowrap">
+                                            Valor a Pagar
+                                        </th>
+                                        <th className="sticky top-0 z-20 bg-muted border-b border-border py-3 px-4 font-semibold text-muted-foreground text-center whitespace-nowrap">
+                                            Origem
+                                        </th>
+                                        <th className="sticky top-0 z-20 bg-muted border-b border-border py-3 px-4 font-semibold text-muted-foreground text-center whitespace-nowrap">
+                                            Ações
+                                        </th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-border">
+                                <tbody>
                                     {filteredBills.map((b) => {
                                         const daily = b.daily_avg_kwh || (b.grid_consumption_kwh / (b.billing_days || 30));
                                         return (
-                                            <tr key={b.id} className="hover:bg-muted/30 transition-colors">
-                                                <td className="py-3 px-4 font-bold text-foreground">
+                                            <tr key={b.id} className="group hover:bg-muted/30 transition-colors">
+                                                <td className="sticky left-0 z-10 bg-card group-hover:bg-muted/40 border-b border-r border-border py-3 px-4 font-bold text-foreground min-w-[110px] whitespace-nowrap shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
                                                     {b.reference_month_label || formatMonthLabel(b.reference_month)}
                                                 </td>
-                                                <td className="py-3 px-4 text-right font-medium">
+                                                <td className="py-3 px-4 text-right font-medium border-b border-border whitespace-nowrap">
                                                     {formatNumber(b.grid_consumption_kwh, 0)}
                                                 </td>
-                                                <td className="py-3 px-4 text-right font-mono">
+                                                <td className="py-3 px-4 text-right font-mono border-b border-border whitespace-nowrap">
                                                     {formatNumber(daily, 2)}
                                                 </td>
-                                                <td className="py-3 px-4 text-right text-muted-foreground">
+                                                <td className="py-3 px-4 text-right text-muted-foreground border-b border-border whitespace-nowrap">
                                                     {b.billing_days || 30}
                                                 </td>
-                                                <td className="py-3 px-4 text-right font-semibold text-emerald-700 dark:text-emerald-300">
+                                                <td className="py-3 px-4 text-right font-semibold text-emerald-700 dark:text-emerald-300 border-b border-border whitespace-nowrap">
                                                     {b.generation_balance_kwh > 0 ? `${formatNumber(b.generation_balance_kwh, 2)} kWh` : "-"}
                                                 </td>
-                                                <td className="py-3 px-4 text-right font-semibold text-amber-600 dark:text-amber-400">
+                                                <td className="py-3 px-4 text-right font-semibold text-amber-600 dark:text-amber-400 border-b border-border whitespace-nowrap">
                                                     {b.solar_injected_kwh > 0 ? `${formatNumber(b.solar_injected_kwh, 0)} kWh` : "-"}
                                                 </td>
-                                                <td className="py-3 px-4 text-right text-muted-foreground">
+                                                <td className="py-3 px-4 text-right text-muted-foreground border-b border-border whitespace-nowrap">
                                                     {b.availability_cost_amount > 0 ? formatCurrency(b.availability_cost_amount) : "-"}
                                                 </td>
-                                                <td className="py-3 px-4 text-right font-mono text-muted-foreground">
+                                                <td className="py-3 px-4 text-right font-mono text-muted-foreground border-b border-border whitespace-nowrap">
                                                     {b.unit_price ? `R$ ${formatNumber(b.unit_price, 4)}` : "-"}
                                                 </td>
-                                                <td className="py-3 px-4 text-right font-bold text-foreground">
+                                                <td className="py-3 px-4 text-right font-bold text-foreground border-b border-border whitespace-nowrap">
                                                     {b.total_amount > 0 ? formatCurrency(b.total_amount) : "-"}
                                                 </td>
-                                                <td className="py-3 px-4 text-center">
+                                                <td className="py-3 px-4 text-center border-b border-border whitespace-nowrap">
                                                     {b.is_historical_only ? (
                                                         <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-medium bg-muted text-muted-foreground">
                                                              Histórico Base
@@ -811,7 +833,7 @@ export default function EnergyDashboardPage() {
                                                         </span>
                                                     )}
                                                 </td>
-                                                <td className="py-3 px-4 text-center">
+                                                <td className="py-3 px-4 text-center border-b border-border whitespace-nowrap">
                                                     <div className="flex items-center justify-center gap-1.5">
                                                         <button
                                                             onClick={() => setEditingBill(b)}
