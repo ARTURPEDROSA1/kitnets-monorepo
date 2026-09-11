@@ -74,7 +74,10 @@ export default function GatewayDetailPage() {
             if (cancelled || !gw?.property_id) return;
 
             const { data: billsData } = await supabase
-                .rpc("get_property_bills", { p_property_id: gw.property_id });
+                .from("water_bills")
+                .select("*")
+                .eq("property_id", gw.property_id)
+                .order("reference_month", { ascending: false });
 
             if (cancelled || !billsData || billsData.length < 2) return;
 
@@ -273,7 +276,13 @@ export default function GatewayDetailPage() {
 
             if (gw.property_id) {
                 const { data: rateData } = await supabase
-                    .rpc("get_latest_billing_rate", { p_property_id: gw.property_id });
+                    .from("water_bills")
+                    .select("effective_rate_per_m3, reference_month")
+                    .eq("property_id", gw.property_id)
+                    .not("effective_rate_per_m3", "is", null)
+                    .gt("effective_rate_per_m3", 0)
+                    .order("reference_month", { ascending: false })
+                    .limit(1);
 
                 const latestBill = rateData?.[0];
                 if (latestBill && latestBill.effective_rate_per_m3) {

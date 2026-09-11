@@ -89,9 +89,12 @@ export default function ManualBillEntryPage() {
                 setProperty(propData[0]);
             }
 
-            // Fetch all bills
+            // Fetch all bills (from water_bills table)
             const { data: bills } = await supabase
-                .rpc("get_property_bills", { p_property_id: propertyId });
+                .from("water_bills")
+                .select("*")
+                .eq("property_id", propertyId)
+                .order("reference_month", { ascending: false });
 
             // ── Edit mode: load existing bill into form ──
             if (editMonth && bills) {
