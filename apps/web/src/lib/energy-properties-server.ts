@@ -30,6 +30,7 @@ export interface OwnerPropertySummary {
     hasRentalListing?: boolean;
     ucCategory: UcCategory | null;
     notes?: string | null;
+    latestBillPdfUrl?: string | null;
 }
 
 /**
@@ -161,12 +162,13 @@ export async function getOwnerPropertiesSummary(userId: string): Promise<OwnerPr
             latestTotalAmount: number | null;
             consumerUnit: string | null;
             utilityCompany: string | null;
+            latestBillPdfUrl: string | null;
         }> = {};
 
         if (propIds.length > 0) {
             const { data: allBills } = await supabase
                 .from("energy_bills")
-                .select("property_id, reference_month, reference_month_label, due_date, total_amount, consumer_unit, utility_company, is_historical_only")
+                .select("property_id, reference_month, reference_month_label, due_date, total_amount, consumer_unit, utility_company, is_historical_only, pdf_url")
                 .in("property_id", propIds)
                 .order("reference_month", { ascending: false });
 
@@ -182,6 +184,7 @@ export async function getOwnerPropertiesSummary(userId: string): Promise<OwnerPr
                             latestTotalAmount: bill.total_amount != null && Number(bill.total_amount) > 0 ? Number(bill.total_amount) : null,
                             consumerUnit: bill.consumer_unit || null,
                             utilityCompany: bill.utility_company || null,
+                            latestBillPdfUrl: (!bill.is_historical_only && bill.pdf_url) ? bill.pdf_url : null,
                         };
                     } else {
                         billsByPropId[pid].count += 1;
@@ -202,6 +205,9 @@ export async function getOwnerPropertiesSummary(userId: string): Promise<OwnerPr
                         if (!current.utilityCompany && bill.utility_company) {
                             current.utilityCompany = bill.utility_company;
                         }
+                        if (!current.latestBillPdfUrl && !bill.is_historical_only && bill.pdf_url) {
+                            current.latestBillPdfUrl = bill.pdf_url;
+                        }
                     }
                 }
             }
@@ -217,6 +223,7 @@ export async function getOwnerPropertiesSummary(userId: string): Promise<OwnerPr
                 latestTotalAmount: null,
                 consumerUnit: null,
                 utilityCompany: null,
+                latestBillPdfUrl: null,
             };
 
             // Check if this property is marked as a standalone UC in electronic_id
@@ -315,6 +322,7 @@ export async function getOwnerPropertiesSummary(userId: string): Promise<OwnerPr
                 hasRentalListing,
                 ucCategory: ucCategory || (isOrphaned ? "outro" : null),
                 notes: savedNotes || (isOrphaned ? "Imóvel desvinculado do portfólio de aluguel" : null),
+                latestBillPdfUrl: billStats.latestBillPdfUrl,
             };
         });
 
