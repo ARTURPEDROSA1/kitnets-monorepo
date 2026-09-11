@@ -489,9 +489,9 @@ export default function GatewayDetailPage() {
                     />
                 </div>
 
-                {/* Link to billing history */}
-                {gateway.property_id && (
-                    <div className="mt-4">
+                {/* Link to billing history + add new bill */}
+                {gateway.property_id ? (
+                    <div className="mt-4 flex flex-wrap items-center gap-4">
                         <Link
                             href={`/${lang}/dashboard/billing/${gateway.property_id}?gateway=${id}`}
                             className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
@@ -499,6 +499,26 @@ export default function GatewayDetailPage() {
                             <FileText className="w-4 h-4" />
                             Histórico de Contas de Água →
                         </Link>
+                        <Link
+                            href={`/${lang}/dashboard/billing/${gateway.property_id}/new?gateway=${id}`}
+                            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
+                        >
+                            <FileText className="w-4 h-4" />
+                            Nova Conta de Água
+                        </Link>
+                    </div>
+                ) : (
+                    <div className="mt-4 p-3 bg-muted/40 border border-dashed border-border rounded-lg flex items-center gap-2 text-sm text-muted-foreground">
+                        <FileText className="w-4 h-4 shrink-0" />
+                        <span>
+                            Para registrar contas de água e calcular o custo estimado,{" "}
+                            <Link
+                                href={`/${lang}/dashboard/gateway/${id}/edit`}
+                                className="font-medium text-primary hover:text-primary/80 underline underline-offset-4"
+                            >
+                                vincule este gateway a um imóvel
+                            </Link>.
+                        </span>
                     </div>
                 )}
             </div>
