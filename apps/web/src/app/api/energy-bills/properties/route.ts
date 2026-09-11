@@ -210,16 +210,16 @@ export async function DELETE(request: Request) {
             await supabase.from("tenants").delete().eq("property_id", propertyId);
         }
 
-        // 4. Delete water bills
+        // 4. Orphan water bills (preserve data — user can re-associate later)
         await supabase
             .from("water_bills")
-            .delete()
+            .update({ property_id: null })
             .eq("property_id", propertyId);
 
-        // 5. Delete associated energy bills
+        // 5. Orphan energy bills (preserve data — user can re-associate later)
         await supabase
             .from("energy_bills")
-            .delete()
+            .update({ property_id: null })
             .eq("property_id", propertyId);
 
         // 6. Remove files from storage

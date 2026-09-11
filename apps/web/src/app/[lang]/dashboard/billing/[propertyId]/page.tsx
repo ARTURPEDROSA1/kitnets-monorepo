@@ -80,6 +80,10 @@ export default function BillingPage() {
     const [customStart, setCustomStart] = useState(""); // "YYYY-MM"
     const [customEnd, setCustomEnd] = useState("");     // "YYYY-MM"
 
+    // Orphaned bills (property_id IS NULL — from deleted properties)
+    const [orphanedBills, setOrphanedBills] = useState<{ id: string; reference_month: string; meter_number: string; consumption_m3: number; total_amount: number }[]>([]);
+    const [claimingOrphans, setClaimingOrphans] = useState(false);
+
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
@@ -99,11 +103,52 @@ export default function BillingPage() {
             }
 
             setLoading(false);
+
+            // Check for orphaned bills (from deleted properties)
+            try {
+                const res = await fetch("/api/water-bills/orphaned");
+                if (res.ok) {
+                    const { bills: orphans } = await res.json();
+                    if (orphans?.length > 0) {
+                        setOrphanedBills(orphans);
+                    }
+                }
+            } catch {
+                // Silent — not critical
+            }
         };
 
         fetchData();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [propertyId]);
+
+    const handleClaimOrphans = async () => {
+        if (orphanedBills.length === 0) return;
+        setClaimingOrphans(true);
+        try {
+            const res = await fetch("/api/water-bills/orphaned", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    billIds: orphanedBills.map(b => b.id),
+                    propertyId,
+                }),
+            });
+            if (res.ok) {
+                // Re-fetch bills to include the newly claimed ones
+                const { data: billsData } = await supabase
+                    .rpc("get_property_bills", { p_property_id: propertyId });
+                if (billsData) {
+                    setBills(billsData);
+                }
+                setOrphanedBills([]);
+            }
+        } catch (err) {
+            console.error("Failed to claim orphaned bills:", err);
+        } finally {
+            setClaimingOrphans(false);
+        }
+    };
 
     // ── Filter bills by month range ─────────────────────────────
     const filteredBills = useMemo(() => {
@@ -227,6 +272,30 @@ export default function BillingPage() {
                     </div>
                 </div>
             </div>
+
+            {/* ── Orphaned Bills Banner ─────────────────────── */}
+            {orphanedBills.length > 0 && (
+                <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <FileText className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                        <div>
+                            <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                                {orphanedBills.length} {orphanedBills.length === 1 ? "conta de água órfã encontrada" : "contas de água órfãs encontradas"}
+                            </p>
+                            <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                                Essas contas perderam o vínculo com o imóvel anterior. Deseja vinculá-las a este imóvel?
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={handleClaimOrphans}
+                        disabled={claimingOrphans}
+                        className="shrink-0 px-4 py-2 text-sm font-semibold rounded-lg bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50 transition-colors"
+                    >
+                        {claimingOrphans ? "Vinculando..." : "Vincular ao Imóvel"}
+                    </button>
+                </div>
+            )}
 
             {/* ── Month Filter ─────────────────────────────── */}
             <div className="flex flex-col gap-2 mb-8">
