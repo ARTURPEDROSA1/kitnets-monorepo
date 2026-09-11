@@ -168,7 +168,7 @@ export async function getOwnerPropertiesSummary(userId: string): Promise<OwnerPr
         if (propIds.length > 0) {
             const { data: allBills } = await supabase
                 .from("energy_bills")
-                .select("property_id, reference_month, reference_month_label, due_date, total_amount, consumer_unit, utility_company, is_historical_only, pdf_url")
+                .select("property_id, reference_month, reference_month_label, due_date, total_amount, consumer_unit, utility_company, is_historical_only")
                 .in("property_id", propIds)
                 .order("reference_month", { ascending: false });
 
@@ -184,7 +184,7 @@ export async function getOwnerPropertiesSummary(userId: string): Promise<OwnerPr
                             latestTotalAmount: bill.total_amount != null && Number(bill.total_amount) > 0 ? Number(bill.total_amount) : null,
                             consumerUnit: bill.consumer_unit || null,
                             utilityCompany: bill.utility_company || null,
-                            latestBillPdfUrl: (!bill.is_historical_only && bill.pdf_url) ? bill.pdf_url : null,
+                            latestBillPdfUrl: null,
                         };
                     } else {
                         billsByPropId[pid].count += 1;
@@ -205,10 +205,34 @@ export async function getOwnerPropertiesSummary(userId: string): Promise<OwnerPr
                         if (!current.utilityCompany && bill.utility_company) {
                             current.utilityCompany = bill.utility_company;
                         }
-                        if (!current.latestBillPdfUrl && !bill.is_historical_only && bill.pdf_url) {
-                            current.latestBillPdfUrl = bill.pdf_url;
-                        }
                     }
+                }
+            }
+
+            // Resolve PDF URLs from Supabase Storage for properties that have bills
+            // pdf_url is NOT a DB column — PDFs are stored as {propertyId}/current_bill.pdf in storage
+            const propsWithBills = Object.keys(billsByPropId);
+            if (propsWithBills.length > 0) {
+                try {
+                    await Promise.all(propsWithBills.map(async (pid) => {
+                        try {
+                            const { data: files } = await supabase.storage
+                                .from("energy-bills")
+                                .list(pid, { limit: 10, search: "current_bill" });
+                            if (files?.some((f: any) => f.name === "current_bill.pdf")) {
+                                const { data: pUrl } = supabase.storage
+                                    .from("energy-bills")
+                                    .getPublicUrl(`${pid}/current_bill.pdf`);
+                                if (pUrl?.publicUrl) {
+                                    billsByPropId[pid].latestBillPdfUrl = `${pUrl.publicUrl}?t=${Date.now()}`;
+                                }
+                            }
+                        } catch {
+                            // Ignore individual storage lookup failures
+                        }
+                    }));
+                } catch {
+                    // Ignore batch storage lookup failures
                 }
             }
         }
