@@ -7,7 +7,7 @@ import Link from "next/link";
 import { Button } from "@kitnets/ui";
 import {
     ArrowLeft, Save, Trash2, Camera, Router as RouterIcon,
-    Loader2, CheckCircle2, AlertTriangle, Image as ImageIcon, Gauge
+    Loader2, CheckCircle2, AlertTriangle, Image as ImageIcon, Gauge, Building2
 } from "lucide-react";
 
 interface GatewayData {
@@ -18,6 +18,8 @@ interface GatewayData {
     description: string;
     photo_url: string;
     panel_photo_url: string;
+    property_id: string | null;
+    owner_id: string | null;
 }
 
 export default function EditGatewayPage() {
@@ -38,6 +40,9 @@ export default function EditGatewayPage() {
     // Form state
     const [label, setLabel] = useState("");
     const [description, setDescription] = useState("");
+    const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
+    const [properties, setProperties] = useState<{ id: string; name: string; address: string | null }[]>([]);
+    const [loadingProperties, setLoadingProperties] = useState(false);
     const [photoPreview, setPhotoPreview] = useState<string | null>(null);
     const [panelPhotoPreview, setPanelPhotoPreview] = useState<string | null>(null);
     const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -55,7 +60,7 @@ export default function EditGatewayPage() {
         setLoading(true);
         const { data, error: fetchErr } = await supabase
             .from("gateways")
-            .select("id, label, serial_number, status, description, photo_url, panel_photo_url")
+            .select("id, label, serial_number, status, description, photo_url, panel_photo_url, property_id, owner_id")
             .eq("id", id)
             .single();
 
@@ -68,9 +73,34 @@ export default function EditGatewayPage() {
         setGateway(data as GatewayData);
         setLabel(data.label || "");
         setDescription(data.description || "");
+        setSelectedPropertyId(data.property_id || null);
         if (data.photo_url) setPhotoPreview(data.photo_url);
         if (data.panel_photo_url) setPanelPhotoPreview(data.panel_photo_url);
         setLoading(false);
+
+        // Fetch owner's properties for the dropdown
+        if (data.owner_id) {
+            fetchProperties(data.owner_id);
+        }
+    };
+
+    const fetchProperties = async (ownerId: string) => {
+        setLoadingProperties(true);
+        try {
+            const { data: props } = await supabase
+                .from("properties")
+                .select("id, name, address")
+                .eq("owner_id", ownerId)
+                .order("name", { ascending: true });
+
+            if (props) {
+                setProperties(props);
+            }
+        } catch (err) {
+            console.error("Failed to fetch properties:", err);
+        } finally {
+            setLoadingProperties(false);
+        }
     };
 
     const uploadPhoto = async (file: File, path: string): Promise<string | null> => {
@@ -117,6 +147,7 @@ export default function EditGatewayPage() {
             const updates: Record<string, unknown> = {
                 label: label.trim() || gateway.label,
                 description: description.trim() || null,
+                property_id: selectedPropertyId || null,
             };
 
             // Upload photos if changed
@@ -274,6 +305,41 @@ export default function EditGatewayPage() {
                             </span>
                         </div>
                     </div>
+                </div>
+
+                {/* Property Linking */}
+                <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
+                    <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+                        <Building2 className="w-4 h-4 text-primary" />
+                        Imóvel Vinculado
+                    </h3>
+                    <p className="text-xs text-muted-foreground mb-3">
+                        Vincule este gateway a um imóvel para registrar contas de água e calcular o custo estimado de consumo.
+                    </p>
+                    <select
+                        value={selectedPropertyId || ""}
+                        onChange={(e) => setSelectedPropertyId(e.target.value || null)}
+                        disabled={loadingProperties}
+                        className="w-full px-4 py-2.5 border border-input rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all appearance-none cursor-pointer"
+                    >
+                        <option value="">— Nenhum imóvel vinculado —</option>
+                        {properties.map((p) => (
+                            <option key={p.id} value={p.id}>
+                                {p.name}{p.address ? ` — ${p.address}` : ""}
+                            </option>
+                        ))}
+                    </select>
+                    {loadingProperties && (
+                        <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1.5">
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            Carregando imóveis...
+                        </p>
+                    )}
+                    {!loadingProperties && properties.length === 0 && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                            Nenhum imóvel cadastrado. Cadastre um imóvel primeiro em Imóveis.
+                        </p>
+                    )}
                 </div>
 
                 {/* Photos Section */}
