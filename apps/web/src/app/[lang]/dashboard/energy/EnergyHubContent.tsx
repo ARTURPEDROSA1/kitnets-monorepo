@@ -20,10 +20,10 @@ import {
     Trash2,
     Sparkles,
     Calendar,
-    ExternalLink,
 } from "lucide-react";
 import { EnergyDistributorLogo } from "@/components/energy/EnergyDistributorLogo";
 import { AddStandaloneUcModal } from "@/components/energy/AddStandaloneUcModal";
+import { PdfViewerModal } from "@/components/ui/PdfViewerModal";
 import type { OwnerPropertySummary } from "@/lib/energy-properties-server";
 
 const formatCurrency = (val: number) =>
@@ -52,6 +52,10 @@ export default function EnergyHubContent({ lang, initialProperties }: EnergyHubC
     const [isAddUcOpen, setIsAddUcOpen] = useState(false);
     const [filterTab, setFilterTab] = useState<"all" | "rental" | "standalone">("all");
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [pdfViewerUrl, setPdfViewerUrl] = useState<string | null>(null);
+    const [pdfViewerTitle, setPdfViewerTitle] = useState("Fatura de Energia");
+    const [pdfViewerFileName, setPdfViewerFileName] = useState("fatura-energia.pdf");
+    const [isPdfViewerOpen, setIsPdfViewerOpen] = useState(false);
 
     const loadProperties = async () => {
         try {
@@ -354,18 +358,22 @@ export default function EnergyHubContent({ lang, initialProperties }: EnergyHubC
                                     <div className="text-right">
                                         {prop.billsCount > 0 ? (
                                             prop.latestBillPdfUrl ? (
-                                                <a
-                                                    href={prop.latestBillPdfUrl}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    className="text-foreground font-medium flex items-center gap-1 justify-end hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
-                                                    title="Abrir última fatura em PDF"
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setPdfViewerUrl(prop.latestBillPdfUrl!);
+                                                        setPdfViewerTitle(`Fatura de Energia - ${prop.consumerUnit || prop.name} - ${prop.latestMonthLabel || prop.latestMonth || ""}`);
+                                                        setPdfViewerFileName(`fatura-energia-${prop.latestMonth || "atual"}.pdf`);
+                                                        setIsPdfViewerOpen(true);
+                                                    }}
+                                                    className="text-foreground font-medium flex items-center gap-1 justify-end hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer"
+                                                    title="Ver última fatura em PDF"
                                                 >
                                                     <FileText className="w-3.5 h-3.5 text-emerald-600" />
                                                     Ver última fatura
-                                                    <ExternalLink className="w-3 h-3 text-muted-foreground" />
-                                                </a>
+                                                    <FileText className="w-3 h-3 text-muted-foreground" />
+                                                </button>
                                             ) : (
                                                 <span className="text-foreground font-medium flex items-center gap-1 justify-end">
                                                     <FileText className="w-3.5 h-3.5 text-emerald-600" />
@@ -470,6 +478,15 @@ export default function EnergyHubContent({ lang, initialProperties }: EnergyHubC
                     setProperties((prev) => [newProperty, ...prev]);
                     router.push(`/${lang}/dashboard/energy/${newProperty.id}`);
                 }}
+            />
+
+            {/* PDF Viewer Modal */}
+            <PdfViewerModal
+                isOpen={isPdfViewerOpen}
+                onClose={() => setIsPdfViewerOpen(false)}
+                url={pdfViewerUrl}
+                title={pdfViewerTitle}
+                fileName={pdfViewerFileName}
             />
         </div>
     );
