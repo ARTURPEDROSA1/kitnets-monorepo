@@ -91,12 +91,9 @@ export default function BillingPage() {
                 setProperty(propData[0]);
             }
 
-            // Fetch all bills (from water_bills table — where upsert_water_bill stores them)
+            // Fetch all bills via RPC (SECURITY DEFINER bypasses RLS)
             const { data: billsData } = await supabase
-                .from("water_bills")
-                .select("*")
-                .eq("property_id", propertyId)
-                .order("reference_month", { ascending: false });
+                .rpc("get_property_bills", { p_property_id: propertyId });
             if (billsData) {
                 setBills(billsData);
             }
