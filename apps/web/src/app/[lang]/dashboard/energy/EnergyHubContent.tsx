@@ -20,6 +20,7 @@ import {
     Trash2,
     Sparkles,
     Calendar,
+    ExternalLink,
 } from "lucide-react";
 import { EnergyDistributorLogo } from "@/components/energy/EnergyDistributorLogo";
 import { AddStandaloneUcModal } from "@/components/energy/AddStandaloneUcModal";
@@ -352,10 +353,25 @@ export default function EnergyHubContent({ lang, initialProperties }: EnergyHubC
 
                                     <div className="text-right">
                                         {prop.billsCount > 0 ? (
-                                            <span className="text-foreground font-medium flex items-center gap-1 justify-end">
-                                                <FileText className="w-3.5 h-3.5 text-emerald-600" />
-                                                {prop.billsCount} {prop.billsCount === 1 ? "fatura arquivada" : "faturas arquivadas"}
-                                            </span>
+                                            prop.latestBillPdfUrl ? (
+                                                <a
+                                                    href={prop.latestBillPdfUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="text-foreground font-medium flex items-center gap-1 justify-end hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                                                    title="Abrir última fatura em PDF"
+                                                >
+                                                    <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                                                    Ver última fatura
+                                                    <ExternalLink className="w-3 h-3 text-muted-foreground" />
+                                                </a>
+                                            ) : (
+                                                <span className="text-foreground font-medium flex items-center gap-1 justify-end">
+                                                    <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                                                    {prop.billsCount} {prop.billsCount === 1 ? "fatura arquivada" : "faturas arquivadas"}
+                                                </span>
+                                            )
                                         ) : (
                                             <span className="text-muted-foreground flex items-center gap-1 justify-end">
                                                 <Sparkles className="w-3.5 h-3.5 text-amber-500" />
