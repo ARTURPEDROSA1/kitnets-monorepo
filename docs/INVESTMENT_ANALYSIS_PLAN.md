@@ -1,6 +1,6 @@
 # Property Investment Analysis — Implementation Plan
 
-**Date:** 2026-09-11 · **Status:** proposal · **Scope:** `apps/web` (Next.js + Supabase)
+**Date:** 2026-09-11 · **Updated:** 2026-09-13 · **Status:** income side delivered; investment side next (see §8) · **Scope:** `apps/web` (Next.js + Supabase)
 
 Goal: for every property in *Gestão de Imóveis*, answer four questions with real numbers instead of estimates:
 
@@ -222,19 +222,32 @@ Tests (`investment-metrics.test.ts`, vitest): the Vale do Sol case from §2 as a
 
 **7.3 Dictionary keys** in pt/en/es for every label; pt first.
 
-## 8. Phases
+## 8. Status and next steps (updated 2026-09-13)
 
-**Delivered ahead of phase 0 (2026-09-11): real income ledger.** `property_income_months` (migration `apps/web/database/property_income_2026_09.sql`), pure helpers in `lib/property-income.ts`, route `/api/properties/[id]/income` (GET / merge-PUT / DELETE), and `PropertyIncomeLedger` inside the cost-center dashboard: editable monthly rows (received, energy portion, other, agency %, derived net and gross rent, status previsto/confirmado), spreadsheet import with column mapping, and the dashboard's revenue, management fee and DRE chart now use the latest confirmed month when data exists. The `properties.id` is now passed into the dashboard, so that part of phase 0 is done. Phase 1's ledger keeps this table as the INCOME source and adds costs, capex and financing; a Banco Inter (Open Finance) integration will write `source = BANK` rows with `bank_reference`.
+### 8.1 What is live on `main`
 
-| Phase | Deliverable | Depends on | Effort |
-|---|---|---|---|
-| 0 | Add vitest to `apps/web` (move the parser checks in `property-income.ts` into a test) | — | 0.5 d |
-| 1 | Migration (§4); engine (§5) with tests; `investment`, `transactions`, `metrics` routes; KPI row, payback curve, config modal, manual ledger | 0 | 3–4 d |
-| 2 | Statement import (XLS/CSV/OFX + PDF fallback) with classifier and review queue; lease/bill sync; real monthly cash-flow chart replacing the fake DRE | 1 | 2–3 d |
-| 3 | Valuations (manual + FipeZap); IRR, equity multiple, appreciation; IPCA-deflated payback; portfolio roll-up on `/imoveis` | 1 | 2 d |
-| 4 | Scenarios ("what if I prepay X", "sell at year N", rent growth by index); PDF/XLSX report export; public "Calculadora de Payback de Imóvel" reusing the engine for SEO | 3 | 2–3 d |
+| Area | State |
+|---|---|
+| **Income side — done** | `property_income_months` (one row per property per month): received, energy income, energy cost (`other_income`), other expenses, agency %, status previsto/confirmado, source manual/import/bank. Derived: net rent = received − energy; gross = net ÷ (1 − fee); revenue = gross + energy; OPEX = fee + energy cost + other expenses; NOI = revenue − OPEX. Pure helpers in `lib/property-income.ts`. |
+| **Income UI — done** | `PropertyIncomeLedger`: inline-editable table (Mês · Bruto · Taxa · Líquido · Energia · Recebido · Custo de energia · Outras despesas · Status · Comentários), period filter (YTD/1–5 anos/Tudo/custom) shared with the DRE chart, period tiles, Excel template export (`/income/template`), filled-ledger export (`?fill=ledger`), `.xlsx` import parsed server-side (`/income/parse`), direct import of the template (replace-all), agency-fee KPI ("economia potencial com autogestão"). |
+| **Dashboard — done** | KPI cards and donut show the latest confirmed month; DRE chart shows real months in the selected period; Ocupação is lifetime; `/imoveis` cards use `/api/properties/income-summary`. |
+| **Infrastructure — done** | Schema is code: `supabase/migrations/` applied by the `db` workflow (PR: fresh DB + lint; merge: `db push` to prod). `vitest` installed (`npm test` in `apps/web`), `ci.yml`, Sentry. `properties.id` reaches the dashboard. |
+| **Not started** | Acquisition, financing, capex / annual-cost ledger, metrics engine, payback UI, valuations, bank integration. |
 
-Acceptance for phase 1, using the Vale do Sol attachments: enter the acquisition (R$ 377.000, 24/04/2018, down payment R$ 91.334,84), import the Bradesco XLS, and the page must show cash invested ≈ R$ 420.8k, 58 financing rows, loan status *Quitado em 25/08/2021*, gross yield 6,7 %, and a payback forecast consistent with the NOI entered.
+### 8.2 Design adjustment
+
+The income ledger is monthly and stays as-is. The *investment* side is dated, irregular (down payment, 58 installments, prepayments, payoff, renovations, yearly IPTU), so it gets its own dated table — the `property_transactions` shape from §4.3 minus the income flows — plus the `property_acquisitions` / `property_financings` headers. Everything the owner's rent spreadsheet already carries in PRESTACAO / TARIFA / AMORTIZACAO / IPTU / UTILIDADES / Comentarios maps onto it, so the first deliverable is the same pattern as income: **table + Excel template + direct import + export**, then the engine on top.
+
+### 8.3 Slices (one PR each, in this order)
+
+| Slice | Deliverable | Acceptance (Vale do Sol) |
+|---|---|---|
+| **A. Investment ledger** | Migration: `property_acquisitions` (date, price, ITBI, registry, broker, down payment, built m²), `property_financings` (lender, contract, SAC/PRICE, principal, rate, term, first due, status, paid-off date), `property_transactions` (dated rows: `kind` = ENTRADA · PRESTAÇÃO · AMORTIZAÇÃO · QUITAÇÃO · TARIFA · IPTU · UTILIDADES · REFORMA · OUTROS, amount, principal/interest/insurance split when known, comment, source). Routes `GET/PUT/DELETE /api/properties/[id]/investment` and `/transactions` (+ `/template`, `/parse`, replace-all import). UI section **"Investimento no imóvel"** under the income ledger: acquisition + financing form, transactions table with period filter, tiles *Total investido*, *Pago ao banco (juros + seguros)*, *Capex*, *Status do financiamento*. | Enter 377.000 / 24-04-2018 / entrada 91.334,84; import the rent spreadsheet's cost columns → total investido ≈ R$ 459.900 (the sheet's own "Investimento" column), 58 financing rows, *Quitado em 25/08/2021*. |
+| **B. Metrics engine + payback** | `lib/investment-metrics.ts` (pure; §3 formulas) with vitest fixtures from §2; `GET /api/properties/[id]/metrics?asOf=`; second KPI row (*Total investido*, *Renda líquida acumulada*, *Payback %* + forecast date, *Yield bruto/líquido*, *Cash-on-cash*, *TIR*); payback curve (cumulative invested vs cumulative NOI, crossing = payback); "Configurar investimento" assumptions (discount rate, rent growth index, vacancy). | Net income to date = Σ NOI of confirmed months (≈ R$ 231k by set/2026 per the sheet); payback % = that ÷ total invested ≈ 50 %; forecast date at the current NOI run rate; gross yield on price 6,7 %. Tests green in CI. |
+| **C. Value & returns** | `property_valuations` (manual, appraisal, FipeZap-derived); appreciation, equity multiple, IRR to date (with unrealised value), IPCA-deflated payback; portfolio roll-up strip on `/imoveis` (invested, NOI 12 m, blended yield, weighted payback). | FipeZap estimate for Nova Lima 2 quartos vs a manual value; IRR reconciles with a spreadsheet XIRR on the same cash flows. |
+| **D. Automation & growth** | Banco Inter (Open Finance) sync writing `source = BANK` rows into both ledgers with a review queue; scenarios (prepay X, sell at year N, rent growth by index); XLSX/PDF report; public "Calculadora de Payback de Imóvel" reusing the engine for SEO. | — |
+
+Each slice ships behind the existing auth helpers (`requireProfile` + `getOwnedProperty`), as a `supabase/migrations` file when the schema changes, with tests for anything that is pure math or parsing.
 
 ## 9. Risks and decisions to confirm
 
