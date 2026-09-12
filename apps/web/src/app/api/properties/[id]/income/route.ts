@@ -34,7 +34,7 @@ const MAX_ROWS = 600;
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 const SELECT_COLUMNS =
-    "id, property_id, month, received_on, received_amount, energy_portion, other_income, agency_fee_pct, status, source, bank_reference, notes, created_at, updated_at";
+    "id, property_id, month, received_on, received_amount, energy_portion, other_income, other_expenses, agency_fee_pct, status, source, bank_reference, notes, created_at, updated_at";
 
 function money(value: unknown): number | null | undefined {
     if (value === undefined) return undefined;
@@ -57,6 +57,7 @@ function normalizeRow(r: PropertyIncomeRow): PropertyIncomeRow {
         received_amount: Number(r.received_amount) || 0,
         energy_portion: Number(r.energy_portion) || 0,
         other_income: Number(r.other_income) || 0,
+        other_expenses: Number(r.other_expenses) || 0,
         agency_fee_pct: Number(r.agency_fee_pct) || 0,
     };
 }
@@ -107,6 +108,7 @@ interface ValidatedInput {
     gross_rent?: number;   // derived into received_amount at merge time, never stored
     energy_portion?: number;
     other_income?: number;
+    other_expenses?: number;
     agency_fee_pct?: number;
     status?: IncomeStatus;
     source?: IncomeSource;
@@ -123,7 +125,7 @@ function validateInput(raw: unknown, index: number): { row: ValidatedInput } | {
     }
     const row: ValidatedInput = { month: r.month };
 
-    for (const key of ["received_amount", "gross_rent", "energy_portion", "other_income"] as const) {
+    for (const key of ["received_amount", "gross_rent", "energy_portion", "other_income", "other_expenses"] as const) {
         const v = money(r[key]);
         if (v === null) return { error: `Linha ${index + 1} (${r.month}): ${key} deve ser um número ≥ 0` };
         if (v !== undefined) row[key] = v;
@@ -203,6 +205,7 @@ export async function PUT(request: Request, context: RouteContext) {
                     received_amount: 0,
                     energy_portion: 0,
                     other_income: 0,
+                    other_expenses: 0,
                     agency_fee_pct: 0,
                     status: "CONFIRMED",
                     source: "MANUAL",
