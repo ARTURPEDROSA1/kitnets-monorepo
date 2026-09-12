@@ -3,7 +3,7 @@ import { currentUser } from '@clerk/nextjs/server';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import OpenAI from 'openai';
 import { extractText, getDocumentProxy } from "unpdf";
-import sharp from 'sharp';
+import { cropLogoByBox, extractLogoFromPdf, isLogoBox, type PDFDocument } from '@/lib/agency-logo';
 
 const getGeminiClient = () => {
     if (!process.env.GEMINI_API_KEY) return null;
@@ -25,7 +25,7 @@ ATENÇÃO CRÍTICA:
    - NÃO CONFUNDA a imobiliária com o LOCADOR (proprietário do imóvel) ou com o LOCATÁRIO (inquilino)! Extraia APENAS os dados da imobiliária/administradora.
 2. Em "Contrato de Prestação de Serviços" para locação/administração:
    - A imobiliária geralmente é a "CONTRATADA". Extraia os dados da CONTRATADA (não do Contratante).
-3. Se o documento for uma imagem e houver logotipo ou marca da imobiliária no cabeçalho/topo, forneça a bounding box estimada do logotipo em coordenadas normalizadas [ymin, xmin, ymax, xmax] (valores inteiros de 0 a 1000). Caso contrário, use null.
+3. Se o documento for uma imagem ou um PDF digitalizado e houver logotipo ou marca da imobiliária no cabeçalho/topo, forneça a bounding box estimada do logotipo em coordenadas normalizadas [ymin, xmin, ymax, xmax] (valores inteiros de 0 a 1000). Caso contrário, use null.
 4. Se o documento contiver dados de contrato de administração ou locação, extraia também a taxa de administração em porcentagem (ex: 10.0, 8.5) e as datas de início e término/vigência se existirem.
 
 Retorne SOMENTE um JSON válido (sem markdown, sem tags de código, sem explicações) com estas chaves:
@@ -179,11 +179,12 @@ export async function POST(request: NextRequest) {
         let textContent = "";
         let base64ForVision = "";
         let mimeType = file.type;
+        let pdfDocument: PDFDocument | null = null;
 
         if (file.type === "application/pdf") {
             try {
-                const pdf = await getDocumentProxy(new Uint8Array(buffer));
-                const result = await extractText(pdf, { mergePages: true });
+                pdfDocument = await getDocumentProxy(new Uint8Array(buffer));
+                const result = await extractText(pdfDocument, { mergePages: true });
                 textContent = result.text || "";
             } catch (pdfError) {
                 console.warn("[Agency Extract] PDF text extraction failed:", pdfError);
@@ -307,41 +308,17 @@ export async function POST(request: NextRequest) {
             extracted.additional_phone = normalizePhoneWithDDD(extracted.additional_phone, extracted.city, extracted.state);
         }
 
-        // Crop logo using sharp if the uploaded file is an image and logo_box_2d is present
-        if (
-            file.type.startsWith("image/") &&
-            extracted.logo_box_2d &&
-            Array.isArray(extracted.logo_box_2d) &&
-            extracted.logo_box_2d.length === 4
-        ) {
-            try {
-                const metadata = await sharp(buffer).metadata();
-                if (metadata.width && metadata.height) {
-                    const [ymin, xmin, ymax, xmax] = extracted.logo_box_2d;
-                    const left = Math.max(0, Math.floor((xmin / 1000) * metadata.width));
-                    const top = Math.max(0, Math.floor((ymin / 1000) * metadata.height));
-                    const width = Math.min(metadata.width - left, Math.ceil(((xmax - xmin) / 1000) * metadata.width));
-                    const height = Math.min(metadata.height - top, Math.ceil(((ymax - ymin) / 1000) * metadata.height));
-
-                    if (width > 20 && height > 20) {
-                        const padX = Math.round(width * 0.05);
-                        const padY = Math.round(height * 0.05);
-                        const cropLeft = Math.max(0, left - padX);
-                        const cropTop = Math.max(0, top - padY);
-                        const cropWidth = Math.min(metadata.width - cropLeft, width + (padX * 2));
-                        const cropHeight = Math.min(metadata.height - cropTop, height + (padY * 2));
-
-                        const croppedBuffer = await sharp(buffer)
-                            .extract({ left: cropLeft, top: cropTop, width: cropWidth, height: cropHeight })
-                            .png()
-                            .toBuffer();
-
-                        extracted.logo_base64 = `data:image/png;base64,${croppedBuffer.toString("base64")}`;
-                    }
-                }
-            } catch (cropErr) {
-                console.warn("[Agency Extract] Server sharp logo crop failed:", cropErr);
+        // Logo: pull it out of the PDF's first page, or crop the model's bounding box from an image upload.
+        try {
+            if (pdfDocument) {
+                const logo = await extractLogoFromPdf(pdfDocument, extracted.logo_box_2d);
+                if (logo) extracted.logo_base64 = logo;
+            } else if (file.type.startsWith("image/") && isLogoBox(extracted.logo_box_2d)) {
+                const logo = await cropLogoByBox(buffer, extracted.logo_box_2d);
+                if (logo) extracted.logo_base64 = logo;
             }
+        } catch (logoErr) {
+            console.warn("[Agency Extract] Logo extraction failed:", logoErr);
         }
 
         return NextResponse.json({ success: true, data: extracted });
