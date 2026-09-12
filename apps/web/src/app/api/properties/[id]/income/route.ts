@@ -4,6 +4,7 @@ import {
     INCOME_SOURCES,
     INCOME_STATUSES,
     MONTH_KEY_REGEX,
+    receivedFromGross,
     type IncomeRowInput,
     type IncomeSource,
     type IncomeStatus,
@@ -102,6 +103,7 @@ export async function GET(_request: Request, context: RouteContext) {
 interface ValidatedInput {
     month: string;
     received_amount?: number;
+    gross_rent?: number;   // derived into received_amount at merge time, never stored
     energy_portion?: number;
     other_income?: number;
     agency_fee_pct?: number;
@@ -120,7 +122,7 @@ function validateInput(raw: unknown, index: number): { row: ValidatedInput } | {
     }
     const row: ValidatedInput = { month: r.month };
 
-    for (const key of ["received_amount", "energy_portion", "other_income"] as const) {
+    for (const key of ["received_amount", "gross_rent", "energy_portion", "other_income"] as const) {
         const v = money(r[key]);
         if (v === null) return { error: `Linha ${index + 1} (${r.month}): ${key} deve ser um número ≥ 0` };
         if (v !== undefined) row[key] = v;
@@ -200,14 +202,25 @@ export async function PUT(request: Request, context: RouteContext) {
             delete base.id;
             delete base.created_at;
             delete base.updated_at;
-            const { month, ...fields } = input;
-            merged.set(month, {
+            const { month, gross_rent, ...fields } = input;
+            const record: Record<string, unknown> = {
                 ...base,
                 ...fields,
                 property_id: propertyId,
                 owner_id: profileId,
                 month: `${month}-01`,
-            });
+            };
+            // Gross rent from a lease sheet: derive what lands in the account
+            // using the merged fee / energy / other values for that month.
+            if (gross_rent !== undefined) {
+                record.received_amount = receivedFromGross(
+                    gross_rent,
+                    Number(record.agency_fee_pct) || 0,
+                    Number(record.energy_portion) || 0,
+                    Number(record.other_income) || 0
+                );
+            }
+            merged.set(month, record);
         }
 
         const { error } = await supabase

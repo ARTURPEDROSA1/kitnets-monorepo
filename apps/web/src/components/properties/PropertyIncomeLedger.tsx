@@ -77,7 +77,7 @@ const parseInput = (s: string): number | null => {
 type DraftField = "received" | "energy" | "other" | "pct" | "gross" | "notes";
 type Drafts = Record<string, Partial<Record<DraftField, string>>>;
 
-const FIELD_OPTIONS: IncomeField[] = ["received", "energy", "other", "notes", "ignore"];
+const FIELD_OPTIONS: IncomeField[] = ["gross", "fee_pct", "received", "energy", "other", "notes", "ignore"];
 const IMPORT_CHUNK = 300;
 const DEFAULT_AGENCY_FEE_PCT = 10;
 const COLLAPSED_ROWS = 24;
@@ -726,6 +726,7 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct =
                         <DialogDescription>
                             Cole ou envie um arquivo TSV/CSV (copiado do Excel / Google Sheets) com uma coluna de data e colunas de valores.
                             Meses já existentes são atualizados apenas nas colunas mapeadas; os demais campos são mantidos.
+                            Se a planilha trouxer o aluguel bruto do contrato, o valor recebido é calculado com a taxa e a energia já registradas no mês.
                         </DialogDescription>
                     </DialogHeader>
 
@@ -796,6 +797,8 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct =
                                         <thead className="bg-muted/40 text-[10px] uppercase text-muted-foreground">
                                             <tr>
                                                 <th className="text-left px-2 py-1">Mês</th>
+                                                <th className="text-right px-2 py-1">Bruto</th>
+                                                <th className="text-right px-2 py-1">Taxa</th>
                                                 <th className="text-right px-2 py-1">Recebido</th>
                                                 <th className="text-right px-2 py-1">Energia</th>
                                                 <th className="text-right px-2 py-1">Outras despesas</th>
@@ -806,7 +809,9 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct =
                                             {importRows.slice(-6).reverse().map(r => (
                                                 <tr key={r.month} className="border-t border-border/60">
                                                     <td className="px-2 py-1 font-semibold">{formatMonthKey(r.month)}</td>
-                                                    <td className="px-2 py-1 text-right tabular-nums">{r.received_amount !== undefined ? formatBRL(r.received_amount) : "—"}</td>
+                                                    <td className="px-2 py-1 text-right tabular-nums">{r.gross_rent !== undefined ? formatBRL(r.gross_rent) : "—"}</td>
+                                                    <td className="px-2 py-1 text-right tabular-nums">{r.agency_fee_pct !== undefined ? `${r.agency_fee_pct}%` : "—"}</td>
+                                                    <td className="px-2 py-1 text-right tabular-nums">{r.received_amount !== undefined ? formatBRL(r.received_amount) : r.gross_rent !== undefined ? "calculado" : "—"}</td>
                                                     <td className="px-2 py-1 text-right tabular-nums">{r.energy_portion !== undefined ? formatBRL(r.energy_portion) : "—"}</td>
                                                     <td className="px-2 py-1 text-right tabular-nums">{r.other_income !== undefined ? formatBRL(r.other_income) : "—"}</td>
                                                     <td className="px-2 py-1 truncate max-w-[180px]">{r.notes ?? ""}</td>
