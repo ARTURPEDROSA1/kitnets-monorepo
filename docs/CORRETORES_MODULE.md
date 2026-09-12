@@ -95,7 +95,7 @@ apps/web/src/
 │   └── agent.ts                       # Agent, AgentWithAgency, AgentFormData, AgentType, AgentStatus
 └── middleware.ts                      # Route protection (/corretores(.*))
 
-packages/core/database/
+supabase/legacy/core/
 └── agent_setup.sql                    # Table schema, indexes, trigger, RLS, storage setup
 ```
 
@@ -193,7 +193,7 @@ export interface AgentFormData {
 
 ### 4.1 Table: `public.agents`
 
-Defined in [`agent_setup.sql`](file:///c:/Users/Administrator/Documents/Kitnets/packages/core/database/agent_setup.sql):
+Defined in [`agent_setup.sql`](file:///c:/Users/Administrator/Documents/Kitnets/supabase/legacy/core/agent_setup.sql):
 
 ```sql
 CREATE TABLE IF NOT EXISTS public.agents (
@@ -540,7 +540,7 @@ To initialize or migrate existing databases, execute:
 
 ```sql
 -- 1. Create table and indexes (from agent_setup.sql)
-\i packages/core/database/agent_setup.sql
+\i supabase/legacy/core/agent_setup.sql
 
 -- 2. If upgrading from earlier draft with whatsapp_phone:
 ALTER TABLE public.agents DROP COLUMN IF EXISTS whatsapp_phone;

@@ -44,3 +44,7 @@ data/*.db-journal
 
 # Turbo
 .turbo
+
+# Supabase CLI
+supabase/.temp
+supabase/.branches
