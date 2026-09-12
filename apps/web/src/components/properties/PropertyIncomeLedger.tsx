@@ -512,7 +512,7 @@ export default function PropertyIncomeLedger({
                     </h3>
                     <p className="text-xs text-muted-foreground">
                         O que entrou na conta a cada mês. A parcela de energia vai para o centro de energia solar; o custo de energia é a conta de luz paga à parte.
-                        Aluguel líquido (após a taxa) = recebido − energia; aluguel bruto = líquido ÷ (1 − taxa); OPEX = taxa + custo de energia; NOI = líquido − custo de energia.
+                        Aluguel líquido (após a taxa) = recebido − energia; aluguel bruto = líquido ÷ (1 − taxa); receita = bruto + energia; OPEX = taxa + custo de energia; NOI = recebido − custo de energia.
                     </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
