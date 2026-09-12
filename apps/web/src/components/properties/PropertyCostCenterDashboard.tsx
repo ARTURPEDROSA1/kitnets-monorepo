@@ -58,7 +58,6 @@ import {
     filterRowsByPeriod,
     formatMonthKey,
     monthKey,
-    type IncomeBreakdown,
     type PropertyIncomeRow,
 } from '@/lib/property-income';
 import { DEFAULT_PERIOD, monthsBetween, periodLabel, periodRange, type PeriodFilterValue } from '@/lib/period-filter';
@@ -165,25 +164,23 @@ export default function PropertyCostCenterDashboard({
             rentedUnitsCount = 1;
         }
 
-        // ── Real data from the income ledger, restricted to the selected period ──
-        const range = periodRange(period);
-        const periodRows = filterRowsByPeriod(incomeRows, range).sort((a, b) => (a.month < b.month ? -1 : 1));
-        const confirmedPeriod = periodRows.filter(r => r.status === 'CONFIRMED');
-        const realMonths = confirmedPeriod.length;
-        const hasRealIncome = realMonths > 0;
-        const sumBy = (pick: (b: IncomeBreakdown) => number) =>
-            confirmedPeriod.reduce((acc, r) => acc + pick(breakdown(r)), 0);
-        const grossTotal = sumBy(b => b.grossRent);
-        const feeTotal = sumBy(b => b.feeAmount);
-        const otherTotal = sumBy(b => b.other);
-        const opexTotal = feeTotal + otherTotal;
-        const noiTotal = sumBy(b => b.noi);
+        // ── Real data from the income ledger ──
+        // KPI cards and the donut show the CURRENT result: the latest confirmed month.
+        // They do not follow the chart period; only the DRE chart does.
+        const confirmedAll = incomeRows
+            .filter(r => r.status === 'CONFIRMED')
+            .sort((a, b) => (a.month < b.month ? -1 : 1));
+        const latest = confirmedAll.length ? confirmedAll[confirmedAll.length - 1] : null;
+        const current = latest ? breakdown(latest) : null;
+        const hasRealIncome = current !== null;
 
-        if (hasRealIncome) {
-            // Monthly averages over the period (the KPI cards are monthly figures)
-            grossMonthlyRevenue = Math.round(grossTotal / realMonths);
+        if (current) {
+            grossMonthlyRevenue = Math.round(current.revenue);   // gross rent + energy income
             if (propertyType === 'single') rentedUnitsCount = 1;
         }
+
+        const range = periodRange(period);
+        const periodRows = filterRowsByPeriod(incomeRows, range).sort((a, b) => (a.month < b.month ? -1 : 1));
 
         // Operational Expenses (OPEX) — estimates from "Ajustar Custos", used only without ledger data
         const iptuMonthly = details.iptuMonthly
@@ -206,9 +203,9 @@ export default function PropertyCostCenterDashboard({
 
         const estimatedExpenses = iptuMonthly + condoMonthly + maintenanceReserve + adminFee + insuranceAndOther;
 
-        // With ledger data: OPEX = agency fee + other expenses deducted (monthly average over the period)
-        const totalExpenses = hasRealIncome ? Math.round(opexTotal / realMonths) : estimatedExpenses;
-        const noi = hasRealIncome ? Math.round(noiTotal / realMonths) : Math.max(0, grossMonthlyRevenue - totalExpenses);
+        // With ledger data: OPEX = agency fee + energy cost, NOI = revenue − OPEX (current month)
+        const totalExpenses = current ? Math.round(current.opex) : estimatedExpenses;
+        const noi = current ? Math.round(current.noi) : Math.max(0, grossMonthlyRevenue - totalExpenses);
         const margin = grossMonthlyRevenue > 0 ? (noi / grossMonthlyRevenue) * 100 : 0;
 
         // Occupancy: lifetime, from the ledger — months with rent ÷ months since the first record
@@ -228,10 +225,10 @@ export default function PropertyCostCenterDashboard({
         }
 
         // Breakdown for Donut Chart
-        const expenseBreakdown = hasRealIncome
+        const expenseBreakdown = current
             ? [
-                { name: 'Taxa da imobiliária', value: Math.round(feeTotal / realMonths) },
-                { name: 'Custo de energia', value: Math.round(otherTotal / realMonths) },
+                { name: 'Taxa da imobiliária', value: Math.round(current.feeAmount) },
+                { name: 'Custo de energia', value: Math.round(current.other) },
             ].filter(item => item.value > 0)
             : [
                 { name: 'IPTU', value: iptuMonthly },
@@ -249,7 +246,7 @@ export default function PropertyCostCenterDashboard({
                 const b = breakdown(r);
                 dreData.push({
                     month: formatMonthKey(monthKey(r.month)),
-                    receita: Math.round(b.grossRent),
+                    receita: Math.round(b.revenue),
                     despesas: Math.round(b.opex),
                     noi: Math.round(b.noi),
                     previsto: r.status === 'EXPECTED',
@@ -275,11 +272,7 @@ export default function PropertyCostCenterDashboard({
         }
 
         return {
-            realIncomeMonth: hasRealIncome ? periodLabel(period) : null,
-            realMonths,
-            grossTotal,
-            opexTotal,
-            noiTotal,
+            realIncomeMonth: latest && hasRealIncome ? formatMonthKey(monthKey(latest.month)) : null,
             occupancyHint,
             grossMonthlyRevenue,
             annualRevenue: grossMonthlyRevenue * 12,
@@ -424,7 +417,7 @@ export default function PropertyCostCenterDashboard({
                         </span>
                         <span className="text-xs text-muted-foreground">
                             {financials.realIncomeMonth
-                                ? `Média mensal · ${financials.realMonths} ${financials.realMonths === 1 ? 'mês' : 'meses'} · total ${formatBRL(financials.grossTotal)}`
+                                ? `Mês atual (${financials.realIncomeMonth}) · aluguel + energia · anual ${formatBRL(financials.annualRevenue)}`
                                 : `Projeção anual: ${formatBRL(financials.annualRevenue)}`}
                         </span>
                     </div>
@@ -518,7 +511,7 @@ export default function PropertyCostCenterDashboard({
                             </h3>
                             <p className="text-xs text-muted-foreground">
                                 {financials.realIncomeMonth
-                                    ? `Receita bruta, despesas (taxa da imobiliária + custo de energia) e NOI reais · ${financials.realIncomeMonth}; meses previstos em tom claro`
+                                    ? `Receita (aluguel bruto + energia), despesas (taxa + custo de energia) e NOI reais · ${periodLabel(period)}; meses previstos em tom claro`
                                     : 'Histórico e projeção de Receitas, Despesas Operacionais e Lucro Líquido (NOI)'}
                             </p>
                         </div>
@@ -577,7 +570,9 @@ export default function PropertyCostCenterDashboard({
                             Composição do Centro de Custos
                         </h3>
                         <p className="text-xs text-muted-foreground">
-                            Distribuição percentual das despesas operacionais
+                            {financials.realIncomeMonth
+                                ? `Despesas do mês atual (${financials.realIncomeMonth}) — não segue o período do gráfico`
+                                : 'Distribuição percentual das despesas operacionais'}
                         </p>
                     </div>
 
