@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs/config";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -32,4 +33,19 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// Sentry build plugin: uploads source maps when SENTRY_AUTH_TOKEN / SENTRY_ORG /
+// SENTRY_PROJECT are set (Vercel); otherwise it only wires the runtime configs.
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: !process.env.CI,
+  // Serve the SDK's requests from our own origin so ad blockers don't drop them.
+  // The path is excluded from the locale redirect in src/middleware.ts.
+  tunnelRoute: "/monitoring",
+  widenClientFileUpload: true,
+  sourcemaps: {
+    deleteSourcemapsAfterUpload: true,
+  },
+  telemetry: false,
+});
