@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { requireUserWithLimit, validateUpload } from "@/lib/session";
+import { HOUR } from "@/lib/rate-limit";
 import { extractText, getDocumentProxy } from "unpdf";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
@@ -318,6 +320,9 @@ async function extractWithOpenAI(base64: string, mimeType: string): Promise<Extr
 }
 
 export async function POST(request: Request) {
+    const gate = await requireUserWithLimit("ai:energy-extract", 30, HOUR);
+    if ("response" in gate) return gate.response;
+
     try {
         const formData = await request.formData();
         const file = formData.get("file") as File | null;
@@ -326,22 +331,9 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Nenhum arquivo enviado" }, { status: 400 });
         }
 
-        const allowedTypes = [
-            "image/jpeg", "image/jpg", "image/png", "image/webp",
-            "image/gif", "application/pdf"
-        ];
-        if (!allowedTypes.includes(file.type)) {
-            return NextResponse.json(
-                { error: `Tipo de arquivo não suportado: ${file.type}. Use JPG, PNG, WebP ou PDF.` },
-                { status: 400 }
-            );
-        }
-
-        if (file.size > 12 * 1024 * 1024) {
-            return NextResponse.json(
-                { error: "Arquivo muito grande. Máximo suportado: 12MB." },
-                { status: 400 }
-            );
+        const uploadError = validateUpload(file, 12 * 1024 * 1024);
+        if (uploadError) {
+            return NextResponse.json({ error: uploadError }, { status: 400 });
         }
 
         // Process in-memory buffer — ZERO PERSISTENCE TO STORAGE
@@ -356,7 +348,7 @@ export async function POST(request: Request) {
         try {
             console.log("[extract-energy-bill] Attempting Gemini Vision extraction...");
             const extracted = await extractWithGemini(base64, mediaType);
-            console.log(`[extract-energy-bill] ✅ Gemini Vision succeeded. UC: ${extracted.consumerUnit}, Month: ${extracted.referenceMonth}, Saldo: ${extracted.generationBalanceKwh} kWh`);
+            console.log(`[extract-energy-bill] ✅ Gemini Vision succeeded. Month: ${extracted.referenceMonth}`);
             return NextResponse.json({
                 success: true,
                 data: extracted,

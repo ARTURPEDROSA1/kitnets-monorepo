@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import { signStorageUrl } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -190,20 +191,15 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
-        // Get current_bill.pdf URL from storage (only 1 PDF stored per property)
+        // Get current_bill.pdf URL from storage (only 1 PDF stored per property).
+        // The bucket is private: return a short-lived signed URL.
         let currentPdfUrl: string | null = null;
         try {
-            const { data: pUrl } = supabase.storage
+            const { data: files } = await supabase.storage
                 .from("energy-bills")
-                .getPublicUrl(`${resolvedPropertyId}/current_bill.pdf`);
-            if (pUrl?.publicUrl) {
-                // Check if the file actually exists by listing the folder
-                const { data: files } = await supabase.storage
-                    .from("energy-bills")
-                    .list(resolvedPropertyId, { limit: 10, search: "current_bill" });
-                if (files?.some((f: any) => f.name === "current_bill.pdf")) {
-                    currentPdfUrl = `${pUrl.publicUrl}?t=${Date.now()}`;
-                }
+                .list(resolvedPropertyId, { limit: 10, search: "current_bill" });
+            if (files?.some((f: any) => f.name === "current_bill.pdf")) {
+                currentPdfUrl = await signStorageUrl(supabase, "energy-bills", `${resolvedPropertyId}/current_bill.pdf`);
             }
         } catch (storageErr) {
             console.warn("[Energy Bills GET] Storage lookup warning:", storageErr);
@@ -291,7 +287,7 @@ export async function POST(request: Request) {
                     const bucketName = "energy-bills";
                     const { data: buckets } = await supabase.storage.listBuckets();
                     if (!buckets?.some((b: any) => b.name === bucketName)) {
-                        await supabase.storage.createBucket(bucketName, { public: true });
+                        await supabase.storage.createBucket(bucketName, { public: false });
                     }
 
                     const arrayBuffer = await uploadedFile.arrayBuffer();

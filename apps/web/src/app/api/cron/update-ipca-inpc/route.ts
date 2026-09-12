@@ -1,5 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
+import { isAuthorizedCron } from '@/lib/cron-auth';
 import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
@@ -190,8 +191,7 @@ async function upsertIndexData(
 
 export async function GET(request: NextRequest) {
     // Authentication
-    const authHeader = request.headers.get('authorization');
-    if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    if (!isAuthorizedCron(request)) {
         return new NextResponse('Unauthorized', { status: 401 });
     }
 
