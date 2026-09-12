@@ -151,6 +151,12 @@ export default async function RootLayout({
                     <link rel="dns-prefetch" href="https://kqhfzcxqmjkqekozhlng.supabase.co" />
                     <link rel="preconnect" href="https://kqhfzcxqmjkqekozhlng.supabase.co" crossOrigin="anonymous" />
                     <link rel="preconnect" href="https://clerk.kitnets.com" crossOrigin="anonymous" />
+                    {/* Apply the persisted sidebar preference before first paint (key shared with components/Sidebar.tsx) */}
+                    <script
+                        dangerouslySetInnerHTML={{
+                            __html: "try{if(localStorage.getItem('kitnets_sidebar_collapsed')==='1'){document.documentElement.setAttribute('data-sidebar','collapsed')}}catch(e){}",
+                        }}
+                    />
                 </head>
                 <body
                     className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white dark:bg-black text-black dark:text-white`}
@@ -167,7 +173,7 @@ export default async function RootLayout({
                             rentFineCalculatorPage: dict.rentFineCalculatorPage ? { menuTitle: dict.rentFineCalculatorPage.menuTitle } : undefined,
                             proRataRentCalculatorPage: (dict.proRataRentCalculatorPage as Record<string, unknown>)?.menuTitle ? { menuTitle: (dict.proRataRentCalculatorPage as Record<string, unknown>).menuTitle as string } : undefined,
                         }} />
-                        <div className="sm:ml-64 flex min-h-screen flex-col pt-16 sm:pt-0">
+                        <div className="sm:ml-[var(--sidebar-width)] transition-[margin] duration-200 flex min-h-screen flex-col pt-16 sm:pt-0">
                             <div className="flex-1 p-4">
                                 {children}
                             </div>
