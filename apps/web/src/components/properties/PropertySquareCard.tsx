@@ -39,6 +39,26 @@ export interface PropertyCardData {
     savedPhotos: string[];
     profilePhotoUrl?: string | null;
     isComplete?: boolean;
+    /** Latest confirmed month from the income ledger (Receitas de Aluguel); null/undefined = no real data yet */
+    realIncome?: PropertyRealIncome | null;
+}
+
+export interface PropertyRealIncome {
+    /** `YYYY-MM` */
+    month: string;
+    /** gross rent + energy income */
+    revenue: number;
+    /** agency fee + energy cost + other expenses */
+    opex: number;
+    noi: number;
+    /** % */
+    margin: number;
+}
+
+const MONTH_SHORT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+function formatMonthShort(key: string): string {
+    const [y, m] = key.split('-');
+    return `${MONTH_SHORT[Number(m) - 1] ?? m}/${y}`;
 }
 
 interface PropertySquareCardProps {
@@ -62,7 +82,7 @@ export default function PropertySquareCard({
     onDelete,
     isDeleting = false,
 }: PropertySquareCardProps) {
-    const { propertyType, details, subUnits, address, savedPhotos, profilePhotoUrl } = property;
+    const { propertyType, details, subUnits, address, savedPhotos, profilePhotoUrl, realIncome } = property;
 
     // Title calculation
     const title = details.propertyName?.trim()
@@ -85,6 +105,18 @@ export default function PropertySquareCard({
 
     // Financial calculations: Revenue, OPEX and NOI
     const financials = useMemo(() => {
+        // Real data from the income ledger wins over every estimate below
+        if (realIncome && realIncome.revenue > 0) {
+            return {
+                monthlyRevenue: realIncome.revenue,
+                totalExpenses: realIncome.opex,
+                noi: realIncome.noi,
+                margin: realIncome.margin,
+                isEstimate: false,
+                realMonth: formatMonthShort(realIncome.month),
+            };
+        }
+
         let monthlyRevenue = 0;
         let isEstimate = false;
 
@@ -140,8 +172,9 @@ export default function PropertySquareCard({
             noi,
             margin,
             isEstimate,
+            realMonth: null as string | null,
         };
-    }, [propertyType, details, subUnits, totalUnits]);
+    }, [propertyType, details, subUnits, totalUnits, realIncome]);
 
     // Thumbnail photo
     const photoUrl = profilePhotoUrl || (savedPhotos.length > 0 ? savedPhotos[0] : null);
@@ -281,8 +314,12 @@ export default function PropertySquareCard({
                             {formatCurrencyBRL(financials.monthlyRevenue)}
                             <span className="text-[10px] font-normal text-muted-foreground">/mês</span>
                         </span>
-                        {financials.isEstimate && (
+                        {financials.realMonth ? (
+                            <span className="text-[9px] text-emerald-700 dark:text-emerald-400 font-medium">Real · {financials.realMonth}</span>
+                        ) : financials.isEstimate ? (
                             <span className="text-[9px] text-muted-foreground italic">(Estimativa base)</span>
+                        ) : (
+                            <span className="text-[9px] text-muted-foreground italic">(Cadastro)</span>
                         )}
                     </div>
 
