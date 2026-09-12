@@ -32,8 +32,8 @@ export default clerkMiddleware(async (auth, req) => {
     // Skip if it's an API route or static file (already handled by config matcher mostly, but safety check)
     // Also skip if it's a Clerk internal route if any leak through, typically they don't with the matcher.
 
-    // Skip if it's an API route
-    if (pathname.startsWith('/api') || pathname.startsWith('/trpc')) {
+    // Skip API routes and the Sentry tunnel (see tunnelRoute in next.config.ts)
+    if (pathname.startsWith('/api') || pathname.startsWith('/trpc') || pathname.startsWith('/monitoring')) {
         return;
     }
 

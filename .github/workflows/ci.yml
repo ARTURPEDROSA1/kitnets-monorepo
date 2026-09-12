@@ -1,0 +1,61 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: web · type-check, lint, test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Type-check
+        run: npm run -w web type-check
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+
+      - name: Lint
+        run: npm run -w web lint
+
+      - name: Unit tests
+        run: npm run -w web test
+
+  # The production build itself runs on Vercel for every push and pull
+  # request (preview deployments), with the real environment variables. A
+  # second build here would need those variables duplicated as secrets and
+  # would double the CI time, so this workflow gates on the checks Vercel
+  # does not run: type-check, lint and tests.
+
+  gateway:
+    name: edge-gateway · build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Compile
+        run: npm run -w edge-gateway build
