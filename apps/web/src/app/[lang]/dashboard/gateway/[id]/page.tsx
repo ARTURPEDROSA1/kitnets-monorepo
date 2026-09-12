@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@/utils/supabase/client";
 import { ArrowLeft, Zap, Droplets, Flame, FileText, CalendarSync, Settings } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -9,7 +8,7 @@ import { KPICard } from "@/components/dashboard/KPICards";
 import { ConsumptionChart } from "@/components/dashboard/ConsumptionChart";
 import { ConsumptionTabs, DailyTotal } from "@/components/dashboard/ConsumptionTabs";
 import { DateRangePicker } from "@/components/dashboard/DateRangePicker";
-import { format, differenceInDays, subDays, startOfMonth, startOfYear, subMonths, endOfMonth } from "date-fns";
+import { format, differenceInDays, startOfMonth, startOfYear, subMonths, endOfMonth } from "date-fns";
 
 interface DateRange {
     start: Date;
@@ -36,7 +35,6 @@ export default function GatewayDetailPage() {
     const params = useParams();
     const lang = params.lang as string;
     const id = params.id as string;
-    const supabase = createClient();
 
     const [gateway, setGateway] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -65,11 +63,13 @@ export default function GatewayDetailPage() {
     useEffect(() => {
         let cancelled = false;
         (async () => {
-            const { data: gw } = await supabase
-                .from("gateways")
-                .select("property_id")
-                .eq("id", id)
-                .single();
+            let gw: { property_id?: string | null } | null = null;
+            try {
+                const res = await fetch(`/api/gateways/${id}`);
+                if (res.ok) gw = (await res.json()).gateway ?? null;
+            } catch {
+                // Non-critical: billing-cycle sync simply stays off
+            }
 
             if (cancelled || !gw?.property_id) return;
 
@@ -105,7 +105,6 @@ export default function GatewayDetailPage() {
             }
         })();
         return () => { cancelled = true; };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id]);
 
     /** Compute billing-cycle-adjusted dates for a given preset label */
@@ -170,22 +169,34 @@ export default function GatewayDetailPage() {
             const startStr = format(dateRange.start, "yyyy-MM-dd");
             const endStr = format(dateRange.end, "yyyy-MM-dd");
 
-            // 1. Gateway + meters (no readings — fast)
-            const { data: gw, error } = await supabase
-                .from("gateways")
-                .select("*, meters(*)")
-                .eq("id", id)
-                .single();
+            // 1. Gateway + meters + readings for the period and the period before it.
+            //    The API verifies ownership; the browser no longer touches these tables.
+            type Reading = { meter_id: string; value: number | string; read_at: string };
+            let gw: { meters?: Array<{ id: string }>; property_id?: string | null } | null = null;
+            let readings: Reading[] = [];
+            let prevReadings: Array<{ value: number | string }> = [];
+            try {
+                const res = await fetch(`/api/gateways/${id}?start=${startStr}&end=${endStr}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    gw = data.gateway ?? null;
+                    readings = data.readings ?? [];
+                    prevReadings = data.prevReadings ?? [];
+                } else {
+                    console.error("Failed to load gateway:", res.status);
+                }
+            } catch (err) {
+                console.error("Failed to load gateway:", err);
+            }
 
             if (cancelled) return;
-            if (error || !gw) {
-                console.error(error);
+            if (!gw) {
                 setLoading(false);
                 return;
             }
 
             setGateway(gw);
-            const meterIds: string[] = (gw.meters || []).map((m: any) => m.id);
+            const meterIds: string[] = (gw.meters || []).map((m) => m.id);
 
             if (meterIds.length === 0) {
                 setMetersData([]);
@@ -195,30 +206,7 @@ export default function GatewayDetailPage() {
                 return;
             }
 
-            // 2. Current-period readings (date-filtered)
-            const { data: readings } = await supabase
-                .from("meter_readings")
-                .select("meter_id, value, read_at")
-                .in("meter_id", meterIds)
-                .gte("read_at", startStr)
-                .lte("read_at", endStr + "T23:59:59.999Z")
-                .order("read_at", { ascending: true });
-
-            if (cancelled) return;
-
-            // 3. Previous-period readings (same duration, immediately before)
             const daysInRange = differenceInDays(dateRange.end, dateRange.start) + 1;
-            const prevStart = subDays(dateRange.start, daysInRange);
-            const prevEnd = subDays(dateRange.start, 1);
-
-            const { data: prevReadings } = await supabase
-                .from("meter_readings")
-                .select("value")
-                .in("meter_id", meterIds)
-                .gte("read_at", format(prevStart, "yyyy-MM-dd"))
-                .lte("read_at", format(prevEnd, "yyyy-MM-dd") + "T23:59:59.999Z");
-
-            if (cancelled) return;
 
             // ── Process readings ──────────────────────────────
             const allReadings = readings || [];
