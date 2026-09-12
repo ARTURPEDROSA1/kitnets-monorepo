@@ -89,8 +89,8 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
     ws.getCell("A5").value =
         "Aluguel bruto = valor do contrato. Taxa = % que a imobiliária retém. Valor recebido = o que entrou na sua conta " +
         "(já calculado pela fórmula; sobrescreva com o valor real do extrato quando tiver). Energia = parcela paga pelo inquilino " +
-        "referente à energia solar (vai para o centro de energia). Outras despesas = valores descontados do repasse (reparos, taxas). " +
-        "Recebido = bruto × (1 − taxa) + energia − outras despesas.";
+        "referente à energia solar (vai para o centro de energia). Custo de energia = a conta de luz que você paga no mês " +
+        "(custo à parte; não altera o valor recebido). Recebido = bruto × (1 − taxa) + energia.";
     ws.getCell("A5").alignment = { wrapText: true, vertical: "top" };
     ws.getCell("A5").font = { name: "Calibri", size: 9, color: { argb: `FF${MUTED}` } };
     ws.getRow(5).height = 44;
@@ -137,7 +137,7 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
             row.getCell(7).value = ledger.notes ?? null;   // status is re-derived from the month on import
         } else {
             row.getCell(3).value = feePct;
-            row.getCell(4).value = { formula: `IF(B${r}="","",ROUND(B${r}*(1-C${r}/100)+E${r}-F${r},2))`, result: "" };
+            row.getCell(4).value = { formula: `IF(B${r}="","",ROUND(B${r}*(1-C${r}/100)+E${r},2))`, result: "" };
         }
 
         for (let c = 1; c <= 7; c++) {
@@ -184,25 +184,25 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
         ["Como usar", "", "h"],
         ["1.", "Preencha a aba “Receitas”: uma linha por mês, com a data no formato dd/mm/aaaa.", "p"],
         ["2.", "Informe o Aluguel bruto (valor do contrato) e a Taxa da imobiliária em %. O Valor recebido é calculado automaticamente; substitua pelo valor real do extrato bancário quando quiser.", "p"],
-        ["3.", "Se o inquilino paga uma parcela referente à energia solar, informe em Energia (vai para o centro de energia). Valores descontados do repasse (reparos, taxas) vão em Outras despesas.", "p"],
+        ["3.", "Se o inquilino paga uma parcela referente à energia solar, informe em Energia (vai para o centro de energia). A conta de luz que você paga no mês vai em Custo de energia.", "p"],
         ["4.", "Os meses vêm do mais recente para o mais antigo. Para acrescentar meses, arraste a última linha para baixo (a fórmula de Valor recebido é copiada junto). Meses futuros são importados como “previstos”.", "p"],
         ["5.", "Salve o arquivo (.xlsx) e importe em Kitnets.com › Imóveis › Gerenciar Imóvel › Importar planilha. As colunas são reconhecidas automaticamente.", "p"],
         ["Colunas", "", "h"],
         ["Mês", "Data de referência do mês (qualquer dia do mês serve).", "p"],
         ["Aluguel bruto (R$)", "Valor do aluguel no contrato, antes da taxa da imobiliária.", "p"],
         ["Taxa imobiliária (%)", "Percentual retido pela imobiliária (ex.: 10). Use 0 quando você mesmo administra o imóvel.", "p"],
-        ["Valor recebido (R$)", "O que efetivamente entrou na sua conta: bruto × (1 − taxa) + energia − outras despesas.", "p"],
+        ["Valor recebido (R$)", "O que efetivamente entrou na sua conta: bruto × (1 − taxa) + energia.", "p"],
         ["Energia (R$)", "Parcela do pagamento do inquilino referente à energia (solar).", "p"],
-        ["Outras despesas (R$)", "Valores descontados do repasse antes de cair na conta (reparos, taxas, vistoria). Sempre positivo.", "p"],
+        ["Custo de energia (R$)", "A conta de luz do imóvel paga por você no mês. É um custo à parte: não altera o valor recebido, reduz o resultado (NOI). Sempre positivo.", "p"],
         ["Observações", "Texto livre (reajuste, vacância, troca de inquilino).", "p"],
         ["Cálculos no Kitnets.com", "", "h"],
-        ["Aluguel líquido", "recebido − energia + outras despesas (o aluguel após a taxa da imobiliária)", "p"],
+        ["Aluguel líquido", "recebido − energia (o aluguel após a taxa da imobiliária)", "p"],
         ["Aluguel bruto", "líquido ÷ (1 − taxa/100), quando o bruto não é informado", "p"],
-        ["Despesas (OPEX)", "taxa da imobiliária + outras despesas", "p"],
-        ["Resultado (NOI)", "aluguel líquido − outras despesas = recebido − energia", "p"],
+        ["Despesas (OPEX)", "taxa da imobiliária + custo de energia", "p"],
+        ["Resultado (NOI)", "aluguel líquido − custo de energia", "p"],
         ["Taxa acumulada", "bruto − líquido, somado mês a mês: a economia potencial ao administrar o imóvel pelo Kitnets.com.", "p"],
         ["Exemplo", "", "h"],
-        ["Bruto 4.000 · Taxa 10 % · Energia 350 · Outras 0", "Recebido 3.950 · Aluguel líquido 3.600 · Taxa da imobiliária 400 · NOI 3.600", "p"],
+        ["Bruto 4.000 · Taxa 10 % · Energia 350 · Custo de energia 109,80", "Recebido 3.950 · Aluguel líquido 3.600 · Taxa da imobiliária 400 · OPEX 509,80 · NOI 3.490,20", "p"],
     ];
     lines.forEach(([a, b, kind], i) => {
         const row = info.getRow(i + 1);

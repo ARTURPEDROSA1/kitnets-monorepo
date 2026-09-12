@@ -221,14 +221,14 @@ export async function PUT(request: Request, context: RouteContext) {
                 month: `${month}-01`,
             };
             // Gross rent from a lease sheet: derive what lands in the account
-            // using the merged fee / energy / other values for that month.
+            // using the merged fee / energy values for that month (the energy
+            // cost is paid separately and does not affect it).
             // An explicit received_amount in the same row always wins (bank truth).
             if (gross_rent !== undefined && fields.received_amount === undefined) {
                 record.received_amount = receivedFromGross(
                     gross_rent,
                     Number(record.agency_fee_pct) || 0,
-                    Number(record.energy_portion) || 0,
-                    Number(record.other_income) || 0
+                    Number(record.energy_portion) || 0
                 );
             }
             merged.set(month, record);
