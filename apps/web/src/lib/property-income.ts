@@ -5,13 +5,19 @@
  * Money model (what the bank shows is what we store):
  *   received_amount  total credited to the owner for the month
  *   energy_portion   part of it that pays for energy (solar cost centre)
- *   other_income     part of it that is not rent (parking, late fee…)
+ *   other_income     OTHER EXPENSES deducted before crediting (repairs, fees…)
+ *                    — column keeps its historical name; it is a cost, stored ≥ 0
  *   agency_fee_pct   % the agency kept before crediting the owner
  *
  * Derived:
- *   net_rent   = received − energy − other
- *   gross_rent = net_rent ÷ (1 − pct/100)
+ *   net_rent   = received − energy + other        (rent after the agency fee)
+ *   gross_rent = net_rent ÷ (1 − pct/100)         (contract value)
  *   fee        = gross_rent − net_rent
+ *   opex       = fee + other
+ *   noi        = net_rent − other = received − energy
+ *
+ * Example: gross 4.000, fee 10 %, energy 350, other 0 → received 3.950,
+ * net 3.600, fee 400, opex 400, noi 3.600.
  */
 
 export type IncomeStatus = "EXPECTED" | "CONFIRMED";
@@ -62,11 +68,16 @@ export interface IncomeRowInput {
 export interface IncomeBreakdown {
     received: number;
     energy: number;
+    /** other expenses deducted before crediting (≥ 0) */
     other: number;
     netRent: number;
     grossRent: number;
     feeAmount: number;
     feePct: number;
+    /** agency fee + other expenses */
+    opex: number;
+    /** net rent − other expenses (= received − energy) */
+    noi: number;
 }
 
 export const MONTH_KEY_REGEX = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -87,23 +98,26 @@ export function breakdown(
     const energy = Number(row.energy_portion) || 0;
     const other = Number(row.other_income) || 0;
     const feePct = clampPct(Number(row.agency_fee_pct) || 0);
-    const netRent = round2(received - energy - other);
+    const netRent = round2(received - energy + other);
     const grossRent = feePct > 0 ? round2(netRent / (1 - feePct / 100)) : netRent;
+    const feeAmount = round2(grossRent - netRent);
     return {
         received,
         energy,
         other,
         netRent,
         grossRent,
-        feeAmount: round2(grossRent - netRent),
+        feeAmount,
         feePct,
+        opex: round2(feeAmount + other),
+        noi: round2(netRent - other),
     };
 }
 
 /** Inverse of `breakdown`: what lands in the account for a given gross rent. */
 export function receivedFromGross(grossRent: number, feePct: number, energy: number, other: number): number {
     const pct = clampPct(feePct);
-    return round2((Number(grossRent) || 0) * (1 - pct / 100) + (Number(energy) || 0) + (Number(other) || 0));
+    return round2((Number(grossRent) || 0) * (1 - pct / 100) + (Number(energy) || 0) - (Number(other) || 0));
 }
 
 /** `2026-09-01` or `2026-09` → `2026-09` */
@@ -302,7 +316,7 @@ export const INCOME_FIELD_LABELS: Record<IncomeField, string> = {
     fee_pct: "Taxa da imobiliária (%)",
     received: "Valor recebido (líquido da imobiliária)",
     energy: "Parcela de energia",
-    other: "Outras despesas",
+    other: "Outras despesas (descontadas)",
     notes: "Observações",
     ignore: "Ignorar",
 };
@@ -400,6 +414,19 @@ export function buildImportRows(sheet: ParsedSheet, mapping: IncomeField[], opts
 // Aggregations used by the dashboard
 // ───────────────────────────────────────────────────────────────────────────
 
+/** Rows whose month falls inside an inclusive `YYYY-MM` range (null bound = open). */
+export function filterRowsByPeriod<T extends { month: string }>(
+    rows: T[],
+    range: { start: string | null; end: string | null }
+): T[] {
+    return rows.filter(r => {
+        const k = monthKey(r.month);
+        if (range.start && k < range.start) return false;
+        if (range.end && k > range.end) return false;
+        return true;
+    });
+}
+
 export interface IncomeSummary {
     latest: (PropertyIncomeRow & IncomeBreakdown) | null;   // latest CONFIRMED month
     confirmedMonths: number;
@@ -410,6 +437,10 @@ export interface IncomeSummary {
     totalFee: number;               // agency fees kept before crediting, all time = potential saving of self-management
     fee12m: number;
     totalGross: number;             // gross rent (contract value), confirmed, all time
+    totalOther: number;             // other expenses deducted, all time
+    other12m: number;
+    totalNoi: number;               // net rent − other expenses, all time
+    noi12m: number;
     netRent12m: number;             // last 12 confirmed months
     energy12m: number;
     received12m: number;
@@ -437,6 +468,10 @@ export function summarize(rows: PropertyIncomeRow[]): IncomeSummary {
         totalFee: sum(confirmed, b => b.feeAmount),
         fee12m: sum(last12, b => b.feeAmount),
         totalGross: sum(confirmed, b => b.grossRent),
+        totalOther: sum(confirmed, b => b.other),
+        other12m: sum(last12, b => b.other),
+        totalNoi: sum(confirmed, b => b.noi),
+        noi12m: sum(last12, b => b.noi),
         netRent12m: sum(last12, b => b.netRent),
         energy12m: sum(last12, b => b.energy),
         received12m: sum(last12, b => b.received),
