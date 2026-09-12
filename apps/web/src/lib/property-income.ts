@@ -14,14 +14,15 @@
  *   net_rent   = received − energy                (rent after the agency fee)
  *   gross_rent = net_rent ÷ (1 − pct/100)         (contract value)
  *   fee        = gross_rent − net_rent
+ *   revenue    = gross_rent + energy              (everything the tenant pays)
  *   opex       = fee + energy cost
- *   noi        = net_rent − energy cost
+ *   noi        = revenue − opex = received − energy cost
  *
  * The energy cost never changes received / net / gross rent — it is a cost
  * paid separately, so it only lowers NOI through OPEX.
  *
  * Example: gross 4.000, fee 10 %, energy 350, energy cost 109,80 →
- * received 3.950, net 3.600, fee 400, opex 509,80, noi 3.490,20.
+ * received 3.950, net 3.600, fee 400, revenue 4.350, opex 509,80, noi 3.840,20.
  */
 
 export type IncomeStatus = "EXPECTED" | "CONFIRMED";
@@ -78,9 +79,11 @@ export interface IncomeBreakdown {
     grossRent: number;
     feeAmount: number;
     feePct: number;
+    /** gross rent + energy income (everything the tenant pays for the month) */
+    revenue: number;
     /** agency fee + energy cost */
     opex: number;
-    /** net rent − energy cost */
+    /** revenue − opex (= received − energy cost) */
     noi: number;
 }
 
@@ -113,8 +116,9 @@ export function breakdown(
         grossRent,
         feeAmount,
         feePct,
+        revenue: round2(grossRent + energy),
         opex: round2(feeAmount + other),
-        noi: round2(netRent - other),
+        noi: round2(received - other),
     };
 }
 
@@ -450,8 +454,10 @@ export interface IncomeSummary {
     totalGross: number;             // gross rent (contract value), confirmed, all time
     totalOther: number;             // other expenses deducted, all time
     other12m: number;
-    totalNoi: number;               // net rent − other expenses, all time
+    totalNoi: number;               // revenue − opex (= received − energy cost), all time
     noi12m: number;
+    totalRevenue: number;           // gross rent + energy income, all time
+    revenue12m: number;
     netRent12m: number;             // last 12 confirmed months
     energy12m: number;
     received12m: number;
@@ -483,6 +489,8 @@ export function summarize(rows: PropertyIncomeRow[]): IncomeSummary {
         other12m: sum(last12, b => b.other),
         totalNoi: sum(confirmed, b => b.noi),
         noi12m: sum(last12, b => b.noi),
+        totalRevenue: sum(confirmed, b => b.revenue),
+        revenue12m: sum(last12, b => b.revenue),
         netRent12m: sum(last12, b => b.netRent),
         energy12m: sum(last12, b => b.energy),
         received12m: sum(last12, b => b.received),

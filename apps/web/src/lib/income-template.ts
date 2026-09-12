@@ -198,11 +198,12 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
         ["Cálculos no Kitnets.com", "", "h"],
         ["Aluguel líquido", "recebido − energia (o aluguel após a taxa da imobiliária)", "p"],
         ["Aluguel bruto", "líquido ÷ (1 − taxa/100), quando o bruto não é informado", "p"],
+        ["Receita bruta", "aluguel bruto + energia (tudo o que o inquilino paga no mês)", "p"],
         ["Despesas (OPEX)", "taxa da imobiliária + custo de energia", "p"],
-        ["Resultado (NOI)", "aluguel líquido − custo de energia", "p"],
+        ["Resultado (NOI)", "receita bruta − OPEX = recebido − custo de energia", "p"],
         ["Taxa acumulada", "bruto − líquido, somado mês a mês: a economia potencial ao administrar o imóvel pelo Kitnets.com.", "p"],
         ["Exemplo", "", "h"],
-        ["Bruto 4.000 · Taxa 10 % · Energia 350 · Custo de energia 109,80", "Recebido 3.950 · Aluguel líquido 3.600 · Taxa da imobiliária 400 · OPEX 509,80 · NOI 3.490,20", "p"],
+        ["Bruto 4.000 · Taxa 10 % · Energia 350 · Custo de energia 109,80", "Recebido 3.950 · Aluguel líquido 3.600 · Receita bruta 4.350 · OPEX 509,80 · NOI 3.840,20", "p"],
     ];
     lines.forEach(([a, b, kind], i) => {
         const row = info.getRow(i + 1);
