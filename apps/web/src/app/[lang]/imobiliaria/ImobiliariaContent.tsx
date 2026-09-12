@@ -1097,11 +1097,11 @@ export default function ImobiliariaContent({ lang, initialAgencies }: Imobiliari
                                         <div className="pt-2 border-t border-border/60 flex items-center justify-between text-xs text-muted-foreground">
                                             <div className="flex items-center gap-2">
                                                 {agency.logo_url ? (
-                                                    <div className="px-2 py-1 bg-background border border-border rounded-lg flex items-center justify-center max-h-8">
+                                                    <div className="px-3 py-2 bg-background border border-border rounded-lg flex items-center justify-center">
                                                         <img
                                                             src={agency.logo_url}
                                                             alt={agency.trade_name || agency.name}
-                                                            className="h-6 max-w-[90px] object-contain"
+                                                            className="h-14 max-w-[160px] object-contain"
                                                         />
                                                     </div>
                                                 ) : (
