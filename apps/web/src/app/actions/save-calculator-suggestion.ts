@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
 import { cookies } from "next/headers";
 
 export interface SaveSuggestionResponse {
@@ -15,7 +15,7 @@ export async function saveCalculatorSuggestion(data: { suggestion: string; email
         return { success: false, error: "Suggestion is required" };
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     try {
         const { error } = await supabase

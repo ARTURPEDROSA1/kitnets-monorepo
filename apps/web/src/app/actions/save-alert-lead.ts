@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
 import { headers } from "next/headers";
 
 export interface SaveAlertLeadResponse {
@@ -45,7 +45,7 @@ export async function saveAlertLead(data: AlertLeadData): Promise<SaveAlertLeadR
         return { success: false, error: "Você precisa concordar com o recebimento de alertas." };
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const timestamp = new Date().toISOString();
     const lowerEmail = email?.toLowerCase() || null;
 

@@ -1,92 +1,86 @@
-
-import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { requireProfile } from '@/lib/api-auth';
 
-// Use service role key to bypass RLS — this API route runs server-side only.
-// Required because unclaimed gateways (owner_id=NULL) are invisible under RLS.
-function getServiceSupabase() {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!url || !key) throw new Error('Missing Supabase service credentials');
-    return createClient(url, key);
-}
-
+/**
+ * POST /api/gateways/claim
+ * body: { code: string }
+ *
+ * Claims an unclaimed gateway (looked up by serial number) for the signed-in
+ * user. The owner is always the caller; a `userId` in the body is ignored.
+ */
 export async function POST(request: Request) {
-    const { code, userId } = await request.json();
+    const authed = await requireProfile();
+    if ("response" in authed) {
+        // Keep the historical message the claim page maps to a friendly hint.
+        if (authed.response.status === 403) {
+            return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
+        }
+        return authed.response;
+    }
+    const { profileId, supabase } = authed.ctx;
 
-    if (!code || !userId) {
-        return NextResponse.json({ error: 'Missing code or userId' }, { status: 400 });
+    const body = await request.json().catch(() => ({}));
+    const code = typeof body?.code === 'string' ? body.code.trim().toUpperCase() : '';
+    if (!code || code.length > 64) {
+        return NextResponse.json({ error: 'Missing code' }, { status: 400 });
     }
 
-    const supabase = getServiceSupabase();
-
-    // 1. Check if gateway exists and is unclaimed
+    // 1. Gateway must exist and be unclaimed
     const { data: gateway, error: fetchError } = await supabase
         .from('gateways')
         .select('*')
         .eq('serial_number', code)
-        .single();
+        .maybeSingle();
 
     if (fetchError || !gateway) {
-        console.error('[Claim] Gateway lookup failed:', fetchError?.message, 'code:', code);
         return NextResponse.json({ error: 'Invalid gateway code' }, { status: 404 });
     }
 
-    if (gateway.status !== 'unclaimed') {
+    if (gateway.status !== 'unclaimed' || gateway.owner_id) {
         return NextResponse.json({ error: 'Gateway already claimed' }, { status: 409 });
     }
 
-    // 2. Find the user's profile
-    const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('clerk_id', userId)
-        .single();
-
-    if (profileError || !profile) {
-        console.error('[Claim] Profile lookup failed:', profileError?.message, 'clerk_id:', userId);
-        return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
-    }
-
-    // 3. Claim the gateway — link to user's profile
-    const { error: updateError } = await supabase
+    // 2. Claim — the WHERE clause re-checks "unclaimed" so two concurrent claims can't both win
+    const { data: claimed, error: updateError } = await supabase
         .from('gateways')
         .update({
-            owner_id: profile.id,
+            owner_id: profileId,
             status: 'online',
-            label: gateway.label || 'My Gateway' // Preserve existing label
+            label: gateway.label || 'My Gateway',
         })
-        .eq('id', gateway.id);
+        .eq('id', gateway.id)
+        .eq('status', 'unclaimed')
+        .is('owner_id', null)
+        .select('id')
+        .maybeSingle();
 
-    if (updateError) {
-        console.error('[Claim] Gateway update failed:', updateError.message);
-        return NextResponse.json({ error: 'Failed to claim gateway' }, { status: 500 });
+    if (updateError || !claimed) {
+        console.error('[Claim] Gateway update failed:', updateError?.message);
+        return NextResponse.json({ error: 'Gateway already claimed' }, { status: 409 });
     }
 
-    // 4. Auto-link gateway to a property
-    // Check if user already has a property
+    // 3. Auto-link to one of the caller's properties (create a first one if none)
     const { data: existingProperty } = await supabase
         .from('properties')
         .select('id')
-        .eq('owner_id', profile.id)
+        .eq('owner_id', profileId)
         .limit(1)
         .maybeSingle();
 
     let propertyId = existingProperty?.id;
 
     if (!propertyId) {
-        // Create a property from user's profile address data
         const { data: userProfile } = await supabase
             .from('profiles')
             .select('property_address, full_name')
-            .eq('id', profile.id)
+            .eq('id', profileId)
             .single();
 
         const addr = userProfile?.property_address as Record<string, string> | null;
         const { data: newProperty, error: propError } = await supabase
             .from('properties')
             .insert({
-                owner_id: profile.id,
+                owner_id: profileId,
                 name: addr?.street ? `${addr.street}, ${addr.number || ''}`.trim() : (userProfile?.full_name || 'Meu Imóvel'),
                 address: addr?.street ? `${addr.street}, ${addr.number || ''} - ${addr.neighborhood || ''}`.trim() : null,
                 city: addr?.city || null,
@@ -107,15 +101,16 @@ export async function POST(request: Request) {
         const { error: linkError } = await supabase
             .from('gateways')
             .update({ property_id: propertyId })
-            .eq('id', gateway.id);
+            .eq('id', gateway.id)
+            .eq('owner_id', profileId);
 
         if (linkError) {
             console.warn('[Claim] Gateway→Property link failed (non-critical):', linkError.message);
-        } else {
-            console.log('[Claim] Gateway', code, 'linked to property', propertyId);
         }
     }
 
-    console.log('[Claim] Gateway', code, 'claimed by profile', profile.id);
-    return NextResponse.json({ success: true, gateway: { ...gateway, owner_id: profile.id, status: 'online', property_id: propertyId } });
+    return NextResponse.json({
+        success: true,
+        gateway: { ...gateway, owner_id: profileId, status: 'online', property_id: propertyId },
+    });
 }

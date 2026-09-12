@@ -1,9 +1,26 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
-const isProtectedRoute = createRouteMatcher(["/dashboard(.*)", "/imobiliaria(.*)", "/corretores(.*)", "/profile(.*)", "/proprietario(.*)", "/imoveis(.*)"]);
 const locales = ["en", "pt", "es"];
 const defaultLocale = "pt";
+
+// Every page lives under /[lang]/…, so the matcher must accept an optional
+// locale prefix. A plain "/dashboard(.*)" pattern never matched "/pt/dashboard"
+// and left the whole authenticated area unprotected at the edge.
+const PROTECTED_SEGMENTS = [
+    "dashboard",
+    "imobiliaria",
+    "corretores",
+    "profile",
+    "proprietario",
+    "imoveis",
+    "inquilinos",
+    "contratos",
+    "onboarding",
+];
+const isProtectedRoute = createRouteMatcher([
+    new RegExp(`^(/(${locales.join("|")}))?/(${PROTECTED_SEGMENTS.join("|")})(/.*)?$`),
+]);
 
 export default clerkMiddleware(async (auth, req) => {
     // 1. Check for Clerk Authentication on protected routes

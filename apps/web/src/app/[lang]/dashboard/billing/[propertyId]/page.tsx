@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
-import { createClient } from "@/utils/supabase/client";
 import { ArrowLeft, FileText, TrendingUp, DollarSign, Droplets, Calendar, ChevronDown, Eye, EyeOff, BadgeDollarSign, Plus, Pencil, Trash2, CalendarRange } from "lucide-react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
@@ -67,7 +66,6 @@ export default function BillingPage() {
     const lang = params.lang as string;
     const propertyId = params.propertyId as string;
     const gatewayId = searchParams.get("gateway");
-    const supabase = createClient();
 
     const [property, setProperty] = useState<Property | null>(null);
     const [bills, setBills] = useState<Bill[]>([]);
@@ -88,18 +86,16 @@ export default function BillingPage() {
         const fetchData = async () => {
             setLoading(true);
 
-            // Fetch property details
-            const { data: propData } = await supabase
-                .rpc("get_property_details", { p_property_id: propertyId });
-            if (propData?.[0]) {
-                setProperty(propData[0]);
-            }
-
-            // Fetch all bills via RPC (SECURITY DEFINER bypasses RLS)
-            const { data: billsData } = await supabase
-                .rpc("get_property_bills", { p_property_id: propertyId });
-            if (billsData) {
-                setBills(billsData);
+            // Property details + bills (server verifies ownership)
+            try {
+                const res = await fetch(`/api/water-bills?propertyId=${encodeURIComponent(propertyId)}`);
+                if (res.ok) {
+                    const { property: propData, bills: billsData } = await res.json();
+                    if (propData) setProperty(propData);
+                    if (billsData) setBills(billsData);
+                }
+            } catch (err) {
+                console.error("Failed to load water bills:", err);
             }
 
             setLoading(false);
@@ -119,7 +115,6 @@ export default function BillingPage() {
         };
 
         fetchData();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [propertyId]);
 
     const handleClaimOrphans = async () => {
@@ -136,10 +131,10 @@ export default function BillingPage() {
             });
             if (res.ok) {
                 // Re-fetch bills to include the newly claimed ones
-                const { data: billsData } = await supabase
-                    .rpc("get_property_bills", { p_property_id: propertyId });
-                if (billsData) {
-                    setBills(billsData);
+                const refetch = await fetch(`/api/water-bills?propertyId=${encodeURIComponent(propertyId)}`);
+                if (refetch.ok) {
+                    const { bills: billsData } = await refetch.json();
+                    if (billsData) setBills(billsData);
                 }
                 setOrphanedBills([]);
             }

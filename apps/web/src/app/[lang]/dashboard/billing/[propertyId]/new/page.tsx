@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { createClient } from "@/utils/supabase/client";
 import { ArrowLeft, Save, Calculator, AlertCircle, CheckCircle2, Upload, FileText } from "lucide-react";
 import Link from "next/link";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
@@ -66,7 +65,6 @@ export default function ManualBillEntryPage() {
     const propertyId = params.propertyId as string;
     const gatewayId = searchParams.get("gateway");
     const editMonth = searchParams.get("edit"); // e.g. "2026-02" — edit mode
-    const supabase = createClient();
 
     const [property, setProperty] = useState<PropertyInfo | null>(null);
     const [form, setForm] = useState<FormData>(emptyForm);
@@ -82,16 +80,24 @@ export default function ManualBillEntryPage() {
 
     useEffect(() => {
         const fetchData = async () => {
-            // Property details
-            const { data: propData } = await supabase
-                .rpc("get_property_details", { p_property_id: propertyId });
-            if (propData?.[0]) {
-                setProperty(propData[0]);
+            // Property details + bills (server verifies ownership)
+            type WaterBillRow = Record<string, unknown> & {
+                reference_month: string;
+                meter_number: string;
+                current_reading: number;
+                occurrence_code: string | null;
+            };
+            let bills: WaterBillRow[] | null = null;
+            try {
+                const res = await fetch(`/api/water-bills?propertyId=${encodeURIComponent(propertyId)}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.property) setProperty(data.property);
+                    bills = data.bills ?? null;
+                }
+            } catch (err) {
+                console.error("Failed to load water bills:", err);
             }
-
-            // Fetch all bills via RPC (SECURITY DEFINER bypasses RLS)
-            const { data: bills } = await supabase
-                .rpc("get_property_bills", { p_property_id: propertyId });
 
             // ── Edit mode: load existing bill into form ──
             if (editMonth && bills) {
@@ -296,30 +302,37 @@ export default function ManualBillEntryPage() {
         setSaving(true);
 
         try {
-            const { error: rpcError } = await supabase.rpc("upsert_water_bill", {
-                p_property_id: propertyId,
-                p_reference_month: form.referenceMonth,
-                p_meter_number: form.meterNumber || null,
-                p_previous_reading: form.previousReading ? parseFloat(form.previousReading) : null,
-                p_current_reading: form.currentReading ? parseFloat(form.currentReading) : null,
-                p_consumption_m3: parseFloat(form.consumptionM3),
-                p_billed_consumption_m3: form.billedConsumptionM3 ? parseFloat(form.billedConsumptionM3) : parseFloat(form.consumptionM3),
-                p_reading_date: form.readingDate || null,
-                p_reading_date_orig: form.readingDateOrig || null,
-                p_due_date: form.dueDate || null,
-                p_total_amount: parseFloat(form.totalAmount),
-                p_water_tariff: form.waterTariff ? parseFloat(form.waterTariff) : 0,
-                p_sewage_tariff: form.sewageTariff ? parseFloat(form.sewageTariff) : 0,
-                p_water_basic_fee: form.waterBasicFee ? parseFloat(form.waterBasicFee) : 0,
-                p_sewage_basic_fee: form.sewageBasicFee ? parseFloat(form.sewageBasicFee) : 0,
-                p_occurrence_code: form.occurrenceCode || null,
-                p_average_consumption_m3: null,
-                p_notes: form.notes || null,
+            const res = await fetch("/api/water-bills", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    propertyId,
+                    bill: {
+                        referenceMonth: form.referenceMonth,
+                        meterNumber: form.meterNumber || null,
+                        previousReading: form.previousReading ? parseFloat(form.previousReading) : null,
+                        currentReading: form.currentReading ? parseFloat(form.currentReading) : null,
+                        consumptionM3: parseFloat(form.consumptionM3),
+                        billedConsumptionM3: form.billedConsumptionM3 ? parseFloat(form.billedConsumptionM3) : parseFloat(form.consumptionM3),
+                        readingDate: form.readingDate || null,
+                        readingDateOrig: form.readingDateOrig || null,
+                        dueDate: form.dueDate || null,
+                        totalAmount: parseFloat(form.totalAmount),
+                        waterTariff: form.waterTariff ? parseFloat(form.waterTariff) : 0,
+                        sewageTariff: form.sewageTariff ? parseFloat(form.sewageTariff) : 0,
+                        waterBasicFee: form.waterBasicFee ? parseFloat(form.waterBasicFee) : 0,
+                        sewageBasicFee: form.sewageBasicFee ? parseFloat(form.sewageBasicFee) : 0,
+                        occurrenceCode: form.occurrenceCode || null,
+                        averageConsumptionM3: null,
+                        notes: form.notes || null,
+                    },
+                }),
             });
 
-            if (rpcError) {
-                console.error(rpcError);
-                setError(`Erro ao salvar: ${rpcError.message}`);
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                console.error("Save water bill failed:", data);
+                setError(`Erro ao salvar: ${data.error || res.statusText}`);
             } else {
                 setSuccess(true);
                 window.scrollTo({ top: 0, behavior: "smooth" });
