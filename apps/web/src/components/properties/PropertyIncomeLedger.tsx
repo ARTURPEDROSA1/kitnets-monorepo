@@ -58,8 +58,8 @@ import {
 interface PropertyIncomeLedgerProps {
     /** `properties.id` — undefined while the property has no DB row yet */
     propertyId?: string;
-    /** Pre-fills the agency fee for new months (from the cost-centre settings) */
-    defaultAgencyFeePct: number;
+    /** Pre-fills the agency fee for new months; 0/undefined falls back to 10 % */
+    defaultAgencyFeePct?: number;
     /** Called whenever the ledger changes so the parent can use real data */
     onRowsChange?: (rows: PropertyIncomeRow[]) => void;
 }
@@ -79,9 +79,10 @@ type Drafts = Record<string, Partial<Record<DraftField, string>>>;
 
 const FIELD_OPTIONS: IncomeField[] = ["received", "energy", "other", "notes", "ignore"];
 const IMPORT_CHUNK = 300;
+const DEFAULT_AGENCY_FEE_PCT = 10;
 const COLLAPSED_ROWS = 24;
 
-export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct, onRowsChange }: PropertyIncomeLedgerProps) {
+export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct = 0, onRowsChange }: PropertyIncomeLedgerProps) {
     const [rows, setRows] = useState<PropertyIncomeRow[]>([]);
     const [loading, setLoading] = useState<boolean>(Boolean(propertyId));
     const [error, setError] = useState<string | null>(null);
@@ -229,7 +230,9 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct, 
     const sorted = useMemo(() => [...rows].sort((a, b) => (a.month < b.month ? 1 : -1)), [rows]);
     const visible = showAll ? sorted : sorted.slice(0, COLLAPSED_ROWS);
     const summary = useMemo(() => summarize(rows), [rows]);
-    const lastPct = sorted.length ? Number(sorted[0].agency_fee_pct) : defaultAgencyFeePct;
+    // Fee pre-fill: last month's fee when set, else the property default, else 10 %
+    const lastRowPct = sorted.length ? Number(sorted[0].agency_fee_pct) : 0;
+    const lastPct = lastRowPct > 0 ? lastRowPct : defaultAgencyFeePct > 0 ? defaultAgencyFeePct : DEFAULT_AGENCY_FEE_PCT;
 
     const chartData = useMemo(
         () =>
@@ -401,7 +404,7 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct, 
                     </h3>
                     <p className="text-xs text-muted-foreground">
                         O que entrou na conta a cada mês. A parcela de energia é deduzida do aluguel e vai para o centro de energia solar.
-                        Aluguel líquido = recebido − energia − outras; aluguel bruto = líquido ÷ (1 − taxa da imobiliária).
+                        Aluguel líquido = recebido − energia − outras despesas; aluguel bruto = líquido ÷ (1 − taxa da imobiliária).
                     </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -499,12 +502,12 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct, 
                         <thead>
                             <tr className="text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border">
                                 <th className="text-left px-2 py-2 font-semibold">Mês</th>
+                                <th className="text-right px-2 py-2 font-semibold">Aluguel bruto</th>
+                                <th className="text-right px-2 py-2 font-semibold">Taxa %</th>
                                 <th className="text-right px-2 py-2 font-semibold">Recebido</th>
                                 <th className="text-right px-2 py-2 font-semibold">Energia</th>
-                                <th className="text-right px-2 py-2 font-semibold">Outras</th>
-                                <th className="text-right px-2 py-2 font-semibold">Taxa %</th>
+                                <th className="text-right px-2 py-2 font-semibold">Outras despesas</th>
                                 <th className="text-right px-2 py-2 font-semibold">Aluguel líquido</th>
-                                <th className="text-right px-2 py-2 font-semibold">Aluguel bruto</th>
                                 <th className="text-center px-2 py-2 font-semibold">Status</th>
                                 <th className="text-left px-2 py-2 font-semibold">Obs.</th>
                                 <th className="px-2 py-2" />
@@ -541,12 +544,12 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct, 
                                             {formatMonthKey(month)}
                                             {busy && <Loader2 className="inline w-3 h-3 ml-1 animate-spin text-muted-foreground" />}
                                         </td>
+                                        <td className="px-2 py-1 text-right">{cell("gross", b.grossRent)}</td>
+                                        <td className="px-2 py-1 text-right">{cell("pct", b.feePct, "0.5")}</td>
                                         <td className="px-2 py-1 text-right">{cell("received", b.received)}</td>
                                         <td className="px-2 py-1 text-right">{cell("energy", b.energy)}</td>
                                         <td className="px-2 py-1 text-right">{cell("other", b.other)}</td>
-                                        <td className="px-2 py-1 text-right">{cell("pct", b.feePct, "0.5")}</td>
                                         <td className="px-2 py-1 text-right font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums">{formatBRL(b.netRent)}</td>
-                                        <td className="px-2 py-1 text-right">{cell("gross", b.grossRent)}</td>
                                         <td className="px-2 py-1 text-center">
                                             <button
                                                 type="button"
@@ -672,7 +675,7 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct, 
                                 />
                             </div>
                             <div className="space-y-1.5">
-                                <Label>Outras receitas (R$)</Label>
+                                <Label>Outras despesas (R$)</Label>
                                 <Input
                                     type="number" step="0.01" min={0} placeholder="0.00"
                                     value={addForm.other}
@@ -795,7 +798,7 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct, 
                                                 <th className="text-left px-2 py-1">Mês</th>
                                                 <th className="text-right px-2 py-1">Recebido</th>
                                                 <th className="text-right px-2 py-1">Energia</th>
-                                                <th className="text-right px-2 py-1">Outras</th>
+                                                <th className="text-right px-2 py-1">Outras despesas</th>
                                                 <th className="text-left px-2 py-1">Obs.</th>
                                             </tr>
                                         </thead>

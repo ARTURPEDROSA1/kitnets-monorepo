@@ -271,7 +271,7 @@ export type IncomeField = "received" | "energy" | "other" | "notes" | "ignore";
 export const INCOME_FIELD_LABELS: Record<IncomeField, string> = {
     received: "Valor recebido (líquido da imobiliária)",
     energy: "Parcela de energia",
-    other: "Outras receitas",
+    other: "Outras despesas",
     notes: "Observações",
     ignore: "Ignorar",
 };
