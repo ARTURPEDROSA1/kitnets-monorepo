@@ -95,7 +95,7 @@ apps/web/src/
 │   └── agency.ts                   # Agency, AgencyMember, AgencyFormData, AgencyWithRole
 └── middleware.ts                   # /imobiliaria(.*)  protected route
 
-packages/core/database/
+supabase/legacy/core/
 ├── agency_setup.sql                # Initial schema (agencies + agency_members)
 └── agency_soft_delete.sql          # Migration: deleted_at + deleted_by columns
 ```
@@ -616,9 +616,9 @@ Two SQL files must be run **in order** in the Supabase SQL Editor:
 
 | Order | File | Purpose |
 |-------|------|---------|
-| 1 | `packages/core/database/agency_setup.sql` | Create `agencies` and `agency_members` tables, RLS policies, indexes, triggers |
-| 2 | `packages/core/database/agency_soft_delete.sql` | Add `deleted_at` and `deleted_by` columns to `agencies`, partial index |
-| 3 | `packages/core/database/agency_allow_duplicate_cnpj.sql` | Drop global unique constraint on `cnpj`, allowing independent agency registrations by multiple accounts |
+| 1 | `supabase/legacy/core/agency_setup.sql` | Create `agencies` and `agency_members` tables, RLS policies, indexes, triggers |
+| 2 | `supabase/legacy/core/agency_soft_delete.sql` | Add `deleted_at` and `deleted_by` columns to `agencies`, partial index |
+| 3 | `supabase/legacy/core/agency_allow_duplicate_cnpj.sql` | Drop global unique constraint on `cnpj`, allowing independent agency registrations by multiple accounts |
 
 **RLS Policies:**
 - `agencies` — Members can SELECT their own agencies via `agency_members` join

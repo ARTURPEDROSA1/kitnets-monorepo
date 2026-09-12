@@ -59,7 +59,7 @@ apps/web/src/
 │   └── profile/
 │       └── PropertyDetailsCard.tsx  # Solar checkbox & direct access button
 │
-packages/core/database/
+supabase/legacy/core/
 └── phase3_energy_bills.sql          # Supabase SQL schema, indexes, RLS, and RPC
 ```
 

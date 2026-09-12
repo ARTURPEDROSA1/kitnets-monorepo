@@ -12,12 +12,24 @@
         "dev:all": "turbo run dev",
         "dev:web": "turbo run dev --filter=web",
         "lint": "turbo run lint",
-        "format": "prettier --write \"**/*.{ts,tsx,md}\""
+        "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+        "db:login": "supabase login",
+        "db:link": "supabase link --project-ref kqhfzcxqmjkqekozhlng",
+        "db:baseline": "node scripts/db-baseline.mjs",
+        "db:new": "supabase migration new",
+        "db:start": "supabase start",
+        "db:stop": "supabase stop",
+        "db:reset": "supabase db reset",
+        "db:lint": "supabase db lint --level warning",
+        "db:push": "supabase db push",
+        "db:repair": "supabase migration repair --status applied",
+        "db:types": "supabase gen types typescript --linked --schema public > apps/web/src/types/database.types.ts"
     },
     "devDependencies": {
         "dotenv": "^17.3.1",
         "prettier": "latest",
-        "turbo": "latest"
+        "turbo": "latest",
+        "supabase": "2.117.0"
     },
     "engines": {
         "node": ">=18"

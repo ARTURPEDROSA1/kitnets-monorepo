@@ -89,7 +89,7 @@ apps/web/src/
 │   ├── PropertyDocumentsCard.tsx   # Document dropzone & 8-folder system (~720 lines)
 │   └── PropertyDetailsCard.tsx     # Property details + SubUnits components (~1210 lines)
 │
-packages/core/database/
+supabase/legacy/core/
 ├── add_property_details.sql        # Migration script for property details DB columns
 └── add_property_index_to_ownership_proofs.sql # Migration for per-property proof isolation
 ```
@@ -796,7 +796,7 @@ const subUnitsForDB = updatedProperties[0].subUnits.map(u => {
 
 ## 10. Database Migration
 
-**File:** `packages/core/database/add_property_details.sql`
+**File:** `supabase/legacy/core/add_property_details.sql`
 
 Run the following SQL in the **Supabase SQL Editor** to add the required columns:
 
@@ -984,7 +984,7 @@ Property details and sub-units are stored as JSONB in the `profiles` table becau
 2. **True deletion:** `removePropSavedProof` now deletes the record from `ownership_proofs` table in Supabase and removes the file from the storage bucket. Added RLS `DELETE` policy on `ownership_proofs`.
 3. **Save concurrency guards:** Added `if (!user || isSaving) return;` guard to `handleSave` and disabled all section "Continuar" buttons while saving (`disabled={isSaving}`), preventing rapid clicks from triggering multiple concurrent upload operations.
 4. **Deduplication:** Added `dedupeProofs` utility to filter out identical proofs by ID and document name both on load, save, and UI rendering. Added client-side duplicate prevention on file input dropzone.
-5. **Database migration script:** Created `packages/core/database/add_property_index_to_ownership_proofs.sql` to add the column, backfill existing records from `file_url`, enable the `DELETE` policy, and deduplicate existing rows.
+5. **Database migration script:** Created `supabase/legacy/core/add_property_index_to_ownership_proofs.sql` to add the column, backfill existing records from `file_url`, enable the `DELETE` policy, and deduplicate existing rows.
 
 ### v2.0 — 2026-02-18
 
