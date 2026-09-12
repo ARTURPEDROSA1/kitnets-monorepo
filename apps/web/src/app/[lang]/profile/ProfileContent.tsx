@@ -10,7 +10,7 @@ import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera,
 import PropertyDetailsCard, { PropertyDetails, SubUnit, SubUnitsSection, Checkbox as DetailCheckbox, defaultSubUnit } from '@/components/profile/PropertyDetailsCard';
 import PropertyDocumentsCard, { DocCategory } from '@/components/profile/PropertyDocumentsCard';
 import { DeletePropertyModal } from '@/components/profile/DeletePropertyModal';
-import PropertySquareCard from '@/components/properties/PropertySquareCard';
+import PropertySquareCard, { type PropertyRealIncome } from '@/components/properties/PropertySquareCard';
 import PropertyCostCenterDashboard from '@/components/properties/PropertyCostCenterDashboard';
 import { cn } from '@/lib/utils';
 import { useUser, useAuth } from '@clerk/nextjs';
@@ -307,6 +307,22 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
     const lang = (params?.lang as string) || 'pt';
     const [imoveisViewMode, setImoveisViewMode] = useState<'grid' | 'manage' | 'wizard'>('grid');
     const [selectedPropertyIdx, setSelectedPropertyIdx] = useState<number | null>(null);
+
+    // Latest confirmed month of the income ledger per property (keyed by properties.id),
+    // shown on the /imoveis cards instead of the estimates. Refreshed whenever the grid is shown.
+    const [realIncomeByProperty, setRealIncomeByProperty] = useState<Record<string, PropertyRealIncome>>({});
+    useEffect(() => {
+        if (view !== 'imoveis' || imoveisViewMode !== 'grid') return;
+        let cancelled = false;
+        fetch('/api/properties/income-summary')
+            .then(async res => {
+                if (!res.ok) return;
+                const data = await res.json().catch(() => ({}));
+                if (!cancelled && data?.summaries) setRealIncomeByProperty(data.summaries as Record<string, PropertyRealIncome>);
+            })
+            .catch(() => { /* cards fall back to estimates */ });
+        return () => { cancelled = true; };
+    }, [view, imoveisViewMode]);
     const [imoveisFilterTab, setImoveisFilterTab] = useState<'all' | 'multi' | 'single' | 'solar'>('all');
     const [imoveisSearch, setImoveisSearch] = useState('');
 
@@ -3257,6 +3273,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                 savedPhotos: prop.savedPhotos,
                                                 profilePhotoUrl: prop.profilePhotoUrl,
                                                 isComplete: isPropertyComplete(prop),
+                                                realIncome: prop.id ? realIncomeByProperty[prop.id] ?? null : null,
                                             }}
                                             onSelect={() => {
                                                 setSelectedPropertyIdx(originalIdx);
