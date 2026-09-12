@@ -188,3 +188,36 @@ body {
     margin: 0 auto;
   }
 }
+/* Sidebar "show more / show less information" toggle.
+   <html data-sidebar="collapsed"> is set before first paint by an inline script in
+   app/[lang]/layout.tsx and kept in sync by components/Sidebar.tsx. Only the desktop
+   layout (sm and up) collapses; the mobile drawer always shows the full menu.
+   Kept outside @layer so it wins over Tailwind utilities. */
+:root {
+  --sidebar-width: 16rem;
+}
+
+@media (width >= 40rem) {
+  html[data-sidebar="collapsed"] {
+    --sidebar-width: 5rem;
+  }
+
+  html[data-sidebar="collapsed"] .sidebar-label,
+  html[data-sidebar="collapsed"] .sidebar-lang {
+    display: none;
+  }
+
+  html[data-sidebar="collapsed"] .sidebar-item,
+  html[data-sidebar="collapsed"] .sidebar-header,
+  html[data-sidebar="collapsed"] .sidebar-footer-row {
+    justify-content: center;
+  }
+
+  html[data-sidebar="collapsed"] .sidebar-header {
+    padding-inline-start: 0;
+  }
+
+  html[data-sidebar="collapsed"] .sidebar-brand img {
+    margin-inline-end: 0;
+  }
+}
