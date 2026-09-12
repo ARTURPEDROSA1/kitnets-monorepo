@@ -1734,6 +1734,7 @@ export type Database = {
           month: string
           notes: string | null
           other_income: number
+          other_expenses: number
           owner_id: string
           property_id: string
           received_amount: number
@@ -1751,6 +1752,7 @@ export type Database = {
           month: string
           notes?: string | null
           other_income?: number
+          other_expenses?: number
           owner_id: string
           property_id: string
           received_amount?: number
@@ -1768,6 +1770,7 @@ export type Database = {
           month?: string
           notes?: string | null
           other_income?: number
+          other_expenses?: number
           owner_id?: string
           property_id?: string
           received_amount?: number

@@ -35,7 +35,7 @@ export async function GET(request: Request, context: RouteContext) {
         if (fillLedger) {
             const { data, error } = await supabase
                 .from("property_income_months")
-                .select("id, property_id, month, received_on, received_amount, energy_portion, other_income, agency_fee_pct, status, source, bank_reference, notes")
+                .select("id, property_id, month, received_on, received_amount, energy_portion, other_income, other_expenses, agency_fee_pct, status, source, bank_reference, notes")
                 .eq("property_id", id)
                 .order("month", { ascending: false });
             if (error) throw new Error(error.message);
