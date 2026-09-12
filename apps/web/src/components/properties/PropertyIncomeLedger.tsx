@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
     Plus,
     Upload,
+    Download,
     Trash2,
     Wallet,
     Zap,
@@ -342,11 +343,63 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct =
         setImportError(parsed.dateColumn < 0 && parsed.rows.length > 0 ? "Não encontrei uma coluna de data (dd/mm/aaaa)." : null);
     };
 
-    const onImportFile = (file: File | null) => {
+    const [parsingFile, setParsingFile] = useState(false);
+
+    const onImportFile = async (file: File | null) => {
         if (!file) return;
-        const reader = new FileReader();
-        reader.onload = () => loadImportText(String(reader.result ?? ""));
-        reader.readAsText(file, "utf-8");
+        const isExcel = /\.(xlsx|xlsm|xls)$/i.test(file.name);
+        if (!isExcel) {
+            const reader = new FileReader();
+            reader.onload = () => loadImportText(String(reader.result ?? ""));
+            reader.readAsText(file, "utf-8");
+            return;
+        }
+        if (!endpoint) return;
+        setParsingFile(true);
+        setImportError(null);
+        try {
+            const form = new FormData();
+            form.append("file", file);
+            const res = await fetch(`${endpoint}/parse`, { method: "POST", body: form });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || "Não foi possível ler a planilha");
+            loadImportText(String(data.text ?? ""));
+        } catch (err) {
+            setImportError((err as Error).message);
+        } finally {
+            setParsingFile(false);
+        }
+    };
+
+    // ── Excel template download ─────────────────────────────────────────
+    const [exporting, setExporting] = useState(false);
+
+    const exportTemplate = async () => {
+        if (!endpoint) return;
+        setExporting(true);
+        setError(null);
+        try {
+            const res = await fetch(`${endpoint}/template?fee=${encodeURIComponent(lastPct)}&months=12`);
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error || "Erro ao gerar o modelo");
+            }
+            const blob = await res.blob();
+            const disposition = res.headers.get("Content-Disposition") ?? "";
+            const match = disposition.match(/filename="([^"]+)"/);
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = match?.[1] ?? "kitnets-receitas.xlsx";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 10_000);
+        } catch (err) {
+            setError((err as Error).message);
+        } finally {
+            setExporting(false);
+        }
     };
 
     const importRows = useMemo(() => {
@@ -409,6 +462,17 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct =
                     </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={exportTemplate}
+                        disabled={exporting}
+                        className="gap-1.5 text-xs"
+                        title="Baixa um modelo Excel formatado para preencher e importar"
+                    >
+                        {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                        Exportar modelo
+                    </Button>
                     <Button size="sm" variant="outline" onClick={openImport} className="gap-1.5 text-xs">
                         <Upload className="w-3.5 h-3.5" />
                         Importar planilha
@@ -732,7 +796,7 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct =
                             Importar planilha de receitas
                         </DialogTitle>
                         <DialogDescription>
-                            Cole ou envie um arquivo TSV/CSV (copiado do Excel / Google Sheets) com uma coluna de data e colunas de valores.
+                            Envie o modelo Excel preenchido (botão “Exportar modelo”), outro .xlsx, ou cole um TSV/CSV com uma coluna de data e colunas de valores.
                             Meses já existentes são atualizados apenas nas colunas mapeadas; os demais campos são mantidos.
                             Se a planilha trouxer o aluguel bruto do contrato, o valor recebido é calculado com a taxa e a energia já registradas no mês.
                         </DialogDescription>
@@ -741,8 +805,18 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct =
                     <div className="space-y-4 py-2 max-h-[65vh] overflow-y-auto pr-1">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div className="space-y-1.5">
-                                <Label>Arquivo (.txt, .tsv, .csv)</Label>
-                                <Input type="file" accept=".txt,.tsv,.csv,text/plain,text/csv" onChange={e => onImportFile(e.target.files?.[0] ?? null)} />
+                                <Label>Arquivo (.xlsx do modelo, .csv, .tsv ou .txt)</Label>
+                                <Input
+                                    type="file"
+                                    accept=".xlsx,.xlsm,.csv,.tsv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,text/csv"
+                                    disabled={parsingFile}
+                                    onChange={e => onImportFile(e.target.files?.[0] ?? null)}
+                                />
+                                {parsingFile && (
+                                    <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
+                                        <Loader2 className="w-3 h-3 animate-spin" /> Lendo a planilha…
+                                    </span>
+                                )}
                             </div>
                             <div className="space-y-1.5">
                                 <Label>Taxa da imobiliária aplicada aos meses importados (%)</Label>
