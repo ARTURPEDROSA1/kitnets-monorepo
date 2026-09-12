@@ -46,6 +46,7 @@ import {
     currentMonthKey,
     formatMonthKey,
     INCOME_FIELD_LABELS,
+    isIncomeTemplate,
     monthKey,
     parseSheet,
     receivedFromGross,
@@ -53,6 +54,7 @@ import {
     summarize,
     type IncomeField,
     type IncomeRowInput,
+    type ImportPreviewRow,
     type ParsedSheet,
     type PropertyIncomeRow,
 } from "@/lib/property-income";
@@ -324,6 +326,11 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct =
     const [importError, setImportError] = useState<string | null>(null);
     const [importDone, setImportDone] = useState<number | null>(null);
 
+    const [templateDetected, setTemplateDetected] = useState(false);
+    const [showMapping, setShowMapping] = useState(false);
+    /** Imports replace the whole ledger of the property (default). Off = merge by month. */
+    const [replaceAll, setReplaceAll] = useState(true);
+
     const openImport = () => {
         setImportText("");
         setSheet(null);
@@ -331,16 +338,36 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct =
         setImportPct(toInput(lastPct));
         setImportError(null);
         setImportDone(null);
+        setTemplateDetected(false);
+        setShowMapping(false);
+        setReplaceAll(true);
         setImportOpen(true);
     };
 
-    const loadImportText = (text: string) => {
+    /**
+     * Parses text into the mapper. With `autoImport` (file uploads), a sheet
+     * that carries the Kitnets.com template headers is imported straight away —
+     * no mapping step.
+     */
+    const loadImportText = (text: string, autoImport = false) => {
         setImportText(text);
         setImportDone(null);
+        setShowMapping(false);
         const parsed = parseSheet(text);
+        const suggested = suggestMapping(parsed.headers, parsed.dateColumn);
+        const isTemplate = parsed.dateColumn >= 0 && isIncomeTemplate(parsed.headers);
         setSheet(parsed);
-        setMapping(suggestMapping(parsed.headers, parsed.dateColumn));
+        setMapping(suggested);
+        setTemplateDetected(isTemplate);
         setImportError(parsed.dateColumn < 0 && parsed.rows.length > 0 ? "Não encontrei uma coluna de data (dd/mm/aaaa)." : null);
+        if (autoImport && isTemplate) {
+            const rows = buildImportRows(parsed, suggested, { agencyFeePct: parseInput(importPct) ?? DEFAULT_AGENCY_FEE_PCT });
+            if (rows.length === 0) {
+                setImportError("O modelo está vazio: preencha pelo menos um mês antes de importar.");
+                return;
+            }
+            void runImportRows(rows, true);
+        }
     };
 
     const [parsingFile, setParsingFile] = useState(false);
@@ -350,7 +377,7 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct =
         const isExcel = /\.(xlsx|xlsm|xls)$/i.test(file.name);
         if (!isExcel) {
             const reader = new FileReader();
-            reader.onload = () => loadImportText(String(reader.result ?? ""));
+            reader.onload = () => loadImportText(String(reader.result ?? ""), true);
             reader.readAsText(file, "utf-8");
             return;
         }
@@ -363,7 +390,7 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct =
             const res = await fetch(`${endpoint}/parse`, { method: "POST", body: form });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(data.error || "Não foi possível ler a planilha");
-            loadImportText(String(data.text ?? ""));
+            loadImportText(String(data.text ?? ""), true);
         } catch (err) {
             setImportError((err as Error).message);
         } finally {
@@ -407,26 +434,27 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct =
         return buildImportRows(sheet, mapping, { agencyFeePct: parseInput(importPct) ?? 0 });
     }, [sheet, mapping, importPct]);
 
-    const runImport = async () => {
-        if (!endpoint || importRows.length === 0) return;
+    const runImportRows = async (rows: ImportPreviewRow[], replace = replaceAll) => {
+        if (!endpoint || rows.length === 0) return;
         setImporting(true);
         setImportError(null);
         try {
             let lastRows: PropertyIncomeRow[] | null = null;
-            for (let i = 0; i < importRows.length; i += IMPORT_CHUNK) {
+            for (let i = 0; i < rows.length; i += IMPORT_CHUNK) {
                 // `line` is only used for the preview; the API ignores unknown fields.
-                const chunk = importRows.slice(i, i + IMPORT_CHUNK);
+                const chunk = rows.slice(i, i + IMPORT_CHUNK);
                 const res = await fetch(endpoint, {
                     method: "PUT",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ rows: chunk }),
+                    // Only the first chunk wipes the ledger; later chunks append to it.
+                    body: JSON.stringify({ rows: chunk, replace: replace && i === 0 }),
                 });
                 const data = await res.json().catch(() => ({}));
                 if (!res.ok) throw new Error(data.error || "Erro ao importar");
                 lastRows = data.rows ?? [];
             }
             if (lastRows) applyRows(lastRows);
-            setImportDone(importRows.length);
+            setImportDone(rows.length);
             setDrafts({});
         } catch (err) {
             setImportError((err as Error).message);
@@ -796,8 +824,8 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct =
                             Importar planilha de receitas
                         </DialogTitle>
                         <DialogDescription>
-                            Envie o modelo Excel preenchido (botão “Exportar modelo”), outro .xlsx, ou cole um TSV/CSV com uma coluna de data e colunas de valores.
-                            Meses já existentes são atualizados apenas nas colunas mapeadas; os demais campos são mantidos.
+                            Envie o modelo Excel preenchido (botão “Exportar modelo”): ele é importado na hora, sem mapear colunas,
+                            substituindo todos os meses registrados. Outros .xlsx ou TSV/CSV com uma coluna de data passam pelo mapeamento abaixo.
                             Se a planilha trouxer o aluguel bruto do contrato, o valor recebido é calculado com a taxa e a energia já registradas no mês.
                         </DialogDescription>
                     </DialogHeader>
@@ -823,6 +851,18 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct =
                                 <Input type="number" step="0.5" min={0} max={99} value={importPct} onChange={e => setImportPct(e.target.value)} />
                             </div>
                         </div>
+                        <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+                            <input
+                                type="checkbox"
+                                className="mt-0.5 accent-emerald-600"
+                                checked={replaceAll}
+                                onChange={e => setReplaceAll(e.target.checked)}
+                            />
+                            <span>
+                                <span className="font-semibold text-foreground">Substituir todos os meses existentes</span> — a planilha passa a ser o registro completo deste imóvel.
+                                Desmarque para apenas atualizar os meses presentes na planilha e manter os demais.
+                            </span>
+                        </label>
                         <div className="space-y-1.5">
                             <Label>Ou cole aqui</Label>
                             <textarea
@@ -834,7 +874,23 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct =
                             />
                         </div>
 
-                        {sheet && sheet.headers.length > 0 && (
+                        {templateDetected && (
+                            <div className="text-xs rounded-lg border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 px-3 py-2 flex items-center justify-between gap-3">
+                                <span className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300">
+                                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                                    Modelo Kitnets.com reconhecido — colunas mapeadas automaticamente.
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowMapping(v => !v)}
+                                    className="text-emerald-700 dark:text-emerald-400 underline underline-offset-2 shrink-0"
+                                >
+                                    {showMapping ? "Ocultar colunas" : "Ajustar colunas"}
+                                </button>
+                            </div>
+                        )}
+
+                        {sheet && sheet.headers.length > 0 && (!templateDetected || showMapping) && (
                             <div className="space-y-2">
                                 <Label>Mapeamento das colunas</Label>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -907,7 +963,7 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct =
 
                         {importDone !== null && (
                             <div className="text-xs text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
-                                <CheckCircle2 className="w-3.5 h-3.5" /> {importDone} meses importados.
+                                <CheckCircle2 className="w-3.5 h-3.5" /> {importDone} meses importados{replaceAll ? " (registro anterior substituído)" : ""}.
                             </div>
                         )}
                     </div>
@@ -915,12 +971,14 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct =
                     <DialogFooter>
                         <Button variant="ghost" onClick={() => setImportOpen(false)}>Fechar</Button>
                         <Button
-                            onClick={runImport}
+                            onClick={() => runImportRows(importRows)}
                             disabled={importing || importRows.length === 0}
                             className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
                         >
                             {importing && <Loader2 className="w-4 h-4 animate-spin" />}
-                            Importar {importRows.length > 0 ? `${importRows.length} meses` : ""}
+                            {importDone !== null && !importing
+                                ? "Importar novamente"
+                                : `Importar ${importRows.length > 0 ? `${importRows.length} meses` : ""}`}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
