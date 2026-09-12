@@ -385,6 +385,9 @@ export interface IncomeSummary {
     totalReceived: number;          // confirmed, all time
     totalNetRent: number;           // confirmed, all time
     totalEnergy: number;            // confirmed, all time
+    totalFee: number;               // agency fees kept before crediting, all time = potential saving of self-management
+    fee12m: number;
+    totalGross: number;             // gross rent (contract value), confirmed, all time
     netRent12m: number;             // last 12 confirmed months
     energy12m: number;
     received12m: number;
@@ -409,6 +412,9 @@ export function summarize(rows: PropertyIncomeRow[]): IncomeSummary {
         totalReceived: sum(confirmed, b => b.received),
         totalNetRent: sum(confirmed, b => b.netRent),
         totalEnergy: sum(confirmed, b => b.energy),
+        totalFee: sum(confirmed, b => b.feeAmount),
+        fee12m: sum(last12, b => b.feeAmount),
+        totalGross: sum(confirmed, b => b.grossRent),
         netRent12m: sum(last12, b => b.netRent),
         energy12m: sum(last12, b => b.energy),
         received12m: sum(last12, b => b.received),

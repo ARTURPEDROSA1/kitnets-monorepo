@@ -12,6 +12,7 @@ import {
     Clock,
     AlertCircle,
     Landmark,
+    Building2,
     ChevronDown,
     ChevronUp,
 } from "lucide-react";
@@ -426,7 +427,7 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct =
             )}
 
             {/* Summary tiles */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                 <SummaryTile
                     label={latest ? `Último mês (${formatMonthKey(monthKey(latest.month))})` : "Último mês"}
                     value={latest ? formatBRL(latest.received) : "—"}
@@ -454,6 +455,13 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct =
                     hint={`Acumulado ${formatBRL(summary.totalEnergy)}`}
                     icon={<Zap className="w-4 h-4" />}
                     tone="amber"
+                />
+                <SummaryTile
+                    label="Taxa da imobiliária · 12 meses"
+                    value={formatBRL(summary.fee12m)}
+                    hint={`Acumulado ${formatBRL(summary.totalFee)} · economia potencial com autogestão no Kitnets.com`}
+                    icon={<Building2 className="w-4 h-4" />}
+                    tone="rose"
                 />
             </div>
 
@@ -850,13 +858,14 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct =
 function SummaryTile({
     label, value, hint, icon, tone,
 }: {
-    label: string; value: string; hint: string; icon: React.ReactNode; tone: "emerald" | "blue" | "violet" | "amber";
+    label: string; value: string; hint: string; icon: React.ReactNode; tone: "emerald" | "blue" | "violet" | "amber" | "rose";
 }) {
     const tones = {
         emerald: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600",
         blue: "bg-blue-50 dark:bg-blue-950/40 text-blue-600",
         violet: "bg-violet-50 dark:bg-violet-950/40 text-violet-600",
         amber: "bg-amber-50 dark:bg-amber-950/40 text-amber-600",
+        rose: "bg-rose-50 dark:bg-rose-950/40 text-rose-600",
     } as const;
     return (
         <div className="p-3.5 rounded-xl border border-border/80 bg-muted/20 space-y-1">
