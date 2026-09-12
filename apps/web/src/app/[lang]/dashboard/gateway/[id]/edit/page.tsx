@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { createClient } from "@/utils/supabase/client";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@kitnets/ui";
@@ -27,7 +26,6 @@ export default function EditGatewayPage() {
     const lang = params.lang as string;
     const id = params.id as string;
     const router = useRouter();
-    const supabase = createClient();
 
     const [gateway, setGateway] = useState<GatewayData | null>(null);
     const [loading, setLoading] = useState(true);
@@ -58,66 +56,49 @@ export default function EditGatewayPage() {
 
     const fetchGateway = async () => {
         setLoading(true);
-        const { data, error: fetchErr } = await supabase
-            .from("gateways")
-            .select("id, label, serial_number, status, description, photo_url, panel_photo_url, property_id, owner_id")
-            .eq("id", id)
-            .single();
-
-        if (fetchErr || !data) {
-            setError("Gateway não encontrado.");
-            setLoading(false);
-            return;
-        }
-
-        setGateway(data as GatewayData);
-        setLabel(data.label || "");
-        setDescription(data.description || "");
-        setSelectedPropertyId(data.property_id || null);
-        if (data.photo_url) setPhotoPreview(data.photo_url);
-        if (data.panel_photo_url) setPanelPhotoPreview(data.panel_photo_url);
-        setLoading(false);
-
-        // Fetch owner's properties for the dropdown
-        if (data.owner_id) {
-            fetchProperties(data.owner_id);
-        }
-    };
-
-    const fetchProperties = async (ownerId: string) => {
         setLoadingProperties(true);
         try {
-            const { data: props } = await supabase
-                .from("properties")
-                .select("id, name, address")
-                .eq("owner_id", ownerId)
-                .order("name", { ascending: true });
-
-            if (props) {
-                setProperties(props);
+            // Gateway + the owner's properties for the dropdown (server verifies ownership)
+            const res = await fetch(`/api/gateways/${id}`);
+            if (!res.ok) {
+                setError("Gateway não encontrado.");
+                return;
             }
+            const data = await res.json();
+            const gw = data.gateway as GatewayData | undefined;
+            if (!gw) {
+                setError("Gateway não encontrado.");
+                return;
+            }
+
+            setGateway(gw);
+            setLabel(gw.label || "");
+            setDescription(gw.description || "");
+            setSelectedPropertyId(gw.property_id || null);
+            if (gw.photo_url) setPhotoPreview(gw.photo_url);
+            if (gw.panel_photo_url) setPanelPhotoPreview(gw.panel_photo_url);
+            setProperties(data.properties ?? []);
         } catch (err) {
-            console.error("Failed to fetch properties:", err);
+            console.error("Failed to load gateway:", err);
+            setError("Gateway não encontrado.");
         } finally {
+            setLoading(false);
             setLoadingProperties(false);
         }
     };
 
-    const uploadPhoto = async (file: File, path: string): Promise<string | null> => {
-        const { data, error: uploadErr } = await supabase.storage
-            .from("gateway-photos")
-            .upload(path, file, { upsert: true });
-
-        if (uploadErr) {
-            console.error("Upload error:", uploadErr);
+    /** Uploads through the API, which stores the URL on the gateway row. */
+    const uploadPhoto = async (file: File, kind: "gateway" | "panel"): Promise<string | null> => {
+        const body = new FormData();
+        body.append("file", file);
+        body.append("kind", kind);
+        const res = await fetch(`/api/gateways/${id}/photo`, { method: "POST", body });
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            console.error("Upload error:", data.error || res.status);
             return null;
         }
-
-        const { data: urlData } = supabase.storage
-            .from("gateway-photos")
-            .getPublicUrl(data.path);
-
-        return urlData.publicUrl;
+        return (await res.json()).url ?? null;
     };
 
     const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>, type: "gateway" | "panel") => {
@@ -144,30 +125,30 @@ export default function EditGatewayPage() {
         setSaved(false);
 
         try {
-            const updates: Record<string, unknown> = {
-                label: label.trim() || gateway.label,
-                description: description.trim() || null,
-                property_id: selectedPropertyId || null,
-            };
-
-            // Upload photos if changed
+            // Upload photos if changed (the API persists the URLs)
             if (photoFile) {
-                const url = await uploadPhoto(photoFile, `${id}/gateway-photo.${photoFile.name.split('.').pop()}`);
-                if (url) updates.photo_url = url;
+                const url = await uploadPhoto(photoFile, "gateway");
+                if (!url) setError("Não foi possível enviar a foto do gateway.");
             }
 
             if (panelPhotoFile) {
-                const url = await uploadPhoto(panelPhotoFile, `${id}/panel-photo.${panelPhotoFile.name.split('.').pop()}`);
-                if (url) updates.panel_photo_url = url;
+                const url = await uploadPhoto(panelPhotoFile, "panel");
+                if (!url) setError("Não foi possível enviar a foto do quadro.");
             }
 
-            const { error: updateErr } = await supabase
-                .from("gateways")
-                .update(updates)
-                .eq("id", id);
+            const res = await fetch(`/api/gateways/${id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    label: label.trim() || gateway.label,
+                    description: description.trim() || null,
+                    property_id: selectedPropertyId || null,
+                }),
+            });
 
-            if (updateErr) {
-                setError("Erro ao salvar: " + updateErr.message);
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                setError("Erro ao salvar: " + (data.error || res.statusText));
             } else {
                 setSaved(true);
                 setPhotoFile(null);
@@ -188,21 +169,12 @@ export default function EditGatewayPage() {
         setError(null);
 
         try {
-            // Unclaim the gateway — set owner_id and property_id to null, status to unclaimed
-            const { error: removeErr } = await supabase
-                .from("gateways")
-                .update({
-                    owner_id: null,
-                    property_id: null,
-                    status: "unclaimed",
-                    description: null,
-                    photo_url: null,
-                    panel_photo_url: null,
-                })
-                .eq("id", id);
+            // Unclaim the gateway (server resets owner, property, status and photos)
+            const res = await fetch(`/api/gateways/${id}`, { method: "DELETE" });
 
-            if (removeErr) {
-                setError("Erro ao remover: " + removeErr.message);
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                setError("Erro ao remover: " + (data.error || res.statusText));
                 setRemoving(false);
                 return;
             }
