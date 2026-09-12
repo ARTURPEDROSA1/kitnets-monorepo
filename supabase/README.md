@@ -8,10 +8,19 @@ existed under names no file in the repo knew about.
 
 Project ref: `kqhfzcxqmjkqekozhlng` (also the hostname in `NEXT_PUBLIC_SUPABASE_URL`).
 
-## One-time setup (do this once, on your machine)
+## One-time setup: the baseline
 
 The baseline must come **from production**, not from the legacy files, because
-production has drifted from them.
+production has drifted from them. `supabase db dump` runs `pg_dump` inside Docker.
+
+### Option A: no Docker available (VMs without nested virtualization)
+
+1. Add the three secrets listed under "CI secrets required" below.
+2. GitHub → Actions → **db-baseline** → Run workflow.
+3. It dumps the live schema, marks it applied, generates the types and opens a PR
+   named `chore(db): baseline production schema`. Review and merge it.
+
+### Option B: on a machine with Docker Desktop
 
 ```bash
 # 1. Authenticate the CLI (opens the browser) and link this repo to the project.
