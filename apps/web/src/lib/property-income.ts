@@ -5,19 +5,23 @@
  * Money model (what the bank shows is what we store):
  *   received_amount  total credited to the owner for the month
  *   energy_portion   part of it that pays for energy (solar cost centre)
- *   other_income     OTHER EXPENSES deducted before crediting (repairs, fees…)
- *                    — column keeps its historical name; it is a cost, stored ≥ 0
+ *   other_income     ENERGY COST: the electricity bill the owner pays for the
+ *                    month, outside the agency transfer (column keeps its
+ *                    historical name; it is a cost, stored ≥ 0)
  *   agency_fee_pct   % the agency kept before crediting the owner
  *
  * Derived:
- *   net_rent   = received − energy + other        (rent after the agency fee)
+ *   net_rent   = received − energy                (rent after the agency fee)
  *   gross_rent = net_rent ÷ (1 − pct/100)         (contract value)
  *   fee        = gross_rent − net_rent
- *   opex       = fee + other
- *   noi        = net_rent − other = received − energy
+ *   opex       = fee + energy cost
+ *   noi        = net_rent − energy cost
  *
- * Example: gross 4.000, fee 10 %, energy 350, other 0 → received 3.950,
- * net 3.600, fee 400, opex 400, noi 3.600.
+ * The energy cost never changes received / net / gross rent — it is a cost
+ * paid separately, so it only lowers NOI through OPEX.
+ *
+ * Example: gross 4.000, fee 10 %, energy 350, energy cost 109,80 →
+ * received 3.950, net 3.600, fee 400, opex 509,80, noi 3.490,20.
  */
 
 export type IncomeStatus = "EXPECTED" | "CONFIRMED";
@@ -68,15 +72,15 @@ export interface IncomeRowInput {
 export interface IncomeBreakdown {
     received: number;
     energy: number;
-    /** other expenses deducted before crediting (≥ 0) */
+    /** energy cost paid by the owner for the month (≥ 0) */
     other: number;
     netRent: number;
     grossRent: number;
     feeAmount: number;
     feePct: number;
-    /** agency fee + other expenses */
+    /** agency fee + energy cost */
     opex: number;
-    /** net rent − other expenses (= received − energy) */
+    /** net rent − energy cost */
     noi: number;
 }
 
@@ -98,7 +102,7 @@ export function breakdown(
     const energy = Number(row.energy_portion) || 0;
     const other = Number(row.other_income) || 0;
     const feePct = clampPct(Number(row.agency_fee_pct) || 0);
-    const netRent = round2(received - energy + other);
+    const netRent = round2(received - energy);
     const grossRent = feePct > 0 ? round2(netRent / (1 - feePct / 100)) : netRent;
     const feeAmount = round2(grossRent - netRent);
     return {
@@ -114,10 +118,10 @@ export function breakdown(
     };
 }
 
-/** Inverse of `breakdown`: what lands in the account for a given gross rent. */
-export function receivedFromGross(grossRent: number, feePct: number, energy: number, other: number): number {
+/** Inverse of `breakdown`: what lands in the account for a given gross rent (the energy cost is paid separately). */
+export function receivedFromGross(grossRent: number, feePct: number, energy: number): number {
     const pct = clampPct(feePct);
-    return round2((Number(grossRent) || 0) * (1 - pct / 100) + (Number(energy) || 0) - (Number(other) || 0));
+    return round2((Number(grossRent) || 0) * (1 - pct / 100) + (Number(energy) || 0));
 }
 
 /** `2026-09-01` or `2026-09` → `2026-09` */
@@ -298,15 +302,21 @@ export const INCOME_TEMPLATE_HEADERS = [
     "Taxa imobiliária (%)",
     "Valor recebido (R$)",
     "Energia (R$)",
-    "Outras despesas (R$)",
+    "Custo de energia (R$)",
     "Observações",
 ] as const;
+
+/** Older template downloads used this header for column 6; still recognised. */
+const LEGACY_HEADER_ALIASES: Record<number, string[]> = { 5: ["Outras despesas (R$)"] };
 
 const normHeader = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
 
 /** True when the sheet's headers are the Kitnets.com template headers (order and text). */
 export function isIncomeTemplate(headers: string[]): boolean {
-    return INCOME_TEMPLATE_HEADERS.every((h, i) => normHeader(headers[i] ?? "") === normHeader(h));
+    return INCOME_TEMPLATE_HEADERS.every((h, i) => {
+        const got = normHeader(headers[i] ?? "");
+        return got === normHeader(h) || (LEGACY_HEADER_ALIASES[i] ?? []).some(a => normHeader(a) === got);
+    });
 }
 
 export type IncomeField = "gross" | "fee_pct" | "received" | "energy" | "other" | "notes" | "ignore";
@@ -316,7 +326,7 @@ export const INCOME_FIELD_LABELS: Record<IncomeField, string> = {
     fee_pct: "Taxa da imobiliária (%)",
     received: "Valor recebido (líquido da imobiliária)",
     energy: "Parcela de energia",
-    other: "Outras despesas (descontadas)",
+    other: "Custo de energia (conta paga)",
     notes: "Observações",
     ignore: "Ignorar",
 };
@@ -332,6 +342,7 @@ export function suggestMapping(headers: string[], dateColumn: number): IncomeFie
         const h = raw.trim().toLowerCase();
         if (!h) return "ignore";
         if (/coment|observa|obs\b|notes?$|descri/.test(h)) return "notes";
+        if (/custo de energia|custo energia|energy cost|conta de luz|conta de energia/.test(h)) return "other";
         if (/acc|acum|saldo|investimento|total|custo|admin|prestac|amortiza|iptu|utilidade/.test(h)) return "ignore";
         if (/taxa|comiss|fee|%/.test(h)) return "fee_pct";
         if (/tarifa/.test(h)) return "ignore";
