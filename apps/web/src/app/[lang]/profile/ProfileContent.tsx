@@ -3279,6 +3279,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             {/* 1. TOP DASHBOARD & METRICS (Cost Center & Result Center) */}
                             <PropertyCostCenterDashboard
                                 propertyIndex={selectedPropertyIdx}
+                                dbId={properties[selectedPropertyIdx].id}
                                 propertyType={properties[selectedPropertyIdx].propertyType}
                                 details={properties[selectedPropertyIdx].details}
                                 subUnits={properties[selectedPropertyIdx].subUnits}
