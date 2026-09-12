@@ -568,9 +568,7 @@ export default function PropertyIncomeLedger({
                 <SummaryTile
                     label="Aluguel bruto no período"
                     value={formatBRL(periodSummary.totalGross)}
-                    hint={periodSummary.confirmedMonths
-                        ? `Líquido ${formatBRL(periodSummary.totalNetRent)} · Recebido ${formatBRL(periodSummary.totalReceived)}`
-                        : "Nenhum mês confirmado no período"}
+                    hint={periodSummary.confirmedMonths ? "Valor de contrato somado" : "Nenhum mês confirmado no período"}
                     icon={<Landmark className="w-4 h-4" />}
                     tone="emerald"
                 />
@@ -591,7 +589,13 @@ export default function PropertyIncomeLedger({
                 <SummaryTile
                     label="Energia Solar no período"
                     value={formatBRL(periodSummary.totalEnergy)}
-                    hint={`Custo ${formatBRL(periodSummary.totalOther)} · resultado ${formatBRL(periodSummary.totalEnergy - periodSummary.totalOther)}`}
+                    hint={
+                        <>
+                            Custo {formatBRL(periodSummary.totalOther)}
+                            <br />
+                            Resultado {formatBRL(periodSummary.totalEnergy - periodSummary.totalOther)}
+                        </>
+                    }
                     icon={<Zap className="w-4 h-4" />}
                     tone="amber"
                 />
@@ -627,7 +631,7 @@ export default function PropertyIncomeLedger({
                                 tickFormatter={(val: number) => `R$ ${val >= 1000 ? `${(val / 1000).toFixed(1)}k` : val}`}
                             />
                             <RechartsTooltip
-                                formatter={(value) => [formatBRL(Number(value)), ""]}
+                                formatter={(value, name) => [formatBRL(Number(value)), String(name)]}
                                 contentStyle={{
                                     backgroundColor: "hsl(var(--background))",
                                     borderColor: "hsl(var(--border))",
@@ -1064,7 +1068,7 @@ export default function PropertyIncomeLedger({
 function SummaryTile({
     label, value, hint, icon, tone,
 }: {
-    label: string; value: string; hint: string; icon: React.ReactNode; tone: "emerald" | "blue" | "violet" | "amber" | "rose";
+    label: string; value: string; hint: React.ReactNode; icon: React.ReactNode; tone: "emerald" | "blue" | "violet" | "amber" | "rose";
 }) {
     const tones = {
         emerald: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600",
