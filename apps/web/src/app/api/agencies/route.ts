@@ -14,6 +14,7 @@ import {
     validateCEP,
 } from '@/lib/validators';
 import { unpackAgencyMetadata, packAgencyMetadata } from '@/lib/agency-metadata';
+import { normalizeAgreementUrl, withSignedAgreement } from '@/lib/agency-agreement';
 
 function getServiceSupabase() {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -60,15 +61,24 @@ export async function GET() {
             return NextResponse.json({ agencies: [] });
         }
 
-        const agenciesWithRole = memberships
-            .map((m: any) => {
-                if (!m.agencies) return null;
-                return unpackAgencyMetadata({
-                    ...m.agencies,
-                    role: m.role || 'VIEWER',
-                });
-            })
-            .filter(Boolean);
+        type MembershipRow = {
+            role?: string | null;
+            agencies?: (Record<string, unknown> & { service_agreement_url?: string | null }) | null;
+        };
+        const agenciesWithRole = await Promise.all(
+            (memberships as unknown as MembershipRow[])
+                .filter((m) => m.agencies)
+                .map((m) =>
+                    // Agreements live in a private bucket: hand out a signed URL
+                    withSignedAgreement(
+                        supabase,
+                        unpackAgencyMetadata({
+                            ...m.agencies,
+                            role: m.role || 'VIEWER',
+                        })
+                    )
+                )
+        );
 
         return NextResponse.json({ agencies: agenciesWithRole });
     } catch (err) {
@@ -217,7 +227,7 @@ export async function POST(request: Request) {
             state: body.state.trim().toUpperCase(),
             country: body.country?.trim() || 'BR',
             description: body.description?.trim() || null,
-            service_agreement_url: body.service_agreement_url || null,
+            service_agreement_url: normalizeAgreementUrl(body.service_agreement_url),
             service_agreement_filename: body.service_agreement_filename?.trim() || null,
             management_fee: body.management_fee ? parseFloat(body.management_fee) : null,
             agreement_start_date: body.agreement_start_date || null,
@@ -298,7 +308,7 @@ export async function POST(request: Request) {
         console.log('[Agencies POST] Created agency:', agency.id, 'owner:', profile.id);
         return NextResponse.json({
             success: true,
-            agency: unpackAgencyMetadata({ ...agency, role: 'OWNER' }),
+            agency: await withSignedAgreement(supabase, unpackAgencyMetadata({ ...agency, role: 'OWNER' })),
         });
     } catch (err) {
         console.error('[Agencies POST] Unexpected error:', err);

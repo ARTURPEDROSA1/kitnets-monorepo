@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getDictionary } from "../../../dictionaries";
 import ImobiliariaContent from "./ImobiliariaContent";
 import { unpackAgencyMetadata } from "@/lib/agency-metadata";
+import { withSignedAgreement } from '@/lib/agency-agreement';
 import type { AgencyWithRole } from "@/types/agency";
 
 export const dynamic = 'force-dynamic';
@@ -44,15 +45,24 @@ async function getInitialAgencies(): Promise<AgencyWithRole[]> {
 
         if (error || !memberships || memberships.length === 0) return [];
 
-        return memberships
-            .map((m: any) => {
-                if (!m.agencies) return null;
-                return unpackAgencyMetadata({
-                    ...m.agencies,
-                    role: m.role || 'VIEWER',
-                });
-            })
-            .filter(Boolean) as AgencyWithRole[];
+        type MembershipRow = {
+            role?: string | null;
+            agencies?: (Record<string, unknown> & { service_agreement_url?: string | null }) | null;
+        };
+        return (await Promise.all(
+            (memberships as unknown as MembershipRow[])
+                .filter((m) => m.agencies)
+                .map((m) =>
+                    // Agreements live in a private bucket: hand out a signed URL
+                    withSignedAgreement(
+                        supabase,
+                        unpackAgencyMetadata({
+                            ...m.agencies,
+                            role: m.role || 'VIEWER',
+                        })
+                    )
+                )
+        )) as AgencyWithRole[];
     } catch (e) {
         console.error('[ImobiliariaPage] Error fetching initial agencies:', e);
         return [];

@@ -1590,7 +1590,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             const fileName = `photos/${propStoragePrefix}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
                             const { error: uploadError } = await sbUpload.storage
-                                .from('documents')
+                                .from('property-media')
                                 .upload(fileName, file);
 
                             if (uploadError) {
@@ -1598,7 +1598,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                 continue;
                             }
 
-                            const { data: { publicUrl } } = sbUpload.storage.from('documents').getPublicUrl(fileName);
+                            const { data: { publicUrl } } = sbUpload.storage.from('property-media').getPublicUrl(fileName);
                             updatedPhotoUrls.push(publicUrl);
                         }
                     }
@@ -1611,7 +1611,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             const fileName = `videos/${propStoragePrefix}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
                             const { error: uploadError } = await sbUpload.storage
-                                .from('documents')
+                                .from('property-media')
                                 .upload(fileName, file);
 
                             if (uploadError) {
@@ -1619,7 +1619,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                 continue;
                             }
 
-                            const { data: { publicUrl } } = sbUpload.storage.from('documents').getPublicUrl(fileName);
+                            const { data: { publicUrl } } = sbUpload.storage.from('property-media').getPublicUrl(fileName);
                             updatedVideoUrls.push(publicUrl);
                         }
                     }
@@ -1633,9 +1633,9 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             for (const file of unit.newPhotos) {
                                 const fileExt = file.name.split('.').pop();
                                 const fileName = `photos/${propStoragePrefix}/unit-${si}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-                                const { error: uploadError } = await sbUpload.storage.from('documents').upload(fileName, file);
+                                const { error: uploadError } = await sbUpload.storage.from('property-media').upload(fileName, file);
                                 if (uploadError) { console.error('Unit photo upload error:', uploadError); continue; }
-                                const { data: { publicUrl } } = sbUpload.storage.from('documents').getPublicUrl(fileName);
+                                const { data: { publicUrl } } = sbUpload.storage.from('property-media').getPublicUrl(fileName);
                                 unitPhotos.push(publicUrl);
                             }
                             updatedSubUnits[si] = { ...unit, photos: unitPhotos, newPhotos: [] };
@@ -1645,9 +1645,9 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             for (const file of unit.newVideos) {
                                 const fileExt = file.name.split('.').pop();
                                 const fileName = `videos/${propStoragePrefix}/unit-${si}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-                                const { error: uploadError } = await sbUpload.storage.from('documents').upload(fileName, file);
+                                const { error: uploadError } = await sbUpload.storage.from('property-media').upload(fileName, file);
                                 if (uploadError) { console.error('Unit video upload error:', uploadError); continue; }
-                                const { data: { publicUrl } } = sbUpload.storage.from('documents').getPublicUrl(fileName);
+                                const { data: { publicUrl } } = sbUpload.storage.from('property-media').getPublicUrl(fileName);
                                 unitVideos.push(publicUrl);
                             }
                             updatedSubUnits[si] = { ...updatedSubUnits[si], videos: unitVideos, newVideos: [] };
@@ -2129,9 +2129,9 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                         for (const file of newPhotos) {
                             const fileExt = file.name.split('.').pop();
                             const fileName = `photos/${propStoragePrefix}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-                            const { error: uploadError } = await sbUpload.storage.from('documents').upload(fileName, file);
+                            const { error: uploadError } = await sbUpload.storage.from('property-media').upload(fileName, file);
                             if (uploadError) { console.error('Photo upload error:', uploadError); continue; }
-                            const { data: { publicUrl } } = sbUpload.storage.from('documents').getPublicUrl(fileName);
+                            const { data: { publicUrl } } = sbUpload.storage.from('property-media').getPublicUrl(fileName);
                             uploadedUrls.push(publicUrl);
                         }
                         if (uploadedUrls.length > 0) {
@@ -2192,9 +2192,9 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                         const propStoragePrefix = propIdx === 0 ? profileId : `${profileId}/prop-${propIdx}`;
                         const fileExt = videoFile.name.split('.').pop();
                         const fileName = `videos/${propStoragePrefix}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-                        const { error: uploadError } = await sbUpload.storage.from('documents').upload(fileName, videoFile);
+                        const { error: uploadError } = await sbUpload.storage.from('property-media').upload(fileName, videoFile);
                         if (uploadError) { console.error('Video upload error:', uploadError); setPVideos(prev => [...prev, videoFile]); return; }
-                        const { data: { publicUrl } } = sbUpload.storage.from('documents').getPublicUrl(fileName);
+                        const { data: { publicUrl } } = sbUpload.storage.from('property-media').getPublicUrl(fileName);
                         const allVideos = [...pSavedVideos, publicUrl];
                         setPSavedVideos(allVideos);
                         if (propIdx === 0) {

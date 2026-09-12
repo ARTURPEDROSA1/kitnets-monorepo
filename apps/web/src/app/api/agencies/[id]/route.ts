@@ -14,6 +14,7 @@ import {
     validateCEP,
 } from '@/lib/validators';
 import { unpackAgencyMetadata, packAgencyMetadata } from '@/lib/agency-metadata';
+import { normalizeAgreementUrl, withSignedAgreement } from '@/lib/agency-agreement';
 
 function getServiceSupabase() {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -158,7 +159,7 @@ export async function PUT(
             state: body.state.trim().toUpperCase(),
             country: body.country?.trim() || 'BR',
             description: body.description?.trim() || null,
-            service_agreement_url: body.service_agreement_url || null,
+            service_agreement_url: normalizeAgreementUrl(body.service_agreement_url),
             service_agreement_filename: body.service_agreement_filename?.trim() || null,
             management_fee: body.management_fee ? parseFloat(body.management_fee) : null,
             agreement_start_date: body.agreement_start_date || null,
@@ -219,7 +220,7 @@ export async function PUT(
         console.log('[Agencies PUT] Updated agency:', agencyId);
         return NextResponse.json({
             success: true,
-            agency: unpackAgencyMetadata({ ...agency, role: membership.role }),
+            agency: await withSignedAgreement(supabase, unpackAgencyMetadata({ ...agency, role: membership.role })),
         });
     } catch (err) {
         console.error('[Agencies PUT] Unexpected error:', err);

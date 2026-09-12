@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { currentUser } from '@clerk/nextjs/server';
 import { packAgencyMetadata, unpackAgencyMetadata } from '@/lib/agency-metadata';
+import { signStorageUrl } from '@/lib/storage';
 
 function getServiceSupabase() {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -111,10 +112,10 @@ export async function POST(
             );
         }
 
-        // ── Get public URL ───────────────────────────────────────────
-        const { data: { publicUrl } } = supabase.storage
-            .from('documents')
-            .getPublicUrl(fileName);
+        // The documents bucket is private: store the object PATH and return a
+        // short-lived signed URL for immediate viewing.
+        const publicUrl = fileName;
+        const signedUrl = (await signStorageUrl(supabase, 'documents', fileName)) ?? fileName;
 
         // ── Update agency record (Native column or packed metadata fallback) ──
         const updatePayload: Record<string, any> = {
@@ -160,7 +161,7 @@ export async function POST(
 
         return NextResponse.json({
             success: true,
-            agreement_url: publicUrl,
+            agreement_url: signedUrl,
             filename: file.name,
         });
     } catch (err) {
