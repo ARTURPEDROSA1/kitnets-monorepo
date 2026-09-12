@@ -99,7 +99,7 @@ apps/web/src/
 └── types/
     └── lease.ts                         # Complete TypeScript type definitions
 
-packages/core/database/
+supabase/legacy/core/
 └── lease_setup.sql                      # DDL for leases, child tables, RLS, & storage bucket
 ```
 
@@ -260,7 +260,7 @@ export interface LeaseAgentOption { id: string; full_name: string; agency_id: st
 
 ## 4. Database Schema & Storage
 
-Created via `packages/core/database/lease_setup.sql`.
+Created via `supabase/legacy/core/lease_setup.sql`.
 
 ### 4.1 Table: `public.leases`
 
