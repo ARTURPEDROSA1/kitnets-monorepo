@@ -22,6 +22,8 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // exceljs (income .xlsx template/import) uses Node streams; keep it out of the bundler.
+  serverExternalPackages: ["exceljs"],
   experimental: {
     optimizePackageImports: ['lucide-react', 'recharts', 'date-fns', '@kitnets/ui', '@clerk/nextjs', 'next-themes'],
     serverActions: {
