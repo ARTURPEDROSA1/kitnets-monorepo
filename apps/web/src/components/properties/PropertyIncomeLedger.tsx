@@ -254,7 +254,6 @@ export default function PropertyIncomeLedger({
     /** Rows inside the selected period (newest first) — drives the chart and the table. */
     const filtered = useMemo(() => filterRowsByPeriod(sorted, range), [sorted, range]);
     const visible = showAll ? filtered : filtered.slice(0, COLLAPSED_ROWS);
-    const summary = useMemo(() => summarize(rows), [rows]);
     /** Totals over the confirmed months inside the selected period (tiles 2–5). */
     const periodSummary = useMemo(() => summarize(filtered), [filtered]);
     // Fee pre-fill: last month's fee when set, else the property default, else 10 %
@@ -504,7 +503,6 @@ export default function PropertyIncomeLedger({
         );
     }
 
-    const latest = summary.latest;
 
     return (
         <div className="bg-card border border-border rounded-2xl p-6 shadow-xs space-y-5">
@@ -568,9 +566,11 @@ export default function PropertyIncomeLedger({
             {/* Summary tiles: "Aluguel bruto" is the current month; the other four follow the period filter below */}
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                 <SummaryTile
-                    label={latest ? `Aluguel bruto (${formatMonthKey(monthKey(latest.month))})` : "Aluguel bruto"}
-                    value={latest ? formatBRL(latest.grossRent) : "—"}
-                    hint={latest ? `Líquido ${formatBRL(latest.netRent)} · Recebido ${formatBRL(latest.received)} · mês atual` : "Nenhum mês confirmado"}
+                    label="Aluguel bruto no período"
+                    value={formatBRL(periodSummary.totalGross)}
+                    hint={periodSummary.confirmedMonths
+                        ? `Líquido ${formatBRL(periodSummary.totalNetRent)} · Recebido ${formatBRL(periodSummary.totalReceived)}`
+                        : "Nenhum mês confirmado no período"}
                     icon={<Landmark className="w-4 h-4" />}
                     tone="emerald"
                 />
@@ -589,7 +589,7 @@ export default function PropertyIncomeLedger({
                     tone="violet"
                 />
                 <SummaryTile
-                    label="Energia (centro solar) no período"
+                    label="Energia Solar no período"
                     value={formatBRL(periodSummary.totalEnergy)}
                     hint={`Custo ${formatBRL(periodSummary.totalOther)} · resultado ${formatBRL(periodSummary.totalEnergy - periodSummary.totalOther)}`}
                     icon={<Zap className="w-4 h-4" />}
@@ -1074,13 +1074,13 @@ function SummaryTile({
         rose: "bg-rose-50 dark:bg-rose-950/40 text-rose-600",
     } as const;
     return (
-        <div className="p-3.5 rounded-xl border border-border/80 bg-muted/20 space-y-1">
-            <div className="flex items-center justify-between text-muted-foreground">
-                <span className="text-[10px] font-semibold uppercase tracking-wider truncate">{label}</span>
-                <span className={cn("p-1.5 rounded-lg", tones[tone])}>{icon}</span>
+        <div className="p-3.5 rounded-xl border border-border/80 bg-muted/20 space-y-1 flex flex-col">
+            <div className="flex items-start justify-between gap-2 text-muted-foreground">
+                <span className="text-[10px] font-semibold uppercase tracking-wider leading-tight">{label}</span>
+                <span className={cn("p-1.5 rounded-lg shrink-0", tones[tone])}>{icon}</span>
             </div>
             <span className="text-lg font-bold text-foreground block tabular-nums">{value}</span>
-            <span className="text-[11px] text-muted-foreground block truncate" title={hint}>{hint}</span>
+            <span className="text-[11px] text-muted-foreground block leading-snug break-words">{hint}</span>
         </div>
     );
 }
