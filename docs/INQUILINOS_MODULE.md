@@ -92,7 +92,7 @@ apps/web/src/
 └── types/
     └── tenant.ts                        # TypeScript interfaces
 
-packages/core/database/
+supabase/legacy/core/
 └── tenant_setup.sql                     # Database migration
 ```
 
@@ -284,7 +284,7 @@ These are fetched at form mount for populating `<select>` dropdowns.
 | `deleted_at` | `TIMESTAMPTZ` | YES | — | Soft delete timestamp |
 | `deleted_by` | `UUID` | YES | — | FK → `profiles(id)`, who deleted |
 
-**Source:** [`tenant_setup.sql`](file:///c:/Users/Administrator/Documents/Kitnets/packages/core/database/tenant_setup.sql)
+**Source:** [`tenant_setup.sql`](file:///c:/Users/Administrator/Documents/Kitnets/supabase/legacy/core/tenant_setup.sql)
 
 ### 4.2 Indexes & Uniqueness
 
@@ -600,7 +600,7 @@ The route `/[lang]/inquilinos` is protected by the existing Clerk middleware. Un
 Run the SQL migration in the Supabase SQL Editor:
 
 ```sql
--- File: packages/core/database/tenant_setup.sql
+-- File: supabase/legacy/core/tenant_setup.sql
 -- Prerequisite: agency_setup.sql, agent_setup.sql, phase1_dashboard_setup.sql
 ```
 
