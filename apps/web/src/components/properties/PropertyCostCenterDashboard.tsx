@@ -566,7 +566,7 @@ export default function PropertyCostCenterDashboard({
             {/* Real income ledger (monthly, editable, importable) */}
             <PropertyIncomeLedger
                 propertyId={dbId}
-                defaultAgencyFeePct={parseFloat(details.managementFeePercent || '8') || 0}
+                defaultAgencyFeePct={details.managementFeePercent ? parseFloat(details.managementFeePercent) || 0 : 0}
                 onRowsChange={setIncomeRows}
             />
 

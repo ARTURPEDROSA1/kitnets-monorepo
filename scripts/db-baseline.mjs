@@ -34,6 +34,17 @@ if (!existsSync(resolve(root, "supabase/.temp/project-ref"))) {
     process.exit(1);
 }
 
+try {
+    execSync("docker --version", { stdio: "ignore" });
+} catch {
+    console.error(
+        "Docker is required: the Supabase CLI runs pg_dump in a container.\n" +
+        "No Docker here? Use the GitHub Actions workflow instead: Actions → db-baseline → Run workflow\n" +
+        "(needs the SUPABASE_* repository secrets, see supabase/README.md)."
+    );
+    process.exit(1);
+}
+
 const stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14); // YYYYMMDDHHmmss
 const baseline = `supabase/migrations/${stamp}_baseline.sql`;
 

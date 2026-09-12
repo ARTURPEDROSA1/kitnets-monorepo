@@ -42,6 +42,13 @@ export interface PropertyIncomeRow {
 export interface IncomeRowInput {
     month: string;
     received_amount?: number;
+    /**
+     * Not stored. When present and `received_amount` is absent, the server
+     * derives `received_amount` from it using the (merged) fee, energy and
+     * other values: received = gross × (1 − pct/100) + energy + other.
+     * When both are sent, `received_amount` wins.
+     */
+    gross_rent?: number;
     energy_portion?: number;
     other_income?: number;
     agency_fee_pct?: number;
@@ -130,7 +137,7 @@ export function parseMoney(raw: string | null | undefined): number | null {
     let s = String(raw).trim();
     if (!s) return null;
     const negative = /^\(.*\)$/.test(s) || /^-/.test(s) || /-\s*R?\$/.test(s);
-    s = s.replace(/[R$()\s]/gi, "").replace(/^-/, "");
+    s = s.replace(/[R$()%\s]/gi, "").replace(/^-/, "");
     if (!s || /^-+$/.test(s)) return null;
     if (!/^[\d.,-]+$/.test(s)) return null;
     s = s.replace(/-/g, "");
@@ -266,12 +273,14 @@ export function parseSheet(text: string): ParsedSheet {
     return { delimiter, headers, dateColumn, rows };
 }
 
-export type IncomeField = "received" | "energy" | "other" | "notes" | "ignore";
+export type IncomeField = "gross" | "fee_pct" | "received" | "energy" | "other" | "notes" | "ignore";
 
 export const INCOME_FIELD_LABELS: Record<IncomeField, string> = {
+    gross: "Aluguel bruto (contrato)",
+    fee_pct: "Taxa da imobiliária (%)",
     received: "Valor recebido (líquido da imobiliária)",
     energy: "Parcela de energia",
-    other: "Outras receitas",
+    other: "Outras despesas",
     notes: "Observações",
     ignore: "Ignorar",
 };
@@ -287,11 +296,16 @@ export function suggestMapping(headers: string[], dateColumn: number): IncomeFie
         const h = raw.trim().toLowerCase();
         if (!h) return "ignore";
         if (/coment|observa|obs\b|notes?$|descri/.test(h)) return "notes";
-        if (/acc|acum|saldo|investimento|total|custo|admin|prestac|tarifa|amortiza|iptu|utilidade/.test(h)) return "ignore";
+        if (/acc|acum|saldo|investimento|total|custo|admin|prestac|amortiza|iptu|utilidade/.test(h)) return "ignore";
+        if (/taxa|comiss|fee|%/.test(h)) return "fee_pct";
+        if (/tarifa/.test(h)) return "ignore";
         if (/energia|energy|solar/.test(h)) return "energy";
         if (/^renda aluguel 1$/.test(h)) return "energy";
         if (/^renda aluguel 2$/.test(h)) return "ignore";
-        if (/renda aluguel|aluguel|rent|recebid|receita|cr[eé]dito/.test(h)) return "received";
+        if (/bruto|gross|contrat/.test(h)) return "gross";
+        if (/l[ií]quido|\bnet\b/.test(h)) return "ignore";   // derived column, never imported
+        if (/recebid|cr[eé]dito/.test(h)) return "received";
+        if (/renda aluguel|aluguel|rent|receita/.test(h)) return "received";
         if (/outr|other/.test(h)) return "other";
         return "ignore";
     });
@@ -337,9 +351,16 @@ export function buildImportRows(sheet: ParsedSheet, mapping: IncomeField[], opts
             }
             const value = parseMoney(cell);
             if (value === null) return;
-            filled++;
             const abs = Math.max(0, value);
-            if (field === "received") row.received_amount = abs;
+            if (field === "fee_pct") {
+                // "10", "10%", "0,10" (fraction) → 10
+                const pct = abs > 0 && abs < 1 ? round2(abs * 100) : abs;
+                if (pct < 100) row.agency_fee_pct = pct;
+                return;
+            }
+            filled++;
+            if (field === "gross") row.gross_rent = abs;
+            else if (field === "received") row.received_amount = abs;
             else if (field === "energy") row.energy_portion = abs;
             else if (field === "other") row.other_income = abs;
         });
@@ -364,6 +385,9 @@ export interface IncomeSummary {
     totalReceived: number;          // confirmed, all time
     totalNetRent: number;           // confirmed, all time
     totalEnergy: number;            // confirmed, all time
+    totalFee: number;               // agency fees kept before crediting, all time = potential saving of self-management
+    fee12m: number;
+    totalGross: number;             // gross rent (contract value), confirmed, all time
     netRent12m: number;             // last 12 confirmed months
     energy12m: number;
     received12m: number;
@@ -388,6 +412,9 @@ export function summarize(rows: PropertyIncomeRow[]): IncomeSummary {
         totalReceived: sum(confirmed, b => b.received),
         totalNetRent: sum(confirmed, b => b.netRent),
         totalEnergy: sum(confirmed, b => b.energy),
+        totalFee: sum(confirmed, b => b.feeAmount),
+        fee12m: sum(last12, b => b.feeAmount),
+        totalGross: sum(confirmed, b => b.grossRent),
         netRent12m: sum(last12, b => b.netRent),
         energy12m: sum(last12, b => b.energy),
         received12m: sum(last12, b => b.received),

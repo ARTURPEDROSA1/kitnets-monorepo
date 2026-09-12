@@ -12,6 +12,7 @@ import {
     Clock,
     AlertCircle,
     Landmark,
+    Building2,
     ChevronDown,
     ChevronUp,
 } from "lucide-react";
@@ -58,8 +59,8 @@ import {
 interface PropertyIncomeLedgerProps {
     /** `properties.id` — undefined while the property has no DB row yet */
     propertyId?: string;
-    /** Pre-fills the agency fee for new months (from the cost-centre settings) */
-    defaultAgencyFeePct: number;
+    /** Pre-fills the agency fee for new months; 0/undefined falls back to 10 % */
+    defaultAgencyFeePct?: number;
     /** Called whenever the ledger changes so the parent can use real data */
     onRowsChange?: (rows: PropertyIncomeRow[]) => void;
 }
@@ -77,11 +78,12 @@ const parseInput = (s: string): number | null => {
 type DraftField = "received" | "energy" | "other" | "pct" | "gross" | "notes";
 type Drafts = Record<string, Partial<Record<DraftField, string>>>;
 
-const FIELD_OPTIONS: IncomeField[] = ["received", "energy", "other", "notes", "ignore"];
+const FIELD_OPTIONS: IncomeField[] = ["gross", "fee_pct", "received", "energy", "other", "notes", "ignore"];
 const IMPORT_CHUNK = 300;
+const DEFAULT_AGENCY_FEE_PCT = 10;
 const COLLAPSED_ROWS = 24;
 
-export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct, onRowsChange }: PropertyIncomeLedgerProps) {
+export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct = 0, onRowsChange }: PropertyIncomeLedgerProps) {
     const [rows, setRows] = useState<PropertyIncomeRow[]>([]);
     const [loading, setLoading] = useState<boolean>(Boolean(propertyId));
     const [error, setError] = useState<string | null>(null);
@@ -229,7 +231,9 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct, 
     const sorted = useMemo(() => [...rows].sort((a, b) => (a.month < b.month ? 1 : -1)), [rows]);
     const visible = showAll ? sorted : sorted.slice(0, COLLAPSED_ROWS);
     const summary = useMemo(() => summarize(rows), [rows]);
-    const lastPct = sorted.length ? Number(sorted[0].agency_fee_pct) : defaultAgencyFeePct;
+    // Fee pre-fill: last month's fee when set, else the property default, else 10 %
+    const lastRowPct = sorted.length ? Number(sorted[0].agency_fee_pct) : 0;
+    const lastPct = lastRowPct > 0 ? lastRowPct : defaultAgencyFeePct > 0 ? defaultAgencyFeePct : DEFAULT_AGENCY_FEE_PCT;
 
     const chartData = useMemo(
         () =>
@@ -401,7 +405,7 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct, 
                     </h3>
                     <p className="text-xs text-muted-foreground">
                         O que entrou na conta a cada mês. A parcela de energia é deduzida do aluguel e vai para o centro de energia solar.
-                        Aluguel líquido = recebido − energia − outras; aluguel bruto = líquido ÷ (1 − taxa da imobiliária).
+                        Aluguel líquido = recebido − energia − outras despesas; aluguel bruto = líquido ÷ (1 − taxa da imobiliária).
                     </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -423,7 +427,7 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct, 
             )}
 
             {/* Summary tiles */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                 <SummaryTile
                     label={latest ? `Último mês (${formatMonthKey(monthKey(latest.month))})` : "Último mês"}
                     value={latest ? formatBRL(latest.received) : "—"}
@@ -451,6 +455,13 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct, 
                     hint={`Acumulado ${formatBRL(summary.totalEnergy)}`}
                     icon={<Zap className="w-4 h-4" />}
                     tone="amber"
+                />
+                <SummaryTile
+                    label="Taxa da imobiliária · 12 meses"
+                    value={formatBRL(summary.fee12m)}
+                    hint={`Acumulado ${formatBRL(summary.totalFee)} · economia potencial com autogestão no Kitnets.com`}
+                    icon={<Building2 className="w-4 h-4" />}
+                    tone="rose"
                 />
             </div>
 
@@ -499,12 +510,12 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct, 
                         <thead>
                             <tr className="text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border">
                                 <th className="text-left px-2 py-2 font-semibold">Mês</th>
+                                <th className="text-right px-2 py-2 font-semibold">Aluguel bruto</th>
+                                <th className="text-right px-2 py-2 font-semibold">Taxa %</th>
                                 <th className="text-right px-2 py-2 font-semibold">Recebido</th>
                                 <th className="text-right px-2 py-2 font-semibold">Energia</th>
-                                <th className="text-right px-2 py-2 font-semibold">Outras</th>
-                                <th className="text-right px-2 py-2 font-semibold">Taxa %</th>
+                                <th className="text-right px-2 py-2 font-semibold">Outras despesas</th>
                                 <th className="text-right px-2 py-2 font-semibold">Aluguel líquido</th>
-                                <th className="text-right px-2 py-2 font-semibold">Aluguel bruto</th>
                                 <th className="text-center px-2 py-2 font-semibold">Status</th>
                                 <th className="text-left px-2 py-2 font-semibold">Obs.</th>
                                 <th className="px-2 py-2" />
@@ -541,12 +552,12 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct, 
                                             {formatMonthKey(month)}
                                             {busy && <Loader2 className="inline w-3 h-3 ml-1 animate-spin text-muted-foreground" />}
                                         </td>
+                                        <td className="px-2 py-1 text-right">{cell("gross", b.grossRent)}</td>
+                                        <td className="px-2 py-1 text-right">{cell("pct", b.feePct, "0.5")}</td>
                                         <td className="px-2 py-1 text-right">{cell("received", b.received)}</td>
                                         <td className="px-2 py-1 text-right">{cell("energy", b.energy)}</td>
                                         <td className="px-2 py-1 text-right">{cell("other", b.other)}</td>
-                                        <td className="px-2 py-1 text-right">{cell("pct", b.feePct, "0.5")}</td>
                                         <td className="px-2 py-1 text-right font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums">{formatBRL(b.netRent)}</td>
-                                        <td className="px-2 py-1 text-right">{cell("gross", b.grossRent)}</td>
                                         <td className="px-2 py-1 text-center">
                                             <button
                                                 type="button"
@@ -672,7 +683,7 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct, 
                                 />
                             </div>
                             <div className="space-y-1.5">
-                                <Label>Outras receitas (R$)</Label>
+                                <Label>Outras despesas (R$)</Label>
                                 <Input
                                     type="number" step="0.01" min={0} placeholder="0.00"
                                     value={addForm.other}
@@ -723,6 +734,7 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct, 
                         <DialogDescription>
                             Cole ou envie um arquivo TSV/CSV (copiado do Excel / Google Sheets) com uma coluna de data e colunas de valores.
                             Meses já existentes são atualizados apenas nas colunas mapeadas; os demais campos são mantidos.
+                            Se a planilha trouxer o aluguel bruto do contrato, o valor recebido é calculado com a taxa e a energia já registradas no mês.
                         </DialogDescription>
                     </DialogHeader>
 
@@ -793,9 +805,11 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct, 
                                         <thead className="bg-muted/40 text-[10px] uppercase text-muted-foreground">
                                             <tr>
                                                 <th className="text-left px-2 py-1">Mês</th>
+                                                <th className="text-right px-2 py-1">Bruto</th>
+                                                <th className="text-right px-2 py-1">Taxa</th>
                                                 <th className="text-right px-2 py-1">Recebido</th>
                                                 <th className="text-right px-2 py-1">Energia</th>
-                                                <th className="text-right px-2 py-1">Outras</th>
+                                                <th className="text-right px-2 py-1">Outras despesas</th>
                                                 <th className="text-left px-2 py-1">Obs.</th>
                                             </tr>
                                         </thead>
@@ -803,7 +817,9 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct, 
                                             {importRows.slice(-6).reverse().map(r => (
                                                 <tr key={r.month} className="border-t border-border/60">
                                                     <td className="px-2 py-1 font-semibold">{formatMonthKey(r.month)}</td>
-                                                    <td className="px-2 py-1 text-right tabular-nums">{r.received_amount !== undefined ? formatBRL(r.received_amount) : "—"}</td>
+                                                    <td className="px-2 py-1 text-right tabular-nums">{r.gross_rent !== undefined ? formatBRL(r.gross_rent) : "—"}</td>
+                                                    <td className="px-2 py-1 text-right tabular-nums">{r.agency_fee_pct !== undefined ? `${r.agency_fee_pct}%` : "—"}</td>
+                                                    <td className="px-2 py-1 text-right tabular-nums">{r.received_amount !== undefined ? formatBRL(r.received_amount) : r.gross_rent !== undefined ? "calculado" : "—"}</td>
                                                     <td className="px-2 py-1 text-right tabular-nums">{r.energy_portion !== undefined ? formatBRL(r.energy_portion) : "—"}</td>
                                                     <td className="px-2 py-1 text-right tabular-nums">{r.other_income !== undefined ? formatBRL(r.other_income) : "—"}</td>
                                                     <td className="px-2 py-1 truncate max-w-[180px]">{r.notes ?? ""}</td>
@@ -842,13 +858,14 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct, 
 function SummaryTile({
     label, value, hint, icon, tone,
 }: {
-    label: string; value: string; hint: string; icon: React.ReactNode; tone: "emerald" | "blue" | "violet" | "amber";
+    label: string; value: string; hint: string; icon: React.ReactNode; tone: "emerald" | "blue" | "violet" | "amber" | "rose";
 }) {
     const tones = {
         emerald: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600",
         blue: "bg-blue-50 dark:bg-blue-950/40 text-blue-600",
         violet: "bg-violet-50 dark:bg-violet-950/40 text-violet-600",
         amber: "bg-amber-50 dark:bg-amber-950/40 text-amber-600",
+        rose: "bg-rose-50 dark:bg-rose-950/40 text-rose-600",
     } as const;
     return (
         <div className="p-3.5 rounded-xl border border-border/80 bg-muted/20 space-y-1">
