@@ -212,7 +212,8 @@ export async function PUT(request: Request, context: RouteContext) {
             };
             // Gross rent from a lease sheet: derive what lands in the account
             // using the merged fee / energy / other values for that month.
-            if (gross_rent !== undefined) {
+            // An explicit received_amount in the same row always wins (bank truth).
+            if (gross_rent !== undefined && fields.received_amount === undefined) {
                 record.received_amount = receivedFromGross(
                     gross_rent,
                     Number(record.agency_fee_pct) || 0,

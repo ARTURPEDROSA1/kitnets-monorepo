@@ -43,9 +43,10 @@ export interface IncomeRowInput {
     month: string;
     received_amount?: number;
     /**
-     * Not stored. When present the server derives `received_amount` from it
-     * using the (merged) fee, energy and other values:
-     * received = gross × (1 − pct/100) + energy + other.
+     * Not stored. When present and `received_amount` is absent, the server
+     * derives `received_amount` from it using the (merged) fee, energy and
+     * other values: received = gross × (1 − pct/100) + energy + other.
+     * When both are sent, `received_amount` wins.
      */
     gross_rent?: number;
     energy_portion?: number;
@@ -302,7 +303,8 @@ export function suggestMapping(headers: string[], dateColumn: number): IncomeFie
         if (/^renda aluguel 1$/.test(h)) return "energy";
         if (/^renda aluguel 2$/.test(h)) return "ignore";
         if (/bruto|gross|contrat/.test(h)) return "gross";
-        if (/l[ií]quido|recebid|cr[eé]dito/.test(h)) return "received";
+        if (/l[ií]quido|\bnet\b/.test(h)) return "ignore";   // derived column, never imported
+        if (/recebid|cr[eé]dito/.test(h)) return "received";
         if (/renda aluguel|aluguel|rent|receita/.test(h)) return "received";
         if (/outr|other/.test(h)) return "other";
         return "ignore";
