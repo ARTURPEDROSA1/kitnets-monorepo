@@ -51,7 +51,17 @@ import {
 import { cn } from '@/lib/utils';
 import type { PropertyDetails, SubUnit } from '@/components/profile/PropertyDetailsCard';
 import PropertyIncomeLedger from './PropertyIncomeLedger';
-import { breakdown, formatMonthKey, monthKey, summarize, type PropertyIncomeRow } from '@/lib/property-income';
+import PeriodFilter from './PeriodFilter';
+import {
+    breakdown,
+    currentMonthKey,
+    filterRowsByPeriod,
+    formatMonthKey,
+    monthKey,
+    type IncomeBreakdown,
+    type PropertyIncomeRow,
+} from '@/lib/property-income';
+import { DEFAULT_PERIOD, monthsBetween, periodLabel, periodRange, type PeriodFilterValue } from '@/lib/period-filter';
 
 interface PropertyCostCenterDashboardProps {
     propertyIndex: number;
@@ -98,7 +108,8 @@ export default function PropertyCostCenterDashboard({
     // Real monthly income from the ledger (fed by PropertyIncomeLedger)
     const [incomeRows, setIncomeRows] = useState<PropertyIncomeRow[]>([]);
     useEffect(() => setIncomeRows([]), [dbId]);
-    const incomeSummary = useMemo(() => summarize(incomeRows), [incomeRows]);
+    // Period shared by the DRE chart and the income ledger (chart + table)
+    const [period, setPeriod] = useState<PeriodFilterValue>(DEFAULT_PERIOD);
 
     // Form state for configuring cost center parameters
     const [configForm, setConfigForm] = useState({
@@ -154,15 +165,27 @@ export default function PropertyCostCenterDashboard({
             rentedUnitsCount = 1;
         }
 
-        // Real income (latest confirmed month in the ledger) overrides the estimate
-        const real = incomeSummary.latest;
-        const hasRealIncome = Boolean(real && real.grossRent > 0);
-        if (real && hasRealIncome) {
-            grossMonthlyRevenue = real.grossRent;
+        // ── Real data from the income ledger, restricted to the selected period ──
+        const range = periodRange(period);
+        const periodRows = filterRowsByPeriod(incomeRows, range).sort((a, b) => (a.month < b.month ? -1 : 1));
+        const confirmedPeriod = periodRows.filter(r => r.status === 'CONFIRMED');
+        const realMonths = confirmedPeriod.length;
+        const hasRealIncome = realMonths > 0;
+        const sumBy = (pick: (b: IncomeBreakdown) => number) =>
+            confirmedPeriod.reduce((acc, r) => acc + pick(breakdown(r)), 0);
+        const grossTotal = sumBy(b => b.grossRent);
+        const feeTotal = sumBy(b => b.feeAmount);
+        const otherTotal = sumBy(b => b.other);
+        const opexTotal = feeTotal + otherTotal;
+        const noiTotal = sumBy(b => b.noi);
+
+        if (hasRealIncome) {
+            // Monthly averages over the period (the KPI cards are monthly figures)
+            grossMonthlyRevenue = Math.round(grossTotal / realMonths);
             if (propertyType === 'single') rentedUnitsCount = 1;
         }
 
-        // Operational Expenses (OPEX)
+        // Operational Expenses (OPEX) — estimates from "Ajustar Custos", used only without ledger data
         const iptuMonthly = details.iptuMonthly
             ? (parseFloat(details.iptuMonthly.replace(/[^\d.,]/g, '').replace(',', '.')) || 140)
             : 140;
@@ -175,46 +198,61 @@ export default function PropertyCostCenterDashboard({
             ? (parseFloat(details.maintenanceMonthly.replace(/[^\d.,]/g, '').replace(',', '.')) || Math.round(grossMonthlyRevenue * 0.05))
             : Math.round(grossMonthlyRevenue * 0.05);
 
-        const adminFee = real && hasRealIncome
-            ? Math.round(real.feeAmount)
-            : Math.round(grossMonthlyRevenue * (parseFloat(details.managementFeePercent || '8') / 100));
+        const adminFee = Math.round(grossMonthlyRevenue * (parseFloat(details.managementFeePercent || '8') / 100));
 
         const insuranceAndOther = details.otherExpensesMonthly
             ? (parseFloat(details.otherExpensesMonthly.replace(/[^\d.,]/g, '').replace(',', '.')) || 65)
             : 65;
 
-        const totalExpenses = iptuMonthly + condoMonthly + maintenanceReserve + adminFee + insuranceAndOther;
-        const noi = Math.max(0, grossMonthlyRevenue - totalExpenses);
+        const estimatedExpenses = iptuMonthly + condoMonthly + maintenanceReserve + adminFee + insuranceAndOther;
+
+        // With ledger data: OPEX = agency fee + other expenses deducted (monthly average over the period)
+        const totalExpenses = hasRealIncome ? Math.round(opexTotal / realMonths) : estimatedExpenses;
+        const noi = hasRealIncome ? Math.round(noiTotal / realMonths) : Math.max(0, grossMonthlyRevenue - totalExpenses);
         const margin = grossMonthlyRevenue > 0 ? (noi / grossMonthlyRevenue) * 100 : 0;
-        const occupancyRate = totalUnits > 0 ? Math.round((rentedUnitsCount / totalUnits) * 100) : 100;
+
+        // Occupancy: lifetime, from the ledger — months with rent ÷ months since the first record
+        let occupancyRate = totalUnits > 0 ? Math.round((rentedUnitsCount / totalUnits) * 100) : 100;
+        let occupancyHint = propertyType === 'multi'
+            ? `${rentedUnitsCount}/${totalUnits} unidades ativas`
+            : 'Imóvel ativo (estimativa)';
+        const lifetime = incomeRows
+            .filter(r => r.status === 'CONFIRMED' && monthKey(r.month) <= currentMonthKey())
+            .sort((a, b) => (a.month < b.month ? -1 : 1));
+        if (lifetime.length > 0) {
+            const firstKey = monthKey(lifetime[0].month);
+            const span = monthsBetween(firstKey, currentMonthKey()) + 1;
+            const occupied = lifetime.filter(r => breakdown(r).netRent > 0).length;
+            occupancyRate = span > 0 ? Math.round((occupied / span) * 100) : 0;
+            occupancyHint = `${occupied} de ${span} meses com aluguel desde ${formatMonthKey(firstKey)}`;
+        }
 
         // Breakdown for Donut Chart
-        const expenseBreakdown = [
-            { name: 'IPTU', value: iptuMonthly },
-            { name: 'Manutenção Predial', value: maintenanceReserve },
-            { name: 'Taxa Administrativa', value: adminFee },
-            { name: 'Condomínio / Áreas Comuns', value: condoMonthly },
-            { name: 'Seguro & Outros', value: insuranceAndOther },
-        ].filter(item => item.value > 0);
+        const expenseBreakdown = hasRealIncome
+            ? [
+                { name: 'Taxa da imobiliária', value: Math.round(feeTotal / realMonths) },
+                { name: 'Outras despesas descontadas', value: Math.round(otherTotal / realMonths) },
+            ].filter(item => item.value > 0)
+            : [
+                { name: 'IPTU', value: iptuMonthly },
+                { name: 'Manutenção Predial', value: maintenanceReserve },
+                { name: 'Taxa Administrativa', value: adminFee },
+                { name: 'Condomínio / Áreas Comuns', value: condoMonthly },
+                { name: 'Seguro & Outros', value: insuranceAndOther },
+            ].filter(item => item.value > 0);
 
-        // DRE data: real months from the income ledger when available, else a 6-month projection
-        const dreData: { month: string; receita: number; despesas: number; noi: number }[] = [];
-        const confirmedIncome = incomeRows
-            .filter(r => r.status === 'CONFIRMED')
-            .sort((a, b) => (a.month < b.month ? -1 : 1))
-            .slice(-6);
+        // DRE data: every ledger month in the period (expected months drawn lighter), else a 6-month projection
+        const dreData: { month: string; receita: number; despesas: number; noi: number; previsto: boolean }[] = [];
 
-        if (confirmedIncome.length > 0) {
-            const fixedExpenses = totalExpenses - adminFee;
-            confirmedIncome.forEach((r) => {
+        if (periodRows.length > 0) {
+            periodRows.forEach((r) => {
                 const b = breakdown(r);
-                const rec = Math.round(b.grossRent);
-                const exp = Math.round(fixedExpenses + b.feeAmount);
                 dreData.push({
                     month: formatMonthKey(monthKey(r.month)),
-                    receita: rec,
-                    despesas: exp,
-                    noi: rec - exp,
+                    receita: Math.round(b.grossRent),
+                    despesas: Math.round(b.opex),
+                    noi: Math.round(b.noi),
+                    previsto: r.status === 'EXPECTED',
                 });
             });
         } else {
@@ -231,12 +269,18 @@ export default function PropertyCostCenterDashboard({
                     receita: rec,
                     despesas: exp,
                     noi: Math.max(0, rec - exp),
+                    previsto: false,
                 });
             }
         }
 
         return {
-            realIncomeMonth: real && hasRealIncome ? formatMonthKey(monthKey(real.month)) : null,
+            realIncomeMonth: hasRealIncome ? periodLabel(period) : null,
+            realMonths,
+            grossTotal,
+            opexTotal,
+            noiTotal,
+            occupancyHint,
             grossMonthlyRevenue,
             annualRevenue: grossMonthlyRevenue * 12,
             totalExpenses,
@@ -249,7 +293,7 @@ export default function PropertyCostCenterDashboard({
             expenseBreakdown,
             dreData,
         };
-    }, [propertyType, details, subUnits, totalUnits, incomeSummary, incomeRows]);
+    }, [propertyType, details, subUnits, totalUnits, incomeRows, period]);
 
     const handleSaveConfig = () => {
         const updated = {
@@ -379,8 +423,9 @@ export default function PropertyCostCenterDashboard({
                             {formatBRL(financials.grossMonthlyRevenue)}
                         </span>
                         <span className="text-xs text-muted-foreground">
-                            {financials.realIncomeMonth ? `Real (${financials.realIncomeMonth}) · anual: ` : 'Projeção anual: '}
-                            {formatBRL(financials.annualRevenue)}
+                            {financials.realIncomeMonth
+                                ? `Média mensal · ${financials.realMonths} ${financials.realMonths === 1 ? 'mês' : 'meses'} · total ${formatBRL(financials.grossTotal)}`
+                                : `Projeção anual: ${formatBRL(financials.annualRevenue)}`}
                         </span>
                     </div>
                 </div>
@@ -398,6 +443,7 @@ export default function PropertyCostCenterDashboard({
                             {formatBRL(financials.totalExpenses)}
                         </span>
                         <span className="text-xs text-muted-foreground">
+                            {financials.realIncomeMonth ? 'Taxa da imobiliária + outras despesas · ' : ''}
                             {((financials.totalExpenses / (financials.grossMonthlyRevenue || 1)) * 100).toFixed(0)}% da receita bruta
                         </span>
                     </div>
@@ -436,9 +482,7 @@ export default function PropertyCostCenterDashboard({
                             {financials.occupancyRate}%
                         </span>
                         <span className="text-xs text-muted-foreground">
-                            {propertyType === 'multi'
-                                ? `${financials.rentedUnitsCount}/${totalUnits} unidades ativas`
-                                : 'Imóvel ativo'}
+                            {financials.occupancyHint}
                         </span>
                     </div>
                 </div>
@@ -474,10 +518,11 @@ export default function PropertyCostCenterDashboard({
                             </h3>
                             <p className="text-xs text-muted-foreground">
                                 {financials.realIncomeMonth
-                                    ? 'Receita real dos últimos meses registrados; despesas conforme os parâmetros do centro de custos'
+                                    ? `Receita bruta, despesas (taxa da imobiliária + outras) e NOI reais · ${financials.realIncomeMonth}; meses previstos em tom claro`
                                     : 'Histórico e projeção de Receitas, Despesas Operacionais e Lucro Líquido (NOI)'}
                             </p>
                         </div>
+                        <PeriodFilter value={period} onChange={setPeriod} className="justify-end" />
                     </div>
 
                     <div className="h-[280px] w-full pt-2">
@@ -501,9 +546,24 @@ export default function PropertyCostCenterDashboard({
                                     }}
                                 />
                                 <Legend wrapperStyle={{ paddingTop: '10px', fontSize: '12px' }} />
-                                <Bar dataKey="receita" name="Receita Bruta" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={32} />
-                                <Bar dataKey="despesas" name="Despesas (OPEX)" fill="#f43f5e" radius={[4, 4, 0, 0]} maxBarSize={32} />
-                                <Line type="monotone" dataKey="noi" name="Resultado Líquido (NOI)" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4 }} />
+                                <Bar dataKey="receita" name="Receita Bruta" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={32}>
+                                    {financials.dreData.map((d, i) => (
+                                        <Cell key={`rec-${i}`} fill="#10b981" fillOpacity={d.previsto ? 0.35 : 1} />
+                                    ))}
+                                </Bar>
+                                <Bar dataKey="despesas" name="Despesas (OPEX)" fill="#f43f5e" radius={[4, 4, 0, 0]} maxBarSize={32}>
+                                    {financials.dreData.map((d, i) => (
+                                        <Cell key={`exp-${i}`} fill="#f43f5e" fillOpacity={d.previsto ? 0.35 : 1} />
+                                    ))}
+                                </Bar>
+                                <Line
+                                    type="monotone"
+                                    dataKey="noi"
+                                    name="Resultado Líquido (NOI)"
+                                    stroke="#3b82f6"
+                                    strokeWidth={3}
+                                    dot={financials.dreData.length > 24 ? false : { r: 4 }}
+                                />
                             </ComposedChart>
                         </ResponsiveContainer>
                     </div>
@@ -568,6 +628,8 @@ export default function PropertyCostCenterDashboard({
                 propertyId={dbId}
                 defaultAgencyFeePct={details.managementFeePercent ? parseFloat(details.managementFeePercent) || 0 : 0}
                 onRowsChange={setIncomeRows}
+                period={period}
+                onPeriodChange={setPeriod}
             />
 
             {/* Multifamily Units Summary (if applicable) */}
