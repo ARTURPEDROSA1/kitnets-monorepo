@@ -222,49 +222,36 @@ export default function PropertySquareCard({
                     )}
                 </div>
 
-                {/* Identification & Meters Preview */}
-                <div className="pt-2 border-t border-border/60 flex items-center justify-between text-xs text-muted-foreground">
-                    <div className="flex items-center gap-2 truncate">
-                        {details.inscricaoImobiliaria || details.matricula ? (
-                            <span className="font-mono text-[11px] bg-muted px-2 py-0.5 rounded truncate">
-                                Matrícula / IPTU: {details.inscricaoImobiliaria || details.matricula}
-                            </span>
-                        ) : (
-                            <span className="text-[11px] italic">
-                                {property.isComplete ? 'Documentos verificados' : 'Documentação em análise'}
-                            </span>
-                        )}
-                    </div>
-
-                    {/* Utility meter icons */}
-                    <div className="flex items-center gap-1.5 flex-shrink-0 text-muted-foreground">
-                        {details.mainMeters?.energy && (
-                            <span title="Medidor de Energia"><Zap className="w-3.5 h-3.5 text-amber-500" /></span>
-                        )}
-                        {details.mainMeters?.water && (
-                            <span title="Medidor de Água"><Droplets className="w-3.5 h-3.5 text-blue-500" /></span>
-                        )}
-                        {details.mainMeters?.gas && (
-                            <span title="Medidor de Gás"><Flame className="w-3.5 h-3.5 text-orange-500" /></span>
-                        )}
-                    </div>
-                </div>
-
-                {/* Middle Info & Thumbnail Row */}
-                <div className="flex items-center gap-3 pt-1">
+                {/* Photo, Info & Meters Row */}
+                <div className="pt-3 border-t border-border/60 flex items-center gap-4">
                     {photoUrl ? (
-                        <div className="w-12 h-12 rounded-xl overflow-hidden border border-border flex-shrink-0 bg-muted">
+                        <div className="w-24 h-24 rounded-2xl overflow-hidden border border-border flex-shrink-0 bg-muted">
                             <Image
                                 src={photoUrl}
                                 alt={title}
-                                width={48}
-                                height={48}
+                                width={96}
+                                height={96}
                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                             />
                         </div>
                     ) : (
-                        <div className="w-12 h-12 rounded-xl border border-border bg-muted/40 flex items-center justify-center flex-shrink-0 text-muted-foreground">
-                            {propertyType === 'multi' ? <Building2 className="w-6 h-6" /> : <Home className="w-6 h-6" />}
+                        <div className="w-24 h-24 rounded-2xl border border-border bg-muted/40 flex items-center justify-center flex-shrink-0 text-muted-foreground">
+                            {propertyType === 'multi' ? <Building2 className="w-10 h-10" /> : <Home className="w-10 h-10" />}
+                        </div>
+                    )}
+
+                    {/* Utility meter icons */}
+                    {(details.mainMeters?.energy || details.mainMeters?.water || details.mainMeters?.gas) && (
+                        <div className="order-last flex items-center gap-1.5 flex-shrink-0 self-start text-muted-foreground">
+                            {details.mainMeters?.energy && (
+                                <span title="Medidor de Energia"><Zap className="w-3.5 h-3.5 text-amber-500" /></span>
+                            )}
+                            {details.mainMeters?.water && (
+                                <span title="Medidor de Água"><Droplets className="w-3.5 h-3.5 text-blue-500" /></span>
+                            )}
+                            {details.mainMeters?.gas && (
+                                <span title="Medidor de Gás"><Flame className="w-3.5 h-3.5 text-orange-500" /></span>
+                            )}
                         </div>
                     )}
 
