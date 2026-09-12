@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
 import { cookies } from "next/headers";
 
 export interface SaveCalculatorLeadResponse {
@@ -47,7 +47,7 @@ export async function saveCalculatorLead(data: CalculatorLeadData): Promise<Save
         return { success: false, error: "Name and Email are required" };
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     try {
         // Construct the payload matching the DB schema provided in the spec

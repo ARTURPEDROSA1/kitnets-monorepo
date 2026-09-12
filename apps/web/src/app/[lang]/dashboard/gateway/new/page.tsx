@@ -35,10 +35,7 @@ export default function AddGatewayPage() {
             const res = await fetch("/api/gateways/claim", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    code: code.trim(),
-                    userId: user.id,
-                }),
+                body: JSON.stringify({ code: code.trim() }),
             });
 
             const data = await res.json();

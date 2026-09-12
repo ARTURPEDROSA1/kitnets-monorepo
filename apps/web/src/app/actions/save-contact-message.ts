@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
 import { cookies } from "next/headers";
 
 export interface SaveContactMessageResponse {
@@ -20,7 +20,7 @@ export async function saveContactMessage(data: {
         return { success: false, error: "Missing required fields" };
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     try {
         const { error } = await supabase

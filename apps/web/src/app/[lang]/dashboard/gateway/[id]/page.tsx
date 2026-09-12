@@ -73,8 +73,13 @@ export default function GatewayDetailPage() {
 
             if (cancelled || !gw?.property_id) return;
 
-            const { data: billsData } = await supabase
-                .rpc("get_property_bills", { p_property_id: gw.property_id });
+            let billsData: Array<{ reading_date_orig?: string | null; reading_date?: string | null }> | null = null;
+            try {
+                const res = await fetch(`/api/water-bills?propertyId=${encodeURIComponent(gw.property_id)}`);
+                if (res.ok) billsData = (await res.json()).bills ?? null;
+            } catch {
+                // Non-critical: billing-cycle sync simply stays off
+            }
 
             if (cancelled || !billsData || billsData.length < 2) return;
 
@@ -272,10 +277,18 @@ export default function GatewayDetailPage() {
             let rateInfo: string | null = null;
 
             if (gw.property_id) {
-                const { data: rateData } = await supabase
-                    .rpc("get_latest_billing_rate", { p_property_id: gw.property_id });
-
-                const latestBill = rateData?.[0];
+                // Latest bill with a known effective rate (bills come newest first)
+                type RateBill = { effective_rate_per_m3: number | string | null; reference_month: string };
+                let latestBill: RateBill | null = null;
+                try {
+                    const res = await fetch(`/api/water-bills?propertyId=${encodeURIComponent(gw.property_id)}`);
+                    if (res.ok) {
+                        const { bills } = (await res.json()) as { bills?: RateBill[] };
+                        latestBill = (bills ?? []).find((b) => b.effective_rate_per_m3 != null) ?? null;
+                    }
+                } catch {
+                    // Non-critical: cost estimate stays hidden
+                }
                 if (latestBill && latestBill.effective_rate_per_m3) {
                     const rate = Number(latestBill.effective_rate_per_m3);
                     // totalConsumption is in liters, rate is R$/m³
