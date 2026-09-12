@@ -231,7 +231,7 @@ export default function PropertyIncomeLedger({
         if (value === null) return clear();
 
         if (field === "gross") {
-            const received = receivedFromGross(value, b.feePct, b.energy, b.other);
+            const received = receivedFromGross(value, b.feePct, b.energy);
             if (received === b.received) return clear();
             return void putRows([{ month, received_amount: received }]);
         }
@@ -301,7 +301,7 @@ export default function PropertyIncomeLedger({
     const recalcFromGross = (form: typeof addForm) => {
         const gross = parseInput(form.gross);
         if (gross === null) return form;
-        const received = receivedFromGross(gross, parseInput(form.pct) ?? 0, parseInput(form.energy) ?? 0, parseInput(form.other) ?? 0);
+        const received = receivedFromGross(gross, parseInput(form.pct) ?? 0, parseInput(form.energy) ?? 0);
         return { ...form, received: toInput(received) };
     };
     const recalcFromReceived = (form: typeof addForm) => {
@@ -344,6 +344,7 @@ export default function PropertyIncomeLedger({
     const [importing, setImporting] = useState(false);
     const [importError, setImportError] = useState<string | null>(null);
     const [importDone, setImportDone] = useState<number | null>(null);
+    const [importNotice, setImportNotice] = useState<string | null>(null);
 
     const [templateDetected, setTemplateDetected] = useState(false);
     const [showMapping, setShowMapping] = useState(false);
@@ -477,6 +478,10 @@ export default function PropertyIncomeLedger({
             if (lastRows) applyRows(lastRows);
             setImportDone(rows.length);
             setDrafts({});
+            // Close the dialog so the user sees the result in the ledger; confirm with a short notice.
+            setImportOpen(false);
+            setImportNotice(`${rows.length} ${rows.length === 1 ? "mês importado" : "meses importados"}${replace ? " · registro anterior substituído" : ""}`);
+            window.setTimeout(() => setImportNotice(null), 8000);
         } catch (err) {
             setImportError((err as Error).message);
         } finally {
@@ -506,8 +511,8 @@ export default function PropertyIncomeLedger({
                         Receitas de Aluguel (valores reais)
                     </h3>
                     <p className="text-xs text-muted-foreground">
-                        O que entrou na conta a cada mês. A parcela de energia vai para o centro de energia solar; outras despesas são valores descontados do repasse.
-                        Aluguel líquido (após a taxa) = recebido − energia + outras despesas; aluguel bruto = líquido ÷ (1 − taxa); NOI = líquido − outras despesas.
+                        O que entrou na conta a cada mês. A parcela de energia vai para o centro de energia solar; o custo de energia é a conta de luz paga à parte.
+                        Aluguel líquido (após a taxa) = recebido − energia; aluguel bruto = líquido ÷ (1 − taxa); OPEX = taxa + custo de energia; NOI = líquido − custo de energia.
                     </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -549,6 +554,11 @@ export default function PropertyIncomeLedger({
                     <AlertCircle className="w-3.5 h-3.5" /> {error}
                 </div>
             )}
+            {importNotice && (
+                <div className="text-xs text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 rounded-lg px-3 py-2 flex items-center gap-2">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> {importNotice}
+                </div>
+            )}
 
             {/* Summary tiles */}
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
@@ -576,7 +586,7 @@ export default function PropertyIncomeLedger({
                 <SummaryTile
                     label="Energia (centro solar) · 12 meses"
                     value={formatBRL(summary.energy12m)}
-                    hint={`Acumulado ${formatBRL(summary.totalEnergy)}`}
+                    hint={`Custo ${formatBRL(summary.other12m)} · resultado ${formatBRL(summary.energy12m - summary.other12m)} · acumulado ${formatBRL(summary.totalEnergy - summary.totalOther)}`}
                     icon={<Zap className="w-4 h-4" />}
                     tone="amber"
                 />
@@ -651,7 +661,7 @@ export default function PropertyIncomeLedger({
                                 <th className="text-right px-2 py-2 font-semibold">Taxa %</th>
                                 <th className="text-right px-2 py-2 font-semibold">Recebido</th>
                                 <th className="text-right px-2 py-2 font-semibold">Energia</th>
-                                <th className="text-right px-2 py-2 font-semibold">Outras despesas</th>
+                                <th className="text-right px-2 py-2 font-semibold" title="Conta de luz paga no mês (custo à parte; não altera o recebido)">Custo de energia</th>
                                 <th className="text-right px-2 py-2 font-semibold">Aluguel líquido</th>
                                 <th className="text-center px-2 py-2 font-semibold">Status</th>
                                 <th className="text-left px-2 py-2 font-semibold">Obs.</th>
@@ -820,7 +830,7 @@ export default function PropertyIncomeLedger({
                                 />
                             </div>
                             <div className="space-y-1.5">
-                                <Label>Outras despesas descontadas (R$)</Label>
+                                <Label>Custo de energia (R$)</Label>
                                 <Input
                                     type="number" step="0.01" min={0} placeholder="0.00"
                                     value={addForm.other}
@@ -984,7 +994,7 @@ export default function PropertyIncomeLedger({
                                                 <th className="text-right px-2 py-1">Taxa</th>
                                                 <th className="text-right px-2 py-1">Recebido</th>
                                                 <th className="text-right px-2 py-1">Energia</th>
-                                                <th className="text-right px-2 py-1">Outras despesas</th>
+                                                <th className="text-right px-2 py-1">Custo de energia</th>
                                                 <th className="text-left px-2 py-1">Obs.</th>
                                             </tr>
                                         </thead>

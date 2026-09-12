@@ -231,7 +231,7 @@ export default function PropertyCostCenterDashboard({
         const expenseBreakdown = hasRealIncome
             ? [
                 { name: 'Taxa da imobiliária', value: Math.round(feeTotal / realMonths) },
-                { name: 'Outras despesas descontadas', value: Math.round(otherTotal / realMonths) },
+                { name: 'Custo de energia', value: Math.round(otherTotal / realMonths) },
             ].filter(item => item.value > 0)
             : [
                 { name: 'IPTU', value: iptuMonthly },
@@ -443,7 +443,7 @@ export default function PropertyCostCenterDashboard({
                             {formatBRL(financials.totalExpenses)}
                         </span>
                         <span className="text-xs text-muted-foreground">
-                            {financials.realIncomeMonth ? 'Taxa da imobiliária + outras despesas · ' : ''}
+                            {financials.realIncomeMonth ? 'Taxa da imobiliária + custo de energia · ' : ''}
                             {((financials.totalExpenses / (financials.grossMonthlyRevenue || 1)) * 100).toFixed(0)}% da receita bruta
                         </span>
                     </div>
@@ -518,7 +518,7 @@ export default function PropertyCostCenterDashboard({
                             </h3>
                             <p className="text-xs text-muted-foreground">
                                 {financials.realIncomeMonth
-                                    ? `Receita bruta, despesas (taxa da imobiliária + outras) e NOI reais · ${financials.realIncomeMonth}; meses previstos em tom claro`
+                                    ? `Receita bruta, despesas (taxa da imobiliária + custo de energia) e NOI reais · ${financials.realIncomeMonth}; meses previstos em tom claro`
                                     : 'Histórico e projeção de Receitas, Despesas Operacionais e Lucro Líquido (NOI)'}
                             </p>
                         </div>
