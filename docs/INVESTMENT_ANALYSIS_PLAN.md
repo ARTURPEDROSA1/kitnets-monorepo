@@ -89,6 +89,7 @@ All amounts in BRL; `t0` = acquisition date; "to date" = up to the selected as-o
 - `equityMultiple` = (`netIncomeToDate` + current equity) ÷ `cashInvested`, where equity = market value − outstanding loan balance
 - `irr` = XIRR over the dated cash-flow series: −(down payment + closing) at t0, −installments/prepayments/capex on their dates, +NOI monthly, terminal +(market value − outstanding balance) at the as-of date. Report as "TIR até hoje (incl. valorização)" and "TIR realizada (sem venda)"
 - `appreciation` = market value ÷ purchase price − 1; `totalReturn` = `netIncomeToDate` + appreciation gain
+- `agencyFeesPaid` = Σ (gross rent − net rent) over confirmed months; shown as **economia potencial com autogestão**: what the owner keeps by self-managing on Kitnets.com instead of paying the agency. Gross rent from the lease is therefore a first-class input, not just a derived number
 - `rentPerSqm` = rent ÷ built area; `pricePerSqm`; `priceToRent` = purchase price ÷ annual rent
 - `breakEvenOccupancy` = (`opex` + `debtService`) ÷ potential gross rent (multi-unit)
 - `dscr` = `noi` ÷ `debtService` (only while financed)
