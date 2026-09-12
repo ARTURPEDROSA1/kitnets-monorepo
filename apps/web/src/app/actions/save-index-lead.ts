@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
 import { cookies, headers } from "next/headers";
 
 export interface SaveIndexLeadResponse {
@@ -37,7 +37,7 @@ export async function saveIndexLead(data: IndexLeadData): Promise<SaveIndexLeadR
         return { success: false, error: "Nome e e-mail são obrigatórios." };
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const lowerEmail = email.toLowerCase();
     const timestamp = new Date().toISOString();
 

@@ -90,11 +90,8 @@ export default function OwnerSignupPage({ lang }: { lang: "en" | "pt" | "es" }) 
                     const profileRes = await fetch('/api/profiles/create', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            clerkId: completeSignUp.createdUserId,
-                            fullName: name,
-                            email: emailAddress
-                        })
+                        // Identity (Clerk id, verified e-mail) is read server-side from the session
+                        body: JSON.stringify({ fullName: name })
                     });
                     if (!profileRes.ok) {
                         const errData = await profileRes.json().catch(() => ({}));

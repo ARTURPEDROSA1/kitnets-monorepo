@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
 import { cookies } from "next/headers";
 
 export interface SaveFaqQuestionResponse {
@@ -15,7 +15,7 @@ export async function saveFaqQuestion(data: { name?: string; email: string; ques
         return { success: false, error: "Email and question are required" };
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     try {
         const { error } = await supabase

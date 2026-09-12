@@ -13,6 +13,22 @@ function getServiceSupabase() {
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** Thrown when a propertyId is a UUID that does not belong to the caller. */
+class PropertyNotFoundError extends Error {
+    constructor() {
+        super("Imóvel não encontrado");
+        this.name = "PropertyNotFoundError";
+    }
+}
+
+function errorResponse(err: unknown, fallback: string) {
+    if (err instanceof PropertyNotFoundError) {
+        return NextResponse.json({ error: err.message }, { status: 404 });
+    }
+    console.error(`[Energy Bills] ${fallback}:`, err);
+    return NextResponse.json({ error: fallback }, { status: 500 });
+}
+
 /**
  * Resolves a propertyId input (which might be a valid UUID, or "primary", or legacy alias)
  * to a verified UUID in public.properties. Auto-creates property record if needed.
@@ -22,18 +38,6 @@ async function resolvePropertyUuid(
     clerkUserId: string,
     inputId: string
 ): Promise<string> {
-    if (inputId && UUID_REGEX.test(inputId)) {
-        const { data: existing } = await supabase
-            .from("properties")
-            .select("id")
-            .eq("id", inputId)
-            .maybeSingle();
-
-        if (existing?.id) {
-            return existing.id;
-        }
-    }
-
     // 1. Find user's profile
     const { data: profile } = await supabase
         .from("profiles")
@@ -43,6 +47,22 @@ async function resolvePropertyUuid(
 
     if (!profile) {
         throw new Error("Perfil de usuário não encontrado");
+    }
+
+    // A concrete UUID must belong to the caller. Never fall through to the
+    // alias/auto-create logic for a UUID that isn't theirs.
+    if (inputId && UUID_REGEX.test(inputId)) {
+        const { data: existing } = await supabase
+            .from("properties")
+            .select("id")
+            .eq("id", inputId)
+            .eq("owner_id", profile.id)
+            .maybeSingle();
+
+        if (existing?.id) {
+            return existing.id;
+        }
+        throw new PropertyNotFoundError();
     }
 
     // Fetch all existing properties for this owner
@@ -223,9 +243,7 @@ export async function GET(request: Request) {
             currentPdfUrl,
         });
     } catch (err) {
-        console.error("[Energy Bills GET] Critical error:", err);
-        const message = err instanceof Error ? err.message : "Erro interno do servidor";
-        return NextResponse.json({ error: message }, { status: 500 });
+        return errorResponse(err, "Erro ao carregar faturas");
     }
 }
 
@@ -472,9 +490,7 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ success: true, bill: savedBill, propertyId: resolvedPropertyId });
     } catch (err) {
-        console.error("[Energy Bills POST] Critical error:", err);
-        const message = err instanceof Error ? err.message : "Erro interno do servidor";
-        return NextResponse.json({ error: message }, { status: 500 });
+        return errorResponse(err, "Erro ao salvar fatura");
     }
 }
 
@@ -523,9 +539,12 @@ export async function PUT(request: Request) {
             return NextResponse.json({ error: "Fatura não encontrada" }, { status: 404 });
         }
 
-        const prop = existingBill.properties as any;
-        if (prop && prop.owner_id && prop.owner_id !== profile.id) {
-            return NextResponse.json({ error: "Acesso não autorizado a esta fatura" }, { status: 403 });
+        // Deny unless the bill's property is owned by the caller. Orphaned bills
+        // (property_id NULL) and ownerless properties are NOT editable here.
+        const rel = existingBill.properties as unknown;
+        const prop = (Array.isArray(rel) ? rel[0] : rel) as { owner_id: string | null } | null | undefined;
+        if (!prop || !prop.owner_id || prop.owner_id !== profile.id) {
+            return NextResponse.json({ error: "Fatura não encontrada" }, { status: 404 });
         }
 
         // 3. Prepare payload
@@ -593,9 +612,7 @@ export async function PUT(request: Request) {
 
         return NextResponse.json({ success: true, bill: updated });
     } catch (err) {
-        console.error("[Energy Bills PUT] Critical error:", err);
-        const message = err instanceof Error ? err.message : "Erro interno do servidor";
-        return NextResponse.json({ error: message }, { status: 500 });
+        return errorResponse(err, "Erro ao atualizar fatura");
     }
 }
 
@@ -618,14 +635,37 @@ export async function DELETE(request: Request) {
 
         const supabase = getServiceSupabase();
 
+        const { data: profile } = await supabase
+            .from("profiles")
+            .select("id")
+            .eq("clerk_id", userId)
+            .maybeSingle();
+
+        if (!profile) {
+            return NextResponse.json({ error: "Perfil de usuário não encontrado" }, { status: 403 });
+        }
+
+        // Ownership: bill → property → owner (inner join filters out orphaned bills)
+        const { data: bill } = await supabase
+            .from("energy_bills")
+            .select("id, property_id, properties!inner(owner_id)")
+            .eq("id", id)
+            .eq("properties.owner_id", profile.id)
+            .maybeSingle();
+
+        if (!bill) {
+            return NextResponse.json({ error: "Fatura não encontrada" }, { status: 404 });
+        }
+
         const { error } = await supabase
             .from("energy_bills")
             .delete()
-            .eq("id", id);
+            .eq("id", id)
+            .eq("property_id", bill.property_id);
 
         if (error) {
             console.error("[Energy Bills DELETE] Error:", error);
-            return NextResponse.json({ error: error.message }, { status: 500 });
+            return NextResponse.json({ error: "Erro ao excluir fatura" }, { status: 500 });
         }
 
         return NextResponse.json({ success: true });

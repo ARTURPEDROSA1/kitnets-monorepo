@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
 import { WaitlistData } from "@/components/waitlist/types";
 
 export interface WaitlistResult {
@@ -9,7 +9,7 @@ export interface WaitlistResult {
 }
 
 export async function submitWaitlist(data: WaitlistData): Promise<WaitlistResult> {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     const {
         profile,
