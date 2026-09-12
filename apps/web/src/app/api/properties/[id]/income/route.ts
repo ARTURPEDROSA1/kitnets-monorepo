@@ -17,7 +17,8 @@ export const dynamic = "force-dynamic";
  * Monthly income ledger for a property the signed-in user owns.
  *
  *   GET    /api/properties/[id]/income              → { rows }   (newest month first)
- *   PUT    /api/properties/[id]/income  { rows }    → { rows }   merge-upsert by month
+ *   PUT    /api/properties/[id]/income  { rows, replace? } → { rows }   merge-upsert by month;
+ *                                       replace: true wipes the property's months first
  *   DELETE /api/properties/[id]/income?month=YYYY-MM → { ok }
  *
  * PUT semantics: for each input row only the fields present are
@@ -160,12 +161,15 @@ export async function PUT(request: Request, context: RouteContext) {
     if ("response" in resolved) return resolved.response;
     const { profileId, supabase, propertyId } = resolved.ctx;
 
-    let body: { rows?: unknown };
+    let body: { rows?: unknown; replace?: unknown };
     try {
         body = await request.json();
     } catch {
         return NextResponse.json({ error: "Corpo da requisição inválido" }, { status: 400 });
     }
+    // replace: true → the property's existing months are deleted first, so the
+    // request becomes the whole ledger (used by spreadsheet imports).
+    const replaceAll = body.replace === true;
     if (!Array.isArray(body.rows) || body.rows.length === 0) {
         return NextResponse.json({ error: "rows é obrigatório" }, { status: 400 });
     }
@@ -181,7 +185,13 @@ export async function PUT(request: Request, context: RouteContext) {
     }
 
     try {
-        const existing = new Map((await loadRows(supabase, propertyId)).map(r => [r.month.slice(0, 7), r]));
+        if (replaceAll) {
+            const { error: delError } = await supabase.from(TABLE).delete().eq("property_id", propertyId);
+            if (delError) throw new Error(delError.message);
+        }
+        const existing = new Map(
+            replaceAll ? [] : (await loadRows(supabase, propertyId)).map(r => [r.month.slice(0, 7), r] as const)
+        );
         const merged = new Map<string, Record<string, unknown>>();
 
         for (const input of inputs) {
@@ -230,7 +240,7 @@ export async function PUT(request: Request, context: RouteContext) {
         if (error) throw new Error(error.message);
 
         const rows = await loadRows(supabase, propertyId);
-        return NextResponse.json({ rows, upserted: merged.size });
+        return NextResponse.json({ rows, upserted: merged.size, replaced: replaceAll });
     } catch (err) {
         console.error("[Income PUT]", (err as Error).message);
         return NextResponse.json({ error: "Erro ao salvar receitas" }, { status: 500 });
