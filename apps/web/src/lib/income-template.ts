@@ -163,12 +163,8 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
         }
     }
 
-    // Footer note
-    const noteRow = HEADER_ROW + months + 2;
-    ws.mergeCells(`A${noteRow}:G${noteRow}`);
-    ws.getCell(`A${noteRow}`).value =
-        "Meses do mais recente para o mais antigo. Adicione mais linhas abaixo se precisar (a coluna Valor recebido pode ser copiada para manter a fórmula). Meses futuros são importados como “previstos”.";
-    ws.getCell(`A${noteRow}`).font = { name: "Calibri", size: 9, italic: true, color: { argb: `FF${MUTED}` } };
+    // No footer text below the table: it would block dragging the last row down
+    // to extend the table. Guidance lives in the "Instruções" sheet instead.
 
     // ── Sheet 2: Instruções ─────────────────────────────────────────────
     const info = wb.addWorksheet("Instruções");
@@ -179,7 +175,8 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
         ["1.", "Preencha a aba “Receitas”: uma linha por mês, com a data no formato dd/mm/aaaa.", "p"],
         ["2.", "Informe o Aluguel bruto (valor do contrato) e a Taxa da imobiliária em %. O Valor recebido é calculado automaticamente; substitua pelo valor real do extrato bancário quando quiser.", "p"],
         ["3.", "Se o inquilino paga uma parcela referente à energia solar, informe em Energia. Esse valor é deduzido do aluguel e contabilizado no centro de energia.", "p"],
-        ["4.", "Salve o arquivo (.xlsx) e importe em Kitnets.com › Imóveis › Gerenciar Imóvel › Importar planilha. As colunas são reconhecidas automaticamente.", "p"],
+        ["4.", "Os meses vêm do mais recente para o mais antigo. Para acrescentar meses, arraste a última linha para baixo (a fórmula de Valor recebido é copiada junto). Meses futuros são importados como “previstos”.", "p"],
+        ["5.", "Salve o arquivo (.xlsx) e importe em Kitnets.com › Imóveis › Gerenciar Imóvel › Importar planilha. As colunas são reconhecidas automaticamente.", "p"],
         ["Colunas", "", "h"],
         ["Mês", "Data de referência do mês (qualquer dia do mês serve).", "p"],
         ["Aluguel bruto (R$)", "Valor do aluguel no contrato, antes da taxa da imobiliária.", "p"],
