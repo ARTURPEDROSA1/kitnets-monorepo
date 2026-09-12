@@ -7,7 +7,7 @@
  */
 import ExcelJS from "exceljs";
 import { KITNETS_LOGO_PNG_BASE64 } from "./income-template-logo";
-import { INCOME_TEMPLATE_HEADERS } from "./property-income";
+import { INCOME_TEMPLATE_HEADERS, breakdown, type PropertyIncomeRow } from "./property-income";
 
 export const INCOME_TEMPLATE_SHEET = "Receitas";
 
@@ -33,8 +33,10 @@ const thin: Partial<ExcelJS.Borders> = {
 export interface IncomeTemplateOptions {
     propertyName: string;
     feePct: number;
-    /** Number of month rows to pre-fill, ending at the current month. Default 12. */
+    /** Number of empty month rows to pre-fill, ending at the current month. Default 12. Ignored when `rows` is given. */
     months?: number;
+    /** When given, the sheet is filled with these ledger rows (export) instead of empty months. */
+    rows?: PropertyIncomeRow[];
     now?: Date;
 }
 
@@ -43,7 +45,10 @@ const fmtDate = (d: Date) => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.g
 
 export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<Buffer> {
     const now = opts.now ?? new Date();
-    const months = Math.min(Math.max(opts.months ?? 12, 1), 120);
+    const exportRows = opts.rows
+        ? [...opts.rows].sort((a, b) => (a.month < b.month ? 1 : -1))   // newest first
+        : null;
+    const months = exportRows ? Math.max(exportRows.length, 1) : Math.min(Math.max(opts.months ?? 12, 1), 120);
     const feePct = Number.isFinite(opts.feePct) ? Math.min(Math.max(opts.feePct, 0), 99.99) : 10;
 
     const wb = new ExcelJS.Workbook();
@@ -74,7 +79,7 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
 
     ws.getCell("B1").value = "Kitnets.com";
     ws.getCell("B1").font = { name: "Calibri", size: 18, bold: true, color: { argb: `FF${BRAND}` } };
-    ws.getCell("B2").value = `Receitas de aluguel — ${opts.propertyName}`;
+    ws.getCell("B2").value = `Receitas de aluguel — ${opts.propertyName}${exportRows ? " (registro exportado)" : ""}`;
     ws.getCell("B2").font = { name: "Calibri", size: 12, bold: true, color: { argb: `FF${INK}` } };
     ws.getCell("B3").value = `Modelo gerado em ${fmtDate(now)} · Preencha uma linha por mês e importe em Imóveis › Gerenciar › Importar planilha`;
     ws.getCell("B3").font = { name: "Calibri", size: 9, italic: true, color: { argb: `FF${MUTED}` } };
@@ -84,7 +89,8 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
     ws.getCell("A5").value =
         "Aluguel bruto = valor do contrato. Taxa = % que a imobiliária retém. Valor recebido = o que entrou na sua conta " +
         "(já calculado pela fórmula; sobrescreva com o valor real do extrato quando tiver). Energia = parcela paga pelo inquilino " +
-        "referente à energia solar (é deduzida do aluguel e vai para o centro de energia). Aluguel líquido = recebido − energia − outras despesas.";
+        "referente à energia solar (vai para o centro de energia). Outras despesas = valores descontados do repasse (reparos, taxas). " +
+        "Recebido = bruto × (1 − taxa) + energia − outras despesas.";
     ws.getCell("A5").alignment = { wrapText: true, vertical: "top" };
     ws.getCell("A5").font = { name: "Calibri", size: 9, color: { argb: `FF${MUTED}` } };
     ws.getRow(5).height = 44;
@@ -107,18 +113,32 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
     for (let i = 0; i < months; i++) {
         const rowIdx = HEADER_ROW + 1 + i;
         const row = ws.getRow(rowIdx);
-        const monthDate = new Date(first.getFullYear(), first.getMonth() - i, 1);
         const r = rowIdx;
+        const ledger = exportRows ? exportRows[i] : undefined;
+        const monthDate = ledger
+            ? new Date(Number(ledger.month.slice(0, 4)), Number(ledger.month.slice(5, 7)) - 1, 1)
+            : new Date(first.getFullYear(), first.getMonth() - i, 1);
 
         row.getCell(1).value = monthDate;
         row.getCell(1).numFmt = DATE_FMT;
         row.getCell(2).numFmt = CURRENCY_FMT;
-        row.getCell(3).value = feePct;
         row.getCell(3).numFmt = PCT_FMT;
-        row.getCell(4).value = { formula: `IF(B${r}="","",ROUND(B${r}*(1-C${r}/100)+E${r}+F${r},2))`, result: "" };
         row.getCell(4).numFmt = CURRENCY_FMT;
         row.getCell(5).numFmt = CURRENCY_FMT;
         row.getCell(6).numFmt = CURRENCY_FMT;
+
+        if (ledger) {
+            const b = breakdown(ledger);
+            row.getCell(2).value = b.grossRent;
+            row.getCell(3).value = b.feePct;
+            row.getCell(4).value = b.received;           // real value, not the formula
+            row.getCell(5).value = b.energy;
+            row.getCell(6).value = b.other;
+            row.getCell(7).value = ledger.notes ?? null;   // status is re-derived from the month on import
+        } else {
+            row.getCell(3).value = feePct;
+            row.getCell(4).value = { formula: `IF(B${r}="","",ROUND(B${r}*(1-C${r}/100)+E${r}-F${r},2))`, result: "" };
+        }
 
         for (let c = 1; c <= 7; c++) {
             const cell = row.getCell(c);
@@ -164,23 +184,25 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
         ["Como usar", "", "h"],
         ["1.", "Preencha a aba “Receitas”: uma linha por mês, com a data no formato dd/mm/aaaa.", "p"],
         ["2.", "Informe o Aluguel bruto (valor do contrato) e a Taxa da imobiliária em %. O Valor recebido é calculado automaticamente; substitua pelo valor real do extrato bancário quando quiser.", "p"],
-        ["3.", "Se o inquilino paga uma parcela referente à energia solar, informe em Energia. Esse valor é deduzido do aluguel e contabilizado no centro de energia.", "p"],
+        ["3.", "Se o inquilino paga uma parcela referente à energia solar, informe em Energia (vai para o centro de energia). Valores descontados do repasse (reparos, taxas) vão em Outras despesas.", "p"],
         ["4.", "Os meses vêm do mais recente para o mais antigo. Para acrescentar meses, arraste a última linha para baixo (a fórmula de Valor recebido é copiada junto). Meses futuros são importados como “previstos”.", "p"],
         ["5.", "Salve o arquivo (.xlsx) e importe em Kitnets.com › Imóveis › Gerenciar Imóvel › Importar planilha. As colunas são reconhecidas automaticamente.", "p"],
         ["Colunas", "", "h"],
         ["Mês", "Data de referência do mês (qualquer dia do mês serve).", "p"],
         ["Aluguel bruto (R$)", "Valor do aluguel no contrato, antes da taxa da imobiliária.", "p"],
         ["Taxa imobiliária (%)", "Percentual retido pela imobiliária (ex.: 10). Use 0 quando você mesmo administra o imóvel.", "p"],
-        ["Valor recebido (R$)", "O que efetivamente entrou na sua conta: bruto × (1 − taxa) + energia + outras despesas.", "p"],
+        ["Valor recebido (R$)", "O que efetivamente entrou na sua conta: bruto × (1 − taxa) + energia − outras despesas.", "p"],
         ["Energia (R$)", "Parcela do pagamento do inquilino referente à energia (solar).", "p"],
-        ["Outras despesas (R$)", "Outros valores repassados junto com o aluguel (estacionamento, multa, reembolsos).", "p"],
+        ["Outras despesas (R$)", "Valores descontados do repasse antes de cair na conta (reparos, taxas, vistoria). Sempre positivo.", "p"],
         ["Observações", "Texto livre (reajuste, vacância, troca de inquilino).", "p"],
         ["Cálculos no Kitnets.com", "", "h"],
-        ["Aluguel líquido", "recebido − energia − outras despesas", "p"],
+        ["Aluguel líquido", "recebido − energia + outras despesas (o aluguel após a taxa da imobiliária)", "p"],
         ["Aluguel bruto", "líquido ÷ (1 − taxa/100), quando o bruto não é informado", "p"],
+        ["Despesas (OPEX)", "taxa da imobiliária + outras despesas", "p"],
+        ["Resultado (NOI)", "aluguel líquido − outras despesas = recebido − energia", "p"],
         ["Taxa acumulada", "bruto − líquido, somado mês a mês: a economia potencial ao administrar o imóvel pelo Kitnets.com.", "p"],
         ["Exemplo", "", "h"],
-        ["Bruto 4.000 · Taxa 10 % · Energia 350", "Recebido 3.950 · Aluguel líquido 3.600 · Taxa da imobiliária 400", "p"],
+        ["Bruto 4.000 · Taxa 10 % · Energia 350 · Outras 0", "Recebido 3.950 · Aluguel líquido 3.600 · Taxa da imobiliária 400 · NOI 3.600", "p"],
     ];
     lines.forEach(([a, b, kind], i) => {
         const row = info.getRow(i + 1);
