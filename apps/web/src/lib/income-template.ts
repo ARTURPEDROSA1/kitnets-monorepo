@@ -112,12 +112,12 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
     });
     header.height = 30;
 
-    // Month rows (oldest first, ending at the current month)
-    const first = new Date(now.getFullYear(), now.getMonth() - (months - 1), 1);
+    // Month rows (newest first: current month at the top, like the ledger on screen)
+    const first = new Date(now.getFullYear(), now.getMonth(), 1);
     for (let i = 0; i < months; i++) {
         const rowIdx = HEADER_ROW + 1 + i;
         const row = ws.getRow(rowIdx);
-        const monthDate = new Date(first.getFullYear(), first.getMonth() + i, 1);
+        const monthDate = new Date(first.getFullYear(), first.getMonth() - i, 1);
         const r = rowIdx;
 
         row.getCell(1).value = monthDate;
@@ -167,7 +167,7 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
     const noteRow = HEADER_ROW + months + 2;
     ws.mergeCells(`A${noteRow}:G${noteRow}`);
     ws.getCell(`A${noteRow}`).value =
-        "Adicione mais linhas abaixo se precisar (a coluna Valor recebido pode ser copiada para manter a fórmula). Meses futuros são importados como “previstos”.";
+        "Meses do mais recente para o mais antigo. Adicione mais linhas abaixo se precisar (a coluna Valor recebido pode ser copiada para manter a fórmula). Meses futuros são importados como “previstos”.";
     ws.getCell(`A${noteRow}`).font = { name: "Calibri", size: 9, italic: true, color: { argb: `FF${MUTED}` } };
 
     // ── Sheet 2: Instruções ─────────────────────────────────────────────
