@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import {
     ArrowLeft,
@@ -50,9 +50,13 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import type { PropertyDetails, SubUnit } from '@/components/profile/PropertyDetailsCard';
+import PropertyIncomeLedger from './PropertyIncomeLedger';
+import { breakdown, formatMonthKey, monthKey, summarize, type PropertyIncomeRow } from '@/lib/property-income';
 
 interface PropertyCostCenterDashboardProps {
     propertyIndex: number;
+    /** `properties.id` — enables the real income ledger when present */
+    dbId?: string;
     propertyType: 'single' | 'multi';
     details: PropertyDetails;
     subUnits: SubUnit[];
@@ -79,6 +83,7 @@ const COLORS = ['#f43f5e', '#f59e0b', '#3b82f6', '#8b5cf6', '#06b6d4'];
 
 export default function PropertyCostCenterDashboard({
     propertyIndex,
+    dbId,
     propertyType,
     details,
     subUnits,
@@ -89,6 +94,11 @@ export default function PropertyCostCenterDashboard({
     onUpdateDetails,
 }: PropertyCostCenterDashboardProps) {
     const [isConfigOpen, setIsConfigOpen] = useState(false);
+
+    // Real monthly income from the ledger (fed by PropertyIncomeLedger)
+    const [incomeRows, setIncomeRows] = useState<PropertyIncomeRow[]>([]);
+    useEffect(() => setIncomeRows([]), [dbId]);
+    const incomeSummary = useMemo(() => summarize(incomeRows), [incomeRows]);
 
     // Form state for configuring cost center parameters
     const [configForm, setConfigForm] = useState({
@@ -144,6 +154,14 @@ export default function PropertyCostCenterDashboard({
             rentedUnitsCount = 1;
         }
 
+        // Real income (latest confirmed month in the ledger) overrides the estimate
+        const real = incomeSummary.latest;
+        const hasRealIncome = Boolean(real && real.grossRent > 0);
+        if (real && hasRealIncome) {
+            grossMonthlyRevenue = real.grossRent;
+            if (propertyType === 'single') rentedUnitsCount = 1;
+        }
+
         // Operational Expenses (OPEX)
         const iptuMonthly = details.iptuMonthly
             ? (parseFloat(details.iptuMonthly.replace(/[^\d.,]/g, '').replace(',', '.')) || 140)
@@ -157,9 +175,9 @@ export default function PropertyCostCenterDashboard({
             ? (parseFloat(details.maintenanceMonthly.replace(/[^\d.,]/g, '').replace(',', '.')) || Math.round(grossMonthlyRevenue * 0.05))
             : Math.round(grossMonthlyRevenue * 0.05);
 
-        const adminFee = Math.round(
-            grossMonthlyRevenue * (parseFloat(details.managementFeePercent || '8') / 100)
-        );
+        const adminFee = real && hasRealIncome
+            ? Math.round(real.feeAmount)
+            : Math.round(grossMonthlyRevenue * (parseFloat(details.managementFeePercent || '8') / 100));
 
         const insuranceAndOther = details.otherExpensesMonthly
             ? (parseFloat(details.otherExpensesMonthly.replace(/[^\d.,]/g, '').replace(',', '.')) || 65)
@@ -179,26 +197,46 @@ export default function PropertyCostCenterDashboard({
             { name: 'Seguro & Outros', value: insuranceAndOther },
         ].filter(item => item.value > 0);
 
-        // 6-Month Projection / DRE Data
-        const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-        const currentMonthIdx = new Date().getMonth();
-        const dreData = [];
+        // DRE data: real months from the income ledger when available, else a 6-month projection
+        const dreData: { month: string; receita: number; despesas: number; noi: number }[] = [];
+        const confirmedIncome = incomeRows
+            .filter(r => r.status === 'CONFIRMED')
+            .sort((a, b) => (a.month < b.month ? -1 : 1))
+            .slice(-6);
 
-        for (let i = 0; i < 6; i++) {
-            const mIdx = (currentMonthIdx - 3 + i + 12) % 12;
-            // Slight variance for realistic historical/projection view
-            const variance = 1 + (i === 1 ? -0.04 : i === 4 ? 0.03 : 0);
-            const rec = Math.round(grossMonthlyRevenue * variance);
-            const exp = Math.round(totalExpenses * (1 + (i === 2 ? 0.08 : 0)));
-            dreData.push({
-                month: months[mIdx],
-                receita: rec,
-                despesas: exp,
-                noi: Math.max(0, rec - exp),
+        if (confirmedIncome.length > 0) {
+            const fixedExpenses = totalExpenses - adminFee;
+            confirmedIncome.forEach((r) => {
+                const b = breakdown(r);
+                const rec = Math.round(b.grossRent);
+                const exp = Math.round(fixedExpenses + b.feeAmount);
+                dreData.push({
+                    month: formatMonthKey(monthKey(r.month)),
+                    receita: rec,
+                    despesas: exp,
+                    noi: rec - exp,
+                });
             });
+        } else {
+            const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+            const currentMonthIdx = new Date().getMonth();
+            for (let i = 0; i < 6; i++) {
+                const mIdx = (currentMonthIdx - 3 + i + 12) % 12;
+                // Slight variance for realistic historical/projection view
+                const variance = 1 + (i === 1 ? -0.04 : i === 4 ? 0.03 : 0);
+                const rec = Math.round(grossMonthlyRevenue * variance);
+                const exp = Math.round(totalExpenses * (1 + (i === 2 ? 0.08 : 0)));
+                dreData.push({
+                    month: months[mIdx],
+                    receita: rec,
+                    despesas: exp,
+                    noi: Math.max(0, rec - exp),
+                });
+            }
         }
 
         return {
+            realIncomeMonth: real && hasRealIncome ? formatMonthKey(monthKey(real.month)) : null,
             grossMonthlyRevenue,
             annualRevenue: grossMonthlyRevenue * 12,
             totalExpenses,
@@ -211,7 +249,7 @@ export default function PropertyCostCenterDashboard({
             expenseBreakdown,
             dreData,
         };
-    }, [propertyType, details, subUnits, totalUnits]);
+    }, [propertyType, details, subUnits, totalUnits, incomeSummary, incomeRows]);
 
     const handleSaveConfig = () => {
         const updated = {
@@ -341,7 +379,8 @@ export default function PropertyCostCenterDashboard({
                             {formatBRL(financials.grossMonthlyRevenue)}
                         </span>
                         <span className="text-xs text-muted-foreground">
-                            Projeção anual: {formatBRL(financials.annualRevenue)}
+                            {financials.realIncomeMonth ? `Real (${financials.realIncomeMonth}) · anual: ` : 'Projeção anual: '}
+                            {formatBRL(financials.annualRevenue)}
                         </span>
                     </div>
                 </div>
@@ -434,7 +473,9 @@ export default function PropertyCostCenterDashboard({
                                 Demonstrativo de Resultados (DRE Mensal)
                             </h3>
                             <p className="text-xs text-muted-foreground">
-                                Histórico e projeção de Receitas, Despesas Operacionais e Lucro Líquido (NOI)
+                                {financials.realIncomeMonth
+                                    ? 'Receita real dos últimos meses registrados; despesas conforme os parâmetros do centro de custos'
+                                    : 'Histórico e projeção de Receitas, Despesas Operacionais e Lucro Líquido (NOI)'}
                             </p>
                         </div>
                     </div>
@@ -521,6 +562,13 @@ export default function PropertyCostCenterDashboard({
                     </div>
                 </div>
             </div>
+
+            {/* Real income ledger (monthly, editable, importable) */}
+            <PropertyIncomeLedger
+                propertyId={dbId}
+                defaultAgencyFeePct={parseFloat(details.managementFeePercent || '8') || 0}
+                onRowsChange={setIncomeRows}
+            />
 
             {/* Multifamily Units Summary (if applicable) */}
             {propertyType === 'multi' && subUnits.length > 0 && (
