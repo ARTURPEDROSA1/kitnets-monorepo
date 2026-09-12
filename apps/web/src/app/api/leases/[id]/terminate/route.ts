@@ -38,7 +38,7 @@ export async function POST(request: Request, context: RouteContext) {
         // Verify ownership
         const { data: lease } = await supabase
             .from('leases')
-            .select('id, status')
+            .select('id, status, notes')
             .eq('id', leaseId)
             .eq('user_id', profile.id)
             .is('deleted_at', null)
@@ -71,7 +71,9 @@ export async function POST(request: Request, context: RouteContext) {
                 status: 'TERMINATED',
                 termination_date: body.termination_date,
                 termination_reason: body.termination_reason?.trim() || null,
-                notes: body.notes?.trim() || lease.status,  // Preserve existing notes, append if new provided
+                // Keep the existing notes when the request doesn't provide new ones
+                // (previously fell back to `lease.status`, overwriting notes with "ACTIVE").
+                notes: body.notes?.trim() || lease.notes || null,
             })
             .eq('id', leaseId)
             .select()

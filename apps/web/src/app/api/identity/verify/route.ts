@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireUserWithLimit, validateUpload } from '@/lib/session';
+import { HOUR } from '@/lib/rate-limit';
 import OpenAI from 'openai';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
@@ -338,7 +340,9 @@ function parseCnpjComprovante(text: string): ExtractionResult | null {
 // ============================================================
 
 export async function POST(request: NextRequest) {
-    console.log('[API] /api/identity/verify called');
+    const gate = await requireUserWithLimit('ai:identity-verify', 20, HOUR);
+    if ('response' in gate) return gate.response;
+
     try {
         const formData = await request.formData();
         const file = formData.get('file') as File | null;
@@ -348,7 +352,12 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'No file provided' }, { status: 400 });
         }
 
-        console.log(`[Identity] File: ${file.name} (${file.type}), category: ${documentCategory}`);
+        const uploadError = validateUpload(file, 10 * 1024 * 1024);
+        if (uploadError) {
+            return NextResponse.json({ error: uploadError }, { status: 400 });
+        }
+
+        console.log(`[Identity] ${file.type}, ${file.size} bytes, category: ${documentCategory}`);
 
         const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
@@ -412,15 +421,11 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({
                 success: false,
                 error: 'Failed to analyze document',
-                details: visionErr instanceof Error ? visionErr.message : String(visionErr),
             }, { status: 500 });
         }
 
     } catch (error) {
         console.error('[Identity] Critical error:', error);
-        return NextResponse.json({
-            error: 'Internal server error',
-            details: error instanceof Error ? error.message : String(error),
-        }, { status: 500 });
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 }

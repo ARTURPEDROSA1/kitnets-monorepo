@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireUserWithLimit, validateUpload } from "@/lib/session";
+import { HOUR } from "@/lib/rate-limit";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import OpenAI from 'openai';
 import { extractText, getDocumentProxy } from "unpdf";
@@ -61,6 +63,9 @@ function parseJsonResponse(text: string) {
 }
 
 export async function POST(request: NextRequest) {
+    const gate = await requireUserWithLimit("ai:extract-contract", 30, HOUR);
+    if ("response" in gate) return gate.response;
+
     try {
         const formData = await request.formData();
         const file = formData.get("file") as File | null;
@@ -69,19 +74,11 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Nenhum arquivo enviado' }, { status: 400 });
         }
 
-        const allowedTypes = [
-            "image/jpeg", "image/jpg", "image/png", "image/webp",
-            "application/pdf"
-        ];
-        if (!allowedTypes.includes(file.type)) {
-            return NextResponse.json(
-                { error: `Tipo de arquivo não suportado: ${file.type}. Use JPG, PNG, WebP ou PDF.` },
-                { status: 400 }
-            );
-        }
-
-        if (file.size > 10 * 1024 * 1024) {
-            return NextResponse.json({ error: 'Arquivo muito grande. Máximo: 10MB.' }, { status: 400 });
+        const uploadError = validateUpload(file, 10 * 1024 * 1024, [
+            "image/jpeg", "image/jpg", "image/png", "image/webp", "application/pdf",
+        ]);
+        if (uploadError) {
+            return NextResponse.json({ error: uploadError }, { status: 400 });
         }
 
         const bytes = await file.arrayBuffer();
