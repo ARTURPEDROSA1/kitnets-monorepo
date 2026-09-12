@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@kitnets/ui";
 import { SignOutButton, useAuth } from "@clerk/nextjs";
-import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Rocket, HardHat, Briefcase, Building2, User, Users, UserCheck, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart, ArrowLeftRight, FileText, AlertCircle, Plus, Minus, Gem, X, Zap } from "lucide-react";
+import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Rocket, HardHat, Briefcase, Building2, User, Users, UserCheck, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart, ArrowLeftRight, FileText, AlertCircle, Plus, Minus, Gem, X, Zap, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { PropertyFilters } from "./PropertyFilters";
 
 import { useTheme } from "next-themes";
@@ -18,6 +18,44 @@ const languages = [
     { code: "es", label: "Español" },
 ];
 
+// Persisted "show less information" (collapsed) preference, exposed as a tiny
+// external store so useSyncExternalStore can hydrate it without a setState-in-
+// effect. The root layout reads the same key in an inline <head> script so the
+// first paint already uses the stored width (see app/[lang]/layout.tsx).
+export const SIDEBAR_COLLAPSED_KEY = "kitnets_sidebar_collapsed";
+
+const collapsedListeners = new Set<() => void>();
+let collapsedFallback = false; // used when localStorage is unavailable
+
+function readCollapsedPreference(): boolean {
+    try {
+        return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
+    } catch {
+        return collapsedFallback;
+    }
+}
+
+function writeCollapsedPreference(next: boolean) {
+    collapsedFallback = next;
+    try {
+        window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
+    } catch {
+        // Storage blocked (private mode etc.): the in-memory fallback still works for this session.
+    }
+    collapsedListeners.forEach((listener) => listener());
+}
+
+function subscribeCollapsedPreference(listener: () => void) {
+    collapsedListeners.add(listener);
+    window.addEventListener("storage", listener); // keep other tabs in sync
+    return () => {
+        collapsedListeners.delete(listener);
+        window.removeEventListener("storage", listener);
+    };
+}
+
+const getServerCollapsed = () => false;
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
     const pathname = usePathname();
@@ -26,6 +64,27 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
     const [sidebarView, setSidebarView] = React.useState<'main' | 'rent-filters' | 'buy-filters' | 'launches-filters' | 'calculators-menu' | 'indices-menu' | 'contents-menu'>('main');
     const [expandedSections, setExpandedSections] = React.useState<Record<string, boolean>>({});
     const [isMobileOpen, setIsMobileOpen] = React.useState(false);
+    // Server renders expanded; the client snapshot takes over after hydration.
+    const collapsed = React.useSyncExternalStore(subscribeCollapsedPreference, readCollapsedPreference, getServerCollapsed);
+
+    // The compact rail only makes sense for the main menu; filter and
+    // sub-menu views need the full width, so they temporarily expand.
+    const navCollapsed = collapsed && sidebarView === 'main';
+
+    // Mirror the effective state onto <html data-sidebar> so CSS can size the
+    // rail and the page offset (globals.css). Read the store directly so the
+    // hydration pass (which still sees the server value) cannot undo what the
+    // inline script applied before first paint.
+    React.useEffect(() => {
+        const active = readCollapsedPreference() && sidebarView === 'main';
+        if (active) {
+            document.documentElement.setAttribute('data-sidebar', 'collapsed');
+        } else {
+            document.documentElement.removeAttribute('data-sidebar');
+        }
+    }, [collapsed, sidebarView]);
+
+    const toggleCollapsed = () => writeCollapsedPreference(!collapsed);
 
     // Dictionary is now passed as prop
 
@@ -121,15 +180,15 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
             )}
 
             <aside
-                className={`fixed left-0 top-0 z-[60] sm:z-40 h-screen w-64 transition-transform border-r border-border bg-background sm:translate-x-0 ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
+                className={`fixed left-0 top-0 z-[60] sm:z-40 h-screen w-64 sm:w-[var(--sidebar-width)] transition-[transform,width] duration-200 border-r border-border bg-background sm:translate-x-0 ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
                 aria-modal={isMobileOpen ? "true" : undefined}
                 role={isMobileOpen ? "dialog" : undefined}
             >
                 <div className="flex h-full flex-col justify-between px-3 py-4 overflow-y-auto custom-scrollbar">
                     {sidebarView === 'main' ? (
                         <div>
-                            <div className="flex items-center justify-between mb-5 ps-2.5">
-                                <Link href={lang === 'pt' ? '/' : `/${lang}`} className="flex items-baseline">
+                            <div className="sidebar-header flex items-center justify-between mb-5 ps-2.5">
+                                <Link href={lang === 'pt' ? '/' : `/${lang}`} className="sidebar-brand flex items-baseline" title={navCollapsed ? "Kitnets.com" : undefined}>
                                     <Image
                                         src="/kitnets-logo.png"
                                         alt="Kitnets Logo"
@@ -139,7 +198,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                         sizes="32px"
                                         priority
                                     />
-                                    <span className="whitespace-nowrap text-xl font-semibold text-foreground leading-none">
+                                    <span className="sidebar-label whitespace-nowrap text-xl font-semibold text-foreground leading-none">
                                         Kitnets.com
                                     </span>
                                 </Link>
@@ -159,45 +218,49 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                             <>
                                                 <li>
                                                     <Link
+                                                        title={navCollapsed ? dict.menu.advertise : undefined}
                                                         href={lang === 'pt' ? '/anunciar' : `/${lang}/anunciar`}
                                                         aria-current={isActive(lang === 'pt' ? '/anunciar' : `/${lang}/anunciar`) ? "page" : undefined}
-                                                        className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/anunciar' : `/${lang}/anunciar`) ? 'bg-accent' : ''}`}
+                                                        className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/anunciar' : `/${lang}/anunciar`) ? 'bg-accent' : ''}`}
                                                     >
                                                         <Megaphone className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                        <span className="ms-3">{dict.menu.advertise}</span>
+                                                        <span className="ms-3 sidebar-label">{dict.menu.advertise}</span>
                                                     </Link>
                                                 </li>
                                                 <li>
                                                     <Link
+                                                        title={navCollapsed ? dict.menu.rent : undefined}
                                                         href={lang === 'pt' ? '/alugar' : `/${lang}/alugar`}
                                                         onClick={() => setSidebarView('rent-filters')}
                                                         aria-current={isActive(lang === 'pt' ? '/alugar' : `/${lang}/alugar`) ? "page" : undefined}
-                                                        className={`w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/alugar' : `/${lang}/alugar`) ? 'bg-accent' : ''}`}
+                                                        className={`sidebar-item w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/alugar' : `/${lang}/alugar`) ? 'bg-accent' : ''}`}
                                                     >
                                                         <Key className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                        <span className="ms-3">{dict.menu.rent}</span>
+                                                        <span className="ms-3 sidebar-label">{dict.menu.rent}</span>
                                                     </Link>
                                                 </li>
                                                 <li>
                                                     <Link
+                                                        title={navCollapsed ? dict.menu.buy : undefined}
                                                         href={lang === 'pt' ? '/comprar' : `/${lang}/comprar`}
                                                         onClick={() => setSidebarView('buy-filters')}
                                                         aria-current={isActive(lang === 'pt' ? '/comprar' : `/${lang}/comprar`) ? "page" : undefined}
-                                                        className={`w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/comprar' : `/${lang}/comprar`) ? 'bg-accent' : ''}`}
+                                                        className={`sidebar-item w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/comprar' : `/${lang}/comprar`) ? 'bg-accent' : ''}`}
                                                     >
                                                         <Home className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                        <span className="ms-3">{dict.menu.buy}</span>
+                                                        <span className="ms-3 sidebar-label">{dict.menu.buy}</span>
                                                     </Link>
                                                 </li>
                                                 <li>
                                                     <Link
+                                                        title={navCollapsed ? dict.menu.launches : undefined}
                                                         href={lang === 'pt' ? '/lancamentos' : `/${lang}/lancamentos`}
                                                         onClick={() => setSidebarView('launches-filters')}
                                                         aria-current={isActive(lang === 'pt' ? '/lancamentos' : `/${lang}/lancamentos`) ? "page" : undefined}
-                                                        className={`w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/lancamentos' : `/${lang}/lancamentos`) ? 'bg-accent' : ''}`}
+                                                        className={`sidebar-item w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/lancamentos' : `/${lang}/lancamentos`) ? 'bg-accent' : ''}`}
                                                     >
                                                         <Rocket className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                        <span className="ms-3">{dict.menu.launches}</span>
+                                                        <span className="ms-3 sidebar-label">{dict.menu.launches}</span>
                                                     </Link>
                                                 </li>
                                             </>
@@ -206,50 +269,54 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                         {FLAGS.SHOW_CALCULATORS && (
                                             <li>
                                                 <Link
+                                                    title={navCollapsed ? dict.menu.calculators : undefined}
                                                     href={lang === 'pt' ? '/calculadoras' : `/${lang}/calculadoras`}
                                                     onClick={() => setSidebarView('calculators-menu')}
                                                     aria-current={isActive(lang === 'pt' ? '/calculadoras' : `/${lang}/calculadoras`) ? "page" : undefined}
-                                                    className={`w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/calculadoras' : `/${lang}/calculadoras`) ? 'bg-accent' : ''}`}
+                                                    className={`sidebar-item w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/calculadoras' : `/${lang}/calculadoras`) ? 'bg-accent' : ''}`}
                                                 >
                                                     <Calculator className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3">{dict.menu.calculators}</span>
+                                                    <span className="ms-3 sidebar-label">{dict.menu.calculators}</span>
                                                 </Link>
                                             </li>
                                         )}
 
                                         <li>
                                             <Link
+                                                title={navCollapsed ? "Indicadores" : undefined}
                                                 href={lang === 'pt' ? '/indices/panorama' : `/${lang}/indices/panorama`}
                                                 onClick={() => setSidebarView('indices-menu')}
                                                 aria-current={isActive(lang === 'pt' ? '/indices/panorama' : `/${lang}/indices/panorama`) ? "page" : undefined}
-                                                className={`w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/indices/panorama' : `/${lang}/indices/panorama`) ? 'bg-accent' : ''}`}
+                                                className={`sidebar-item w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/indices/panorama' : `/${lang}/indices/panorama`) ? 'bg-accent' : ''}`}
                                             >
                                                 <LineChart className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                <span className="ms-3">Indicadores</span>
+                                                <span className="ms-3 sidebar-label">Indicadores</span>
                                             </Link>
                                         </li>
 
                                         <li>
                                             <Link
+                                                title={navCollapsed ? dict.menu.contents : undefined}
                                                 href={lang === 'pt' ? '/conteudos' : `/${lang}/conteudos`}
                                                 onClick={() => setSidebarView('contents-menu')}
                                                 aria-current={isActive(lang === 'pt' ? '/conteudos' : `/${lang}/conteudos`) ? "page" : undefined}
-                                                className={`w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/conteudos' : `/${lang}/conteudos`) ? 'bg-accent' : ''}`}
+                                                className={`sidebar-item w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/conteudos' : `/${lang}/conteudos`) ? 'bg-accent' : ''}`}
                                             >
                                                 <FileText className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                <span className="ms-3">{dict.menu.contents}</span>
+                                                <span className="ms-3 sidebar-label">{dict.menu.contents}</span>
                                             </Link>
                                         </li>
 
                                         {FLAGS.SHOW_USEFUL_LINKS && (
                                             <li>
                                                 <Link
+                                                    title={navCollapsed ? dict.menu.usefulLinks : undefined}
                                                     href={lang === 'pt' ? '/links-uteis' : `/${lang}/links-uteis`}
                                                     aria-current={isActive(lang === 'pt' ? '/links-uteis' : `/${lang}/links-uteis`) ? "page" : undefined}
-                                                    className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/links-uteis' : `/${lang}/links-uteis`) ? 'bg-accent' : ''}`}
+                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/links-uteis' : `/${lang}/links-uteis`) ? 'bg-accent' : ''}`}
                                                 >
                                                     <LinkIcon className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3">{dict.menu.usefulLinks}</span>
+                                                    <span className="ms-3 sidebar-label">{dict.menu.usefulLinks}</span>
                                                 </Link>
                                             </li>
                                         )}
@@ -257,12 +324,13 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                         {FLAGS.SHOW_FAQ && (
                                             <li>
                                                 <Link
+                                                    title={navCollapsed ? dict.menu.faq : undefined}
                                                     href={lang === 'pt' ? '/perguntas-frequentes' : `/${lang}/perguntas-frequentes`}
                                                     aria-current={isActive(lang === 'pt' ? '/perguntas-frequentes' : `/${lang}/perguntas-frequentes`) ? "page" : undefined}
-                                                    className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/perguntas-frequentes' : `/${lang}/perguntas-frequentes`) ? 'bg-accent' : ''}`}
+                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/perguntas-frequentes' : `/${lang}/perguntas-frequentes`) ? 'bg-accent' : ''}`}
                                                 >
                                                     <HelpCircle className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3">{dict.menu.faq}</span>
+                                                    <span className="ms-3 sidebar-label">{dict.menu.faq}</span>
                                                 </Link>
                                             </li>
                                         )}
@@ -275,87 +343,97 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                         <>
                                             <li>
                                                 <Link
+                                                    title={navCollapsed ? "Dashboard" : undefined}
                                                     href={lang === 'pt' ? '/dashboard' : `/${lang}/dashboard`}
                                                     aria-current={isActive(lang === 'pt' ? '/dashboard' : `/${lang}/dashboard`) ? "page" : undefined}
-                                                    className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/dashboard' : `/${lang}/dashboard`) ? 'bg-accent' : ''}`}
+                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/dashboard' : `/${lang}/dashboard`) ? 'bg-accent' : ''}`}
                                                 >
                                                     <LayoutDashboard className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3">Dashboard</span>
+                                                    <span className="ms-3 sidebar-label">Dashboard</span>
                                                 </Link>
                                             </li>
                                             <li>
                                                 <Link
+                                                    title={navCollapsed ? "Proprietário" : undefined}
                                                     href={lang === 'pt' ? '/proprietario' : `/${lang}/proprietario`}
                                                     aria-current={isActive(lang === 'pt' ? '/proprietario' : `/${lang}/proprietario`) ? "page" : undefined}
-                                                    className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/proprietario' : `/${lang}/proprietario`) ? 'bg-accent' : ''}`}
+                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/proprietario' : `/${lang}/proprietario`) ? 'bg-accent' : ''}`}
                                                 >
                                                     <User className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3">Proprietário</span>
+                                                    <span className="ms-3 sidebar-label">Proprietário</span>
                                                 </Link>
                                             </li>
                                             <li>
                                                 <Link
+                                                    title={navCollapsed ? "Imóveis" : undefined}
                                                     href={lang === 'pt' ? '/imoveis' : `/${lang}/imoveis`}
                                                     aria-current={isActive(lang === 'pt' ? '/imoveis' : `/${lang}/imoveis`) ? "page" : undefined}
-                                                    className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/imoveis' : `/${lang}/imoveis`) ? 'bg-accent' : ''}`}
+                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/imoveis' : `/${lang}/imoveis`) ? 'bg-accent' : ''}`}
                                                 >
                                                     <Home className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3">Imóveis</span>
+                                                    <span className="ms-3 sidebar-label">Imóveis</span>
                                                 </Link>
                                             </li>
                                             <li>
                                                 <Link
+                                                    title={navCollapsed ? "Energia Solar" : undefined}
                                                     href={lang === 'pt' ? '/dashboard/energy' : `/${lang}/dashboard/energy`}
                                                     aria-current={pathname.includes('/dashboard/energy') ? "page" : undefined}
-                                                    className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${pathname.includes('/dashboard/energy') ? 'bg-accent font-medium' : ''}`}
+                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${pathname.includes('/dashboard/energy') ? 'bg-accent font-medium' : ''}`}
                                                 >
                                                     <Zap className="h-5 w-5 text-amber-500 transition duration-75 group-hover:text-amber-600" />
-                                                    <span className="ms-3">Energia Solar</span>
+                                                    <span className="ms-3 sidebar-label">Energia Solar</span>
                                                 </Link>
                                             </li>
                                             <li>
                                                 <Link
+                                                    title={navCollapsed ? "Imobiliária" : undefined}
                                                     href={lang === 'pt' ? '/imobiliaria' : `/${lang}/imobiliaria`}
                                                     aria-current={isActive(lang === 'pt' ? '/imobiliaria' : `/${lang}/imobiliaria`) ? "page" : undefined}
-                                                    className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/imobiliaria' : `/${lang}/imobiliaria`) ? 'bg-accent' : ''}`}
+                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/imobiliaria' : `/${lang}/imobiliaria`) ? 'bg-accent' : ''}`}
                                                 >
                                                     <Building2 className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3">Imobiliária</span>
+                                                    <span className="ms-3 sidebar-label">Imobiliária</span>
                                                 </Link>
                                             </li>
                                             <li>
                                                 <Link
+                                                    title={navCollapsed ? "Corretores" : undefined}
                                                     href={lang === 'pt' ? '/corretores' : `/${lang}/corretores`}
                                                     aria-current={isActive(lang === 'pt' ? '/corretores' : `/${lang}/corretores`) ? "page" : undefined}
-                                                    className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/corretores' : `/${lang}/corretores`) ? 'bg-accent' : ''}`}
+                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/corretores' : `/${lang}/corretores`) ? 'bg-accent' : ''}`}
                                                 >
                                                     <Users className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3">Corretores</span>
+                                                    <span className="ms-3 sidebar-label">Corretores</span>
                                                 </Link>
                                             </li>
                                             <li>
                                                 <Link
+                                                    title={navCollapsed ? "Inquilinos" : undefined}
                                                     href={lang === 'pt' ? '/inquilinos' : `/${lang}/inquilinos`}
                                                     aria-current={isActive(lang === 'pt' ? '/inquilinos' : `/${lang}/inquilinos`) ? "page" : undefined}
-                                                    className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/inquilinos' : `/${lang}/inquilinos`) ? 'bg-accent' : ''}`}
+                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/inquilinos' : `/${lang}/inquilinos`) ? 'bg-accent' : ''}`}
                                                 >
                                                     <UserCheck className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3">Inquilinos</span>
+                                                    <span className="ms-3 sidebar-label">Inquilinos</span>
                                                 </Link>
                                             </li>
                                             <li>
                                                 <Link
+                                                    title={navCollapsed ? "Contratos" : undefined}
                                                     href={lang === 'pt' ? '/contratos' : `/${lang}/contratos`}
                                                     aria-current={isActive(lang === 'pt' ? '/contratos' : `/${lang}/contratos`) ? "page" : undefined}
-                                                    className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/contratos' : `/${lang}/contratos`) ? 'bg-accent' : ''}`}
+                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/contratos' : `/${lang}/contratos`) ? 'bg-accent' : ''}`}
                                                 >
                                                     <FileText className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3">Contratos</span>
+                                                    <span className="ms-3 sidebar-label">Contratos</span>
                                                 </Link>
                                             </li>
                                             <li>
                                                 <SignOutButton>
-                                                    <button className="flex w-full items-center rounded-lg p-2 text-foreground hover:bg-red-50 hover:text-red-600 group min-h-[44px]">
+                                                    <button
+                                                        title={navCollapsed ? "Sair" : undefined}
+                                                        className="sidebar-item flex w-full items-center rounded-lg p-2 text-foreground hover:bg-red-50 hover:text-red-600 group min-h-[44px]">
                                                         <svg
                                                             className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-red-600"
                                                             aria-hidden="true"
@@ -371,7 +449,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                                                 d="M1 8h11m0 0L8 4m4 4-4 4m4-11h3a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-3"
                                                             />
                                                         </svg>
-                                                        <span className="ms-3">Sair</span>
+                                                        <span className="ms-3 sidebar-label">Sair</span>
                                                     </button>
                                                 </SignOutButton>
                                             </li>
@@ -381,59 +459,65 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                     <>
                                         <li>
                                             <Link
+                                                title={navCollapsed ? dict.menu.owner : undefined}
                                                 href={lang === 'pt' ? '/login/proprietario' : `/${lang}/login/proprietario`}
                                                 aria-current={isActive(lang === 'pt' ? '/login/proprietario' : `/${lang}/login/proprietario`) ? "page" : undefined}
-                                                className={`flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/login/proprietario' : `/${lang}/login/proprietario`) ? 'bg-accent' : ''}`}
+                                                className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/login/proprietario' : `/${lang}/login/proprietario`) ? 'bg-accent' : ''}`}
                                             >
                                                 <KeyRound className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                <span className="ms-3">{dict.menu.owner}</span>
+                                                <span className="ms-3 sidebar-label">{dict.menu.owner}</span>
                                             </Link>
                                         </li>
                                         {FLAGS.SHOW_LOGIN_LINKS && (
                                             <>
                                                 <li>
                                                     <Link
+                                                        title={navCollapsed ? dict.menu.brokers : undefined}
                                                         href={lang === 'pt' ? '/login/corretor' : `/${lang}/login/corretor`}
-                                                        className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
+                                                        className="sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
                                                     >
                                                         <Briefcase className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                        <span className="ms-3">{dict.menu.brokers}</span>
+                                                        <span className="ms-3 sidebar-label">{dict.menu.brokers}</span>
                                                     </Link>
                                                 </li>
                                                 <li>
                                                     <Link
+                                                        title={navCollapsed ? dict.menu.agencies : undefined}
                                                         href={lang === 'pt' ? '/login/imobiliaria' : `/${lang}/login/imobiliaria`}
-                                                        className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
+                                                        className="sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
                                                     >
                                                         <Building2 className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                        <span className="ms-3">{dict.menu.agencies}</span>
+                                                        <span className="ms-3 sidebar-label">{dict.menu.agencies}</span>
                                                     </Link>
                                                 </li>
                                                 <li>
                                                     <Link
+                                                        title={navCollapsed ? dict.menu.residents : undefined}
                                                         href={lang === 'pt' ? '/login' : `/${lang}/login`}
-                                                        className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
+                                                        className="sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
                                                     >
                                                         <User className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                        <span className="ms-3">{dict.menu.residents}</span>
+                                                        <span className="ms-3 sidebar-label">{dict.menu.residents}</span>
                                                     </Link>
                                                 </li>
                                                 <li>
                                                     <Link
+                                                        title={navCollapsed ? dict.menu.owners : undefined}
                                                         href={lang === 'pt' ? '/login/proprietario' : `/${lang}/login/proprietario`}
-                                                        className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
+                                                        className="sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
                                                     >
                                                         <KeyRound className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                        <span className="ms-3">{dict.menu.owners}</span>
+                                                        <span className="ms-3 sidebar-label">{dict.menu.owners}</span>
                                                     </Link>
                                                 </li>
                                                 <li>
                                                     <Link
+                                                        title={navCollapsed ? dict.menu.developers : undefined}
                                                         href={lang === 'pt' ? '/login/construtora' : `/${lang}/login/construtora`}
-                                                        className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
+                                                        className="sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
                                                     >
                                                         <HardHat className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                        <span className="ms-3">{dict.menu.developers}</span>
+                                                        <span className="ms-3 sidebar-label">{dict.menu.developers}</span>
                                                     </Link>
                                                 </li>
                                             </>
@@ -726,9 +810,9 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                     ) : null}
 
 
-                    <div className="mt-auto space-y-4 pt-4 border-t border-border w-full px-2 pb-2">
-                        <div className="flex items-center gap-2">
-                            <div className="flex-1 min-w-0">
+                    <div className="mt-auto space-y-2 pt-4 border-t border-border w-full px-2 pb-2">
+                        <div className="sidebar-footer-row flex items-center gap-2">
+                            <div className="sidebar-lang flex-1 min-w-0">
                                 <select
                                     value={lang}
                                     onChange={(e) => handleLanguageChange(e.target.value)}
@@ -753,6 +837,18 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                 </Button>
                             </div>
                         </div>
+                        <button
+                            type="button"
+                            onClick={toggleCollapsed}
+                            aria-pressed={collapsed}
+                            title={collapsed ? dict.menu.showMore : dict.menu.showLess}
+                            className="sidebar-item hidden sm:flex w-full items-center rounded-lg p-2 text-xs text-muted-foreground hover:text-foreground hover:bg-accent min-h-[44px] transition-colors"
+                        >
+                            {collapsed
+                                ? <ChevronsRight className="h-5 w-5 shrink-0" />
+                                : <ChevronsLeft className="h-5 w-5 shrink-0" />}
+                            <span className="ms-3 sidebar-label">{collapsed ? dict.menu.showMore : dict.menu.showLess}</span>
+                        </button>
                     </div>
                 </div>
             </aside>
