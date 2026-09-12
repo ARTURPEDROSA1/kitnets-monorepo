@@ -53,34 +53,27 @@ export async function POST(request: Request) {
         }
 
         if (!matchedProp) {
-            // Find all properties owned by this user
-            const { data: ownerProps } = await supabase
-                .from("properties")
-                .select("id, name, address, electronic_id")
-                .eq("owner_id", profile.id);
+            // Legacy fallback for profile properties that never got a properties-table id:
+            // only an exact (case-insensitive) name or address match counts. Substring
+            // matching and the "owner has a single row, take it" shortcut used to delete
+            // the leases/tenants of an unrelated property.
+            const normName = name ? String(name).trim().toLowerCase() : "";
+            const normAddress = address ? String(address).trim().toLowerCase() : "";
 
-            if (ownerProps && ownerProps.length > 0) {
-                const normName = name ? String(name).trim().toLowerCase() : "";
-                const normAddress = address ? String(address).trim().toLowerCase() : "";
+            if (normName || normAddress) {
+                const { data: ownerProps } = await supabase
+                    .from("properties")
+                    .select("id, name, address, electronic_id")
+                    .eq("owner_id", profile.id);
 
-                // Match by exact/partial name or address
-                matchedProp = ownerProps.find(p => {
+                const candidates = (ownerProps ?? []).filter(p => {
                     const pName = (p.name || "").trim().toLowerCase();
                     const pAddr = (p.address || "").trim().toLowerCase();
+                    return (normName !== "" && pName === normName) || (normAddress !== "" && pAddr === normAddress);
+                });
 
-                    if (normName && (pName === normName || pName.includes(normName) || normName.includes(pName))) {
-                        return true;
-                    }
-                    if (normAddress && (pAddr === normAddress || pAddr.includes(normAddress) || normAddress.includes(pAddr))) {
-                        return true;
-                    }
-                    return false;
-                }) || null;
-
-                // If only 1 property exists for this owner and no other name matched, match it
-                if (!matchedProp && ownerProps.length === 1 && (normName || normAddress)) {
-                    matchedProp = ownerProps[0];
-                }
+                // Ambiguous matches are treated as no match rather than picking one.
+                matchedProp = candidates.length === 1 ? candidates[0] : null;
             }
         }
 
