@@ -273,6 +273,28 @@ export function parseSheet(text: string): ParsedSheet {
     return { delimiter, headers, dateColumn, rows };
 }
 
+/**
+ * Header labels of the Excel template ("Exportar modelo"). A sheet whose
+ * first columns carry exactly these headers is imported without the mapping
+ * step. Keep in sync with `suggestMapping` (each maps to its field).
+ */
+export const INCOME_TEMPLATE_HEADERS = [
+    "Mês (dd/mm/aaaa)",
+    "Aluguel bruto (R$)",
+    "Taxa imobiliária (%)",
+    "Valor recebido (R$)",
+    "Energia (R$)",
+    "Outras despesas (R$)",
+    "Observações",
+] as const;
+
+const normHeader = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
+
+/** True when the sheet's headers are the Kitnets.com template headers (order and text). */
+export function isIncomeTemplate(headers: string[]): boolean {
+    return INCOME_TEMPLATE_HEADERS.every((h, i) => normHeader(headers[i] ?? "") === normHeader(h));
+}
+
 export type IncomeField = "gross" | "fee_pct" | "received" | "energy" | "other" | "notes" | "ignore";
 
 export const INCOME_FIELD_LABELS: Record<IncomeField, string> = {

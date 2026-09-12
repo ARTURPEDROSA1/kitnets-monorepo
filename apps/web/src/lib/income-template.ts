@@ -7,19 +7,9 @@
  */
 import ExcelJS from "exceljs";
 import { KITNETS_LOGO_PNG_BASE64 } from "./income-template-logo";
+import { INCOME_TEMPLATE_HEADERS } from "./property-income";
 
 export const INCOME_TEMPLATE_SHEET = "Receitas";
-
-/** Header labels — chosen so `suggestMapping` maps them without user input. */
-export const INCOME_TEMPLATE_HEADERS = [
-    "Mês (dd/mm/aaaa)",
-    "Aluguel bruto (R$)",
-    "Taxa imobiliária (%)",
-    "Valor recebido (R$)",
-    "Energia (R$)",
-    "Outras despesas (R$)",
-    "Observações",
-] as const;
 
 const BRAND = "059669";        // emerald-600
 const BRAND_DARK = "065F46";   // emerald-800
