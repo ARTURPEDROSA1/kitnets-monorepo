@@ -1798,6 +1798,9 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
+                    // properties-table id resolved at load time; the backend deletes
+                    // exactly this row instead of guessing by name.
+                    propertyId: deletedProp.id ?? null,
                     name: propName,
                     address: propAddress,
                     action: action,
@@ -3286,7 +3289,6 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                     idx: originalIdx,
                                                     label: prop.details?.propertyName || `Propriedade ${originalIdx + 1}`,
                                                 });
-                                                setShowDeleteModal(true);
                                             }}
                                         />
                                     ))}
