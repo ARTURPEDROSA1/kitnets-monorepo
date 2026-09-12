@@ -6,10 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@clerk/nextjs": "^6.36.5",
+    "@clerk/nextjs": "^6.39.6",
     "@google/generative-ai": "^0.24.1",
     "@kitnets/core": "*",
     "@kitnets/ui": "*",
@@ -24,14 +26,14 @@
     "class-variance-authority": "^0.7.1",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.468.0",
-    "next": "16.0.10",
+    "next": "^16.3.5",
     "next-mdx-remote": "^5.0.0",
     "next-themes": "^0.4.6",
     "openai": "^6.22.0",
     "pdf-parse": "^2.4.5",
     "pdfjs-dist": "^5.4.624",
-    "react": "19.2.1",
-    "react-dom": "19.2.1",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "recharts": "^3.6.0",
     "remark-breaks": "^4.0.0",
     "remark-gfm": "^4.0.1",
@@ -46,9 +48,10 @@
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "^1.0.0",
     "eslint": "^9",
-    "eslint-config-next": "16.0.10",
+    "eslint-config-next": "^16.3.5",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.0.0"
   },
   "browserslist": [
     "chrome >= 90",

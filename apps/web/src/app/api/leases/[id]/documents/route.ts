@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { currentUser } from '@clerk/nextjs/server';
+import { extractStoragePath, signStorageUrl } from '@/lib/storage';
 
 function getServiceSupabase() {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -109,18 +110,15 @@ export async function POST(request: Request, context: RouteContext) {
             );
         }
 
-        // ── Get public URL ───────────────────────────────────────────
-        const { data: { publicUrl } } = supabase.storage
-            .from('lease-documents')
-            .getPublicUrl(fileName);
-
         // ── Insert document record ───────────────────────────────────
+        // The bucket is private: store the object PATH, and hand out short-lived
+        // signed URLs at read time (see GET /api/leases/[id]).
         const { data: doc, error: insertError } = await supabase
             .from('lease_documents')
             .insert({
                 lease_id: leaseId,
                 document_type: documentType,
-                file_url: publicUrl,
+                file_url: fileName,
                 file_name: file.name,
                 file_size: file.size,
                 mime_type: file.type,
@@ -130,13 +128,15 @@ export async function POST(request: Request, context: RouteContext) {
 
         if (insertError) {
             console.error('[Lease Doc Upload] DB insert error:', insertError);
+            await supabase.storage.from('lease-documents').remove([fileName]);
             return NextResponse.json(
                 { error: 'Erro ao registrar documento.' },
                 { status: 500 }
             );
         }
 
-        return NextResponse.json({ document: doc }, { status: 201 });
+        const signedUrl = await signStorageUrl(supabase, 'lease-documents', fileName);
+        return NextResponse.json({ document: { ...doc, file_url: signedUrl ?? doc.file_url } }, { status: 201 });
     } catch (err) {
         console.error('[Lease Doc Upload] Error:', err);
         return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
@@ -200,14 +200,10 @@ export async function DELETE(request: Request, context: RouteContext) {
             return NextResponse.json({ error: 'Documento não encontrado.' }, { status: 404 });
         }
 
-        // Delete from Supabase Storage
-        if (doc.file_url) {
-            const bucketSegment = '/storage/v1/object/public/lease-documents/';
-            const idx = doc.file_url.indexOf(bucketSegment);
-            if (idx !== -1) {
-                const storagePath = doc.file_url.substring(idx + bucketSegment.length);
-                await supabase.storage.from('lease-documents').remove([storagePath]);
-            }
+        // Delete from Supabase Storage (file_url may be a legacy public URL or a bare path)
+        const storagePath = extractStoragePath('lease-documents', doc.file_url);
+        if (storagePath) {
+            await supabase.storage.from('lease-documents').remove([storagePath]);
         }
 
         // Delete DB record

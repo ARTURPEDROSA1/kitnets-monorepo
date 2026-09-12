@@ -1,5 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
+import { requireUserWithLimit, validateUpload } from '@/lib/session';
+import { HOUR } from '@/lib/rate-limit';
 import OpenAI from 'openai';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { DocumentExtractionResult } from '@/types/ownership';
@@ -505,22 +507,35 @@ async function analyzeVisionWithOpenAI(base64: string, mimeType: string) {
 // MAIN HANDLER — 3-tier pipeline
 // ============================================================
 
+const MAX_FILES = 5;
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+
 export async function POST(request: NextRequest) {
-    console.log("[API] /api/ownership/analyze called");
+    const gate = await requireUserWithLimit('ai:ownership-analyze', 20, HOUR);
+    if ('response' in gate) return gate.response;
+
     try {
         const formData = await request.formData();
-        const files = formData.getAll('file') as File[];
+        const files = formData.getAll('file').filter((f): f is File => f instanceof File);
 
-        if (!files || files.length === 0) {
-            console.warn("[API] No files provided in request");
+        if (files.length === 0) {
             return NextResponse.json({ error: 'No files provided' }, { status: 400 });
+        }
+        if (files.length > MAX_FILES) {
+            return NextResponse.json({ error: `Envie no máximo ${MAX_FILES} arquivos por vez.` }, { status: 400 });
+        }
+        for (const file of files) {
+            const uploadError = validateUpload(file, MAX_FILE_BYTES);
+            if (uploadError) {
+                return NextResponse.json({ error: uploadError }, { status: 400 });
+            }
         }
 
         console.log(`[API] Processing ${files.length} files`);
         const results: DocumentExtractionResult[] = [];
 
         for (const file of files) {
-            console.log(`[API] Processing file: ${file.name} (${file.type})`);
+            console.log(`[API] Processing file: ${file.type}, ${file.size} bytes`);
             const methods_tried: string[] = [];
 
             try {
@@ -543,7 +558,6 @@ export async function POST(request: NextRequest) {
 
                     if (pdfText) {
                         console.log(`[Ownership] PDF text extracted: ${pdfText.length} chars`);
-                        console.log(`[Ownership] First 500 chars: ${pdfText.substring(0, 500)}`);
                         methods_tried.push('regex_parse');
 
                         const extracted = extractDataFromText(pdfText);
@@ -551,7 +565,6 @@ export async function POST(request: NextRequest) {
 
                         if (isExtractionSufficient(extracted)) {
                             console.log(`[Ownership] ✅ Regex extraction sufficient! Type: ${docType}`);
-                            console.log(`[Ownership] Extracted:`, JSON.stringify(extracted, null, 2));
 
                             resultRaw = {
                                 classified_type: docType,
@@ -652,9 +665,6 @@ export async function POST(request: NextRequest) {
 
     } catch (error) {
         console.error('[API] Critical Error processing ownership documents:', error);
-        return NextResponse.json({
-            error: 'Internal server error',
-            details: error instanceof Error ? error.message : String(error)
-        }, { status: 500 });
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 }

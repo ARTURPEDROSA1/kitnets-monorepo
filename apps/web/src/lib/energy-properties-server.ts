@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { signStorageUrl } from "@/lib/storage";
 
 function getServiceSupabase() {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -220,11 +221,10 @@ export async function getOwnerPropertiesSummary(userId: string): Promise<OwnerPr
                                 .from("energy-bills")
                                 .list(pid, { limit: 10, search: "current_bill" });
                             if (files?.some((f: any) => f.name === "current_bill.pdf")) {
-                                const { data: pUrl } = supabase.storage
-                                    .from("energy-bills")
-                                    .getPublicUrl(`${pid}/current_bill.pdf`);
-                                if (pUrl?.publicUrl) {
-                                    billsByPropId[pid].latestBillPdfUrl = `${pUrl.publicUrl}?t=${Date.now()}`;
+                                // Private bucket: short-lived signed URL
+                                const signed = await signStorageUrl(supabase, "energy-bills", `${pid}/current_bill.pdf`);
+                                if (signed) {
+                                    billsByPropId[pid].latestBillPdfUrl = signed;
                                 }
                             }
                         } catch {

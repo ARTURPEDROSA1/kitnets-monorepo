@@ -825,7 +825,11 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
     const fetchCpfData = async (cpf: string) => {
         setIsLoadingEnrichment(true);
         try {
-            const res = await fetch(`/api/enrichment/cpf?cpf=${cpf}`);
+            const res = await fetch('/api/enrichment/cpf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ cpf }),
+            });
             if (!res.ok) {
                 console.warn(`Enrichment failed: ${res.status} ${res.statusText}`);
                 return;
