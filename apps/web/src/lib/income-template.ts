@@ -67,6 +67,7 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
         { key: "received", width: 20 },
         { key: "energy", width: 16 },
         { key: "other", width: 20 },
+        { key: "otherExpenses", width: 20 },
         { key: "notes", width: 44 },
     ];
 
@@ -85,12 +86,13 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
     ws.getCell("B3").font = { name: "Calibri", size: 9, italic: true, color: { argb: `FF${MUTED}` } };
 
     // Instructions (row 5)
-    ws.mergeCells("A5:G5");
+    ws.mergeCells("A5:H5");
     ws.getCell("A5").value =
         "Aluguel bruto = valor do contrato. Taxa = % que a imobiliária retém. Valor recebido = o que entrou na sua conta " +
         "(já calculado pela fórmula; sobrescreva com o valor real do extrato quando tiver). Energia = parcela paga pelo inquilino " +
-        "referente à energia solar (vai para o centro de energia). Custo de energia = a conta de luz que você paga no mês " +
-        "(custo à parte; não altera o valor recebido). Recebido = bruto × (1 − taxa) + energia.";
+        "referente à energia solar (vai para o centro de energia). Custo de energia = a conta de luz que você paga no mês; " +
+        "Outras despesas = outros custos pagos por você (reparos, taxas). Custos à parte não alteram o valor recebido. " +
+        "Recebido = bruto × (1 − taxa) + energia.";
     ws.getCell("A5").alignment = { wrapText: true, vertical: "top" };
     ws.getCell("A5").font = { name: "Calibri", size: 9, color: { argb: `FF${MUTED}` } };
     ws.getRow(5).height = 44;
@@ -126,6 +128,7 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
         row.getCell(4).numFmt = CURRENCY_FMT;
         row.getCell(5).numFmt = CURRENCY_FMT;
         row.getCell(6).numFmt = CURRENCY_FMT;
+        row.getCell(7).numFmt = CURRENCY_FMT;
 
         if (ledger) {
             const b = breakdown(ledger);
@@ -134,17 +137,18 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
             row.getCell(4).value = b.received;           // real value, not the formula
             row.getCell(5).value = b.energy;
             row.getCell(6).value = b.other;
-            row.getCell(7).value = ledger.notes ?? null;   // status is re-derived from the month on import
+            row.getCell(7).value = b.otherExpenses;
+            row.getCell(8).value = ledger.notes ?? null;   // status is re-derived from the month on import
         } else {
             row.getCell(3).value = feePct;
             row.getCell(4).value = { formula: `IF(B${r}="","",ROUND(B${r}*(1-C${r}/100)+E${r},2))`, result: "" };
         }
 
-        for (let c = 1; c <= 7; c++) {
+        for (let c = 1; c <= 8; c++) {
             const cell = row.getCell(c);
             cell.border = thin;
             cell.font = { name: "Calibri", size: 10, color: { argb: `FF${INK}` } };
-            cell.alignment = { vertical: "middle", horizontal: c === 1 ? "center" : c === 7 ? "left" : "right" };
+            cell.alignment = { vertical: "middle", horizontal: c === 1 ? "center" : c === 8 ? "left" : "right" };
             if (c === 4) {
                 cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${CALC}` } };
             } else if (i % 2 === 1) {
@@ -165,7 +169,7 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
             type: "decimal", operator: "between", formulae: [0, 99.99], allowBlank: true,
             showErrorMessage: true, errorTitle: "Taxa inválida", error: "Informe a taxa em % entre 0 e 99,99 (ex.: 10).",
         };
-        for (const col of ["B", "D", "E", "F"]) {
+        for (const col of ["B", "D", "E", "F", "G"]) {
             ws.getCell(`${col}${r}`).dataValidation = {
                 type: "decimal", operator: "greaterThanOrEqual", formulae: [0], allowBlank: true,
                 showErrorMessage: true, errorTitle: "Valor inválido", error: "Informe um valor em reais maior ou igual a zero.",
@@ -184,7 +188,7 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
         ["Como usar", "", "h"],
         ["1.", "Preencha a aba “Receitas”: uma linha por mês, com a data no formato dd/mm/aaaa.", "p"],
         ["2.", "Informe o Aluguel bruto (valor do contrato) e a Taxa da imobiliária em %. O Valor recebido é calculado automaticamente; substitua pelo valor real do extrato bancário quando quiser.", "p"],
-        ["3.", "Se o inquilino paga uma parcela referente à energia solar, informe em Energia (vai para o centro de energia). A conta de luz que você paga no mês vai em Custo de energia.", "p"],
+        ["3.", "Se o inquilino paga uma parcela referente à energia solar, informe em Energia (vai para o centro de energia). A conta de luz que você paga no mês vai em Custo de energia; outros custos pagos por você vão em Outras despesas.", "p"],
         ["4.", "Os meses vêm do mais recente para o mais antigo. Para acrescentar meses, arraste a última linha para baixo (a fórmula de Valor recebido é copiada junto). Meses futuros são importados como “previstos”.", "p"],
         ["5.", "Salve o arquivo (.xlsx) e importe em Kitnets.com › Imóveis › Gerenciar Imóvel › Importar planilha. As colunas são reconhecidas automaticamente.", "p"],
         ["Colunas", "", "h"],
@@ -194,16 +198,17 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
         ["Valor recebido (R$)", "O que efetivamente entrou na sua conta: bruto × (1 − taxa) + energia.", "p"],
         ["Energia (R$)", "Parcela do pagamento do inquilino referente à energia (solar).", "p"],
         ["Custo de energia (R$)", "A conta de luz do imóvel paga por você no mês. É um custo à parte: não altera o valor recebido, reduz o resultado (NOI). Sempre positivo.", "p"],
-        ["Observações", "Texto livre (reajuste, vacância, troca de inquilino).", "p"],
+        ["Outras despesas (R$)", "Outros custos do imóvel pagos por você no mês (reparos, taxas, vistoria). Também à parte: não altera o recebido, reduz o NOI. Sempre positivo.", "p"],
+        ["Comentários", "Texto livre (reajuste, vacância, troca de inquilino).", "p"],
         ["Cálculos no Kitnets.com", "", "h"],
         ["Aluguel líquido", "recebido − energia (o aluguel após a taxa da imobiliária)", "p"],
         ["Aluguel bruto", "líquido ÷ (1 − taxa/100), quando o bruto não é informado", "p"],
         ["Receita bruta", "aluguel bruto + energia (tudo o que o inquilino paga no mês)", "p"],
-        ["Despesas (OPEX)", "taxa da imobiliária + custo de energia", "p"],
-        ["Resultado (NOI)", "receita bruta − OPEX = recebido − custo de energia", "p"],
+        ["Despesas (OPEX)", "taxa da imobiliária + custo de energia + outras despesas", "p"],
+        ["Resultado (NOI)", "receita bruta − OPEX = recebido − custo de energia − outras despesas", "p"],
         ["Taxa acumulada", "bruto − líquido, somado mês a mês: a economia potencial ao administrar o imóvel pelo Kitnets.com.", "p"],
         ["Exemplo", "", "h"],
-        ["Bruto 4.000 · Taxa 10 % · Energia 350 · Custo de energia 109,80", "Recebido 3.950 · Aluguel líquido 3.600 · Receita bruta 4.350 · OPEX 509,80 · NOI 3.840,20", "p"],
+        ["Bruto 4.000 · Taxa 10 % · Energia 350 · Custo de energia 109,80 · Outras 50", "Recebido 3.950 · Aluguel líquido 3.600 · Receita bruta 4.350 · OPEX 559,80 · NOI 3.790,20", "p"],
     ];
     lines.forEach(([a, b, kind], i) => {
         const row = info.getRow(i + 1);
