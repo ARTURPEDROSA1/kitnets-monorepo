@@ -41,9 +41,10 @@ export function Step9Review() {
                     photoUrls.push(file);
                 } else {
                     const fileExt = file.name.split('.').pop();
-                    const fileName = `${profile.id}/${Date.now()}-${Math.random()}.${fileExt}`;
+                    // Listing photos are public marketing media → public property-media bucket
+                    const fileName = `listings/${profile.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
                     const { error: uploadError } = await sb.storage
-                        .from('documents') // Using documents bucket for now per schema
+                        .from('property-media')
                         .upload(fileName, file);
 
                     if (uploadError) {
@@ -51,7 +52,7 @@ export function Step9Review() {
                         continue;
                     }
 
-                    const { data: { publicUrl } } = sb.storage.from('documents').getPublicUrl(fileName);
+                    const { data: { publicUrl } } = sb.storage.from('property-media').getPublicUrl(fileName);
                     photoUrls.push(publicUrl);
                 }
             }
