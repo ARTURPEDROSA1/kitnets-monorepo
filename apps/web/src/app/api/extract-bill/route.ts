@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { requireUserWithLimit, validateUpload } from "@/lib/session";
+import { HOUR } from "@/lib/rate-limit";
 import { extractText, getDocumentProxy } from "unpdf";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
@@ -253,6 +255,9 @@ async function extractWithOpenAI(base64: string, mimeType: string): Promise<Extr
 // 3. OpenAI GPT-4o Vision (PAID, last resort)
 
 export async function POST(request: Request) {
+    const gate = await requireUserWithLimit("ai:extract-bill", 30, HOUR);
+    if ("response" in gate) return gate.response;
+
     try {
         const formData = await request.formData();
         const file = formData.get("file") as File | null;
@@ -264,22 +269,9 @@ export async function POST(request: Request) {
             );
         }
 
-        const allowedTypes = [
-            "image/jpeg", "image/jpg", "image/png", "image/webp",
-            "image/gif", "application/pdf"
-        ];
-        if (!allowedTypes.includes(file.type)) {
-            return NextResponse.json(
-                { error: `Tipo de arquivo não suportado: ${file.type}. Use JPG, PNG, WebP ou PDF.` },
-                { status: 400 }
-            );
-        }
-
-        if (file.size > 10 * 1024 * 1024) {
-            return NextResponse.json(
-                { error: "Arquivo muito grande. Máximo: 10MB." },
-                { status: 400 }
-            );
+        const uploadError = validateUpload(file, 10 * 1024 * 1024);
+        if (uploadError) {
+            return NextResponse.json({ error: uploadError }, { status: 400 });
         }
 
         const bytes = await file.arrayBuffer();

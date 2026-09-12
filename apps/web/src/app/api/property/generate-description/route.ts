@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireUserWithLimit } from '@/lib/session';
+import { HOUR } from '@/lib/rate-limit';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import OpenAI from 'openai';
 
@@ -29,6 +31,9 @@ Regras:
 - Se a finalidade for "ambos", gere duas seções claramente separadas: uma para VENDA e outra para ALUGUEL`;
 
 export async function POST(request: NextRequest) {
+    const gate = await requireUserWithLimit('ai:generate-description', 30, HOUR);
+    if ('response' in gate) return gate.response;
+
     try {
         const body = await request.json();
         const { propertyData, unitData, type, purpose } = body;

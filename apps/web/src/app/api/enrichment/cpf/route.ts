@@ -1,75 +1,65 @@
-
 import { NextRequest, NextResponse } from 'next/server';
+import { validateCPF } from '@/lib/validators';
+import { requireUserWithLimit } from '@/lib/session';
+import { HOUR } from '@/lib/rate-limit';
 
-export async function GET(request: NextRequest) {
-    const searchParams = request.nextUrl.searchParams;
-    const cpf = searchParams.get('cpf')?.replace(/\D/g, '');
+/**
+ * POST /api/enrichment/cpf
+ * body: { cpf: string }
+ *
+ * Looks up birth date / phone for a CPF via BigDataCorp to pre-fill the
+ * profile form. Signed-in users only, rate limited, CPF in the body (never in
+ * the URL / server logs). Without BIGDATACORP_TOKEN it returns no data.
+ */
+export async function POST(request: NextRequest) {
+    const gate = await requireUserWithLimit('enrichment:cpf', 10, HOUR);
+    if ('response' in gate) return gate.response;
 
-    if (!cpf || cpf.length !== 11) {
+    const body = await request.json().catch(() => ({}));
+    const cpf = typeof body?.cpf === 'string' ? body.cpf.replace(/\D/g, '') : '';
+
+    if (cpf.length !== 11 || !validateCPF(cpf)) {
         return NextResponse.json({ error: 'CPF inválido.' }, { status: 400 });
     }
 
-    // --- REAL API INTEGRATION (BigDataCorp Example) ---
     const token = process.env.BIGDATACORP_TOKEN;
-
-    if (token) {
-        try {
-            // Official Endpoint for BigDataCorp "People" dataset
-            // Docs: https://api.bigdatacorp.com.br/
-            const response = await fetch(`https://plataforma.bigdatacorp.com.br/pessoas?cpf=${cpf}`, {
-                method: 'GET',
-                headers: {
-                    'AccessToken': token,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-
-                // Map their response format to ours
-                // Note: Actual field names depend on specific dataset purchased (Basic, Contact, etc.)
-                const basicData = data.BasicData || {};
-                const phones = data.Phones || [];
-
-                // Extract best phone (mobile preferred)
-                const mobile = phones.find((p: any) => p.Type === 'Mobile') || phones[0];
-                const phoneFormatted = mobile
-                    ? `(${mobile.AreaCode}) ${mobile.Number}`
-                    : null;
-
-                return NextResponse.json({
-                    success: true,
-                    source: 'BIGDATACORP',
-                    data: {
-                        birthDate: basicData.BirthDate ? basicData.BirthDate.split('T')[0] : null,
-                        name: basicData.Name,
-                        phone: phoneFormatted
-                    }
-                });
-            } else {
-                console.error('BigDataCorp Error:', response.status, await response.text());
-                // Fallthrough to mock if API fails? Or return error?
-                // For safety, let's fallthrough to mock for dev, but in prod you might want to error.
-            }
-
-        } catch (error) {
-            console.error('Enrichment API Error:', error);
-        }
+    if (!token) {
+        return NextResponse.json({ success: false, source: 'DISABLED', data: null });
     }
 
-    // --- FALLBACK MOCK (If no token or API fails) ---
-    // Useful for development without spending credits
+    try {
+        const response = await fetch('https://plataforma.bigdatacorp.com.br/pessoas', {
+            method: 'POST',
+            headers: {
+                AccessToken: token,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ q: `doc{${cpf}}`, Datasets: 'basic_data,phones' }),
+            signal: AbortSignal.timeout(10_000),
+        });
 
-    await new Promise(resolve => setTimeout(resolve, 800));
-
-    return NextResponse.json({
-        success: true,
-        source: 'MOCK',
-        data: {
-            birthDate: '1988-04-12',
-            phone: '(31) 99876-5432',
-            name: 'ARTUR DA CONCEICAO PEDROSA'
+        if (!response.ok) {
+            console.error('[enrichment/cpf] provider error:', response.status);
+            return NextResponse.json({ success: false, source: 'BIGDATACORP', data: null });
         }
-    });
+
+        const payload = await response.json();
+        const result = Array.isArray(payload?.Result) ? payload.Result[0] : payload;
+        const basicData = result?.BasicData || {};
+        const phones: Array<{ Type?: string; AreaCode?: string; Number?: string }> = result?.Phones || [];
+        const mobile = phones.find((p) => p.Type === 'Mobile') || phones[0];
+
+        return NextResponse.json({
+            success: true,
+            source: 'BIGDATACORP',
+            data: {
+                birthDate: basicData.BirthDate ? String(basicData.BirthDate).split('T')[0] : null,
+                name: basicData.Name ?? null,
+                phone: mobile?.AreaCode && mobile?.Number ? `(${mobile.AreaCode}) ${mobile.Number}` : null,
+            },
+        });
+    } catch (error) {
+        console.error('[enrichment/cpf] request failed:', error instanceof Error ? error.message : error);
+        return NextResponse.json({ success: false, source: 'BIGDATACORP', data: null });
+    }
 }
