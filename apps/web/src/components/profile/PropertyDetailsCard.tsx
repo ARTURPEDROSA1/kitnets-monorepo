@@ -243,13 +243,6 @@ export default function PropertyDetailsCard({
 }: DetailsProps) {
     const [isOpen, setIsOpen] = useState(initialOpen);
 
-    // For multi properties, ensure numberOfUnits defaults to 1 if unset or 0
-    useEffect(() => {
-        if (propertyType === "multi" && (!details.numberOfUnits || details.numberOfUnits < 1)) {
-            updateDetail("numberOfUnits", 1);
-        }
-    }, [propertyType]);
-
     const toggleOpen = () => {
         const next = !isOpen;
         setIsOpen(next);
@@ -275,6 +268,13 @@ export default function PropertyDetailsCard({
 
         onDetailsChange(updated);
     };
+
+    // For multi properties, ensure numberOfUnits defaults to 1 if unset or 0
+    useEffect(() => {
+        if (propertyType === "multi" && (!details.numberOfUnits || details.numberOfUnits < 1)) {
+            updateDetail("numberOfUnits", 1);
+        }
+    }, [propertyType]);
 
     const updateMainMeter = (meter: keyof PropertyDetails["mainMeters"], val: boolean) => {
         onDetailsChange({

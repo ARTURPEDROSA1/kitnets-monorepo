@@ -58,11 +58,13 @@ export default async function DashboardPage({ params }: { params: Promise<{ lang
     const supabase = createAdminClient();
 
     // Fetch user profile with all property-related fields
-    let { data: profile, error: profileError } = await supabase
+    const profileRes = await supabase
         .from('profiles')
         .select('id, full_name, property_type, property_details, property_address, additional_properties')
         .eq('clerk_id', user.id)
         .maybeSingle();
+    let profile = profileRes.data;
+    const profileError = profileRes.error;
 
     // Fallback: reconcile by email if clerk_id changed
     if (!profile && user.emailAddresses?.[0]?.emailAddress) {

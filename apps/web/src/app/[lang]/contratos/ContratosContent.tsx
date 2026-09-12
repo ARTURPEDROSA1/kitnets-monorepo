@@ -309,7 +309,7 @@ export default function ContratosContent({ lang }: { lang: string }) {
                     today.setHours(0, 0, 0, 0);
 
                     // Find the next adjustment date that is in the future
-                    let nextDate = new Date(startDate);
+                    const nextDate = new Date(startDate);
                     nextDate.setMonth(nextDate.getMonth() + freq);
 
                     while (nextDate <= today) {

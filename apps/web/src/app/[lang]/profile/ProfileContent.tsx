@@ -429,11 +429,13 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                 const sb = await getSupabase();
 
                 // Use .maybeSingle() instead of .single() — returns null (no error) when 0 rows found
-                let { data: profile, error: fetchError } = await sb
+                const profileRes = await sb
                     .from('profiles')
                     .select('*')
                     .eq('clerk_id', user.id)
                     .maybeSingle();
+                let profile = profileRes.data;
+                const fetchError = profileRes.error;
 
                 // If not found by clerk_id, try reconciling via server-side API (handles re-signups / OAuth / changed Clerk ID)
                 if (!profile && !fetchError && user.primaryEmailAddress?.emailAddress) {
@@ -1823,6 +1825,35 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
         setPropertyToDelete(null);
     };
 
+    // Hooks must run on every render: keep these above the early return below.
+    const propertyCounts = useMemo(() => {
+        const multi = properties.filter(p => p.propertyType === 'multi').length;
+        const single = properties.filter(p => p.propertyType === 'single').length;
+        const solar = properties.filter(p => p.details?.solarEnergy).length;
+        return { all: properties.length, multi, single, solar };
+    }, [properties]);
+
+    const filteredProperties = useMemo(() => {
+        return properties
+            .map((prop, originalIdx) => ({ prop, originalIdx }))
+            .filter(({ prop }) => {
+                if (imoveisFilterTab === 'multi' && prop.propertyType !== 'multi') return false;
+                if (imoveisFilterTab === 'single' && prop.propertyType !== 'single') return false;
+                if (imoveisFilterTab === 'solar' && !prop.details?.solarEnergy) return false;
+
+                if (imoveisSearch.trim()) {
+                    const query = imoveisSearch.toLowerCase().trim();
+                    const name = (prop.details?.propertyName || 'Propriedade').toLowerCase();
+                    const street = (prop.address?.street || '').toLowerCase();
+                    const city = (prop.address?.city || '').toLowerCase();
+                    const neighborhood = (prop.address?.neighborhood || '').toLowerCase();
+                    const cep = (prop.address?.cep || '').toLowerCase();
+                    return name.includes(query) || street.includes(query) || city.includes(query) || neighborhood.includes(query) || cep.includes(query);
+                }
+                return true;
+            });
+    }, [properties, imoveisFilterTab, imoveisSearch]);
+
     if (!isLoaded || !user) return <div className="p-8 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-emerald-600" /></div>;
 
     const handleQuickPublish = (intent: 'rent' | 'sale', targetPropIdx: number = 0) => {
@@ -1905,33 +1936,6 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
         window.location.href = `/pt/anunciar?step=review&hydrate=true`;
     };
 
-    const propertyCounts = useMemo(() => {
-        const multi = properties.filter(p => p.propertyType === 'multi').length;
-        const single = properties.filter(p => p.propertyType === 'single').length;
-        const solar = properties.filter(p => p.details?.solarEnergy).length;
-        return { all: properties.length, multi, single, solar };
-    }, [properties]);
-
-    const filteredProperties = useMemo(() => {
-        return properties
-            .map((prop, originalIdx) => ({ prop, originalIdx }))
-            .filter(({ prop }) => {
-                if (imoveisFilterTab === 'multi' && prop.propertyType !== 'multi') return false;
-                if (imoveisFilterTab === 'single' && prop.propertyType !== 'single') return false;
-                if (imoveisFilterTab === 'solar' && !prop.details?.solarEnergy) return false;
-
-                if (imoveisSearch.trim()) {
-                    const query = imoveisSearch.toLowerCase().trim();
-                    const name = (prop.details?.propertyName || 'Propriedade').toLowerCase();
-                    const street = (prop.address?.street || '').toLowerCase();
-                    const city = (prop.address?.city || '').toLowerCase();
-                    const neighborhood = (prop.address?.neighborhood || '').toLowerCase();
-                    const cep = (prop.address?.cep || '').toLowerCase();
-                    return name.includes(query) || street.includes(query) || city.includes(query) || neighborhood.includes(query) || cep.includes(query);
-                }
-                return true;
-            });
-    }, [properties, imoveisFilterTab, imoveisSearch]);
 
     const renderPropertyDetailCards = (propIdx: number, mode: 'wizard' | 'manage' | 'accordion' = 'accordion') => {
         const prop = properties[propIdx];
