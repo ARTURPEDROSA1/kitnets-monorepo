@@ -14,6 +14,7 @@ import {
     AlertCircle,
     Landmark,
     Building2,
+    FileSpreadsheet,
     ChevronDown,
     ChevronUp,
 } from "lucide-react";
@@ -40,10 +41,13 @@ import {
     DialogFooter,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import PeriodFilter from "./PeriodFilter";
+import { DEFAULT_PERIOD, periodLabel, periodRange, type PeriodFilterValue } from "@/lib/period-filter";
 import {
     breakdown,
     buildImportRows,
     currentMonthKey,
+    filterRowsByPeriod,
     formatMonthKey,
     INCOME_FIELD_LABELS,
     isIncomeTemplate,
@@ -66,6 +70,9 @@ interface PropertyIncomeLedgerProps {
     defaultAgencyFeePct?: number;
     /** Called whenever the ledger changes so the parent can use real data */
     onRowsChange?: (rows: PropertyIncomeRow[]) => void;
+    /** Period applied to the chart and the table. Controlled when both props are given; otherwise internal. */
+    period?: PeriodFilterValue;
+    onPeriodChange?: (next: PeriodFilterValue) => void;
 }
 
 const formatBRL = (val: number) =>
@@ -86,7 +93,18 @@ const IMPORT_CHUNK = 300;
 const DEFAULT_AGENCY_FEE_PCT = 10;
 const COLLAPSED_ROWS = 24;
 
-export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct = 0, onRowsChange }: PropertyIncomeLedgerProps) {
+export default function PropertyIncomeLedger({
+    propertyId,
+    defaultAgencyFeePct = 0,
+    onRowsChange,
+    period: periodProp,
+    onPeriodChange,
+}: PropertyIncomeLedgerProps) {
+    const [localPeriod, setLocalPeriod] = useState<PeriodFilterValue>(DEFAULT_PERIOD);
+    const period = periodProp ?? localPeriod;
+    const setPeriod = onPeriodChange ?? setLocalPeriod;
+    const range = useMemo(() => periodRange(period), [period]);
+
     const [rows, setRows] = useState<PropertyIncomeRow[]>([]);
     const [loading, setLoading] = useState<boolean>(Boolean(propertyId));
     const [error, setError] = useState<string | null>(null);
@@ -232,7 +250,9 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct =
 
     // ── Derived ─────────────────────────────────────────────────────────
     const sorted = useMemo(() => [...rows].sort((a, b) => (a.month < b.month ? 1 : -1)), [rows]);
-    const visible = showAll ? sorted : sorted.slice(0, COLLAPSED_ROWS);
+    /** Rows inside the selected period (newest first) — drives the chart and the table. */
+    const filtered = useMemo(() => filterRowsByPeriod(sorted, range), [sorted, range]);
+    const visible = showAll ? filtered : filtered.slice(0, COLLAPSED_ROWS);
     const summary = useMemo(() => summarize(rows), [rows]);
     // Fee pre-fill: last month's fee when set, else the property default, else 10 %
     const lastRowPct = sorted.length ? Number(sorted[0].agency_fee_pct) : 0;
@@ -240,9 +260,8 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct =
 
     const chartData = useMemo(
         () =>
-            [...rows]
+            [...filtered]
                 .sort((a, b) => (a.month < b.month ? -1 : 1))
-                .slice(-24)
                 .map(r => {
                     const b = breakdown(r);
                     return {
@@ -253,7 +272,7 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct =
                         previsto: r.status === "EXPECTED",
                     };
                 }),
-        [rows]
+        [filtered]
     );
 
     // ── Add month dialog ────────────────────────────────────────────────
@@ -399,17 +418,19 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct =
     };
 
     // ── Excel template download ─────────────────────────────────────────
-    const [exporting, setExporting] = useState(false);
+    const [exporting, setExporting] = useState<"template" | "ledger" | null>(null);
 
-    const exportTemplate = async () => {
+    /** Downloads the empty template, or the property's ledger in the same layout (re-importable backup). */
+    const exportTemplate = async (kind: "template" | "ledger" = "template") => {
         if (!endpoint) return;
-        setExporting(true);
+        setExporting(kind);
         setError(null);
         try {
-            const res = await fetch(`${endpoint}/template?fee=${encodeURIComponent(lastPct)}&months=12`);
+            const query = kind === "ledger" ? "fill=ledger" : `fee=${encodeURIComponent(lastPct)}&months=12`;
+            const res = await fetch(`${endpoint}/template?${query}`);
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}));
-                throw new Error(data.error || "Erro ao gerar o modelo");
+                throw new Error(data.error || "Erro ao gerar a planilha");
             }
             const blob = await res.blob();
             const disposition = res.headers.get("Content-Disposition") ?? "";
@@ -425,7 +446,7 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct =
         } catch (err) {
             setError((err as Error).message);
         } finally {
-            setExporting(false);
+            setExporting(null);
         }
     };
 
@@ -485,21 +506,32 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct =
                         Receitas de Aluguel (valores reais)
                     </h3>
                     <p className="text-xs text-muted-foreground">
-                        O que entrou na conta a cada mês. A parcela de energia é deduzida do aluguel e vai para o centro de energia solar.
-                        Aluguel líquido = recebido − energia − outras despesas; aluguel bruto = líquido ÷ (1 − taxa da imobiliária).
+                        O que entrou na conta a cada mês. A parcela de energia vai para o centro de energia solar; outras despesas são valores descontados do repasse.
+                        Aluguel líquido (após a taxa) = recebido − energia + outras despesas; aluguel bruto = líquido ÷ (1 − taxa); NOI = líquido − outras despesas.
                     </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                     <Button
                         size="sm"
                         variant="outline"
-                        onClick={exportTemplate}
-                        disabled={exporting}
+                        onClick={() => exportTemplate("template")}
+                        disabled={exporting !== null}
                         className="gap-1.5 text-xs"
                         title="Baixa um modelo Excel formatado para preencher e importar"
                     >
-                        {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                        {exporting === "template" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
                         Exportar modelo
+                    </Button>
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => exportTemplate("ledger")}
+                        disabled={exporting !== null || rows.length === 0}
+                        className="gap-1.5 text-xs"
+                        title="Baixa todos os meses deste imóvel em Excel (mesmo layout do modelo; pode ser reimportado)"
+                    >
+                        {exporting === "ledger" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
+                        Exportar registro
                     </Button>
                     <Button size="sm" variant="outline" onClick={openImport} className="gap-1.5 text-xs">
                         <Upload className="w-3.5 h-3.5" />
@@ -557,6 +589,15 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct =
                 />
             </div>
 
+            {/* Period (shared with the DRE chart when controlled by the dashboard) */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <span className="text-xs text-muted-foreground">
+                    Período do gráfico e da tabela · <span className="font-semibold text-foreground">{periodLabel(period)}</span>
+                    {" · "}{filtered.length} {filtered.length === 1 ? "mês" : "meses"}
+                </span>
+                <PeriodFilter value={period} onChange={setPeriod} />
+            </div>
+
             {/* Chart */}
             {chartData.length > 1 && (
                 <div className="h-[220px] w-full">
@@ -595,6 +636,10 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct =
             ) : sorted.length === 0 ? (
                 <div className="text-sm text-muted-foreground text-center py-8 border border-dashed border-border rounded-xl">
                     Nenhuma receita registrada. Adicione um mês ou importe a planilha de aluguéis.
+                </div>
+            ) : filtered.length === 0 ? (
+                <div className="text-sm text-muted-foreground text-center py-8 border border-dashed border-border rounded-xl">
+                    Nenhum mês no período selecionado ({periodLabel(period)}). Escolha outro período acima.
                 </div>
             ) : (
                 <div className="overflow-x-auto -mx-2">
@@ -702,14 +747,14 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct =
                             })}
                         </tbody>
                     </table>
-                    {sorted.length > COLLAPSED_ROWS && (
+                    {filtered.length > COLLAPSED_ROWS && (
                         <button
                             type="button"
                             onClick={() => setShowAll(v => !v)}
                             className="mt-2 mx-2 text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
                         >
                             {showAll ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                            {showAll ? "Mostrar apenas os últimos 24 meses" : `Mostrar todos os ${sorted.length} meses`}
+                            {showAll ? `Mostrar apenas os últimos ${COLLAPSED_ROWS} meses` : `Mostrar todos os ${filtered.length} meses do período`}
                         </button>
                     )}
                 </div>
@@ -775,7 +820,7 @@ export default function PropertyIncomeLedger({ propertyId, defaultAgencyFeePct =
                                 />
                             </div>
                             <div className="space-y-1.5">
-                                <Label>Outras despesas (R$)</Label>
+                                <Label>Outras despesas descontadas (R$)</Label>
                                 <Input
                                     type="number" step="0.01" min={0} placeholder="0.00"
                                     value={addForm.other}
