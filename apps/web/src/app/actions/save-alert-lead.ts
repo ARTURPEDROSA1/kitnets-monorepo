@@ -2,6 +2,7 @@
 
 import { createAdminClient } from "@/utils/supabase/admin";
 import { headers } from "next/headers";
+import { HOUR, RATE_LIMITED_MESSAGE, rateLimitByIp } from "@/lib/rate-limit";
 
 export interface SaveAlertLeadResponse {
     success: boolean;
@@ -22,6 +23,9 @@ export interface AlertLeadData {
 }
 
 export async function saveAlertLead(data: AlertLeadData): Promise<SaveAlertLeadResponse> {
+    const limited = await rateLimitByIp("form:alert-lead", 5, HOUR);
+    if (!limited.ok) return { success: false, error: RATE_LIMITED_MESSAGE };
+
     const { name, email, whatsapp, index_type, locale, source_page, consent, utm_source, utm_medium, utm_campaign } = data;
 
     // Validation

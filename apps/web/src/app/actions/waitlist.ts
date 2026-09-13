@@ -2,6 +2,7 @@
 
 import { createAdminClient } from "@/utils/supabase/admin";
 import { WaitlistData } from "@/components/waitlist/types";
+import { HOUR, RATE_LIMITED_MESSAGE, rateLimitByIp } from "@/lib/rate-limit";
 
 export interface WaitlistResult {
     success: boolean;
@@ -9,6 +10,9 @@ export interface WaitlistResult {
 }
 
 export async function submitWaitlist(data: WaitlistData): Promise<WaitlistResult> {
+    const limited = await rateLimitByIp("form:waitlist", 5, HOUR);
+    if (!limited.ok) return { success: false, error: RATE_LIMITED_MESSAGE };
+
     const supabase = createAdminClient();
 
     const {

@@ -2,6 +2,7 @@
 
 import { createAdminClient } from "@/utils/supabase/admin";
 import { cookies } from "next/headers";
+import { HOUR, RATE_LIMITED_MESSAGE, rateLimitByIp } from "@/lib/rate-limit";
 
 export interface SaveLeadResponse {
     success: boolean;
@@ -9,6 +10,9 @@ export interface SaveLeadResponse {
 }
 
 export async function saveLead(data: { name: string; email: string; source: string }): Promise<SaveLeadResponse> {
+    const limited = await rateLimitByIp("form:lead", 10, HOUR);
+    if (!limited.ok) return { success: false, error: RATE_LIMITED_MESSAGE };
+
     const { name, email, source } = data;
 
     if (!email) {
