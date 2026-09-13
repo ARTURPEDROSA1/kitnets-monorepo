@@ -93,14 +93,16 @@ jobs:
           echo "::add-mask::$key"
           url="https://$host/api/$project/cron/$MONITOR_SLUG/$key/"
           # Upsert the monitor so nothing has to be created by hand in Sentry.
-          id=$(curl -fsS -X POST "$url" -H 'Content-Type: application/json' -d '{
+          resp=$(curl -sS -X POST "$url" -H 'Content-Type: application/json' -d '{
             "status": "in_progress",
             "monitor_config": {
               "schedule": { "type": "crontab", "value": "0 6 * * *" },
               "checkin_margin": 60, "max_runtime": 40, "timezone": "UTC",
               "failure_issue_threshold": 1, "recovery_threshold": 1
             }
-          }' | sed -E 's/.*"id" *: *"([^"]+)".*/\1/')
+          }') || true
+          echo "sentry: $resp"
+          id=$(RESP="$resp" node -e 'try { console.log(JSON.parse(process.env.RESP).id || "") } catch { console.log("") }')
           echo "SENTRY_CHECKIN_URL=$url" >> "$GITHUB_ENV"
           echo "SENTRY_CHECKIN_ID=$id" >> "$GITHUB_ENV"
 
@@ -237,5 +239,11 @@ jobs:
         if: always() && env.SENTRY_CHECKIN_URL != ''
         run: |
           status=ok; [ "${{ job.status }}" = "success" ] || status=error
-          curl -fsS -X POST "$SENTRY_CHECKIN_URL" -H 'Content-Type: application/json' \
-            -d "{\"check_in_id\": \"$SENTRY_CHECKIN_ID\", \"status\": \"$status\"}"
+          # Close the check-in opened at the start; without its id, send a
+          # standalone check-in so the monitor still records this run.
+          if [ -n "$SENTRY_CHECKIN_ID" ]; then
+            body="{\"check_in_id\": \"$SENTRY_CHECKIN_ID\", \"status\": \"$status\"}"
+          else
+            body="{\"status\": \"$status\"}"
+          fi
+          curl -sS -X POST "$SENTRY_CHECKIN_URL" -H 'Content-Type: application/json' -d "$body"; echo
