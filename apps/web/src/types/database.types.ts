@@ -1877,6 +1877,63 @@ export type Database = {
           },
         ]
       }
+      property_taxes: {
+        Row: {
+          amount: number
+          comment: string | null
+          created_at: string
+          id: string
+          kind: string
+          owner_id: string
+          paid_by: string
+          paid_on: string | null
+          property_id: string
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          amount: number
+          comment?: string | null
+          created_at?: string
+          id?: string
+          kind: string
+          owner_id: string
+          paid_by?: string
+          paid_on?: string | null
+          property_id: string
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          amount?: number
+          comment?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          owner_id?: string
+          paid_by?: string
+          paid_on?: string | null
+          property_id?: string
+          updated_at?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_taxes_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_taxes_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       property_transactions: {
         Row: {
           amount: number
