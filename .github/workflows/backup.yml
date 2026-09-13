@@ -92,17 +92,19 @@ jobs:
           project=$(sed -E 's#.*/([0-9]+)$#\1#' <<<"$SENTRY_DSN")
           echo "::add-mask::$key"
           url="https://$host/api/$project/cron/$MONITOR_SLUG/$key/"
+          # The DSN check-in endpoint answers 202 with an empty body, so we choose
+          # the check-in id ourselves and reuse it to close the check-in later.
+          id=$(node -e 'console.log(require("crypto").randomUUID())')
           # Upsert the monitor so nothing has to be created by hand in Sentry.
-          resp=$(curl -sS -w '\n[http %{http_code}]' -X POST "$url" -H 'Content-Type: application/json' -d '{
+          curl -sS -w '[http %{http_code}]\n' -X POST "$url" -H 'Content-Type: application/json' -d '{
+            "check_in_id": "'"$id"'",
             "status": "in_progress",
             "monitor_config": {
               "schedule": { "type": "crontab", "value": "0 6 * * *" },
               "checkin_margin": 60, "max_runtime": 40, "timezone": "UTC",
               "failure_issue_threshold": 1, "recovery_threshold": 1
             }
-          }') || true
-          echo "sentry: $resp"
-          id=$(RESP="${resp%%$'\n'*}" node -e 'try { console.log(JSON.parse(process.env.RESP).id || "") } catch { console.log("") }')
+          }' || true
           echo "SENTRY_CHECKIN_URL=$url" >> "$GITHUB_ENV"
           echo "SENTRY_CHECKIN_ID=$id" >> "$GITHUB_ENV"
 
@@ -240,11 +242,6 @@ jobs:
         if: always() && env.SENTRY_CHECKIN_URL != ''
         run: |
           status=ok; [ "${{ job.status }}" = "success" ] || status=error
-          # Close the check-in opened at the start; without its id, send a
-          # standalone check-in so the monitor still records this run.
-          if [ -n "$SENTRY_CHECKIN_ID" ]; then
-            body="{\"check_in_id\": \"$SENTRY_CHECKIN_ID\", \"status\": \"$status\"}"
-          else
-            body="{\"status\": \"$status\"}"
-          fi
-          curl -sS -w '\n[http %{http_code}]\n' -X POST "$SENTRY_CHECKIN_URL" -H 'Content-Type: application/json' -d "$body"
+          # Close the check-in opened at the start with the id we chose there.
+          curl -sS -w '[http %{http_code}]\n' -X POST "$SENTRY_CHECKIN_URL" -H 'Content-Type: application/json' \
+            -d "{\"check_in_id\": \"$SENTRY_CHECKIN_ID\", \"status\": \"$status\"}"
