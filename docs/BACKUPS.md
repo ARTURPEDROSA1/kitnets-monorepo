@@ -134,6 +134,7 @@ full restore against production for this.
 ```bash
 # scratch database with the Supabase roles: `supabase start` locally, or
 # docker run -e POSTGRES_PASSWORD=x -p 54329:5432 supabase/postgres:17.6.1.171
+psql postgresql://postgres:x@localhost:54329/postgres -f scripts/backup/drill-prepare.sql   # auth.jwt() etc.
 scripts/backup/restore-db.sh restore/db.dump.gpg postgresql://postgres:x@localhost:54329/postgres public
 
 # inspect, then move rows with psql \copy, or pg_dump -t public.<table> --data-only
