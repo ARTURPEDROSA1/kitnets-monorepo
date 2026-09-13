@@ -1883,6 +1883,7 @@ export type Database = {
           comment: string | null
           created_at: string
           id: string
+          installments: Json
           kind: string
           owner_id: string
           paid_by: string
@@ -1896,6 +1897,7 @@ export type Database = {
           comment?: string | null
           created_at?: string
           id?: string
+          installments?: Json
           kind: string
           owner_id: string
           paid_by?: string
@@ -1909,6 +1911,7 @@ export type Database = {
           comment?: string | null
           created_at?: string
           id?: string
+          installments?: Json
           kind?: string
           owner_id?: string
           paid_by?: string
