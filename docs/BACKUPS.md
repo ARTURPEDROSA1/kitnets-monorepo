@@ -59,8 +59,8 @@ openssl rand -base64 32
 ### 3. GitHub secrets
 
 GitHub → repository → *Settings* → *Secrets and variables* → *Actions* →
-**Environment secrets** for `production` (the same place as the `SUPABASE_*`
-secrets already used by the migrations workflow).
+**New repository secret** (the same place as the `SUPABASE_*` secrets already
+used by the migrations workflow). Names must match exactly.
 
 | Secret | Value |
 |---|---|
