@@ -51,6 +51,7 @@ import {
 import { cn } from '@/lib/utils';
 import type { PropertyDetails, SubUnit } from '@/components/profile/PropertyDetailsCard';
 import PropertyIncomeLedger from './PropertyIncomeLedger';
+import PropertyInvestmentSection from './PropertyInvestmentSection';
 import PeriodFilter from './PeriodFilter';
 import {
     breakdown,
@@ -627,6 +628,9 @@ export default function PropertyCostCenterDashboard({
                 period={period}
                 onPeriodChange={setPeriod}
             />
+
+            {/* Investment ledger: acquisition, financing, capex, running costs, solar */}
+            <PropertyInvestmentSection propertyId={dbId} incomeRows={incomeRows} />
 
             {/* Multifamily Units Summary (if applicable) */}
             {propertyType === 'multi' && subUnits.length > 0 && (
