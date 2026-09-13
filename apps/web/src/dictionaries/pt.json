@@ -2654,13 +2654,15 @@
             "startYear": "Ano de Início",
             "totalCard": "Carga Tributária Total",
             "totalTax": "Total a Pagar",
-            "totalEffective": "Alíquota Efetiva Total"
+            "totalEffective": "Alíquota Efetiva Total",
+            "socialReducer": "Redutor social (R$ 600 por imóvel/mês)"
         },
         "alerts": {
             "classification": "Classificação baseada no ano anterior.",
             "cumulative": "IBS e CBS não substituem o IRPF; a tributação é cumulativa.",
             "advice": "Esta simulação não substitui a assessoria de um contador.",
-            "credits": "Créditos de IVA não considerados nesta versão."
+            "credits": "Créditos de IVA não considerados nesta versão.",
+            "testYear": "2026 é ano-teste: a CBS de 0,9% e o IBS de 0,1% são compensáveis com PIS/COFINS ou dispensados para quem cumpre as obrigações acessórias. Nada a pagar neste ano."
         },
         "seo": {
             "title": "Calculadora Imposto Aluguel Pessoa Física (IRPF, IBS, CBS) | Kitnets",
