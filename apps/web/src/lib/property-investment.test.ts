@@ -110,7 +110,7 @@ describe("summarizeInvestment", () => {
 describe("solarPayback", () => {
     const month = (m: string, energy: number, cost: number, status: "CONFIRMED" | "EXPECTED" = "CONFIRMED"): PropertyIncomeRow => ({
         id: m, property_id: "p", month: `${m}-01`, received_on: null, received_amount: 3950, energy_portion: energy,
-        other_income: cost, other_expenses: 0, agency_fee_pct: 10, status, source: "MANUAL", bank_reference: null, notes: null,
+        other_income: cost, other_expenses: 0, iptu_amount: 0, agency_fee_pct: 10, status, source: "MANUAL", bank_reference: null, notes: null,
     });
     it("recovers the investment with net energy income from confirmed months only", () => {
         const s = solarPayback(1000, [month("2026-07", 350, 100), month("2026-08", 350, 110), month("2026-09", 350, 90, "EXPECTED")]);

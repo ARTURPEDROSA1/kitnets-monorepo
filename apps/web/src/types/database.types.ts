@@ -1735,6 +1735,7 @@ export type Database = {
           notes: string | null
           other_income: number
           other_expenses: number
+          iptu_amount: number
           owner_id: string
           property_id: string
           received_amount: number
@@ -1753,6 +1754,7 @@ export type Database = {
           notes?: string | null
           other_income?: number
           other_expenses?: number
+          iptu_amount?: number
           owner_id: string
           property_id: string
           received_amount?: number
@@ -1771,6 +1773,7 @@ export type Database = {
           notes?: string | null
           other_income?: number
           other_expenses?: number
+          iptu_amount?: number
           owner_id?: string
           property_id?: string
           received_amount?: number

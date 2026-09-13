@@ -34,7 +34,7 @@ export async function GET() {
 
     const { data, error } = await supabase
         .from("property_income_months")
-        .select("property_id, month, received_amount, energy_portion, other_income, other_expenses, agency_fee_pct, status")
+        .select("property_id, month, received_amount, energy_portion, other_income, other_expenses, iptu_amount, agency_fee_pct, status")
         .eq("owner_id", profileId)
         .eq("status", "CONFIRMED")
         .lte("month", `${currentMonthKey()}-01`)
@@ -46,7 +46,7 @@ export async function GET() {
     }
 
     const summaries: Record<string, PropertyIncomeSnapshot> = {};
-    for (const raw of (data ?? []) as unknown as Array<Pick<PropertyIncomeRow, "property_id" | "month" | "received_amount" | "energy_portion" | "other_income" | "other_expenses" | "agency_fee_pct">>) {
+    for (const raw of (data ?? []) as unknown as Array<Pick<PropertyIncomeRow, "property_id" | "month" | "received_amount" | "energy_portion" | "other_income" | "other_expenses" | "iptu_amount" | "agency_fee_pct">>) {
         const existing = summaries[raw.property_id];
         if (existing) {
             existing.confirmedMonths += 1;
