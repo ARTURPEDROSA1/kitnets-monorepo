@@ -93,7 +93,7 @@ jobs:
           echo "::add-mask::$key"
           url="https://$host/api/$project/cron/$MONITOR_SLUG/$key/"
           # Upsert the monitor so nothing has to be created by hand in Sentry.
-          resp=$(curl -sS -X POST "$url" -H 'Content-Type: application/json' -d '{
+          resp=$(curl -sS -w '\n[http %{http_code}]' -X POST "$url" -H 'Content-Type: application/json' -d '{
             "status": "in_progress",
             "monitor_config": {
               "schedule": { "type": "crontab", "value": "0 6 * * *" },
@@ -102,7 +102,7 @@ jobs:
             }
           }') || true
           echo "sentry: $resp"
-          id=$(RESP="$resp" node -e 'try { console.log(JSON.parse(process.env.RESP).id || "") } catch { console.log("") }')
+          id=$(RESP="${resp%%$'\n'*}" node -e 'try { console.log(JSON.parse(process.env.RESP).id || "") } catch { console.log("") }')
           echo "SENTRY_CHECKIN_URL=$url" >> "$GITHUB_ENV"
           echo "SENTRY_CHECKIN_ID=$id" >> "$GITHUB_ENV"
 
@@ -169,6 +169,7 @@ jobs:
             fi
           done
           [ -n "${DRILL_URL:-}" ] || { echo "::error::cannot connect to the drill database"; exit 1; }
+          psql "$DRILL_URL" -q -v ON_ERROR_STOP=1 -f scripts/backup/drill-prepare.sql
           scripts/backup/restore-db.sh "backup-$STAMP/db.dump.gpg" "$DRILL_URL" public
           psql "$DRILL_URL" -Atq -f count-rows.sql > drill-counts.csv
 
@@ -246,4 +247,4 @@ jobs:
           else
             body="{\"status\": \"$status\"}"
           fi
-          curl -sS -X POST "$SENTRY_CHECKIN_URL" -H 'Content-Type: application/json' -d "$body"; echo
+          curl -sS -w '\n[http %{http_code}]\n' -X POST "$SENTRY_CHECKIN_URL" -H 'Content-Type: application/json' -d "$body"
