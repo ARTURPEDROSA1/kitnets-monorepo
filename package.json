@@ -23,6 +23,7 @@
         "db:lint": "supabase db lint --level warning",
         "db:push": "supabase db push",
         "db:repair": "supabase migration repair --status applied",
+        "db:backup": "bash scripts/backup/dump-db.sh",
         "db:types": "supabase gen types typescript --linked --schema public > apps/web/src/types/database.types.ts"
     },
     "devDependencies": {

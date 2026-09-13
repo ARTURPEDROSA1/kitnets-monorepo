@@ -1,0 +1,241 @@
+name: backup
+
+# Nightly, verified, encrypted backup of the production database to an
+# S3-compatible bucket outside Supabase, plus (when the storage keys exist) a
+# mirror of the Supabase Storage buckets. Every run restores its own dump into a
+# scratch Postgres and compares it with production before uploading.
+# Runbook, setup and restore procedures: docs/BACKUPS.md
+#
+# GitHub disables cron workflows after 60 days without repository activity. The
+# optional Sentry cron monitor (SENTRY_DSN secret) alerts when a night is missed.
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # 06:00 UTC = 03:00 America/Sao_Paulo
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+env:
+  PG_MAJOR: "17" # must match supabase/config.toml major_version
+  DAILY_RETENTION_DAYS: "30"
+  MONITOR_SLUG: kitnets-nightly-backup
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment: production
+    services:
+      # Same image family as production, so roles (anon, authenticated,
+      # service_role), the auth schema and the extensions already exist.
+      drill:
+        image: supabase/postgres:17.6.1.171
+        env:
+          POSTGRES_PASSWORD: drill
+        ports:
+          - 54329:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }} # optional override
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+      BACKUP_S3_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+      BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+      BACKUP_S3_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+      BACKUP_S3_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+      SUPABASE_S3_ACCESS_KEY_ID: ${{ secrets.SUPABASE_S3_ACCESS_KEY_ID }} # optional
+      SUPABASE_S3_SECRET_ACCESS_KEY: ${{ secrets.SUPABASE_S3_SECRET_ACCESS_KEY }} # optional
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }} # optional
+      # rclone remote "dest" = the backup bucket, configured from the env above.
+      RCLONE_CONFIG_DEST_TYPE: s3
+      RCLONE_CONFIG_DEST_PROVIDER: ${{ vars.BACKUP_S3_PROVIDER || 'Cloudflare' }}
+      RCLONE_CONFIG_DEST_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+      RCLONE_CONFIG_DEST_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+      RCLONE_CONFIG_DEST_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+      RCLONE_CONFIG_DEST_REGION: ${{ vars.BACKUP_S3_REGION || 'auto' }}
+      RCLONE_CONFIG_DEST_NO_CHECK_BUCKET: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check secrets
+        run: |
+          missing=""
+          for v in SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD SUPABASE_PROJECT_ID \
+                   BACKUP_PASSPHRASE BACKUP_S3_ENDPOINT BACKUP_S3_BUCKET \
+                   BACKUP_S3_ACCESS_KEY_ID BACKUP_S3_SECRET_ACCESS_KEY; do
+            [ -z "${!v}" ] && missing="$missing $v"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing secrets:$missing (see docs/BACKUPS.md)"
+            exit 1
+          fi
+          echo "STAMP=$(date -u +%Y%m%d-%H%M%S)" >> "$GITHUB_ENV"
+          echo "DAY=$(date -u +%d)" >> "$GITHUB_ENV"
+
+      - name: Sentry cron check-in (start)
+        if: env.SENTRY_DSN != ''
+        run: |
+          key=$(sed -E 's#https://([^@]+)@.*#\1#' <<<"$SENTRY_DSN")
+          host=$(sed -E 's#https://[^@]+@([^/]+)/.*#\1#' <<<"$SENTRY_DSN")
+          project=$(sed -E 's#.*/([0-9]+)$#\1#' <<<"$SENTRY_DSN")
+          echo "::add-mask::$key"
+          url="https://$host/api/$project/cron/$MONITOR_SLUG/$key/"
+          # Upsert the monitor so nothing has to be created by hand in Sentry.
+          id=$(curl -fsS -X POST "$url" -H 'Content-Type: application/json' -d '{
+            "status": "in_progress",
+            "monitor_config": {
+              "schedule": { "type": "crontab", "value": "0 6 * * *" },
+              "checkin_margin": 60, "max_runtime": 40, "timezone": "UTC",
+              "failure_issue_threshold": 1, "recovery_threshold": 1
+            }
+          }' | sed -E 's/.*"id" *: *"([^"]+)".*/\1/')
+          echo "SENTRY_CHECKIN_URL=$url" >> "$GITHUB_ENV"
+          echo "SENTRY_CHECKIN_ID=$id" >> "$GITHUB_ENV"
+
+      - name: Install pg client ${{ env.PG_MAJOR }} and rclone
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            | sudo tee /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc >/dev/null
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq "postgresql-client-$PG_MAJOR" rclone >/dev/null
+          echo "/usr/lib/postgresql/$PG_MAJOR/bin" >> "$GITHUB_PATH"
+          "/usr/lib/postgresql/$PG_MAJOR/bin/pg_dump" --version
+          rclone version | head -1
+
+      - name: Resolve production connection
+        run: |
+          url=$(scripts/backup/resolve-db-url.sh)
+          echo "::add-mask::$url"
+          echo "DB_URL=$url" >> "$GITHUB_ENV"
+          region=$(curl -fsS -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_ID" \
+            | sed -E 's/.*"region" *: *"([^"]+)".*/\1/')
+          echo "SUPABASE_REGION=$region" >> "$GITHUB_ENV"
+          psql "$url" -Atqc "select 'connected to ' || current_database() || ' (' || version() || ')'"
+
+      # Exact per-table row counts, taken right before the dump, to compare with
+      # the restored copy. Kept as a script file: it runs on both databases.
+      - name: Count rows in production
+        run: |
+          cat > count-rows.sql <<'SQL'
+          select format('%s,%s', c.relname,
+                   (xpath('/row/n/text()',
+                      query_to_xml(format('select count(*) as n from public.%I', c.relname), false, true, '')))[1]::text)
+          from pg_class c join pg_namespace ns on ns.oid = c.relnamespace
+          where ns.nspname = 'public' and c.relkind = 'r'
+          order by 1;
+          SQL
+          psql "$DB_URL" -Atq -f count-rows.sql > source-counts.csv
+          echo "$(wc -l < source-counts.csv) tables, $(awk -F, '{s+=$2} END {print s+0}' source-counts.csv) rows"
+
+      - name: Dump
+        run: scripts/backup/dump-db.sh "backup-$STAMP"
+
+      - name: Encrypt
+        working-directory: backup-${{ env.STAMP }}
+        run: |
+          for f in *.dump; do
+            gpg --batch --yes --symmetric --cipher-algo AES256 \
+              --pinentry-mode loopback --passphrase-fd 3 --output "$f.gpg" "$f" 3<<<"$BACKUP_PASSPHRASE"
+            rm "$f"
+          done
+          sha256sum *.gpg MANIFEST.txt > SHA256SUMS
+          ls -la
+
+      # Restore the *encrypted* artifact into the scratch database: this proves
+      # the passphrase, the archive and the restore procedure all at once.
+      - name: Restore drill
+        run: |
+          for u in supabase_admin postgres; do
+            if psql "postgresql://$u:drill@localhost:54329/postgres" -Atqc 'select 1' >/dev/null 2>&1; then
+              DRILL_URL="postgresql://$u:drill@localhost:54329/postgres"; break
+            fi
+          done
+          [ -n "${DRILL_URL:-}" ] || { echo "::error::cannot connect to the drill database"; exit 1; }
+          scripts/backup/restore-db.sh "backup-$STAMP/db.dump.gpg" "$DRILL_URL" public
+          psql "$DRILL_URL" -Atq -f count-rows.sql > drill-counts.csv
+
+          cut -d, -f1 source-counts.csv > a.txt; cut -d, -f1 drill-counts.csv > b.txt
+          if ! diff -q a.txt b.txt >/dev/null; then
+            echo "::error::restored table list differs from production:"; diff a.txt b.txt || true; exit 1
+          fi
+          src=$(awk -F, '{s+=$2} END {print s+0}' source-counts.csv)
+          got=$(awk -F, '{s+=$2} END {print s+0}' drill-counts.csv)
+          echo "rows: production=$src restored=$got"
+          # Production keeps writing (gateway readings) while the dump runs, so
+          # require near-equality rather than identity.
+          awk -v s="$src" -v g="$got" 'BEGIN { if (s > 0 && g < 0.98 * s) { print "::error::restored rows are below 98% of production"; exit 1 } }'
+          echo "RESTORE_ROWS=$got" >> "$GITHUB_ENV"
+          echo "RESTORE_TABLES=$(wc -l < drill-counts.csv)" >> "$GITHUB_ENV"
+
+      - name: Upload
+        run: |
+          dest="dest:$BACKUP_S3_BUCKET/database"
+          rclone copy "backup-$STAMP" "$dest/daily/$STAMP" --stats-one-line -v 2>&1 | tail -5
+          if [ "$DAY" = "01" ]; then
+            rclone copy "backup-$STAMP" "$dest/monthly/$STAMP" --stats-one-line 2>&1 | tail -1
+          fi
+          # Retention: daily copies older than N days go; monthly copies stay.
+          rclone delete "$dest/daily" --min-age "${DAILY_RETENTION_DAYS}d" 2>&1 | tail -1 || true
+          rclone rmdirs "$dest/daily" --leave-root 2>/dev/null || true
+          echo "remote daily backups:"
+          rclone lsd "$dest/daily" | awk '{print $NF}' | tail -40
+          rclone size "$dest" | tee size.txt
+
+      - name: Mirror storage buckets
+        if: env.SUPABASE_S3_ACCESS_KEY_ID != ''
+        env:
+          RCLONE_CONFIG_SUPA_TYPE: s3
+          RCLONE_CONFIG_SUPA_PROVIDER: Other
+          RCLONE_CONFIG_SUPA_ENDPOINT: https://${{ secrets.SUPABASE_PROJECT_ID }}.storage.supabase.co/storage/v1/s3
+          RCLONE_CONFIG_SUPA_ACCESS_KEY_ID: ${{ secrets.SUPABASE_S3_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_SUPA_SECRET_ACCESS_KEY: ${{ secrets.SUPABASE_S3_SECRET_ACCESS_KEY }}
+          RCLONE_CONFIG_SUPA_FORCE_PATH_STYLE: "true"
+        run: |
+          export RCLONE_CONFIG_SUPA_REGION="$SUPABASE_REGION"
+          dest="dest:$BACKUP_S3_BUCKET"
+          echo "buckets:"; rclone lsd supa: | awk '{print "  " $NF}'
+          # Files removed in Supabase are kept under storage-history/<day> for
+          # the retention window instead of vanishing from the mirror.
+          rclone sync supa: "$dest/storage" \
+            --backup-dir "$dest/storage-history/$STAMP" \
+            --fast-list --transfers 8 --checkers 16 --stats-one-line -v 2>&1 | tail -5
+          rclone delete "$dest/storage-history" --min-age "${DAILY_RETENTION_DAYS}d" 2>&1 | tail -1 || true
+          rclone rmdirs "$dest/storage-history" --leave-root 2>/dev/null || true
+          rclone size "$dest/storage" | tee storage-size.txt
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Nightly backup $STAMP"
+            echo
+            [ -f "backup-$STAMP/MANIFEST.txt" ] && { echo '```'; cat "backup-$STAMP/MANIFEST.txt"; echo '```'; }
+            [ -n "${RESTORE_TABLES:-}" ] && echo "- Restore drill: **${RESTORE_TABLES} tables, ${RESTORE_ROWS} rows** restored from the encrypted copy"
+            [ -f size.txt ] && echo "- Database backups in bucket: $(tr '\n' ' ' < size.txt)"
+            [ -f storage-size.txt ] && echo "- Storage mirror: $(tr '\n' ' ' < storage-size.txt)"
+            [ -z "$SUPABASE_S3_ACCESS_KEY_ID" ] && echo "- Storage mirror: **skipped** (SUPABASE_S3_* secrets not set)"
+            true
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Sentry cron check-in (finish)
+        if: always() && env.SENTRY_CHECKIN_URL != ''
+        run: |
+          status=ok; [ "${{ job.status }}" = "success" ] || status=error
+          curl -fsS -X POST "$SENTRY_CHECKIN_URL" -H 'Content-Type: application/json' \
+            -d "{\"check_in_id\": \"$SENTRY_CHECKIN_ID\", \"status\": \"$status\"}"
