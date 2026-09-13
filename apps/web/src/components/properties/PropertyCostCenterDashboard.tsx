@@ -338,7 +338,7 @@ export default function PropertyCostCenterDashboard({
                         <Sparkles className="w-3.5 h-3.5" />
                         Anunciar Venda
                     </Button>
-                    <Link href={`/${lang}/dashboard/energy`}>
+                    <Link href={dbId ? `/${lang}/dashboard/energy/${dbId}` : `/${lang}/dashboard/energy`}>
                         <Button
                             size="sm"
                             variant="outline"
