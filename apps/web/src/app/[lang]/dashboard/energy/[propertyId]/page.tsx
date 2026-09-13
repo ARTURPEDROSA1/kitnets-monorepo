@@ -453,6 +453,18 @@ export default function EnergyDashboardPage() {
 
                 {/* Header Actions */}
                 <div className="flex flex-wrap items-center gap-2.5 self-start md:self-auto">
+                    {currentProperty && !currentProperty.isStandaloneUc && !currentProperty.isOrphaned && (
+                        <Link href={`/${lang}/imoveis?id=${currentProperty.id}`}>
+                            <Button
+                                variant="outline"
+                                className="gap-2 text-sm font-medium text-amber-700 border-amber-300 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/30"
+                            >
+                                <ArrowLeft className="w-4 h-4" />
+                                Voltar ao Imóvel
+                            </Button>
+                        </Link>
+                    )}
+
                     <Button
                         variant="outline"
                         onClick={() => setIsAddUcOpen(true)}

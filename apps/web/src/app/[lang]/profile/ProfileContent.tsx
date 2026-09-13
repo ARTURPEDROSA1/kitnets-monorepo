@@ -332,6 +332,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
 
     // Auto-open add property modal when ?add=true is in the URL (from dashboard "Novo Imóvel" button)
     const searchParams = useSearchParams();
+    const pendingPropertyIdRef = useRef<string | null>(null);
     useEffect(() => {
         if (searchParams.get('add') === 'true') {
             setActiveTab('ownership');
@@ -339,12 +340,15 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
             // Small delay to let the tab switch render, then show modal
             setTimeout(() => setShowAddPropertyModal(true), 100);
         }
+        // ?id=<index> opens a property by position; ?id=<properties.id> (uuid, e.g. from the
+        // energy dashboard's "Voltar ao Imóvel") is resolved once the properties have loaded.
         const idParam = searchParams.get('id');
         if (idParam !== null) {
-            const parsed = parseInt(idParam, 10);
-            if (!isNaN(parsed)) {
-                setSelectedPropertyIdx(parsed);
+            if (/^\d+$/.test(idParam)) {
+                setSelectedPropertyIdx(parseInt(idParam, 10));
                 setImoveisViewMode('manage');
+            } else {
+                pendingPropertyIdRef.current = idParam;
             }
         }
     }, [searchParams]);
@@ -740,6 +744,17 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             ? [primaryProperty, ...additionalProps]
                             : additionalProps;
                         setProperties(allProps);
+
+                        // Deep link by database id (see the ?id= handling above)
+                        const pendingId = pendingPropertyIdRef.current;
+                        if (pendingId) {
+                            pendingPropertyIdRef.current = null;
+                            const idx = allProps.findIndex(p => p.id === pendingId);
+                            if (idx >= 0) {
+                                setSelectedPropertyIdx(idx);
+                                setImoveisViewMode('manage');
+                            }
+                        }
 
                         // Start with all properties collapsed
                         setExpandedPropertyIdx(null);
