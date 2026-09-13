@@ -41,6 +41,8 @@ export interface PropertyCardData {
     isComplete?: boolean;
     /** Latest confirmed month from the income ledger (Receitas de Aluguel); null/undefined = no real data yet */
     realIncome?: PropertyRealIncome | null;
+    /** True while the income summary is still being fetched and nothing is cached: show placeholders, not estimates */
+    incomeLoading?: boolean;
 }
 
 export interface PropertyRealIncome {
@@ -304,6 +306,20 @@ export default function PropertySquareCard({
 
             {/* Financial / Cost Center Preview Block */}
             <div className="pt-4 mt-4 border-t border-border/60 space-y-3">
+                {property.incomeLoading && !realIncome ? (
+                <div className="p-3 bg-muted/40 dark:bg-muted/20 border border-border/80 rounded-xl grid grid-cols-2 gap-2 text-xs animate-pulse" aria-busy="true" aria-label="Carregando receitas">
+                    <div className="space-y-1.5">
+                        <div className="h-2.5 w-20 rounded bg-muted" />
+                        <div className="h-4 w-24 rounded bg-muted" />
+                        <div className="h-2 w-16 rounded bg-muted/70" />
+                    </div>
+                    <div className="space-y-1.5 flex flex-col items-end">
+                        <div className="h-2.5 w-24 rounded bg-muted" />
+                        <div className="h-4 w-20 rounded bg-muted" />
+                        <div className="h-2 w-14 rounded bg-muted/70" />
+                    </div>
+                </div>
+                ) : (
                 <div className="p-3 bg-muted/40 dark:bg-muted/20 border border-border/80 rounded-xl grid grid-cols-2 gap-2 text-xs">
                     <div className="space-y-0.5">
                         <span className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground flex items-center gap-1">
@@ -337,6 +353,7 @@ export default function PropertySquareCard({
                         </span>
                     </div>
                 </div>
+                )}
 
                 {/* Bottom CTA Action Button */}
                 <Button

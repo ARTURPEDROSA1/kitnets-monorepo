@@ -133,7 +133,11 @@ const PhotoPreview = ({ file, onRemove }: { file: File, onRemove: () => void }) 
 // ── /imoveis cards cache ─────────────────────────────────────────────────────
 // The grid paints instantly from the last snapshot while loadProfile runs
 // (stale-while-revalidate); only what PropertySquareCard needs is stored.
-type CachedCard = Pick<PropertyState, 'id' | 'propertyType' | 'details' | 'subUnits' | 'address' | 'savedPhotos' | 'profilePhotoUrl'> & { isComplete: boolean };
+type CachedCard = Pick<PropertyState, 'id' | 'propertyType' | 'details' | 'subUnits' | 'address' | 'savedPhotos' | 'profilePhotoUrl'> & {
+    isComplete: boolean;
+    /** Last known ledger snapshot, so a repeat visit never flashes the estimate */
+    realIncome?: PropertyRealIncome | null;
+};
 const EMPTY_CARDS: CachedCard[] = [];
 const cardsCacheSnapshots = new Map<string, { raw: string | null; cards: CachedCard[] }>();
 const subscribeCardsCache = () => () => { /* localStorage is only written by this component */ };
@@ -257,22 +261,11 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
         () => (cardsCacheKey ? readCardsCache(cardsCacheKey) : EMPTY_CARDS),
         () => EMPTY_CARDS,
     );
-    useEffect(() => {
-        if (!propertiesLoaded || !cardsCacheKey) return;
-        try {
-            const snapshot: CachedCard[] = properties.map(p => ({
-                id: p.id,
-                propertyType: p.propertyType,
-                details: p.details,
-                subUnits: p.subUnits,
-                address: p.address,
-                savedPhotos: p.savedPhotos,
-                profilePhotoUrl: p.profilePhotoUrl,
-                isComplete: isPropertyComplete(p),
-            }));
-            window.localStorage.setItem(cardsCacheKey, JSON.stringify(snapshot));
-        } catch { /* storage blocked or full: the next visit shows skeletons instead */ }
-    }, [properties, propertiesLoaded, cardsCacheKey]);
+    const cachedRealIncomeById = useMemo(() => {
+        const map = new Map<string, PropertyRealIncome | null>();
+        for (const c of cachedCards) if (c.id && 'realIncome' in c) map.set(c.id, c.realIncome ?? null);
+        return map;
+    }, [cachedCards]);
 
     // Helper: update a single property in the array
     const updateProperty = (idx: number, updater: (prev: PropertyState) => PropertyState) => {
@@ -358,6 +351,8 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
     // Latest confirmed month of the income ledger per property (keyed by properties.id),
     // shown on the /imoveis cards instead of the estimates. Refreshed whenever the grid is shown.
     const [realIncomeByProperty, setRealIncomeByProperty] = useState<Record<string, PropertyRealIncome>>({});
+    // False until the first successful summary; cached figures are shown until then
+    const [realIncomeLoaded, setRealIncomeLoaded] = useState(false);
     useEffect(() => {
         if (view !== 'imoveis' || imoveisViewMode !== 'grid') return;
         let cancelled = false;
@@ -365,11 +360,34 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
             .then(async res => {
                 if (!res.ok) return;
                 const data = await res.json().catch(() => ({}));
-                if (!cancelled && data?.summaries) setRealIncomeByProperty(data.summaries as Record<string, PropertyRealIncome>);
+                if (cancelled || !data?.summaries) return;
+                setRealIncomeByProperty(data.summaries as Record<string, PropertyRealIncome>);
+                setRealIncomeLoaded(true);
             })
-            .catch(() => { /* cards fall back to estimates */ });
+            .catch(() => { /* cards keep the cached figures or fall back to estimates */ });
         return () => { cancelled = true; };
     }, [view, imoveisViewMode]);
+
+    // Cards snapshot for the next visit (see readCardsCache). Written only once both
+    // the properties and the income summary are in, so a failed summary fetch never
+    // overwrites the last good ledger figures.
+    useEffect(() => {
+        if (!propertiesLoaded || !realIncomeLoaded || !cardsCacheKey) return;
+        try {
+            const snapshot: CachedCard[] = properties.map(p => ({
+                id: p.id,
+                propertyType: p.propertyType,
+                details: p.details,
+                subUnits: p.subUnits,
+                address: p.address,
+                savedPhotos: p.savedPhotos,
+                profilePhotoUrl: p.profilePhotoUrl,
+                isComplete: isPropertyComplete(p),
+                realIncome: p.id ? realIncomeByProperty[p.id] ?? null : null,
+            }));
+            window.localStorage.setItem(cardsCacheKey, JSON.stringify(snapshot));
+        } catch { /* storage blocked or full: the next visit shows skeletons instead */ }
+    }, [properties, propertiesLoaded, realIncomeLoaded, realIncomeByProperty, cardsCacheKey]);
     const [imoveisFilterTab, setImoveisFilterTab] = useState<'all' | 'multi' | 'single' | 'solar'>('all');
     const [imoveisSearch, setImoveisSearch] = useState('');
 
@@ -3366,7 +3384,11 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                 savedPhotos: prop.savedPhotos,
                                                 profilePhotoUrl: prop.profilePhotoUrl,
                                                 isComplete: 'isComplete' in prop ? prop.isComplete : isPropertyComplete(prop),
-                                                realIncome: prop.id ? realIncomeByProperty[prop.id] ?? null : null,
+                                                realIncome: prop.id
+                                                    ? (realIncomeLoaded ? realIncomeByProperty[prop.id] ?? null : cachedRealIncomeById.get(prop.id) ?? null)
+                                                    : null,
+                                                // Waits for the summary only when nothing is cached for this property
+                                                incomeLoading: !realIncomeLoaded && !!prop.id && !cachedRealIncomeById.has(prop.id),
                                             }}
                                             onSelect={() => {
                                                 setSelectedPropertyIdx(originalIdx);
