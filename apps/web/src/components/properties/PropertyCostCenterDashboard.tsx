@@ -107,7 +107,12 @@ export default function PropertyCostCenterDashboard({
 
     // Real monthly income from the ledger (fed by PropertyIncomeLedger)
     const [incomeRows, setIncomeRows] = useState<PropertyIncomeRow[]>([]);
-    useEffect(() => setIncomeRows([]), [dbId]);
+    // True while the ledger fetches: KPIs and charts show a skeleton instead of estimates first
+    const [incomeLoading, setIncomeLoading] = useState(Boolean(dbId));
+    useEffect(() => {
+        setIncomeRows([]);
+        setIncomeLoading(Boolean(dbId));
+    }, [dbId]);
     // Period shared by the DRE chart and the income ledger (chart + table)
     const [period, setPeriod] = useState<PeriodFilterValue>(DEFAULT_PERIOD);
 
@@ -403,6 +408,35 @@ export default function PropertyCostCenterDashboard({
                 </div>
             </div>
 
+            {incomeLoading ? (
+                <div className="space-y-6" aria-busy="true" aria-label="Carregando resultados do imóvel">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                        {[0, 1, 2, 3, 4].map(i => (
+                            <div key={`kpi-skeleton-${i}`} className="p-5 rounded-2xl border border-border bg-card shadow-xs space-y-3 animate-pulse">
+                                <div className="flex items-center justify-between">
+                                    <div className="h-3 w-24 rounded bg-muted" />
+                                    <div className="h-8 w-8 rounded-lg bg-muted/70" />
+                                </div>
+                                <div className="h-7 w-28 rounded bg-muted" />
+                                <div className="h-3 w-full rounded bg-muted/70" />
+                            </div>
+                        ))}
+                    </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div className="lg:col-span-2 bg-card border border-border rounded-2xl p-6 shadow-xs space-y-4 animate-pulse">
+                            <div className="h-4 w-64 max-w-full rounded bg-muted" />
+                            <div className="h-3 w-96 max-w-full rounded bg-muted/70" />
+                            <div className="h-64 rounded-xl bg-muted/50" />
+                        </div>
+                        <div className="bg-card border border-border rounded-2xl p-6 shadow-xs space-y-4 animate-pulse">
+                            <div className="h-4 w-48 max-w-full rounded bg-muted" />
+                            <div className="h-3 w-56 max-w-full rounded bg-muted/70" />
+                            <div className="h-64 rounded-xl bg-muted/50" />
+                        </div>
+                    </div>
+                </div>
+            ) : (
+            <>
             {/* Row of KPI Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                 {/* 1. Receita Bruta */}
@@ -619,12 +653,15 @@ export default function PropertyCostCenterDashboard({
                     </div>
                 </div>
             </div>
+            </>
+            )}
 
             {/* Real income ledger (monthly, editable, importable) */}
             <PropertyIncomeLedger
                 propertyId={dbId}
                 defaultAgencyFeePct={details.managementFeePercent ? parseFloat(details.managementFeePercent) || 0 : 0}
                 onRowsChange={setIncomeRows}
+                onLoadingChange={setIncomeLoading}
                 period={period}
                 onPeriodChange={setPeriod}
             />

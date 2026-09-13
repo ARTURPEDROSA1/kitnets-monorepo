@@ -70,6 +70,8 @@ interface PropertyIncomeLedgerProps {
     defaultAgencyFeePct?: number;
     /** Called whenever the ledger changes so the parent can use real data */
     onRowsChange?: (rows: PropertyIncomeRow[]) => void;
+    /** True while the initial rows are being fetched, so the parent can hold off on estimates */
+    onLoadingChange?: (loading: boolean) => void;
     /** Period applied to the chart and the table. Controlled when both props are given; otherwise internal. */
     period?: PeriodFilterValue;
     onPeriodChange?: (next: PeriodFilterValue) => void;
@@ -97,6 +99,7 @@ export default function PropertyIncomeLedger({
     propertyId,
     defaultAgencyFeePct = 0,
     onRowsChange,
+    onLoadingChange,
     period: periodProp,
     onPeriodChange,
 }: PropertyIncomeLedgerProps) {
@@ -114,6 +117,8 @@ export default function PropertyIncomeLedger({
 
     const onRowsChangeRef = useRef(onRowsChange);
     onRowsChangeRef.current = onRowsChange;
+    const onLoadingChangeRef = useRef(onLoadingChange);
+    onLoadingChangeRef.current = onLoadingChange;
 
     const endpoint = propertyId ? `/api/properties/${propertyId}/income` : null;
 
@@ -126,10 +131,12 @@ export default function PropertyIncomeLedger({
     useEffect(() => {
         if (!endpoint) {
             setLoading(false);
+            onLoadingChangeRef.current?.(false);
             return;
         }
         let cancelled = false;
         setLoading(true);
+        onLoadingChangeRef.current?.(true);
         setError(null);
         fetch(endpoint)
             .then(async res => {
@@ -141,7 +148,9 @@ export default function PropertyIncomeLedger({
                 if (!cancelled) setError((err as Error).message);
             })
             .finally(() => {
-                if (!cancelled) setLoading(false);
+                if (cancelled) return;
+                setLoading(false);
+                onLoadingChangeRef.current?.(false);
             });
         return () => {
             cancelled = true;
