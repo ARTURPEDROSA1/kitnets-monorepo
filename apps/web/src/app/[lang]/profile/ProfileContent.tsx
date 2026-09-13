@@ -130,6 +130,27 @@ const PhotoPreview = ({ file, onRemove }: { file: File, onRemove: () => void }) 
     );
 };
 
+// ── /imoveis cards cache ─────────────────────────────────────────────────────
+// The grid paints instantly from the last snapshot while loadProfile runs
+// (stale-while-revalidate); only what PropertySquareCard needs is stored.
+type CachedCard = Pick<PropertyState, 'id' | 'propertyType' | 'details' | 'subUnits' | 'address' | 'savedPhotos' | 'profilePhotoUrl'> & { isComplete: boolean };
+const EMPTY_CARDS: CachedCard[] = [];
+const cardsCacheSnapshots = new Map<string, { raw: string | null; cards: CachedCard[] }>();
+const subscribeCardsCache = () => () => { /* localStorage is only written by this component */ };
+function readCardsCache(key: string): CachedCard[] {
+    let raw: string | null = null;
+    try { raw = window.localStorage.getItem(key); } catch { raw = null; }
+    const hit = cardsCacheSnapshots.get(key);
+    if (hit && hit.raw === raw) return hit.cards; // stable reference for useSyncExternalStore
+    let cards: CachedCard[] = EMPTY_CARDS;
+    try {
+        const parsed = raw ? JSON.parse(raw) : null;
+        if (Array.isArray(parsed)) cards = parsed as CachedCard[];
+    } catch { /* corrupt snapshot: ignore */ }
+    cardsCacheSnapshots.set(key, { raw, cards });
+    return cards;
+}
+
 export default function ProfileContent({ dict, view = 'full' }: ProfileContentProps) {
     const { isLoaded, user } = useUser();
     const p = dict.profile;
@@ -203,6 +224,8 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
     });
 
     const [properties, setProperties] = useState<PropertyState[]>([]);
+    // False until loadProfile settles; the /imoveis grid shows cached cards or skeletons meanwhile
+    const [propertiesLoaded, setPropertiesLoaded] = useState(false);
     const [expandedPropertyIdx, setExpandedPropertyIdx] = useState<number | null>(null);
     const [collapsedUnitsTrees, setCollapsedUnitsTrees] = useState<Record<number, boolean>>({});
 
@@ -226,6 +249,30 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
         const hasDocs = prop.savedProofs.length > 0 || prop.ownershipFiles.length > 0;
         return hasAddress && hasDetails && hasPhotos && hasDescription && hasDocs;
     };
+
+    // Cached cards for the /imoveis grid (see readCardsCache above)
+    const cardsCacheKey = user ? `kitnets_imoveis_cards:${user.id}` : null;
+    const cachedCards = React.useSyncExternalStore(
+        subscribeCardsCache,
+        () => (cardsCacheKey ? readCardsCache(cardsCacheKey) : EMPTY_CARDS),
+        () => EMPTY_CARDS,
+    );
+    useEffect(() => {
+        if (!propertiesLoaded || !cardsCacheKey) return;
+        try {
+            const snapshot: CachedCard[] = properties.map(p => ({
+                id: p.id,
+                propertyType: p.propertyType,
+                details: p.details,
+                subUnits: p.subUnits,
+                address: p.address,
+                savedPhotos: p.savedPhotos,
+                profilePhotoUrl: p.profilePhotoUrl,
+                isComplete: isPropertyComplete(p),
+            }));
+            window.localStorage.setItem(cardsCacheKey, JSON.stringify(snapshot));
+        } catch { /* storage blocked or full: the next visit shows skeletons instead */ }
+    }, [properties, propertiesLoaded, cardsCacheKey]);
 
     // Helper: update a single property in the array
     const updateProperty = (idx: number, updater: (prev: PropertyState) => PropertyState) => {
@@ -528,6 +575,16 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                     });
 
                     // ── Build properties array from DB ──
+                    // Proofs and public.properties only depend on profile.id: fetch them in parallel
+                    const dbPropsPromise = sb
+                        .from('properties')
+                        .select('id, name, electronic_id, created_at')
+                        .eq('owner_id', profile.id)
+                        .order('created_at', { ascending: true })
+                        .then(res => res.data, (dbErr) => {
+                            console.warn('[Profile] Could not fetch db properties:', dbErr);
+                            return null;
+                        });
                     const allProofs: ProofData[] = [];
                     {
                         const { data: proofs } = await sb
@@ -558,16 +615,8 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
 
                     // Fetch properties from public.properties to enrich PropertyState with database UUIDs
                     let dbPropsList: Array<{ id: string; name: string; electronic_id?: any; created_at?: string }> = [];
-                    try {
-                        const { data: dbProps } = await sb
-                            .from('properties')
-                            .select('id, name, electronic_id, created_at')
-                            .eq('owner_id', profile.id)
-                            .order('created_at', { ascending: true });
-                        if (dbProps) dbPropsList = dbProps;
-                    } catch (dbErr) {
-                        console.warn('[Profile] Could not fetch db properties:', dbErr);
-                    }
+                    const dbProps = await dbPropsPromise;
+                    if (dbProps) dbPropsList = dbProps;
 
                     // Filter out standalone auxiliary UCs
                     const nonStandaloneDbProps = dbPropsList.filter(p => {
@@ -784,6 +833,8 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
             } catch (err) {
                 console.error('[Profile] Unexpected error loading profile:', err);
                 setProfileLoadError('Erro inesperado ao carregar perfil. Verifique o console.');
+            } finally {
+                setPropertiesLoaded(true);
             }
         };
 
@@ -1868,7 +1919,8 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
     }, [properties]);
 
     const filteredProperties = useMemo(() => {
-        return properties
+        const source: Array<PropertyState | CachedCard> = propertiesLoaded ? properties : cachedCards;
+        return source
             .map((prop, originalIdx) => ({ prop, originalIdx }))
             .filter(({ prop }) => {
                 if (imoveisFilterTab === 'multi' && prop.propertyType !== 'multi') return false;
@@ -1886,7 +1938,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                 }
                 return true;
             });
-    }, [properties, imoveisFilterTab, imoveisSearch]);
+    }, [properties, propertiesLoaded, cachedCards, imoveisFilterTab, imoveisSearch]);
 
     if (!isLoaded || !user) return <div className="p-8 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-emerald-600" /></div>;
 
@@ -3240,8 +3292,31 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                 </div>
                             )}
 
+                            {/* Loading skeleton: first visit, nothing cached yet */}
+                            {!propertiesLoaded && cachedCards.length === 0 && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" aria-busy="true" aria-label="Carregando imóveis">
+                                    {[0, 1, 2].map(i => (
+                                        <div key={`prop-skeleton-${i}`} className="rounded-2xl border border-border bg-card p-6 shadow-xs space-y-5 animate-pulse">
+                                            <div className="flex items-start gap-4">
+                                                <div className="w-24 h-24 rounded-2xl bg-muted/60 flex-shrink-0" />
+                                                <div className="flex-1 space-y-2.5 pt-1">
+                                                    <div className="h-5 w-3/4 rounded bg-muted" />
+                                                    <div className="h-3 w-full rounded bg-muted/70" />
+                                                    <div className="h-3 w-2/3 rounded bg-muted/70" />
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="h-12 rounded-xl bg-muted/50" />
+                                                <div className="h-12 rounded-xl bg-muted/50" />
+                                            </div>
+                                            <div className="h-9 rounded-xl bg-muted/40" />
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
                             {/* Empty State when no properties exist */}
-                            {properties.length === 0 && (
+                            {propertiesLoaded && properties.length === 0 && (
                                 <div className="flex flex-col items-center justify-center py-16 px-4 text-center rounded-2xl border-2 border-dashed border-border bg-card/50">
                                     <div className="w-14 h-14 rounded-2xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 flex items-center justify-center mb-4 shadow-xs">
                                         <Building2 className="w-7 h-7" />
@@ -3262,7 +3337,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             )}
 
                             {/* Search / Filter Empty State */}
-                            {properties.length > 0 && filteredProperties.length === 0 && (
+                            {(propertiesLoaded ? properties : cachedCards).length > 0 && filteredProperties.length === 0 && (
                                 <div className="flex flex-col items-center justify-center py-12 px-4 text-center rounded-2xl border border-border bg-card">
                                     <p className="text-base font-semibold text-foreground">Nenhum imóvel encontrado</p>
                                     <p className="text-xs text-muted-foreground mt-1 mb-4">Tente ajustar sua busca ou filtro.</p>
@@ -3290,7 +3365,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                 address: prop.address,
                                                 savedPhotos: prop.savedPhotos,
                                                 profilePhotoUrl: prop.profilePhotoUrl,
-                                                isComplete: isPropertyComplete(prop),
+                                                isComplete: 'isComplete' in prop ? prop.isComplete : isPropertyComplete(prop),
                                                 realIncome: prop.id ? realIncomeByProperty[prop.id] ?? null : null,
                                             }}
                                             onSelect={() => {
@@ -3300,6 +3375,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                             }}
                                             onDelete={(e) => {
                                                 e.stopPropagation();
+                                                if (!propertiesLoaded) return; // cached card: wait for the real list
                                                 setPropertyToDelete({
                                                     idx: originalIdx,
                                                     label: prop.details?.propertyName || `Propriedade ${originalIdx + 1}`,
