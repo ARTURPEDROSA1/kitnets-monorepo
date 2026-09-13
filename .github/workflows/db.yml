@@ -79,7 +79,10 @@ jobs:
 
       - name: Push migrations
         if: steps.secrets.outputs.configured == 'true'
-        run: supabase db push
+        # --include-all: apply local migrations even when their version is older than the
+        # remote head. Parallel branches merge out of timestamp order (e.g. #35/#37 vs the
+        # rate-limits migration); without it db push aborts and production drifts.
+        run: supabase db push --include-all
 
       - name: List applied migrations
         if: steps.secrets.outputs.configured == 'true'
