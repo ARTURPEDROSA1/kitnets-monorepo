@@ -266,10 +266,10 @@ const clean = (s: string) => s.replace(/[\t\r\n]+/g, " ").trim();
  * Reads the "Receitas" sheet (or the first sheet), finds the header row (the
  * first row containing a "Mês"/"Data" cell) and returns TSV text.
  */
-export async function xlsxToTsv(data: ArrayBuffer | Buffer): Promise<string> {
+export async function xlsxToTsv(data: ArrayBuffer | Buffer, sheetName: string = INCOME_TEMPLATE_SHEET): Promise<string> {
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(data as ArrayBuffer);
-    const ws = wb.getWorksheet(INCOME_TEMPLATE_SHEET) ?? wb.worksheets[0];
+    const ws = wb.getWorksheet(sheetName) ?? wb.worksheets[0];
     if (!ws) return "";
 
     let headerRow = 0;
