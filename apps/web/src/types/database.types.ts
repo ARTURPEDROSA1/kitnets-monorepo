@@ -1796,6 +1796,150 @@ export type Database = {
           },
         ]
       }
+      property_investments: {
+        Row: {
+          acquired_on: string | null
+          annual_rate: number | null
+          built_area_m2: number | null
+          contract_date: string | null
+          contract_number: string | null
+          created_at: string
+          financing_status: string
+          financing_system: string | null
+          first_due_date: string | null
+          lender: string | null
+          notes: string | null
+          owner_id: string
+          paid_off_on: string | null
+          principal: number | null
+          property_id: string
+          purchase_price: number
+          term_months: number | null
+          updated_at: string
+        }
+        Insert: {
+          acquired_on?: string | null
+          annual_rate?: number | null
+          built_area_m2?: number | null
+          contract_date?: string | null
+          contract_number?: string | null
+          created_at?: string
+          financing_status?: string
+          financing_system?: string | null
+          first_due_date?: string | null
+          lender?: string | null
+          notes?: string | null
+          owner_id: string
+          paid_off_on?: string | null
+          principal?: number | null
+          property_id: string
+          purchase_price?: number
+          term_months?: number | null
+          updated_at?: string
+        }
+        Update: {
+          acquired_on?: string | null
+          annual_rate?: number | null
+          built_area_m2?: number | null
+          contract_date?: string | null
+          contract_number?: string | null
+          created_at?: string
+          financing_status?: string
+          financing_system?: string | null
+          first_due_date?: string | null
+          lender?: string | null
+          notes?: string | null
+          owner_id?: string
+          paid_off_on?: string | null
+          principal?: number | null
+          property_id?: string
+          purchase_price?: number
+          term_months?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_investments_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_investments_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: true
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_transactions: {
+        Row: {
+          amount: number
+          bank_reference: string | null
+          comment: string | null
+          created_at: string
+          id: string
+          insurance_part: number | null
+          interest_part: number | null
+          kind: string
+          occurred_on: string
+          owner_id: string
+          principal_part: number | null
+          property_id: string
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          bank_reference?: string | null
+          comment?: string | null
+          created_at?: string
+          id?: string
+          insurance_part?: number | null
+          interest_part?: number | null
+          kind: string
+          occurred_on: string
+          owner_id: string
+          principal_part?: number | null
+          property_id: string
+          source?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          bank_reference?: string | null
+          comment?: string | null
+          created_at?: string
+          id?: string
+          insurance_part?: number | null
+          interest_part?: number | null
+          kind?: string
+          occurred_on?: string
+          owner_id?: string
+          principal_part?: number | null
+          property_id?: string
+          source?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_transactions_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_transactions_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       readings: {
         Row: {
           delta: number | null
