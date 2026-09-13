@@ -41,6 +41,8 @@ export interface PropertyDetails {
     ac?: "none" | "cold" | "cold_hot";
     cooktop?: "none" | "gas" | "electric" | "induction";
     // Cost Center & Financial Metrics
+    /** Who pays the property tax. 'landlord' adds an IPTU column to the income ledger. Default 'tenant'. */
+    iptuPaidBy?: 'tenant' | 'landlord';
     monthlyRentEstimate?: string;
     iptuMonthly?: string;
     condoMonthly?: string;

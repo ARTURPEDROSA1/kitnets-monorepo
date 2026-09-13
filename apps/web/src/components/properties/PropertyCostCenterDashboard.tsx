@@ -38,7 +38,6 @@ import {
     Cell,
 } from 'recharts';
 import { Button } from '@kitnets/ui';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
     Dialog,
@@ -116,15 +115,9 @@ export default function PropertyCostCenterDashboard({
     // Period shared by the DRE chart and the income ledger (chart + table)
     const [period, setPeriod] = useState<PeriodFilterValue>(DEFAULT_PERIOD);
 
-    // Form state for configuring cost center parameters
-    const [configForm, setConfigForm] = useState({
-        monthlyRentEstimate: details.monthlyRentEstimate || '',
-        iptuMonthly: details.iptuMonthly || '',
-        condoMonthly: details.condoMonthly || '',
-        maintenanceMonthly: details.maintenanceMonthly || '',
-        managementFeePercent: details.managementFeePercent || '8',
-        otherExpensesMonthly: details.otherExpensesMonthly || '',
-    });
+    // Cost-centre setting: who pays IPTU (the only parameter left; everything else is real ledger data)
+    const [iptuPaidBy, setIptuPaidBy] = useState<'tenant' | 'landlord'>(details.iptuPaidBy ?? 'tenant');
+    useEffect(() => setIptuPaidBy(details.iptuPaidBy ?? 'tenant'), [details.iptuPaidBy]);
 
     const totalUnits = propertyType === 'multi'
         ? Math.max(details.numberOfUnits || 0, subUnits.length || 1)
@@ -236,6 +229,7 @@ export default function PropertyCostCenterDashboard({
                 { name: 'Taxa da imobiliária', value: Math.round(current.feeAmount) },
                 { name: 'Custo de energia', value: Math.round(current.other) },
                 { name: 'Outras despesas', value: Math.round(current.otherExpenses) },
+                { name: 'IPTU', value: Math.round(current.iptu) },
             ].filter(item => item.value > 0)
             : [
                 { name: 'IPTU', value: iptuMonthly },
@@ -296,16 +290,7 @@ export default function PropertyCostCenterDashboard({
     }, [propertyType, details, subUnits, totalUnits, incomeRows, period]);
 
     const handleSaveConfig = () => {
-        const updated = {
-            ...details,
-            monthlyRentEstimate: configForm.monthlyRentEstimate,
-            iptuMonthly: configForm.iptuMonthly,
-            condoMonthly: configForm.condoMonthly,
-            maintenanceMonthly: configForm.maintenanceMonthly,
-            managementFeePercent: configForm.managementFeePercent,
-            otherExpensesMonthly: configForm.otherExpensesMonthly,
-        };
-        onUpdateDetails(updated);
+        onUpdateDetails({ ...details, iptuPaidBy });
         setIsConfigOpen(false);
     };
 
@@ -472,7 +457,7 @@ export default function PropertyCostCenterDashboard({
                             {formatBRL(financials.totalExpenses)}
                         </span>
                         <span className="text-xs text-muted-foreground">
-                            {financials.realIncomeMonth ? 'Taxa + custo de energia + outras despesas · ' : ''}
+                            {financials.realIncomeMonth ? `Taxa + custo de energia + outras despesas${iptuPaidBy === 'landlord' ? ' + IPTU' : ''} · ` : ''}
                             {((financials.totalExpenses / (financials.grossMonthlyRevenue || 1)) * 100).toFixed(0)}% da receita bruta
                         </span>
                     </div>
@@ -547,7 +532,7 @@ export default function PropertyCostCenterDashboard({
                             </h3>
                             <p className="text-xs text-muted-foreground">
                                 {financials.realIncomeMonth
-                                    ? `Receita (aluguel bruto + energia), despesas (taxa + custo de energia + outras) e NOI reais · ${periodLabel(period)}; meses previstos em tom claro`
+                                    ? `Receita (aluguel bruto + energia), despesas (taxa + custo de energia + outras${iptuPaidBy === 'landlord' ? ' + IPTU' : ''}) e NOI reais · ${periodLabel(period)}; meses previstos em tom claro`
                                     : 'Histórico e projeção de Receitas, Despesas Operacionais e Lucro Líquido (NOI)'}
                             </p>
                         </div>
@@ -664,6 +649,7 @@ export default function PropertyCostCenterDashboard({
                 onLoadingChange={setIncomeLoading}
                 period={period}
                 onPeriodChange={setPeriod}
+                iptuPaidByLandlord={iptuPaidBy === 'landlord'}
             />
 
             {/* Investment ledger: acquisition, financing, capex, running costs, solar */}
@@ -733,69 +719,44 @@ export default function PropertyCostCenterDashboard({
                             Ajustar Centro de Custos do Imóvel
                         </DialogTitle>
                         <DialogDescription>
-                            Personalize os valores financeiros deste imóvel para recalcular o NOI, projeções e métricas analíticas.
+                            Receitas e custos vêm do registro real de Receitas de Aluguel. Aqui você informa apenas quem paga o IPTU.
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="space-y-4 py-2">
-                        <div className="space-y-1.5">
-                            <Label>Receita de Aluguel Estimada / Base (R$/mês)</Label>
-                            <Input
-                                placeholder="Ex: 2400.00"
-                                value={configForm.monthlyRentEstimate}
-                                onChange={(e) => setConfigForm(prev => ({ ...prev, monthlyRentEstimate: e.target.value }))}
-                            />
-                            <span className="text-[11px] text-muted-foreground">
-                                {propertyType === 'multi' ? 'Caso as kitnets não tenham valores individuais preenchidos' : 'Valor mensal total estimado'}
-                            </span>
-                        </div>
-
+                    <div className="space-y-3 py-2">
+                        <Label>IPTU pago por</Label>
                         <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1.5">
-                                <Label>IPTU Mensal (R$)</Label>
-                                <Input
-                                    placeholder="Ex: 140.00"
-                                    value={configForm.iptuMonthly}
-                                    onChange={(e) => setConfigForm(prev => ({ ...prev, iptuMonthly: e.target.value }))}
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <Label>Condomínio (R$)</Label>
-                                <Input
-                                    placeholder="Ex: 250.00"
-                                    value={configForm.condoMonthly}
-                                    onChange={(e) => setConfigForm(prev => ({ ...prev, condoMonthly: e.target.value }))}
-                                />
-                            </div>
+                            {([
+                                { value: 'tenant', title: 'Inquilino', hint: 'O IPTU não entra nos custos do imóvel.' },
+                                { value: 'landlord', title: 'Proprietário', hint: 'Uma coluna IPTU aparece nas Receitas de Aluguel e entra nas despesas (OPEX) e no NOI.' },
+                            ] as const).map(opt => (
+                                <label
+                                    key={opt.value}
+                                    className={cn(
+                                        "cursor-pointer rounded-xl border p-3 space-y-1 transition-colors",
+                                        iptuPaidBy === opt.value
+                                            ? "border-amber-500 bg-amber-50 dark:bg-amber-950/30"
+                                            : "border-border hover:border-amber-300"
+                                    )}
+                                >
+                                    <span className="flex items-center gap-2 font-semibold text-sm text-foreground">
+                                        <input
+                                            type="radio"
+                                            name="iptuPaidBy"
+                                            value={opt.value}
+                                            checked={iptuPaidBy === opt.value}
+                                            onChange={() => setIptuPaidBy(opt.value)}
+                                            className="accent-amber-600"
+                                        />
+                                        {opt.title}
+                                    </span>
+                                    <span className="block text-[11px] text-muted-foreground leading-snug">{opt.hint}</span>
+                                </label>
+                            ))}
                         </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1.5">
-                                <Label>Reserva Manutenção (R$)</Label>
-                                <Input
-                                    placeholder="Ex: 150.00"
-                                    value={configForm.maintenanceMonthly}
-                                    onChange={(e) => setConfigForm(prev => ({ ...prev, maintenanceMonthly: e.target.value }))}
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <Label>Taxa Adm Imobiliária (%)</Label>
-                                <Input
-                                    placeholder="Ex: 8"
-                                    value={configForm.managementFeePercent}
-                                    onChange={(e) => setConfigForm(prev => ({ ...prev, managementFeePercent: e.target.value }))}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="space-y-1.5">
-                            <Label>Seguro Predial / Outras Despesas (R$/mês)</Label>
-                            <Input
-                                placeholder="Ex: 65.00"
-                                value={configForm.otherExpensesMonthly}
-                                onChange={(e) => setConfigForm(prev => ({ ...prev, otherExpensesMonthly: e.target.value }))}
-                            />
-                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                            A coluna IPTU está sempre disponível na planilha modelo; valores já lançados continuam contando mesmo se você mudar esta opção.
+                        </p>
                     </div>
 
                     <DialogFooter>

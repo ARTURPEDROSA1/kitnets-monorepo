@@ -75,6 +75,8 @@ interface PropertyIncomeLedgerProps {
     /** Period applied to the chart and the table. Controlled when both props are given; otherwise internal. */
     period?: PeriodFilterValue;
     onPeriodChange?: (next: PeriodFilterValue) => void;
+    /** Property setting "IPTU pago por proprietário": shows the IPTU column (also shown when any row has IPTU). */
+    iptuPaidByLandlord?: boolean;
 }
 
 const formatBRL = (val: number) =>
@@ -87,10 +89,10 @@ const parseInput = (s: string): number | null => {
     return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : null;
 };
 
-type DraftField = "received" | "energy" | "other" | "otherExp" | "pct" | "gross" | "notes";
+type DraftField = "received" | "energy" | "other" | "otherExp" | "iptu" | "pct" | "gross" | "notes";
 type Drafts = Record<string, Partial<Record<DraftField, string>>>;
 
-const FIELD_OPTIONS: IncomeField[] = ["gross", "fee_pct", "received", "energy", "other", "other_expenses", "notes", "ignore"];
+const FIELD_OPTIONS: IncomeField[] = ["gross", "fee_pct", "received", "energy", "other", "other_expenses", "iptu", "notes", "ignore"];
 const IMPORT_CHUNK = 300;
 const DEFAULT_AGENCY_FEE_PCT = 10;
 const COLLAPSED_ROWS = 24;
@@ -102,6 +104,7 @@ export default function PropertyIncomeLedger({
     onLoadingChange,
     period: periodProp,
     onPeriodChange,
+    iptuPaidByLandlord = false,
 }: PropertyIncomeLedgerProps) {
     const [localPeriod, setLocalPeriod] = useState<PeriodFilterValue>(DEFAULT_PERIOD);
     const period = periodProp ?? localPeriod;
@@ -249,7 +252,8 @@ export default function PropertyIncomeLedger({
                 : field === "energy" ? "energy_portion"
                     : field === "other" ? "other_income"
                         : field === "otherExp" ? "other_expenses"
-                            : "agency_fee_pct";
+                            : field === "iptu" ? "iptu_amount"
+                                : "agency_fee_pct";
         if (field === "pct" && value >= 100) return clear();
         if (value === Number(row[key])) return clear();
         putRows([{ month, [key]: value }]);
@@ -265,6 +269,8 @@ export default function PropertyIncomeLedger({
     const visible = showAll ? filtered : filtered.slice(0, COLLAPSED_ROWS);
     /** Totals over the confirmed months inside the selected period (tiles 2–5). */
     const periodSummary = useMemo(() => summarize(filtered), [filtered]);
+    /** IPTU column: when the landlord pays it, or when any month already carries a value. */
+    const showIptu = iptuPaidByLandlord || rows.some(r => Number(r.iptu_amount) > 0);
     // Fee pre-fill: last month's fee when set, else the property default, else 10 %
     const lastRowPct = sorted.length ? Number(sorted[0].agency_fee_pct) : 0;
     const lastPct = lastRowPct > 0 ? lastRowPct : defaultAgencyFeePct > 0 ? defaultAgencyFeePct : DEFAULT_AGENCY_FEE_PCT;
@@ -288,7 +294,7 @@ export default function PropertyIncomeLedger({
 
     // ── Add month dialog ────────────────────────────────────────────────
     const [addOpen, setAddOpen] = useState(false);
-    const [addForm, setAddForm] = useState({ month: currentMonthKey(), gross: "", received: "", energy: "", other: "", otherExp: "", pct: "", notes: "" });
+    const [addForm, setAddForm] = useState({ month: currentMonthKey(), gross: "", received: "", energy: "", other: "", otherExp: "", iptu: "", pct: "", notes: "" });
 
     const openAdd = () => {
         const next = new Date();
@@ -304,6 +310,7 @@ export default function PropertyIncomeLedger({
             energy: last ? toInput(last.energy) : "",
             other: last ? toInput(last.other) : "",
             otherExp: "",
+            iptu: last ? toInput(last.iptu) : "",
             pct: toInput(lastPct),
             notes: "",
         });
@@ -339,6 +346,7 @@ export default function PropertyIncomeLedger({
                 energy_portion: parseInput(addForm.energy) ?? 0,
                 other_income: parseInput(addForm.other) ?? 0,
                 other_expenses: parseInput(addForm.otherExp) ?? 0,
+                iptu_amount: parseInput(addForm.iptu) ?? 0,
                 agency_fee_pct: parseInput(addForm.pct) ?? 0,
                 status: month > currentMonthKey() ? "EXPECTED" : "CONFIRMED",
                 source: "MANUAL",
@@ -524,7 +532,7 @@ export default function PropertyIncomeLedger({
                     </h3>
                     <p className="text-xs text-muted-foreground">
                         O que entrou na conta a cada mês. A parcela de energia vai para o centro de energia solar; custo de energia e outras despesas são custos pagos à parte.
-                        Aluguel líquido (após a taxa) = recebido − energia; aluguel bruto = líquido ÷ (1 − taxa); receita = bruto + energia; OPEX = taxa + custo de energia + outras despesas; NOI = recebido − custos.
+                        Aluguel líquido (após a taxa) = recebido − energia; aluguel bruto = líquido ÷ (1 − taxa); receita = bruto + energia; OPEX = taxa + custo de energia + outras despesas{showIptu ? " + IPTU" : ""}; NOI = recebido − custos.
                     </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -682,6 +690,7 @@ export default function PropertyIncomeLedger({
                                 <th className="text-right px-2 py-2 font-semibold" title="O que entrou na conta">Recebido</th>
                                 <th className="text-right px-2 py-2 font-semibold" title="Conta de luz paga no mês (custo à parte; não altera o recebido)">Custo de energia</th>
                                 <th className="text-right px-2 py-2 font-semibold" title="Outros custos pagos à parte no mês (reparos, taxas); não alteram o recebido">Outras despesas</th>
+                                {showIptu && <th className="text-right px-2 py-2 font-semibold" title="IPTU pago pelo proprietário no mês (custo à parte)">IPTU</th>}
                                 <th className="text-center px-2 py-2 font-semibold">Status</th>
                                 <th className="text-left px-2 py-2 font-semibold">Comentários</th>
                                 <th className="px-2 py-2" />
@@ -725,6 +734,7 @@ export default function PropertyIncomeLedger({
                                         <td className="px-2 py-1 text-right">{cell("received", b.received)}</td>
                                         <td className="px-2 py-1 text-right">{cell("other", b.other)}</td>
                                         <td className="px-2 py-1 text-right">{cell("otherExp", b.otherExpenses)}</td>
+                                        {showIptu && <td className="px-2 py-1 text-right">{cell("iptu", b.iptu)}</td>}
                                         <td className="px-2 py-1 text-center">
                                             <button
                                                 type="button"
@@ -867,11 +877,28 @@ export default function PropertyIncomeLedger({
                                     onChange={e => setAddForm(f => ({ ...f, otherExp: e.target.value }))}
                                 />
                             </div>
+                            {showIptu ? (
+                                <div className="space-y-1.5">
+                                    <Label>IPTU (R$)</Label>
+                                    <Input
+                                        type="number" step="0.01" min={0} placeholder="0.00"
+                                        value={addForm.iptu}
+                                        onChange={e => setAddForm(f => ({ ...f, iptu: e.target.value }))}
+                                    />
+                                </div>
+                            ) : (
+                                <div className="space-y-1.5">
+                                    <Label>Comentários</Label>
+                                    <Input value={addForm.notes} placeholder="Opcional" onChange={e => setAddForm(f => ({ ...f, notes: e.target.value }))} />
+                                </div>
+                            )}
+                        </div>
+                        {showIptu && (
                             <div className="space-y-1.5">
                                 <Label>Comentários</Label>
                                 <Input value={addForm.notes} placeholder="Opcional" onChange={e => setAddForm(f => ({ ...f, notes: e.target.value }))} />
                             </div>
-                        </div>
+                        )}
                         {parseInput(addForm.received) !== null && (
                             <p className="text-xs text-muted-foreground">
                                 Aluguel líquido:{" "}
@@ -1026,6 +1053,7 @@ export default function PropertyIncomeLedger({
                                                 <th className="text-right px-2 py-1">Energia</th>
                                                 <th className="text-right px-2 py-1">Custo de energia</th>
                                                 <th className="text-right px-2 py-1">Outras despesas</th>
+                                                <th className="text-right px-2 py-1">IPTU</th>
                                                 <th className="text-left px-2 py-1">Comentários</th>
                                             </tr>
                                         </thead>
@@ -1039,6 +1067,7 @@ export default function PropertyIncomeLedger({
                                                     <td className="px-2 py-1 text-right tabular-nums">{r.energy_portion !== undefined ? formatBRL(r.energy_portion) : "—"}</td>
                                                     <td className="px-2 py-1 text-right tabular-nums">{r.other_income !== undefined ? formatBRL(r.other_income) : "—"}</td>
                                                     <td className="px-2 py-1 text-right tabular-nums">{r.other_expenses !== undefined ? formatBRL(r.other_expenses) : "—"}</td>
+                                                    <td className="px-2 py-1 text-right tabular-nums">{r.iptu_amount !== undefined ? formatBRL(r.iptu_amount) : "—"}</td>
                                                     <td className="px-2 py-1 truncate max-w-[180px]">{r.notes ?? ""}</td>
                                                 </tr>
                                             ))}
