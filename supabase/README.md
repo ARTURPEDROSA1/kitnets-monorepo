@@ -88,6 +88,8 @@ emergency), paste the same SQL into a migration file right after, then
 | `SUPABASE_PROJECT_ID` | `kqhfzcxqmjkqekozhlng` |
 | `SUPABASE_DB_PASSWORD` | Dashboard → Settings → Database → Database password |
 
+Nightly backups need a few more secrets; see [docs/BACKUPS.md](../docs/BACKUPS.md).
+
 Until these exist, the PR check still runs (it only needs Docker) but the push-to-
 production job is skipped.
 
