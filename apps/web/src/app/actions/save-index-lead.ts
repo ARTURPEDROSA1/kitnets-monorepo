@@ -2,6 +2,7 @@
 
 import { createAdminClient } from "@/utils/supabase/admin";
 import { cookies, headers } from "next/headers";
+import { HOUR, RATE_LIMITED_MESSAGE, rateLimitByIp } from "@/lib/rate-limit";
 
 export interface SaveIndexLeadResponse {
     success: boolean;
@@ -31,6 +32,9 @@ export interface IndexLeadData {
 }
 
 export async function saveIndexLead(data: IndexLeadData): Promise<SaveIndexLeadResponse> {
+    const limited = await rateLimitByIp("form:index-lead", 10, HOUR);
+    if (!limited.ok) return { success: false, error: RATE_LIMITED_MESSAGE };
+
     const { name, email, source, page_url, user_agent, location_data, attribution_data } = data;
 
     if (!email || !name) {

@@ -2,6 +2,7 @@
 
 import { createAdminClient } from "@/utils/supabase/admin";
 import { cookies } from "next/headers";
+import { HOUR, RATE_LIMITED_MESSAGE, rateLimitByIp } from "@/lib/rate-limit";
 
 export interface SaveLinkSuggestionResponse {
     success: boolean;
@@ -9,6 +10,9 @@ export interface SaveLinkSuggestionResponse {
 }
 
 export async function saveLinkSuggestion(data: { name: string; email: string; url: string; description?: string }): Promise<SaveLinkSuggestionResponse> {
+    const limited = await rateLimitByIp("form:link-suggestion", 5, HOUR);
+    if (!limited.ok) return { success: false, error: RATE_LIMITED_MESSAGE };
+
     const { name, email, url, description } = data;
 
     if (!email || !url || !name) {

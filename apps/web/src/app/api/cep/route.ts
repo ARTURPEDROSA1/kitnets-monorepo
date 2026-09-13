@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { MINUTE, rateLimitByIp, rateLimitResponse } from '@/lib/rate-limit';
 
 /**
  * GET /api/cep?code=01310100
@@ -14,6 +15,10 @@ export async function GET(request: Request) {
             { status: 400 }
         );
     }
+
+    // Public proxy: keep one client from using it as a free ViaCEP mirror.
+    const limited = await rateLimitByIp('cep', 60, MINUTE);
+    if (!limited.ok) return rateLimitResponse(limited);
 
     try {
         const res = await fetch(`https://viacep.com.br/ws/${code}/json/`, {

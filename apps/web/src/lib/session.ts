@@ -20,7 +20,7 @@ export async function requireUserWithLimit(
     if (!userId) {
         return { response: NextResponse.json({ error: "Não autorizado" }, { status: 401 }) };
     }
-    const result = rateLimit(`${scope}:${userId}`, limit, windowMs);
+    const result = await rateLimit(`${scope}:${userId}`, limit, windowMs);
     if (!result.ok) {
         return { response: rateLimitResponse(result) };
     }
