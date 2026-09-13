@@ -452,13 +452,15 @@
             "startYear": "Año de Inicio",
             "totalCard": "Carga Tributaria Total",
             "totalTax": "Total a Pagar",
-            "totalEffective": "Tasa Efectiva Total"
+            "totalEffective": "Tasa Efectiva Total",
+            "socialReducer": "Reductor social (R$ 600 por inmueble/mes)"
         },
         "alerts": {
             "classification": "Clasificación basada en el año anterior.",
             "cumulative": "IBS y CBS no reemplazan al IRPF; la tributación es acumulativa.",
             "advice": "Esta simulación no reemplaza el asesoramiento profesional.",
-            "credits": "Créditos de IVA no considerados en esta versión."
+            "credits": "Créditos de IVA no considerados en esta versión.",
+            "testYear": "2026 es un año de prueba: la CBS del 0,9% y el IBS del 0,1% se compensan con PIS/COFINS o se dispensan para quienes cumplen las obligaciones accesorias. Nada que pagar este año."
         },
         "seo": {
             "title": "Calculadora Impuesto Alquiler Persona Física (IRPF, IBS y CBS)",

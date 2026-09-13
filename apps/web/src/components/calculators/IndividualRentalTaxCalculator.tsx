@@ -55,7 +55,8 @@ export function IndividualRentalTaxCalculator({ content }: IndividualRentalTaxCa
             dependents: Number.isNaN(dependents) ? 0 : dependents,
             deductibleExpenses,
             taxYear: Number.isNaN(taxYear) ? 2026 : taxYear,
-            referenceYear: (Number.isNaN(taxYear) ? 2026 : taxYear) - 1
+            referenceYear: (Number.isNaN(taxYear) ? 2026 : taxYear) - 1,
+            residential: true
         };
         return calculateRentalTax(input);
     }, [numberOfProperties, annualRentalRevenue, otherTaxableIncome, dependents, deductibleExpenses, taxYear]);
@@ -258,11 +259,20 @@ export function IndividualRentalTaxCalculator({ content }: IndividualRentalTaxCa
                             <span className="text-muted-foreground">{t?.results?.startYear}</span>
                             <span>{result.ibsCbsStartYear}</span>
                         </div>
+                        {result.vatSocialReducer > 0 && (
+                            <div className="flex justify-between text-sm">
+                                <span className="text-muted-foreground">{t?.results?.socialReducer ?? "Redutor social (R$ 600/imóvel/mês)"}</span>
+                                <span>- {formatCurrency(result.vatSocialReducer)}</span>
+                            </div>
+                        )}
                         <Separator />
                         <div className="flex justify-between">
                             <span className="text-muted-foreground">{t?.results?.vatTax}</span>
                             <span className="font-bold text-red-600 dark:text-red-400">{formatCurrency(result.vatTaxDue)}</span>
                         </div>
+                        {result.vatTestYear && (
+                            <p className="text-xs text-muted-foreground">{t?.alerts?.testYear ?? "2026 é ano-teste: CBS 0,9% + IBS 0,1% compensáveis com PIS/COFINS ou dispensados para quem cumpre as obrigações acessórias. Nada a pagar."}</p>
+                        )}
                     </CardContent>
                 </Card>
             </div>

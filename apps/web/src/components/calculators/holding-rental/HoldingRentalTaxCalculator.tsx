@@ -24,6 +24,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dictionary } from "@/dictionaries";
 import { useCalculatorLeadCapture } from "../../../hooks/useCalculatorLeadCapture";
 import LeadCaptureModal from "../LeadCaptureModal";
+import { nominalRatesForYear } from "@/lib/ibs-cbs";
+import { computeHoldingTaxes } from "@/lib/holding-rental-tax";
 
 // --- Types & Constants ---
 
@@ -38,19 +40,6 @@ const COLORS = {
     effective: "#10b981" // Emerald 500
 };
 
-// Fixed rates for 2026-2028 (Law defined)
-interface RateType {
-    cbs: number;
-    ibs: number;
-    pis?: number;
-    cofins?: number;
-}
-
-const FIXED_TRANSITION_RATES: Record<number, RateType> = {
-    2026: { cbs: 0.9, ibs: 0.1, pis: 0.65, cofins: 3.00 },
-    2027: { cbs: 8.7, ibs: 0.1, pis: 0, cofins: 0 },
-    2028: { cbs: 8.7, ibs: 0.1, pis: 0, cofins: 0 },
-};
 
 // --- Helper Functions ---
 
@@ -165,41 +154,7 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
     // --- Logic ---
 
     // 1. Determine Nominal CBS/IBS for the selected year
-    const getNominalRates = (year: number, targetTotalIva: number) => {
-        // Target split for 2033 based on reference (CBS 8.8% / IBS 19.2% for 28% total)
-        // We maintain the ratio if targetTotalIva changes.
-        const refTotal = 28.0;
-        const refCbs = 8.8;
-        const refIbs = 19.2;
-
-        const targetCbs2033 = (refCbs / refTotal) * targetTotalIva;
-        const targetIbs2033 = (refIbs / refTotal) * targetTotalIva;
-
-        if (year <= 2028) {
-
-            return FIXED_TRANSITION_RATES[year];
-        }
-
-        if (year === 2033) {
-            return { cbs: targetCbs2033, ibs: targetIbs2033 };
-        }
-
-        // Interpolation 2029-2032
-        // Start (2028): CBS 8.7, IBS 0.1
-        // End (2033): Target CBS, Target IBS
-        const steps = 2033 - 2028; // 5 steps
-        const currentStep = year - 2028;
-
-        const startCbs = FIXED_TRANSITION_RATES[2028].cbs;
-        const startIbs = FIXED_TRANSITION_RATES[2028].ibs;
-
-        const cbs = startCbs + ((targetCbs2033 - startCbs) / steps) * currentStep;
-        const ibs = startIbs + ((targetIbs2033 - startIbs) / steps) * currentStep;
-
-        return { cbs, ibs, pis: 0, cofins: 0 };
-    };
-
-    const rates = useMemo(() => getNominalRates(selectedYear, nominalIva), [selectedYear, nominalIva]);
+    const rates = useMemo(() => nominalRatesForYear(selectedYear, nominalIva), [selectedYear, nominalIva]);
 
     // Check if Legacy Taxes are active (for UI logic)
     const showLegacy = (rates.pis || 0) > 0 || (rates.cofins || 0) > 0;
@@ -220,76 +175,12 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
 
     const totalAnnualRevenue = revenues.reduce((a, b) => a + b, 0);
 
-    // 4. Tax Calculations (Standard Presumed Profit)
-    // Base Calculation: 32% of NET Revenue (Gross Revenue - Revenue Taxes)
-    const PRESUMED_PROFIT_BASE = 0.32;
-    const IRPJ_RATE = 0.15;
-    const CSLL_RATE = 0.09;
-    const IRPJ_ADDITIONAL_RATE = 0.10;
-    const IRPJ_ADDITIONAL_THRESHOLD = 20000; // Monthly
-
-    const monthlyTaxes = revenues.map(revenue => {
-        // 1. Calculate Revenue Taxes First (PIS, COFINS, CBS, IBS) on Gross Revenue
-        const pis = revenue * ((rates.pis || 0) / 100);
-        const cofins = revenue * ((rates.cofins || 0) / 100);
-        const cbs = revenue * (effectiveCbsRate / 100);
-        const ibs = revenue * (effectiveIbsRate / 100);
-
-        const revenueTaxes = pis + cofins + cbs + ibs;
-
-        // 2. Calculate Net Revenue (Gross - Revenue Taxes)
-        // This is the new base for the Presumed Profit calculation
-        const netRevenue = revenue - revenueTaxes;
-
-        // 3. Calculate Presumed Base (32% of Net Revenue)
-        const presumedProfit = netRevenue * PRESUMED_PROFIT_BASE;
-
-        // 4. Calculate Profit Taxes from Presumed Base
-        // IRPJ Basic
-        const irpjBasic = presumedProfit * IRPJ_RATE;
-
-        // IRPJ Additional (Faixa 2)
-        // Limit is 20k/month on the Presumed Base
-        const excessPresumedProfit = Math.max(0, presumedProfit - IRPJ_ADDITIONAL_THRESHOLD);
-        const irpjAdditional = excessPresumedProfit * IRPJ_ADDITIONAL_RATE;
-
-        // CSLL
-        const csll = presumedProfit * CSLL_RATE;
-
-        return {
-            revenue,
-            netRevenue,
-            irpjBasic,
-            irpjAdditional,
-            csll,
-            cbs,
-            ibs,
-            pis,
-            cofins,
-            totalIva: cbs + ibs,
-            totalIrpjCsll: irpjBasic + irpjAdditional + csll,
-            totalLegacy: pis + cofins,
-            totalTax: irpjBasic + irpjAdditional + csll + cbs + ibs + pis + cofins
-        };
-    });
-
-    const annualTotals = monthlyTaxes.reduce((acc, curr) => ({
-        revenue: acc.revenue + curr.revenue,
-        netRevenue: acc.netRevenue + curr.netRevenue,
-        irpjBasic: acc.irpjBasic + curr.irpjBasic,
-        irpjAdditional: acc.irpjAdditional + curr.irpjAdditional,
-        csll: acc.csll + curr.csll,
-        cbs: acc.cbs + curr.cbs,
-        ibs: acc.ibs + curr.ibs,
-        pis: acc.pis + curr.pis,
-        cofins: acc.cofins + curr.cofins,
-        totalIva: acc.totalIva + curr.totalIva,
-        totalIrpjCsll: acc.totalIrpjCsll + curr.totalIrpjCsll,
-        totalLegacy: acc.totalLegacy + curr.totalLegacy,
-        totalTax: acc.totalTax + curr.totalTax
-    }), {
-        revenue: 0, netRevenue: 0, irpjBasic: 0, irpjAdditional: 0, csll: 0, cbs: 0, ibs: 0, pis: 0, cofins: 0, totalIva: 0, totalIrpjCsll: 0, totalLegacy: 0, totalTax: 0
-    });
+    // 4. Tax calculations (Lucro Presumido): 32% of GROSS revenue for
+    //    IRPJ/CSLL, IRPJ additional assessed per quarter. See lib/holding-rental-tax.ts.
+    const { months: monthlyTaxes, totals: annualTotals } = useMemo(
+        () => computeHoldingTaxes(revenues, rates),
+        [revenues, rates]
+    );
 
     // 5. Handlers
     const handleMonthlyRevenueChange = (index: number, value: string) => {
@@ -317,35 +208,13 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
 
     // Timeline Data (2026-2033) for Line Chart
     const timelineData = Array.from({ length: 2033 - 2026 + 1 }, (_, i) => 2026 + i).map(year => {
-        const r = getNominalRates(year, nominalIva);
-        const effCbs = r.cbs * EFFECTIVE_FACTOR;
-        const effIbs = r.ibs * EFFECTIVE_FACTOR;
-        const nomPis = r.pis || 0;
-        const nomCofins = r.cofins || 0;
-
-        const ivaBurden = (effCbs + effIbs) / 100 * totalAnnualRevenue;
-        const legacyBurden = (nomPis + nomCofins) / 100 * totalAnnualRevenue;
-        const revenueTaxes = ivaBurden + legacyBurden;
-
-        // Recalculate IRPJ/CSLL for this specific year (since Base depends on Net Revenue)
-        const netRevenue = totalAnnualRevenue - revenueTaxes;
-        const presumedBase = netRevenue * 0.32;
-
-        const irpjBasic = presumedBase * 0.15;
-        // Annual Threshold 240k
-        const excess = Math.max(0, presumedBase - 240000);
-        const irpjAdditional = excess * 0.10;
-        const csll = presumedBase * 0.09;
-
-        const profitTaxes = irpjBasic + irpjAdditional + csll;
-
-        const total = profitTaxes + ivaBurden + legacyBurden;
-        const rate = totalAnnualRevenue > 0 ? (total / totalAnnualRevenue) * 100 : 0;
-
+        const r = nominalRatesForYear(year, nominalIva);
+        const { totals } = computeHoldingTaxes(Array(12).fill(totalAnnualRevenue / 12), r);
+        const rate = totalAnnualRevenue > 0 ? (totals.totalTax / totalAnnualRevenue) * 100 : 0;
         return {
             year,
             rate: parseFloat(rate.toFixed(2)),
-            ivaRate: parseFloat((effCbs + effIbs).toFixed(2))
+            ivaRate: parseFloat(((r.cbs + r.ibs) * EFFECTIVE_FACTOR).toFixed(2))
         };
     });
 
@@ -807,7 +676,7 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
                                         )}
 
                                         <TableRow className="bg-muted/10">
-                                            <TableCell className="font-medium sticky left-0 z-10 bg-card shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[160px] min-w-[160px] max-w-[160px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">Receita Líquida (Base)</TableCell>
+                                            <TableCell className="font-medium sticky left-0 z-10 bg-card shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[160px] min-w-[160px] max-w-[160px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">Receita Líquida</TableCell>
                                             <TableCell colSpan={4} className="text-muted-foreground">Receita Bruta - Tributos sobre Receita</TableCell>
                                             <TableCell className="text-right font-medium">{formatCurrency(annualTotals.netRevenue)}</TableCell>
                                         </TableRow>
@@ -819,7 +688,7 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
                                         </TableRow>
                                         <TableRow>
                                             <TableCell className="font-medium sticky left-0 z-10 bg-card shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[160px] min-w-[160px] max-w-[160px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">IRPJ (Base)</TableCell>
-                                            <TableCell>32% da Receita Líquida</TableCell>
+                                            <TableCell>32% da Receita Bruta</TableCell>
                                             <TableCell>15%</TableCell>
                                             <TableCell>-</TableCell>
                                             <TableCell>-</TableCell>
@@ -828,7 +697,7 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
                                         {annualTotals.irpjAdditional > 0 && (
                                             <TableRow>
                                                 <TableCell className="font-medium sticky left-0 z-10 bg-card shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[160px] min-w-[160px] max-w-[160px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">IRPJ (Adicional)</TableCell>
-                                                <TableCell className="text-xs text-muted-foreground">Excedente R$ 20k/mês na Base</TableCell>
+                                                <TableCell className="text-xs text-muted-foreground">Lucro presumido acima de R$ 60 mil no trimestre</TableCell>
                                                 <TableCell>10%</TableCell>
                                                 <TableCell>-</TableCell>
                                                 <TableCell>-</TableCell>
@@ -837,7 +706,7 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
                                         )}
                                         <TableRow>
                                             <TableCell className="font-medium sticky left-0 z-10 bg-card shadow-[1px_0_0_0_rgba(0,0,0,0.1)] w-[160px] min-w-[160px] max-w-[160px] md:w-auto md:min-w-0 md:max-w-none whitespace-normal">CSLL</TableCell>
-                                            <TableCell>32% da Receita Líquida</TableCell>
+                                            <TableCell>32% da Receita Bruta</TableCell>
                                             <TableCell>9%</TableCell>
                                             <TableCell>-</TableCell>
                                             <TableCell>-</TableCell>

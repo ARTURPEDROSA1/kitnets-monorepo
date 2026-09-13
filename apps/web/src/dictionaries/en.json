@@ -468,13 +468,15 @@
             "startYear": "Start Year",
             "totalCard": "Total Tax Burden",
             "totalTax": "Total to Pay",
-            "totalEffective": "Total Effective Rate"
+            "totalEffective": "Total Effective Rate",
+            "socialReducer": "Social reducer (R$ 600 per property/month)"
         },
         "alerts": {
             "classification": "Classification based on the previous year.",
             "cumulative": "IBS and CBS do not replace IRPF; taxation is cumulative.",
             "advice": "This simulation does not replace professional advice.",
-            "credits": "VAT credits not considered in this version."
+            "credits": "VAT credits not considered in this version.",
+            "testYear": "2026 is a test year: the 0.9% CBS and 0.1% IBS are offset against PIS/COFINS or waived for taxpayers that file the ancillary returns. Nothing is due this year."
         },
         "seo": {
             "title": "Individual Rental Income Tax Calculator (IRPF, IBS & CBS)",
