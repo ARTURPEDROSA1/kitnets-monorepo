@@ -300,6 +300,43 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
     const [parsingFile, setParsingFile] = useState(false);
     const [importing, setImporting] = useState(false);
     const [replaceAll, setReplaceAll] = useState(true);
+
+    // ── Bank statement (OFX / CSV) import with review ────────────────────
+    type StatementRow = { date: string; amount: number; memo: string; reference: string; kind: TransactionKind | null; inflow: boolean; duplicate: boolean; include: boolean };
+    const [stmtOpen, setStmtOpen] = useState(false);
+    const [stmtRows, setStmtRows] = useState<StatementRow[]>([]);
+    const [stmtError, setStmtError] = useState<string | null>(null);
+    const [stmtParsing, setStmtParsing] = useState(false);
+    const [stmtImporting, setStmtImporting] = useState(false);
+    const openStatement = () => { setStmtRows([]); setStmtError(null); setStmtOpen(true); };
+    const onStatementFile = async (file: File | null) => {
+        if (!file || !txEndpoint) return;
+        setStmtError(null); setStmtParsing(true);
+        try {
+            const form = new FormData();
+            form.append("file", file);
+            const res = await fetch(`${txEndpoint}/statement`, { method: "POST", body: form });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || "Não foi possível ler o extrato");
+            const rows = (data.rows ?? []) as Omit<StatementRow, "include">[];
+            setStmtRows(rows.map(r => ({ ...r, include: !r.inflow && !r.duplicate && r.kind !== null })));
+        } catch (err) {
+            setStmtError((err as Error).message);
+        } finally {
+            setStmtParsing(false);
+        }
+    };
+    const setStmt = (i: number, patch: Partial<StatementRow>) => setStmtRows(prev => prev.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+    const runStatementImport = async () => {
+        const chosen = stmtRows.filter(r => r.include && r.kind && !r.inflow);
+        if (chosen.length === 0) return;
+        setStmtImporting(true);
+        const ok = await putTxs(chosen.map(r => ({
+            occurred_on: r.date, kind: r.kind!, amount: Math.abs(r.amount), comment: r.memo.slice(0, 500) || null, source: "BANK" as const, bank_reference: r.reference,
+        })), false);
+        setStmtImporting(false);
+        if (ok) { setStmtOpen(false); flash(`${chosen.length} lançamentos importados do extrato`); }
+    };
     const openImport = () => { setImportRows([]); setImportErrors([]); setImportFatal(null); setReplaceAll(true); setImportOpen(true); };
     const loadText = (text: string) => {
         const { rows, errors } = buildTransactionImportRows(parseSheet(text));
@@ -422,6 +459,9 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                     </Button>
                     <Button size="sm" variant="outline" onClick={openImport} className="gap-1.5 text-xs">
                         <Upload className="w-3.5 h-3.5" /> Importar planilha
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={openStatement} className="gap-1.5 text-xs" title="Extrato OFX ou CSV do banco: cada saída vira um lançamento após sua revisão">
+                        <Landmark className="w-3.5 h-3.5" /> Importar extrato
                     </Button>
                     <Button size="sm" onClick={() => setAddOpen(true)} className="gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white">
                         <Plus className="w-3.5 h-3.5" /> Adicionar lançamento
@@ -782,6 +822,66 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                         <Button variant="ghost" onClick={() => setImportOpen(false)}>Fechar</Button>
                         <Button onClick={runImport} disabled={importing || importRows.length === 0} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
                             {importing && <Loader2 className="w-4 h-4 animate-spin" />} Importar {importRows.length > 0 ? `${importRows.length} lançamentos` : ""}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Bank statement import (OFX / CSV) */}
+            <Dialog open={stmtOpen} onOpenChange={setStmtOpen}>
+                <DialogContent className="max-w-3xl">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2"><Landmark className="w-5 h-5 text-emerald-600" /> Importar extrato bancário</DialogTitle>
+                        <DialogDescription>
+                            Envie o extrato em OFX (Banco Inter, Bradesco, Caixa, Itaú…) ou CSV com Data, Histórico e Valor. Cada saída recebe um tipo sugerido; revise, ajuste e importe. Entradas (aluguel etc.) são só mostradas. Lançamentos já importados são detectados pelo identificador do banco.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3 py-2 max-h-[65vh] overflow-y-auto pr-1">
+                        <Field label="Arquivo (.ofx, .qfx, .csv, .tsv, .txt ou .xlsx)">
+                            <Input type="file" accept=".ofx,.qfx,.csv,.tsv,.txt,.xlsx" disabled={stmtParsing} onChange={e => onStatementFile(e.target.files?.[0] ?? null)} />
+                            {stmtParsing && <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Lendo o extrato…</span>}
+                        </Field>
+                        {stmtError && <div className="text-xs text-rose-600 flex items-center gap-2"><AlertCircle className="w-3.5 h-3.5" /> {stmtError}</div>}
+                        {stmtRows.length > 0 && (
+                            <div className="space-y-2">
+                                <p className="text-xs text-muted-foreground">
+                                    <span className="font-semibold text-foreground">{stmtRows.filter(r => r.include && r.kind && !r.inflow).length}</span> de {stmtRows.filter(r => !r.inflow).length} saídas selecionadas
+                                    {" · "}{stmtRows.filter(r => r.inflow).length} entradas ignoradas
+                                    {stmtRows.some(r => r.duplicate) && <> · {stmtRows.filter(r => r.duplicate).length} já importadas</>}
+                                    {stmtRows.some(r => !r.inflow && !r.duplicate && !r.kind) && <> · <span className="text-amber-700 dark:text-amber-400">{stmtRows.filter(r => !r.inflow && !r.duplicate && !r.kind).length} sem tipo: escolha um para incluir</span></>}
+                                </p>
+                                <div className="overflow-x-auto border border-border rounded-lg">
+                                    <table className="w-full text-xs">
+                                        <thead className="bg-muted/40 text-[10px] uppercase text-muted-foreground"><tr>
+                                            <th className="px-2 py-1" /><th className="text-left px-2 py-1">Data</th><th className="text-left px-2 py-1">Histórico</th><th className="text-right px-2 py-1">Valor</th><th className="text-left px-2 py-1">Tipo</th>
+                                        </tr></thead>
+                                        <tbody>
+                                            {stmtRows.map((r, i) => (
+                                                <tr key={r.reference + i} className={cn("border-t border-border/60", (r.inflow || r.duplicate) && "opacity-50")}>
+                                                    <td className="px-2 py-1"><input type="checkbox" className="accent-emerald-600" checked={r.include} disabled={r.inflow || r.duplicate || !r.kind} onChange={e => setStmt(i, { include: e.target.checked })} /></td>
+                                                    <td className="px-2 py-1 whitespace-nowrap">{formatDateBR(r.date)}</td>
+                                                    <td className="px-2 py-1 max-w-[280px] truncate" title={r.memo}>{r.memo}{r.duplicate && <span className="ml-1 text-[10px] text-muted-foreground">(já importado)</span>}</td>
+                                                    <td className={cn("px-2 py-1 text-right tabular-nums whitespace-nowrap", r.inflow ? "text-emerald-700" : "")}>{formatBRL(r.amount)}</td>
+                                                    <td className="px-2 py-1">
+                                                        {r.inflow ? <span className="text-muted-foreground">entrada</span> : (
+                                                            <select value={r.kind ?? ""} disabled={r.duplicate} onChange={e => setStmt(i, { kind: (e.target.value || null) as TransactionKind | null, include: Boolean(e.target.value) })} className={cn("bg-transparent border rounded-md px-1.5 py-1 outline-none", r.kind ? "border-transparent" : "border-amber-400")}>
+                                                                <option value="">— escolher —</option>
+                                                                {TRANSACTION_KINDS.map(k => <option key={k.kind} value={k.kind}>{k.label}</option>)}
+                                                            </select>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button variant="ghost" onClick={() => setStmtOpen(false)}>Fechar</Button>
+                        <Button onClick={runStatementImport} disabled={stmtImporting || stmtRows.filter(r => r.include && r.kind && !r.inflow).length === 0} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
+                            {stmtImporting && <Loader2 className="w-4 h-4 animate-spin" />} Importar {stmtRows.filter(r => r.include && r.kind && !r.inflow).length || ""} lançamentos
                         </Button>
                     </DialogFooter>
                 </DialogContent>

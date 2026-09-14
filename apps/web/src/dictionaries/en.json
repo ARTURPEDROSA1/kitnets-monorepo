@@ -1725,6 +1725,10 @@
             "ctaPrimary": "Calculate now",
             "ctaSecondary": "Understand how it works",
             "items": {
+                "paybackProperty": {
+                    "title": "Property Payback",
+                    "description": "How many years until a rental property pays for itself? Payback, yield, cash flow and IRR with or without financing."
+                },
                 "rentAdjustment": {
                     "title": "Rent Adjustment",
                     "description": "Update rent value using indices like IGP-M, IPCA, or IVAR."
@@ -2485,5 +2489,11 @@
         "title": "Professionalize your rental management",
         "description": "Kitnets.com offers complete tools for owners and agencies to manage contracts, payments, and adjustments automatically.",
         "button": "Explore Platform"
+    },
+    "paybackCalculatorPage": {
+        "seo": {
+            "title": "Rental Property Payback Calculator - Kitnets.com",
+            "description": "Find out how many years a rental property takes to pay for itself: payback, gross and net yield, cash flow and IRR with or without a mortgage. Free."
+        }
     }
 }

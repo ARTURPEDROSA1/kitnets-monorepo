@@ -1390,6 +1390,10 @@
         "cards": {
             "ctaPrimary": "Calcular",
             "items": {
+                "paybackProperty": {
+                    "title": "Payback de Imóvel",
+                    "description": "Em quantos anos um imóvel alugado se paga? Payback, yield, fluxo de caixa e TIR com ou sem financiamento."
+                },
                 "rentAdjustment": {
                     "title": "Reajuste de Aluguel",
                     "description": "Calcule o reajuste do aluguel com base em diversos índices (IGP-M, IPCA, IVAR, etc.) e simule diferentes cenários."
@@ -3171,5 +3175,11 @@
         "title": "Profissionalize sua gestão de aluguéis",
         "description": "O Kitnets.com oferece ferramentas completas para proprietários e imobiliárias gerenciarem contratos, cobranças e reajustes automaticamente.",
         "button": "Conhecer Plataforma"
+    },
+    "paybackCalculatorPage": {
+        "seo": {
+            "title": "Calculadora de Payback de Imóvel para Aluguel - Kitnets.com",
+            "description": "Descubra em quantos anos um imóvel alugado se paga. Payback, yield bruto e líquido, fluxo de caixa e TIR com ou sem financiamento. Grátis."
+        }
     }
 }

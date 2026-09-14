@@ -19,13 +19,14 @@ import {
     YAxis,
 } from "recharts";
 import {
-    Activity, AlertCircle, BadgeDollarSign, CalendarClock, Gauge, Landmark, Loader2, Percent, PiggyBank, Plus, Scale, Sparkles, Target, Trash2, TrendingUp, Wallet,
+    Activity, AlertCircle, BadgeDollarSign, CalendarClock, FileSpreadsheet, Gauge, Landmark, Loader2, Percent, PiggyBank, Plus, Scale, Sparkles, Target, Trash2, TrendingUp, Wallet,
 } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Tile from "./Tile";
+import InvestmentScenarios from "./InvestmentScenarios";
 import { computeInvestmentMetrics, type InvestmentMetrics } from "@/lib/investment-metrics";
 import { formatMonthKey, type PropertyIncomeRow } from "@/lib/property-income";
 import { formatDateBR, type PropertyInvestment, type PropertyTransaction } from "@/lib/property-investment";
@@ -223,6 +224,11 @@ export default function PropertyInvestmentAnalysis({ propertyId, bedrooms, inves
                             <BadgeDollarSign className="w-3.5 h-3.5" /> Valor de mercado{valuations.length ? ` (${valuations.length})` : ""}
                         </Button>
                     )}
+                    {propertyId && hasData && (
+                        <a href={`/api/properties/${propertyId}/report`} download className="inline-flex items-center gap-1.5 h-8 rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-muted transition-colors" title="Excel com resumo, série mensal, receitas, investimento, tributos e avaliações">
+                            <FileSpreadsheet className="w-3.5 h-3.5" /> Exportar relatório
+                        </a>
+                    )}
                 </div>
             </div>
 
@@ -351,6 +357,8 @@ export default function PropertyInvestmentAnalysis({ propertyId, bedrooms, inves
                             {metrics.expectedMonthsExcluded > 0 && !includeExpected && ` ${metrics.expectedMonthsExcluded} ${metrics.expectedMonthsExcluded === 1 ? "mês previsto ficou" : "meses previstos ficaram"} de fora; marque "Incluir meses previstos" para contá-los.`}
                         </p>
                     </div>
+
+                    <InvestmentScenarios metrics={metrics} investment={investment} />
                 </>
             )}
 

@@ -67,6 +67,14 @@ const CALCULATORS: CalculatorItem[] = [
         dictKey: 'rentalIncome'
     },
     {
+        id: 'paybackProperty',
+        icon: Building2,
+        route: (lang) => `/${lang}/calculadora-payback-imovel`,
+        categories: ['finance', 'planning', 'rent'],
+        dictKey: 'paybackProperty',
+        mostUsed: true
+    },
+    {
         id: 'amortization',
         icon: PiggyBank,
         route: (lang) => `/${lang}/calculadora-amortizacao-financiamento-imobiliario`,

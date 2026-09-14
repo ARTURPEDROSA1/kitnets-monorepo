@@ -637,6 +637,15 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                             </li>
                                             <li>
                                                 <Link
+                                                    href={lang === 'pt' ? '/calculadora-payback-imovel' : `/${lang}/calculadora-payback-imovel`}
+                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
+                                                >
+                                                    <PiggyBank className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3 text-sm">Payback de Imóvel</span>
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <Link
                                                     href={lang === 'pt' ? '/calculadora-independencia-financeira' : `/${lang}/calculadora-independencia-financeira`}
                                                     className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
                                                 >
