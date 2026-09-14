@@ -28,6 +28,18 @@ describe("parseStatementCsv", () => {
         expect(rows[0]).toMatchObject({ date: "2026-09-05", amount: -3850.04, memo: "Parc Cred Imob" });
         expect(rows[0].reference).toMatch(/^csv:2026-09-05:/);
     });
+    it("reads the Banco Inter layout: preamble, Histórico + Descrição, R$ amounts and Saldo column", () => {
+        const csv = [
+            "Extrato Conta Corrente", "Conta;123456-7", "Período;01/09/2026 a 11/09/2026", "Saldo;R$ 2.345,67", "",
+            "Data Lançamento;Histórico;Descrição;Valor;Saldo",
+            "05/09/2026;Pagamento efetuado;Parc Cred Imob 906687;-R$ 3.850,04;R$ 1.000,00",
+            "06/09/2026;Pix recebido;Maria Silva;R$ 3.950,00;R$ 4.950,00",
+        ].join("\n");
+        const rows = parseStatementCsv(csv);
+        expect(rows).toHaveLength(2);
+        expect(rows[0]).toMatchObject({ date: "2026-09-05", amount: -3850.04, memo: "Pagamento efetuado · Parc Cred Imob 906687" });
+        expect(rows[1]).toMatchObject({ date: "2026-09-06", amount: 3950, memo: "Pix recebido · Maria Silva" });
+    });
     it("handles separate debit / credit columns", () => {
         const csv = "Data\tLançamento\tDébito\tCrédito\n10/09/2026\tTarifa\t29,90\t\n11/09/2026\tAluguel\t\t3.950,00\n";
         const rows = parseStatementCsv(csv);

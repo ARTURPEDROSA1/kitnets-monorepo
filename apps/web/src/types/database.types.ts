@@ -1928,6 +1928,72 @@ export type Database = {
           },
         ]
       }
+      bank_transactions: {
+        Row: {
+          amount: number
+          bank: string | null
+          created_at: string
+          destination: string
+          id: string
+          kind: string | null
+          linked_id: string | null
+          memo: string
+          occurred_on: string
+          owner_id: string
+          property_id: string | null
+          reference: string
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          bank?: string | null
+          created_at?: string
+          destination?: string
+          id?: string
+          kind?: string | null
+          linked_id?: string | null
+          memo?: string
+          occurred_on: string
+          owner_id: string
+          property_id?: string | null
+          reference: string
+          source?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          bank?: string | null
+          created_at?: string
+          destination?: string
+          id?: string
+          kind?: string | null
+          linked_id?: string | null
+          memo?: string
+          occurred_on?: string
+          owner_id?: string
+          property_id?: string | null
+          reference?: string
+          source?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_transactions_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_transactions_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       property_taxes: {
         Row: {
           amount: number
