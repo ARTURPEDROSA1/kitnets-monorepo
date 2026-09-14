@@ -3,6 +3,7 @@ import { parseSheet } from "./property-income";
 import type { PropertyIncomeRow } from "./property-income";
 import {
     buildTransactionImportRows,
+    estimateFinancingSplits,
     kindFromText,
     solarPayback,
     summarizeInvestment,
@@ -121,5 +122,70 @@ describe("solarPayback", () => {
     });
     it("handles no investment", () => {
         expect(solarPayback(0, []).pct).toBe(0);
+    });
+});
+
+describe("estimateFinancingSplits", () => {
+    const inv: PropertyInvestment = {
+        property_id: "p", purchase_price: 377000, acquired_on: "2018-04-24", built_area_m2: 112.42,
+        lender: "Bradesco", contract_number: "906687", financing_system: "SAC", principal: 285665.16, annual_rate: 9.06,
+        term_months: 360, contract_date: "2018-04-24", first_due_date: "2018-06-05", financing_status: "PAID_OFF", paid_off_on: "2021-08-25", notes: null,
+    };
+    const fin = (occurred_on: string, kind: PropertyTransaction["kind"], amount: number, extra: Partial<PropertyTransaction> = {}): PropertyTransaction =>
+        ({ id: `${occurred_on}-${kind}`, property_id: "p", occurred_on, kind, amount, interest_part: null, principal_part: null, insurance_part: null, comment: null, source: "IMPORT", bank_reference: null, created_at: occurred_on, ...extra });
+
+    it("reproduces the Bradesco simulator for the first two instalments", () => {
+        const r = estimateFinancingSplits(inv, [fin("2018-06-05", "PRESTACAO", 3850.04), fin("2018-07-05", "PRESTACAO", 3065.44)]);
+        // Simulator row 1: interest 2.935,21 (42 days), amortisation 793,51, MIP+DFI+TAC 121,32
+        expect(r.splits[0].interest_part).toBeGreaterThan(2900);
+        expect(r.splits[0].interest_part).toBeLessThan(3050);
+        expect(r.splits[0].principal_part).toBeCloseTo(793.51, 2);
+        expect(r.splits[0].insurance_part).toBeGreaterThan(0);
+        expect(r.splits[0].balance_after).toBeCloseTo(284871.65, 2);
+        // Simulator row 2: interest 2.150,78, amortisation 793,51, insurance 121,15
+        expect(r.splits[1].interest_part).toBeCloseTo(2150.78, 0);
+        expect(r.splits[1].principal_part).toBeCloseTo(793.51, 1);
+        expect(r.splits[1].insurance_part).toBeCloseTo(121.15, 0);
+        expect(r.updates).toHaveLength(2);
+    });
+
+    it("treats extra amortisations as principal and the payoff as the remaining balance", () => {
+        const r = estimateFinancingSplits(inv, [
+            fin("2018-06-05", "PRESTACAO", 3850.04),
+            fin("2019-03-07", "AMORTIZACAO", 9050),
+            fin("2021-08-25", "QUITACAO", 300000),
+        ]);
+        expect(r.splits[1]).toMatchObject({ principal_part: 9050, interest_part: 0, insurance_part: 0 });
+        expect(r.splits[2].principal_part).toBeCloseTo(285665.16 - 793.51 - 9050, 1);
+        expect(r.splits[2].interest_part).toBeCloseTo(300000 - r.splits[2].principal_part, 1);
+        expect(r.endingBalance).toBe(0);
+        expect(r.totals.paid).toBeCloseTo(3850.04 + 9050 + 300000, 2);
+    });
+
+    it("keeps rows that already have a split unless overwrite is set", () => {
+        const rows = [fin("2018-06-05", "PRESTACAO", 3850.04, { interest_part: 2935.21, principal_part: 793.51, insurance_part: 121.32 }), fin("2018-07-05", "PRESTACAO", 3065.44)];
+        const kept = estimateFinancingSplits(inv, rows);
+        expect(kept.splits[0].kept).toBe(true);
+        expect(kept.updates.map(u => u.id)).toEqual(["2018-07-05-PRESTACAO"]);
+        const redo = estimateFinancingSplits(inv, rows, { overwrite: true });
+        expect(redo.splits[0].kept).toBe(false);
+        expect(redo.updates).toHaveLength(2);
+    });
+
+    it("flags a residual balance after payoff and missing terms", () => {
+        const r = estimateFinancingSplits(inv, [fin("2018-06-05", "PRESTACAO", 3850.04), fin("2018-08-25", "QUITACAO", 1000)]);
+        expect(r.endingBalance).toBeGreaterThan(1);
+        expect(r.notes.some(n => n.includes("Saldo estimado"))).toBe(true);
+        expect(estimateFinancingSplits({ ...inv, principal: null }, [fin("2018-06-05", "PRESTACAO", 100)]).notes[0]).toContain("Preencha");
+    });
+
+    it("uses the PRICE formula when the system is PRICE", () => {
+        const r = estimateFinancingSplits({ ...inv, financing_system: "PRICE", contract_date: null }, [fin("2018-06-05", "PRESTACAO", 2500)]);
+        const interest = 285665.16 * 0.0906 / 12;
+        expect(r.splits[0].interest_part).toBeCloseTo(interest, 1);
+        // PRICE payment on 285.665,16 @ 0,755 %/360 m ≈ 2.301; amortisation = payment − interest ≈ 145; insurance = remainder
+        expect(r.splits[0].principal_part).toBeGreaterThan(100);
+        expect(r.splits[0].principal_part).toBeLessThan(200);
+        expect(r.splits[0].insurance_part).toBeCloseTo(2500 - interest - r.splits[0].principal_part, 1);
     });
 });
