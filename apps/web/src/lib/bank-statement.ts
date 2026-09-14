@@ -44,19 +44,28 @@ export function parseOfx(text: string): StatementRow[] {
     return rows;
 }
 
+/** Drops the preamble some banks put before the header row (Inter: "Extrato Conta Corrente", "Conta", "Período", "Saldo"). */
+function stripPreamble(text: string): string {
+    const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/);
+    const isHeader = (l: string) => /(^|[;,\t])\s*"?data\b/i.test(l) && /valor|d[eé]bito|cr[eé]dito|amount/i.test(l);
+    const idx = lines.findIndex(isHeader);
+    return idx > 0 ? lines.slice(idx).join("\n") : text;
+}
+
 /**
  * Generic CSV/TSV statement: finds the date, amount and description columns by
  * header name (Data, Valor/Débito/Crédito, Histórico/Descrição/Lançamento).
+ * Histórico and Descrição are joined when both exist (Banco Inter layout).
  */
 export function parseStatementCsv(text: string): StatementRow[] {
-    const sheet = parseSheet(text);
+    const sheet = parseSheet(stripPreamble(text));
     const h = sheet.headers.map(x => x.trim().toLowerCase());
     const find = (...res: RegExp[]) => h.findIndex(x => res.some(r => r.test(x)));
     const cDate = sheet.dateColumn >= 0 ? sheet.dateColumn : find(/^data/);
     const cAmount = find(/^valor/, /^montante/, /^amount/);
     const cDebit = find(/d[eé]bito/, /sa[ií]da/);
     const cCredit = find(/cr[eé]dito/, /entrada/);
-    const cMemo = find(/hist[oó]rico/, /descri/, /lan[cç]amento/, /memo/, /detalhe/);
+    const memoCols = [find(/hist[oó]rico/, /^lan[cç]amento/, /memo/), find(/descri/, /detalhe/, /favorecido|benefici/)].filter((c, i, a) => c >= 0 && c !== cDate && a.indexOf(c) === i);
     const rows: StatementRow[] = [];
     if (cDate < 0 || (cAmount < 0 && cDebit < 0 && cCredit < 0)) return rows;
     for (const r of sheet.rows) {
@@ -71,7 +80,7 @@ export function parseStatementCsv(text: string): StatementRow[] {
             else if (c !== null && c !== 0) amount = Math.abs(c);
         }
         if (amount === null || amount === 0) continue;
-        const memo = (cMemo >= 0 ? r.cells[cMemo] ?? "" : "").replace(/\s+/g, " ").trim();
+        const memo = memoCols.map(c => (r.cells[c] ?? "").trim()).filter(Boolean).join(" · ").replace(/\s+/g, " ").trim();
         rows.push({ date, amount: Math.round(amount * 100) / 100, memo, reference: hashRef(date, amount, memo) });
     }
     return rows;
