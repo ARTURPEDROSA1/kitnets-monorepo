@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import PeriodFilter from "./PeriodFilter";
+import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "./TableColumnFilters";
 import { DEFAULT_PERIOD, periodLabel, periodRange, type PeriodFilterValue } from "@/lib/period-filter";
 import {
     breakdown,
@@ -266,11 +267,26 @@ export default function PropertyIncomeLedger({
     const sorted = useMemo(() => [...rows].sort((a, b) => (a.month < b.month ? 1 : -1)), [rows]);
     /** Rows inside the selected period (newest first) — drives the chart and the table. */
     const filtered = useMemo(() => filterRowsByPeriod(sorted, range), [sorted, range]);
-    const visible = showAll ? filtered : filtered.slice(0, COLLAPSED_ROWS);
-    /** Totals over the confirmed months inside the selected period (tiles 2–5). */
-    const periodSummary = useMemo(() => summarize(filtered), [filtered]);
     /** IPTU column: when the landlord pays it, or when any month already carries a value. */
     const showIptu = iptuPaidByLandlord || rows.some(r => Number(r.iptu_amount) > 0);
+    // Excel-style column sort & filters on top of the period filter (table only; the chart follows the period)
+    const columns = useMemo<ColumnDef<PropertyIncomeRow>[]>(() => [
+        { key: "month", label: "Mês", kind: "month", get: r => monthKey(r.month) },
+        { key: "gross", label: "Aluguel bruto", kind: "number", align: "right", get: r => breakdown(r).grossRent },
+        { key: "pct", label: "Taxa %", kind: "number", align: "right", get: r => Number(r.agency_fee_pct) || 0 },
+        { key: "net", label: "Aluguel líquido", kind: "number", align: "right", title: "Recebido − energia (aluguel após a taxa)", get: r => breakdown(r).netRent },
+        { key: "energy", label: "Energia", kind: "number", align: "right", title: "Parcela de energia paga pelo inquilino (centro solar)", get: r => breakdown(r).energy },
+        { key: "received", label: "Recebido", kind: "number", align: "right", title: "O que entrou na conta", get: r => breakdown(r).received },
+        { key: "other", label: "Custo de energia", kind: "number", align: "right", title: "Conta de luz paga no mês (custo à parte; não altera o recebido)", get: r => breakdown(r).other },
+        { key: "otherExp", label: "Outras despesas", kind: "number", align: "right", title: "Outros custos pagos à parte no mês (reparos, taxas); não alteram o recebido", get: r => breakdown(r).otherExpenses },
+        ...(showIptu ? [{ key: "iptu", label: "IPTU", kind: "number" as const, align: "right" as const, title: "IPTU pago pelo proprietário no mês (custo à parte)", get: (r: PropertyIncomeRow) => breakdown(r).iptu }] : []),
+        { key: "status", label: "Status", kind: "enum", align: "center", get: r => r.status, options: [{ value: "CONFIRMED", label: "Confirmado" }, { value: "EXPECTED", label: "Previsto" }] },
+        { key: "notes", label: "Comentários", kind: "text", get: r => r.notes ?? "" },
+    ], [showIptu]);
+    const cf = useColumnFilters(filtered, columns, { key: "month", dir: "desc" });
+    const visible = showAll ? cf.rows : cf.rows.slice(0, COLLAPSED_ROWS);
+    /** Totals over the confirmed months inside the selected period (tiles 2–5). */
+    const periodSummary = useMemo(() => summarize(filtered), [filtered]);
     // Fee pre-fill: last month's fee when set, else the property default, else 10 %
     const lastRowPct = sorted.length ? Number(sorted[0].agency_fee_pct) : 0;
     const lastPct = lastRowPct > 0 ? lastRowPct : defaultAgencyFeePct > 0 ? defaultAgencyFeePct : DEFAULT_AGENCY_FEE_PCT;
@@ -629,10 +645,11 @@ export default function PropertyIncomeLedger({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <span className="text-xs text-muted-foreground">
                     Período do gráfico e da tabela · <span className="font-semibold text-foreground">{periodLabel(period)}</span>
-                    {" · "}{filtered.length} {filtered.length === 1 ? "mês" : "meses"}
+                    {" · "}{cf.anyFilter ? `${cf.rows.length} de ${filtered.length}` : filtered.length} {filtered.length === 1 ? "mês" : "meses"}
                 </span>
                 <PeriodFilter value={period} onChange={setPeriod} />
             </div>
+            <FilterChips columns={columns} ctl={cf} />
 
             {/* Chart */}
             {chartData.length > 1 && (
@@ -677,24 +694,15 @@ export default function PropertyIncomeLedger({
                 <div className="text-sm text-muted-foreground text-center py-8 border border-dashed border-border rounded-xl">
                     Nenhum mês no período selecionado ({periodLabel(period)}). Escolha outro período acima.
                 </div>
+            ) : cf.rows.length === 0 ? (
+                <div className="text-sm text-muted-foreground text-center py-8 border border-dashed border-border rounded-xl">
+                    Nenhum mês com os filtros atuais. <button type="button" onClick={cf.clearFilters} className="underline underline-offset-2">Limpar filtros</button>
+                </div>
             ) : (
                 <div className="overflow-x-auto -mx-2">
                     <table className="w-full text-xs min-w-[1040px]">
                         <thead>
-                            <tr className="text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border">
-                                <th className="text-left px-2 py-2 font-semibold">Mês</th>
-                                <th className="text-right px-2 py-2 font-semibold">Aluguel bruto</th>
-                                <th className="text-right px-2 py-2 font-semibold">Taxa %</th>
-                                <th className="text-right px-2 py-2 font-semibold" title="Recebido − energia (aluguel após a taxa)">Aluguel líquido</th>
-                                <th className="text-right px-2 py-2 font-semibold" title="Parcela de energia paga pelo inquilino (centro solar)">Energia</th>
-                                <th className="text-right px-2 py-2 font-semibold" title="O que entrou na conta">Recebido</th>
-                                <th className="text-right px-2 py-2 font-semibold" title="Conta de luz paga no mês (custo à parte; não altera o recebido)">Custo de energia</th>
-                                <th className="text-right px-2 py-2 font-semibold" title="Outros custos pagos à parte no mês (reparos, taxas); não alteram o recebido">Outras despesas</th>
-                                {showIptu && <th className="text-right px-2 py-2 font-semibold" title="IPTU pago pelo proprietário no mês (custo à parte)">IPTU</th>}
-                                <th className="text-center px-2 py-2 font-semibold">Status</th>
-                                <th className="text-left px-2 py-2 font-semibold">Comentários</th>
-                                <th className="px-2 py-2" />
-                            </tr>
+                            <ColumnHeaders columns={columns} ctl={cf} trailing={<th className="px-2 py-2" />} />
                         </thead>
                         <tbody>
                             {visible.map(row => {
@@ -787,16 +795,17 @@ export default function PropertyIncomeLedger({
                             })}
                         </tbody>
                     </table>
-                    {filtered.length > COLLAPSED_ROWS && (
+                    {cf.rows.length > COLLAPSED_ROWS && (
                         <button
                             type="button"
                             onClick={() => setShowAll(v => !v)}
                             className="mt-2 mx-2 text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
                         >
                             {showAll ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                            {showAll ? `Mostrar apenas os últimos ${COLLAPSED_ROWS} meses` : `Mostrar todos os ${filtered.length} meses do período`}
+                            {showAll ? `Mostrar apenas os primeiros ${COLLAPSED_ROWS} meses` : `Mostrar todos os ${cf.rows.length} meses${cf.anyFilter ? " filtrados" : " do período"}`}
                         </button>
                     )}
+                    <ColumnMenu columns={columns} ctl={cf} />
                 </div>
             )}
 
