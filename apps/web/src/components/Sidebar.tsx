@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@kitnets/ui";
 import { SignOutButton, useAuth } from "@clerk/nextjs";
-import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Rocket, HardHat, Briefcase, Building2, User, Users, UserCheck, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart, ArrowLeftRight, FileText, AlertCircle, Plus, Minus, Gem, X, Zap, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Rocket, HardHat, Briefcase, Building2, User, Users, UserCheck, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart, ArrowLeftRight, FileText, AlertCircle, Plus, Minus, Gem, X, Zap, ChevronsLeft, ChevronsRight, Landmark } from "lucide-react";
 import { PropertyFilters } from "./PropertyFilters";
 
 import { useTheme } from "next-themes";
@@ -429,6 +429,23 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                                     <span className="ms-3 sidebar-label">Contratos</span>
                                                 </Link>
                                             </li>
+                                            {/* Contábil & Fiscal: holding-level accounting fed by the bank account */}
+                                            <li className="my-2 border-t border-border" />
+                                            {!navCollapsed && (
+                                                <li className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Contábil &amp; Fiscal</li>
+                                            )}
+                                            <li>
+                                                <Link
+                                                    title={navCollapsed ? "Contas bancárias" : undefined}
+                                                    href={lang === 'pt' ? '/contabil/contas-bancarias' : `/${lang}/contabil/contas-bancarias`}
+                                                    aria-current={isActive(lang === 'pt' ? '/contabil/contas-bancarias' : `/${lang}/contabil/contas-bancarias`) ? "page" : undefined}
+                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/contabil/contas-bancarias' : `/${lang}/contabil/contas-bancarias`) ? 'bg-accent' : ''}`}
+                                                >
+                                                    <Landmark className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3 sidebar-label">Contas bancárias</span>
+                                                </Link>
+                                            </li>
+                                            <li className="my-2 border-t border-border" />
                                             <li>
                                                 <SignOutButton>
                                                     <button
