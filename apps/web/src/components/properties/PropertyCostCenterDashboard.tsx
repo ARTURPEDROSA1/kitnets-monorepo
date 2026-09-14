@@ -659,6 +659,8 @@ export default function PropertyCostCenterDashboard({
 
             {/* Payback, forecast, yields and IRR from the three ledgers */}
             <PropertyInvestmentAnalysis
+                propertyId={dbId}
+                bedrooms={details.bedrooms}
                 investment={investmentData.investment}
                 transactions={investmentData.transactions}
                 incomeRows={incomeRows}

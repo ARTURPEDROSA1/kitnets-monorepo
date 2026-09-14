@@ -10,7 +10,8 @@ import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera,
 import PropertyDetailsCard, { PropertyDetails, SubUnit, SubUnitsSection, Checkbox as DetailCheckbox, defaultSubUnit } from '@/components/profile/PropertyDetailsCard';
 import PropertyDocumentsCard, { DocCategory } from '@/components/profile/PropertyDocumentsCard';
 import { DeletePropertyModal } from '@/components/profile/DeletePropertyModal';
-import PropertySquareCard, { type PropertyRealIncome } from '@/components/properties/PropertySquareCard';
+import PropertySquareCard, { type PropertyRealIncome, type PropertyCardInvestment } from '@/components/properties/PropertySquareCard';
+import PortfolioStrip, { type PortfolioTotalsData } from '@/components/properties/PortfolioStrip';
 import PropertyCostCenterDashboard from '@/components/properties/PropertyCostCenterDashboard';
 import { cn } from '@/lib/utils';
 import { useUser, useAuth } from '@clerk/nextjs';
@@ -353,6 +354,21 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
     const [realIncomeByProperty, setRealIncomeByProperty] = useState<Record<string, PropertyRealIncome>>({});
     // False until the first successful summary; cached figures are shown until then
     const [realIncomeLoaded, setRealIncomeLoaded] = useState(false);
+    // Investment engine per property + portfolio totals (payback, yield, market value) for the strip and the cards
+    const [portfolio, setPortfolio] = useState<{ properties: Record<string, PropertyCardInvestment>; totals: PortfolioTotalsData } | null>(null);
+    useEffect(() => {
+        if (view !== 'imoveis' || imoveisViewMode !== 'grid') return;
+        let cancelled = false;
+        fetch('/api/portfolio/metrics')
+            .then(async res => {
+                if (!res.ok) return;
+                const data = await res.json().catch(() => null);
+                if (cancelled || !data?.totals) return;
+                setPortfolio({ properties: data.properties ?? {}, totals: data.totals });
+            })
+            .catch(() => { /* strip and payback rows stay hidden */ });
+        return () => { cancelled = true; };
+    }, [view, imoveisViewMode]);
     useEffect(() => {
         if (view !== 'imoveis' || imoveisViewMode !== 'grid') return;
         let cancelled = false;
@@ -3369,6 +3385,11 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                 </div>
                             )}
 
+                            {/* Portfolio totals from the investment engine */}
+                            {portfolio && portfolio.totals.count > 0 && filteredProperties.length > 0 && (
+                                <PortfolioStrip totals={portfolio.totals} />
+                            )}
+
                             {/* Responsive Square Cards Grid */}
                             {filteredProperties.length > 0 && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -3389,6 +3410,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                     : null,
                                                 // Waits for the summary only when nothing is cached for this property
                                                 incomeLoading: !realIncomeLoaded && !!prop.id && !cachedRealIncomeById.has(prop.id),
+                                                investment: prop.id ? portfolio?.properties[prop.id] ?? null : null,
                                             }}
                                             onSelect={() => {
                                                 setSelectedPropertyIdx(originalIdx);
