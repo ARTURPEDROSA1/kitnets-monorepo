@@ -27,6 +27,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import PeriodFilter from "./PeriodFilter";
+import Tile from "./Tile";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "./TableColumnFilters";
 import { periodLabel, periodRange, type PeriodFilterValue } from "@/lib/period-filter";
 import { parseSheet, type PropertyIncomeRow } from "@/lib/property-income";
@@ -52,6 +53,8 @@ interface Props {
     propertyId?: string;
     /** Confirmed income months feed the solar payback (net energy income). */
     incomeRows: PropertyIncomeRow[];
+    /** Lets the dashboard feed the investment analysis with the loaded header + transactions. */
+    onDataChange?: (data: { investment: PropertyInvestment | null; transactions: PropertyTransaction[]; loading: boolean }) => void;
 }
 
 const formatBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -78,7 +81,7 @@ const FIN_KINDS: TransactionKind[] = ["PRESTACAO", "AMORTIZACAO", "QUITACAO"];
 
 type TxDraft = Partial<Record<"date" | "kind" | "amount" | "interest" | "principal" | "insurance" | "comment", string>>;
 
-export default function PropertyInvestmentSection({ propertyId, incomeRows }: Props) {
+export default function PropertyInvestmentSection({ propertyId, incomeRows, onDataChange }: Props) {
     const txEndpoint = propertyId ? `/api/properties/${propertyId}/transactions` : null;
     const invEndpoint = propertyId ? `/api/properties/${propertyId}/investment` : null;
 
@@ -116,6 +119,8 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows }: Pr
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
     }, [txEndpoint, invEndpoint]);
+
+    useEffect(() => { onDataChange?.({ investment, transactions: txs, loading }); }, [investment, txs, loading, onDataChange]);
 
     // ── Persist ─────────────────────────────────────────────────────────
     const putTxs = useCallback(async (rows: TransactionInput[], replace = false, keys: string[] = []) => {
@@ -789,22 +794,3 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     return <div className="space-y-1.5"><Label>{label}</Label>{children}</div>;
 }
 
-function Tile({ label, value, hint, icon, tone }: { label: string; value: string; hint: React.ReactNode; icon: React.ReactNode; tone: "emerald" | "blue" | "violet" | "amber" | "rose" }) {
-    const tones = {
-        emerald: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600",
-        blue: "bg-blue-50 dark:bg-blue-950/40 text-blue-600",
-        violet: "bg-violet-50 dark:bg-violet-950/40 text-violet-600",
-        amber: "bg-amber-50 dark:bg-amber-950/40 text-amber-600",
-        rose: "bg-rose-50 dark:bg-rose-950/40 text-rose-600",
-    } as const;
-    return (
-        <div className="p-3.5 rounded-xl border border-border/80 bg-muted/20 space-y-1 flex flex-col">
-            <div className="flex items-start justify-between gap-2 text-muted-foreground">
-                <span className="text-[10px] font-semibold uppercase tracking-wider leading-tight">{label}</span>
-                <span className={cn("p-1.5 rounded-lg shrink-0", tones[tone])}>{icon}</span>
-            </div>
-            <span className="text-lg font-bold text-foreground block tabular-nums leading-tight">{value}</span>
-            <span className="text-[11px] text-muted-foreground block leading-snug break-words">{hint}</span>
-        </div>
-    );
-}

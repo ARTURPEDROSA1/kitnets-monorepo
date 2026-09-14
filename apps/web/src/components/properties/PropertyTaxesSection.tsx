@@ -47,6 +47,8 @@ interface Props {
     propertyId?: string;
     /** Property setting: default payer for new rows. */
     iptuPaidByLandlord?: boolean;
+    /** Lets the dashboard feed the investment analysis with the loaded rows. */
+    onRowsChange?: (rows: PropertyTax[]) => void;
 }
 
 const formatBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -92,7 +94,7 @@ async function fileForExtraction(file: File): Promise<File> {
 
 type ReviewForm = Record<"year" | "amount" | "parts" | "paidBy" | "vencimento" | "aliquota" | "valorImposto" | "coletaLixo" | "tsa" | "desconto" | "valorVenalImovel" | "valorVenalPredial" | "valorVenalTerreno" | "areaConstruida" | "areaTerreno" | "inscricao" | "municipio" | "referencia" | "comment", string>;
 
-export default function PropertyTaxesSection({ propertyId, iptuPaidByLandlord = false }: Props) {
+export default function PropertyTaxesSection({ propertyId, iptuPaidByLandlord = false, onRowsChange }: Props) {
     const endpoint = propertyId ? `/api/properties/${propertyId}/taxes` : null;
     const defaultPayer: TaxPayer = iptuPaidByLandlord ? "LANDLORD" : "TENANT";
     const [rows, setRows] = useState<PropertyTax[]>([]);
@@ -107,6 +109,8 @@ export default function PropertyTaxesSection({ propertyId, iptuPaidByLandlord = 
     const [viewer, setViewer] = useState<{ url: string; title: string } | null>(null);
 
     const flash = (msg: string) => { setNotice(msg); window.setTimeout(() => setNotice(null), 8000); };
+
+    useEffect(() => { onRowsChange?.(rows); }, [rows, onRowsChange]);
 
     useEffect(() => {
         if (!endpoint) { setLoading(false); return; }

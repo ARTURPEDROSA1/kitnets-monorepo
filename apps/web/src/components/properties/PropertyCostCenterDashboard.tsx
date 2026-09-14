@@ -52,6 +52,7 @@ import type { PropertyDetails, SubUnit } from '@/components/profile/PropertyDeta
 import PropertyIncomeLedger from './PropertyIncomeLedger';
 import PropertyInvestmentSection from './PropertyInvestmentSection';
 import PropertyTaxesSection from './PropertyTaxesSection';
+import PropertyInvestmentAnalysis from './PropertyInvestmentAnalysis';
 import PeriodFilter from './PeriodFilter';
 import {
     breakdown,
@@ -62,6 +63,8 @@ import {
     type PropertyIncomeRow,
 } from '@/lib/property-income';
 import { DEFAULT_PERIOD, monthsBetween, periodLabel, periodRange, type PeriodFilterValue } from '@/lib/period-filter';
+import type { PropertyInvestment, PropertyTransaction } from '@/lib/property-investment';
+import type { PropertyTax } from '@/lib/property-taxes';
 
 interface PropertyCostCenterDashboardProps {
     propertyIndex: number;
@@ -109,6 +112,9 @@ export default function PropertyCostCenterDashboard({
     const [incomeRows, setIncomeRows] = useState<PropertyIncomeRow[]>([]);
     // True while the ledger fetches: KPIs and charts show a skeleton instead of estimates first
     const [incomeLoading, setIncomeLoading] = useState(Boolean(dbId));
+    // Investment header + transactions (fed by PropertyInvestmentSection) and taxes (fed by PropertyTaxesSection) for the analysis
+    const [investmentData, setInvestmentData] = useState<{ investment: PropertyInvestment | null; transactions: PropertyTransaction[]; loading: boolean }>({ investment: null, transactions: [], loading: Boolean(dbId) });
+    const [taxRows, setTaxRows] = useState<PropertyTax[]>([]);
     useEffect(() => {
         setIncomeRows([]);
         setIncomeLoading(Boolean(dbId));
@@ -651,11 +657,20 @@ export default function PropertyCostCenterDashboard({
                 iptuPaidByLandlord={iptuPaidBy === 'landlord'}
             />
 
-            {/* Investment ledger: acquisition, financing, capex, running costs, solar */}
-            <PropertyInvestmentSection propertyId={dbId} incomeRows={incomeRows} />
+            {/* Payback, forecast, yields and IRR from the three ledgers */}
+            <PropertyInvestmentAnalysis
+                investment={investmentData.investment}
+                transactions={investmentData.transactions}
+                incomeRows={incomeRows}
+                taxes={taxRows}
+                loading={incomeLoading || investmentData.loading}
+            />
 
-            {/* Property taxes register: IPTU per year, ITBI, others (informational) */}
-            <PropertyTaxesSection propertyId={dbId} iptuPaidByLandlord={iptuPaidBy === 'landlord'} />
+            {/* Investment ledger: acquisition, financing, capex, running costs, solar */}
+            <PropertyInvestmentSection propertyId={dbId} incomeRows={incomeRows} onDataChange={setInvestmentData} />
+
+            {/* Property taxes register: IPTU per year, ITBI, others; landlord IPTU feeds the analysis when the ledgers lack it */}
+            <PropertyTaxesSection propertyId={dbId} iptuPaidByLandlord={iptuPaidBy === 'landlord'} onRowsChange={setTaxRows} />
 
             {/* Multifamily Units Summary (if applicable) */}
             {propertyType === 'multi' && subUnits.length > 0 && (
