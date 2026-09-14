@@ -2,30 +2,34 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-    AlertCircle, CheckCircle2, ChevronDown, ChevronRight, Landmark, Loader2, Plus, Receipt, Scale, SplitSquareVertical, Trash2, TrendingUp, Wand2,
+    AlertCircle, CheckCircle2, ChevronDown, ChevronRight, FileText, Landmark, LineChart, Loader2, Plus, Receipt, Scale, Sparkles, SplitSquareVertical, Trash2, TrendingUp, Upload, Wand2,
 } from "lucide-react";
-import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip as RechartsTooltip, Cell } from "recharts";
 import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { PdfViewerModal } from "@/components/ui/PdfViewerModal";
 import { cn } from "@/lib/utils";
 import type { PropertyTransaction } from "@/lib/property-investment";
 import {
+    checkIptuTotals,
     effectiveTax,
-    iptuSeries,
+    iptuFromExtraction,
     iptuYearsFromTransactions,
     MAX_INSTALLMENTS,
+    parseReferencia,
     splitInstallments,
     summarizeTaxes,
     TAX_KINDS,
     TAX_PAYERS,
+    type ExtractedIptu,
     type PropertyTax,
     type PropertyTaxInput,
     type TaxInstallment,
     type TaxKind,
     type TaxPayer,
 } from "@/lib/property-taxes";
+import { IptuHistoryModal } from "./IptuHistoryModal";
 
 interface Props {
     propertyId?: string;
@@ -45,21 +49,50 @@ const BOX = "bg-transparent border border-transparent hover:border-border focus:
 type Draft = Partial<Record<"year" | "kind" | "amount" | "paidBy" | "date" | "comment", string>>;
 type PartDraft = Partial<Record<"amount" | "paidBy" | "date", string>>;
 
-const toInput_ = (row: PropertyTax): PropertyTaxInput => ({
+const rowToInput = (row: PropertyTax): PropertyTaxInput => ({
     id: row.id, year: row.year, kind: row.kind, amount: row.amount, paid_by: row.paid_by,
     paid_on: row.paid_on, comment: row.comment, installments: row.installments ?? [],
 });
 
+/** Renders page 1 of a PDF to a PNG file for the vision model (falls back to the PDF itself). */
+async function fileForExtraction(file: File): Promise<File> {
+    if (file.type !== "application/pdf") return file;
+    try {
+        const pdfjsLib = await import("pdfjs-dist");
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+        const pdf = await pdfjsLib.getDocument(new Uint8Array(await file.arrayBuffer())).promise;
+        const page = await pdf.getPage(1);
+        const viewport = page.getViewport({ scale: 2 });
+        const canvas = document.createElement("canvas");
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("Canvas indisponível");
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await page.render({ canvasContext: ctx, viewport, canvas } as any).promise;
+        const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(b => (b ? resolve(b) : reject(new Error("Falha ao renderizar PDF"))), "image/png"));
+        return new File([blob], "iptu-page1.png", { type: "image/png" });
+    } catch (err) {
+        console.warn("[IPTU import] PDF render failed, sending the PDF itself:", err);
+        return file;
+    }
+}
+
+type ReviewForm = Record<"year" | "amount" | "parts" | "paidBy" | "vencimento" | "aliquota" | "valorImposto" | "coletaLixo" | "tsa" | "desconto" | "valorVenalImovel" | "valorVenalPredial" | "valorVenalTerreno" | "areaConstruida" | "areaTerreno" | "inscricao" | "municipio" | "referencia" | "comment", string>;
+
 export default function PropertyTaxesSection({ propertyId, iptuPaidByLandlord = false }: Props) {
     const endpoint = propertyId ? `/api/properties/${propertyId}/taxes` : null;
+    const defaultPayer: TaxPayer = iptuPaidByLandlord ? "LANDLORD" : "TENANT";
     const [rows, setRows] = useState<PropertyTax[]>([]);
     const [loading, setLoading] = useState<boolean>(Boolean(propertyId));
     const [error, setError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
     const [saving, setSaving] = useState<Set<string>>(new Set());
     const [drafts, setDrafts] = useState<Record<string, Draft>>({});
-    const [partDrafts, setPartDrafts] = useState<Record<string, PartDraft>>({});   // key: `${rowId}:${seq}`
+    const [partDrafts, setPartDrafts] = useState<Record<string, PartDraft>>({});
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
+    const [historyOpen, setHistoryOpen] = useState(false);
+    const [viewer, setViewer] = useState<{ url: string; title: string } | null>(null);
 
     const flash = (msg: string) => { setNotice(msg); window.setTimeout(() => setNotice(null), 8000); };
 
@@ -100,7 +133,7 @@ export default function PropertyTaxesSection({ propertyId, iptuPaidByLandlord = 
 
     const remove = async (row: PropertyTax) => {
         if (!endpoint) return;
-        if (!window.confirm(`Excluir ${row.kind} ${row.year} (${formatBRL(effectiveTax(row).amount)})?`)) return;
+        if (!window.confirm(`Excluir ${row.kind} ${row.year} (${formatBRL(effectiveTax(row).amount)})?${row.document_path ? " O PDF atual do IPTU também será removido." : ""}`)) return;
         setSaving(prev => new Set([...prev, row.id]));
         try {
             const res = await fetch(`${endpoint}?id=${row.id}`, { method: "DELETE" });
@@ -121,13 +154,12 @@ export default function PropertyTaxesSection({ propertyId, iptuPaidByLandlord = 
         const raw = drafts[row.id]?.[field];
         if (raw === undefined) return;
         const clear = () => setDrafts(prev => { const n = { ...prev, [row.id]: { ...prev[row.id] } }; delete n[row.id][field]; return n; });
-        const next = toInput_(row);
+        const next = rowToInput(row);
         if (field === "year") { const y = Number(raw); if (!Number.isInteger(y) || y < 1990 || y > 2100 || y === row.year) return clear(); next.year = y; }
         else if (field === "kind") { if (raw === row.kind) return clear(); next.kind = raw as TaxKind; }
         else if (field === "paidBy") {
             if (raw === row.paid_by) return clear();
             next.paid_by = raw as TaxPayer;
-            // Without parcelas the row payer is the payer; with parcelas, apply to all of them.
             if (next.installments?.length) next.installments = next.installments.map(p => ({ ...p, paid_by: raw as TaxPayer }));
         }
         else if (field === "date") { const d = raw || null; if (d !== null && !/^\d{4}-\d{2}-\d{2}$/.test(d)) return clear(); if (d === row.paid_on) return clear(); next.paid_on = d; }
@@ -136,7 +168,6 @@ export default function PropertyTaxesSection({ propertyId, iptuPaidByLandlord = 
             const v = parseInput(raw);
             if (v === null || v === row.amount) return clear();
             next.amount = v;
-            // Re-spread a changed total across existing parcelas (keeps payers and dates)
             if (next.installments?.length) next.installments = splitInstallments(v, next.installments.length, row.paid_by, next.installments);
         }
         void put([next], [row.id]);
@@ -144,17 +175,15 @@ export default function PropertyTaxesSection({ propertyId, iptuPaidByLandlord = 
 
     // ── Parcelas ────────────────────────────────────────────────────────
     const toggleExpanded = (id: string) => setExpanded(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
-
     const splitRow = (row: PropertyTax, n: number) => {
-        const total = effectiveTax(row).amount;
-        const next = toInput_(row);
-        next.installments = splitInstallments(total, n, row.paid_by, row.installments ?? []);
+        const next = rowToInput(row);
+        next.installments = splitInstallments(effectiveTax(row).amount, n, row.paid_by, row.installments ?? []);
         setExpanded(prev => new Set([...prev, row.id]));
         void put([next], [row.id]);
     };
     const unsplitRow = (row: PropertyTax) => {
         const e = effectiveTax(row);
-        const next = toInput_(row);
+        const next = rowToInput(row);
         next.amount = e.amount;
         next.paid_by = e.byLandlord > e.byTenant ? "LANDLORD" : "TENANT";
         next.installments = [];
@@ -171,31 +200,104 @@ export default function PropertyTaxesSection({ propertyId, iptuPaidByLandlord = 
         if (field === "amount") { const v = parseInput(raw); if (v === null || v === part.amount) return clear(); updated.amount = v; }
         else if (field === "paidBy") { if (raw === part.paid_by) return clear(); updated.paid_by = raw as TaxPayer; }
         else { const d = raw || null; if (d !== null && !/^\d{4}-\d{2}-\d{2}$/.test(d)) return clear(); if (d === part.paid_on) return clear(); updated.paid_on = d; }
-        const next = toInput_(row);
+        const next = rowToInput(row);
         next.installments = (row.installments ?? []).map(p => (p.seq === part.seq ? updated : p));
         void put([next], [row.id]);
     };
 
     // ── Add dialog ──────────────────────────────────────────────────────
     const [addOpen, setAddOpen] = useState(false);
-    const [add, setAdd] = useState({ year: String(new Date().getFullYear()), kind: "IPTU" as TaxKind, amount: "", paidBy: (iptuPaidByLandlord ? "LANDLORD" : "TENANT") as TaxPayer, date: "", comment: "", parts: "1" });
+    const [add, setAdd] = useState({ year: String(new Date().getFullYear()), kind: "IPTU" as TaxKind, amount: "", paidBy: defaultPayer, date: "", comment: "", parts: "1" });
     const [adding, setAdding] = useState(false);
-    const openAdd = () => {
-        setAdd(a => ({ ...a, year: String(new Date().getFullYear()), amount: "", date: "", comment: "", parts: "1", paidBy: iptuPaidByLandlord ? "LANDLORD" : "TENANT" }));
-        setAddOpen(true);
-    };
+    const openAdd = () => { setAdd(a => ({ ...a, year: String(new Date().getFullYear()), amount: "", date: "", comment: "", parts: "1", paidBy: defaultPayer })); setAddOpen(true); };
     const submitAdd = async () => {
         const amount = parseInput(add.amount);
         const year = Number(add.year);
         if (amount === null || !Number.isInteger(year)) return;
         const n = Number(add.parts) || 1;
         setAdding(true);
-        const ok = await put([{
-            year, kind: add.kind, amount, paid_by: add.paidBy, paid_on: add.date || null, comment: add.comment.trim() || null,
-            installments: n > 1 ? splitInstallments(amount, n, add.paidBy) : [],
-        }]);
+        const ok = await put([{ year, kind: add.kind, amount, paid_by: add.paidBy, paid_on: add.date || null, comment: add.comment.trim() || null, installments: n > 1 ? splitInstallments(amount, n, add.paidBy) : [] }]);
         setAdding(false);
         if (ok) setAddOpen(false);
+    };
+
+    // ── Import IPTU (AI) ────────────────────────────────────────────────
+    const [importOpen, setImportOpen] = useState(false);
+    const [importFile, setImportFile] = useState<File | null>(null);
+    const [extracting, setExtracting] = useState(false);
+    const [extracted, setExtracted] = useState<ExtractedIptu | null>(null);
+    const [review, setReview] = useState<ReviewForm | null>(null);
+    const [importError, setImportError] = useState<string | null>(null);
+    const [importing, setImporting] = useState(false);
+
+    const openImport = () => { setImportFile(null); setExtracted(null); setReview(null); setImportError(null); setImportOpen(true); };
+
+    const onImportFile = async (file: File | null) => {
+        if (!file || !endpoint) return;
+        setImportFile(file);
+        setExtracted(null);
+        setReview(null);
+        setImportError(null);
+        setExtracting(true);
+        try {
+            const form = new FormData();
+            form.append("file", await fileForExtraction(file));
+            const res = await fetch(`${endpoint}/extract`, { method: "POST", body: form });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) throw new Error(data.error || "Falha na extração por IA");
+            const x = data.data as ExtractedIptu;
+            const input = iptuFromExtraction(x, defaultPayer);
+            const ref = parseReferencia(x.referencia);
+            setExtracted(x);
+            setReview({
+                year: String(input.year), amount: toInput(input.amount), parts: ref ? String(ref.de) : "1", paidBy: defaultPayer,
+                vencimento: x.vencimento ?? "", aliquota: x.aliquotaPct === null ? "" : String(x.aliquotaPct),
+                valorImposto: toInput(x.valorImposto), coletaLixo: toInput(x.coletaLixo), tsa: toInput(x.tsa), desconto: toInput(x.desconto),
+                valorVenalImovel: toInput(x.valorVenalImovel), valorVenalPredial: toInput(x.valorVenalPredial), valorVenalTerreno: toInput(x.valorVenalTerreno),
+                areaConstruida: toInput(x.areaConstruida), areaTerreno: toInput(x.areaTerreno),
+                inscricao: x.inscricao ?? "", municipio: x.municipio ?? "", referencia: x.referencia ?? "", comment: "",
+            });
+        } catch (err) {
+            setImportError((err as Error).message);
+        } finally {
+            setExtracting(false);
+        }
+    };
+
+    const runImport = async () => {
+        if (!endpoint || !review) return;
+        const amount = parseInput(review.amount);
+        const year = Number(review.year);
+        if (amount === null || !Number.isInteger(year)) { setImportError("Informe o exercício e o valor total."); return; }
+        const n = Number(review.parts) || 1;
+        const num = (s: string) => (s.trim() === "" ? null : Number(s.replace(",", ".")));
+        const data: PropertyTaxInput = {
+            year, kind: "IPTU", amount, paid_by: review.paidBy as TaxPayer, paid_on: null,
+            comment: review.comment.trim() || null,
+            installments: n > 1 ? splitInstallments(amount, n, review.paidBy as TaxPayer) : [],
+            municipio: review.municipio || null, inscricao: review.inscricao || null, referencia: review.referencia || null,
+            vencimento: review.vencimento || null,
+            area_terreno: num(review.areaTerreno), area_construida: num(review.areaConstruida),
+            valor_venal_terreno: num(review.valorVenalTerreno), valor_venal_predial: num(review.valorVenalPredial), valor_venal_imovel: num(review.valorVenalImovel),
+            aliquota_pct: num(review.aliquota), valor_imposto: num(review.valorImposto), coleta_lixo: num(review.coletaLixo), tsa: num(review.tsa), desconto: num(review.desconto),
+        };
+        setImporting(true);
+        setImportError(null);
+        try {
+            const form = new FormData();
+            form.append("data", JSON.stringify(data));
+            if (importFile) form.append("file", importFile);
+            const res = await fetch(`${endpoint}/import`, { method: "POST", body: form });
+            const body = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(body.error || "Erro ao importar");
+            setRows(body.rows ?? []);
+            setImportOpen(false);
+            flash(`IPTU ${year} importado${importFile ? " · PDF guardado como documento atual" : ""}.`);
+        } catch (err) {
+            setImportError((err as Error).message);
+        } finally {
+            setImporting(false);
+        }
     };
 
     // ── Seed IPTU years from the investment ledger ──────────────────────
@@ -209,8 +311,7 @@ export default function PropertyTaxesSection({ propertyId, iptuPaidByLandlord = 
             const data = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(data.error || "Erro ao ler lançamentos");
             const existingYears = new Set(rows.filter(r => r.kind === "IPTU").map(r => r.year));
-            const seeds = iptuYearsFromTransactions((data.rows ?? []) as PropertyTransaction[], iptuPaidByLandlord ? "LANDLORD" : "TENANT")
-                .filter(s => !existingYears.has(s.year));
+            const seeds = iptuYearsFromTransactions((data.rows ?? []) as PropertyTransaction[], defaultPayer).filter(s => !existingYears.has(s.year));
             if (seeds.length === 0) { flash("Nenhum ano de IPTU novo encontrado nos lançamentos do investimento."); return; }
             if (!window.confirm(`Criar ${seeds.length} ano(s) de IPTU a partir dos lançamentos (${seeds[0].year}–${seeds[seeds.length - 1].year})?`)) return;
             if (await put(seeds)) flash(`${seeds.length} ano(s) de IPTU criados. Agora você pode excluir os lançamentos de IPTU do investimento.`);
@@ -222,7 +323,7 @@ export default function PropertyTaxesSection({ propertyId, iptuPaidByLandlord = 
     };
 
     const summary = useMemo(() => summarizeTaxes(rows), [rows]);
-    const series = useMemo(() => iptuSeries(rows), [rows]);
+    const reviewTotals = useMemo(() => (extracted ? checkIptuTotals(extracted) : null), [extracted]);
 
     if (!propertyId) return null;
 
@@ -231,10 +332,11 @@ export default function PropertyTaxesSection({ propertyId, iptuPaidByLandlord = 
         if (e.payer === "MIXED") return `Misto · inquilino ${Math.round((e.byTenant / e.amount) * 100)}%`;
         return e.payer === "LANDLORD" ? "Proprietário" : "Inquilino";
     };
+    const currentDoc = rows.find(r => r.document_url);
 
     return (
         <div className="bg-card border border-border rounded-2xl p-6 shadow-xs space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+            <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-3">
                 <div className="space-y-0.5">
                     <h3 className="font-bold text-base text-foreground flex items-center gap-2">
                         <Scale className="w-4 h-4 text-emerald-600" />
@@ -249,6 +351,9 @@ export default function PropertyTaxesSection({ propertyId, iptuPaidByLandlord = 
                     <Button size="sm" variant="outline" onClick={seedFromTransactions} disabled={seeding} className="gap-1.5 text-xs" title="Agrupa por ano os lançamentos de IPTU do investimento">
                         {seeding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />} Gerar IPTU dos lançamentos
                     </Button>
+                    <Button size="sm" variant="outline" onClick={openImport} className="gap-1.5 text-xs text-amber-700 border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/30" title="Lê a guia do IPTU (PDF ou foto) com IA e guarda o documento">
+                        <Sparkles className="w-3.5 h-3.5" /> Importar IPTU
+                    </Button>
                     <Button size="sm" onClick={openAdd} className="gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white">
                         <Plus className="w-3.5 h-3.5" /> Adicionar tributo
                     </Button>
@@ -261,30 +366,38 @@ export default function PropertyTaxesSection({ propertyId, iptuPaidByLandlord = 
             {/* Tiles */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
                 <Tile label="IPTU acumulado" value={formatBRL(summary.iptuTotal)} tone="rose" icon={<Receipt className="w-4 h-4" />}
-                    hint={<>{summary.iptuYears} {summary.iptuYears === 1 ? "ano" : "anos"}{series.length ? ` · ${series[0].year}–${series[series.length - 1].year}` : ""}<br />Média {formatBRL(summary.iptuAvgPerYear)}/ano</>} />
+                    hint={<>{summary.iptuYears} {summary.iptuYears === 1 ? "ano" : "anos"}{summary.firstYear ? ` · ${summary.firstYear}–${summary.lastYear}` : ""}<br />Média {formatBRL(summary.iptuAvgPerYear)}/ano</>} />
                 <Tile label="Quem pagou o IPTU" value={summary.iptuTotal > 0 ? `${Math.round((summary.iptuByTenant / summary.iptuTotal) * 100)}% inquilino` : "—"} tone="violet" icon={<Landmark className="w-4 h-4" />}
                     hint={<>Inquilino {formatBRL(summary.iptuByTenant)}<br />Proprietário {formatBRL(summary.iptuByLandlord)}</>} />
                 <Tile label="IPTU atual" value={summary.iptuLatest ? formatBRL(summary.iptuLatest.amount) : "—"} tone="amber" icon={<TrendingUp className="w-4 h-4" />}
                     hint={summary.iptuLatest
                         ? <>Exercício {summary.iptuLatest.year} · {formatBRL(summary.iptuLatest.amount / 12)}/mês
                             {summary.iptuGrowthPct !== null && <> · <span className={summary.iptuGrowthPct > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}>{summary.iptuGrowthPct > 0 ? "+" : ""}{summary.iptuGrowthPct}% vs {summary.iptuLatest.year - 1}</span></>}
-                            {summary.iptuCagrPct !== null && <><br />Crescimento médio {summary.iptuCagrPct > 0 ? "+" : ""}{summary.iptuCagrPct}% ao ano desde {series[0].year}</>}
                         </>
                         : "Nenhum ano registrado"}
-                    chart={series.length > 1 ? <IptuChart series={series} /> : null} />
+                    action={summary.iptuYears > 1 ? (
+                        <button type="button" onClick={() => setHistoryOpen(true)} className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 dark:text-amber-400 hover:underline underline-offset-2">
+                            <LineChart className="w-3.5 h-3.5" /> Ver histórico
+                        </button>
+                    ) : null} />
                 <Tile label="ITBI e outros" value={formatBRL(summary.itbi + summary.other)} tone="blue" icon={<Scale className="w-4 h-4" />}
-                    hint={<>ITBI {formatBRL(summary.itbi)}<br />Outros {formatBRL(summary.other)}</>} />
+                    hint={<>ITBI {formatBRL(summary.itbi)}<br />Outros {formatBRL(summary.other)}</>}
+                    action={currentDoc ? (
+                        <button type="button" onClick={() => setViewer({ url: currentDoc.document_url!, title: `IPTU ${currentDoc.year}` })} className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 dark:text-blue-400 hover:underline underline-offset-2">
+                            <FileText className="w-3.5 h-3.5" /> Ver guia atual (IPTU {currentDoc.year})
+                        </button>
+                    ) : null} />
             </div>
 
             {loading ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Carregando…</div>
             ) : rows.length === 0 ? (
                 <div className="text-sm text-muted-foreground text-center py-8 border border-dashed border-border rounded-xl">
-                    Nenhum tributo registrado. Adicione o IPTU de cada ano e o ITBI, ou gere os anos de IPTU a partir dos lançamentos do investimento.
+                    Nenhum tributo registrado. Importe a guia do IPTU, adicione o IPTU de cada ano e o ITBI, ou gere os anos de IPTU a partir dos lançamentos do investimento.
                 </div>
             ) : (
                 <div className="overflow-x-auto -mx-2">
-                    <table className="w-full text-xs min-w-[860px]">
+                    <table className="w-full text-xs min-w-[900px]">
                         <thead>
                             <tr className="text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border">
                                 <th className="px-1 py-2 w-6" />
@@ -321,6 +434,7 @@ export default function PropertyTaxesSection({ propertyId, iptuPaidByLandlord = 
                                                     onChange={ev => setDraft(row.id, "year", ev.target.value)} onBlur={() => commit(row, "year")}
                                                     className={cn(BOX, "w-20 font-semibold text-foreground")} />
                                                 {busy && <Loader2 className="inline w-3 h-3 ml-1 animate-spin text-muted-foreground" />}
+                                                {row.extracted_at && <span className="block text-[9px] text-muted-foreground pl-1.5" title={`Valor venal ${row.valor_venal_imovel ? formatBRL(Number(row.valor_venal_imovel)) : "—"} · alíquota ${row.aliquota_pct ?? "—"}%`}>guia lida por IA</span>}
                                             </td>
                                             <td className="px-2 py-1">
                                                 <select disabled={busy} value={d.kind ?? row.kind} onChange={ev => setDraft(row.id, "kind", ev.target.value)} onBlur={() => commit(row, "kind")} className={BOX}>
@@ -352,7 +466,7 @@ export default function PropertyTaxesSection({ propertyId, iptuPaidByLandlord = 
                                                 <input type="text" disabled={busy} value={d.comment ?? (row.comment ?? "")} placeholder="—"
                                                     onChange={ev => setDraft(row.id, "comment", ev.target.value)} onBlur={() => commit(row, "comment")}
                                                     onKeyDown={ev => { if (ev.key === "Enter") (ev.target as HTMLInputElement).blur(); }}
-                                                    className={cn(BOX, "w-44 truncate")} />
+                                                    className={cn(BOX, "w-40 truncate")} />
                                             </td>
                                             <td className="px-2 py-1 whitespace-nowrap">
                                                 {hasParts ? (
@@ -367,7 +481,13 @@ export default function PropertyTaxesSection({ propertyId, iptuPaidByLandlord = 
                                                     </select>
                                                 )}
                                             </td>
-                                            <td className="px-2 py-1 text-right">
+                                            <td className="px-2 py-1 text-right whitespace-nowrap">
+                                                {row.document_url && (
+                                                    <button type="button" onClick={() => setViewer({ url: row.document_url!, title: `IPTU ${row.year}` })} title="Ver a guia do IPTU (PDF)"
+                                                        className="p-1 rounded-md text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30">
+                                                        <FileText className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
                                                 <button type="button" disabled={busy} onClick={() => remove(row)} title="Excluir" className="p-1 rounded-md text-muted-foreground hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30">
                                                     <Trash2 className="w-3.5 h-3.5" />
                                                 </button>
@@ -409,10 +529,12 @@ export default function PropertyTaxesSection({ propertyId, iptuPaidByLandlord = 
                     <p className="text-[11px] text-muted-foreground mt-2 mx-2">
                         Escolha “2x…{MAX_INSTALLMENTS}x” para dividir um ano em parcelas e mudar o pagador de cada uma (por exemplo, o proprietário paga as parcelas de um período vago).
                         Pago por “Proprietário” não altera os KPIs por si só: lance o valor mensal na coluna IPTU das Receitas de Aluguel para que entre nas despesas.
+                        Apenas a guia mais recente fica guardada como documento atual.
                     </p>
                 </div>
             )}
 
+            {/* Add dialog */}
             <Dialog open={addOpen} onOpenChange={setAddOpen}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>
@@ -442,11 +564,6 @@ export default function PropertyTaxesSection({ propertyId, iptuPaidByLandlord = 
                             <div className="space-y-1.5"><Label>Data do pagamento</Label><Input type="date" value={add.date} onChange={ev => setAdd(a => ({ ...a, date: ev.target.value }))} /></div>
                         </div>
                         <div className="space-y-1.5"><Label>Comentários</Label><Input value={add.comment} placeholder="Opcional" onChange={ev => setAdd(a => ({ ...a, comment: ev.target.value }))} /></div>
-                        {Number(add.parts) > 1 && parseInput(add.amount) !== null && (
-                            <p className="text-[11px] text-muted-foreground">
-                                {add.parts} parcelas de ≈ {formatBRL((parseInput(add.amount) ?? 0) / Number(add.parts))}; ajuste valores, datas e pagador de cada parcela na tabela depois de salvar.
-                            </p>
-                        )}
                     </div>
                     <DialogFooter>
                         <Button variant="ghost" onClick={() => setAddOpen(false)}>Cancelar</Button>
@@ -456,35 +573,94 @@ export default function PropertyTaxesSection({ propertyId, iptuPaidByLandlord = 
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Import IPTU dialog */}
+            <Dialog open={importOpen} onOpenChange={setImportOpen}>
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2"><Sparkles className="w-5 h-5 text-amber-600" /> Importar guia do IPTU</DialogTitle>
+                        <DialogDescription>
+                            Envie o PDF (ou foto) da guia de IPTU. A IA lê o exercício, os valores venais, a alíquota, o imposto, a coleta de lixo, o desconto e o total; revise e salve.
+                            O PDF fica guardado como a guia atual do imóvel.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2 max-h-[65vh] overflow-y-auto pr-1">
+                        <div className="space-y-1.5">
+                            <Label>Guia do IPTU (.pdf, .jpg, .png)</Label>
+                            <Input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*" disabled={extracting || importing} onChange={ev => onImportFile(ev.target.files?.[0] ?? null)} />
+                            {extracting && <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Lendo a guia com IA…</span>}
+                        </div>
+                        {importError && <div className="text-xs text-rose-600 flex items-center gap-2"><AlertCircle className="w-3.5 h-3.5" /> {importError}</div>}
+
+                        {review && extracted && (
+                            <div className="space-y-4">
+                                <div className={cn("text-xs rounded-lg border px-3 py-2 flex items-start gap-2",
+                                    reviewTotals?.matches === false
+                                        ? "border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300"
+                                        : "border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300")}>
+                                    {reviewTotals?.matches === false ? <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" /> : <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 shrink-0" />}
+                                    <span>
+                                        Leitura concluída{extracted.municipio ? ` · ${extracted.municipio}` : ""}{extracted.contribuinte ? ` · ${extracted.contribuinte}` : ""} · confiança {Math.round(extracted.confidence * 100)}%.
+                                        {reviewTotals?.matches === false && reviewTotals.computed !== null && <> Atenção: imposto + lixo + TSA − desconto = {formatBRL(reviewTotals.computed)}, diferente do total lido ({formatBRL(extracted.total ?? 0)}). Confira os valores.</>}
+                                        {parseReferencia(extracted.referencia) && <> Esta guia é a parcela {extracted.referencia}: confirme o valor total do ano e o número de parcelas.</>}
+                                    </span>
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                    <Field label="Exercício"><Input type="number" min={1990} max={2100} step={1} value={review.year} onChange={ev => setReview(f => f && ({ ...f, year: ev.target.value }))} /></Field>
+                                    <Field label="Valor total do ano (R$)"><Input type="number" step="0.01" min={0} value={review.amount} onChange={ev => setReview(f => f && ({ ...f, amount: ev.target.value }))} /></Field>
+                                    <Field label="Parcelas">
+                                        <select value={review.parts} onChange={ev => setReview(f => f && ({ ...f, parts: ev.target.value }))} className="h-12 w-full rounded-xl border border-input bg-background px-3 text-base">
+                                            <option value="1">À vista</option>
+                                            {Array.from({ length: MAX_INSTALLMENTS - 1 }, (_, i) => i + 2).map(n => <option key={n} value={String(n)}>{n}x</option>)}
+                                        </select>
+                                    </Field>
+                                    <Field label="Pago por">
+                                        <select value={review.paidBy} onChange={ev => setReview(f => f && ({ ...f, paidBy: ev.target.value }))} className="h-12 w-full rounded-xl border border-input bg-background px-3 text-base">
+                                            {TAX_PAYERS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                                        </select>
+                                    </Field>
+                                    <Field label="Vencimento"><Input type="date" value={review.vencimento} onChange={ev => setReview(f => f && ({ ...f, vencimento: ev.target.value }))} /></Field>
+                                    <Field label="Referência"><Input value={review.referencia} placeholder="Única / 1/6" onChange={ev => setReview(f => f && ({ ...f, referencia: ev.target.value }))} /></Field>
+                                    <Field label="Valor do imposto (R$)"><Input type="number" step="0.01" min={0} value={review.valorImposto} onChange={ev => setReview(f => f && ({ ...f, valorImposto: ev.target.value }))} /></Field>
+                                    <Field label="Coleta de lixo (R$)"><Input type="number" step="0.01" min={0} value={review.coletaLixo} onChange={ev => setReview(f => f && ({ ...f, coletaLixo: ev.target.value }))} /></Field>
+                                    <Field label="Desconto (R$)"><Input type="number" step="0.01" min={0} value={review.desconto} onChange={ev => setReview(f => f && ({ ...f, desconto: ev.target.value }))} /></Field>
+                                    <Field label="Alíquota (%)"><Input type="number" step="0.0001" min={0} value={review.aliquota} onChange={ev => setReview(f => f && ({ ...f, aliquota: ev.target.value }))} /></Field>
+                                    <Field label="Valor venal do imóvel (R$)"><Input type="number" step="0.01" min={0} value={review.valorVenalImovel} onChange={ev => setReview(f => f && ({ ...f, valorVenalImovel: ev.target.value }))} /></Field>
+                                    <Field label="Valor venal predial (R$)"><Input type="number" step="0.01" min={0} value={review.valorVenalPredial} onChange={ev => setReview(f => f && ({ ...f, valorVenalPredial: ev.target.value }))} /></Field>
+                                    <Field label="Valor venal do terreno (R$)"><Input type="number" step="0.01" min={0} value={review.valorVenalTerreno} onChange={ev => setReview(f => f && ({ ...f, valorVenalTerreno: ev.target.value }))} /></Field>
+                                    <Field label="Área construída (m²)"><Input type="number" step="0.01" min={0} value={review.areaConstruida} onChange={ev => setReview(f => f && ({ ...f, areaConstruida: ev.target.value }))} /></Field>
+                                    <Field label="Área do terreno (m²)"><Input type="number" step="0.01" min={0} value={review.areaTerreno} onChange={ev => setReview(f => f && ({ ...f, areaTerreno: ev.target.value }))} /></Field>
+                                    <Field label="Inscrição imobiliária"><Input value={review.inscricao} onChange={ev => setReview(f => f && ({ ...f, inscricao: ev.target.value }))} /></Field>
+                                    <Field label="Município"><Input value={review.municipio} onChange={ev => setReview(f => f && ({ ...f, municipio: ev.target.value }))} /></Field>
+                                    <Field label="TSA (R$)"><Input type="number" step="0.01" min={0} value={review.tsa} onChange={ev => setReview(f => f && ({ ...f, tsa: ev.target.value }))} /></Field>
+                                </div>
+                                <Field label="Comentários"><Input value={review.comment} placeholder="Opcional" onChange={ev => setReview(f => f && ({ ...f, comment: ev.target.value }))} /></Field>
+                                {rows.some(r => r.kind === "IPTU" && r.year === Number(review.year)) && (
+                                    <p className="text-[11px] text-amber-700 dark:text-amber-400">Já existe IPTU {review.year} no registro: ele será atualizado com os dados desta guia.</p>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button variant="ghost" onClick={() => setImportOpen(false)}>Fechar</Button>
+                        <Button onClick={runImport} disabled={!review || importing || extracting} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
+                            {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />} Salvar IPTU{review ? ` ${review.year}` : ""}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <IptuHistoryModal isOpen={historyOpen} onClose={() => setHistoryOpen(false)} rows={rows} />
+            <PdfViewerModal isOpen={viewer !== null} onClose={() => setViewer(null)} url={viewer?.url ?? null} title={viewer?.title ?? "Guia do IPTU"} fileName={`${(viewer?.title ?? "iptu").toLowerCase().replace(/\s+/g, "-")}.pdf`} />
         </div>
     );
 }
 
-function IptuChart({ series }: { series: ReturnType<typeof iptuSeries> }) {
-    const data = series.map(p => ({ year: String(p.year), total: p.amount, inquilino: p.byTenant, proprietario: p.byLandlord }));
-    return (
-        <div className="h-[84px] w-full mt-2 -mb-1">
-            <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={data} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
-                    <XAxis dataKey="year" tickLine={false} axisLine={false} fontSize={9} stroke="hsl(var(--muted-foreground))" interval="preserveStartEnd" />
-                    <YAxis hide domain={[0, "dataMax"]} />
-                    <RechartsTooltip
-                        formatter={(value, name) => [Number(value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }), name === "total" ? "IPTU" : name === "inquilino" ? "Inquilino" : "Proprietário"]}
-                        labelFormatter={(label) => `Exercício ${label}`}
-                        contentStyle={{ backgroundColor: "hsl(var(--background))", borderColor: "hsl(var(--border))", borderRadius: "10px", fontSize: "11px" }}
-                    />
-                    <Bar dataKey="inquilino" stackId="a" fill="#f59e0b" fillOpacity={0.55} maxBarSize={18} />
-                    <Bar dataKey="proprietario" stackId="a" fill="#f43f5e" fillOpacity={0.7} radius={[3, 3, 0, 0]} maxBarSize={18}>
-                        {data.map((_, i) => <Cell key={i} />)}
-                    </Bar>
-                    <Line type="monotone" dataKey="total" stroke="#d97706" strokeWidth={2} dot={{ r: 2 }} />
-                </ComposedChart>
-            </ResponsiveContainer>
-        </div>
-    );
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+    return <div className="space-y-1.5"><Label>{label}</Label>{children}</div>;
 }
 
-function Tile({ label, value, hint, icon, tone, chart }: { label: string; value: string; hint: React.ReactNode; icon: React.ReactNode; tone: "emerald" | "blue" | "violet" | "amber" | "rose"; chart?: React.ReactNode }) {
+function Tile({ label, value, hint, icon, tone, action }: { label: string; value: string; hint: React.ReactNode; icon: React.ReactNode; tone: "emerald" | "blue" | "violet" | "amber" | "rose"; action?: React.ReactNode }) {
     const tones = {
         emerald: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600",
         blue: "bg-blue-50 dark:bg-blue-950/40 text-blue-600",
@@ -500,7 +676,7 @@ function Tile({ label, value, hint, icon, tone, chart }: { label: string; value:
             </div>
             <span className="text-lg font-bold text-foreground block tabular-nums leading-tight">{value}</span>
             <span className="text-[11px] text-muted-foreground block leading-snug break-words">{hint}</span>
-            {chart}
+            {action}
         </div>
     );
 }
