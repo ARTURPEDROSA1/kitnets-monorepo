@@ -222,19 +222,20 @@ Tests (`investment-metrics.test.ts`, vitest): the Vale do Sol case from §2 as a
 
 **7.3 Dictionary keys** in pt/en/es for every label; pt first.
 
-## 8. Phases
+## 8. Phases — status (updated 2026-09-14)
 
-**Delivered ahead of phase 0 (2026-09-11): real income ledger.** `property_income_months` (migration `apps/web/database/property_income_2026_09.sql`), pure helpers in `lib/property-income.ts`, route `/api/properties/[id]/income` (GET / merge-PUT / DELETE), and `PropertyIncomeLedger` inside the cost-center dashboard: editable monthly rows (received, energy portion, other, agency %, derived net and gross rent, status previsto/confirmado), spreadsheet import with column mapping, and the dashboard's revenue, management fee and DRE chart now use the latest confirmed month when data exists. The `properties.id` is now passed into the dashboard, so that part of phase 0 is done. Phase 1's ledger keeps this table as the INCOME source and adds costs, capex and financing; a Banco Inter (Open Finance) integration will write `source = BANK` rows with `bank_reference`.
+The work was cut into slices instead of the original phases; each slice shipped as its own PR on `main`.
 
-| Phase | Deliverable | Depends on | Effort |
-|---|---|---|---|
-| 0 | Add vitest to `apps/web` (move the parser checks in `property-income.ts` into a test) | — | 0.5 d |
-| 1 | Migration (§4); engine (§5) with tests; `investment`, `transactions`, `metrics` routes; KPI row, payback curve, config modal, manual ledger | 0 | 3–4 d |
-| 2 | Statement import (XLS/CSV/OFX + PDF fallback) with classifier and review queue; lease/bill sync; real monthly cash-flow chart replacing the fake DRE | 1 | 2–3 d |
-| 3 | Valuations (manual + FipeZap); IRR, equity multiple, appreciation; IPCA-deflated payback; portfolio roll-up on `/imoveis` | 1 | 2 d |
-| 4 | Scenarios ("what if I prepay X", "sell at year N", rent growth by index); PDF/XLSX report export; public "Calculadora de Payback de Imóvel" reusing the engine for SEO | 3 | 2–3 d |
+| Slice | Deliverable | Status |
+|---|---|---|
+| Income ledger | `property_income_months` + `lib/property-income.ts` + `PropertyIncomeLedger` (manual rows, Excel template import/export, period filter, KPIs, agency-fee saving, IPTU column, property cards with real data) | ✅ delivered (PRs #6–#37) |
+| **A — investment ledger** | `property_investments` + `property_transactions` (`lib/property-investment.ts`): acquisition/financing header, dated transactions by kind, Excel template, solar as its own cost centre, financing split estimator (`estimateFinancingSplits`), Excel-style table filters | ✅ delivered (PRs #38–#44) |
+| Taxes register | `property_taxes` (`lib/property-taxes.ts`): IPTU per year with parcelas and payer, ITBI, AI import of the IPTU DAM (PDF kept in a private bucket), history modal | ✅ delivered (PRs #39–#41) |
+| **B — metrics engine and payback** | `lib/investment-metrics.ts` (`computeInvestmentMetrics`, `xirr`, `registerIptuByMonth`) with vitest fixtures; `PropertyInvestmentAnalysis` section: total investido, renda líquida acumulada, payback % with progress, payback previsto (trailing-12 pace + remaining instalments), yield bruto / sobre custo, price-to-rent, cash-on-cash + DSCR while financed, TIR realizada; payback curve (cumulative invested vs cumulative NOI, dashed projection, markers for payback and quitação); toggle to count *previsto* months | ✅ delivered (PR #45) |
+| **C — value and returns** | Manual + FipeZap valuations, appreciation, IRR with unrealised value, IPCA-deflated payback, portfolio strip on `/imoveis` with real yield and payback per property | ⏳ next |
+| **D — automation** | Banco Inter (Open Finance) sync into both ledgers, what-if scenarios (prepay X, sell at year N, rent growth by index), PDF/XLSX report export, public "Calculadora de Payback de Imóvel" reusing the engine | ⏳ later |
 
-Acceptance for phase 1, using the Vale do Sol attachments: enter the acquisition (R$ 377.000, 24/04/2018, down payment R$ 91.334,84), import the Bradesco XLS, and the page must show cash invested ≈ R$ 420.8k, 58 financing rows, loan status *Quitado em 25/08/2021*, gross yield 6,7 %, and a payback forecast consistent with the NOI entered.
+**Slice B money model (as implemented).** Per calendar month: invested = entrada + custos de aquisição + prestações + amortizações + quitação + reformas; running costs = tarifa + IPTU + utilidades + outros, plus landlord-paid IPTU from the taxes register only for years where neither ledger already carries IPTU; net rent = received − energy portion; property opex = outras despesas + IPTU column; net energy (energy − custo de energia) pays the solar system back first and only the surplus counts for the property; NOI = net rent − property opex − running costs + energy surplus. Payback % = Σ NOI ÷ Σ invested (cash basis). The forecast walks forward at the average NOI of the months with income in the last 12, adding the remaining instalments while the loan is active. TIR realizada = XIRR of the monthly (NOI − invested) flows dated mid-month, no sale. Everything is computed client-side from data the page already loads; no metrics endpoint yet (add one with caching when the portfolio roll-up in slice C needs it).
 
 ## 9. Risks and decisions to confirm
 
