@@ -140,3 +140,55 @@ describe("computeInvestmentMetrics", () => {
         expect(covered.netIncomeToDate).toBe(3 * 3850 - 900);
     });
 });
+
+describe("computeInvestmentMetrics — value, returns and real payback", () => {
+    const txs = [tx("2024-01-10", "ENTRADA", 40000), tx("2024-01-10", "CUSTOS_AQUISICAO", 10000),
+        ...months("2024-02", 12).map(m => tx(`${m}-05`, "PRESTACAO", 5000))];
+    const rows = months("2024-02", 32).map(m => income(m));
+    const inv = investment({ financing_status: "PAID_OFF" });
+
+    it("derives appreciation, equity, multiple, total return and IRR with value from the latest valuation", () => {
+        const base = computeInvestmentMetrics({ investment: inv, transactions: txs, incomeRows: rows, asOf: "2026-09" });
+        const m = computeInvestmentMetrics({ investment: inv, transactions: txs, incomeRows: rows, asOf: "2026-09", marketValue: { amount: 130000, valuedOn: "2026-08-01", source: "MANUAL" } });
+        expect(m.marketValue).toBe(130000);
+        expect(m.appreciationPct).toBeCloseTo(30, 1);
+        expect(m.appreciationGain).toBe(30000);
+        expect(m.outstandingBalance).toBe(0);
+        expect(m.equity).toBe(130000);
+        expect(m.equityMultiple).toBeCloseTo((m.netIncomeToDate + 130000) / 110000, 2);
+        expect(m.totalReturn).toBe(m.netIncomeToDate + 30000);
+        expect(m.capRate).toBeCloseTo((3850 * 12 / 130000) * 100, 0);
+        expect(m.grossYieldOnValue).toBeCloseTo((4000 * 12 / 130000) * 100, 0);
+        expect(m.irrWithValue).not.toBeNull();
+        expect(m.irrWithValue!).toBeGreaterThan(base.irrRealized!);
+        expect(base.marketValue).toBeNull();
+        expect(base.irrWithValue).toBeNull();
+    });
+
+    it("tracks the outstanding balance while the loan is active only when every payment is split", () => {
+        const active = investment({ financing_status: "ACTIVE", principal: 60000, term_months: 120 });
+        const unsplit = computeInvestmentMetrics({ investment: active, transactions: txs, incomeRows: rows, asOf: "2026-09", marketValue: { amount: 130000, valuedOn: "2026-08-01", source: "MANUAL" } });
+        expect(unsplit.outstandingBalance).toBeNull();
+        expect(unsplit.equity).toBeNull();
+        const split = txs.map(t => (t.kind === "PRESTACAO" ? { ...t, principal_part: 1000, interest_part: 3900, insurance_part: 100 } : t));
+        const m = computeInvestmentMetrics({ investment: active, transactions: split, incomeRows: rows, asOf: "2026-09", marketValue: { amount: 130000, valuedOn: "2026-08-01", source: "MANUAL" } });
+        expect(m.outstandingBalance).toBe(48000);
+        expect(m.equity).toBe(82000);
+    });
+
+    it("restates invested and NOI in today's money with an IPCA series", () => {
+        // 1% every month: older flows are worth more in today's money
+        const ipca = months("2024-01", 33).map(m => ({ month: m, value: 1 }));
+        const m = computeInvestmentMetrics({ investment: inv, transactions: txs, incomeRows: rows, asOf: "2026-09", ipca });
+        expect(m.ipcaAvailable).toBe(true);
+        expect(m.cashInvestedReal!).toBeGreaterThan(m.cashInvested);
+        expect(m.netIncomeToDateReal!).toBeGreaterThan(m.netIncomeToDate);
+        // the investment came first, so inflation hurts the real payback
+        expect(m.paybackPctReal!).toBeLessThan(m.paybackPct);
+        expect(m.series[0].cumInvestedReal).toBeCloseTo(50000 * Math.pow(1.01, 32), 0);
+        expect(m.series.at(-1)!.cumNoiReal).toBe(m.netIncomeToDateReal);
+        const none = computeInvestmentMetrics({ investment: inv, transactions: txs, incomeRows: rows, asOf: "2026-09" });
+        expect(none.ipcaAvailable).toBe(false);
+        expect(none.paybackPctReal).toBeNull();
+    });
+});

@@ -22,11 +22,17 @@
  *   payback date   = walk forward at the trailing-12 NOI pace (and the remaining
  *                    instalments while the loan is active) until the gap closes
  *   IRR realizada  = XIRR of (noi_m − invested_m) monthly flows, no sale
+ *
+ * With a market value (latest valuation): appreciation, equity (value − outstanding
+ * loan), equity multiple, total return, IRR with the unrealised value as a terminal
+ * flow, cap rate. With an IPCA series: every month's invested and NOI restated in
+ * today's money for a real (inflation-adjusted) payback.
  */
 import { breakdown, currentMonthKey, monthKey, round2, type PropertyIncomeRow } from "./property-income";
 import { monthsBetween, shiftMonthKey } from "./period-filter";
 import { KIND_GROUP, type PropertyInvestment, type PropertyTransaction } from "./property-investment";
 import type { PropertyTax } from "./property-taxes";
+import { priceLevelFactors, type MonthlyIndexPoint } from "./property-valuations";
 
 export interface MetricsInput {
     investment: PropertyInvestment | null;
@@ -37,6 +43,10 @@ export interface MetricsInput {
     asOf?: string;
     /** count EXPECTED income months as if confirmed (default false) */
     includeExpected?: boolean;
+    /** latest valuation (market value) when known */
+    marketValue?: { amount: number; valuedOn: string; source: string } | null;
+    /** IPCA monthly variations (%), any range; enables the real (today's money) payback */
+    ipca?: MonthlyIndexPoint[];
 }
 
 export interface MonthPoint {
@@ -57,6 +67,9 @@ export interface MonthPoint {
     hasIncome: boolean;
     /** AMORTIZACAO / QUITACAO in this month */
     event: "AMORTIZACAO" | "QUITACAO" | null;
+    /** cumulative figures restated in asOf money by IPCA (null without a series) */
+    cumInvestedReal: number | null;
+    cumNoiReal: number | null;
 }
 
 export interface ProjectionPoint {
@@ -108,6 +121,36 @@ export interface InvestmentMetrics {
     projection: ProjectionPoint[];
     /** landlord IPTU pulled from the register (years missing from both ledgers) */
     registerIptuUsed: number;
+
+    // ── value and returns (need a valuation) ────────────────────────────
+    marketValue: number | null;
+    marketValueOn: string | null;
+    marketValueSource: string | null;
+    /** market value ÷ purchase price − 1, in % */
+    appreciationPct: number | null;
+    appreciationGain: number | null;
+    /** principal − Σ known principal parts while ACTIVE; 0 when paid off / not financed; null when unknown */
+    outstandingBalance: number | null;
+    /** market value − outstanding balance */
+    equity: number | null;
+    /** (net income to date + equity) ÷ cash invested */
+    equityMultiple: number | null;
+    /** net income to date + appreciation gain */
+    totalReturn: number | null;
+    totalReturnPct: number | null;
+    /** annual IRR with the equity as a terminal inflow at asOf, in % */
+    irrWithValue: number | null;
+    /** annualised trailing NOI ÷ market value, in % */
+    capRate: number | null;
+    /** 12 × current gross rent ÷ market value, in % */
+    grossYieldOnValue: number | null;
+
+    // ── real (IPCA, today's money) ──────────────────────────────────────
+    ipcaAvailable: boolean;
+    cashInvestedReal: number | null;
+    netIncomeToDateReal: number | null;
+    paybackPctReal: number | null;
+    remainingReal: number | null;
 }
 
 const INVEST_KINDS = new Set(["ENTRADA", "CUSTOS_AQUISICAO", "PRESTACAO", "AMORTIZACAO", "QUITACAO", "REFORMA"]);
@@ -200,6 +243,9 @@ export function computeInvestmentMetrics(input: MetricsInput): InvestmentMetrics
         noi12m: 0, cashFlow12m: 0, debtService12m: 0, monthsWithIncome12m: 0, currentGrossRent: null, currentNetRent: null,
         grossYieldOnPrice: null, netYieldOnCost: null, cashOnCash: null, priceToRent: null, dscr: null, irrRealized: null,
         series: [], projection: [], registerIptuUsed: 0,
+        marketValue: null, marketValueOn: null, marketValueSource: null, appreciationPct: null, appreciationGain: null,
+        outstandingBalance: null, equity: null, equityMultiple: null, totalReturn: null, totalReturnPct: null, irrWithValue: null,
+        capRate: null, grossYieldOnValue: null, ipcaAvailable: false, cashInvestedReal: null, netIncomeToDateReal: null, paybackPctReal: null, remainingReal: null,
     });
     if (!firstMonth) return empty();
 
@@ -265,8 +311,26 @@ export function computeInvestmentMetrics(input: MetricsInput): InvestmentMetrics
         series.push({
             month: m, invested: round2(invested), debtService: round2(debt), runningCosts: round2(running),
             netRent, grossRent: gross, energySurplus: round2(energySurplus), noi, cashFlow: round2(noi - debt),
-            cumInvested, cumNoi, remaining, hasIncome: Boolean(row), event,
+            cumInvested, cumNoi, remaining, hasIncome: Boolean(row), event, cumInvestedReal: null, cumNoiReal: null,
         });
+    }
+
+    // ── real (today's money): restate each month's flows by the IPCA level ──
+    const ipca = (input.ipca ?? []).filter(p => p && typeof p.month === "string" && Number.isFinite(p.value));
+    const ipcaAvailable = ipca.length > 0;
+    let cashInvestedReal: number | null = null, netIncomeToDateReal: number | null = null;
+    if (ipcaAvailable) {
+        const level = priceLevelFactors(ipca, firstMonth, asOf, asOf);   // level(asOf) = 1, earlier months < 1
+        let ci = 0, cn = 0;
+        for (const p of series) {
+            const f = level.get(p.month) ?? 1;
+            ci = round2(ci + p.invested / f);
+            cn = round2(cn + p.noi / f);
+            p.cumInvestedReal = ci;
+            p.cumNoiReal = cn;
+        }
+        cashInvestedReal = ci;
+        netIncomeToDateReal = cn;
     }
 
     // ── trailing 12 calendar months ─────────────────────────────────────
@@ -317,7 +381,26 @@ export function computeInvestmentMetrics(input: MetricsInput): InvestmentMetrics
     const dscr = financed && debt12m > 0 ? Math.round((noi12m / debt12m) * 100) / 100 : null;
 
     // ── realised IRR (no sale): monthly net flows dated mid-month ────────
-    const irr = xirr(series.map(p => ({ date: `${p.month}-15`, amount: round2(p.noi - p.invested) })));
+    const flows = series.map(p => ({ date: `${p.month}-15`, amount: round2(p.noi - p.invested) }));
+    const irr = xirr(flows);
+
+    // ── value and returns ───────────────────────────────────────────────
+    const mv = input.marketValue && input.marketValue.amount > 0 ? input.marketValue : null;
+    let outstandingBalance: number | null = null;
+    if (!inv || inv.financing_status === "NONE" || inv.financing_status === "PAID_OFF") outstandingBalance = 0;
+    else if (inv.principal) {
+        const fin = txs.filter(t => DEBT_KINDS.has(t.kind));
+        const known = fin.filter(t => t.principal_part !== null && t.principal_part !== undefined);
+        if (fin.length === 0 || known.length === fin.length) {
+            outstandingBalance = round2(Math.max(0, Number(inv.principal) - known.reduce((a, t) => a + (Number(t.principal_part) || 0), 0)));
+        }
+    }
+    const equity = mv && outstandingBalance !== null ? round2(mv.amount - outstandingBalance) : null;
+    const appreciationGain = mv && price > 0 ? round2(mv.amount - price) : null;
+    const totalReturn = appreciationGain !== null ? round2(cumNoi + appreciationGain) : null;
+    const irrWithValue = equity !== null && equity > 0
+        ? xirr([...flows.slice(0, -1), { date: `${asOf}-15`, amount: round2((flows.at(-1)?.amount ?? 0) + equity) }])
+        : null;
 
     return {
         asOf,
@@ -350,5 +433,23 @@ export function computeInvestmentMetrics(input: MetricsInput): InvestmentMetrics
         series,
         projection,
         registerIptuUsed: round2(registerIptuUsed),
+        marketValue: mv?.amount ?? null,
+        marketValueOn: mv?.valuedOn ?? null,
+        marketValueSource: mv?.source ?? null,
+        appreciationPct: mv && price > 0 ? pct1(mv.amount / price - 1) : null,
+        appreciationGain,
+        outstandingBalance,
+        equity,
+        equityMultiple: equity !== null && cumInvested > 0 ? Math.round(((cumNoi + equity) / cumInvested) * 100) / 100 : null,
+        totalReturn,
+        totalReturnPct: totalReturn !== null && cumInvested > 0 ? pct1(totalReturn / cumInvested) : null,
+        irrWithValue: irrWithValue === null ? null : pct1(irrWithValue),
+        capRate: mv && monthsWithIncome12m > 0 ? pct1((noiPace * 12) / mv.amount) : null,
+        grossYieldOnValue: mv && lastGross ? pct1((12 * lastGross) / mv.amount) : null,
+        ipcaAvailable,
+        cashInvestedReal,
+        netIncomeToDateReal,
+        paybackPctReal: cashInvestedReal !== null && netIncomeToDateReal !== null && cashInvestedReal > 0 ? pct1(netIncomeToDateReal / cashInvestedReal) : null,
+        remainingReal: cashInvestedReal !== null && netIncomeToDateReal !== null ? round2(Math.max(0, cashInvestedReal - netIncomeToDateReal)) : null,
     };
 }

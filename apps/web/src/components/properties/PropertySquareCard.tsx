@@ -16,6 +16,7 @@ import {
     FileText,
     DollarSign,
     Percent,
+    PiggyBank,
 } from 'lucide-react';
 import { Button } from '@kitnets/ui';
 import { cn } from '@/lib/utils';
@@ -43,6 +44,20 @@ export interface PropertyCardData {
     realIncome?: PropertyRealIncome | null;
     /** True while the income summary is still being fetched and nothing is cached: show placeholders, not estimates */
     incomeLoading?: boolean;
+    /** Payback / yield from the investment engine (portfolio metrics); null = no investment ledger yet */
+    investment?: PropertyCardInvestment | null;
+}
+
+export interface PropertyCardInvestment {
+    invested: number;
+    /** % */
+    paybackPct: number;
+    paybackReachedOn: string | null;
+    paybackForecastMonth: string | null;
+    grossYieldOnPrice: number | null;
+    netYieldOnCost: number | null;
+    marketValue: number | null;
+    appreciationPct: number | null;
 }
 
 export interface PropertyRealIncome {
@@ -84,7 +99,7 @@ export default function PropertySquareCard({
     onDelete,
     isDeleting = false,
 }: PropertySquareCardProps) {
-    const { propertyType, details, subUnits, address, savedPhotos, profilePhotoUrl, realIncome } = property;
+    const { propertyType, details, subUnits, address, savedPhotos, profilePhotoUrl, realIncome, investment } = property;
 
     // Title calculation
     const title = details.propertyName?.trim()
@@ -353,6 +368,37 @@ export default function PropertySquareCard({
                         </span>
                     </div>
                 </div>
+                )}
+
+                {/* Investment: payback and yield from the engine (only when the ledger exists) */}
+                {investment && investment.invested > 0 && (
+                    <div className="px-3 py-2 rounded-xl border border-border/80 bg-muted/20 text-xs space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground flex items-center gap-1">
+                                <PiggyBank className="w-3 h-3 text-emerald-500" />
+                                Payback
+                            </span>
+                            <span className="font-bold text-foreground tabular-nums">
+                                {investment.paybackPct.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%
+                                <span className="text-[10px] font-normal text-muted-foreground">
+                                    {investment.paybackReachedOn
+                                        ? ` · desde ${formatMonthShort(investment.paybackReachedOn)}`
+                                        : investment.paybackForecastMonth ? ` · previsto ${formatMonthShort(investment.paybackForecastMonth)}` : ''}
+                                </span>
+                            </span>
+                        </div>
+                        <span className="block h-1.5 rounded-full bg-muted overflow-hidden">
+                            <span className={cn('block h-full', investment.paybackPct >= 100 ? 'bg-emerald-500' : 'bg-amber-500')} style={{ width: `${Math.min(100, Math.max(0, investment.paybackPct))}%` }} />
+                        </span>
+                        <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+                            <span>Investido {formatCurrencyBRL(investment.invested)}</span>
+                            <span>
+                                {investment.grossYieldOnPrice !== null && <>Yield {investment.grossYieldOnPrice.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%</>}
+                                {investment.netYieldOnCost !== null && <> · líq. {investment.netYieldOnCost.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%</>}
+                                {investment.appreciationPct !== null && <> · valor {investment.appreciationPct >= 0 ? '+' : ''}{investment.appreciationPct.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%</>}
+                            </span>
+                        </div>
+                    </div>
                 )}
 
                 {/* Bottom CTA Action Button */}

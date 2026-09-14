@@ -1,10 +1,11 @@
 "use client";
 
 /**
- * Análise do investimento — payback, forecast, yields and IRR computed from the
- * three ledgers (investment, income, taxes) with `computeInvestmentMetrics`.
+ * Análise do investimento — payback, forecast, yields, IRR, market value and
+ * real (IPCA) payback computed from the ledgers with `computeInvestmentMetrics`.
+ * Also owns the property's valuations (manual, appraisal, FipeZap, listings).
  */
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
     Area,
     CartesianGrid,
@@ -17,14 +18,31 @@ import {
     XAxis,
     YAxis,
 } from "recharts";
-import { Activity, CalendarClock, Gauge, Percent, PiggyBank, Target, TrendingUp, Wallet } from "lucide-react";
+import {
+    Activity, AlertCircle, BadgeDollarSign, CalendarClock, Gauge, Landmark, Loader2, Percent, PiggyBank, Plus, Scale, Sparkles, Target, Trash2, TrendingUp, Wallet,
+} from "lucide-react";
+import { Button } from "@kitnets/ui";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Tile from "./Tile";
 import { computeInvestmentMetrics, type InvestmentMetrics } from "@/lib/investment-metrics";
 import { formatMonthKey, type PropertyIncomeRow } from "@/lib/property-income";
 import { formatDateBR, type PropertyInvestment, type PropertyTransaction } from "@/lib/property-investment";
 import type { PropertyTax } from "@/lib/property-taxes";
+import {
+    latestValuation,
+    VALUATION_SOURCE_LABELS,
+    VALUATION_SOURCES,
+    type MonthlyIndexPoint,
+    type PropertyValuation,
+    type ValuationSource,
+} from "@/lib/property-valuations";
 
 interface Props {
+    propertyId?: string;
+    /** bedrooms from the property details (FipeZap bucket) */
+    bedrooms?: string;
     investment: PropertyInvestment | null;
     transactions: PropertyTransaction[];
     incomeRows: PropertyIncomeRow[];
@@ -41,6 +59,11 @@ const yearsLabel = (months: number) => {
     if (y === 0) return monthsLabel(m);
     return `${y} ${y === 1 ? "ano" : "anos"}${m ? ` e ${monthsLabel(m)}` : ""}`;
 };
+const todayIso = () => new Date().toISOString().slice(0, 10);
+const endOfMonth = (key: string) => {
+    const [y, m] = key.split("-").map(Number);
+    return `${key}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
+};
 
 interface ChartPoint {
     month: string;
@@ -51,11 +74,13 @@ interface ChartPoint {
     projecaoInvestido: number | null;
 }
 
-function buildChart(m: InvestmentMetrics): ChartPoint[] {
+function buildChart(m: InvestmentMetrics, real: boolean): ChartPoint[] {
     const pts: ChartPoint[] = m.series.map(p => ({
-        month: p.month, label: formatMonthKey(p.month), investido: p.cumInvested, recuperado: p.cumNoi, projecao: null, projecaoInvestido: null,
+        month: p.month, label: formatMonthKey(p.month),
+        investido: real ? p.cumInvestedReal : p.cumInvested, recuperado: real ? p.cumNoiReal : p.cumNoi,
+        projecao: null, projecaoInvestido: null,
     }));
-    // the projection starts at asOf so the dashed line continues from the last real point
+    if (real) return pts;   // the projection is nominal; not shown in today's money
     m.projection.forEach((p, i) => {
         if (i === 0) {
             const last = pts[pts.length - 1];
@@ -66,25 +91,98 @@ function buildChart(m: InvestmentMetrics): ChartPoint[] {
     return pts;
 }
 
-export default function PropertyInvestmentAnalysis({ investment, transactions, incomeRows, taxes, loading }: Props) {
+type Draft = { valued_on: string; amount: string; source: ValuationSource; note: string };
+const emptyDraft = (): Draft => ({ valued_on: todayIso(), amount: "", source: "MANUAL", note: "" });
+
+export default function PropertyInvestmentAnalysis({ propertyId, bedrooms, investment, transactions, incomeRows, taxes, loading }: Props) {
     const [includeExpected, setIncludeExpected] = useState(false);
+    const [realMode, setRealMode] = useState(false);
+
+    // ── valuations + IPCA ───────────────────────────────────────────────
+    const endpoint = propertyId ? `/api/properties/${propertyId}/valuations` : null;
+    const [valuations, setValuations] = useState<PropertyValuation[]>([]);
+    const [ipca, setIpca] = useState<MonthlyIndexPoint[]>([]);
+    const [dialogOpen, setDialogOpen] = useState(false);
+    const [draft, setDraft] = useState<Draft>(emptyDraft);
+    const [busy, setBusy] = useState<"save" | "fipezap" | string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [fipezapNote, setFipezapNote] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!endpoint) return;
+        let cancelled = false;
+        fetch(endpoint)
+            .then(async res => { const d = await res.json().catch(() => ({})); if (res.ok && !cancelled) setValuations(d.rows ?? []); })
+            .catch(() => { /* tiles show the empty state */ });
+        fetch("/api/indices/ipca/calculator-data")
+            .then(async res => { const d = await res.json().catch(() => []); if (res.ok && Array.isArray(d) && !cancelled) setIpca(d as MonthlyIndexPoint[]); })
+            .catch(() => { /* real payback stays unavailable */ });
+        return () => { cancelled = true; };
+    }, [endpoint]);
+
+    const latest = useMemo(() => latestValuation(valuations), [valuations]);
     const metrics = useMemo(
-        () => computeInvestmentMetrics({ investment, transactions, incomeRows, taxes, includeExpected }),
-        [investment, transactions, incomeRows, taxes, includeExpected]
+        () => computeInvestmentMetrics({
+            investment, transactions, incomeRows, taxes, includeExpected, ipca,
+            marketValue: latest ? { amount: latest.amount, valuedOn: latest.valued_on, source: latest.source } : null,
+        }),
+        [investment, transactions, incomeRows, taxes, includeExpected, ipca, latest]
     );
-    const chart = useMemo(() => buildChart(metrics), [metrics]);
+    const real = realMode && metrics.ipcaAvailable;
+    const chart = useMemo(() => buildChart(metrics, real), [metrics, real]);
     const hasData = metrics.cashInvested > 0;
     const paidBack = metrics.remaining <= 0 && hasData;
     const financed = investment?.financing_status === "ACTIVE";
 
+    const saveDraft = useCallback(async () => {
+        if (!endpoint) return;
+        const amount = Number(draft.amount.replace(/\./g, "").replace(",", "."));
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.valued_on)) { setError("Informe a data da avaliação"); return; }
+        if (!Number.isFinite(amount) || amount <= 0) { setError("Informe o valor avaliado"); return; }
+        setBusy("save"); setError(null);
+        try {
+            const res = await fetch(endpoint, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rows: [{ valued_on: draft.valued_on, amount, source: draft.source, note: draft.note.trim() || null }] }) });
+            const d = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(d.error || "Erro ao salvar");
+            setValuations(d.rows ?? []);
+            setDraft(emptyDraft());
+            setFipezapNote(null);
+        } catch (err) { setError((err as Error).message); } finally { setBusy(null); }
+    }, [endpoint, draft]);
+
+    const removeValuation = useCallback(async (row: PropertyValuation) => {
+        if (!endpoint) return;
+        if (!window.confirm(`Excluir a avaliação de ${formatDateBR(row.valued_on)} (${formatBRL(row.amount)})?`)) return;
+        setBusy(row.id); setError(null);
+        try {
+            const res = await fetch(`${endpoint}?id=${row.id}`, { method: "DELETE" });
+            const d = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(d.error || "Erro ao excluir");
+            setValuations(prev => prev.filter(v => v.id !== row.id));
+        } catch (err) { setError((err as Error).message); } finally { setBusy(null); }
+    }, [endpoint]);
+
+    const estimateFipezap = useCallback(async () => {
+        if (!endpoint) return;
+        setBusy("fipezap"); setError(null);
+        try {
+            const res = await fetch(`${endpoint}/fipezap`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bedrooms }) });
+            const d = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(d.error || "Erro ao consultar o FipeZap");
+            const e = d.estimate as { amount: number; factor: number; from: string; to: string; months: number };
+            const pct = ((e.factor - 1) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+            const bucket = d.bucket === "total" ? "todos os dormitórios" : `${d.bucket} dorm.`;
+            const note = `FipeZap venda (${bucket}): ${pct}% de ${formatMonthKey(e.from)} a ${formatMonthKey(e.to)} sobre ${formatBRL(d.purchasePrice)}`;
+            setDraft({ valued_on: endOfMonth(e.to), amount: e.amount.toFixed(2).replace(".", ","), source: "FIPEZAP", note });
+            setFipezapNote(`Estimativa preenchida: ${formatBRL(e.amount)} (${e.months} meses de índice). Confira e clique em Salvar.`);
+        } catch (err) { setError((err as Error).message); } finally { setBusy(null); }
+    }, [endpoint, bedrooms]);
+
+    // ── labels ──────────────────────────────────────────────────────────
     const paybackHint = paidBack
         ? `Investimento recuperado em ${metrics.paybackReachedOn ? formatMonthKey(metrics.paybackReachedOn) : "—"}`
         : `Falta ${formatBRL(metrics.remaining)}`;
-    const forecastValue = paidBack
-        ? "Concluído"
-        : metrics.paybackForecastMonth
-            ? formatMonthKey(metrics.paybackForecastMonth)
-            : "—";
+    const forecastValue = paidBack ? "Concluído" : metrics.paybackForecastMonth ? formatMonthKey(metrics.paybackForecastMonth) : "—";
     const forecastHint = paidBack
         ? `Renda líquida acumulada supera o investido desde ${metrics.paybackReachedOn ? formatMonthKey(metrics.paybackReachedOn) : "—"}`
         : metrics.monthsToPayback !== null
@@ -92,12 +190,13 @@ export default function PropertyInvestmentAnalysis({ investment, transactions, i
             : metrics.monthlyNoiPace <= 0
                 ? "Sem renda líquida positiva nos últimos 12 meses"
                 : "Cadastre a aquisição para calcular";
-
     const irrHint = metrics.irrRealized === null
         ? "Precisa de entradas e saídas registradas"
         : metrics.irrRealized < 0
             ? "Fluxos realizados até hoje, sem venda: fica negativa até o payback e sobe depois"
             : "Fluxos realizados até hoje, sem venda nem valorização";
+    const valueSourceLabel = metrics.marketValueSource ? (VALUATION_SOURCE_LABELS[metrics.marketValueSource as ValuationSource] ?? metrics.marketValueSource) : null;
+    const needValue = <>Cadastre uma avaliação em <button type="button" onClick={() => setDialogOpen(true)} className="underline underline-offset-2 text-foreground">Valor de mercado</button></>;
 
     return (
         <div className="bg-card border border-border rounded-2xl p-6 shadow-xs space-y-5">
@@ -113,12 +212,25 @@ export default function PropertyInvestmentAnalysis({ investment, transactions, i
                         {investment?.purchase_price ? ` Valor de compra ${formatBRL(investment.purchase_price)}${investment.acquired_on ? ` em ${formatDateBR(investment.acquired_on)}` : ""}.` : ""}
                     </p>
                 </div>
-                <label className="inline-flex items-center gap-2 text-xs text-muted-foreground shrink-0 cursor-pointer select-none">
-                    <input type="checkbox" className="accent-emerald-600" checked={includeExpected} onChange={e => setIncludeExpected(e.target.checked)} />
-                    Incluir meses previstos
-                    {metrics.expectedMonthsExcluded > 0 && !includeExpected && <span className="text-amber-600">({metrics.expectedMonthsExcluded} fora)</span>}
-                </label>
+                <div className="flex flex-wrap items-center gap-3 shrink-0">
+                    <label className="inline-flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+                        <input type="checkbox" className="accent-emerald-600" checked={includeExpected} onChange={e => setIncludeExpected(e.target.checked)} />
+                        Incluir meses previstos
+                        {metrics.expectedMonthsExcluded > 0 && !includeExpected && <span className="text-amber-600">({metrics.expectedMonthsExcluded} fora)</span>}
+                    </label>
+                    {propertyId && (
+                        <Button size="sm" variant="outline" onClick={() => setDialogOpen(true)} className="gap-1.5 text-xs">
+                            <BadgeDollarSign className="w-3.5 h-3.5" /> Valor de mercado{valuations.length ? ` (${valuations.length})` : ""}
+                        </Button>
+                    )}
+                </div>
             </div>
+
+            {error && !dialogOpen && (
+                <div className="text-xs text-rose-600 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 rounded-lg px-3 py-2 flex items-center gap-2">
+                    <AlertCircle className="w-3.5 h-3.5" /> {error}
+                </div>
+            )}
 
             {loading ? (
                 <div className="text-sm text-muted-foreground text-center py-8">Carregando…</div>
@@ -157,12 +269,45 @@ export default function PropertyInvestmentAnalysis({ investment, transactions, i
                                 : irrHint} />
                     </div>
 
+                    {/* Value and returns */}
+                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+                        <Tile label="Valor de mercado" value={metrics.marketValue !== null ? formatBRL(metrics.marketValue) : "—"} tone="emerald" icon={<BadgeDollarSign className="w-4 h-4" />}
+                            hint={metrics.marketValue !== null
+                                ? <>{valueSourceLabel} · {formatDateBR(metrics.marketValueOn)} · <button type="button" onClick={() => setDialogOpen(true)} className="underline underline-offset-2 hover:text-foreground">avaliações</button>{metrics.capRate !== null && <><br />Cap rate {pctLabel(metrics.capRate)} · yield bruto sobre valor {pctLabel(metrics.grossYieldOnValue)}</>}</>
+                                : needValue} />
+                        <Tile label="Valorização" value={metrics.appreciationPct !== null ? pctLabel(metrics.appreciationPct) : "—"} tone={metrics.appreciationPct !== null && metrics.appreciationPct < 0 ? "rose" : "emerald"} icon={<TrendingUp className="w-4 h-4" />}
+                            hint={metrics.appreciationGain !== null
+                                ? `${metrics.appreciationGain >= 0 ? "+" : ""}${formatBRL(metrics.appreciationGain)} sobre o valor de compra${investment?.acquired_on ? ` (${formatDateBR(investment.acquired_on)})` : ""}`
+                                : investment?.purchase_price ? needValue : "Informe o valor de compra em Aquisição & financiamento"} />
+                        <Tile label="Patrimônio no imóvel" value={metrics.equity !== null ? formatBRL(metrics.equity) : "—"} tone="violet" icon={<Landmark className="w-4 h-4" />}
+                            hint={metrics.equity !== null
+                                ? <>Valor de mercado − saldo devedor{metrics.outstandingBalance ? ` (${formatBRL(metrics.outstandingBalance)})` : ""}{metrics.equityMultiple !== null && <><br />Múltiplo: (renda + patrimônio) ÷ investido = {metrics.equityMultiple.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}×</>}</>
+                                : metrics.marketValue !== null ? "Saldo devedor desconhecido: calcule juros e amortização das prestações" : needValue} />
+                        <Tile label="TIR com valorização" value={metrics.irrWithValue !== null ? `${pctLabel(metrics.irrWithValue)} a.a.` : "—"} tone={metrics.irrWithValue !== null && metrics.irrWithValue >= 0 ? "emerald" : "slate"} icon={<Scale className="w-4 h-4" />}
+                            hint={metrics.irrWithValue !== null ? "Fluxos realizados + patrimônio no imóvel como saída hoje (valor estimado)" : needValue} />
+                        <Tile label="Retorno total" value={metrics.totalReturn !== null ? formatBRL(metrics.totalReturn) : "—"} tone="blue" icon={<Wallet className="w-4 h-4" />}
+                            hint={metrics.totalReturn !== null ? `Renda líquida acumulada + valorização = ${pctLabel(metrics.totalReturnPct)} do investido` : needValue} />
+                        <Tile label="Payback real (IPCA)" value={metrics.paybackPctReal !== null ? pctLabel(metrics.paybackPctReal) : "—"} tone="amber" icon={<Gauge className="w-4 h-4" />}
+                            hint={metrics.paybackPctReal !== null
+                                ? <>Em valores de hoje: investido {formatK(metrics.cashInvestedReal ?? 0)} · renda {formatK(metrics.netIncomeToDateReal ?? 0)}{metrics.remainingReal ? <><br />Falta {formatBRL(metrics.remainingReal)}</> : <><br />Recuperado</>}</>
+                                : "Série IPCA indisponível no momento"} />
+                    </div>
+
                     {/* Payback curve */}
                     <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Activity className="w-3.5 h-3.5" />
-                            Curva de payback · investido acumulado vs. renda líquida acumulada
-                            {metrics.projection.length > 0 && <> · projeção tracejada até {formatMonthKey(metrics.paybackForecastMonth!)}</>}
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                            <span className="inline-flex items-center gap-2">
+                                <Activity className="w-3.5 h-3.5" />
+                                Curva de payback · investido acumulado vs. renda líquida acumulada
+                                {!real && metrics.projection.length > 0 && <> · projeção tracejada até {formatMonthKey(metrics.paybackForecastMonth!)}</>}
+                                {real && <> · em valores de {formatMonthKey(metrics.asOf)} (IPCA)</>}
+                            </span>
+                            {metrics.ipcaAvailable && (
+                                <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                                    <input type="checkbox" className="accent-emerald-600" checked={realMode} onChange={e => setRealMode(e.target.checked)} />
+                                    Valores de hoje (IPCA)
+                                </label>
+                            )}
                         </div>
                         <div className="h-[300px] w-full">
                             <ResponsiveContainer width="100%" height="100%">
@@ -182,9 +327,9 @@ export default function PropertyInvestmentAnalysis({ investment, transactions, i
                                         contentStyle={{ backgroundColor: "hsl(var(--background))", borderColor: "hsl(var(--border))", borderRadius: "12px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", fontSize: 12 }}
                                     />
                                     <Legend wrapperStyle={{ paddingTop: "8px", fontSize: "12px" }} />
-                                    <Area type="stepAfter" dataKey="investido" name="Investido acumulado" stroke="#10b981" strokeWidth={2} fill="url(#payback-invested)" dot={false} connectNulls={false} isAnimationActive={false} />
-                                    <Line type="monotone" dataKey="recuperado" name="Renda líquida acumulada" stroke="#3b82f6" strokeWidth={2.5} dot={false} connectNulls={false} isAnimationActive={false} />
-                                    {metrics.projection.length > 0 && (
+                                    <Area type="stepAfter" dataKey="investido" name={real ? "Investido acumulado (hoje)" : "Investido acumulado"} stroke="#10b981" strokeWidth={2} fill="url(#payback-invested)" dot={false} connectNulls={false} isAnimationActive={false} />
+                                    <Line type="monotone" dataKey="recuperado" name={real ? "Renda líquida acumulada (hoje)" : "Renda líquida acumulada"} stroke="#3b82f6" strokeWidth={2.5} dot={false} connectNulls={false} isAnimationActive={false} />
+                                    {!real && metrics.projection.length > 0 && (
                                         <>
                                             <Line type="stepAfter" dataKey="projecaoInvestido" name="Investido (projeção)" stroke="#10b981" strokeWidth={1.5} strokeDasharray="4 4" dot={false} connectNulls={false} isAnimationActive={false} legendType="none" />
                                             <Line type="monotone" dataKey="projecao" name="Renda líquida (projeção)" stroke="#3b82f6" strokeWidth={1.5} strokeDasharray="4 4" dot={false} connectNulls={false} isAnimationActive={false} />
@@ -202,12 +347,96 @@ export default function PropertyInvestmentAnalysis({ investment, transactions, i
                         </div>
                         <p className="text-[11px] text-muted-foreground">
                             Base de caixa: entrada, custos de aquisição, prestações, amortizações, quitação e reformas. A projeção repete a renda líquida média dos últimos 12 meses
-                            {financed ? " e as prestações restantes do contrato" : ""}; não considera valorização do imóvel nem inflação (fase seguinte).
+                            {financed ? " e as prestações restantes do contrato" : ""}; não considera valorização do imóvel. Em “valores de hoje” cada mês é corrigido pelo IPCA até {formatMonthKey(metrics.asOf)}.
                             {metrics.expectedMonthsExcluded > 0 && !includeExpected && ` ${metrics.expectedMonthsExcluded} ${metrics.expectedMonthsExcluded === 1 ? "mês previsto ficou" : "meses previstos ficaram"} de fora; marque "Incluir meses previstos" para contá-los.`}
                         </p>
                     </div>
                 </>
             )}
+
+            {/* Valuations dialog */}
+            <Dialog open={dialogOpen} onOpenChange={o => { setDialogOpen(o); if (!o) { setError(null); setFipezapNote(null); } }}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Valor de mercado do imóvel</DialogTitle>
+                        <DialogDescription>
+                            Registre quanto o imóvel vale ao longo do tempo. A avaliação mais recente alimenta valorização, patrimônio e TIR com valorização. Todo valor de mercado é uma estimativa.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        {valuations.length > 0 ? (
+                            <div className="rounded-xl border border-border overflow-hidden">
+                                <table className="w-full text-xs">
+                                    <thead>
+                                        <tr className="text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border bg-muted/30">
+                                            <th className="text-left px-2 py-1.5 font-semibold">Data</th>
+                                            <th className="text-right px-2 py-1.5 font-semibold">Valor</th>
+                                            <th className="text-left px-2 py-1.5 font-semibold">Fonte</th>
+                                            <th className="px-2 py-1.5" />
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {valuations.map(v => (
+                                            <tr key={v.id} className="border-b border-border/60 last:border-0 align-top">
+                                                <td className="px-2 py-1.5 whitespace-nowrap">{formatDateBR(v.valued_on)}</td>
+                                                <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{formatBRL(v.amount)}</td>
+                                                <td className="px-2 py-1.5">
+                                                    {VALUATION_SOURCE_LABELS[v.source] ?? v.source}
+                                                    {v.note && <span className="block text-[11px] text-muted-foreground">{v.note}</span>}
+                                                </td>
+                                                <td className="px-2 py-1.5 text-right">
+                                                    <button type="button" disabled={busy === v.id} onClick={() => removeValuation(v)} className="text-muted-foreground hover:text-rose-600" title="Excluir">
+                                                        {busy === v.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <p className="text-xs text-muted-foreground">Nenhuma avaliação registrada ainda.</p>
+                        )}
+
+                        <div className="rounded-xl border border-dashed border-border p-3 space-y-3">
+                            <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs font-semibold text-foreground inline-flex items-center gap-1.5"><Plus className="w-3.5 h-3.5" /> Nova avaliação</span>
+                                <Button size="sm" variant="outline" onClick={estimateFipezap} disabled={busy !== null} className="gap-1.5 text-xs" title="Corrige o valor de compra pelo índice FipeZap de venda desde a aquisição">
+                                    {busy === "fipezap" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />} Estimar pelo FipeZap
+                                </Button>
+                            </div>
+                            {fipezapNote && <p className="text-[11px] text-emerald-700 dark:text-emerald-400">{fipezapNote}</p>}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                    <Label htmlFor="val-date" className="text-xs">Data</Label>
+                                    <Input id="val-date" type="date" value={draft.valued_on} onChange={e => setDraft(d => ({ ...d, valued_on: e.target.value }))} className="h-8 text-xs" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="val-amount" className="text-xs">Valor (R$)</Label>
+                                    <Input id="val-amount" inputMode="decimal" placeholder="450000,00" value={draft.amount} onChange={e => setDraft(d => ({ ...d, amount: e.target.value }))} className="h-8 text-xs" />
+                                </div>
+                                <div className="space-y-1 col-span-2">
+                                    <Label htmlFor="val-source" className="text-xs">Fonte</Label>
+                                    <select id="val-source" value={draft.source} onChange={e => setDraft(d => ({ ...d, source: e.target.value as ValuationSource }))} className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs">
+                                        {VALUATION_SOURCES.map(s => <option key={s.value} value={s.value}>{s.label} — {s.hint}</option>)}
+                                    </select>
+                                </div>
+                                <div className="space-y-1 col-span-2">
+                                    <Label htmlFor="val-note" className="text-xs">Observação</Label>
+                                    <Input id="val-note" value={draft.note} onChange={e => setDraft(d => ({ ...d, note: e.target.value }))} placeholder="Ex.: laudo Caixa, anúncio do vizinho…" className="h-8 text-xs" />
+                                </div>
+                            </div>
+                            {error && <p className="text-xs text-rose-600 inline-flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5" /> {error}</p>}
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" size="sm" onClick={() => setDialogOpen(false)}>Fechar</Button>
+                        <Button size="sm" onClick={saveDraft} disabled={busy !== null} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5">
+                            {busy === "save" && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Salvar avaliação
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
