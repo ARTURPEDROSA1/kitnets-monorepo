@@ -25,6 +25,7 @@ import {
     Filter,
     FilterX,
     X,
+    Calculator,
 } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
@@ -36,6 +37,7 @@ import { periodLabel, periodRange, type PeriodFilterValue } from "@/lib/period-f
 import { parseSheet, type PropertyIncomeRow } from "@/lib/property-income";
 import {
     buildTransactionImportRows,
+    estimateFinancingSplits,
     formatDateBR,
     KIND_GROUP,
     KIND_LABELS,
@@ -383,6 +385,20 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows }: Pr
         if (ok) { setImportOpen(false); flash(`${importRows.length} lançamentos importados${replaceAll ? " · registro anterior substituído" : ""}`); }
     };
 
+    // ── Estimate interest / amortisation / insurance from the contract terms ──
+    const [splitOpen, setSplitOpen] = useState(false);
+    const [splitOverwrite, setSplitOverwrite] = useState(false);
+    const [applyingSplit, setApplyingSplit] = useState(false);
+    const canEstimate = Boolean(investment && investment.financing_status !== "NONE" && investment.principal && investment.annual_rate && investment.term_months);
+    const estimate = useMemo(() => (splitOpen ? estimateFinancingSplits(investment, txs, { overwrite: splitOverwrite }) : null), [splitOpen, investment, txs, splitOverwrite]);
+    const applySplit = async () => {
+        if (!estimate || estimate.updates.length === 0) return;
+        setApplyingSplit(true);
+        const ok = await putTxs(estimate.updates, false, estimate.updates.map(u => u.id!));
+        setApplyingSplit(false);
+        if (ok) { setSplitOpen(false); flash(`${estimate.updates.length} lançamentos atualizados com juros, amortização e seguro estimados — edite qualquer célula se tiver o valor exato do extrato.`); }
+    };
+
     // ── Export ──────────────────────────────────────────────────────────
     const [exporting, setExporting] = useState<"template" | "ledger" | null>(null);
     const exportXlsx = async (kind: "template" | "ledger") => {
@@ -440,6 +456,10 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows }: Pr
                 <div className="flex flex-wrap items-center gap-2 shrink-0">
                     <Button size="sm" variant="outline" onClick={openConfig} className="gap-1.5 text-xs">
                         <Settings className="w-3.5 h-3.5" /> Aquisição & financiamento
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => { setSplitOverwrite(false); setSplitOpen(true); }} disabled={!canEstimate} className="gap-1.5 text-xs text-blue-700 border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                        title={canEstimate ? "Estima juros, amortização e seguro de cada prestação a partir do contrato" : "Preencha valor financiado, juros e prazo em Aquisição & financiamento"}>
+                        <Calculator className="w-3.5 h-3.5" /> Calcular juros e amortização
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => exportXlsx("template")} disabled={exporting !== null} className="gap-1.5 text-xs">
                         {exporting === "template" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />} Exportar modelo
@@ -720,6 +740,84 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows }: Pr
                     </div>
                 </>
             )}
+
+            {/* Estimate interest / amortisation / insurance */}
+            <Dialog open={splitOpen} onOpenChange={setSplitOpen}>
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2"><Calculator className="w-5 h-5 text-blue-600" /> Calcular juros, amortização e seguro</DialogTitle>
+                        <DialogDescription>
+                            Percorre as prestações, amortizações extras e a quitação em ordem de data: juros = saldo × {investment?.annual_rate ?? "—"}% ÷ 12
+                            (primeira prestação pro rata desde o contrato), amortização pela tabela {investment?.financing_system ?? "SAC"} recalculada a cada amortização extra,
+                            seguro (MIP + DFI + tarifas) = o que sobra. Amortizações extras abatem o saldo; a quitação zera o saldo e o excedente é juros/encargos.
+                            É uma estimativa: todos os valores continuam editáveis na tabela.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2 max-h-[65vh] overflow-y-auto pr-1">
+                        <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+                            <input type="checkbox" className="mt-0.5 accent-blue-600" checked={splitOverwrite} onChange={e => setSplitOverwrite(e.target.checked)} />
+                            <span><span className="font-semibold text-foreground">Recalcular também as linhas já preenchidas</span> — desmarcado, linhas com juros/amortização/seguro informados são mantidas como estão.</span>
+                        </label>
+                        {estimate && (
+                            <>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                    {[
+                                        ["Pago ao banco", estimate.totals.paid, "text-foreground"],
+                                        ["Juros", estimate.totals.interest, "text-rose-700 dark:text-rose-400"],
+                                        ["Amortização", estimate.totals.principal, "text-emerald-700 dark:text-emerald-400"],
+                                        ["Seguro e tarifas", estimate.totals.insurance, "text-amber-700 dark:text-amber-400"],
+                                    ].map(([label, value, cls]) => (
+                                        <div key={String(label)} className="bg-muted/40 border border-border rounded-xl p-3 space-y-0.5">
+                                            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
+                                            <p className={cn("text-base font-bold tabular-nums", String(cls))}>{formatBRL(Number(value))}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    {estimate.splits.length} lançamentos do financiamento · {estimate.updates.length} a atualizar · saldo estimado ao final {formatBRL(estimate.endingBalance)}
+                                    {investment?.principal ? <> · juros + seguros estimados {formatBRL(estimate.totals.interest + estimate.totals.insurance)} vs. pago − financiado {formatBRL(estimate.totals.paid - Number(investment.principal))}</> : null}
+                                </p>
+                                {estimate.notes.length > 0 && (
+                                    <div className="text-xs text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg px-3 py-2 space-y-0.5">
+                                        {estimate.notes.slice(0, 6).map((n, i) => <div key={i}>{n}</div>)}
+                                        {estimate.notes.length > 6 && <div>… e mais {estimate.notes.length - 6}</div>}
+                                    </div>
+                                )}
+                                {estimate.splits.length > 0 && (
+                                    <div className="overflow-x-auto border border-border rounded-lg">
+                                        <table className="w-full text-xs">
+                                            <thead className="bg-muted/40 text-[10px] uppercase text-muted-foreground"><tr>
+                                                <th className="text-left px-2 py-1">Data</th><th className="text-left px-2 py-1">Tipo</th><th className="text-right px-2 py-1">Valor</th>
+                                                <th className="text-right px-2 py-1">Juros</th><th className="text-right px-2 py-1">Amortização</th><th className="text-right px-2 py-1">Seguro</th><th className="text-right px-2 py-1">Saldo após</th>
+                                            </tr></thead>
+                                            <tbody>
+                                                {estimate.splits.slice(0, 8).map(s => (
+                                                    <tr key={s.id} className={cn("border-t border-border/60", s.kept && "opacity-60")}>
+                                                        <td className="px-2 py-1">{formatDateBR(s.occurred_on)}</td>
+                                                        <td className="px-2 py-1">{KIND_LABELS[s.kind]}{s.kept ? " (mantido)" : ""}</td>
+                                                        <td className="px-2 py-1 text-right tabular-nums">{formatBRL(s.amount)}</td>
+                                                        <td className="px-2 py-1 text-right tabular-nums">{formatBRL(s.interest_part)}</td>
+                                                        <td className="px-2 py-1 text-right tabular-nums">{formatBRL(s.principal_part)}</td>
+                                                        <td className="px-2 py-1 text-right tabular-nums">{formatBRL(s.insurance_part)}</td>
+                                                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{formatBRL(s.balance_after)}</td>
+                                                    </tr>
+                                                ))}
+                                                {estimate.splits.length > 8 && <tr className="border-t border-border/60"><td colSpan={7} className="px-2 py-1 text-muted-foreground">… e mais {estimate.splits.length - 8} lançamentos</td></tr>}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button variant="ghost" onClick={() => setSplitOpen(false)}>Fechar</Button>
+                        <Button onClick={applySplit} disabled={applyingSplit || !estimate || estimate.updates.length === 0} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
+                            {applyingSplit && <Loader2 className="w-4 h-4 animate-spin" />} Aplicar em {estimate?.updates.length ?? 0} lançamentos
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* Config dialog */}
             <Dialog open={configOpen} onOpenChange={setConfigOpen}>
