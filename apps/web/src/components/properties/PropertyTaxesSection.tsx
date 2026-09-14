@@ -30,6 +30,18 @@ import {
     type TaxPayer,
 } from "@/lib/property-taxes";
 import { IptuHistoryModal } from "./IptuHistoryModal";
+import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "./TableColumnFilters";
+
+/** Excel-style sort/filter columns for the taxes table (values honour parcelas). */
+const TAX_COLUMNS: ColumnDef<PropertyTax>[] = [
+    { key: "year", label: "Ano", kind: "number", get: r => r.year },
+    { key: "kind", label: "Tributo", kind: "enum", get: r => r.kind, options: TAX_KINDS.map(k => ({ value: k.kind, label: k.label })) },
+    { key: "amount", label: "Valor", kind: "number", align: "right", get: r => effectiveTax(r).amount },
+    { key: "payer", label: "Pago por", kind: "enum", get: r => effectiveTax(r).payer, options: [{ value: "TENANT", label: "Inquilino" }, { value: "LANDLORD", label: "Proprietário" }, { value: "MIXED", label: "Misto" }] },
+    { key: "date", label: "Data", kind: "date", get: r => r.paid_on },
+    { key: "comment", label: "Comentários", kind: "text", get: r => r.comment ?? "" },
+    { key: "parts", label: "Parcelas", kind: "number", get: r => (r.installments?.length ? r.installments.length : 1) },
+];
 
 interface Props {
     propertyId?: string;
@@ -324,6 +336,7 @@ export default function PropertyTaxesSection({ propertyId, iptuPaidByLandlord = 
 
     const summary = useMemo(() => summarizeTaxes(rows), [rows]);
     const reviewTotals = useMemo(() => (extracted ? checkIptuTotals(extracted) : null), [extracted]);
+    const cf = useColumnFilters(rows, TAX_COLUMNS, { key: "year", dir: "desc" });
 
     if (!propertyId) return null;
 
@@ -389,6 +402,8 @@ export default function PropertyTaxesSection({ propertyId, iptuPaidByLandlord = 
                     ) : null} />
             </div>
 
+            <FilterChips columns={TAX_COLUMNS} ctl={cf} />
+
             {loading ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Carregando…</div>
             ) : rows.length === 0 ? (
@@ -399,20 +414,15 @@ export default function PropertyTaxesSection({ propertyId, iptuPaidByLandlord = 
                 <div className="overflow-x-auto -mx-2">
                     <table className="w-full text-xs min-w-[900px]">
                         <thead>
-                            <tr className="text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border">
-                                <th className="px-1 py-2 w-6" />
-                                <th className="text-left px-2 py-2 font-semibold">Ano</th>
-                                <th className="text-left px-2 py-2 font-semibold">Tributo</th>
-                                <th className="text-right px-2 py-2 font-semibold">Valor</th>
-                                <th className="text-left px-2 py-2 font-semibold">Pago por</th>
-                                <th className="text-left px-2 py-2 font-semibold">Data</th>
-                                <th className="text-left px-2 py-2 font-semibold">Comentários</th>
-                                <th className="text-left px-2 py-2 font-semibold">Parcelas</th>
-                                <th className="px-2 py-2" />
-                            </tr>
+                            <ColumnHeaders columns={TAX_COLUMNS} ctl={cf} leading={<th className="px-1 py-2 w-6" />} trailing={<th className="px-2 py-2" />} />
                         </thead>
                         <tbody>
-                            {rows.map(row => {
+                            {cf.rows.length === 0 && (
+                                <tr><td colSpan={9} className="px-2 py-6 text-center text-muted-foreground">
+                                    Nenhum tributo com os filtros atuais. <button type="button" onClick={cf.clearFilters} className="underline underline-offset-2">Limpar filtros</button>
+                                </td></tr>
+                            )}
+                            {cf.rows.map(row => {
                                 const d = drafts[row.id] ?? {};
                                 const busy = saving.has(row.id);
                                 const parts = row.installments ?? [];
@@ -470,7 +480,7 @@ export default function PropertyTaxesSection({ propertyId, iptuPaidByLandlord = 
                                             </td>
                                             <td className="px-2 py-1 whitespace-nowrap">
                                                 {hasParts ? (
-                                                    <span className="inline-flex items-center gap-1.5">
+                                                    <span className="inline-flex items-center gap-1.5 px-1.5 py-1 border border-transparent">
                                                         <button type="button" onClick={() => toggleExpanded(row.id)} className="text-emerald-700 dark:text-emerald-400 underline underline-offset-2">{parts.length}x</button>
                                                         <button type="button" disabled={busy} onClick={() => unsplitRow(row)} className="text-muted-foreground hover:text-foreground" title="Voltar a pagamento único">unir</button>
                                                     </span>
@@ -526,6 +536,7 @@ export default function PropertyTaxesSection({ propertyId, iptuPaidByLandlord = 
                             })}
                         </tbody>
                     </table>
+                    <ColumnMenu columns={TAX_COLUMNS} ctl={cf} />
                     <p className="text-[11px] text-muted-foreground mt-2 mx-2">
                         Escolha “2x…{MAX_INSTALLMENTS}x” para dividir um ano em parcelas e mudar o pagador de cada uma (por exemplo, o proprietário paga as parcelas de um período vago).
                         Pago por “Proprietário” não altera os KPIs por si só: lance o valor mensal na coluna IPTU das Receitas de Aluguel para que entre nas despesas.

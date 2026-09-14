@@ -648,8 +648,6 @@ export default function PropertyCostCenterDashboard({
                 defaultAgencyFeePct={details.managementFeePercent ? parseFloat(details.managementFeePercent) || 0 : 0}
                 onRowsChange={setIncomeRows}
                 onLoadingChange={setIncomeLoading}
-                period={period}
-                onPeriodChange={setPeriod}
                 iptuPaidByLandlord={iptuPaidBy === 'landlord'}
             />
 

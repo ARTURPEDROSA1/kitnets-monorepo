@@ -19,12 +19,6 @@ import {
     Upload,
     ChevronDown,
     ChevronUp,
-    ArrowDown,
-    ArrowUp,
-    ArrowUpDown,
-    Filter,
-    FilterX,
-    X,
     Calculator,
 } from "lucide-react";
 import { Button } from "@kitnets/ui";
@@ -33,6 +27,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import PeriodFilter from "./PeriodFilter";
+import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "./TableColumnFilters";
 import { periodLabel, periodRange, type PeriodFilterValue } from "@/lib/period-filter";
 import { parseSheet, type PropertyIncomeRow } from "@/lib/property-income";
 import {
@@ -68,6 +63,17 @@ const parseInput = (s: string): number | null => {
 };
 const todayIso = () => new Date().toISOString().slice(0, 10);
 const COLLAPSED_ROWS = 24;
+/** Excel-style sort/filter columns for the transactions table. */
+const INVESTMENT_COLUMNS: ColumnDef<PropertyTransaction>[] = [
+    { key: "date", label: "Data", kind: "date", get: t => t.occurred_on },
+    { key: "kind", label: "Tipo", kind: "enum", get: t => t.kind, options: TRANSACTION_KINDS.map(k => ({ value: k.kind, label: k.label })) },
+    { key: "amount", label: "Valor", kind: "number", align: "right", get: t => t.amount },
+    { key: "interest", label: "Juros", kind: "number", align: "right", get: t => t.interest_part },
+    { key: "principal", label: "Amortização", kind: "number", align: "right", get: t => t.principal_part },
+    { key: "insurance", label: "Seguro", kind: "number", align: "right", get: t => t.insurance_part },
+    { key: "comment", label: "Comentários", kind: "text", get: t => t.comment ?? "" },
+];
+
 const FIN_KINDS: TransactionKind[] = ["PRESTACAO", "AMORTIZACAO", "QUITACAO"];
 
 type TxDraft = Partial<Record<"date" | "kind" | "amount" | "interest" | "principal" | "insurance" | "comment", string>>;
@@ -85,27 +91,6 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows }: Pr
     const [drafts, setDrafts] = useState<Record<string, TxDraft>>({});
     const [showAll, setShowAll] = useState(false);
 
-    // ── Excel-style column sort & filters ───────────────────────────────
-    type SortCol = "date" | "kind" | "amount" | "interest" | "principal" | "insurance" | "comment";
-    type NumCol = "amount" | "interest" | "principal" | "insurance";
-    const [sort, setSort] = useState<{ col: SortCol; dir: "asc" | "desc" }>({ col: "date", dir: "desc" });
-    const [kindFilter, setKindFilter] = useState<Set<TransactionKind> | null>(null);   // null = all kinds
-    const [commentFilter, setCommentFilter] = useState("");
-    const [numFilter, setNumFilter] = useState<Record<NumCol, { min: string; max: string }>>({
-        amount: { min: "", max: "" }, interest: { min: "", max: "" }, principal: { min: "", max: "" }, insurance: { min: "", max: "" },
-    });
-    const [menu, setMenu] = useState<{ col: SortCol; x: number; y: number } | null>(null);
-    const numOf = (t: PropertyTransaction, col: NumCol): number | null =>
-        col === "amount" ? t.amount : col === "interest" ? t.interest_part : col === "principal" ? t.principal_part : t.insurance_part;
-    const numActive = (col: NumCol) => numFilter[col].min.trim() !== "" || numFilter[col].max.trim() !== "";
-    const filterActive = (col: SortCol) =>
-        col === "kind" ? kindFilter !== null : col === "comment" ? commentFilter.trim() !== "" : col === "date" ? false : numActive(col);
-    const anyFilter = kindFilter !== null || commentFilter.trim() !== "" || (["amount", "interest", "principal", "insurance"] as NumCol[]).some(numActive);
-    const clearFilters = () => {
-        setKindFilter(null);
-        setCommentFilter("");
-        setNumFilter({ amount: { min: "", max: "" }, interest: { min: "", max: "" }, principal: { min: "", max: "" }, insurance: { min: "", max: "" } });
-    };
     const [period, setPeriod] = useState<PeriodFilterValue>({ kind: "all" });
 
     const flash = (msg: string) => {
@@ -212,7 +197,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows }: Pr
     const summary = useMemo(() => summarizeInvestment(txs, investment), [txs, investment]);
     const solar = useMemo(() => solarPayback(summary.solarInvested, incomeRows), [summary.solarInvested, incomeRows]);
     const range = useMemo(() => periodRange(period), [period]);
-    /** Rows inside the period (before column filters) — used for the kind counts in the Tipo menu. */
+    /** Rows inside the period (before column filters). */
     const inPeriod = useMemo(
         () => txs.filter(t => {
             const k = t.occurred_on.slice(0, 7);
@@ -220,45 +205,8 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows }: Pr
         }),
         [txs, range]
     );
-    const kindCounts = useMemo(() => {
-        const m = new Map<TransactionKind, number>();
-        inPeriod.forEach(t => m.set(t.kind, (m.get(t.kind) ?? 0) + 1));
-        return m;
-    }, [inPeriod]);
-    const filtered = useMemo(() => {
-        const q = commentFilter.trim().toLowerCase();
-        const num = (s: string) => (s.trim() === "" ? null : Number(s.replace(",", ".")));
-        const rows = inPeriod.filter(t => {
-            if (kindFilter && !kindFilter.has(t.kind)) return false;
-            if (q && !(t.comment ?? "").toLowerCase().includes(q)) return false;
-            for (const col of ["amount", "interest", "principal", "insurance"] as NumCol[]) {
-                const min = num(numFilter[col].min), max = num(numFilter[col].max);
-                if (min === null && max === null) continue;
-                const v = numOf(t, col);
-                if (v === null) return false;
-                if (min !== null && v < min) return false;
-                if (max !== null && v > max) return false;
-            }
-            return true;
-        });
-        const dir = sort.dir === "asc" ? 1 : -1;
-        const cmp = (a: PropertyTransaction, b: PropertyTransaction): number => {
-            switch (sort.col) {
-                case "date": return a.occurred_on.localeCompare(b.occurred_on) || (a.created_at ?? "").localeCompare(b.created_at ?? "");
-                case "kind": return KIND_LABELS[a.kind].localeCompare(KIND_LABELS[b.kind], "pt-BR");
-                case "comment": return (a.comment ?? "").localeCompare(b.comment ?? "", "pt-BR");
-                default: {
-                    const va = numOf(a, sort.col), vb = numOf(b, sort.col);
-                    if (va === null && vb === null) return 0;
-                    if (va === null) return 1 * dir;   // nulls last either way
-                    if (vb === null) return -1 * dir;
-                    return va - vb;
-                }
-            }
-        };
-        return rows.sort((a, b) => cmp(a, b) * dir);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [inPeriod, kindFilter, commentFilter, numFilter, sort]);
+    const cf = useColumnFilters(inPeriod, INVESTMENT_COLUMNS, { key: "date", dir: "desc" });
+    const filtered = cf.rows;
     const filteredTotal = useMemo(() => filtered.reduce((a, t) => a + t.amount, 0), [filtered]);
     const visible = showAll ? filtered : filtered.slice(0, COLLAPSED_ROWS);
 
@@ -441,7 +389,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows }: Pr
 
     return (
         <div className="bg-card border border-border rounded-2xl p-6 shadow-xs space-y-5">
-            <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-3">
+            <div className="space-y-3">
                 <div className="space-y-0.5">
                     <h3 className="font-bold text-base text-foreground flex items-center gap-2">
                         <PiggyBank className="w-4 h-4 text-emerald-600" />
@@ -453,7 +401,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows }: Pr
                         {investment?.purchase_price ? ` Valor de compra ${formatBRL(investment.purchase_price)}${investment.acquired_on ? ` em ${formatDateBR(investment.acquired_on)}` : ""}.` : ""}
                     </p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <div className="flex flex-wrap items-center gap-2">
                     <Button size="sm" variant="outline" onClick={openConfig} className="gap-1.5 text-xs">
                         <Settings className="w-3.5 h-3.5" /> Aquisição & financiamento
                     </Button>
@@ -515,30 +463,13 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows }: Pr
             {/* Period + table */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <span className="text-xs text-muted-foreground">
-                    Lançamentos · <span className="font-semibold text-foreground">{periodLabel(period)}</span> · {filtered.length} {filtered.length === 1 ? "lançamento" : "lançamentos"}{anyFilter && inPeriod.length !== filtered.length ? ` de ${inPeriod.length}` : ""} · total {formatBRL(filteredTotal)}
+                    Lançamentos · <span className="font-semibold text-foreground">{periodLabel(period)}</span> · {filtered.length} {filtered.length === 1 ? "lançamento" : "lançamentos"}{cf.anyFilter && inPeriod.length !== filtered.length ? ` de ${inPeriod.length}` : ""} · total {formatBRL(filteredTotal)}
                     {summary.totalOutlay > 0 && <> · desembolso total {formatBRL(summary.totalOutlay)}</>}
                 </span>
                 <PeriodFilter value={period} onChange={setPeriod} />
             </div>
 
-            {/* Active column filters */}
-            {anyFilter && (
-                <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-                    <Filter className="w-3.5 h-3.5 text-muted-foreground" />
-                    {kindFilter && (
-                        <Chip label={`Tipo: ${Array.from(kindFilter).map(k => KIND_LABELS[k]).join(", ") || "nenhum"}`} onClear={() => setKindFilter(null)} />
-                    )}
-                    {commentFilter.trim() && <Chip label={`Comentários contém “${commentFilter.trim()}”`} onClear={() => setCommentFilter("")} />}
-                    {(["amount", "interest", "principal", "insurance"] as NumCol[]).filter(numActive).map(col => (
-                        <Chip key={col}
-                            label={`${{ amount: "Valor", interest: "Juros", principal: "Amortização", insurance: "Seguro" }[col]}: ${numFilter[col].min.trim() ? `≥ ${numFilter[col].min}` : ""}${numFilter[col].min.trim() && numFilter[col].max.trim() ? " e " : ""}${numFilter[col].max.trim() ? `≤ ${numFilter[col].max}` : ""}`}
-                            onClear={() => setNumFilter(f => ({ ...f, [col]: { min: "", max: "" } }))} />
-                    ))}
-                    <button type="button" onClick={clearFilters} className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground underline underline-offset-2 ml-1">
-                        <FilterX className="w-3.5 h-3.5" /> Limpar filtros
-                    </button>
-                </div>
-            )}
+            <FilterChips columns={INVESTMENT_COLUMNS} ctl={cf} />
 
             {loading ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Carregando…</div>
@@ -548,42 +479,15 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows }: Pr
                 </div>
             ) : filtered.length === 0 ? (
                 <div className="text-sm text-muted-foreground text-center py-8 border border-dashed border-border rounded-xl">
-                    {anyFilter ? (
-                        <>Nenhum lançamento com os filtros atuais. <button type="button" onClick={clearFilters} className="underline underline-offset-2">Limpar filtros</button></>
+                    {cf.anyFilter ? (
+                        <>Nenhum lançamento com os filtros atuais. <button type="button" onClick={cf.clearFilters} className="underline underline-offset-2">Limpar filtros</button></>
                     ) : "Nenhum lançamento no período selecionado."}
                 </div>
             ) : (
                 <div className="overflow-x-auto -mx-2">
                     <table className="w-full text-xs min-w-[980px]">
                         <thead>
-                            <tr className="text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border">
-                                {([
-                                    ["date", "Data", "left"], ["kind", "Tipo", "left"], ["amount", "Valor", "right"], ["interest", "Juros", "right"],
-                                    ["principal", "Amortização", "right"], ["insurance", "Seguro", "right"], ["comment", "Comentários", "left"],
-                                ] as [SortCol, string, "left" | "right"][]).map(([col, label, align]) => {
-                                    const sorted = sort.col === col;
-                                    const active = filterActive(col);
-                                    return (
-                                        <th key={col} className={cn("px-2 py-2 font-semibold", align === "right" ? "text-right" : "text-left")}>
-                                            <button
-                                                type="button"
-                                                onClick={e => {
-                                                    const r = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
-                                                    setMenu(m => (m?.col === col ? null : { col, x: Math.min(r.left, window.innerWidth - 280), y: r.bottom + 4 }));
-                                                }}
-                                                title="Ordenar e filtrar"
-                                                className={cn("inline-flex items-center gap-1 rounded px-1 -mx-1 hover:bg-muted hover:text-foreground transition-colors uppercase",
-                                                    (sorted || active) && "text-foreground", align === "right" && "flex-row-reverse")}
-                                            >
-                                                <span>{label}</span>
-                                                {sorted ? (sort.dir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-40" />}
-                                                {active && <Filter className="w-3 h-3 text-emerald-600" />}
-                                            </button>
-                                        </th>
-                                    );
-                                })}
-                                <th className="px-2 py-2" />
-                            </tr>
+                            <ColumnHeaders columns={INVESTMENT_COLUMNS} ctl={cf} trailing={<th className="px-2 py-2" />} />
                         </thead>
                         <tbody>
                             {visible.map(tx => {
@@ -652,94 +556,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows }: Pr
                 </div>
             )}
 
-            {/* Column menu (sort + filter), positioned at the clicked header; fixed so the scrolling table never clips it */}
-            {menu && (
-                <>
-                    <div className="fixed inset-0 z-[60]" onClick={() => setMenu(null)} />
-                    <div className="fixed z-[61] w-64 rounded-xl border border-border bg-popover text-popover-foreground shadow-xl p-2 text-xs space-y-1" style={{ left: menu.x, top: menu.y }}>
-                        {(() => {
-                            const col = menu.col;
-                            const isNum = col === "amount" || col === "interest" || col === "principal" || col === "insurance";
-                            const ascLabel = col === "date" ? "Mais antigo primeiro" : isNum ? "Menor → maior" : "A → Z";
-                            const descLabel = col === "date" ? "Mais recente primeiro" : isNum ? "Maior → menor" : "Z → A";
-                            const sortBtn = (dir: "asc" | "desc", label: string, Icon: typeof ArrowUp) => (
-                                <button type="button" onClick={() => { setSort({ col, dir }); setMenu(null); }}
-                                    className={cn("w-full flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-muted", sort.col === col && sort.dir === dir && "bg-muted font-semibold")}>
-                                    <Icon className="w-3.5 h-3.5" /> {label}
-                                </button>
-                            );
-                            return (
-                                <>
-                                    {sortBtn("asc", ascLabel, ArrowUp)}
-                                    {sortBtn("desc", descLabel, ArrowDown)}
-                                    {col !== "date" && <div className="border-t border-border my-1" />}
-                                    {col === "kind" && (
-                                        <div className="space-y-1">
-                                            <div className="flex items-center justify-between px-2 text-[10px] uppercase tracking-wider text-muted-foreground">
-                                                <span>Filtrar por tipo</span>
-                                                <span className="space-x-2">
-                                                    <button type="button" className="hover:text-foreground" onClick={() => setKindFilter(null)}>todos</button>
-                                                    <button type="button" className="hover:text-foreground" onClick={() => setKindFilter(new Set())}>nenhum</button>
-                                                </span>
-                                            </div>
-                                            <div className="max-h-56 overflow-y-auto">
-                                                {TRANSACTION_KINDS.map(k => {
-                                                    const checked = kindFilter === null || kindFilter.has(k.kind);
-                                                    const count = kindCounts.get(k.kind) ?? 0;
-                                                    return (
-                                                        <label key={k.kind} className={cn("flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-muted cursor-pointer", count === 0 && "opacity-50")}>
-                                                            <input type="checkbox" className="accent-emerald-600" checked={checked}
-                                                                onChange={e => setKindFilter(prev => {
-                                                                    const next = new Set(prev ?? TRANSACTION_KINDS.map(x => x.kind));
-                                                                    if (e.target.checked) next.add(k.kind); else next.delete(k.kind);
-                                                                    return next.size === TRANSACTION_KINDS.length ? null : next;
-                                                                })} />
-                                                            <span className="flex-1">{k.label}</span>
-                                                            <span className="text-muted-foreground tabular-nums">{count}</span>
-                                                        </label>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    )}
-                                    {col === "comment" && (
-                                        <div className="px-2 py-1 space-y-1">
-                                            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Contém o texto</div>
-                                            <input autoFocus type="text" value={commentFilter} onChange={e => setCommentFilter(e.target.value)} placeholder="Ex: reforma, calha…"
-                                                className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs" />
-                                        </div>
-                                    )}
-                                    {isNum && (
-                                        <div className="px-2 py-1 space-y-1">
-                                            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Faixa de valores (R$)</div>
-                                            <div className="flex items-center gap-1.5">
-                                                <input type="number" step="0.01" min={0} placeholder="mín." value={numFilter[col].min}
-                                                    onChange={e => setNumFilter(f => ({ ...f, [col]: { ...f[col], min: e.target.value } }))}
-                                                    className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs" />
-                                                <span className="text-muted-foreground">a</span>
-                                                <input type="number" step="0.01" min={0} placeholder="máx." value={numFilter[col].max}
-                                                    onChange={e => setNumFilter(f => ({ ...f, [col]: { ...f[col], max: e.target.value } }))}
-                                                    className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs" />
-                                            </div>
-                                        </div>
-                                    )}
-                                    {filterActive(col) && (
-                                        <button type="button"
-                                            onClick={() => {
-                                                if (col === "kind") setKindFilter(null);
-                                                else if (col === "comment") setCommentFilter("");
-                                                else if (isNum) setNumFilter(f => ({ ...f, [col]: { min: "", max: "" } }));
-                                            }}
-                                            className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-muted text-muted-foreground">
-                                            <X className="w-3.5 h-3.5" /> Limpar filtro desta coluna
-                                        </button>
-                                    )}
-                                </>
-                            );
-                        })()}
-                    </div>
-                </>
-            )}
+            <ColumnMenu columns={INVESTMENT_COLUMNS} ctl={cf} />
 
             {/* Estimate interest / amortisation / insurance */}
             <Dialog open={splitOpen} onOpenChange={setSplitOpen}>
@@ -970,15 +787,6 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows }: Pr
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
     return <div className="space-y-1.5"><Label>{label}</Label>{children}</div>;
-}
-
-function Chip({ label, onClear }: { label: string; onClear: () => void }) {
-    return (
-        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 px-2 py-0.5">
-            {label}
-            <button type="button" onClick={onClear} className="hover:text-foreground" title="Remover filtro"><X className="w-3 h-3" /></button>
-        </span>
-    );
 }
 
 function Tile({ label, value, hint, icon, tone }: { label: string; value: string; hint: React.ReactNode; icon: React.ReactNode; tone: "emerald" | "blue" | "violet" | "amber" | "rose" }) {
