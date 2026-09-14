@@ -1735,6 +1735,10 @@
             "ctaPrimary": "Calcular ahora",
             "ctaSecondary": "Entiende cómo funciona",
             "items": {
+                "paybackProperty": {
+                    "title": "Payback de Inmueble",
+                    "description": "¿En cuántos años se paga un inmueble alquilado? Payback, yield, flujo de caja y TIR con o sin financiación."
+                },
                 "rentAdjustment": {
                     "title": "Reajuste de Alquiler",
                     "description": "Actualiza el valor del alquiler usando índices como IGP-M, IPCA o IVAR."
@@ -2368,5 +2372,11 @@
         "title": "Profesionalice su gestión de alquileres",
         "description": "Kitnets.com ofrece herramientas completas para propietarios e inmobiliarias para gestionar contratos, cobros y reajustes automáticamente.",
         "button": "Conocer Plataforma"
+    },
+    "paybackCalculatorPage": {
+        "seo": {
+            "title": "Calculadora de Payback de Inmueble en Alquiler - Kitnets.com",
+            "description": "Descubre en cuántos años un inmueble alquilado se paga solo: payback, yield bruto y neto, flujo de caja y TIR con o sin financiación. Gratis."
+        }
     }
 }

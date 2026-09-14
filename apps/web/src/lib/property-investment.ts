@@ -138,6 +138,8 @@ export interface TransactionInput {
     insurance_part?: number | null;
     comment?: string | null;
     source?: TransactionSource;
+    /** bank's transaction id (OFX FITID) for BANK rows; used to skip duplicates */
+    bank_reference?: string | null;
 }
 
 // ───────────────────────────────────────────────────────────────────────────

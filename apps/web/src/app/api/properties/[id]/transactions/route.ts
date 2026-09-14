@@ -80,6 +80,7 @@ interface Validated {
     insurance_part: number | null;
     comment: string | null;
     source: TransactionSource;
+    bank_reference?: string | null;
 }
 
 function validate(raw: unknown, i: number): { row: Validated } | { error: string } {
@@ -99,6 +100,8 @@ function validate(raw: unknown, i: number): { row: Validated } | { error: string
     }
     if (r.source !== undefined && !SOURCES.includes(r.source)) return { error: `${where}: origem inválida` };
     const comment = typeof r.comment === "string" && r.comment.trim() ? r.comment.trim().slice(0, 500) : null;
+    const rawRef = (r as { bank_reference?: unknown }).bank_reference;
+    const bank_reference = typeof rawRef === "string" && rawRef.trim() ? rawRef.trim().slice(0, 120) : undefined;
     return {
         row: {
             id: r.id,
@@ -110,6 +113,7 @@ function validate(raw: unknown, i: number): { row: Validated } | { error: string
             insurance_part: parts.insurance_part,
             comment,
             source: r.source ?? "MANUAL",
+            ...(bank_reference !== undefined ? { bank_reference } : {}),
         },
     };
 }
