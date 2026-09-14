@@ -446,6 +446,34 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                                 </Link>
                                             </li>
                                             <li className="my-2 border-t border-border" />
+                                            {/* Tools also reachable while signed in (same sub-menus as the public sidebar) */}
+                                            {FLAGS.SHOW_CALCULATORS && (
+                                                <li>
+                                                    <Link
+                                                        title={navCollapsed ? dict.menu.calculators : undefined}
+                                                        href={lang === 'pt' ? '/calculadoras' : `/${lang}/calculadoras`}
+                                                        onClick={() => setSidebarView('calculators-menu')}
+                                                        aria-current={isActive(lang === 'pt' ? '/calculadoras' : `/${lang}/calculadoras`) ? "page" : undefined}
+                                                        className={`sidebar-item w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/calculadoras' : `/${lang}/calculadoras`) ? 'bg-accent' : ''}`}
+                                                    >
+                                                        <Calculator className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                        <span className="ms-3 sidebar-label">{dict.menu.calculators}</span>
+                                                    </Link>
+                                                </li>
+                                            )}
+                                            <li>
+                                                <Link
+                                                    title={navCollapsed ? "Indicadores" : undefined}
+                                                    href={lang === 'pt' ? '/indices/panorama' : `/${lang}/indices/panorama`}
+                                                    onClick={() => setSidebarView('indices-menu')}
+                                                    aria-current={isActive(lang === 'pt' ? '/indices/panorama' : `/${lang}/indices/panorama`) ? "page" : undefined}
+                                                    className={`sidebar-item w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/indices/panorama' : `/${lang}/indices/panorama`) ? 'bg-accent' : ''}`}
+                                                >
+                                                    <LineChart className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3 sidebar-label">Indicadores</span>
+                                                </Link>
+                                            </li>
+                                            <li className="my-2 border-t border-border" />
                                             <li>
                                                 <SignOutButton>
                                                     <button
