@@ -184,6 +184,7 @@ export function IptuHistoryModal({ isOpen, onClose, rows }: IptuHistoryModalProp
                                         <th className="text-left px-3 py-2">Pago por</th>
                                         <th className="text-right px-3 py-2">Valor venal</th>
                                         <th className="text-right px-3 py-2">Alíquota</th>
+                                        <th className="text-right px-3 py-2" title="Valor do imposto (valor venal × alíquota)">Imposto</th>
                                         <th className="text-right px-3 py-2">Lixo</th>
                                         <th className="text-right px-3 py-2">Desconto</th>
                                     </tr>
@@ -201,6 +202,7 @@ export function IptuHistoryModal({ isOpen, onClose, rows }: IptuHistoryModalProp
                                                 <td className="px-3 py-2">{payer}</td>
                                                 <td className="px-3 py-2 text-right tabular-nums">{d?.valor_venal_imovel ? formatCurrency(Number(d.valor_venal_imovel)) : "—"}</td>
                                                 <td className="px-3 py-2 text-right tabular-nums">{d?.aliquota_pct ? `${Number(d.aliquota_pct).toLocaleString("pt-BR", { maximumFractionDigits: 4 })}%` : "—"}</td>
+                                                <td className="px-3 py-2 text-right tabular-nums">{d?.valor_imposto ? formatCurrency(Number(d.valor_imposto)) : "—"}</td>
                                                 <td className="px-3 py-2 text-right tabular-nums">{d?.coleta_lixo ? formatCurrency(Number(d.coleta_lixo)) : "—"}</td>
                                                 <td className="px-3 py-2 text-right tabular-nums">{d?.desconto ? formatCurrency(Number(d.desconto)) : "—"}</td>
                                             </tr>
@@ -209,7 +211,7 @@ export function IptuHistoryModal({ isOpen, onClose, rows }: IptuHistoryModalProp
                                 </tbody>
                             </table>
                         </div>
-                        <p className="text-[11px] text-muted-foreground">Valor venal, alíquota, lixo e desconto aparecem para os exercícios importados a partir da guia (DAM).</p>
+                        <p className="text-[11px] text-muted-foreground">Valor venal, alíquota, imposto, lixo e desconto aparecem para os exercícios importados a partir da guia (DAM). IPTU = imposto + lixo + TSA − desconto.</p>
                     </div>
                 </div>
             </div>
