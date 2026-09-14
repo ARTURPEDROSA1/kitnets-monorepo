@@ -1891,6 +1891,22 @@ export type Database = {
           property_id: string
           updated_at: string
           year: number
+          municipio: string | null
+          inscricao: string | null
+          referencia: string | null
+          vencimento: string | null
+          area_terreno: number | null
+          area_construida: number | null
+          valor_venal_terreno: number | null
+          valor_venal_predial: number | null
+          valor_venal_imovel: number | null
+          aliquota_pct: number | null
+          valor_imposto: number | null
+          coleta_lixo: number | null
+          tsa: number | null
+          desconto: number | null
+          document_path: string | null
+          extracted_at: string | null
         }
         Insert: {
           amount: number
@@ -1905,6 +1921,22 @@ export type Database = {
           property_id: string
           updated_at?: string
           year: number
+          municipio: string | null
+          inscricao: string | null
+          referencia: string | null
+          vencimento: string | null
+          area_terreno: number | null
+          area_construida: number | null
+          valor_venal_terreno: number | null
+          valor_venal_predial: number | null
+          valor_venal_imovel: number | null
+          aliquota_pct: number | null
+          valor_imposto: number | null
+          coleta_lixo: number | null
+          tsa: number | null
+          desconto: number | null
+          document_path: string | null
+          extracted_at: string | null
         }
         Update: {
           amount?: number
@@ -1919,6 +1951,22 @@ export type Database = {
           property_id?: string
           updated_at?: string
           year?: number
+          municipio?: string | null
+          inscricao?: string | null
+          referencia?: string | null
+          vencimento?: string | null
+          area_terreno?: number | null
+          area_construida?: number | null
+          valor_venal_terreno?: number | null
+          valor_venal_predial?: number | null
+          valor_venal_imovel?: number | null
+          aliquota_pct?: number | null
+          valor_imposto?: number | null
+          coleta_lixo?: number | null
+          tsa?: number | null
+          desconto?: number | null
+          document_path?: string | null
+          extracted_at?: string | null
         }
         Relationships: [
           {

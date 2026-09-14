@@ -1,18 +1,53 @@
 import { describe, expect, it } from "vitest";
 import type { PropertyTransaction } from "./property-investment";
 import {
+    checkIptuTotals,
     effectiveTax,
+    iptuFromExtraction,
     iptuSeries,
     iptuYearsFromTransactions,
     normalizeInstallments,
+    parseReferencia,
     splitInstallments,
     summarizeTaxes,
+    type ExtractedIptu,
     type PropertyTax,
     type TaxInstallment,
 } from "./property-taxes";
 
+const blankAssessment = {
+    municipio: null, inscricao: null, referencia: null, vencimento: null, area_terreno: null, area_construida: null,
+    valor_venal_terreno: null, valor_venal_predial: null, valor_venal_imovel: null, aliquota_pct: null,
+    valor_imposto: null, coleta_lixo: null, tsa: null, desconto: null, document_path: null, extracted_at: null,
+};
 const tax = (year: number, kind: PropertyTax["kind"], amount: number, paid_by: PropertyTax["paid_by"] = "TENANT", installments: TaxInstallment[] = []): PropertyTax =>
-    ({ id: `${kind}-${year}-${amount}`, property_id: "p", year, kind, amount, paid_by, paid_on: null, comment: null, installments });
+    ({ id: `${kind}-${year}-${amount}`, property_id: "p", year, kind, amount, paid_by, paid_on: null, comment: null, installments, ...blankAssessment });
+
+describe("IPTU document extraction helpers", () => {
+    // The Nova Lima DAM from the owner's screenshot
+    const dam: ExtractedIptu = {
+        municipio: "NOVA LIMA", contribuinte: null, inscricao: "01/07/029/0055-001", exercicio: 2026, referencia: "Única", vencimento: "2026-06-10",
+        areaTerreno: 360, areaConstruida: 112.42, valorVenalTerreno: 41658.62, valorVenalPredial: 93606.47, valorVenalImovel: 135265.09,
+        aliquotaPct: 0.5, valorImposto: 676.33, coletaLixo: 270.53, tsa: 0, desconto: 33.82, total: 913.04, confidence: 0.95,
+    };
+    it("checks the DAM arithmetic", () => {
+        expect(checkIptuTotals(dam)).toEqual({ computed: 913.04, matches: true });
+        expect(checkIptuTotals({ ...dam, total: 900 })).toEqual({ computed: 913.04, matches: false });
+        expect(checkIptuTotals({ ...dam, valorImposto: null })).toEqual({ computed: null, matches: null });
+    });
+    it("parses the parcela reference", () => {
+        expect(parseReferencia("Única")).toBeNull();
+        expect(parseReferencia("1/6")).toEqual({ numero: 1, de: 6 });
+        expect(parseReferencia("3 / 6")).toEqual({ numero: 3, de: 6 });
+        expect(parseReferencia(null)).toBeNull();
+    });
+    it("maps the extraction onto a tax row", () => {
+        const row = iptuFromExtraction(dam, "TENANT");
+        expect(row).toMatchObject({ year: 2026, kind: "IPTU", amount: 913.04, paid_by: "TENANT", valor_venal_imovel: 135265.09, aliquota_pct: 0.5, valor_imposto: 676.33, coleta_lixo: 270.53, desconto: 33.82, area_construida: 112.42, inscricao: "01/07/029/0055-001", vencimento: "2026-06-10" });
+        expect(iptuFromExtraction({ ...dam, total: null }, "LANDLORD").amount).toBe(913.04);   // computed from the parts
+        expect(iptuFromExtraction({ ...dam, exercicio: null }, "TENANT", 2030).year).toBe(2030);
+    });
+});
 
 describe("splitInstallments", () => {
     it("splits equally and puts the rounding on the last parcela", () => {

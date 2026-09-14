@@ -41,7 +41,33 @@ export interface TaxInstallment {
     paid_on: string | null;
 }
 
-export interface PropertyTax {
+/** Assessment fields read from the municipal IPTU document (DAM). All optional. */
+export interface IptuAssessment {
+    municipio: string | null;
+    inscricao: string | null;
+    /** "Única", "1/6"… */
+    referencia: string | null;
+    vencimento: string | null;
+    area_terreno: number | null;
+    area_construida: number | null;
+    valor_venal_terreno: number | null;
+    valor_venal_predial: number | null;
+    valor_venal_imovel: number | null;
+    /** % (e.g. 0.5) */
+    aliquota_pct: number | null;
+    valor_imposto: number | null;
+    coleta_lixo: number | null;
+    tsa: number | null;
+    desconto: number | null;
+}
+
+export const IPTU_ASSESSMENT_KEYS: ReadonlyArray<keyof IptuAssessment> = [
+    "municipio", "inscricao", "referencia", "vencimento", "area_terreno", "area_construida",
+    "valor_venal_terreno", "valor_venal_predial", "valor_venal_imovel", "aliquota_pct",
+    "valor_imposto", "coleta_lixo", "tsa", "desconto",
+];
+
+export interface PropertyTax extends IptuAssessment {
     id: string;
     property_id: string;
     year: number;
@@ -53,11 +79,16 @@ export interface PropertyTax {
     paid_on: string | null;
     comment: string | null;
     installments: TaxInstallment[];
+    /** storage path of the current IPTU PDF (only one row per property) */
+    document_path: string | null;
+    /** short-lived signed URL, added by the API when `document_path` is set */
+    document_url?: string | null;
+    extracted_at: string | null;
     created_at?: string;
     updated_at?: string;
 }
 
-export interface PropertyTaxInput {
+export interface PropertyTaxInput extends Partial<IptuAssessment> {
     id?: string;
     year: number;
     kind: TaxKind;
@@ -66,6 +97,79 @@ export interface PropertyTaxInput {
     paid_on?: string | null;
     comment?: string | null;
     installments?: TaxInstallment[];
+}
+
+/** What the AI returns for a municipal IPTU document (DAM). */
+export interface ExtractedIptu {
+    municipio: string | null;
+    contribuinte: string | null;
+    inscricao: string | null;
+    exercicio: number | null;
+    /** "Única" or "n/N" */
+    referencia: string | null;
+    vencimento: string | null;
+    areaTerreno: number | null;
+    areaConstruida: number | null;
+    valorVenalTerreno: number | null;
+    valorVenalPredial: number | null;
+    valorVenalImovel: number | null;
+    aliquotaPct: number | null;
+    valorImposto: number | null;
+    coletaLixo: number | null;
+    tsa: number | null;
+    desconto: number | null;
+    total: number | null;
+    confidence: number;
+}
+
+/** Parses "1/6" → { numero: 1, de: 6 }; "Única"/null → null. */
+export function parseReferencia(ref: string | null | undefined): { numero: number; de: number } | null {
+    if (!ref) return null;
+    const m = String(ref).match(/(\d{1,2})\s*\/\s*(\d{1,2})/);
+    if (!m) return null;
+    const numero = Number(m[1]), de = Number(m[2]);
+    return de > 1 && numero >= 1 && numero <= de ? { numero, de } : null;
+}
+
+/**
+ * Sanity-checks the DAM arithmetic: imposto + lixo + TSA − desconto = total.
+ * Returns the computed total (null if the parts are missing) and whether it
+ * agrees with the printed total within 5 cents.
+ */
+export function checkIptuTotals(x: Pick<ExtractedIptu, "valorImposto" | "coletaLixo" | "tsa" | "desconto" | "total">): { computed: number | null; matches: boolean | null } {
+    if (x.valorImposto === null || x.valorImposto === undefined) return { computed: null, matches: null };
+    const computed = round2((x.valorImposto || 0) + (x.coletaLixo || 0) + (x.tsa || 0) - (x.desconto || 0));
+    if (x.total === null || x.total === undefined) return { computed, matches: null };
+    return { computed, matches: Math.abs(computed - x.total) <= 0.05 };
+}
+
+/** Builds a tax-row input from an extraction, for the review form / import. */
+export function iptuFromExtraction(x: ExtractedIptu, paidBy: TaxPayer, fallbackYear = new Date().getFullYear()): PropertyTaxInput {
+    const totals = checkIptuTotals(x);
+    const amount = x.total ?? totals.computed ?? 0;
+    return {
+        year: x.exercicio ?? fallbackYear,
+        kind: "IPTU",
+        amount: round2(Math.max(0, amount)),
+        paid_by: paidBy,
+        paid_on: null,
+        comment: null,
+        installments: [],
+        municipio: x.municipio ?? null,
+        inscricao: x.inscricao ?? null,
+        referencia: x.referencia ?? null,
+        vencimento: x.vencimento ?? null,
+        area_terreno: x.areaTerreno ?? null,
+        area_construida: x.areaConstruida ?? null,
+        valor_venal_terreno: x.valorVenalTerreno ?? null,
+        valor_venal_predial: x.valorVenalPredial ?? null,
+        valor_venal_imovel: x.valorVenalImovel ?? null,
+        aliquota_pct: x.aliquotaPct ?? null,
+        valor_imposto: x.valorImposto ?? null,
+        coleta_lixo: x.coletaLixo ?? null,
+        tsa: x.tsa ?? null,
+        desconto: x.desconto ?? null,
+    };
 }
 
 export interface EffectiveTax {
@@ -241,6 +345,6 @@ export function iptuYearsFromTransactions(txs: PropertyTransaction[], paidBy: Ta
             paid_by: paidBy,
             paid_on: v.last,
             comment: "Gerado a partir dos lançamentos de IPTU do investimento",
-            installments: [],
+            installments: [] as TaxInstallment[],
         }));
 }
