@@ -49,6 +49,8 @@ interface Props {
     incomeRows: PropertyIncomeRow[];
     taxes: PropertyTax[];
     loading?: boolean;
+    /** Valuations loaded by the parent (overview): undefined = fetch here. */
+    preloadedValuations?: PropertyValuation[] | null;
 }
 
 const formatBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -95,7 +97,7 @@ function buildChart(m: InvestmentMetrics, real: boolean): ChartPoint[] {
 type Draft = { valued_on: string; amount: string; source: ValuationSource; note: string };
 const emptyDraft = (): Draft => ({ valued_on: todayIso(), amount: "", source: "MANUAL", note: "" });
 
-export default function PropertyInvestmentAnalysis({ propertyId, bedrooms, investment, transactions, incomeRows, taxes, loading }: Props) {
+export default function PropertyInvestmentAnalysis({ propertyId, bedrooms, investment, transactions, incomeRows, taxes, loading, preloadedValuations }: Props) {
     const [includeExpected, setIncludeExpected] = useState(false);
     const [realMode, setRealMode] = useState(false);
 
@@ -112,14 +114,18 @@ export default function PropertyInvestmentAnalysis({ propertyId, bedrooms, inves
     useEffect(() => {
         if (!endpoint) return;
         let cancelled = false;
-        fetch(endpoint)
-            .then(async res => { const d = await res.json().catch(() => ({})); if (res.ok && !cancelled) setValuations(d.rows ?? []); })
-            .catch(() => { /* tiles show the empty state */ });
+        if (preloadedValuations !== undefined) {
+            if (preloadedValuations) setValuations(preloadedValuations);
+        } else {
+            fetch(endpoint)
+                .then(async res => { const d = await res.json().catch(() => ({})); if (res.ok && !cancelled) setValuations(d.rows ?? []); })
+                .catch(() => { /* tiles show the empty state */ });
+        }
         fetch("/api/indices/ipca/calculator-data")
             .then(async res => { const d = await res.json().catch(() => []); if (res.ok && Array.isArray(d) && !cancelled) setIpca(d as MonthlyIndexPoint[]); })
             .catch(() => { /* real payback stays unavailable */ });
         return () => { cancelled = true; };
-    }, [endpoint]);
+    }, [endpoint, preloadedValuations]);
 
     const latest = useMemo(() => latestValuation(valuations), [valuations]);
     const metrics = useMemo(

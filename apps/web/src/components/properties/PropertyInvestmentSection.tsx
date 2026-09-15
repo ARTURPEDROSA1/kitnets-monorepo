@@ -55,6 +55,8 @@ interface Props {
     incomeRows: PropertyIncomeRow[];
     /** Lets the dashboard feed the investment analysis with the loaded header + transactions. */
     onDataChange?: (data: { investment: PropertyInvestment | null; transactions: PropertyTransaction[]; loading: boolean }) => void;
+    /** Loaded by the parent (overview): undefined = fetch here, null = parent still loading. */
+    preloaded?: { investment: PropertyInvestment | null; transactions: PropertyTransaction[] } | null;
 }
 
 const formatBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -81,7 +83,7 @@ const FIN_KINDS: TransactionKind[] = ["PRESTACAO", "AMORTIZACAO", "QUITACAO"];
 
 type TxDraft = Partial<Record<"date" | "kind" | "amount" | "interest" | "principal" | "insurance" | "comment", string>>;
 
-export default function PropertyInvestmentSection({ propertyId, incomeRows, onDataChange }: Props) {
+export default function PropertyInvestmentSection({ propertyId, incomeRows, onDataChange, preloaded }: Props) {
     const txEndpoint = propertyId ? `/api/properties/${propertyId}/transactions` : null;
     const invEndpoint = propertyId ? `/api/properties/${propertyId}/investment` : null;
 
@@ -104,6 +106,11 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
     // ── Load ────────────────────────────────────────────────────────────
     useEffect(() => {
         if (!txEndpoint || !invEndpoint) { setLoading(false); return; }
+        if (preloaded !== undefined) {
+            if (preloaded === null) { setLoading(true); return; }
+            setTxs(preloaded.transactions); setInvestment(preloaded.investment); setLoading(false);
+            return;
+        }
         let cancelled = false;
         setLoading(true);
         setError(null);
@@ -118,7 +125,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
             .catch(err => { if (!cancelled) setError((err as Error).message); })
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
-    }, [txEndpoint, invEndpoint]);
+    }, [txEndpoint, invEndpoint, preloaded]);
 
     useEffect(() => { onDataChange?.({ investment, transactions: txs, loading }); }, [investment, txs, loading, onDataChange]);
 

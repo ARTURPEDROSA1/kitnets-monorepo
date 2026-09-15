@@ -62,9 +62,10 @@ import {
     monthKey,
     type PropertyIncomeRow,
 } from '@/lib/property-income';
-import { DEFAULT_PERIOD, monthsBetween, periodLabel, periodRange, type PeriodFilterValue } from '@/lib/period-filter';
+import { monthsBetween, periodLabel, periodRange, type PeriodFilterValue } from '@/lib/period-filter';
 import type { PropertyInvestment, PropertyTransaction } from '@/lib/property-investment';
 import type { PropertyTax } from '@/lib/property-taxes';
+import type { PropertyValuation } from '@/lib/property-valuations';
 
 interface PropertyCostCenterDashboardProps {
     propertyIndex: number;
@@ -115,12 +116,29 @@ export default function PropertyCostCenterDashboard({
     // Investment header + transactions (fed by PropertyInvestmentSection) and taxes (fed by PropertyTaxesSection) for the analysis
     const [investmentData, setInvestmentData] = useState<{ investment: PropertyInvestment | null; transactions: PropertyTransaction[]; loading: boolean }>({ investment: null, transactions: [], loading: Boolean(dbId) });
     const [taxRows, setTaxRows] = useState<PropertyTax[]>([]);
+    // One request for every ledger of the property (auth + ownership once); sections fall back to their own fetches if it fails.
+    type Overview = { income: PropertyIncomeRow[]; investment: PropertyInvestment | null; transactions: PropertyTransaction[]; taxes: PropertyTax[]; valuations: PropertyValuation[] };
+    const [overview, setOverview] = useState<Overview | null | undefined>(dbId ? null : undefined);
+    useEffect(() => {
+        if (!dbId) { setOverview(undefined); return; }
+        let cancelled = false;
+        setOverview(null);
+        fetch(`/api/properties/${dbId}/overview`)
+            .then(async res => {
+                const data = await res.json().catch(() => null);
+                if (cancelled) return;
+                if (!res.ok || !data) { setOverview(undefined); return; }
+                setOverview({ income: data.income ?? [], investment: data.investment ?? null, transactions: data.transactions ?? [], taxes: data.taxes ?? [], valuations: data.valuations ?? [] });
+            })
+            .catch(() => { if (!cancelled) setOverview(undefined); });
+        return () => { cancelled = true; };
+    }, [dbId]);
     useEffect(() => {
         setIncomeRows([]);
         setIncomeLoading(Boolean(dbId));
     }, [dbId]);
     // Period shared by the DRE chart and the income ledger (chart + table)
-    const [period, setPeriod] = useState<PeriodFilterValue>(DEFAULT_PERIOD);
+    const [period, setPeriod] = useState<PeriodFilterValue>({ kind: 'ytd' });   // DRE chart opens on the current year
 
     // Cost-centre setting: who pays IPTU (the only parameter left; everything else is real ledger data)
     const [iptuPaidBy, setIptuPaidBy] = useState<'tenant' | 'landlord'>(details.iptuPaidBy ?? 'tenant');
@@ -655,6 +673,7 @@ export default function PropertyCostCenterDashboard({
                 onRowsChange={setIncomeRows}
                 onLoadingChange={setIncomeLoading}
                 iptuPaidByLandlord={iptuPaidBy === 'landlord'}
+                preloadedRows={overview === undefined ? undefined : overview?.income ?? null}
             />
 
             {/* Payback, forecast, yields and IRR from the three ledgers */}
@@ -666,13 +685,14 @@ export default function PropertyCostCenterDashboard({
                 incomeRows={incomeRows}
                 taxes={taxRows}
                 loading={incomeLoading || investmentData.loading}
+                preloadedValuations={overview === undefined ? undefined : overview?.valuations ?? null}
             />
 
             {/* Investment ledger: acquisition, financing, capex, running costs, solar */}
-            <PropertyInvestmentSection propertyId={dbId} incomeRows={incomeRows} onDataChange={setInvestmentData} />
+            <PropertyInvestmentSection propertyId={dbId} incomeRows={incomeRows} onDataChange={setInvestmentData} preloaded={overview === undefined ? undefined : overview ? { investment: overview.investment, transactions: overview.transactions } : null} />
 
             {/* Property taxes register: IPTU per year, ITBI, others; landlord IPTU feeds the analysis when the ledgers lack it */}
-            <PropertyTaxesSection propertyId={dbId} iptuPaidByLandlord={iptuPaidBy === 'landlord'} onRowsChange={setTaxRows} />
+            <PropertyTaxesSection propertyId={dbId} iptuPaidByLandlord={iptuPaidBy === 'landlord'} onRowsChange={setTaxRows} preloadedRows={overview === undefined ? undefined : overview?.taxes ?? null} />
 
             {/* Multifamily Units Summary (if applicable) */}
             {propertyType === 'multi' && subUnits.length > 0 && (

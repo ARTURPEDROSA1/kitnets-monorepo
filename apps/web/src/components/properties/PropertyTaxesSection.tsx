@@ -49,6 +49,8 @@ interface Props {
     iptuPaidByLandlord?: boolean;
     /** Lets the dashboard feed the investment analysis with the loaded rows. */
     onRowsChange?: (rows: PropertyTax[]) => void;
+    /** Rows loaded by the parent (overview): undefined = fetch here, null = parent still loading. */
+    preloadedRows?: PropertyTax[] | null;
 }
 
 const formatBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -94,7 +96,7 @@ async function fileForExtraction(file: File): Promise<File> {
 
 type ReviewForm = Record<"year" | "amount" | "parts" | "paidBy" | "vencimento" | "aliquota" | "valorImposto" | "coletaLixo" | "tsa" | "desconto" | "valorVenalImovel" | "valorVenalPredial" | "valorVenalTerreno" | "areaConstruida" | "areaTerreno" | "inscricao" | "municipio" | "referencia" | "comment", string>;
 
-export default function PropertyTaxesSection({ propertyId, iptuPaidByLandlord = false, onRowsChange }: Props) {
+export default function PropertyTaxesSection({ propertyId, iptuPaidByLandlord = false, onRowsChange, preloadedRows }: Props) {
     const endpoint = propertyId ? `/api/properties/${propertyId}/taxes` : null;
     const defaultPayer: TaxPayer = iptuPaidByLandlord ? "LANDLORD" : "TENANT";
     const [rows, setRows] = useState<PropertyTax[]>([]);
@@ -114,6 +116,11 @@ export default function PropertyTaxesSection({ propertyId, iptuPaidByLandlord = 
 
     useEffect(() => {
         if (!endpoint) { setLoading(false); return; }
+        if (preloadedRows !== undefined) {
+            if (preloadedRows === null) { setLoading(true); return; }
+            setRows(preloadedRows); setLoading(false);
+            return;
+        }
         let cancelled = false;
         setLoading(true);
         fetch(endpoint)
@@ -125,7 +132,7 @@ export default function PropertyTaxesSection({ propertyId, iptuPaidByLandlord = 
             .catch(err => { if (!cancelled) setError((err as Error).message); })
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
-    }, [endpoint]);
+    }, [endpoint, preloadedRows]);
 
     const put = useCallback(async (inputs: PropertyTaxInput[], keys: string[] = []) => {
         if (!endpoint) return false;

@@ -43,7 +43,7 @@ import {
 import { cn } from "@/lib/utils";
 import PeriodFilter from "./PeriodFilter";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "./TableColumnFilters";
-import { DEFAULT_PERIOD, periodLabel, periodRange, type PeriodFilterValue } from "@/lib/period-filter";
+import { periodLabel, periodRange, type PeriodFilterValue } from "@/lib/period-filter";
 import {
     breakdown,
     buildImportRows,
@@ -78,6 +78,8 @@ interface PropertyIncomeLedgerProps {
     onPeriodChange?: (next: PeriodFilterValue) => void;
     /** Property setting "IPTU pago por proprietário": shows the IPTU column (also shown when any row has IPTU). */
     iptuPaidByLandlord?: boolean;
+    /** Rows loaded by the parent (overview): undefined = fetch here, null = parent still loading, array = use as is. */
+    preloadedRows?: PropertyIncomeRow[] | null;
 }
 
 const formatBRL = (val: number) =>
@@ -106,8 +108,9 @@ export default function PropertyIncomeLedger({
     period: periodProp,
     onPeriodChange,
     iptuPaidByLandlord = false,
+    preloadedRows,
 }: PropertyIncomeLedgerProps) {
-    const [localPeriod, setLocalPeriod] = useState<PeriodFilterValue>(DEFAULT_PERIOD);
+    const [localPeriod, setLocalPeriod] = useState<PeriodFilterValue>({ kind: "all" });   // the ledger opens on the whole history
     const period = periodProp ?? localPeriod;
     const setPeriod = onPeriodChange ?? setLocalPeriod;
     const range = useMemo(() => periodRange(period), [period]);
@@ -138,6 +141,13 @@ export default function PropertyIncomeLedger({
             onLoadingChangeRef.current?.(false);
             return;
         }
+        if (preloadedRows !== undefined) {
+            if (preloadedRows === null) { setLoading(true); onLoadingChangeRef.current?.(true); return; }
+            applyRows(preloadedRows);
+            setLoading(false);
+            onLoadingChangeRef.current?.(false);
+            return;
+        }
         let cancelled = false;
         setLoading(true);
         onLoadingChangeRef.current?.(true);
@@ -159,7 +169,7 @@ export default function PropertyIncomeLedger({
         return () => {
             cancelled = true;
         };
-    }, [endpoint, applyRows]);
+    }, [endpoint, applyRows, preloadedRows]);
 
     // ── Persist ─────────────────────────────────────────────────────────
     const putRows = useCallback(
