@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-    AlertCircle, CheckCircle2, ChevronDown, ChevronRight, FileText, Landmark, LineChart, Loader2, Plus, Receipt, Scale, Sparkles, SplitSquareVertical, Trash2, TrendingUp, Upload, Wand2,
+    AlertCircle, CheckCircle2, ChevronDown, ChevronRight, FileText, Landmark, LineChart, Loader2, Plus, Receipt, Scale, Sparkles, SplitSquareVertical, Trash2, TrendingUp, Upload,
 } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
@@ -10,12 +10,10 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { PdfViewerModal } from "@/components/ui/PdfViewerModal";
 import { cn } from "@/lib/utils";
-import type { PropertyTransaction } from "@/lib/property-investment";
 import {
     checkIptuTotals,
     effectiveTax,
     iptuFromExtraction,
-    iptuYearsFromTransactions,
     MAX_INSTALLMENTS,
     parseReferencia,
     splitInstallments,
@@ -324,27 +322,6 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
         }
     };
 
-    // ── Seed IPTU years from the investment ledger ──────────────────────
-    const [seeding, setSeeding] = useState(false);
-    const seedFromTransactions = async () => {
-        if (!propertyId) return;
-        setSeeding(true);
-        setError(null);
-        try {
-            const res = await fetch(`/api/properties/${propertyId}/transactions`);
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(data.error || "Erro ao ler lançamentos");
-            const existingYears = new Set(rows.filter(r => r.kind === "IPTU").map(r => r.year));
-            const seeds = iptuYearsFromTransactions((data.rows ?? []) as PropertyTransaction[], defaultPayer).filter(s => !existingYears.has(s.year));
-            if (seeds.length === 0) { flash("Nenhum ano de IPTU novo encontrado nos lançamentos do investimento."); return; }
-            if (!window.confirm(`Criar ${seeds.length} ano(s) de IPTU a partir dos lançamentos (${seeds[0].year}–${seeds[seeds.length - 1].year})?`)) return;
-            if (await put(seeds)) flash(`${seeds.length} ano(s) de IPTU criados. Agora você pode excluir os lançamentos de IPTU do investimento.`);
-        } catch (err) {
-            setError((err as Error).message);
-        } finally {
-            setSeeding(false);
-        }
-    };
 
     const summary = useMemo(() => summarizeTaxes(rows), [rows]);
     const reviewTotals = useMemo(() => (extracted ? checkIptuTotals(extracted) : null), [extracted]);
@@ -373,9 +350,6 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 shrink-0">
-                    <Button size="sm" variant="outline" onClick={seedFromTransactions} disabled={seeding} className="gap-1.5 text-xs" title="Agrupa por ano os lançamentos de IPTU do investimento">
-                        {seeding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />} Gerar IPTU dos lançamentos
-                    </Button>
                     <Button size="sm" variant="outline" onClick={openImport} className="gap-1.5 text-xs text-amber-700 border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/30" title="Lê a guia do IPTU (PDF ou foto) com IA e guarda o documento">
                         <Sparkles className="w-3.5 h-3.5" /> Importar IPTU
                     </Button>
