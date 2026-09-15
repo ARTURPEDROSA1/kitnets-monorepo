@@ -180,6 +180,19 @@ describe("estimateFinancingSplits", () => {
         expect(estimateFinancingSplits({ ...inv, principal: null }, [fin("2018-06-05", "PRESTACAO", 100)]).notes[0]).toContain("Preencha");
     });
 
+    it("clears stale parts on tarifas and keeps them out of the schedule", () => {
+        const r = estimateFinancingSplits(inv, [
+            fin("2018-06-05", "PRESTACAO", 3850.04),
+            fin("2018-06-05", "TARIFA", 33.63, { principal_part: 33.63, interest_part: 0, insurance_part: 0 }),
+            fin("2018-07-05", "TARIFA", 33.63),
+        ]);
+        expect(r.splits.map(sp => sp.kind)).toEqual(["PRESTACAO"]);
+        const clear = r.updates.find(u => u.kind === "TARIFA");
+        expect(clear).toMatchObject({ occurred_on: "2018-06-05", interest_part: null, principal_part: null, insurance_part: null });
+        expect(r.updates.filter(u => u.kind === "TARIFA")).toHaveLength(1);
+        expect(r.notes.some(n => n.includes("tarifa"))).toBe(true);
+    });
+
     it("uses the PRICE formula when the system is PRICE", () => {
         const r = estimateFinancingSplits({ ...inv, financing_system: "PRICE", contract_date: null }, [fin("2018-06-05", "PRESTACAO", 2500)]);
         const interest = 285665.16 * 0.0906 / 12;
