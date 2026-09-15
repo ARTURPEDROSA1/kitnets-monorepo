@@ -183,7 +183,7 @@ export function ColumnHeaders<T>({ columns, ctl, leading, trailing, className }:
                         </button>
                         {sums.has(c.key) && (
                             <span className="block mt-0.5 text-[11px] normal-case tracking-normal font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums" title="Soma das linhas filtradas">
-                                Σ {(c.formatSum ?? formatBRL)(sums.get(c.key)!)}
+                                {(c.formatSum ?? formatBRL)(sums.get(c.key)!)}
                             </span>
                         )}
                     </th>
