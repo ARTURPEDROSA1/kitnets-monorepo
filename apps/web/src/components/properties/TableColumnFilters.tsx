@@ -30,6 +30,10 @@ export interface ColumnDef<T> {
     title?: string;
     /** extra classes for the <th> */
     className?: string;
+    /** number columns: show the sum of the filtered rows under the header while a filter is active (default true; false for %, years, counts) */
+    sum?: boolean;
+    /** formats the sum (default: R$) */
+    formatSum?: (n: number) => string;
 }
 
 export interface ColumnFilter {
@@ -142,8 +146,21 @@ export function useColumnFilters<T>(rows: T[], columns: ColumnDef<T>[], defaultS
     return { rows: filtered, sort, setSort, filters, setFilter, clearColumn, clearFilters, isActive, anyFilter, counts, menu, openMenu, closeMenu, total: rows.length };
 }
 
-/** Header cells: a button per column with sort arrow and filter icon. Pass extra cells via `leading` / `trailing`. */
+const formatBRL = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** Header cells: a button per column with sort arrow and filter icon. While a filter is active, number columns show the sum of the visible rows. Pass extra cells via `leading` / `trailing`. */
 export function ColumnHeaders<T>({ columns, ctl, leading, trailing, className }: { columns: ColumnDef<T>[]; ctl: ColumnFilterController<T>; leading?: React.ReactNode; trailing?: React.ReactNode; className?: string }) {
+    const sums = useMemo(() => {
+        const m = new Map<string, number>();
+        if (!ctl.anyFilter) return m;
+        for (const c of columns) {
+            if (c.kind !== "number" || c.sum === false) continue;
+            let total = 0, any = false;
+            for (const r of ctl.rows) { const v = c.get(r); if (v !== null && v !== undefined && v !== "" && Number.isFinite(Number(v))) { total += Number(v); any = true; } }
+            if (any) m.set(c.key, Math.round(total * 100) / 100);
+        }
+        return m;
+    }, [columns, ctl.rows, ctl.anyFilter]);
     return (
         <tr className={cn("text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border", className)}>
             {leading}
@@ -164,6 +181,11 @@ export function ColumnHeaders<T>({ columns, ctl, leading, trailing, className }:
                             {sorted ? (ctl.sort.dir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-40" />}
                             {active && <Filter className="w-3 h-3 text-emerald-600" />}
                         </button>
+                        {sums.has(c.key) && (
+                            <span className="block mt-0.5 text-[11px] normal-case tracking-normal font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums" title="Soma das linhas filtradas">
+                                Σ {(c.formatSum ?? formatBRL)(sums.get(c.key)!)}
+                            </span>
+                        )}
                     </th>
                 );
             })}
