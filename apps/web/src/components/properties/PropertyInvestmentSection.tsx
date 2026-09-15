@@ -591,13 +591,13 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                                 );
                                 return (
                                     <tr key={tx.id} className="border-b border-border/60 hover:bg-muted/30">
-                                        <td className="px-2 py-1 whitespace-nowrap">
+                                        <td {...sel.cellProps("date", tx.id, null, "px-2 py-1 whitespace-nowrap")}>
                                             <input type="date" disabled={busy} value={d.date ?? tx.occurred_on}
                                                 onChange={e => setDraft(tx.id, "date", e.target.value)} onBlur={() => commit(tx, "date")}
                                                 className="bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-md px-1 py-1 outline-none" />
                                             {busy && <Loader2 className="inline w-3 h-3 ml-1 animate-spin text-muted-foreground" />}
                                         </td>
-                                        <td className="px-2 py-1">
+                                        <td {...sel.cellProps("kind", tx.id, null, "px-2 py-1")}>
                                             <select disabled={busy} value={d.kind ?? tx.kind}
                                                 onChange={e => { setDraft(tx.id, "kind", e.target.value); }}
                                                 onBlur={() => commit(tx, "kind")}
@@ -617,7 +617,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                                                 <td {...sel.cellProps("insurance", tx.id, tx.insurance_part, "px-2 py-1 text-right")}>{money("insurance", tx.insurance_part, isFin)}</td>
                                             </>
                                         )}
-                                        <td className="px-2 py-1">
+                                        <td {...sel.cellProps("comment", tx.id, null, "px-2 py-1")}>
                                             <input type="text" disabled={busy} value={d.comment ?? (tx.comment ?? "")} placeholder="—"
                                                 onChange={e => setDraft(tx.id, "comment", e.target.value)} onBlur={() => commit(tx, "comment")}
                                                 onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}

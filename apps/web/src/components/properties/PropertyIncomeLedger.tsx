@@ -746,7 +746,7 @@ export default function PropertyIncomeLedger({
                                             {busy && <Loader2 className="inline w-3 h-3 ml-1 animate-spin text-muted-foreground" />}
                                         </td>
                                         <td {...sel.cellProps("gross", month, b.grossRent, "px-2 py-1 text-right")}>{cell("gross", b.grossRent)}</td>
-                                        <td className="px-2 py-1 text-right">{cell("pct", b.feePct, "0.5")}</td>
+                                        <td {...sel.cellProps("pct", month, b.feePct, "px-2 py-1 text-right")}>{cell("pct", b.feePct, "0.5")}</td>
                                         <td {...sel.cellProps("net", month, b.netRent, "px-2 py-1 text-right font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums")}>{formatBRL(b.netRent)}</td>
                                         <td {...sel.cellProps("energy", month, b.energy, "px-2 py-1 text-right")}>{cell("energy", b.energy)}</td>
                                         <td {...sel.cellProps("received", month, b.received, "px-2 py-1 text-right")}>{cell("received", b.received)}</td>
@@ -774,7 +774,7 @@ export default function PropertyIncomeLedger({
                                                 </span>
                                             )}
                                         </td>
-                                        <td className="px-2 py-1">
+                                        <td {...sel.cellProps("notes", month, null, "px-2 py-1")}>
                                             <input
                                                 type="text"
                                                 disabled={busy}

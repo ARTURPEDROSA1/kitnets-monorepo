@@ -451,14 +451,14 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
                                                     </button>
                                                 )}
                                             </td>
-                                            <td className="px-2 py-1">
+                                            <td {...sel.cellProps("year", row.id, null, "px-2 py-1")}>
                                                 <input type="number" min={1990} max={2100} step={1} disabled={busy} value={d.year ?? String(row.year)}
                                                     onChange={ev => setDraft(row.id, "year", ev.target.value)} onBlur={() => commit(row, "year")}
                                                     className={cn(BOX, "w-20 font-semibold text-foreground")} />
                                                 {busy && <Loader2 className="inline w-3 h-3 ml-1 animate-spin text-muted-foreground" />}
                                                 {row.extracted_at && <span className="block text-[9px] text-muted-foreground pl-1.5" title={`Valor venal ${row.valor_venal_imovel ? formatBRL(Number(row.valor_venal_imovel)) : "—"} · alíquota ${row.aliquota_pct ?? "—"}%`}>guia lida por IA</span>}
                                             </td>
-                                            <td className="px-2 py-1">
+                                            <td {...sel.cellProps("kind", row.id, null, "px-2 py-1")}>
                                                 <select disabled={busy} value={d.kind ?? row.kind} onChange={ev => setDraft(row.id, "kind", ev.target.value)} onBlur={() => commit(row, "kind")} className={BOX}>
                                                     {TAX_KINDS.map(k => <option key={k.kind} value={k.kind}>{k.label}</option>)}
                                                 </select>
@@ -469,7 +469,7 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
                                                     title={hasParts ? "Alterar o total redistribui entre as parcelas" : undefined}
                                                     className="w-32 font-semibold text-foreground" />
                                             </td>
-                                            <td className="px-2 py-1">
+                                            <td {...sel.cellProps("payer", row.id, null, "px-2 py-1")}>
                                                 {e.payer === "MIXED" ? (
                                                     <span className="text-violet-700 dark:text-violet-400 font-medium" title={`Inquilino ${formatBRL(e.byTenant)} · Proprietário ${formatBRL(e.byLandlord)}`}>{payerLabel(row)}</span>
                                                 ) : (
@@ -480,10 +480,10 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
                                                     </select>
                                                 )}
                                             </td>
-                                            <td className="px-2 py-1 whitespace-nowrap">
+                                            <td {...sel.cellProps("date", row.id, null, "px-2 py-1 whitespace-nowrap")}>
                                                 <input type="date" disabled={busy} value={d.date ?? (row.paid_on ?? "")} onChange={ev => setDraft(row.id, "date", ev.target.value)} onBlur={() => commit(row, "date")} className={BOX} />
                                             </td>
-                                            <td className="px-2 py-1">
+                                            <td {...sel.cellProps("comment", row.id, null, "px-2 py-1")}>
                                                 <input type="text" disabled={busy} value={d.comment ?? (row.comment ?? "")} placeholder="—"
                                                     onChange={ev => setDraft(row.id, "comment", ev.target.value)} onBlur={() => commit(row, "comment")}
                                                     onKeyDown={ev => { if (ev.key === "Enter") (ev.target as HTMLInputElement).blur(); }}
