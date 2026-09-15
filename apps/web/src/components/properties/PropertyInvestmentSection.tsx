@@ -523,9 +523,9 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
             {/* Tiles */}
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
                 <Tile label="Total investido no imóvel" value={formatBRL(summary.invested)} tone="emerald" icon={<PiggyBank className="w-4 h-4" />}
-                    hint={<>Entrada: {formatBRL(summary.downPayment)}<br />Banco: {formatBRL(summary.bankPaid)}<br />Tarifas: {formatBRL(summary.bankFees)}<br />Reformas: {formatBRL(summary.capex)}</>} />
-                <Tile label="Pago ao banco" value={formatBRL(summary.bankPaid)} tone="blue" icon={<Landmark className="w-4 h-4" />}
-                    hint={<>{summary.installments} prestações<br />Juros + seguros {summary.interestAndInsurance === null ? "—" : formatBRL(summary.interestAndInsurance)}</>} />
+                    hint={<>Entrada: {formatBRL(summary.downPayment)}<br />Banco: {formatBRL(summary.bankPaid + summary.bankFees)}<br />Reformas: {formatBRL(summary.capex)}</>} />
+                <Tile label="Pago ao banco" value={formatBRL(summary.bankPaid + summary.bankFees)} tone="blue" icon={<Landmark className="w-4 h-4" />}
+                    hint={<>Prestações: {summary.installments}<br />Juros + seguros: {summary.interestAndInsurance === null ? "—" : formatBRL(summary.interestAndInsurance)}<br />Tarifas: {formatBRL(summary.bankFees)}</>} />
                 <Tile label="Reformas (capex)" value={formatBRL(summary.capex)} tone="violet" icon={<Hammer className="w-4 h-4" />}
                     hint={`${txs.filter(t => t.kind === "REFORMA").length} lançamentos`} />
                 <Tile label="Custos do imóvel" value={formatBRL(summary.runningCosts + taxes.total)} tone="rose" icon={<Receipt className="w-4 h-4" />}
