@@ -31,7 +31,7 @@ import Tile from "./Tile";
 import { CellSumBar, useCellSum } from "./TableCellSum";
 import MoneyInput, { parseMoneyText } from "./MoneyInput";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "./TableColumnFilters";
-import { periodLabel, periodRange, type PeriodFilterValue } from "@/lib/period-filter";
+import { monthsBetween, periodLabel, periodRange, type PeriodFilterValue } from "@/lib/period-filter";
 import { parseSheet, type PropertyIncomeRow } from "@/lib/property-income";
 import {
     buildTransactionImportRows,
@@ -465,8 +465,16 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
     const financingLabel = investment?.financing_status === "PAID_OFF"
         ? `Quitado${investment.paid_off_on ? ` em ${formatDateBR(investment.paid_off_on)}` : ""}`
         : investment?.financing_status === "ACTIVE" ? "Ativo" : "Sem financiamento";
+    // months from the contract (or first instalment / purchase) to the payoff
+    const paidOffStart = investment?.contract_date ?? investment?.first_due_date ?? investment?.acquired_on ?? null;
+    const paidOffMonths = investment?.financing_status === "PAID_OFF" && investment.paid_off_on && paidOffStart
+        ? Math.max(1, monthsBetween(paidOffStart.slice(0, 7), investment.paid_off_on.slice(0, 7)))
+        : null;
     const financingHint = investment && investment.financing_status !== "NONE"
-        ? [investment.lender, investment.financing_system, investment.principal ? formatBRL(investment.principal) : null, investment.term_months ? `${investment.term_months} meses` : null, investment.annual_rate ? `${investment.annual_rate}% a.a.` : null].filter(Boolean).join(" · ")
+        ? <>
+            {[investment.lender, investment.financing_system, investment.principal ? formatBRL(investment.principal) : null, investment.term_months ? `${investment.term_months} meses` : null, investment.annual_rate ? `${investment.annual_rate}% a.a.` : null].filter(Boolean).join(" · ")}
+            {paidOffMonths !== null && <><br />Quitado em {paidOffMonths} {paidOffMonths === 1 ? "mês" : "meses"}{investment.term_months ? ` (de ${investment.term_months})` : ""}</>}
+        </>
         : "Configure a aquisição e o financiamento";
 
     return (
