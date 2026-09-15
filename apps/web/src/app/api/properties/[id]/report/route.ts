@@ -92,7 +92,7 @@ export async function GET(_request: Request, context: RouteContext) {
         line("Financiamento", investment ? `${investment.financing_status === "ACTIVE" ? "Ativo" : investment.financing_status === "PAID_OFF" ? `Quitado${investment.paid_off_on ? ` em ${investment.paid_off_on.split("-").reverse().join("/")}` : ""}` : "Sem financiamento"}${investment.lender ? ` · ${investment.lender}` : ""}${investment.financing_system ? ` · ${investment.financing_system}` : ""}` : "—");
 
         section("Investimento e payback");
-        line("Total investido (base de caixa)", m.cashInvested, BRL, "Entrada + custos de aquisição + prestações + amortizações + quitação + reformas");
+        line("Total investido (base de caixa)", m.cashInvested, BRL, "Tudo o que foi pago: entrada, custos de aquisição, prestações, amortizações, quitação, tarifas, reformas, custos, tributos e energia solar");
         line("Renda líquida acumulada", m.netIncomeToDate, BRL, `${m.incomeMonths} meses com receita`);
         line("Payback até hoje", m.paybackPct, PCT, m.paybackReachedOn ? `Atingido em ${formatMonthKey(m.paybackReachedOn)}` : `Falta R$ ${m.remaining.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`);
         line("Payback previsto", monthOrDash(m.paybackForecastMonth), undefined, m.monthsToPayback !== null ? `${m.monthsToPayback} meses ao ritmo de R$ ${m.monthlyNoiPace.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}/mês` : undefined);

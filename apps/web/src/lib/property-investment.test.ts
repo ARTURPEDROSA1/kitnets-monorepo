@@ -88,10 +88,10 @@ describe("summarizeInvestment", () => {
         expect(s.capex).toBe(1050);
         expect(s.runningCosts).toBeCloseTo(s.byKind.UTILIDADES + s.byKind.OUTROS, 2);   // IPTU kind is informational; bank fees are investment
         expect(s.bankFees).toBe(s.byKind.TARIFA);
-        expect(s.invested).toBeCloseTo(79334.84 + 10000 + s.bankPaid + s.byKind.TARIFA + 1050, 2);
-        expect(s.totalOutlay).toBeCloseTo(s.invested + s.runningCosts, 2);
         expect(s.solarInvested).toBe(20442.76);
-        expect(s.invested + s.runningCosts + s.solarInvested + s.byKind.IPTU).toBeCloseTo(rows.reduce((a, r) => a + r.amount, 0), 2); // solar excluded from invested; IPTU not a running cost
+        expect(s.invested).toBeCloseTo(79334.84 + 10000 + s.bankPaid + s.byKind.TARIFA + 1050 + s.runningCosts + 20442.76, 2);   // everything paid
+        expect(s.totalOutlay).toBeCloseTo(s.invested, 2);
+        expect(s.invested + s.byKind.IPTU).toBeCloseTo(rows.reduce((a, r) => a + r.amount, 0), 2); // only the legacy IPTU kind stays out
         expect(s.firstDate).toBe("2018-04-05");
         expect(s.lastDate).toBe("2024-01-24");
     });
