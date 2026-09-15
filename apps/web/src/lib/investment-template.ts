@@ -8,7 +8,7 @@ import {
     INVESTMENT_TEMPLATE_HEADERS,
     INVESTMENT_TEMPLATE_SHEET,
     KIND_LABELS,
-    TRANSACTION_KINDS,
+    ACTIVE_TRANSACTION_KINDS,
     type PropertyTransaction,
 } from "./property-investment";
 
@@ -78,7 +78,7 @@ export async function buildInvestmentTemplate(opts: InvestmentTemplateOptions): 
 
     ws.mergeCells("A5:G5");
     ws.getCell("A5").value =
-        "Tipo: Entrada · Custos de aquisição · Prestação · Amortização extra · Quitação · Tarifa bancária · IPTU · Utilidades · Reforma · Energia solar · Outros. " +
+        "Tipo: Entrada · Custos de aquisição · Prestação · Amortização extra · Quitação · Tarifa bancária · Utilidades · Reforma · Energia solar · Outros (IPTU e outros tributos: registre em Tributos do imóvel). " +
         "Valor = total pago. Juros / Amortização / Seguro são opcionais (só para prestações, se você souber a composição). " +
         "Energia solar é acompanhada como investimento à parte, pago pela receita líquida de energia.";
     ws.getCell("A5").alignment = { wrapText: true, vertical: "top" };
@@ -97,7 +97,7 @@ export async function buildInvestmentTemplate(opts: InvestmentTemplateOptions): 
     });
     header.height = 30;
 
-    const kindList = `"${TRANSACTION_KINDS.map(k => k.label).join(",")}"`;
+    const kindList = `"${ACTIVE_TRANSACTION_KINDS.map(k => k.label).join(",")}"`;
 
     for (let i = 0; i < count; i++) {
         const row = ws.getRow(HEADER_ROW + 1 + i);
@@ -154,11 +154,11 @@ export async function buildInvestmentTemplate(opts: InvestmentTemplateOptions): 
         ["2.", "Para prestações do financiamento, Juros / Amortização / Seguro são opcionais: preencha se tiver o extrato do banco; senão deixe em branco.", "p"],
         ["3.", "Salve (.xlsx) e importe em Kitnets.com › Imóveis › Gerenciar Imóvel › Investimento no imóvel › Importar planilha. A importação substitui todos os lançamentos do imóvel.", "p"],
         ["Tipos", "", "h"],
-        ...TRANSACTION_KINDS.map(k => [k.label, k.hint, "p"] as [string, string, "p"]),
+        ...ACTIVE_TRANSACTION_KINDS.map(k => [k.label, k.hint, "p"] as [string, string, "p"]),
         ["Cálculos no Kitnets.com", "", "h"],
         ["Total investido", "Entrada + custos de aquisição + prestações + amortizações + quitação + reformas", "p"],
         ["Pago ao banco", "Prestações + amortizações extras + quitação (juros + seguros = pago ao banco − valor financiado, quando quitado)", "p"],
-        ["Custos do imóvel", "Tarifa bancária + IPTU + utilidades + outros — abatidos do resultado, não do investimento", "p"],
+        ["Custos do imóvel", "Utilidades + outros — abatidos do resultado, não do investimento (tarifas contam no investido; tributos vêm de Tributos do imóvel)", "p"],
         ["Energia solar", "Investimento à parte: recuperado pela receita líquida de energia (energia − custo de energia) registrada nas Receitas de Aluguel", "p"],
         ["Payback do imóvel", "Σ NOI das receitas − custos do imóvel, dividido pelo total investido", "p"],
     ];

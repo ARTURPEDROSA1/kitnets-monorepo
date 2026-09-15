@@ -94,7 +94,7 @@ export function parseStatement(text: string, fileName = ""): StatementRow[] {
 /** Statement wording → ledger kind. Extends `kindFromText` with common bank phrasing. */
 export function classifyMemo(memo: string): TransactionKind | null {
     const t = memo.toLowerCase();
-    if (/iptu/.test(t)) return "IPTU";
+    if (/iptu/.test(t)) return null;   // taxes belong in Tributos do imóvel, not in the investment ledger
     if (/cemig|enel|light|copel|celesc|energia|sabesp|copasa|sanepar|\bagua\b|água|gas\b|comgas/.test(t)) return "UTILIDADES";
     if (/tarifa|cesta|pacote de servi|manuten[cç][aã]o de conta|anuidade|enc\.? descob/.test(t)) return "TARIFA";
     if (/reforma|obra|material de constru|leroy|telhanorte|c&c|pintura|marcenaria/.test(t)) return "REFORMA";

@@ -36,14 +36,15 @@ export type TransactionKind =
 
 export type TransactionGroup = "AQUISICAO" | "FINANCIAMENTO" | "CAPEX" | "CUSTOS" | "ENERGIA";
 
-export const TRANSACTION_KINDS: ReadonlyArray<{ kind: TransactionKind; label: string; group: TransactionGroup; hint: string }> = [
+export const TRANSACTION_KINDS: ReadonlyArray<{ kind: TransactionKind; label: string; group: TransactionGroup; hint: string; hidden?: boolean }> = [
     { kind: "ENTRADA", label: "Entrada", group: "AQUISICAO", hint: "Valor pago ao vendedor na compra (sinal + entrada)" },
     { kind: "CUSTOS_AQUISICAO", label: "Custos de aquisição", group: "AQUISICAO", hint: "ITBI, registro, escritura, corretagem, avaliação" },
     { kind: "PRESTACAO", label: "Prestação", group: "FINANCIAMENTO", hint: "Parcela mensal do financiamento (juros + amortização + seguros + tarifa)" },
     { kind: "AMORTIZACAO", label: "Amortização extra", group: "FINANCIAMENTO", hint: "Pagamento extraordinário que reduz o saldo devedor" },
     { kind: "QUITACAO", label: "Quitação", group: "FINANCIAMENTO", hint: "Pagamento final do saldo devedor" },
     { kind: "TARIFA", label: "Tarifa bancária", group: "FINANCIAMENTO", hint: "Tarifas da conta usada para pagar o financiamento (contam no total investido)" },
-    { kind: "IPTU", label: "IPTU", group: "CUSTOS", hint: "Informativo: o IPTU que conta é o de Tributos do imóvel (use “Gerar IPTU dos lançamentos”)" },
+    // legacy: taxes live in Tributos do imóvel; kept so old rows still render and "Gerar IPTU dos lançamentos" can migrate them
+    { kind: "IPTU", label: "IPTU (legado)", group: "CUSTOS", hint: "Registre o IPTU em Tributos do imóvel", hidden: true },
     { kind: "UTILIDADES", label: "Utilidades", group: "CUSTOS", hint: "Água, luz, gás pagos pelo proprietário (vacância etc.)" },
     { kind: "REFORMA", label: "Reforma", group: "CAPEX", hint: "Obras, melhorias e equipamentos que ficam no imóvel" },
     { kind: "ENERGIA_SOLAR", label: "Energia solar", group: "ENERGIA", hint: "Investimento no sistema fotovoltaico (centro de energia)" },
@@ -59,6 +60,8 @@ export const KIND_GROUP: Record<TransactionKind, TransactionGroup> = Object.from
 ) as Record<TransactionKind, TransactionGroup>;
 
 export const TRANSACTION_KIND_VALUES = TRANSACTION_KINDS.map(k => k.kind) as TransactionKind[];
+/** Kinds offered in the UI and templates (legacy kinds such as IPTU are hidden). */
+export const ACTIVE_TRANSACTION_KINDS = TRANSACTION_KINDS.filter(k => !k.hidden);
 
 const strip = (s: string) =>
     s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -77,7 +80,7 @@ export function kindFromText(text: string | null | undefined): TransactionKind |
     if (/amortiz|ant par|prepay/.test(t)) return "AMORTIZACAO";
     if (/prestac|parc cred|prest fin|parcela|installment|fin imob/.test(t)) return "PRESTACAO";
     if (/tarifa|cesta|bank fee/.test(t)) return "TARIFA";
-    if (/iptu/.test(t)) return "IPTU";
+    if (/iptu/.test(t)) return null;   // taxes are registered in Tributos do imóvel
     if (/utilidade|agua|luz|gas|utilit/.test(t)) return "UTILIDADES";
     if (/reforma|obra|melhoria|equipamento|capex|renov/.test(t)) return "REFORMA";
     if (/solar|fotovolt|energia/.test(t)) return "ENERGIA_SOLAR";
@@ -203,7 +206,10 @@ export function buildTransactionImportRows(sheet: ParsedSheet): TransactionImpor
         if (!iso) { errors.push(`Linha ${r.line}: data inválida "${dateCell ?? ""}"`); continue; }
         if (amount === null) continue;                                  // no amount → nothing to record
         const kind = kindFromText(kindText);
-        if (!kind) { errors.push(`Linha ${r.line}: tipo desconhecido "${kindText ?? ""}"`); continue; }
+        if (!kind) {
+            errors.push(/iptu/i.test(kindText ?? "") ? `Linha ${r.line}: IPTU não entra aqui — registre em Tributos do imóvel` : `Linha ${r.line}: tipo desconhecido "${kindText ?? ""}"`);
+            continue;
+        }
         const part = (i: number) => (i >= 0 ? parseMoney(r.cells[i]) : null);
         const comment = cComment >= 0 ? (r.cells[cComment] ?? "").trim().slice(0, 500) : "";
         rows.push({

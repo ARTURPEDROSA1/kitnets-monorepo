@@ -41,6 +41,7 @@ import {
     KIND_LABELS,
     solarPayback,
     summarizeInvestment,
+    ACTIVE_TRANSACTION_KINDS,
     TRANSACTION_KINDS,
     type FinancingStatus,
     type FinancingSystem,
@@ -606,7 +607,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                                                     KIND_GROUP[tx.kind] === "CAPEX" && "text-violet-700 dark:text-violet-400",
                                                     KIND_GROUP[tx.kind] === "ENERGIA" && "text-amber-700 dark:text-amber-400",
                                                     KIND_GROUP[tx.kind] === "CUSTOS" && "text-rose-700 dark:text-rose-400")}>
-                                                {TRANSACTION_KINDS.map(k => <option key={k.kind} value={k.kind}>{k.label}</option>)}
+                                                {ACTIVE_TRANSACTION_KINDS.map(k => <option key={k.kind} value={k.kind}>{k.label}</option>)}
                                             </select>
                                         </td>
                                         <td {...sel.cellProps("amount", tx.id, tx.amount, "px-2 py-1 text-right")}>{money("amount", tx.amount)}</td>
@@ -785,7 +786,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                             <Field label="Data"><Input type="date" value={add.date} onChange={e => setAdd(a => ({ ...a, date: e.target.value }))} /></Field>
                             <Field label="Tipo">
                                 <select value={add.kind} onChange={e => setAdd(a => ({ ...a, kind: e.target.value as TransactionKind }))} className="h-12 w-full rounded-xl border border-input bg-background px-3 text-base">
-                                    {TRANSACTION_KINDS.map(k => <option key={k.kind} value={k.kind}>{k.label}</option>)}
+                                    {ACTIVE_TRANSACTION_KINDS.map(k => <option key={k.kind} value={k.kind}>{k.label}</option>)}
                                 </select>
                             </Field>
                         </div>
@@ -910,7 +911,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                                                         {r.inflow ? <span className="text-muted-foreground">entrada</span> : (
                                                             <select value={r.kind ?? ""} disabled={r.duplicate} onChange={e => setStmt(i, { kind: (e.target.value || null) as TransactionKind | null, include: Boolean(e.target.value) })} className={cn("bg-transparent border rounded-md px-1.5 py-1 outline-none", r.kind ? "border-transparent" : "border-amber-400")}>
                                                                 <option value="">— escolher —</option>
-                                                                {TRANSACTION_KINDS.map(k => <option key={k.kind} value={k.kind}>{k.label}</option>)}
+                                                                {ACTIVE_TRANSACTION_KINDS.map(k => <option key={k.kind} value={k.kind}>{k.label}</option>)}
                                                             </select>
                                                         )}
                                                     </td>

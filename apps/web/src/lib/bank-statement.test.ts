@@ -56,7 +56,7 @@ describe("classifyStatement", () => {
         const rows = classifyStatement(parseOfx(OFX));
         expect(rows.map(r => r.kind)).toEqual(["PRESTACAO", null, "TARIFA", "UTILIDADES", null]);
         expect(rows[1].inflow).toBe(true);
-        expect(classifyMemo("IPTU 2026 PARC 1")).toBe("IPTU");
+        expect(classifyMemo("IPTU 2026 PARC 1")).toBeNull();   // taxes go to Tributos do imóvel
         expect(classifyMemo("Ant Par Financ")).toBe("AMORTIZACAO");
         expect(classifyMemo("Leroy Merlin material")).toBe("REFORMA");
     });
