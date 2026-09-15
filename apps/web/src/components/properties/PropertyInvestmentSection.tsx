@@ -496,7 +496,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                 <Tile label="Reformas (capex)" value={formatBRL(summary.capex)} tone="violet" icon={<Hammer className="w-4 h-4" />}
                     hint={`${txs.filter(t => t.kind === "REFORMA").length} lançamentos`} />
                 <Tile label="Custos do imóvel" value={formatBRL(summary.runningCosts)} tone="rose" icon={<Receipt className="w-4 h-4" />}
-                    hint={<>IPTU {formatBRL(summary.byKind.IPTU)} · utilidades {formatBRL(summary.byKind.UTILIDADES)}<br />Tarifas {formatBRL(summary.byKind.TARIFA)} · outros {formatBRL(summary.byKind.OUTROS)}</>} />
+                    hint={<>Utilidades {formatBRL(summary.byKind.UTILIDADES)} · tarifas {formatBRL(summary.byKind.TARIFA)} · outros {formatBRL(summary.byKind.OUTROS)}<br />IPTU: veja Tributos do imóvel{summary.byKind.IPTU > 0 ? ` (${formatBRL(summary.byKind.IPTU)} em lançamentos antigos, não contados)` : ""}</>} />
                 <Tile label="Financiamento" value={financingLabel} tone="blue" icon={<Banknote className="w-4 h-4" />} hint={financingHint} />
                 <Tile label="Energia solar" value={formatBRL(solar.invested)} tone="amber" icon={<Sun className="w-4 h-4" />}
                     hint={

@@ -4,15 +4,15 @@
  * Inputs are the three ledgers the property already has:
  *   • investment header + dated transactions (`property-investment.ts`)
  *   • monthly income ledger (`property-income.ts`)
- *   • taxes register (`property-taxes.ts`) — landlord-paid IPTU is charged
- *     only for years where neither ledger already carries IPTU (no double count)
+ *   • taxes register (`property-taxes.ts`) — the only source of IPTU: landlord-paid
+ *     amounts are charged in the month they were paid
  *
  * Money model (per calendar month):
  *   invested_m    = ENTRADA + CUSTOS_AQUISICAO + PRESTACAO + AMORTIZACAO + QUITACAO + REFORMA
  *   debtService_m = PRESTACAO + AMORTIZACAO + QUITACAO
- *   running_m     = TARIFA + IPTU + UTILIDADES + OUTROS (+ landlord IPTU from the register, see above)
+ *   running_m     = TARIFA + UTILIDADES + OUTROS + landlord IPTU from the register (the IPTU kind is ignored)
  *   netRent_m     = received − energy portion            (rent after the agency fee)
- *   propertyOpex  = other expenses + IPTU column
+ *   propertyOpex  = other expenses
  *   energyNet_m   = energy portion − energy cost         → pays the solar system back first;
  *                   the surplus (or all of it when there is no solar) belongs to the property
  *   noi_m         = netRent − propertyOpex − running + energy surplus
@@ -31,7 +31,7 @@
 import { breakdown, currentMonthKey, monthKey, round2, type PropertyIncomeRow } from "./property-income";
 import { monthsBetween, shiftMonthKey } from "./period-filter";
 import { KIND_GROUP, type PropertyInvestment, type PropertyTransaction } from "./property-investment";
-import type { PropertyTax } from "./property-taxes";
+import { landlordIptuByMonth, type PropertyTax } from "./property-taxes";
 import { priceLevelFactors, type MonthlyIndexPoint } from "./property-valuations";
 
 export interface MetricsInput {
@@ -119,7 +119,7 @@ export interface InvestmentMetrics {
     irrRealized: number | null;
     series: MonthPoint[];
     projection: ProjectionPoint[];
-    /** landlord IPTU pulled from the register (years missing from both ledgers) */
+    /** landlord IPTU from the taxes register charged in the period */
     registerIptuUsed: number;
 
     // ── value and returns (need a valuation) ────────────────────────────
@@ -156,34 +156,6 @@ export interface InvestmentMetrics {
 const INVEST_KINDS = new Set(["ENTRADA", "CUSTOS_AQUISICAO", "PRESTACAO", "AMORTIZACAO", "QUITACAO", "REFORMA"]);
 const DEBT_KINDS = new Set(["PRESTACAO", "AMORTIZACAO", "QUITACAO"]);
 const MAX_FORECAST_MONTHS = 600;
-
-/**
- * Landlord-paid IPTU from the taxes register, by month, for years where neither
- * the income ledger (IPTU column) nor the investment ledger (IPTU kind) has any IPTU.
- */
-export function registerIptuByMonth(taxes: PropertyTax[], incomeRows: PropertyIncomeRow[], txs: PropertyTransaction[]): Map<string, number> {
-    const out = new Map<string, number>();
-    const coveredYears = new Set<string>();
-    for (const r of incomeRows) if ((Number(r.iptu_amount) || 0) > 0) coveredYears.add(monthKey(r.month).slice(0, 4));
-    for (const t of txs) if (t.kind === "IPTU") coveredYears.add(t.occurred_on.slice(0, 4));
-    for (const tax of taxes) {
-        if (tax.kind !== "IPTU") continue;
-        const year = String(tax.year);
-        if (coveredYears.has(year)) continue;
-        const parts = Array.isArray(tax.installments) ? tax.installments : [];
-        const add = (m: string, amt: number) => { if (amt > 0) out.set(m, round2((out.get(m) ?? 0) + amt)); };
-        if (parts.length === 0) {
-            if (tax.paid_by === "LANDLORD") add(tax.paid_on ? monthKey(tax.paid_on) : `${year}-01`, Number(tax.amount) || 0);
-        } else {
-            parts.forEach((p, i) => {
-                if (p.paid_by !== "LANDLORD") return;
-                const m = p.paid_on ? monthKey(p.paid_on) : `${year}-${String(Math.min(12, i + 1)).padStart(2, "0")}`;
-                add(m, Number(p.amount) || 0);
-            });
-        }
-    }
-    return out;
-}
 
 /** Annualised internal rate of return of dated flows (Newton, bisection fallback). Null when no sign change. */
 export function xirr(flows: Array<{ date: string; amount: number }>): number | null {
@@ -226,7 +198,7 @@ export function computeInvestmentMetrics(input: MetricsInput): InvestmentMetrics
     const incomeAll = input.incomeRows.filter(r => monthKey(r.month) <= asOf);
     const counted = incomeAll.filter(r => r.status === "CONFIRMED" || input.includeExpected);
     const expectedExcluded = incomeAll.length - counted.length;
-    const registerIptu = registerIptuByMonth(input.taxes ?? [], incomeAll, txs);
+    const registerIptu = landlordIptuByMonth(input.taxes ?? []);
 
     // ── month buckets ───────────────────────────────────────────────────
     const months = new Set<string>();
@@ -272,7 +244,7 @@ export function computeInvestmentMetrics(input: MetricsInput): InvestmentMetrics
             const a = Number(t.amount) || 0;
             if (INVEST_KINDS.has(t.kind)) invested += a;
             if (DEBT_KINDS.has(t.kind)) debt += a;
-            if (KIND_GROUP[t.kind] === "CUSTOS") running += a;
+            if (KIND_GROUP[t.kind] === "CUSTOS" && t.kind !== "IPTU") running += a;   // IPTU comes from the register
             if (t.kind === "ENERGIA_SOLAR") solarInvestedCum += a;
             if (t.kind === "QUITACAO") event = "QUITACAO";
             else if (t.kind === "AMORTIZACAO" && event !== "QUITACAO") event = "AMORTIZACAO";
@@ -287,7 +259,7 @@ export function computeInvestmentMetrics(input: MetricsInput): InvestmentMetrics
             const b = breakdown(row);
             netRent = b.netRent;
             gross = b.grossRent;
-            propertyOpex = b.otherExpenses + b.iptu;
+            propertyOpex = b.otherExpenses;
             energyNet = b.energy - b.other;
             lastGross = b.grossRent;
             lastNet = b.netRent;

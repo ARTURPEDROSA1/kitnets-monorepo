@@ -34,24 +34,24 @@ describe("breakdown", () => {
         expect(b.opex).toBe(559.8);
         expect(b.noi).toBe(3790.2);
         expect(receivedFromGross(4000, 10, 350)).toBe(3950);
-        // IPTU paid by the landlord is a cost too; it never touches received / net / gross
-        const withIptu = breakdown({ received_amount: 3950, energy_portion: 350, other_income: 109.8, other_expenses: 50, iptu_amount: 140, agency_fee_pct: 10 });
+        // the legacy iptu_amount column is ignored: IPTU comes from the taxes register
+        const withIptu = breakdown({ received_amount: 3950, energy_portion: 350, other_income: 109.8, other_expenses: 50, iptu_amount: 140, agency_fee_pct: 10 } as Parameters<typeof breakdown>[0]);
         expect(withIptu.grossRent).toBe(4000);
-        expect(withIptu.opex).toBe(699.8);
-        expect(withIptu.noi).toBe(3650.2);
+        expect(withIptu.opex).toBe(559.8);
+        expect(withIptu.noi).toBe(3790.2);
     });
 });
 
 describe("template import", () => {
     it("detects the template and maps every column", () => {
-        const tsv = [INCOME_TEMPLATE_HEADERS.join("\t"), "01/09/2026\t4000\t10\t3950\t350\t109,80\t50\t140\tok"].join("\n");
+        const tsv = [INCOME_TEMPLATE_HEADERS.join("\t"), "01/09/2026\t4000\t10\t3950\t350\t109,80\t50\tok"].join("\n");
         const sheet = parseSheet(tsv);
         expect(isIncomeTemplate(sheet.headers)).toBe(true);
         const mapping = suggestMapping(sheet.headers, sheet.dateColumn);
-        expect(mapping).toEqual(["ignore", "gross", "fee_pct", "received", "energy", "other", "other_expenses", "iptu", "notes"]);
+        expect(mapping).toEqual(["ignore", "gross", "fee_pct", "received", "energy", "other", "other_expenses", "notes"]);
         const rows = buildImportRows(sheet, mapping, { agencyFeePct: 10, todayMonth: "2026-09" });
         expect(rows).toHaveLength(1);
-        expect(rows[0]).toMatchObject({ month: "2026-09", gross_rent: 4000, received_amount: 3950, energy_portion: 350, other_income: 109.8, other_expenses: 50, iptu_amount: 140, agency_fee_pct: 10, status: "CONFIRMED", notes: "ok" });
+        expect(rows[0]).toMatchObject({ month: "2026-09", gross_rent: 4000, received_amount: 3950, energy_portion: 350, other_income: 109.8, other_expenses: 50, agency_fee_pct: 10, status: "CONFIRMED", notes: "ok" });
     });
 
     it("marks future months as expected and ignores derived columns", () => {

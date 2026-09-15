@@ -6,7 +6,7 @@
  * property_transactions : dated outflows, one kind each (all amounts ≥ 0)
  *
  *   invested (imóvel) = ENTRADA + CUSTOS_AQUISICAO + PRESTACAO + AMORTIZACAO + QUITACAO + REFORMA
- *   custos do imóvel  = TARIFA + IPTU + UTILIDADES + OUTROS   (running costs, not investment)
+ *   custos do imóvel  = TARIFA + UTILIDADES + OUTROS   (running costs, not investment; IPTU comes from Tributos do imóvel)
  *   energia solar     = ENERGIA_SOLAR — its own cost centre, paid back by
  *                       net energy income (energy − energy cost) from the income ledger
  */
@@ -42,7 +42,7 @@ export const TRANSACTION_KINDS: ReadonlyArray<{ kind: TransactionKind; label: st
     { kind: "AMORTIZACAO", label: "Amortização extra", group: "FINANCIAMENTO", hint: "Pagamento extraordinário que reduz o saldo devedor" },
     { kind: "QUITACAO", label: "Quitação", group: "FINANCIAMENTO", hint: "Pagamento final do saldo devedor" },
     { kind: "TARIFA", label: "Tarifa bancária", group: "CUSTOS", hint: "Tarifas da conta usada para pagar o financiamento" },
-    { kind: "IPTU", label: "IPTU", group: "CUSTOS", hint: "IPTU pago pelo proprietário" },
+    { kind: "IPTU", label: "IPTU", group: "CUSTOS", hint: "Informativo: o IPTU que conta é o de Tributos do imóvel (use “Gerar IPTU dos lançamentos”)" },
     { kind: "UTILIDADES", label: "Utilidades", group: "CUSTOS", hint: "Água, luz, gás pagos pelo proprietário (vacância etc.)" },
     { kind: "REFORMA", label: "Reforma", group: "CAPEX", hint: "Obras, melhorias e equipamentos que ficam no imóvel" },
     { kind: "ENERGIA_SOLAR", label: "Energia solar", group: "ENERGIA", hint: "Investimento no sistema fotovoltaico (centro de energia)" },
@@ -234,7 +234,7 @@ export interface InvestmentSummary {
     /** Σ known interest + insurance parts, else bankPaid − principal when the loan is paid off, else null */
     interestAndInsurance: number | null;
     capex: number;
-    /** TARIFA + IPTU + UTILIDADES + OUTROS */
+    /** TARIFA + UTILIDADES + OUTROS (IPTU is tracked in the taxes register) */
     runningCosts: number;
     /** ENTRADA + CUSTOS_AQUISICAO + bankPaid + capex — the property's cost basis */
     invested: number;
@@ -266,7 +266,7 @@ export function summarizeInvestment(txs: PropertyTransaction[], inv: PropertyInv
     }
     const bankPaid = round2(byKind.PRESTACAO + byKind.AMORTIZACAO + byKind.QUITACAO);
     const capex = byKind.REFORMA;
-    const runningCosts = round2(byKind.TARIFA + byKind.IPTU + byKind.UTILIDADES + byKind.OUTROS);
+    const runningCosts = round2(byKind.TARIFA + byKind.UTILIDADES + byKind.OUTROS);
     const invested = round2(byKind.ENTRADA + byKind.CUSTOS_AQUISICAO + bankPaid + capex);
     let interestAndInsurance: number | null = null;
     if (hasParts) interestAndInsurance = round2(knownParts);

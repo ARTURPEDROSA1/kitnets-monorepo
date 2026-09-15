@@ -101,7 +101,7 @@ export async function GET(_request: Request, context: RouteContext) {
         line("Yield sobre custo", m.netYieldOnCost, PCT, "Renda líquida anualizada ÷ total investido");
         line("Cash-on-cash (12 m)", m.cashOnCash, PCT);
         line("TIR realizada (sem venda)", m.irrRealized, PCT);
-        if (m.registerIptuUsed > 0) line("IPTU do registro considerado", m.registerIptuUsed, BRL, "Anos sem IPTU nos lançamentos");
+        if (m.registerIptuUsed > 0) line("IPTU pago pelo proprietário (Tributos)", m.registerIptuUsed, BRL, "Contado no mês do pagamento");
 
         section("Valor de mercado e retornos");
         line("Valor de mercado", m.marketValue, BRL, m.marketValueSource ? `${VALUATION_SOURCE_LABELS[m.marketValueSource as keyof typeof VALUATION_SOURCE_LABELS] ?? m.marketValueSource} · ${m.marketValueOn?.split("-").reverse().join("/") ?? ""}` : "Sem avaliação");
@@ -148,14 +148,14 @@ export async function GET(_request: Request, context: RouteContext) {
         sr.columns = [
             { header: "Mês", key: "month", width: 12 }, { header: "Aluguel bruto", key: "gross", width: 14 }, { header: "Taxa (%)", key: "pct", width: 10 },
             { header: "Aluguel líquido", key: "net", width: 15 }, { header: "Energia", key: "energy", width: 12 }, { header: "Recebido", key: "received", width: 13 },
-            { header: "Custo de energia", key: "other", width: 16 }, { header: "Outras despesas", key: "otherExp", width: 16 }, { header: "IPTU", key: "iptu", width: 12 },
+            { header: "Custo de energia", key: "other", width: 16 }, { header: "Outras despesas", key: "otherExp", width: 16 },
             { header: "NOI", key: "noi", width: 13 }, { header: "Status", key: "status", width: 12 }, { header: "Comentários", key: "notes", width: 40 },
         ];
         for (const r of incomeRows) {
             const b = breakdown(r);
-            sr.addRow({ month: formatMonthKey(monthKey(r.month)), gross: b.grossRent, pct: b.feePct, net: b.netRent, energy: b.energy, received: b.received, other: b.other, otherExp: b.otherExpenses, iptu: b.iptu, noi: b.noi, status: r.status === "CONFIRMED" ? "Confirmado" : "Previsto", notes: r.notes ?? "" });
+            sr.addRow({ month: formatMonthKey(monthKey(r.month)), gross: b.grossRent, pct: b.feePct, net: b.netRent, energy: b.energy, received: b.received, other: b.other, otherExp: b.otherExpenses, noi: b.noi, status: r.status === "CONFIRMED" ? "Confirmado" : "Previsto", notes: r.notes ?? "" });
         }
-        styleTable(sr, ["gross", "net", "energy", "received", "other", "otherExp", "iptu", "noi"]);
+        styleTable(sr, ["gross", "net", "energy", "received", "other", "otherExp", "noi"]);
 
         // ── Investimento ────────────────────────────────────────────────
         const si = wb.addWorksheet("Investimento");

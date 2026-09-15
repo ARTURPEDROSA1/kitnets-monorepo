@@ -6,6 +6,8 @@ import {
     iptuFromExtraction,
     iptuSeries,
     iptuYearsFromTransactions,
+    landlordIptuByMonth,
+    landlordIptuForMonth,
     normalizeInstallments,
     parseReferencia,
     splitInstallments,
@@ -150,5 +152,27 @@ describe("iptuYearsFromTransactions", () => {
         expect(seeds).toHaveLength(2);
         expect(seeds[0]).toMatchObject({ year: 2022, kind: "IPTU", amount: 131.96, paid_by: "TENANT", paid_on: "2022-10-24", installments: [] });
         expect(seeds[1]).toMatchObject({ year: 2023, amount: 279.56, paid_on: "2023-07-24" });
+    });
+});
+
+describe("landlordIptuByMonth", () => {
+    it("puts landlord payments in the month they were paid and ignores tenant ones", () => {
+        const rows = [
+            { ...tax(2024, "IPTU", 1200, "LANDLORD"), paid_on: "2024-03-10" },
+            tax(2025, "IPTU", 0, "TENANT", [
+                { seq: 1, amount: 650, paid_by: "LANDLORD", paid_on: "2025-02-05" },
+                { seq: 2, amount: 650, paid_by: "TENANT", paid_on: "2025-03-05" },
+            ]),
+            tax(2026, "IPTU", 900, "LANDLORD"),
+            { ...tax(2023, "ITBI", 5000, "LANDLORD"), paid_on: "2023-01-10" },
+        ];
+        const m = landlordIptuByMonth(rows);
+        expect(m.get("2024-03")).toBe(1200);
+        expect(m.get("2025-02")).toBe(650);
+        expect(m.get("2025-03")).toBeUndefined();
+        expect(m.get("2026-01")).toBe(900);          // no date → January
+        expect([...m.keys()].some(k => k.startsWith("2023"))).toBe(false);   // ITBI is not IPTU
+        expect(landlordIptuForMonth(rows, "2024-03")).toBe(1200);
+        expect(landlordIptuForMonth(rows, "2024-04")).toBe(0);
     });
 });
