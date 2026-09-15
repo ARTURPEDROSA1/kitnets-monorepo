@@ -522,13 +522,13 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
             {/* Tiles */}
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
                 <Tile label="Total investido no imóvel" value={formatBRL(summary.invested)} tone="emerald" icon={<PiggyBank className="w-4 h-4" />}
-                    hint={<>Entrada {formatBRL(summary.downPayment)} · banco {formatBRL(summary.bankPaid)}<br />Tarifas {formatBRL(summary.bankFees)} · reformas {formatBRL(summary.capex)}</>} />
+                    hint={<>Entrada: {formatBRL(summary.downPayment)}<br />Banco: {formatBRL(summary.bankPaid)}<br />Tarifas: {formatBRL(summary.bankFees)}<br />Reformas: {formatBRL(summary.capex)}</>} />
                 <Tile label="Pago ao banco" value={formatBRL(summary.bankPaid)} tone="blue" icon={<Landmark className="w-4 h-4" />}
                     hint={<>{summary.installments} prestações<br />Juros + seguros {summary.interestAndInsurance === null ? "—" : formatBRL(summary.interestAndInsurance)}</>} />
                 <Tile label="Reformas (capex)" value={formatBRL(summary.capex)} tone="violet" icon={<Hammer className="w-4 h-4" />}
                     hint={`${txs.filter(t => t.kind === "REFORMA").length} lançamentos`} />
                 <Tile label="Custos do imóvel" value={formatBRL(summary.runningCosts + taxes.total)} tone="rose" icon={<Receipt className="w-4 h-4" />}
-                    hint={<>Utilidades {formatBRL(summary.byKind.UTILIDADES)} · outros {formatBRL(summary.byKind.OUTROS)}<br />IPTU {formatBRL(taxes.iptu)} · ITBI {formatBRL(taxes.itbi)}{taxes.other > 0 ? ` · outros tributos ${formatBRL(taxes.other)}` : ""}</>} />
+                    hint={<>Utilidades: {formatBRL(summary.byKind.UTILIDADES)}<br />Outros: {formatBRL(summary.byKind.OUTROS)}<br />IPTU: {formatBRL(taxes.iptu)}<br />ITBI: {formatBRL(taxes.itbi)}{taxes.other > 0 && <><br />Outros tributos: {formatBRL(taxes.other)}</>}</>} />
                 <Tile label="Financiamento" value={financingLabel} tone="blue" icon={<Banknote className="w-4 h-4" />} hint={financingHint} />
                 <Tile label="Energia solar" value={formatBRL(solar.invested)} tone="amber" icon={<Sun className="w-4 h-4" />}
                     hint={
