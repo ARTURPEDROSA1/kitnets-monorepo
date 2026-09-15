@@ -260,7 +260,7 @@ export function summarizeInvestment(txs: PropertyTransaction[], inv: PropertyInv
         const amt = Number(t.amount) || 0;
         byKind[t.kind] = round2(byKind[t.kind] + amt);
         if (t.kind === "PRESTACAO") installments++;
-        if (KIND_GROUP[t.kind] === "FINANCIAMENTO" && (t.interest_part !== null || t.insurance_part !== null)) {
+        if ((t.kind === "PRESTACAO" || t.kind === "AMORTIZACAO" || t.kind === "QUITACAO") && (t.interest_part !== null || t.insurance_part !== null)) {
             hasParts = true;
             knownParts += (Number(t.interest_part) || 0) + (Number(t.insurance_part) || 0);
         }
@@ -361,6 +361,7 @@ const pricePayment = (balance: number, r: number, n: number) => (r === 0 ? balan
  *   insurance    = payment − interest − amortisation (MIP + DFI + fees), floored at 0
  *   charges dated before the first due date (month-zero fees/insurance) are fees only
  *   extra amortisations reduce the balance in full; the instalment is recomputed ("reduce instalment")
+ *   same-day instalment + amortisation: the order is chosen by which scheduled instalment matches the amount paid
  *   the payoff clears the balance; any excess is interest/fees
  *
  * Calibration: when the loan is paid off and a QUITACAO row exists, the total principal is known
@@ -380,148 +381,180 @@ export function estimateFinancingSplits(
     if (!inv || !inv.principal || !inv.annual_rate || !inv.term_months) {
         return empty("Preencha valor financiado, juros nominal e prazo em “Aquisição & financiamento”.");
     }
+    // Only the loan itself: bank fees (TARIFA) are investment but not part of the schedule.
     const rows = txs
-        .filter(t => KIND_GROUP[t.kind] === "FINANCIAMENTO")
+        .filter(t => t.kind === "PRESTACAO" || t.kind === "AMORTIZACAO" || t.kind === "QUITACAO")
         .sort((a, b) => a.occurred_on.localeCompare(b.occurred_on) || (a.created_at ?? "").localeCompare(b.created_at ?? ""));
     if (rows.length === 0) return empty("Nenhuma prestação, amortização ou quitação registrada.");
+    const byId = new Map(rows.map(t => [t.id, t]));
+    const payoffId = rows.find(t => t.kind === "QUITACAO")?.id ?? null;
 
     const principal0 = round2(Number(inv.principal));
     const monthlyRate = inv.annual_rate / 100 / 12;
     const dailyRate = inv.annual_rate / 100 / 360;
     const system = inv.financing_system ?? "SAC";
     const firstDue = inv.first_due_date ?? null;
-    const payoffIdx = rows.findIndex(t => t.kind === "QUITACAO");
 
-    const walk = (k: number) => {
+    // Same-day groups: an instalment and an extra amortisation on the same date can go either way
+    // (the instalment issued for that due date may have been computed before or after the prepayment);
+    // the walk picks the order whose scheduled instalment is closer to the amount actually paid.
+    const groups: PropertyTransaction[][] = [];
+    for (const t of rows) {
+        const g = groups[groups.length - 1];
+        if (g && g[0].occurred_on === t.occurred_on) g.push(t); else groups.push([t]);
+    }
+
+    /**
+     * One pass over the rows. Interest is contractual (balance × rate). Insurance (MIP + DFI + admin)
+     * is modelled as proportional to the balance, `f × segRate × balance`, where segRate comes from
+     * the first regular instalment (where the SAC/PRICE schedule is exact) and `f` is the calibration
+     * factor. Amortisation is whatever is left of the payment.
+     */
+    const walk = (f: number) => {
         let balance = principal0;
         let remaining = inv.term_months!;
         let first = true;
+        let segRate: number | null = null;
         let balanceBeforePayoff: number | null = null;
         const splits: FinancingSplit[] = [];
         const notes: string[] = [];
         const totals = { interest: 0, principal: 0, insurance: 0, paid: 0 };
 
-        rows.forEach((t, idx) => {
-            const amount = round2(Number(t.amount) || 0);
-            const hasParts = t.interest_part !== null || t.principal_part !== null || t.insurance_part !== null;
-            const keep = hasParts && !opts.overwrite;
-            let interest = 0, principal = 0, insurance = 0;
+        const scheduledFor = (bal: number, t: PropertyTransaction) => {
+            const days = first && inv.contract_date ? daysBetween(inv.contract_date, t.occurred_on) : 0;
+            const interest = round2(bal * (first && days > 0 ? dailyRate * days : monthlyRate));
+            const amort = system === "PRICE" ? pricePayment(bal, monthlyRate, remaining) - interest : bal / Math.max(1, remaining);
+            return { interest, amort };
+        };
 
-            if (keep) {
-                interest = Number(t.interest_part) || 0;
-                insurance = Number(t.insurance_part) || 0;
-                principal = t.principal_part !== null ? Number(t.principal_part) || 0 : Math.max(0, amount - interest - insurance);
-                if (t.kind === "PRESTACAO") { remaining = Math.max(1, remaining - 1); first = false; }
-            } else if (t.kind === "PRESTACAO") {
-                if (firstDue && t.occurred_on < firstDue) {
-                    // Month-zero charges (TAC, first insurance) before the first instalment: no interest, no amortisation.
-                    insurance = amount;
-                    notes.push(`${formatDateBR(t.occurred_on)}: cobrança anterior à 1ª prestação — tratada como tarifas/seguro.`);
-                } else if (balance <= 0) {
-                    interest = amount;
-                    notes.push(`${formatDateBR(t.occurred_on)}: prestação após o saldo zerar — tratada como juros/encargos.`);
-                } else {
-                    const days = first && inv.contract_date ? daysBetween(inv.contract_date, t.occurred_on) : 0;
-                    interest = round2(balance * (first && days > 0 ? dailyRate * days : monthlyRate));
-                    let scheduled = system === "PRICE" ? pricePayment(balance, monthlyRate, remaining) - interest : balance / Math.max(1, remaining);
-                    scheduled = round2(Math.min(Math.max(scheduled * k, 0), balance, Math.max(0, amount - interest)));
-                    insurance = round2(amount - interest - scheduled);
-                    if (amount < interest) {
+        for (const g of groups) {
+            let items = g;
+            const p = g.find(t => t.kind === "PRESTACAO");
+            const amorts = g.filter(t => t.kind === "AMORTIZACAO");
+            const pKept = p ? (p.interest_part !== null || p.principal_part !== null || p.insurance_part !== null) && !opts.overwrite : false;
+            if (p && amorts.length > 0 && !pKept && balance > 0 && (!firstDue || p.occurred_on >= firstDue)) {
+                const amount = round2(Number(p.amount) || 0);
+                const prepay = amorts.reduce((a, t) => a + Math.min(Number(t.amount) || 0, balance), 0);
+                const before = scheduledFor(balance, p), after = scheduledFor(Math.max(0, balance - prepay), p);
+                const fitBefore = Math.abs(before.interest + before.amort - amount), fitAfter = Math.abs(after.interest + after.amort - amount);
+                const others = g.filter(t => t !== p && t.kind !== "AMORTIZACAO");
+                items = fitAfter < fitBefore ? [...amorts, p, ...others] : [p, ...amorts, ...others];
+            }
+
+            for (const t of items) {
+                const amount = round2(Number(t.amount) || 0);
+                const hasParts = t.interest_part !== null || t.principal_part !== null || t.insurance_part !== null;
+                const keep = hasParts && !opts.overwrite;
+                let interest = 0, principal = 0, insurance = 0;
+
+                if (keep) {
+                    interest = Number(t.interest_part) || 0;
+                    insurance = Number(t.insurance_part) || 0;
+                    principal = t.principal_part !== null ? Number(t.principal_part) || 0 : Math.max(0, amount - interest - insurance);
+                    if (t.kind === "PRESTACAO") { remaining = Math.max(1, remaining - 1); first = false; }
+                } else if (t.kind === "PRESTACAO") {
+                    if (firstDue && t.occurred_on < firstDue) {
+                        // Month-zero charges (TAC, first insurance) before the first instalment: no interest, no amortisation.
+                        insurance = amount;
+                        notes.push(`${formatDateBR(t.occurred_on)}: cobrança anterior à 1ª prestação — tratada como tarifas/seguro.`);
+                    } else if (balance <= 0) {
                         interest = amount;
-                        insurance = 0;
-                        notes.push(`${formatDateBR(t.occurred_on)}: prestação (${amount.toFixed(2)}) menor que os juros estimados — confira o valor.`);
+                        notes.push(`${formatDateBR(t.occurred_on)}: prestação após o saldo zerar — tratada como juros/encargos.`);
+                    } else {
+                        const sch = scheduledFor(balance, t);
+                        const proRata = first && Boolean(inv.contract_date) && daysBetween(inv.contract_date!, t.occurred_on) > 0;
+                        interest = sch.interest;
+                        if (amount < interest) {
+                            interest = amount;
+                            notes.push(`${formatDateBR(t.occurred_on)}: prestação (${amount.toFixed(2)}) menor que os juros estimados — confira o valor.`);
+                        } else {
+                            if (segRate === null && !proRata) {
+                                // first full instalment: the schedule is exact, so the leftover is the real insurance
+                                const seg0 = Math.max(0, amount - interest - round2(sch.amort));
+                                segRate = balance > 0 ? seg0 / balance : 0;
+                            }
+                            // pro-rata first instalment (interest by days is approximate): keep the scheduled amortisation
+                            insurance = segRate === null
+                                ? round2(Math.max(0, amount - interest - round2(sch.amort)))
+                                : round2(Math.min(amount - interest, f * segRate * balance));
+                            principal = round2(Math.min(balance, Math.max(0, amount - interest - insurance)));
+                            insurance = round2(amount - interest - principal);
+                        }
+                        remaining = Math.max(1, remaining - 1);
+                        first = false;
                     }
-                    principal = scheduled;
-                    remaining = Math.max(1, remaining - 1);
-                    first = false;
+                } else if (t.kind === "AMORTIZACAO") {
+                    principal = round2(Math.min(amount, balance));
+                    interest = round2(amount - principal);
+                } else {
+                    if (t.id === payoffId) balanceBeforePayoff = balance;
+                    principal = round2(Math.min(amount, balance));
+                    interest = round2(amount - principal);
                 }
-            } else if (t.kind === "AMORTIZACAO") {
-                principal = round2(Math.min(amount, balance));
-                interest = round2(amount - principal);
-            } else {
-                if (idx === payoffIdx) balanceBeforePayoff = balance;
-                principal = round2(Math.min(amount, balance));
-                interest = round2(amount - principal);
-            }
 
-            balance = round2(Math.max(0, balance - principal));
-            totals.interest = round2(totals.interest + interest);
-            totals.principal = round2(totals.principal + principal);
-            totals.insurance = round2(totals.insurance + insurance);
-            totals.paid = round2(totals.paid + amount);
-            splits.push({ id: t.id, occurred_on: t.occurred_on, kind: t.kind, amount, interest_part: interest, principal_part: principal, insurance_part: insurance, balance_after: balance, kept: keep });
-        });
-        return { splits, totals, notes, balance, balanceBeforePayoff };
-    };
-
-    // ── Calibration (paid-off loans with a QUITACAO row) ─────────────────────
-    // Total principal must equal the financed amount, so juros + seguros over the
-    // whole loan = paid − financed. Scale every instalment's interest and insurance
-    // by the same factor and move the difference into amortisation, then replay the
-    // balance so the payoff clears it exactly.
-    const r = walk(1);
-    let splits = r.splits;
-    const notes = [...new Set(r.notes)];
-    let balanceFinal = r.balance;
-    let totals = r.totals;
-    if (inv.financing_status === "PAID_OFF" && payoffIdx >= 0 && r.balanceBeforePayoff !== null) {
-        const payoff = round2(Number(rows[payoffIdx].amount) || 0);
-        const residual = round2(r.balanceBeforePayoff - payoff);
-        // Only instalments after the first extra amortisation are uncertain (the SAC/PRICE schedule
-        // reproduces the bank exactly until then); month-zero charges are fees and stay untouched.
-        const firstPrepayIdx = rows.findIndex(t => t.kind === "AMORTIZACAO");
-        const adjustable = splits.filter((sp, i) =>
-            sp.kind === "PRESTACAO" && !sp.kept && i < payoffIdx
-            && (firstPrepayIdx < 0 || i > firstPrepayIdx)
-            && (!firstDue || sp.occurred_on >= firstDue)
-        );
-        const pool = adjustable.reduce((a, sp) => a + sp.interest_part + sp.insurance_part, 0);
-        if (residual > 1 && pool > 0) {
-            const f = Math.max(0, 1 - residual / pool);
-            if (f === 0) {
-                notes.push(`Mesmo zerando juros e seguros das prestações, sobra saldo de ${round2(residual - pool).toFixed(2)} na quitação — confira valor financiado, amortizações e quitação.`);
-            } else {
-                notes.unshift(`Juros e seguros estimados das prestações reduzidos em ${((1 - f) * 100).toFixed(1)}% para que a amortização total feche com o valor financiado (juros + seguros reais = pago − financiado).`);
-            }
-            const adjusted = new Set(adjustable.map(sp => sp.id));
-            let balance = principal0;
-            totals = { interest: 0, principal: 0, insurance: 0, paid: 0 };
-            splits = splits.map((sp, i) => {
-                let { interest_part: interest, principal_part: principal, insurance_part: insurance } = sp;
-                if (adjusted.has(sp.id)) {
-                    interest = round2(interest * f);
-                    insurance = round2(insurance * f);
-                    principal = round2(Math.min(balance, Math.max(0, sp.amount - interest - insurance)));
-                    insurance = round2(sp.amount - interest - principal);
-                } else if (sp.kind === "AMORTIZACAO" && !sp.kept) {
-                    principal = round2(Math.min(sp.amount, balance));
-                    interest = round2(sp.amount - principal);
-                } else if (i === payoffIdx && !sp.kept) {
-                    principal = round2(Math.min(sp.amount, balance));
-                    interest = round2(sp.amount - principal);
-                }
                 balance = round2(Math.max(0, balance - principal));
                 totals.interest = round2(totals.interest + interest);
                 totals.principal = round2(totals.principal + principal);
                 totals.insurance = round2(totals.insurance + insurance);
-                totals.paid = round2(totals.paid + sp.amount);
-                return { ...sp, interest_part: interest, principal_part: principal, insurance_part: insurance, balance_after: balance };
-            });
-            balanceFinal = balance;
+                totals.paid = round2(totals.paid + amount);
+                splits.push({ id: t.id, occurred_on: t.occurred_on, kind: t.kind, amount, interest_part: interest, principal_part: principal, insurance_part: insurance, balance_after: balance, kept: keep });
+            }
+        }
+        return { splits, totals, notes, balance, balanceBeforePayoff };
+    };
+
+    // ── Calibration (paid-off loans with a QUITACAO row) ─────────────────────
+    // The payoff clears the balance, so the balance right before it must equal the payoff amount.
+    // Interest is contractual; the free parameter is the insurance scale `f` (more insurance →
+    // less amortisation → higher balance), solved by bisection. Without a payoff, f = 1.
+    let f = 1;
+    let r = walk(1);
+    const notes: string[] = [];
+    if (inv.financing_status === "PAID_OFF" && payoffId && r.balanceBeforePayoff !== null) {
+        const payoff = round2(Number(byId.get(payoffId)!.amount) || 0);
+        const residualAt = (x: number) => { const w = walk(x); return w.balanceBeforePayoff === null ? 0 : w.balanceBeforePayoff - payoff; };
+        const r1 = residualAt(1);
+        // A payoff larger than the balance already reads as interest/fees; only a leftover balance needs calibration.
+        if (r1 > 1) {
+            let lo = 0, hi = 1;
+            const rLo = residualAt(lo), rHi = residualAt(hi);
+            if (rLo > 0) {
+                // Even with zero insurance the balance does not close: some principal was paid outside
+                // the statement (FGTS, for instance). Keep the modelled insurance and say so.
+                notes.push(`Sobra saldo de ${round2(rLo).toFixed(2)} na quitação mesmo sem seguros: provavelmente uma amortização não registrada (FGTS, por exemplo). Cadastre-a como “Amortização extra” e recalcule.`);
+                f = 1;
+            } else if (rHi <= 0) {
+                f = 1;
+            } else {
+                for (let i = 0; i < 60; i++) {
+                    const mid = (lo + hi) / 2;
+                    if (residualAt(mid) > 0) hi = mid; else lo = mid;
+                    if (hi - lo < 1e-6) break;
+                }
+                f = (lo + hi) / 2;
+                if (Math.abs(f - 1) > 0.05) {
+                    notes.push(`Seguros estimados ${f > 1 ? "aumentados" : "reduzidos"} em ${(Math.abs(f - 1) * 100).toFixed(1)}% em relação à 1ª prestação para que a amortização total feche com o valor financiado.`);
+                }
+            }
+            r = walk(f);
         }
     }
+    const splits = r.splits;
+    const totals = r.totals;
+    const balanceFinal = r.balance;
+    for (const n of r.notes) if (!notes.includes(n)) notes.push(n);
     if (inv.financing_status === "PAID_OFF" && balanceFinal > 1) {
         notes.push(`Saldo estimado após a quitação: ${balanceFinal.toFixed(2)}. Ajuste a amortização nas linhas em que souber o valor exato.`);
     }
 
     const updates: TransactionInput[] = [];
-    splits.forEach((sp, i) => {
-        const t = rows[i];
-        if (sp.kept) return;
+    for (const sp of splits) {
+        const t = byId.get(sp.id)!;
+        if (sp.kept) continue;
         if (t.interest_part !== sp.interest_part || t.principal_part !== sp.principal_part || t.insurance_part !== sp.insurance_part) {
             updates.push({ id: t.id, occurred_on: t.occurred_on, kind: t.kind, amount: t.amount, interest_part: sp.interest_part, principal_part: sp.principal_part, insurance_part: sp.insurance_part, comment: t.comment, source: t.source });
         }
-    });
+    }
     return { splits, updates, totals, endingBalance: balanceFinal, notes };
 }
 

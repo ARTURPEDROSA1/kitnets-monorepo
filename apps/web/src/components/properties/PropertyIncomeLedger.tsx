@@ -44,6 +44,7 @@ import { cn } from "@/lib/utils";
 import PeriodFilter from "./PeriodFilter";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "./TableColumnFilters";
 import { CellSumBar, useCellSum } from "./TableCellSum";
+import MoneyInput, { parseMoneyText } from "./MoneyInput";
 import { periodLabel, periodRange, type PeriodFilterValue } from "@/lib/period-filter";
 import {
     breakdown,
@@ -86,9 +87,8 @@ const formatBRL = (val: number) =>
 
 const toInput = (n: number) => (Number.isFinite(n) ? n.toFixed(2) : "");
 const parseInput = (s: string): number | null => {
-    if (s.trim() === "") return null;
-    const n = Number(s.replace(",", "."));
-    return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : null;
+    const n = parseMoneyText(s);
+    return n !== null && n >= 0 ? Math.round(n * 100) / 100 : null;
 };
 
 type DraftField = "received" | "energy" | "other" | "otherExp" | "pct" | "gross" | "notes";
@@ -652,7 +652,6 @@ export default function PropertyIncomeLedger({
                 </span>
                 <PeriodFilter value={period} onChange={setPeriod} />
             </div>
-            <FilterChips columns={columns} ctl={cf} />
 
             {/* Chart */}
             {chartData.length > 1 && (
@@ -685,6 +684,8 @@ export default function PropertyIncomeLedger({
             )}
 
             {/* Table */}
+            <FilterChips columns={columns} ctl={cf} />
+
             {loading ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center">
                     <Loader2 className="w-4 h-4 animate-spin" /> Carregando receitas…
@@ -713,7 +714,16 @@ export default function PropertyIncomeLedger({
                                 const b = breakdown(row);
                                 const d = drafts[month] ?? {};
                                 const busy = saving.has(month);
-                                const cell = (field: DraftField, value: number, step = "0.01") => (
+                                const cell = (field: DraftField, value: number, step = "0.01") => field !== "pct" ? (
+                                    <MoneyInput
+                                        value={value}
+                                        draft={d[field]}
+                                        disabled={busy}
+                                        onDraft={text => setDraft(month, field, text)}
+                                        onCommit={() => commitDraft(row, field)}
+                                        className={cn("w-28", field === "gross" && "text-foreground font-semibold")}
+                                    />
+                                ) : (
                                     <input
                                         type="number"
                                         inputMode="decimal"
@@ -726,10 +736,7 @@ export default function PropertyIncomeLedger({
                                         onKeyDown={e => {
                                             if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                                         }}
-                                        className={cn(
-                                            "w-24 text-right bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-md px-1.5 py-1 outline-none tabular-nums",
-                                            field === "gross" && "text-foreground font-semibold"
-                                        )}
+                                        className="w-20 text-right bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-md px-1.5 py-1 outline-none tabular-nums"
                                     />
                                 );
                                 return (

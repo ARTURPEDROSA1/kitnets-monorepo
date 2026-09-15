@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils";
 import PeriodFilter from "./PeriodFilter";
 import Tile from "./Tile";
 import { CellSumBar, useCellSum } from "./TableCellSum";
+import MoneyInput, { parseMoneyText } from "./MoneyInput";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "./TableColumnFilters";
 import { periodLabel, periodRange, type PeriodFilterValue } from "@/lib/period-filter";
 import { parseSheet, type PropertyIncomeRow } from "@/lib/property-income";
@@ -65,9 +66,8 @@ interface Props {
 const formatBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const toInput = (n: number | null | undefined) => (n === null || n === undefined || !Number.isFinite(n) ? "" : n.toFixed(2));
 const parseInput = (s: string): number | null => {
-    if (s.trim() === "") return null;
-    const n = Number(s.replace(",", "."));
-    return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : null;
+    const n = parseMoneyText(s);
+    return n !== null && n >= 0 ? Math.round(n * 100) / 100 : null;
 };
 const todayIso = () => new Date().toISOString().slice(0, 10);
 const COLLAPSED_ROWS = 24;
@@ -552,15 +552,14 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                                 const busy = saving.has(tx.id);
                                 const isFin = FIN_KINDS.includes(tx.kind);
                                 const money = (field: "amount" | "interest" | "principal" | "insurance", value: number | null, enabled = true) => (
-                                    <input
-                                        type="number" inputMode="decimal" step="0.01" min={0}
+                                    <MoneyInput
+                                        value={value}
+                                        draft={d[field]}
                                         disabled={busy || !enabled}
-                                        value={d[field] ?? toInput(value)}
                                         placeholder={enabled ? "" : "—"}
-                                        onChange={e => setDraft(tx.id, field, e.target.value)}
-                                        onBlur={() => commit(tx, field)}
-                                        onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                                        className={cn("w-24 text-right bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-md px-1.5 py-1 outline-none tabular-nums disabled:opacity-40", field === "amount" && "font-semibold text-foreground")}
+                                        onDraft={text => setDraft(tx.id, field, text)}
+                                        onCommit={() => commit(tx, field)}
+                                        className={cn("w-28 disabled:opacity-40", field === "amount" && "font-semibold text-foreground")}
                                     />
                                 );
                                 return (
