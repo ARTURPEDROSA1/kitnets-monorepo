@@ -35,13 +35,13 @@ import { CellSumBar, useCellSum } from "./TableCellSum";
 
 /** Excel-style sort/filter columns for the taxes table (values honour parcelas). */
 const TAX_COLUMNS: ColumnDef<PropertyTax>[] = [
-    { key: "year", label: "Ano", kind: "number", get: r => r.year },
+    { key: "year", label: "Ano", kind: "number", sum: false, get: r => r.year },
     { key: "kind", label: "Tributo", kind: "enum", get: r => r.kind, options: TAX_KINDS.map(k => ({ value: k.kind, label: k.label })) },
     { key: "amount", label: "Valor", kind: "number", align: "right", get: r => effectiveTax(r).amount },
     { key: "payer", label: "Pago por", kind: "enum", get: r => effectiveTax(r).payer, options: [{ value: "TENANT", label: "Inquilino" }, { value: "LANDLORD", label: "Proprietário" }, { value: "MIXED", label: "Misto" }] },
     { key: "date", label: "Data", kind: "date", get: r => r.paid_on },
     { key: "comment", label: "Comentários", kind: "text", get: r => r.comment ?? "" },
-    { key: "parts", label: "Parcelas", kind: "number", get: r => (r.installments?.length ? r.installments.length : 1) },
+    { key: "parts", label: "Parcelas", kind: "number", sum: false, get: r => (r.installments?.length ? r.installments.length : 1) },
 ];
 
 interface Props {

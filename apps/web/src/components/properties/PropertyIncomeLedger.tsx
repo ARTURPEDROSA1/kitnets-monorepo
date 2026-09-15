@@ -279,7 +279,7 @@ export default function PropertyIncomeLedger({
     const columns = useMemo<ColumnDef<PropertyIncomeRow>[]>(() => [
         { key: "month", label: "Mês", kind: "month", get: r => monthKey(r.month) },
         { key: "gross", label: "Aluguel bruto", kind: "number", align: "right", get: r => breakdown(r).grossRent },
-        { key: "pct", label: "Taxa %", kind: "number", align: "right", get: r => Number(r.agency_fee_pct) || 0 },
+        { key: "pct", label: "Taxa %", kind: "number", align: "right", sum: false, get: r => Number(r.agency_fee_pct) || 0 },
         { key: "net", label: "Aluguel líquido", kind: "number", align: "right", title: "Recebido − energia (aluguel após a taxa)", get: r => breakdown(r).netRent },
         { key: "energy", label: "Energia", kind: "number", align: "right", title: "Parcela de energia paga pelo inquilino (centro solar)", get: r => breakdown(r).energy },
         { key: "received", label: "Recebido", kind: "number", align: "right", title: "O que entrou na conta", get: r => breakdown(r).received },
