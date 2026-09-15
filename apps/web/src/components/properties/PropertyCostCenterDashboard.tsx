@@ -121,6 +121,12 @@ export default function PropertyCostCenterDashboard({
             .catch(() => { if (!cancelled) setOverview(undefined); });
         return () => { cancelled = true; };
     }, [dbId]);
+    // Stable identity: a fresh object on every render would re-run the section's load effect and
+    // overwrite edits the section already saved (rows only change when the overview is re-fetched).
+    const preloadedInvestment = useMemo(
+        () => (overview === undefined ? undefined : overview ? { investment: overview.investment, transactions: overview.transactions } : null),
+        [overview]
+    );
     useEffect(() => {
         setIncomeRows([]);
         setIncomeLoading(Boolean(dbId));
@@ -689,7 +695,7 @@ export default function PropertyCostCenterDashboard({
             />
 
             {/* Investment ledger: acquisition, financing, capex, running costs, solar */}
-            <PropertyInvestmentSection propertyId={dbId} incomeRows={incomeRows} landlordIptu={summarizeTaxes(taxRows).iptuByLandlord} onDataChange={setInvestmentData} preloaded={overview === undefined ? undefined : overview ? { investment: overview.investment, transactions: overview.transactions } : null} />
+            <PropertyInvestmentSection propertyId={dbId} incomeRows={incomeRows} landlordIptu={summarizeTaxes(taxRows).iptuByLandlord} onDataChange={setInvestmentData} preloaded={preloadedInvestment} />
 
             {/* Property taxes register: the source of IPTU (landlord payments count in the month paid) */}
             <PropertyTaxesSection propertyId={dbId} onRowsChange={setTaxRows} preloadedRows={overview === undefined ? undefined : overview?.taxes ?? null} />
