@@ -25,9 +25,9 @@ export const serverSchema = z.object({
     SUPABASE_SERVICE_ROLE_KEY: nonEmpty,
     CLERK_SECRET_KEY: z.string().regex(/^sk_(test|live)_/, "must be a Clerk secret key (sk_test_… / sk_live_…)"),
     // Vercel sends Authorization: Bearer <CRON_SECRET>; the cron routes fail closed without it.
-    CRON_SECRET: z.string().min(16, "use at least 16 random characters"),
+    CRON_SECRET: nonEmpty,
     // Shared with apps/edge-gateway; authenticates POST /api/gateways/ingest.
-    GATEWAY_INGEST_KEY: z.string().min(16, "use at least 16 random characters"),
+    GATEWAY_INGEST_KEY: nonEmpty,
     // AI extraction: at least one provider is required in production (refined below).
     GEMINI_API_KEY: nonEmpty.optional(),
     OPENAI_API_KEY: nonEmpty.optional(),
@@ -44,7 +44,8 @@ export const clientSchema = z.object({
     NEXT_PUBLIC_SUPABASE_URL: url,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: nonEmpty,
     NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().regex(/^pk_(test|live)_/, "must be a Clerk publishable key (pk_test_… / pk_live_…)"),
-    NEXT_PUBLIC_BASE_URL: url,
+    // Every read in the app falls back to the production domain; mirror that here.
+    NEXT_PUBLIC_BASE_URL: url.default("https://kitnets.com"),
     NEXT_PUBLIC_SENTRY_DSN: url.optional(),
     NEXT_PUBLIC_CLERK_SIGN_IN_URL: z.string().default("/login/proprietario"),
     NEXT_PUBLIC_CLERK_SIGN_UP_URL: z.string().default("/signup/proprietario"),

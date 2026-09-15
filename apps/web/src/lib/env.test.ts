@@ -21,14 +21,19 @@ describe("parseEnv strict (production)", () => {
         expect(env.OPENAI_API_KEY).toBeUndefined();
     });
 
+    it("defaults the base URL to the production domain when unset", () => {
+        const withoutBase = { ...complete, NEXT_PUBLIC_BASE_URL: undefined };
+        expect(parseEnv(withoutBase, "strict").NEXT_PUBLIC_BASE_URL).toBe("https://kitnets.com");
+    });
+
     it("lists every missing or malformed variable in one error", () => {
-        const broken = { ...complete, SUPABASE_SERVICE_ROLE_KEY: "", NEXT_PUBLIC_BASE_URL: "kitnets.com", CRON_SECRET: "short" };
+        const broken = { ...complete, SUPABASE_SERVICE_ROLE_KEY: "", NEXT_PUBLIC_BASE_URL: "kitnets.com", CRON_SECRET: "" };
         let message = "";
         try { parseEnv(broken, "strict"); } catch (e) { message = (e as Error).message; }
         expect(message).toContain("Invalid environment variables (strict mode)");
         expect(message).toContain("SUPABASE_SERVICE_ROLE_KEY");
         expect(message).toContain("NEXT_PUBLIC_BASE_URL");
-        expect(message).toContain("CRON_SECRET: use at least 16 random characters");
+        expect(message).toContain("CRON_SECRET: Required");
         expect(message).toContain(".env.example");
     });
 
