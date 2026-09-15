@@ -12,7 +12,7 @@
  * Column kinds: text (contains), number (min–max), date (ISO min–max), month (YYYY-MM min–max),
  * enum (checkbox list with counts from the unfiltered rows).
  */
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, Filter, FilterX, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -144,6 +144,13 @@ export function useColumnFilters<T>(rows: T[], columns: ColumnDef<T>[], defaultS
         setMenu(m => (m?.key === key ? null : { key, x: Math.max(8, Math.min(r.left, window.innerWidth - 280)), y: r.bottom + 4 }));
     }, []);
     const closeMenu = useCallback(() => setMenu(null), []);
+    // Esc closes the popup (listener only while it is open; stops the event so a cell selection stays)
+    useEffect(() => {
+        if (!menu) return;
+        const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopImmediatePropagation(); setMenu(null); } };
+        window.addEventListener("keydown", onKey, true);
+        return () => window.removeEventListener("keydown", onKey, true);
+    }, [menu]);
 
     return { rows: filtered, sort, setSort, filters, setFilter, clearColumn, clearFilters, isActive, anyFilter, counts, menu, openMenu, closeMenu, total: rows.length };
 }
