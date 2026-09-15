@@ -139,6 +139,8 @@ export default function PropertyCostCenterDashboard({
     }, [dbId]);
     // Period shared by the DRE chart and the income ledger (chart + table)
     const [period, setPeriod] = useState<PeriodFilterValue>({ kind: 'ytd' });   // DRE chart opens on the current year
+    // YTD only: repeat the latest confirmed month until December so the chart shows the whole year
+    const [forecastYear, setForecastYear] = useState(false);
 
     // Cost-centre setting: who pays IPTU (the only parameter left; everything else is real ledger data)
     const [iptuPaidBy, setIptuPaidBy] = useState<'tenant' | 'landlord'>(details.iptuPaidBy ?? 'tenant');
@@ -242,10 +244,12 @@ export default function PropertyCostCenterDashboard({
             .sort((a, b) => (a.month < b.month ? -1 : 1));
         if (lifetime.length > 0) {
             const firstKey = monthKey(lifetime[0].month);
-            const span = monthsBetween(firstKey, currentMonthKey()) + 1;
+            const lastKey = monthKey(lifetime[lifetime.length - 1].month);
+            // span = calendar months between the first and the last recorded month (same count the ledger shows)
+            const span = monthsBetween(firstKey, lastKey) + 1;
             const occupied = lifetime.filter(r => breakdown(r).netRent > 0).length;
             occupancyRate = span > 0 ? Math.round((occupied / span) * 100) : 0;
-            occupancyHint = `${occupied} de ${span} meses com aluguel desde ${formatMonthKey(firstKey)}`;
+            occupancyHint = `${occupied} de ${span} meses com aluguel · ${formatMonthKey(firstKey)} a ${formatMonthKey(lastKey)}`;
         }
 
         // Breakdown for Donut Chart
@@ -278,6 +282,16 @@ export default function PropertyCostCenterDashboard({
                     previsto: r.status === 'EXPECTED',
                 });
             });
+            // YTD forecast: repeat the latest confirmed month for the months left until December
+            if (period.kind === 'ytd' && forecastYear && current) {
+                const year = currentMonthKey().slice(0, 4);
+                let m = monthKey(periodRows[periodRows.length - 1].month);
+                while (m.slice(0, 4) === year && m < `${year}-12`) {
+                    const [y, mm] = m.split('-').map(Number);
+                    m = `${y}-${String(mm + 1).padStart(2, '0')}`;
+                    dreData.push({ month: formatMonthKey(m), receita: Math.round(current.revenue), despesas: Math.round(current.opex), noi: Math.round(current.noi), previsto: true });
+                }
+            }
         } else {
             const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
             const currentMonthIdx = new Date().getMonth();
@@ -311,8 +325,11 @@ export default function PropertyCostCenterDashboard({
             rentedUnitsCount,
             expenseBreakdown,
             dreData,
+            energyIncome: current ? current.energy : null,
+            energyCost: current ? current.other : null,
+            energyNet: current ? Math.round((current.energy - current.other) * 100) / 100 : null,
         };
-    }, [propertyType, details, subUnits, totalUnits, incomeRows, period]);
+    }, [propertyType, details, subUnits, totalUnits, incomeRows, period, forecastYear]);
 
     const handleSaveConfig = () => {
         onUpdateDetails({ ...details, iptuPaidBy });
@@ -461,10 +478,8 @@ export default function PropertyCostCenterDashboard({
                         <span className="text-xl sm:text-2xl font-bold text-foreground block">
                             {formatBRL(financials.grossMonthlyRevenue)}
                         </span>
-                        <span className="text-xs text-muted-foreground">
-                            {financials.realIncomeMonth
-                                ? `Mês atual (${financials.realIncomeMonth}) · aluguel + energia · anual ${formatBRL(financials.annualRevenue)}`
-                                : `Projeção anual: ${formatBRL(financials.annualRevenue)}`}
+                        <span className="text-xs text-muted-foreground block leading-snug">
+                            {financials.realIncomeMonth ? <>{financials.realIncomeMonth}: aluguel + energia<br />Anual {formatBRL(financials.annualRevenue)}</> : `Projeção anual: ${formatBRL(financials.annualRevenue)}`}
                         </span>
                     </div>
                 </div>
@@ -481,8 +496,8 @@ export default function PropertyCostCenterDashboard({
                         <span className="text-xl sm:text-2xl font-bold text-rose-600 dark:text-rose-400 block">
                             {formatBRL(financials.totalExpenses)}
                         </span>
-                        <span className="text-xs text-muted-foreground">
-                            {financials.realIncomeMonth ? `Taxa + custo de energia + outras despesas${iptuPaidBy === 'landlord' ? ' + IPTU' : ''} · ` : ''}
+                        <span className="text-xs text-muted-foreground block leading-snug">
+                            {financials.realIncomeMonth && <>Taxa + custo de energia + outros + IPTU<br /></>}
                             {((financials.totalExpenses / (financials.grossMonthlyRevenue || 1)) * 100).toFixed(0)}% da receita bruta
                         </span>
                     </div>
@@ -536,10 +551,18 @@ export default function PropertyCostCenterDashboard({
                     </div>
                     <div>
                         <span className="text-xl sm:text-2xl font-bold text-foreground block">
-                            {details.solarEnergy ? (details.solarKwp ? `${details.solarKwp} kWp` : 'Ativa') : 'Rede Padrão'}
+                            {financials.energyNet !== null
+                                ? formatBRL(financials.energyNet)
+                                : details.solarEnergy ? (details.solarKwp ? `${details.solarKwp} kWp` : 'Ativa') : 'Rede Padrão'}
                         </span>
-                        <span className="text-xs text-muted-foreground">
-                            {details.solarEnergy ? 'Compensação GD ativa' : 'Sem geração local'}
+                        <span className="text-xs text-muted-foreground block leading-snug">
+                            {financials.energyNet !== null ? (
+                                <>
+                                    Energia recebida {formatBRL(financials.energyIncome ?? 0)}<br />
+                                    Custo de energia {formatBRL(financials.energyCost ?? 0)}<br />
+                                    {details.solarEnergy ? (details.solarKwp ? `${details.solarKwp} kWp` : 'Solar GD ativa') : 'Sem geração local'}
+                                </>
+                            ) : details.solarEnergy ? 'Compensação GD ativa' : 'Sem geração local'}
                         </span>
                     </div>
                 </div>
@@ -561,7 +584,15 @@ export default function PropertyCostCenterDashboard({
                                     : 'Histórico e projeção de Receitas, Despesas Operacionais e Lucro Líquido (NOI)'}
                             </p>
                         </div>
-                        <PeriodFilter value={period} onChange={setPeriod} className="justify-end" />
+                        <div className="flex flex-col items-end gap-1.5">
+                            <PeriodFilter value={period} onChange={setPeriod} className="justify-end" />
+                            {period.kind === 'ytd' && financials.realIncomeMonth && (
+                                <label className="inline-flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+                                    <input type="checkbox" className="accent-emerald-600" checked={forecastYear} onChange={e => setForecastYear(e.target.checked)} />
+                                    Projetar até dezembro (repete {financials.realIncomeMonth})
+                                </label>
+                            )}
+                        </div>
                     </div>
 
                     <div className="h-[280px] w-full pt-2">
