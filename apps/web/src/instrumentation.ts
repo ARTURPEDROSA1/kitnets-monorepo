@@ -4,6 +4,8 @@
 import * as Sentry from "@sentry/nextjs";
 
 export async function register() {
+    // Fail on boot, with every problem listed, rather than on the first request.
+    await import("./lib/env");
     if (process.env.NEXT_RUNTIME === "nodejs") {
         await import("../sentry.server.config");
     }

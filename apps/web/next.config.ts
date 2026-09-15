@@ -1,5 +1,8 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs/config";
+// Validates environment variables at build time (strict on Vercel production).
+// A missing or malformed variable fails the deploy here, not a user request later.
+import "./src/lib/env";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
