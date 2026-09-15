@@ -50,6 +50,7 @@ import type {
     LeaseAgencyOption,
     LeaseAgentOption,
 } from '@/types/lease';
+import { formatDateBR as formatDateOnlyBR, nextOccurrence, toISODate } from "@/lib/dates";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -304,24 +305,12 @@ export default function ContratosContent({ lang }: { lang: string }) {
             if (iso) {
                 const freq = parseInt(form.adjustment_frequency, 10);
                 if (!isNaN(freq) && freq > 0) {
-                    const startDate = new Date(iso + 'T00:00:00');
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
+                    // Anchored on the start day and clamped to short months, so a
+                    // contract starting on the 31st does not drift to the 28th forever.
+                    const next = nextOccurrence(iso, freq, new Date());
+                    const computed = next ? formatDateOnlyBR(toISODate(next)) : '';
 
-                    // Find the next adjustment date that is in the future
-                    const nextDate = new Date(startDate);
-                    nextDate.setMonth(nextDate.getMonth() + freq);
-
-                    while (nextDate <= today) {
-                        nextDate.setMonth(nextDate.getMonth() + freq);
-                    }
-
-                    const dd = String(nextDate.getDate()).padStart(2, '0');
-                    const mm = String(nextDate.getMonth() + 1).padStart(2, '0');
-                    const yyyy = nextDate.getFullYear();
-                    const computed = `${dd}/${mm}/${yyyy}`;
-
-                    if (form.next_adjustment_date !== computed) {
+                    if (computed && form.next_adjustment_date !== computed) {
                         setForm(prev => ({ ...prev, next_adjustment_date: computed }));
                     }
                 }
