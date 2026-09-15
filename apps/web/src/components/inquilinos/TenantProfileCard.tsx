@@ -20,17 +20,13 @@ import { Button } from '@kitnets/ui';
 import { Badge } from '@/components/ui/badge';
 import type { TenantWithDetails } from '@/types/tenant';
 import { formatCPF, formatPhone, formatCEP } from '@/lib/validators';
+import { formatDateBR } from '@/lib/dates';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-function formatDate(dateStr: string | null): string {
-    if (!dateStr) return '—';
-    try {
-        return new Intl.DateTimeFormat('pt-BR').format(new Date(dateStr));
-    } catch {
-        return dateStr;
-    }
-}
+// Date-only strings must not go through new Date(): that is UTC midnight,
+// i.e. the previous evening in Brazil. See lib/dates.ts.
+const formatDate = (dateStr: string | null): string => formatDateBR(dateStr);
 
 function getStatusLabel(status: string): { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' } {
     switch (status) {

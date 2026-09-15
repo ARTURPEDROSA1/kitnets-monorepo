@@ -2,19 +2,13 @@ import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { currentUser } from '@clerk/nextjs/server';
 import { signStorageUrl } from '@/lib/storage';
+import { parseCurrencyBR } from '@/lib/currency';
 
 function getServiceSupabase() {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!url || !key) throw new Error('Missing Supabase service credentials');
     return createClient(url, key);
-}
-
-function parseCurrency(value: string): number {
-    if (!value) return 0;
-    const cleaned = value.replace(/[R$\s.]/g, '').replace(',', '.');
-    const num = parseFloat(cleaned);
-    return isNaN(num) ? 0 : num;
 }
 
 const VALID_STATUSES = ['DRAFT', 'ACTIVE', 'EXPIRING_SOON', 'EXPIRED', 'TERMINATED', 'CANCELLED'];
@@ -172,7 +166,7 @@ export async function PUT(request: Request, context: RouteContext) {
             errors.end_date = 'Data de término deve ser posterior à data de início.';
         }
 
-        const monthlyRent = parseCurrency(body.monthly_rent);
+        const monthlyRent = parseCurrencyBR(body.monthly_rent);
         if (!body.monthly_rent || monthlyRent <= 0) {
             errors.monthly_rent = 'Valor do aluguel deve ser maior que zero.';
         }
@@ -283,7 +277,7 @@ export async function PUT(request: Request, context: RouteContext) {
 
         // ── Update lease ─────────────────────────────────────────────
 
-        const securityDeposit = body.security_deposit ? parseCurrency(body.security_deposit) : null;
+        const securityDeposit = body.security_deposit ? parseCurrencyBR(body.security_deposit) : null;
         const depositMonths = body.deposit_months ? parseInt(body.deposit_months, 10) : null;
         const adjFreq = body.adjustment_frequency ? parseInt(body.adjustment_frequency, 10) : 12;
 
@@ -353,7 +347,7 @@ export async function PUT(request: Request, context: RouteContext) {
                     charge_type: c.charge_type,
                     label: c.label?.trim() || null,
                     responsibility: c.responsibility,
-                    amount: c.amount ? parseCurrency(c.amount) : null,
+                    amount: c.amount ? parseCurrencyBR(c.amount) : null,
                 }));
 
             if (chargeRows.length > 0) {

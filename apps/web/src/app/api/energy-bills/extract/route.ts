@@ -3,6 +3,7 @@ import { requireUserWithLimit, validateUpload } from "@/lib/session";
 import { HOUR } from "@/lib/rate-limit";
 import { extractText, getDocumentProxy } from "unpdf";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { resolveAvailabilityKwh } from "@/lib/energy-availability";
 
 export const dynamic = "force-dynamic";
 
@@ -230,7 +231,7 @@ export function postProcessExtractedBill(data: ExtractedEnergyBill): ExtractedEn
                                 (data.generationBalanceKwh && data.generationBalanceKwh > 0);
 
         if (hasSolarActivity && data.gridConsumptionKwh && data.gridConsumptionKwh > 0) {
-            const availKwh = data.availabilityCostKwh || 30;
+            const availKwh = resolveAvailabilityKwh(data.availabilityCostKwh, data.installationClass);
             // In CEMIG, the compensated amount is typically the consumption above availability cost
             if (data.gridConsumptionKwh > availKwh) {
                 const estimatedCompensated = data.gridConsumptionKwh - availKwh;

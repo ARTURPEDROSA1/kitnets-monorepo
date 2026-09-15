@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { signStorageUrl } from "@/lib/storage";
+import { resolveAvailabilityKwh } from "@/lib/energy-availability";
 
 export const dynamic = "force-dynamic";
 
@@ -355,7 +356,8 @@ export async function POST(request: Request) {
             solar_compensated_kwh: Number(billData.solarCompensatedKwh) || 0,
             generation_balance_kwh: Number(billData.generationBalanceKwh) || 0,
             unit_price: billData.unitPrice != null ? Number(billData.unitPrice) : null,
-            availability_cost_kwh: billData.availabilityCostKwh != null ? Number(billData.availabilityCostKwh) : 100,
+            // ANEEL REN 1.000 art. 291: 30/50/100 kWh by connection type, never a flat 100.
+            availability_cost_kwh: resolveAvailabilityKwh(billData.availabilityCostKwh, billData.installationClass),
             availability_cost_amount: billData.availabilityCostAmount != null ? Number(billData.availabilityCostAmount) : 0,
             energy_scee_exempt_amount: billData.energySceeExemptAmount != null ? Number(billData.energySceeExemptAmount) : 0,
             energy_compensated_amount: billData.energyCompensatedAmount != null ? Number(billData.energyCompensatedAmount) : 0,

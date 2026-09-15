@@ -5,73 +5,82 @@
 // ──────────────────────────────────────────────────────────────────────
 
 // ── CNPJ ─────────────────────────────────────────────────────────────
+//
+// Since July 2026 new CNPJs are alphanumeric: 12 characters [0-9A-Z] plus
+// two numeric check digits (IN RFB 2.229/2024). The check-digit algorithm is
+// the classic one with each character valued as (ASCII code − 48), which
+// keeps digits at their face value and maps A–Z to 17–42.
 
-/**
- * Validates a Brazilian CNPJ using the official check-digit algorithm.
- * Accepts formatted (12.345.678/0001-90) or digits-only (12345678000190).
- */
-export function validateCNPJ(cnpj: string): boolean {
-    const digits = cnpj.replace(/\D/g, '');
+const CNPJ_WEIGHTS_1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+const CNPJ_WEIGHTS_2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
 
-    if (digits.length !== 14) return false;
+/** Uppercases and strips everything that is not a digit or a letter. */
+export function normalizeCNPJ(value: string): string {
+    return value.toUpperCase().replace(/[^0-9A-Z]/g, '');
+}
 
-    // Reject known invalid patterns (all same digit)
-    if (/^(\d)\1{13}$/.test(digits)) return false;
+function cnpjCharValue(ch: string): number {
+    return ch.charCodeAt(0) - 48;
+}
 
-    // First check digit
-    const weights1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+function cnpjDigit(chars: string, weights: number[]): number {
     let sum = 0;
-    for (let i = 0; i < 12; i++) {
-        sum += parseInt(digits[i]) * weights1[i];
-    }
-    let remainder = sum % 11;
-    const check1 = remainder < 2 ? 0 : 11 - remainder;
-    if (parseInt(digits[12]) !== check1) return false;
+    for (let i = 0; i < weights.length; i++) sum += cnpjCharValue(chars[i]) * weights[i];
+    const remainder = sum % 11;
+    return remainder < 2 ? 0 : 11 - remainder;
+}
 
-    // Second check digit
-    const weights2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
-    sum = 0;
-    for (let i = 0; i < 13; i++) {
-        sum += parseInt(digits[i]) * weights2[i];
-    }
-    remainder = sum % 11;
-    const check2 = remainder < 2 ? 0 : 11 - remainder;
-    if (parseInt(digits[13]) !== check2) return false;
-
-    return true;
+/** The two check digits for a 12-character base (digits or A–Z). */
+export function cnpjCheckDigits(base12: string): string {
+    const base = normalizeCNPJ(base12);
+    if (base.length !== 12) throw new Error('CNPJ base must have 12 characters');
+    const d1 = cnpjDigit(base, CNPJ_WEIGHTS_1);
+    const d2 = cnpjDigit(base + d1, CNPJ_WEIGHTS_2);
+    return `${d1}${d2}`;
 }
 
 /**
- * Formats a CNPJ digits-only string to display format.
+ * Validates a Brazilian CNPJ, numeric or alphanumeric, using the official
+ * check-digit algorithm. Accepts formatted (12.345.678/0001-90) or raw input.
+ */
+export function validateCNPJ(cnpj: string): boolean {
+    const v = normalizeCNPJ(cnpj || '');
+    if (!/^[0-9A-Z]{12}\d{2}$/.test(v)) return false;
+    // Reject known invalid patterns (all the same character)
+    if (/^(.)\1{13}$/.test(v)) return false;
+    return v.slice(12) === cnpjCheckDigits(v.slice(0, 12));
+}
+
+/**
+ * Formats a raw CNPJ to display format.
  * 12345678000190 → 12.345.678/0001-90
  */
-export function formatCNPJ(digits: string): string {
-    const d = digits.replace(/\D/g, '');
-    if (d.length !== 14) return digits;
+export function formatCNPJ(raw: string): string {
+    const d = normalizeCNPJ(raw);
+    if (d.length !== 14) return raw;
     return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12, 14)}`;
 }
 
 /**
- * Strips CNPJ to digits only.
+ * Strips a CNPJ to its 14 raw characters.
  * 12.345.678/0001-90 → 12345678000190
  */
 export function parseCNPJ(formatted: string): string {
-    return formatted.replace(/\D/g, '');
+    return normalizeCNPJ(formatted);
 }
 
 /**
- * Applies CNPJ mask as the user types.
+ * Applies the CNPJ mask as the user types.
  * Returns the masked value for the current input length.
  */
 export function maskCNPJ(value: string): string {
-    const d = value.replace(/\D/g, '').slice(0, 14);
+    const d = normalizeCNPJ(value).slice(0, 14);
     if (d.length <= 2) return d;
     if (d.length <= 5) return `${d.slice(0, 2)}.${d.slice(2)}`;
     if (d.length <= 8) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5)}`;
     if (d.length <= 12) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8)}`;
     return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
 }
-
 // ── Phone ────────────────────────────────────────────────────────────
 
 /**
