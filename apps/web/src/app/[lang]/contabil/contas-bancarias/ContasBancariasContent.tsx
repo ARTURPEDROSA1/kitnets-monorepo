@@ -16,7 +16,7 @@ import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { DESTINATION_LABELS, routingProblem, type BankDestination, type BankTransaction, type RoutedRow } from "@/lib/bank-ledger";
-import { formatDateBR, KIND_LABELS, TRANSACTION_KINDS, type TransactionKind } from "@/lib/property-investment";
+import { ACTIVE_TRANSACTION_KINDS, formatDateBR, KIND_LABELS, type TransactionKind } from "@/lib/property-investment";
 
 interface Props { lang: "en" | "pt" | "es" }
 type PropertyOpt = { id: string; name: string };
@@ -183,7 +183,7 @@ export default function ContasBancariasContent({ lang }: Props) {
                                                     {r.destination === "INVESTMENT" ? (
                                                         <select value={r.kind ?? ""} disabled={r.duplicate} onChange={e => patch(i, { kind: (e.target.value || null) as TransactionKind | null })} className={cn(SELECT, !r.kind && "border-amber-400")}>
                                                             <option value="">— tipo —</option>
-                                                            {TRANSACTION_KINDS.map(k => <option key={k.kind} value={k.kind}>{k.label}</option>)}
+                                                            {ACTIVE_TRANSACTION_KINDS.map(k => <option key={k.kind} value={k.kind}>{k.label}</option>)}
                                                         </select>
                                                     ) : r.destination === "INCOME" ? <span className="text-muted-foreground">mês {r.date.slice(0, 7).split("-").reverse().join("/")}</span> : <span className="text-muted-foreground">—</span>}
                                                     {problem && !r.duplicate && r.destination !== "IGNORED" && <span className="block text-[10px] text-amber-700 dark:text-amber-400">{problem}</span>}
