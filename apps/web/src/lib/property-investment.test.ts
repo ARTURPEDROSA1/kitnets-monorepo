@@ -86,11 +86,11 @@ describe("summarizeInvestment", () => {
         expect(s.bankPaid).toBeCloseTo(3850.04 + 3065.44 + 9050 + 14243.23, 2);
         expect(s.installments).toBe(2);
         expect(s.capex).toBe(1050);
-        expect(s.runningCosts).toBeCloseTo(33.63 + 139.78, 2);
+        expect(s.runningCosts).toBeCloseTo(33.63, 2);   // IPTU kind is informational: the taxes register is the source
         expect(s.invested).toBeCloseTo(79334.84 + 10000 + s.bankPaid + 1050, 2);
         expect(s.totalOutlay).toBeCloseTo(s.invested + s.runningCosts, 2);
         expect(s.solarInvested).toBe(20442.76);
-        expect(s.invested + s.runningCosts + s.solarInvested).toBeCloseTo(rows.reduce((a, r) => a + r.amount, 0), 2); // solar excluded from invested
+        expect(s.invested + s.runningCosts + s.solarInvested + s.byKind.IPTU).toBeCloseTo(rows.reduce((a, r) => a + r.amount, 0), 2); // solar excluded from invested; IPTU not a running cost
         expect(s.firstDate).toBe("2018-04-05");
         expect(s.lastDate).toBe("2024-01-24");
     });

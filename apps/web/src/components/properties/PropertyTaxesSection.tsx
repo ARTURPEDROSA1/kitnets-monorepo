@@ -45,8 +45,6 @@ const TAX_COLUMNS: ColumnDef<PropertyTax>[] = [
 
 interface Props {
     propertyId?: string;
-    /** Property setting: default payer for new rows. */
-    iptuPaidByLandlord?: boolean;
     /** Lets the dashboard feed the investment analysis with the loaded rows. */
     onRowsChange?: (rows: PropertyTax[]) => void;
     /** Rows loaded by the parent (overview): undefined = fetch here, null = parent still loading. */
@@ -96,10 +94,11 @@ async function fileForExtraction(file: File): Promise<File> {
 
 type ReviewForm = Record<"year" | "amount" | "parts" | "paidBy" | "vencimento" | "aliquota" | "valorImposto" | "coletaLixo" | "tsa" | "desconto" | "valorVenalImovel" | "valorVenalPredial" | "valorVenalTerreno" | "areaConstruida" | "areaTerreno" | "inscricao" | "municipio" | "referencia" | "comment", string>;
 
-export default function PropertyTaxesSection({ propertyId, iptuPaidByLandlord = false, onRowsChange, preloadedRows }: Props) {
+export default function PropertyTaxesSection({ propertyId, onRowsChange, preloadedRows }: Props) {
     const endpoint = propertyId ? `/api/properties/${propertyId}/taxes` : null;
-    const defaultPayer: TaxPayer = iptuPaidByLandlord ? "LANDLORD" : "TENANT";
+    // default payer for new rows: whoever paid the most recent one
     const [rows, setRows] = useState<PropertyTax[]>([]);
+    const defaultPayer: TaxPayer = rows[0]?.paid_by ?? "TENANT";
     const [loading, setLoading] = useState<boolean>(Boolean(propertyId));
     const [error, setError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
@@ -367,8 +366,8 @@ export default function PropertyTaxesSection({ propertyId, iptuPaidByLandlord = 
                         Tributos do imóvel
                     </h3>
                     <p className="text-xs text-muted-foreground">
-                        IPTU por ano (em até {MAX_INSTALLMENTS} parcelas, cada uma com seu pagador), ITBI e outros tributos ao longo da vida do imóvel. Registro informativo:
-                        o IPTU pago pelo proprietário entra nos custos pela coluna IPTU das Receitas de Aluguel; o ITBI entra no investimento como custo de aquisição.
+                        IPTU por ano (em até {MAX_INSTALLMENTS} parcelas, cada uma com seu pagador), ITBI e outros tributos ao longo da vida do imóvel. É a fonte do IPTU:
+                        o que o proprietário paga entra nos custos do mês do pagamento (Composição do Centro de Custos, DRE e análise); o ITBI entra no investimento como custo de aquisição.
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -550,7 +549,7 @@ export default function PropertyTaxesSection({ propertyId, iptuPaidByLandlord = 
                     <ColumnMenu columns={TAX_COLUMNS} ctl={cf} />
                     <p className="text-[11px] text-muted-foreground mt-2 mx-2">
                         Escolha “2x…{MAX_INSTALLMENTS}x” para dividir um ano em parcelas e mudar o pagador de cada uma (por exemplo, o proprietário paga as parcelas de um período vago).
-                        Pago por “Proprietário” não altera os KPIs por si só: lance o valor mensal na coluna IPTU das Receitas de Aluguel para que entre nas despesas.
+                        Pago por “Proprietário” entra nas despesas do mês da data informada (sem data: janeiro do ano).
                         Apenas a guia mais recente fica guardada como documento atual.
                     </p>
                 </div>

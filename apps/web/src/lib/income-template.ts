@@ -68,7 +68,6 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
         { key: "energy", width: 16 },
         { key: "other", width: 20 },
         { key: "otherExpenses", width: 20 },
-        { key: "iptu", width: 14 },
         { key: "notes", width: 44 },
     ];
 
@@ -87,12 +86,12 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
     ws.getCell("B3").font = { name: "Calibri", size: 9, italic: true, color: { argb: `FF${MUTED}` } };
 
     // Instructions (row 5)
-    ws.mergeCells("A5:I5");
+    ws.mergeCells("A5:H5");
     ws.getCell("A5").value =
         "Aluguel bruto = valor do contrato. Taxa = % que a imobiliária retém. Valor recebido = o que entrou na sua conta " +
         "(já calculado pela fórmula; sobrescreva com o valor real do extrato quando tiver). Energia = parcela paga pelo inquilino " +
         "referente à energia solar (vai para o centro de energia). Custo de energia = a conta de luz que você paga no mês; " +
-        "Outras despesas = outros custos pagos por você (reparos, taxas); IPTU = só se pago por você (deixe em branco se o inquilino paga). " +
+        "Outras despesas = outros custos pagos por você (reparos, taxas). O IPTU não entra aqui: registre-o em Tributos do imóvel. " +
         "Custos à parte não alteram o valor recebido. Recebido = bruto × (1 − taxa) + energia.";
     ws.getCell("A5").alignment = { wrapText: true, vertical: "top" };
     ws.getCell("A5").font = { name: "Calibri", size: 9, color: { argb: `FF${MUTED}` } };
@@ -130,7 +129,6 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
         row.getCell(5).numFmt = CURRENCY_FMT;
         row.getCell(6).numFmt = CURRENCY_FMT;
         row.getCell(7).numFmt = CURRENCY_FMT;
-        row.getCell(8).numFmt = CURRENCY_FMT;
 
         if (ledger) {
             const b = breakdown(ledger);
@@ -140,14 +138,13 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
             row.getCell(5).value = b.energy;
             row.getCell(6).value = b.other;
             row.getCell(7).value = b.otherExpenses;
-            row.getCell(8).value = b.iptu;
-            row.getCell(9).value = ledger.notes ?? null;   // status is re-derived from the month on import
+            row.getCell(8).value = ledger.notes ?? null;   // status is re-derived from the month on import
         } else {
             row.getCell(3).value = feePct;
             row.getCell(4).value = { formula: `IF(B${r}="","",ROUND(B${r}*(1-C${r}/100)+E${r},2))`, result: "" };
         }
 
-        for (let c = 1; c <= 9; c++) {
+        for (let c = 1; c <= 8; c++) {
             const cell = row.getCell(c);
             cell.border = thin;
             cell.font = { name: "Calibri", size: 10, color: { argb: `FF${INK}` } };
@@ -202,17 +199,16 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
         ["Energia (R$)", "Parcela do pagamento do inquilino referente à energia (solar).", "p"],
         ["Custo de energia (R$)", "A conta de luz do imóvel paga por você no mês. É um custo à parte: não altera o valor recebido, reduz o resultado (NOI). Sempre positivo.", "p"],
         ["Outras despesas (R$)", "Outros custos do imóvel pagos por você no mês (reparos, taxas, vistoria). Também à parte: não altera o recebido, reduz o NOI. Sempre positivo.", "p"],
-        ["IPTU (R$)", "IPTU do mês quando pago por você. Se o inquilino paga o IPTU, deixe em branco. Também é um custo à parte: reduz o NOI, não altera o recebido.", "p"],
         ["Comentários", "Texto livre (reajuste, vacância, troca de inquilino).", "p"],
         ["Cálculos no Kitnets.com", "", "h"],
         ["Aluguel líquido", "recebido − energia (o aluguel após a taxa da imobiliária)", "p"],
         ["Aluguel bruto", "líquido ÷ (1 − taxa/100), quando o bruto não é informado", "p"],
         ["Receita bruta", "aluguel bruto + energia (tudo o que o inquilino paga no mês)", "p"],
-        ["Despesas (OPEX)", "taxa da imobiliária + custo de energia + outras despesas + IPTU (quando pago por você)", "p"],
-        ["Resultado (NOI)", "receita bruta − OPEX = recebido − custo de energia − outras despesas − IPTU", "p"],
+        ["Despesas (OPEX)", "taxa da imobiliária + custo de energia + outras despesas (+ IPTU pago por você, no mês do pagamento, vindo de Tributos do imóvel)", "p"],
+        ["Resultado (NOI)", "receita bruta − OPEX = recebido − custo de energia − outras despesas", "p"],
         ["Taxa acumulada", "bruto − líquido, somado mês a mês: a economia potencial ao administrar o imóvel pelo Kitnets.com.", "p"],
         ["Exemplo", "", "h"],
-        ["Bruto 4.000 · Taxa 10 % · Energia 350 · Custo de energia 109,80 · Outras 50 · IPTU 140", "Recebido 3.950 · Aluguel líquido 3.600 · Receita bruta 4.350 · OPEX 699,80 · NOI 3.650,20", "p"],
+        ["Bruto 4.000 · Taxa 10 % · Energia 350 · Custo de energia 109,80 · Outras 50", "Recebido 3.950 · Aluguel líquido 3.600 · Receita bruta 4.350 · OPEX 559,80 · NOI 3.790,20", "p"],
     ];
     lines.forEach(([a, b, kind], i) => {
         const row = info.getRow(i + 1);

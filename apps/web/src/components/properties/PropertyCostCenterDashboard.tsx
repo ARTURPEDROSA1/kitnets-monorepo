@@ -12,7 +12,6 @@ import {
     Sun,
     Zap,
     FileText,
-    Settings,
     CheckCircle2,
     AlertCircle,
     Users,
@@ -38,15 +37,6 @@ import {
     Cell,
 } from 'recharts';
 import { Button } from '@kitnets/ui';
-import { Label } from '@/components/ui/label';
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogDescription,
-    DialogFooter,
-} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import type { PropertyDetails, SubUnit } from '@/components/profile/PropertyDetailsCard';
 import PropertyIncomeLedger from './PropertyIncomeLedger';
@@ -64,7 +54,7 @@ import {
 } from '@/lib/property-income';
 import { monthsBetween, periodLabel, periodRange, type PeriodFilterValue } from '@/lib/period-filter';
 import type { PropertyInvestment, PropertyTransaction } from '@/lib/property-investment';
-import type { PropertyTax } from '@/lib/property-taxes';
+import { landlordIptuByMonth, type PropertyTax } from '@/lib/property-taxes';
 import type { PropertyValuation } from '@/lib/property-valuations';
 
 interface PropertyCostCenterDashboardProps {
@@ -107,7 +97,6 @@ export default function PropertyCostCenterDashboard({
     onQuickPublish,
     onUpdateDetails,
 }: PropertyCostCenterDashboardProps) {
-    const [isConfigOpen, setIsConfigOpen] = useState(false);
 
     // Real monthly income from the ledger (fed by PropertyIncomeLedger)
     const [incomeRows, setIncomeRows] = useState<PropertyIncomeRow[]>([]);
@@ -139,10 +128,9 @@ export default function PropertyCostCenterDashboard({
     }, [dbId]);
     // Period shared by the DRE chart and the income ledger (chart + table)
     const [period, setPeriod] = useState<PeriodFilterValue>({ kind: 'ytd' });   // DRE chart opens on the current year
+    // YTD only: repeat the latest confirmed month until December so the chart shows the whole year
+    const [forecastYear, setForecastYear] = useState(false);
 
-    // Cost-centre setting: who pays IPTU (the only parameter left; everything else is real ledger data)
-    const [iptuPaidBy, setIptuPaidBy] = useState<'tenant' | 'landlord'>(details.iptuPaidBy ?? 'tenant');
-    useEffect(() => setIptuPaidBy(details.iptuPaidBy ?? 'tenant'), [details.iptuPaidBy]);
 
     const totalUnits = propertyType === 'multi'
         ? Math.max(details.numberOfUnits || 0, subUnits.length || 1)
@@ -227,9 +215,11 @@ export default function PropertyCostCenterDashboard({
 
         const estimatedExpenses = iptuMonthly + condoMonthly + maintenanceReserve + adminFee + insuranceAndOther;
 
-        // With ledger data: OPEX = agency fee + energy cost, NOI = revenue − OPEX (current month)
-        const totalExpenses = current ? Math.round(current.opex) : estimatedExpenses;
-        const noi = current ? Math.round(current.noi) : Math.max(0, grossMonthlyRevenue - totalExpenses);
+        // With ledger data: OPEX = agency fee + energy cost + other expenses + landlord IPTU paid in the month (taxes register)
+        const iptuByMonth = landlordIptuByMonth(taxRows);
+        const iptuNow = latest ? (iptuByMonth.get(monthKey(latest.month)) ?? 0) : 0;
+        const totalExpenses = current ? Math.round(current.opex + iptuNow) : estimatedExpenses;
+        const noi = current ? Math.round(current.noi - iptuNow) : Math.max(0, grossMonthlyRevenue - totalExpenses);
         const margin = grossMonthlyRevenue > 0 ? (noi / grossMonthlyRevenue) * 100 : 0;
 
         // Occupancy: lifetime, from the ledger — months with rent ÷ months since the first record
@@ -242,10 +232,12 @@ export default function PropertyCostCenterDashboard({
             .sort((a, b) => (a.month < b.month ? -1 : 1));
         if (lifetime.length > 0) {
             const firstKey = monthKey(lifetime[0].month);
-            const span = monthsBetween(firstKey, currentMonthKey()) + 1;
+            const lastKey = monthKey(lifetime[lifetime.length - 1].month);
+            // span = calendar months between the first and the last recorded month (same count the ledger shows)
+            const span = monthsBetween(firstKey, lastKey) + 1;
             const occupied = lifetime.filter(r => breakdown(r).netRent > 0).length;
             occupancyRate = span > 0 ? Math.round((occupied / span) * 100) : 0;
-            occupancyHint = `${occupied} de ${span} meses com aluguel desde ${formatMonthKey(firstKey)}`;
+            occupancyHint = `${occupied} de ${span} meses com aluguel · ${formatMonthKey(firstKey)} a ${formatMonthKey(lastKey)}`;
         }
 
         // Breakdown for Donut Chart
@@ -254,7 +246,7 @@ export default function PropertyCostCenterDashboard({
                 { name: 'Taxa da imobiliária', value: Math.round(current.feeAmount) },
                 { name: 'Custo de energia', value: Math.round(current.other) },
                 { name: 'Outras despesas', value: Math.round(current.otherExpenses) },
-                { name: 'IPTU', value: Math.round(current.iptu) },
+                { name: 'IPTU', value: Math.round(iptuNow) },
             ].filter(item => item.value > 0)
             : [
                 { name: 'IPTU', value: iptuMonthly },
@@ -270,14 +262,25 @@ export default function PropertyCostCenterDashboard({
         if (periodRows.length > 0) {
             periodRows.forEach((r) => {
                 const b = breakdown(r);
+                const iptu = iptuByMonth.get(monthKey(r.month)) ?? 0;
                 dreData.push({
                     month: formatMonthKey(monthKey(r.month)),
                     receita: Math.round(b.revenue),
-                    despesas: Math.round(b.opex),
-                    noi: Math.round(b.noi),
+                    despesas: Math.round(b.opex + iptu),
+                    noi: Math.round(b.noi - iptu),
                     previsto: r.status === 'EXPECTED',
                 });
             });
+            // YTD forecast: repeat the latest confirmed month for the months left until December
+            if (period.kind === 'ytd' && forecastYear && current) {
+                const year = currentMonthKey().slice(0, 4);
+                let m = monthKey(periodRows[periodRows.length - 1].month);
+                while (m.slice(0, 4) === year && m < `${year}-12`) {
+                    const [y, mm] = m.split('-').map(Number);
+                    m = `${y}-${String(mm + 1).padStart(2, '0')}`;
+                    dreData.push({ month: formatMonthKey(m), receita: Math.round(current.revenue), despesas: Math.round(current.opex), noi: Math.round(current.noi), previsto: true });
+                }
+            }
         } else {
             const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
             const currentMonthIdx = new Date().getMonth();
@@ -311,13 +314,12 @@ export default function PropertyCostCenterDashboard({
             rentedUnitsCount,
             expenseBreakdown,
             dreData,
+            energyIncome: current ? current.energy : null,
+            energyCost: current ? current.other : null,
+            energyNet: current ? Math.round((current.energy - current.other) * 100) / 100 : null,
         };
-    }, [propertyType, details, subUnits, totalUnits, incomeRows, period]);
+    }, [propertyType, details, subUnits, totalUnits, incomeRows, taxRows, period, forecastYear]);
 
-    const handleSaveConfig = () => {
-        onUpdateDetails({ ...details, iptuPaidBy });
-        setIsConfigOpen(false);
-    };
 
     const propertyTitle = details.propertyName?.trim()
         || (address.street ? `${address.street}${address.number ? `, ${address.number}` : ''}` : `Propriedade ${propertyIndex + 1}`);
@@ -364,15 +366,6 @@ export default function PropertyCostCenterDashboard({
                             Gestão de Energia
                         </Button>
                     </Link>
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setIsConfigOpen(true)}
-                        className="gap-1.5 text-xs font-medium"
-                    >
-                        <Settings className="w-3.5 h-3.5" />
-                        Ajustar Custos
-                    </Button>
                 </div>
             </div>
 
@@ -461,10 +454,8 @@ export default function PropertyCostCenterDashboard({
                         <span className="text-xl sm:text-2xl font-bold text-foreground block">
                             {formatBRL(financials.grossMonthlyRevenue)}
                         </span>
-                        <span className="text-xs text-muted-foreground">
-                            {financials.realIncomeMonth
-                                ? `Mês atual (${financials.realIncomeMonth}) · aluguel + energia · anual ${formatBRL(financials.annualRevenue)}`
-                                : `Projeção anual: ${formatBRL(financials.annualRevenue)}`}
+                        <span className="text-xs text-muted-foreground block leading-snug">
+                            {financials.realIncomeMonth ? <>{financials.realIncomeMonth}: aluguel + energia<br />Anual {formatBRL(financials.annualRevenue)}</> : `Projeção anual: ${formatBRL(financials.annualRevenue)}`}
                         </span>
                     </div>
                 </div>
@@ -481,8 +472,8 @@ export default function PropertyCostCenterDashboard({
                         <span className="text-xl sm:text-2xl font-bold text-rose-600 dark:text-rose-400 block">
                             {formatBRL(financials.totalExpenses)}
                         </span>
-                        <span className="text-xs text-muted-foreground">
-                            {financials.realIncomeMonth ? `Taxa + custo de energia + outras despesas${iptuPaidBy === 'landlord' ? ' + IPTU' : ''} · ` : ''}
+                        <span className="text-xs text-muted-foreground block leading-snug">
+                            {financials.realIncomeMonth && <>Taxa + custo de energia + outros + IPTU<br /></>}
                             {((financials.totalExpenses / (financials.grossMonthlyRevenue || 1)) * 100).toFixed(0)}% da receita bruta
                         </span>
                     </div>
@@ -536,10 +527,18 @@ export default function PropertyCostCenterDashboard({
                     </div>
                     <div>
                         <span className="text-xl sm:text-2xl font-bold text-foreground block">
-                            {details.solarEnergy ? (details.solarKwp ? `${details.solarKwp} kWp` : 'Ativa') : 'Rede Padrão'}
+                            {financials.energyNet !== null
+                                ? formatBRL(financials.energyNet)
+                                : details.solarEnergy ? (details.solarKwp ? `${details.solarKwp} kWp` : 'Ativa') : 'Rede Padrão'}
                         </span>
-                        <span className="text-xs text-muted-foreground">
-                            {details.solarEnergy ? 'Compensação GD ativa' : 'Sem geração local'}
+                        <span className="text-xs text-muted-foreground block leading-snug">
+                            {financials.energyNet !== null ? (
+                                <>
+                                    Energia recebida {formatBRL(financials.energyIncome ?? 0)}<br />
+                                    Custo de energia {formatBRL(financials.energyCost ?? 0)}<br />
+                                    {details.solarEnergy ? (details.solarKwp ? `${details.solarKwp} kWp` : 'Solar GD ativa') : 'Sem geração local'}
+                                </>
+                            ) : details.solarEnergy ? 'Compensação GD ativa' : 'Sem geração local'}
                         </span>
                     </div>
                 </div>
@@ -557,11 +556,19 @@ export default function PropertyCostCenterDashboard({
                             </h3>
                             <p className="text-xs text-muted-foreground">
                                 {financials.realIncomeMonth
-                                    ? `Receita (aluguel bruto + energia), despesas (taxa + custo de energia + outras${iptuPaidBy === 'landlord' ? ' + IPTU' : ''}) e NOI reais · ${periodLabel(period)}; meses previstos em tom claro`
+                                    ? `Receita (aluguel bruto + energia), despesas (taxa + custo de energia + outras + IPTU pago por você no mês) e NOI reais · ${periodLabel(period)}; meses previstos em tom claro`
                                     : 'Histórico e projeção de Receitas, Despesas Operacionais e Lucro Líquido (NOI)'}
                             </p>
                         </div>
-                        <PeriodFilter value={period} onChange={setPeriod} className="justify-end" />
+                        <div className="flex flex-col items-end gap-1.5">
+                            <PeriodFilter value={period} onChange={setPeriod} className="justify-end" />
+                            {period.kind === 'ytd' && financials.realIncomeMonth && (
+                                <label className="inline-flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+                                    <input type="checkbox" className="accent-emerald-600" checked={forecastYear} onChange={e => setForecastYear(e.target.checked)} />
+                                    Projetar até dezembro (repete {financials.realIncomeMonth})
+                                </label>
+                            )}
+                        </div>
                     </div>
 
                     <div className="h-[280px] w-full pt-2">
@@ -672,7 +679,6 @@ export default function PropertyCostCenterDashboard({
                 defaultAgencyFeePct={details.managementFeePercent ? parseFloat(details.managementFeePercent) || 0 : 0}
                 onRowsChange={setIncomeRows}
                 onLoadingChange={setIncomeLoading}
-                iptuPaidByLandlord={iptuPaidBy === 'landlord'}
                 preloadedRows={overview === undefined ? undefined : overview?.income ?? null}
             />
 
@@ -691,8 +697,8 @@ export default function PropertyCostCenterDashboard({
             {/* Investment ledger: acquisition, financing, capex, running costs, solar */}
             <PropertyInvestmentSection propertyId={dbId} incomeRows={incomeRows} onDataChange={setInvestmentData} preloaded={overview === undefined ? undefined : overview ? { investment: overview.investment, transactions: overview.transactions } : null} />
 
-            {/* Property taxes register: IPTU per year, ITBI, others; landlord IPTU feeds the analysis when the ledgers lack it */}
-            <PropertyTaxesSection propertyId={dbId} iptuPaidByLandlord={iptuPaidBy === 'landlord'} onRowsChange={setTaxRows} preloadedRows={overview === undefined ? undefined : overview?.taxes ?? null} />
+            {/* Property taxes register: the source of IPTU (landlord payments count in the month paid) */}
+            <PropertyTaxesSection propertyId={dbId} onRowsChange={setTaxRows} preloadedRows={overview === undefined ? undefined : overview?.taxes ?? null} />
 
             {/* Multifamily Units Summary (if applicable) */}
             {propertyType === 'multi' && subUnits.length > 0 && (
@@ -749,65 +755,6 @@ export default function PropertyCostCenterDashboard({
                 </div>
             )}
 
-            {/* Modal: Configurar Centro de Custos */}
-            <Dialog open={isConfigOpen} onOpenChange={setIsConfigOpen}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <Settings className="w-5 h-5 text-amber-600" />
-                            Ajustar Centro de Custos do Imóvel
-                        </DialogTitle>
-                        <DialogDescription>
-                            Receitas e custos vêm do registro real de Receitas de Aluguel. Aqui você informa apenas quem paga o IPTU.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <div className="space-y-3 py-2">
-                        <Label>IPTU pago por</Label>
-                        <div className="grid grid-cols-2 gap-3">
-                            {([
-                                { value: 'tenant', title: 'Inquilino', hint: 'O IPTU não entra nos custos do imóvel.' },
-                                { value: 'landlord', title: 'Proprietário', hint: 'Uma coluna IPTU aparece nas Receitas de Aluguel e entra nas despesas (OPEX) e no NOI.' },
-                            ] as const).map(opt => (
-                                <label
-                                    key={opt.value}
-                                    className={cn(
-                                        "cursor-pointer rounded-xl border p-3 space-y-1 transition-colors",
-                                        iptuPaidBy === opt.value
-                                            ? "border-amber-500 bg-amber-50 dark:bg-amber-950/30"
-                                            : "border-border hover:border-amber-300"
-                                    )}
-                                >
-                                    <span className="flex items-center gap-2 font-semibold text-sm text-foreground">
-                                        <input
-                                            type="radio"
-                                            name="iptuPaidBy"
-                                            value={opt.value}
-                                            checked={iptuPaidBy === opt.value}
-                                            onChange={() => setIptuPaidBy(opt.value)}
-                                            className="accent-amber-600"
-                                        />
-                                        {opt.title}
-                                    </span>
-                                    <span className="block text-[11px] text-muted-foreground leading-snug">{opt.hint}</span>
-                                </label>
-                            ))}
-                        </div>
-                        <p className="text-[11px] text-muted-foreground">
-                            A coluna IPTU está sempre disponível na planilha modelo; valores já lançados continuam contando mesmo se você mudar esta opção.
-                        </p>
-                    </div>
-
-                    <DialogFooter>
-                        <Button variant="ghost" onClick={() => setIsConfigOpen(false)}>
-                            Cancelar
-                        </Button>
-                        <Button onClick={handleSaveConfig} className="bg-amber-600 hover:bg-amber-700 text-white">
-                            Salvar Parâmetros
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
         </div>
     );
 }
