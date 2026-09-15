@@ -11,7 +11,7 @@ import PropertyDetailsCard, { PropertyDetails, SubUnit, SubUnitsSection, Checkbo
 import PropertyDocumentsCard, { DocCategory } from '@/components/profile/PropertyDocumentsCard';
 import { DeletePropertyModal } from '@/components/profile/DeletePropertyModal';
 import PropertySquareCard, { type PropertyRealIncome, type PropertyCardInvestment } from '@/components/properties/PropertySquareCard';
-import PortfolioStrip, { type PortfolioTotalsData } from '@/components/properties/PortfolioStrip';
+import type { PortfolioTotalsData } from '@/components/properties/PortfolioStrip';
 import PropertyCostCenterDashboard from '@/components/properties/PropertyCostCenterDashboard';
 import { cn } from '@/lib/utils';
 import { useUser, useAuth } from '@clerk/nextjs';
@@ -3383,11 +3383,6 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                         Limpar Filtros
                                     </Button>
                                 </div>
-                            )}
-
-                            {/* Portfolio totals from the investment engine */}
-                            {portfolio && portfolio.totals.count > 0 && filteredProperties.length > 0 && (
-                                <PortfolioStrip totals={portfolio.totals} />
                             )}
 
                             {/* Responsive Square Cards Grid */}
