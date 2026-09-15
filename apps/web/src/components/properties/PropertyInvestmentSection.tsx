@@ -28,6 +28,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { cn } from "@/lib/utils";
 import PeriodFilter from "./PeriodFilter";
 import Tile from "./Tile";
+import { CellSumBar, useCellSum } from "./TableCellSum";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "./TableColumnFilters";
 import { periodLabel, periodRange, type PeriodFilterValue } from "@/lib/period-filter";
 import { parseSheet, type PropertyIncomeRow } from "@/lib/property-income";
@@ -55,8 +56,8 @@ interface Props {
     incomeRows: PropertyIncomeRow[];
     /** Lets the dashboard feed the investment analysis with the loaded header + transactions. */
     onDataChange?: (data: { investment: PropertyInvestment | null; transactions: PropertyTransaction[]; loading: boolean }) => void;
-    /** IPTU paid by the landlord (Tributos do imóvel), all years — shown with the running costs. */
-    landlordIptu?: number;
+    /** Taxes paid by the landlord (Tributos do imóvel), all years — shown with the running costs. */
+    landlordTaxes?: { iptu: number; itbi: number; other: number; total: number };
     /** Loaded by the parent (overview): undefined = fetch here, null = parent still loading. */
     preloaded?: { investment: PropertyInvestment | null; transactions: PropertyTransaction[] } | null;
 }
@@ -85,7 +86,9 @@ const FIN_KINDS: TransactionKind[] = ["PRESTACAO", "AMORTIZACAO", "QUITACAO"];
 
 type TxDraft = Partial<Record<"date" | "kind" | "amount" | "interest" | "principal" | "insurance" | "comment", string>>;
 
-export default function PropertyInvestmentSection({ propertyId, incomeRows, onDataChange, preloaded, landlordIptu = 0 }: Props) {
+export default function PropertyInvestmentSection({ propertyId, incomeRows, onDataChange, preloaded, landlordTaxes }: Props) {
+    const taxes = landlordTaxes ?? { iptu: 0, itbi: 0, other: 0, total: 0 };
+    const sel = useCellSum();
     const txEndpoint = propertyId ? `/api/properties/${propertyId}/transactions` : null;
     const invEndpoint = propertyId ? `/api/properties/${propertyId}/investment` : null;
 
@@ -492,13 +495,13 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
             {/* Tiles */}
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
                 <Tile label="Total investido no imóvel" value={formatBRL(summary.invested)} tone="emerald" icon={<PiggyBank className="w-4 h-4" />}
-                    hint={<>Entrada {formatBRL(summary.downPayment)} · aquisição {formatBRL(summary.closingCosts)}<br />Banco {formatBRL(summary.bankPaid)} · reformas {formatBRL(summary.capex)}</>} />
+                    hint={<>Entrada {formatBRL(summary.downPayment)} · banco {formatBRL(summary.bankPaid)}<br />Tarifas {formatBRL(summary.bankFees)} · reformas {formatBRL(summary.capex)}</>} />
                 <Tile label="Pago ao banco" value={formatBRL(summary.bankPaid)} tone="blue" icon={<Landmark className="w-4 h-4" />}
                     hint={<>{summary.installments} prestações<br />Juros + seguros {summary.interestAndInsurance === null ? "—" : formatBRL(summary.interestAndInsurance)}</>} />
                 <Tile label="Reformas (capex)" value={formatBRL(summary.capex)} tone="violet" icon={<Hammer className="w-4 h-4" />}
                     hint={`${txs.filter(t => t.kind === "REFORMA").length} lançamentos`} />
-                <Tile label="Custos do imóvel" value={formatBRL(summary.runningCosts + landlordIptu)} tone="rose" icon={<Receipt className="w-4 h-4" />}
-                    hint={<>Utilidades {formatBRL(summary.byKind.UTILIDADES)} · tarifas {formatBRL(summary.byKind.TARIFA)} · outros {formatBRL(summary.byKind.OUTROS)}<br />IPTU: {formatBRL(landlordIptu)}</>} />
+                <Tile label="Custos do imóvel" value={formatBRL(summary.runningCosts + taxes.total)} tone="rose" icon={<Receipt className="w-4 h-4" />}
+                    hint={<>Utilidades {formatBRL(summary.byKind.UTILIDADES)} · outros {formatBRL(summary.byKind.OUTROS)}<br />IPTU {formatBRL(taxes.iptu)} · ITBI {formatBRL(taxes.itbi)}{taxes.other > 0 ? ` · outros tributos ${formatBRL(taxes.other)}` : ""}</>} />
                 <Tile label="Financiamento" value={financingLabel} tone="blue" icon={<Banknote className="w-4 h-4" />} hint={financingHint} />
                 <Tile label="Energia solar" value={formatBRL(solar.invested)} tone="amber" icon={<Sun className="w-4 h-4" />}
                     hint={
@@ -580,10 +583,10 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                                                 {TRANSACTION_KINDS.map(k => <option key={k.kind} value={k.kind}>{k.label}</option>)}
                                             </select>
                                         </td>
-                                        <td className="px-2 py-1 text-right">{money("amount", tx.amount)}</td>
-                                        <td className="px-2 py-1 text-right">{money("interest", tx.interest_part, isFin)}</td>
-                                        <td className="px-2 py-1 text-right">{money("principal", tx.principal_part, isFin)}</td>
-                                        <td className="px-2 py-1 text-right">{money("insurance", tx.insurance_part, isFin)}</td>
+                                        <td {...sel.cellProps("amount", tx.id, tx.amount, "px-2 py-1 text-right")}>{money("amount", tx.amount)}</td>
+                                        <td {...sel.cellProps("interest", tx.id, tx.interest_part, "px-2 py-1 text-right")}>{money("interest", tx.interest_part, isFin)}</td>
+                                        <td {...sel.cellProps("principal", tx.id, tx.principal_part, "px-2 py-1 text-right")}>{money("principal", tx.principal_part, isFin)}</td>
+                                        <td {...sel.cellProps("insurance", tx.id, tx.insurance_part, "px-2 py-1 text-right")}>{money("insurance", tx.insurance_part, isFin)}</td>
                                         <td className="px-2 py-1">
                                             <input type="text" disabled={busy} value={d.comment ?? (tx.comment ?? "")} placeholder="—"
                                                 onChange={e => setDraft(tx.id, "comment", e.target.value)} onBlur={() => commit(tx, "comment")}
@@ -835,6 +838,8 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <CellSumBar ctl={sel} />
 
             {/* Bank statement import (OFX / CSV) */}
             <Dialog open={stmtOpen} onOpenChange={setStmtOpen}>

@@ -31,6 +31,7 @@ import {
 } from "@/lib/property-taxes";
 import { IptuHistoryModal } from "./IptuHistoryModal";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "./TableColumnFilters";
+import { CellSumBar, useCellSum } from "./TableCellSum";
 
 /** Excel-style sort/filter columns for the taxes table (values honour parcelas). */
 const TAX_COLUMNS: ColumnDef<PropertyTax>[] = [
@@ -99,6 +100,7 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
     // default payer for new rows: whoever paid the most recent one
     const [rows, setRows] = useState<PropertyTax[]>([]);
     const defaultPayer: TaxPayer = rows[0]?.paid_by ?? "TENANT";
+    const sel = useCellSum();
     const [loading, setLoading] = useState<boolean>(Boolean(propertyId));
     const [error, setError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
@@ -461,7 +463,7 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
                                                     {TAX_KINDS.map(k => <option key={k.kind} value={k.kind}>{k.label}</option>)}
                                                 </select>
                                             </td>
-                                            <td className="px-2 py-1 text-right">
+                                            <td {...sel.cellProps("amount", row.id, e.amount, "px-2 py-1 text-right")}>
                                                 <input type="number" inputMode="decimal" step="0.01" min={0} disabled={busy} value={d.amount ?? toInput(e.amount)}
                                                     onChange={ev => setDraft(row.id, "amount", ev.target.value)} onBlur={() => commit(row, "amount")}
                                                     onKeyDown={ev => { if (ev.key === "Enter") (ev.target as HTMLInputElement).blur(); }}
@@ -547,6 +549,7 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
                         </tbody>
                     </table>
                     <ColumnMenu columns={TAX_COLUMNS} ctl={cf} />
+                    <CellSumBar ctl={sel} />
                     <p className="text-[11px] text-muted-foreground mt-2 mx-2">
                         Escolha “2x…{MAX_INSTALLMENTS}x” para dividir um ano em parcelas e mudar o pagador de cada uma (por exemplo, o proprietário paga as parcelas de um período vago).
                         Pago por “Proprietário” entra nas despesas do mês da data informada (sem data: janeiro do ano).

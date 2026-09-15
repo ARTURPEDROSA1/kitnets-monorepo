@@ -53,7 +53,7 @@ import {
 } from '@/lib/property-income';
 import { monthsBetween, periodLabel, periodRange, type PeriodFilterValue } from '@/lib/period-filter';
 import type { PropertyInvestment, PropertyTransaction } from '@/lib/property-investment';
-import { landlordIptuByMonth, summarizeTaxes, type PropertyTax } from '@/lib/property-taxes';
+import { landlordTaxesByMonth, landlordTaxTotals, type PropertyTax } from '@/lib/property-taxes';
 import type { PropertyValuation } from '@/lib/property-valuations';
 
 interface PropertyCostCenterDashboardProps {
@@ -221,7 +221,7 @@ export default function PropertyCostCenterDashboard({
         const estimatedExpenses = iptuMonthly + condoMonthly + maintenanceReserve + adminFee + insuranceAndOther;
 
         // With ledger data: OPEX = agency fee + energy cost + other expenses + landlord IPTU paid in the month (taxes register)
-        const iptuByMonth = landlordIptuByMonth(taxRows);
+        const iptuByMonth = landlordTaxesByMonth(taxRows);   // IPTU, ITBI and other taxes paid by the landlord
         const iptuNow = latest ? (iptuByMonth.get(monthKey(latest.month)) ?? 0) : 0;
         const totalExpenses = current ? Math.round(current.opex + iptuNow) : estimatedExpenses;
         const noi = current ? Math.round(current.noi - iptuNow) : Math.max(0, grossMonthlyRevenue - totalExpenses);
@@ -251,7 +251,7 @@ export default function PropertyCostCenterDashboard({
                 { name: 'Taxa da imobiliária', value: Math.round(current.feeAmount) },
                 { name: 'Custo de energia', value: Math.round(current.other) },
                 { name: 'Outras despesas', value: Math.round(current.otherExpenses) },
-                { name: 'IPTU', value: Math.round(iptuNow) },
+                { name: 'Tributos (IPTU, ITBI…)', value: Math.round(iptuNow) },
             ].filter(item => item.value > 0)
             : [
                 { name: 'IPTU', value: iptuMonthly },
@@ -321,7 +321,7 @@ export default function PropertyCostCenterDashboard({
             dreData,
             // only the components that actually cost something this month, e.g. "Taxa + custo de energia"
             opexLabel: current
-                ? ([['Taxa', current.feeAmount], ['custo de energia', current.other], ['outros', current.otherExpenses], ['IPTU', iptuNow]] as Array<[string, number]>)
+                ? ([['Taxa', current.feeAmount], ['custo de energia', current.other], ['outros', current.otherExpenses], ['tributos', iptuNow]] as Array<[string, number]>)
                     .filter(([, v]) => v > 0).map(([n]) => n).join(' + ')
                 : '',
             energyIncome: current ? current.energy : null,
@@ -556,7 +556,7 @@ export default function PropertyCostCenterDashboard({
                             </h3>
                             <p className="text-xs text-muted-foreground">
                                 {financials.realIncomeMonth
-                                    ? `Receita (aluguel bruto + energia), despesas (taxa + custo de energia + outras + IPTU pago por você no mês) e NOI reais · ${periodLabel(period)}; meses previstos em tom claro`
+                                    ? `Receita (aluguel bruto + energia), despesas (taxa + custo de energia + outras + tributos pagos por você no mês) e NOI reais · ${periodLabel(period)}; meses previstos em tom claro`
                                     : 'Histórico e projeção de Receitas, Despesas Operacionais e Lucro Líquido (NOI)'}
                             </p>
                         </div>
@@ -695,7 +695,7 @@ export default function PropertyCostCenterDashboard({
             />
 
             {/* Investment ledger: acquisition, financing, capex, running costs, solar */}
-            <PropertyInvestmentSection propertyId={dbId} incomeRows={incomeRows} landlordIptu={summarizeTaxes(taxRows).iptuByLandlord} onDataChange={setInvestmentData} preloaded={preloadedInvestment} />
+            <PropertyInvestmentSection propertyId={dbId} incomeRows={incomeRows} landlordTaxes={landlordTaxTotals(taxRows)} onDataChange={setInvestmentData} preloaded={preloadedInvestment} />
 
             {/* Property taxes register: the source of IPTU (landlord payments count in the month paid) */}
             <PropertyTaxesSection propertyId={dbId} onRowsChange={setTaxRows} preloadedRows={overview === undefined ? undefined : overview?.taxes ?? null} />

@@ -8,9 +8,9 @@
  *     amounts are charged in the month they were paid
  *
  * Money model (per calendar month):
- *   invested_m    = ENTRADA + CUSTOS_AQUISICAO + PRESTACAO + AMORTIZACAO + QUITACAO + REFORMA
+ *   invested_m    = ENTRADA + CUSTOS_AQUISICAO + PRESTACAO + AMORTIZACAO + QUITACAO + TARIFA + REFORMA
  *   debtService_m = PRESTACAO + AMORTIZACAO + QUITACAO
- *   running_m     = TARIFA + UTILIDADES + OUTROS + landlord IPTU from the register (the IPTU kind is ignored)
+ *   running_m     = UTILIDADES + OUTROS + landlord taxes (IPTU, ITBI, outros) from the register (the IPTU kind is ignored)
  *   netRent_m     = received − energy portion            (rent after the agency fee)
  *   propertyOpex  = other expenses
  *   energyNet_m   = energy portion − energy cost         → pays the solar system back first;
@@ -31,7 +31,7 @@
 import { breakdown, currentMonthKey, monthKey, round2, type PropertyIncomeRow } from "./property-income";
 import { monthsBetween, shiftMonthKey } from "./period-filter";
 import { KIND_GROUP, type PropertyInvestment, type PropertyTransaction } from "./property-investment";
-import { landlordIptuByMonth, type PropertyTax } from "./property-taxes";
+import { landlordTaxesByMonth, type PropertyTax } from "./property-taxes";
 import { priceLevelFactors, type MonthlyIndexPoint } from "./property-valuations";
 
 export interface MetricsInput {
@@ -119,7 +119,7 @@ export interface InvestmentMetrics {
     irrRealized: number | null;
     series: MonthPoint[];
     projection: ProjectionPoint[];
-    /** landlord IPTU from the taxes register charged in the period */
+    /** landlord taxes (IPTU, ITBI, outros) from the register charged in the period */
     registerIptuUsed: number;
 
     // ── value and returns (need a valuation) ────────────────────────────
@@ -153,7 +153,7 @@ export interface InvestmentMetrics {
     remainingReal: number | null;
 }
 
-const INVEST_KINDS = new Set(["ENTRADA", "CUSTOS_AQUISICAO", "PRESTACAO", "AMORTIZACAO", "QUITACAO", "REFORMA"]);
+const INVEST_KINDS = new Set(["ENTRADA", "CUSTOS_AQUISICAO", "PRESTACAO", "AMORTIZACAO", "QUITACAO", "TARIFA", "REFORMA"]);
 const DEBT_KINDS = new Set(["PRESTACAO", "AMORTIZACAO", "QUITACAO"]);
 const MAX_FORECAST_MONTHS = 600;
 
@@ -198,7 +198,7 @@ export function computeInvestmentMetrics(input: MetricsInput): InvestmentMetrics
     const incomeAll = input.incomeRows.filter(r => monthKey(r.month) <= asOf);
     const counted = incomeAll.filter(r => r.status === "CONFIRMED" || input.includeExpected);
     const expectedExcluded = incomeAll.length - counted.length;
-    const registerIptu = landlordIptuByMonth(input.taxes ?? []);
+    const registerIptu = landlordTaxesByMonth(input.taxes ?? []);
 
     // ── month buckets ───────────────────────────────────────────────────
     const months = new Set<string>();
@@ -244,7 +244,7 @@ export function computeInvestmentMetrics(input: MetricsInput): InvestmentMetrics
             const a = Number(t.amount) || 0;
             if (INVEST_KINDS.has(t.kind)) invested += a;
             if (DEBT_KINDS.has(t.kind)) debt += a;
-            if (KIND_GROUP[t.kind] === "CUSTOS" && t.kind !== "IPTU") running += a;   // IPTU comes from the register
+            if (KIND_GROUP[t.kind] === "CUSTOS" && t.kind !== "IPTU") running += a;   // IPTU comes from the register; TARIFA is investment
             if (t.kind === "ENERGIA_SOLAR") solarInvestedCum += a;
             if (t.kind === "QUITACAO") event = "QUITACAO";
             else if (t.kind === "AMORTIZACAO" && event !== "QUITACAO") event = "AMORTIZACAO";

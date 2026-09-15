@@ -57,13 +57,13 @@ describe("computeInvestmentMetrics", () => {
         // Rent every month from Feb 2024 to Sep 2026 (32 months): noi = 3950 − 100 energy cost = 3850 (no solar → energy net is the property's)
         const rows = months("2024-02", 32).map(m => income(m));
         const m = computeInvestmentMetrics({ investment: investment({ financing_status: "PAID_OFF" }), transactions: txs, incomeRows: rows, asOf: "2026-09" });
-        expect(m.cashInvested).toBe(110000);
-        expect(m.netIncomeToDate).toBe(32 * 3850 - 100);
-        expect(m.paybackPct).toBeCloseTo(((32 * 3850 - 100) / 110000) * 100, 0);
+        expect(m.cashInvested).toBe(110100);   // the bank fee counts as investment
+        expect(m.netIncomeToDate).toBe(32 * 3850);
+        expect(m.paybackPct).toBeCloseTo(((32 * 3850) / 110100) * 100, 0);
         expect(m.monthsWithIncome12m).toBe(12);
         expect(m.monthlyNoiPace).toBe(3850);
         expect(m.noi12m).toBe(12 * 3850);
-        expect(m.netYieldOnCost).toBeCloseTo((12 * 3850 / 110000) * 100, 0);
+        expect(m.netYieldOnCost).toBeCloseTo((12 * 3850 / 110100) * 100, 0);
         expect(m.grossYieldOnPrice).toBeCloseTo((12 * 4000 / 100000) * 100, 1);
         expect(m.priceToRent).toBeCloseTo(100000 / 48000, 1);
         // remaining = 110000 − 123100 < 0 → already paid back
