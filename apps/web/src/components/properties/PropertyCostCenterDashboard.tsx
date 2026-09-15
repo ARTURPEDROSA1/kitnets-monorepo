@@ -541,7 +541,7 @@ export default function PropertyCostCenterDashboard({
                                 <>
                                     Energia recebida {formatBRL(financials.energyIncome ?? 0)}<br />
                                     Custo de energia {formatBRL(financials.energyCost ?? 0)}<br />
-                                    {details.solarEnergy ? (details.solarKwp ? `${details.solarKwp} kWp` : 'Solar GD ativa') : 'Sem geração local'}
+                                    <span className="text-sm font-bold text-foreground">{details.solarEnergy ? (details.solarKwp ? `${details.solarKwp} kWp` : 'Solar GD ativa') : 'Sem geração local'}</span>
                                 </>
                             ) : details.solarEnergy ? 'Compensação GD ativa' : 'Sem geração local'}
                         </span>
