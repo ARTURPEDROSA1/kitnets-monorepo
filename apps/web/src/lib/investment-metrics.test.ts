@@ -58,7 +58,7 @@ describe("computeInvestmentMetrics", () => {
         const rows = months("2024-02", 32).map(m => income(m));
         const m = computeInvestmentMetrics({ investment: investment({ financing_status: "PAID_OFF" }), transactions: txs, incomeRows: rows, asOf: "2026-09" });
         expect(m.cashInvested).toBe(110100);   // the bank fee counts as investment
-        expect(m.netIncomeToDate).toBe(32 * 3850);
+        expect(m.netIncomeToDate).toBe(32 * 3850);   // energy net income counts as income
         expect(m.paybackPct).toBeCloseTo(((32 * 3850) / 110100) * 100, 0);
         expect(m.monthsWithIncome12m).toBe(12);
         expect(m.monthlyNoiPace).toBe(3850);
@@ -98,17 +98,16 @@ describe("computeInvestmentMetrics", () => {
         expect(computeInvestmentMetrics({ investment: inv, transactions: txs, incomeRows: [...rows, income("2026-09", { status: "EXPECTED" })], asOf: "2026-09", includeExpected: true }).incomeMonths).toBe(9);
     });
 
-    it("sends net energy income to the solar system first, then to the property", () => {
+    it("counts the solar system as investment and net energy income as income", () => {
         const txs = [tx("2026-01-10", "ENTRADA", 10000), tx("2026-01-10", "ENERGIA_SOLAR", 500)];
-        // energy net = 350 − 100 = 250 per month → solar (500) recovered in 2 months, surplus from month 3
         const rows = months("2026-01", 4).map(m => income(m));
         const m = computeInvestmentMetrics({ investment: investment({ acquired_on: "2026-01-10" }), transactions: txs, incomeRows: rows, asOf: "2026-04" });
-        expect(m.series.map(p => p.energySurplus)).toEqual([0, 0, 250, 250]);
-        expect(m.series.map(p => p.noi)).toEqual([3600, 3600, 3850, 3850]);
-        expect(m.cashInvested).toBe(10000);  // solar is not part of the property's cash basis
+        expect(m.series.map(p => p.energySurplus)).toEqual([250, 250, 250, 250]);
+        expect(m.series.map(p => p.noi)).toEqual([3850, 3850, 3850, 3850]);
+        expect(m.cashInvested).toBe(10500);
     });
 
-    it("charges landlord IPTU from the register in the month it was paid and ignores the IPTU kind in the ledger", () => {
+    it("adds landlord IPTU from the register to the investment in the month it was paid and ignores the IPTU kind in the ledger", () => {
         const txs = [tx("2026-01-10", "ENTRADA", 10000)];
         const rows = months("2026-01", 3).map(m => income(m));
         const taxes = [tax(2026, 900, "LANDLORD", { paid_on: "2026-02-10" })];
@@ -116,10 +115,13 @@ describe("computeInvestmentMetrics", () => {
         const m = computeInvestmentMetrics({ investment: inv, transactions: txs, incomeRows: rows, taxes, asOf: "2026-03" });
         expect(m.registerIptuUsed).toBe(900);
         expect(m.series[1].runningCosts).toBe(900);
-        expect(m.netIncomeToDate).toBe(3 * 3850 - 900);
+        expect(m.series[1].invested).toBe(900);
+        expect(m.cashInvested).toBe(10900);
+        expect(m.netIncomeToDate).toBe(3 * 3850);
         const covered = computeInvestmentMetrics({ investment: inv, transactions: [...txs, tx("2026-02-10", "IPTU", 900)], incomeRows: rows, taxes, asOf: "2026-03" });
         expect(covered.registerIptuUsed).toBe(900);
-        expect(covered.netIncomeToDate).toBe(3 * 3850 - 900);   // the IPTU transaction is not counted twice
+        expect(covered.cashInvested).toBe(10900);            // the legacy IPTU transaction is not counted
+        expect(covered.netIncomeToDate).toBe(3 * 3850);
     });
 });
 

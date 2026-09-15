@@ -486,8 +486,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                         Investimento no imóvel
                     </h3>
                     <p className="text-xs text-muted-foreground">
-                        Tudo o que você pagou: entrada, custos de aquisição, prestações e amortizações do financiamento, reformas e custos do imóvel.
-                        A energia solar é um investimento à parte, recuperado pela receita líquida de energia.
+                        Tudo o que você pagou: entrada, custos de aquisição, prestações, amortizações e tarifas do financiamento, reformas, custos do imóvel, tributos e energia solar.
                         {investment?.purchase_price ? ` Valor de compra ${formatBRL(investment.purchase_price)}${investment.acquired_on ? ` em ${formatDateBR(investment.acquired_on)}` : ""}.` : ""}
                     </p>
                 </div>
@@ -530,8 +529,8 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
 
             {/* Tiles */}
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-                <Tile label="Total investido no imóvel" value={formatBRL(summary.invested)} tone="emerald" icon={<PiggyBank className="w-4 h-4" />}
-                    hint={<>Entrada: {formatBRL(summary.downPayment)}<br />Banco: {formatBRL(summary.bankPaid + summary.bankFees)}<br />Reformas: {formatBRL(summary.capex)}</>} />
+                <Tile label="Total investido no imóvel" value={formatBRL(summary.invested + taxes.total)} tone="emerald" icon={<PiggyBank className="w-4 h-4" />}
+                    hint={<>Entrada: {formatBRL(summary.downPayment + summary.closingCosts)}<br />Banco: {formatBRL(summary.bankPaid + summary.bankFees)}<br />Reformas: {formatBRL(summary.capex)}<br />Custos do imóvel: {formatBRL(summary.runningCosts + taxes.total)}<br />Energia solar: {formatBRL(summary.solarInvested)}</>} />
                 <Tile label="Pago ao banco" value={formatBRL(summary.bankPaid + summary.bankFees)} tone="blue" icon={<Landmark className="w-4 h-4" />}
                     hint={<>Prestações: {summary.installments}<br />Juros + seguros: {summary.interestAndInsurance === null ? "—" : formatBRL(summary.interestAndInsurance)}<br />Tarifas: {formatBRL(summary.bankFees)}</>} />
                 <Tile label="Reformas (capex)" value={formatBRL(summary.capex)} tone="violet" icon={<Hammer className="w-4 h-4" />}

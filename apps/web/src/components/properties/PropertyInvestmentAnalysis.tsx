@@ -215,7 +215,7 @@ export default function PropertyInvestmentAnalysis({ propertyId, bedrooms, inves
                     </h3>
                     <p className="text-xs text-muted-foreground">
                         Payback, previsão e rentabilidade a partir dos lançamentos de investimento, das receitas reais e dos tributos.
-                        {" "}Renda líquida = aluguel líquido − despesas e custos do imóvel; a energia paga primeiro o sistema solar e o excedente conta para o imóvel.
+                        {" "}Investido = tudo o que você pagou (inclusive custos, tributos e energia solar); renda líquida = aluguel líquido + energia líquida − outras despesas.
                         {investment?.purchase_price ? ` Valor de compra ${formatBRL(investment.purchase_price)}${investment.acquired_on ? ` em ${formatDateBR(investment.acquired_on)}` : ""}.` : ""}
                     </p>
                 </div>
@@ -358,7 +358,7 @@ export default function PropertyInvestmentAnalysis({ propertyId, bedrooms, inves
                             </ResponsiveContainer>
                         </div>
                         <p className="text-[11px] text-muted-foreground">
-                            Base de caixa: entrada, custos de aquisição, prestações, amortizações, quitação e reformas. A projeção repete a renda líquida média dos últimos 12 meses
+                            Base de caixa: tudo o que foi pago (entrada, custos de aquisição, prestações, amortizações, quitação, tarifas, reformas, custos, tributos e energia solar). A projeção repete a renda líquida média dos últimos 12 meses
                             {financed ? " e as prestações restantes do contrato" : ""}; não considera valorização do imóvel. Em “valores de hoje” cada mês é corrigido pelo IPCA até {formatMonthKey(metrics.asOf)}.
                             {metrics.expectedMonthsExcluded > 0 && !includeExpected && ` ${metrics.expectedMonthsExcluded} ${metrics.expectedMonthsExcluded === 1 ? "mês previsto ficou" : "meses previstos ficaram"} de fora; marque "Incluir meses previstos" para contá-los.`}
                         </p>

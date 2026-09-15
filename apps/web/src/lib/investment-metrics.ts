@@ -7,15 +7,16 @@
  *   • taxes register (`property-taxes.ts`) — the only source of IPTU: landlord-paid
  *     amounts are charged in the month they were paid
  *
- * Money model (per calendar month):
- *   invested_m    = ENTRADA + CUSTOS_AQUISICAO + PRESTACAO + AMORTIZACAO + QUITACAO + TARIFA + REFORMA
+ * Money model (per calendar month) — "tudo o que você pagou" vs "tudo o que entrou":
+ *   invested_m    = every outflow: ENTRADA + CUSTOS_AQUISICAO + PRESTACAO + AMORTIZACAO + QUITACAO + TARIFA
+ *                   + REFORMA + UTILIDADES + OUTROS + ENERGIA_SOLAR + landlord taxes from the register
+ *                   (the legacy IPTU kind is ignored)
  *   debtService_m = PRESTACAO + AMORTIZACAO + QUITACAO
- *   running_m     = UTILIDADES + OUTROS + landlord taxes (IPTU, ITBI, outros) from the register (the IPTU kind is ignored)
+ *   running_m     = UTILIDADES + OUTROS + landlord taxes (reported; already inside invested)
  *   netRent_m     = received − energy portion            (rent after the agency fee)
- *   propertyOpex  = other expenses
- *   energyNet_m   = energy portion − energy cost         → pays the solar system back first;
- *                   the surplus (or all of it when there is no solar) belongs to the property
- *   noi_m         = netRent − propertyOpex − running + energy surplus
+ *   propertyOpex  = other expenses from the income ledger (paid out of the rent)
+ *   energyNet_m   = energy portion − energy cost         (the solar system is part of the investment)
+ *   noi_m         = netRent − propertyOpex + energyNet
  *   cashFlow_m    = noi − debtService
  *
  *   payback %      = Σ noi ÷ Σ invested          (cash basis, to date)
@@ -119,7 +120,7 @@ export interface InvestmentMetrics {
     irrRealized: number | null;
     series: MonthPoint[];
     projection: ProjectionPoint[];
-    /** landlord taxes (IPTU, ITBI, outros) from the register charged in the period */
+    /** landlord taxes (IPTU, ITBI, outros) from the register, counted as investment */
     registerIptuUsed: number;
 
     // ── value and returns (need a valuation) ────────────────────────────
@@ -153,7 +154,7 @@ export interface InvestmentMetrics {
     remainingReal: number | null;
 }
 
-const INVEST_KINDS = new Set(["ENTRADA", "CUSTOS_AQUISICAO", "PRESTACAO", "AMORTIZACAO", "QUITACAO", "TARIFA", "REFORMA"]);
+const INVEST_KINDS = new Set(["ENTRADA", "CUSTOS_AQUISICAO", "PRESTACAO", "AMORTIZACAO", "QUITACAO", "TARIFA", "REFORMA", "UTILIDADES", "OUTROS", "ENERGIA_SOLAR"]);
 const DEBT_KINDS = new Set(["PRESTACAO", "AMORTIZACAO", "QUITACAO"]);
 const MAX_FORECAST_MONTHS = 600;
 
@@ -232,7 +233,6 @@ export function computeInvestmentMetrics(input: MetricsInput): InvestmentMetrics
     // ── walk every calendar month from the first to asOf ────────────────
     const series: MonthPoint[] = [];
     let cumInvested = 0, cumNoi = 0;
-    let solarInvestedCum = 0, solarRecovered = 0;
     let paybackReachedOn: string | null = null;
     let registerIptuUsed = 0;
     let lastGross: number | null = null, lastNet: number | null = null;
@@ -244,13 +244,13 @@ export function computeInvestmentMetrics(input: MetricsInput): InvestmentMetrics
             const a = Number(t.amount) || 0;
             if (INVEST_KINDS.has(t.kind)) invested += a;
             if (DEBT_KINDS.has(t.kind)) debt += a;
-            if (KIND_GROUP[t.kind] === "CUSTOS" && t.kind !== "IPTU") running += a;   // IPTU comes from the register; TARIFA is investment
-            if (t.kind === "ENERGIA_SOLAR") solarInvestedCum += a;
+            if (KIND_GROUP[t.kind] === "CUSTOS" && t.kind !== "IPTU") running += a;   // reported as custos; already counted in invested
             if (t.kind === "QUITACAO") event = "QUITACAO";
             else if (t.kind === "AMORTIZACAO" && event !== "QUITACAO") event = "AMORTIZACAO";
         }
-        const reg = registerIptu.get(m) ?? 0;
+        const reg = registerIptu.get(m) ?? 0;   // landlord taxes: part of what was paid
         running += reg;
+        invested += reg;
         registerIptuUsed += reg;
 
         const row = incomeByMonth.get(m);
@@ -264,18 +264,10 @@ export function computeInvestmentMetrics(input: MetricsInput): InvestmentMetrics
             lastGross = b.grossRent;
             lastNet = b.netRent;
         }
-        // energy: the solar system is paid back first; the surplus is the property's
-        let energySurplus = 0;
-        if (solarInvestedCum > 0) {
-            if (energyNet < 0) solarRecovered += energyNet;
-            else {
-                const toSolar = Math.min(energyNet, Math.max(0, solarInvestedCum - solarRecovered));
-                solarRecovered += toSolar;
-                energySurplus = energyNet - toSolar;
-            }
-        } else energySurplus = energyNet;
+        // energy income is income of the property (the solar system is inside the investment)
+        const energySurplus = energyNet;
 
-        const noi = round2(netRent - propertyOpex - running + energySurplus);
+        const noi = round2(netRent - propertyOpex + energySurplus);
         cumInvested = round2(cumInvested + invested);
         cumNoi = round2(cumNoi + noi);
         const remaining = round2(cumInvested - cumNoi);

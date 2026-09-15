@@ -5,9 +5,9 @@
  * property_investments  : purchase price / date / area + financing header
  * property_transactions : dated outflows, one kind each (all amounts ≥ 0)
  *
- *   invested (imóvel) = ENTRADA + CUSTOS_AQUISICAO + PRESTACAO + AMORTIZACAO + QUITACAO + TARIFA + REFORMA
- *                       (bank fees count: the account usually exists only for the loan)
- *   custos do imóvel  = UTILIDADES + OUTROS   (running costs; taxes come from Tributos do imóvel)
+ *   invested (imóvel) = everything paid: ENTRADA + CUSTOS_AQUISICAO + PRESTACAO + AMORTIZACAO + QUITACAO + TARIFA
+ *                       + REFORMA + UTILIDADES + OUTROS + ENERGIA_SOLAR (landlord taxes from Tributos do imóvel are added by the UI/engine)
+ *   custos do imóvel  = UTILIDADES + OUTROS   (reported; part of invested)
  *   energia solar     = ENERGIA_SOLAR — its own cost centre, paid back by
  *                       net energy income (energy − energy cost) from the income ledger
  */
@@ -245,9 +245,9 @@ export interface InvestmentSummary {
     runningCosts: number;
     /** TARIFA */
     bankFees: number;
-    /** ENTRADA + CUSTOS_AQUISICAO + bankPaid + bankFees + capex — the property's cost basis */
+    /** everything paid: ENTRADA + CUSTOS_AQUISICAO + bankPaid + bankFees + capex + runningCosts + solarInvested (taxes from the register are added by the caller) */
     invested: number;
-    /** invested + runningCosts — everything the owner has paid out */
+    /** same as invested (kept for callers) */
     totalOutlay: number;
     solarInvested: number;
     firstDate: string | null;
@@ -277,7 +277,7 @@ export function summarizeInvestment(txs: PropertyTransaction[], inv: PropertyInv
     const capex = byKind.REFORMA;
     const runningCosts = round2(byKind.UTILIDADES + byKind.OUTROS);
     const bankFees = byKind.TARIFA;
-    const invested = round2(byKind.ENTRADA + byKind.CUSTOS_AQUISICAO + bankPaid + bankFees + capex);
+    const invested = round2(byKind.ENTRADA + byKind.CUSTOS_AQUISICAO + bankPaid + bankFees + capex + runningCosts + byKind.ENERGIA_SOLAR);
     let interestAndInsurance: number | null = null;
     if (hasParts) interestAndInsurance = round2(knownParts);
     else if (inv?.financing_status === "PAID_OFF" && inv.principal && bankPaid > 0) {
@@ -294,7 +294,7 @@ export function summarizeInvestment(txs: PropertyTransaction[], inv: PropertyInv
         runningCosts,
         bankFees,
         invested,
-        totalOutlay: round2(invested + runningCosts),
+        totalOutlay: invested,
         solarInvested: byKind.ENERGIA_SOLAR,
         firstDate: first,
         lastDate: last,
