@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     AlertCircle,
     Banknote,
@@ -222,7 +222,34 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
         }),
         [txs, range]
     );
-    const cf = useColumnFilters(inPeriod, INVESTMENT_COLUMNS, { key: "date", dir: "desc" });
+    // Juros / Amortização / Seguro are grouped like an Excel outline: collapsed by default, "+" expands, "−" collapses.
+    const [showSplit, setShowSplit] = useState(false);
+    const columns = useMemo<ColumnDef<PropertyTransaction>[]>(() => {
+        const toggle = (expanded: boolean) => (
+            <button
+                type="button"
+                onClick={e => { e.stopPropagation(); setShowSplit(!expanded); }}
+                title={expanded ? "Ocultar juros, amortização e seguro" : "Mostrar juros, amortização e seguro"}
+                className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded border border-border text-[11px] leading-none font-bold text-muted-foreground hover:text-foreground hover:bg-muted align-middle"
+            >
+                {expanded ? "−" : "+"}
+            </button>
+        );
+        const split = new Set(["interest", "principal", "insurance"]);
+        return INVESTMENT_COLUMNS
+            .filter(c => showSplit || !split.has(c.key))
+            .map(c => (c.key === "amount" && !showSplit ? { ...c, headerExtra: toggle(false) } : c.key === "insurance" && showSplit ? { ...c, headerExtra: toggle(true) } : c));
+    }, [showSplit]);
+    const cf = useColumnFilters(inPeriod, columns, { key: "date", dir: "desc" });
+    const cfRef = useRef(cf);
+    cfRef.current = cf;
+    useEffect(() => {
+        // collapsing drops filters/sort that live on the hidden columns
+        if (showSplit) return;
+        const c = cfRef.current;
+        for (const k of ["interest", "principal", "insurance"]) if (c.isActive(k)) c.clearColumn(k);
+        if (["interest", "principal", "insurance"].includes(c.sort.key)) c.setSort({ key: "date", dir: "desc" });
+    }, [showSplit]);
     const filtered = cf.rows;
     const filteredTotal = useMemo(() => filtered.reduce((a, t) => a + t.amount, 0), [filtered]);
     const visible = showAll ? filtered : filtered.slice(0, COLLAPSED_ROWS);
@@ -526,7 +553,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                 <PeriodFilter value={period} onChange={setPeriod} />
             </div>
 
-            <FilterChips columns={INVESTMENT_COLUMNS} ctl={cf} />
+            <FilterChips columns={columns} ctl={cf} />
 
             {loading ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Carregando…</div>
@@ -544,7 +571,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                 <div className="overflow-x-auto -mx-2">
                     <table className="w-full text-xs min-w-[980px]">
                         <thead>
-                            <ColumnHeaders columns={INVESTMENT_COLUMNS} ctl={cf} trailing={<th className="px-2 py-2" />} />
+                            <ColumnHeaders columns={columns} ctl={cf} trailing={<th className="px-2 py-2" />} />
                         </thead>
                         <tbody>
                             {visible.map(tx => {
@@ -583,9 +610,13 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                                             </select>
                                         </td>
                                         <td {...sel.cellProps("amount", tx.id, tx.amount, "px-2 py-1 text-right")}>{money("amount", tx.amount)}</td>
-                                        <td {...sel.cellProps("interest", tx.id, tx.interest_part, "px-2 py-1 text-right")}>{money("interest", tx.interest_part, isFin)}</td>
-                                        <td {...sel.cellProps("principal", tx.id, tx.principal_part, "px-2 py-1 text-right")}>{money("principal", tx.principal_part, isFin)}</td>
-                                        <td {...sel.cellProps("insurance", tx.id, tx.insurance_part, "px-2 py-1 text-right")}>{money("insurance", tx.insurance_part, isFin)}</td>
+                                        {showSplit && (
+                                            <>
+                                                <td {...sel.cellProps("interest", tx.id, tx.interest_part, "px-2 py-1 text-right")}>{money("interest", tx.interest_part, isFin)}</td>
+                                                <td {...sel.cellProps("principal", tx.id, tx.principal_part, "px-2 py-1 text-right")}>{money("principal", tx.principal_part, isFin)}</td>
+                                                <td {...sel.cellProps("insurance", tx.id, tx.insurance_part, "px-2 py-1 text-right")}>{money("insurance", tx.insurance_part, isFin)}</td>
+                                            </>
+                                        )}
                                         <td className="px-2 py-1">
                                             <input type="text" disabled={busy} value={d.comment ?? (tx.comment ?? "")} placeholder="—"
                                                 onChange={e => setDraft(tx.id, "comment", e.target.value)} onBlur={() => commit(tx, "comment")}
@@ -612,7 +643,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                 </div>
             )}
 
-            <ColumnMenu columns={INVESTMENT_COLUMNS} ctl={cf} />
+            <ColumnMenu columns={columns} ctl={cf} />
 
             {/* Estimate interest / amortisation / insurance */}
             <Dialog open={splitOpen} onOpenChange={setSplitOpen}>

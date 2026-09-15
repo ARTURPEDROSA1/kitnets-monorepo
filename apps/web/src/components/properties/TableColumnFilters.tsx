@@ -34,6 +34,8 @@ export interface ColumnDef<T> {
     sum?: boolean;
     /** formats the sum (default: R$) */
     formatSum?: (n: number) => string;
+    /** rendered inside the header cell after the label (e.g. an expand/collapse toggle) */
+    headerExtra?: React.ReactNode;
 }
 
 export interface ColumnFilter {
@@ -181,6 +183,7 @@ export function ColumnHeaders<T>({ columns, ctl, leading, trailing, className }:
                             {sorted ? (ctl.sort.dir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-40" />}
                             {active && <Filter className="w-3 h-3 text-emerald-600" />}
                         </button>
+                        {c.headerExtra}
                         {sums.has(c.key) && (
                             <span className="block mt-0.5 text-[11px] normal-case tracking-normal font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums" title="Soma das linhas filtradas">
                                 {(c.formatSum ?? formatBRL)(sums.get(c.key)!)}
