@@ -46,6 +46,7 @@ output type. Rules:
 | Family | Routes | Status |
 |---|---|---|
 | tenants | 3 files, 5 handlers | migrated (reference implementation) |
+| agents | 3 files, 6 handlers (incl. multipart photo upload) | migrated |
 | properties/*, portfolio, bank, water-bills/orphaned, gateways/claim | 27 handlers | already on `requireProfile`; wrapping them is mechanical |
-| agents, agencies, leases, energy-bills/* | 13 files | still `currentUser()` + inline profile lookup + hand-written validation; next candidates |
+| agencies, leases, energy-bills/* | 10 files | still `currentUser()` + inline profile lookup + hand-written validation; next candidates |
 | cron/*, gateways/ingest, public calculators, AI endpoints | — | different auth (cron secret, ingest key, per-user limit via `requireUserWithLimit`); not for `withAuth` |
