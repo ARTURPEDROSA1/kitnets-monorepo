@@ -12,7 +12,7 @@
  * Column kinds: text (contains), number (min–max), date (ISO min–max), month (YYYY-MM min–max),
  * enum (checkbox list with counts from the unfiltered rows).
  */
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, Filter, FilterX, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -232,8 +232,33 @@ export function FilterChips<T>({ columns, ctl }: { columns: ColumnDef<T>[]; ctl:
     );
 }
 
-/** The popup: sort buttons + the filter control for the column's kind. Fixed-positioned at the clicked header. */
+/** Keeps a fixed popup inside the viewport: slides up/left when it would overflow, scrolls when taller than the screen. */
+function useFitInViewport(anchor: { x: number; y: number } | null) {
+    const ref = useRef<HTMLDivElement>(null);
+    const [pos, setPos] = useState<{ left: number; top: number; maxHeight: number } | null>(null);
+    useLayoutEffect(() => {
+        if (!anchor) { setPos(null); return; }
+        const fit = () => {
+            const el = ref.current;
+            if (!el) return;
+            const margin = 8;
+            const vw = window.innerWidth, vh = window.innerHeight;
+            const maxHeight = Math.max(160, vh - margin * 2);
+            const h = Math.min(el.offsetHeight, maxHeight), w = el.offsetWidth;
+            const left = Math.max(margin, Math.min(anchor.x, vw - w - margin));
+            const top = Math.max(margin, Math.min(anchor.y, vh - h - margin));
+            setPos({ left, top, maxHeight });
+        };
+        fit();
+        window.addEventListener("resize", fit);
+        return () => window.removeEventListener("resize", fit);
+    }, [anchor]);
+    return { ref, pos };
+}
+
+/** The popup: sort buttons + the filter control for the column's kind. Fixed-positioned at the clicked header, kept inside the viewport. */
 export function ColumnMenu<T>({ columns, ctl }: { columns: ColumnDef<T>[]; ctl: ColumnFilterController<T> }) {
+    const { ref, pos } = useFitInViewport(ctl.menu);
     if (!ctl.menu) return null;
     const c = columns.find(x => x.key === ctl.menu!.key);
     if (!c) return null;
@@ -251,7 +276,7 @@ export function ColumnMenu<T>({ columns, ctl }: { columns: ColumnDef<T>[]; ctl: 
     return (
         <>
             <div className="fixed inset-0 z-[60]" onClick={ctl.closeMenu} />
-            <div className="fixed z-[61] w-64 rounded-xl border border-border bg-popover text-popover-foreground shadow-xl p-2 text-xs space-y-1" style={{ left: ctl.menu.x, top: ctl.menu.y }}>
+            <div ref={ref} className="fixed z-[61] overflow-y-auto w-64 rounded-xl border border-border bg-popover text-popover-foreground shadow-xl p-2 text-xs space-y-1" style={pos ? { left: pos.left, top: pos.top, maxHeight: pos.maxHeight } : { left: ctl.menu.x, top: ctl.menu.y, visibility: "hidden" }}>
                 {sortBtn("asc", ascLabel, ArrowUp)}
                 {sortBtn("desc", descLabel, ArrowDown)}
                 <div className="border-t border-border my-1" />
