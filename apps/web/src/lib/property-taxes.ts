@@ -348,3 +348,33 @@ export function iptuYearsFromTransactions(txs: PropertyTransaction[], paidBy: Ta
             installments: [] as TaxInstallment[],
         }));
 }
+
+/**
+ * IPTU paid by the landlord, by calendar month (`YYYY-MM`), from the register:
+ * a parcela lands in the month of its `paid_on`; a single payment in the month
+ * of the row's `paid_on`; rows without a date fall in January of their year.
+ * This is the only IPTU source of the money model (dashboard, DRE, engine).
+ */
+export function landlordIptuByMonth(taxes: PropertyTax[]): Map<string, number> {
+    const out = new Map<string, number>();
+    const add = (m: string, amt: number) => { if (amt > 0) out.set(m, round2((out.get(m) ?? 0) + amt)); };
+    for (const tax of taxes) {
+        if (tax.kind !== "IPTU") continue;
+        const year = String(tax.year);
+        const parts = Array.isArray(tax.installments) ? tax.installments : [];
+        if (parts.length === 0) {
+            if (tax.paid_by === "LANDLORD") add(tax.paid_on ? tax.paid_on.slice(0, 7) : `${year}-01`, Number(tax.amount) || 0);
+        } else {
+            parts.forEach((p, i) => {
+                if (p.paid_by !== "LANDLORD") return;
+                add(p.paid_on ? p.paid_on.slice(0, 7) : `${year}-${String(Math.min(12, i + 1)).padStart(2, "0")}`, Number(p.amount) || 0);
+            });
+        }
+    }
+    return out;
+}
+
+/** Landlord IPTU that falls in one month (`YYYY-MM`). */
+export function landlordIptuForMonth(taxes: PropertyTax[], month: string): number {
+    return landlordIptuByMonth(taxes).get(month) ?? 0;
+}

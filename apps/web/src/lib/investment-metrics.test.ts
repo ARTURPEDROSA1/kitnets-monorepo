@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeInvestmentMetrics, registerIptuByMonth, xirr } from "./investment-metrics";
+import { computeInvestmentMetrics, xirr } from "./investment-metrics";
 import type { PropertyIncomeRow } from "./property-income";
 import type { PropertyInvestment, PropertyTransaction } from "./property-investment";
 import type { PropertyTax } from "./property-taxes";
@@ -39,24 +39,6 @@ describe("xirr", () => {
         expect(r).toBeGreaterThan(0.15);
         expect(r).toBeLessThan(0.25);
         expect(xirr([{ date: "2024-01-01", amount: -1 }, { date: "2024-02-01", amount: -1 }])).toBeNull();
-    });
-});
-
-describe("registerIptuByMonth", () => {
-    it("uses landlord IPTU only for years missing from both ledgers", () => {
-        const taxes = [
-            tax(2024, 1200, "LANDLORD", { paid_on: "2024-03-10" }),
-            tax(2025, 1300, "LANDLORD", { installments: [
-                { seq: 1, amount: 650, paid_by: "LANDLORD", paid_on: "2025-02-05" },
-                { seq: 2, amount: 650, paid_by: "TENANT", paid_on: "2025-03-05" },
-            ] }),
-            tax(2026, 1400, "TENANT"),
-        ];
-        const byMonth = registerIptuByMonth(taxes, [income("2024-03", { iptu_amount: 1200 })], []);
-        expect(byMonth.get("2024-03")).toBeUndefined();   // ledger already has 2024
-        expect(byMonth.get("2025-02")).toBe(650);         // only the landlord parcela
-        expect(byMonth.get("2025-03")).toBeUndefined();
-        expect([...byMonth.keys()].some(k => k.startsWith("2026"))).toBe(false);
     });
 });
 
@@ -126,7 +108,7 @@ describe("computeInvestmentMetrics", () => {
         expect(m.cashInvested).toBe(10000);  // solar is not part of the property's cash basis
     });
 
-    it("charges landlord IPTU from the register when the ledgers have none for that year", () => {
+    it("charges landlord IPTU from the register in the month it was paid and ignores the IPTU kind in the ledger", () => {
         const txs = [tx("2026-01-10", "ENTRADA", 10000)];
         const rows = months("2026-01", 3).map(m => income(m));
         const taxes = [tax(2026, 900, "LANDLORD", { paid_on: "2026-02-10" })];
@@ -136,8 +118,8 @@ describe("computeInvestmentMetrics", () => {
         expect(m.series[1].runningCosts).toBe(900);
         expect(m.netIncomeToDate).toBe(3 * 3850 - 900);
         const covered = computeInvestmentMetrics({ investment: inv, transactions: [...txs, tx("2026-02-10", "IPTU", 900)], incomeRows: rows, taxes, asOf: "2026-03" });
-        expect(covered.registerIptuUsed).toBe(0);
-        expect(covered.netIncomeToDate).toBe(3 * 3850 - 900);
+        expect(covered.registerIptuUsed).toBe(900);
+        expect(covered.netIncomeToDate).toBe(3 * 3850 - 900);   // the IPTU transaction is not counted twice
     });
 });
 
