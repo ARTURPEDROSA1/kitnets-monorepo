@@ -55,6 +55,8 @@ interface Props {
     incomeRows: PropertyIncomeRow[];
     /** Lets the dashboard feed the investment analysis with the loaded header + transactions. */
     onDataChange?: (data: { investment: PropertyInvestment | null; transactions: PropertyTransaction[]; loading: boolean }) => void;
+    /** IPTU paid by the landlord (Tributos do imóvel), all years — shown with the running costs. */
+    landlordIptu?: number;
     /** Loaded by the parent (overview): undefined = fetch here, null = parent still loading. */
     preloaded?: { investment: PropertyInvestment | null; transactions: PropertyTransaction[] } | null;
 }
@@ -83,7 +85,7 @@ const FIN_KINDS: TransactionKind[] = ["PRESTACAO", "AMORTIZACAO", "QUITACAO"];
 
 type TxDraft = Partial<Record<"date" | "kind" | "amount" | "interest" | "principal" | "insurance" | "comment", string>>;
 
-export default function PropertyInvestmentSection({ propertyId, incomeRows, onDataChange, preloaded }: Props) {
+export default function PropertyInvestmentSection({ propertyId, incomeRows, onDataChange, preloaded, landlordIptu = 0 }: Props) {
     const txEndpoint = propertyId ? `/api/properties/${propertyId}/transactions` : null;
     const invEndpoint = propertyId ? `/api/properties/${propertyId}/investment` : null;
 
@@ -495,8 +497,8 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                     hint={<>{summary.installments} prestações<br />Juros + seguros {summary.interestAndInsurance === null ? "—" : formatBRL(summary.interestAndInsurance)}</>} />
                 <Tile label="Reformas (capex)" value={formatBRL(summary.capex)} tone="violet" icon={<Hammer className="w-4 h-4" />}
                     hint={`${txs.filter(t => t.kind === "REFORMA").length} lançamentos`} />
-                <Tile label="Custos do imóvel" value={formatBRL(summary.runningCosts)} tone="rose" icon={<Receipt className="w-4 h-4" />}
-                    hint={<>Utilidades {formatBRL(summary.byKind.UTILIDADES)} · tarifas {formatBRL(summary.byKind.TARIFA)} · outros {formatBRL(summary.byKind.OUTROS)}<br />IPTU: veja Tributos do imóvel{summary.byKind.IPTU > 0 ? ` (${formatBRL(summary.byKind.IPTU)} em lançamentos antigos, não contados)` : ""}</>} />
+                <Tile label="Custos do imóvel" value={formatBRL(summary.runningCosts + landlordIptu)} tone="rose" icon={<Receipt className="w-4 h-4" />}
+                    hint={<>Utilidades {formatBRL(summary.byKind.UTILIDADES)} · tarifas {formatBRL(summary.byKind.TARIFA)} · outros {formatBRL(summary.byKind.OUTROS)}<br />IPTU pago por você {formatBRL(landlordIptu)} (Tributos do imóvel){summary.byKind.IPTU > 0 ? ` · ${formatBRL(summary.byKind.IPTU)} em lançamentos antigos, não contados` : ""}</>} />
                 <Tile label="Financiamento" value={financingLabel} tone="blue" icon={<Banknote className="w-4 h-4" />} hint={financingHint} />
                 <Tile label="Energia solar" value={formatBRL(solar.invested)} tone="amber" icon={<Sun className="w-4 h-4" />}
                     hint={
