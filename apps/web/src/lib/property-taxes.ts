@@ -350,16 +350,17 @@ export function iptuYearsFromTransactions(txs: PropertyTransaction[], paidBy: Ta
 }
 
 /**
- * IPTU paid by the landlord, by calendar month (`YYYY-MM`), from the register:
+ * Taxes paid by the landlord, by calendar month (`YYYY-MM`), from the register:
  * a parcela lands in the month of its `paid_on`; a single payment in the month
  * of the row's `paid_on`; rows without a date fall in January of their year.
- * This is the only IPTU source of the money model (dashboard, DRE, engine).
+ * This is the only tax source of the money model (dashboard, DRE, engine).
+ * `kinds` defaults to every kind (IPTU, ITBI, OUTRO).
  */
-export function landlordIptuByMonth(taxes: PropertyTax[]): Map<string, number> {
+export function landlordTaxesByMonth(taxes: PropertyTax[], kinds: TaxKind[] = ["IPTU", "ITBI", "OUTRO"]): Map<string, number> {
     const out = new Map<string, number>();
     const add = (m: string, amt: number) => { if (amt > 0) out.set(m, round2((out.get(m) ?? 0) + amt)); };
     for (const tax of taxes) {
-        if (tax.kind !== "IPTU") continue;
+        if (!kinds.includes(tax.kind)) continue;
         const year = String(tax.year);
         const parts = Array.isArray(tax.installments) ? tax.installments : [];
         if (parts.length === 0) {
@@ -374,7 +375,27 @@ export function landlordIptuByMonth(taxes: PropertyTax[]): Map<string, number> {
     return out;
 }
 
+/** IPTU only (kept for callers that split IPTU from the other taxes). */
+export function landlordIptuByMonth(taxes: PropertyTax[]): Map<string, number> {
+    return landlordTaxesByMonth(taxes, ["IPTU"]);
+}
+
+/** Landlord taxes (any kind) that fall in one month (`YYYY-MM`). */
+export function landlordTaxesForMonth(taxes: PropertyTax[], month: string): number {
+    return landlordTaxesByMonth(taxes).get(month) ?? 0;
+}
+
 /** Landlord IPTU that falls in one month (`YYYY-MM`). */
 export function landlordIptuForMonth(taxes: PropertyTax[], month: string): number {
     return landlordIptuByMonth(taxes).get(month) ?? 0;
+}
+
+/** Totals paid by the landlord per kind, all years. */
+export function landlordTaxTotals(taxes: PropertyTax[]): { iptu: number; itbi: number; other: number; total: number } {
+    let iptu = 0, itbi = 0, other = 0;
+    for (const t of taxes) {
+        const v = effectiveTax(t).byLandlord;
+        if (t.kind === "IPTU") iptu += v; else if (t.kind === "ITBI") itbi += v; else other += v;
+    }
+    return { iptu: round2(iptu), itbi: round2(itbi), other: round2(other), total: round2(iptu + itbi + other) };
 }

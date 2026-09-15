@@ -233,16 +233,17 @@ export function ColumnMenu<T>({ columns, ctl }: { columns: ColumnDef<T>[]; ctl: 
                             </span>
                         </div>
                         <div className="max-h-56 overflow-y-auto">
-                            {c.options.map(o => {
+                            {c.options.filter(o => (counts?.get(o.value) ?? 0) > 0).map(o => {
                                 const checked = !f.values || f.values.has(o.value);
                                 const count = counts?.get(o.value) ?? 0;
                                 return (
                                     <label key={o.value} className={cn("flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-muted cursor-pointer", count === 0 && "opacity-50")}>
                                         <input type="checkbox" className="accent-emerald-600" checked={checked}
                                             onChange={e => {
-                                                const next = new Set(f.values ?? c.options!.map(x => x.value));
+                                                const present = c.options!.map(x => x.value).filter(v => (counts?.get(v) ?? 0) > 0);
+                                                const next = new Set((f.values ? [...f.values] : present).filter(v => present.includes(v)));
                                                 if (e.target.checked) next.add(o.value); else next.delete(o.value);
-                                                if (next.size === c.options!.length) ctl.clearColumn(c.key); else ctl.setFilter(c.key, { values: next });
+                                                if (present.every(v => next.has(v))) ctl.clearColumn(c.key); else ctl.setFilter(c.key, { values: next });
                                             }} />
                                         <span className="flex-1">{o.label}</span>
                                         <span className="text-muted-foreground tabular-nums">{count}</span>

@@ -8,6 +8,8 @@ import {
     iptuYearsFromTransactions,
     landlordIptuByMonth,
     landlordIptuForMonth,
+    landlordTaxesByMonth,
+    landlordTaxTotals,
     normalizeInstallments,
     parseReferencia,
     splitInstallments,
@@ -172,6 +174,8 @@ describe("landlordIptuByMonth", () => {
         expect(m.get("2025-03")).toBeUndefined();
         expect(m.get("2026-01")).toBe(900);          // no date → January
         expect([...m.keys()].some(k => k.startsWith("2023"))).toBe(false);   // ITBI is not IPTU
+        expect(landlordTaxesByMonth(rows).get("2023-01")).toBe(5000);        // but it is a landlord tax
+        expect(landlordTaxTotals(rows)).toEqual({ iptu: 2750, itbi: 5000, other: 0, total: 7750 });
         expect(landlordIptuForMonth(rows, "2024-03")).toBe(1200);
         expect(landlordIptuForMonth(rows, "2024-04")).toBe(0);
     });
