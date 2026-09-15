@@ -314,6 +314,11 @@ export default function PropertyCostCenterDashboard({
             rentedUnitsCount,
             expenseBreakdown,
             dreData,
+            // only the components that actually cost something this month, e.g. "Taxa + custo de energia"
+            opexLabel: current
+                ? ([['Taxa', current.feeAmount], ['custo de energia', current.other], ['outros', current.otherExpenses], ['IPTU', iptuNow]] as Array<[string, number]>)
+                    .filter(([, v]) => v > 0).map(([n]) => n).join(' + ')
+                : '',
             energyIncome: current ? current.energy : null,
             energyCost: current ? current.other : null,
             energyNet: current ? Math.round((current.energy - current.other) * 100) / 100 : null,
@@ -473,7 +478,7 @@ export default function PropertyCostCenterDashboard({
                             {formatBRL(financials.totalExpenses)}
                         </span>
                         <span className="text-xs text-muted-foreground block leading-snug">
-                            {financials.realIncomeMonth && <>Taxa + custo de energia + outros + IPTU<br /></>}
+                            {financials.realIncomeMonth && financials.opexLabel && <>{financials.opexLabel}<br /></>}
                             {((financials.totalExpenses / (financials.grossMonthlyRevenue || 1)) * 100).toFixed(0)}% da receita bruta
                         </span>
                     </div>
@@ -536,7 +541,7 @@ export default function PropertyCostCenterDashboard({
                                 <>
                                     Energia recebida {formatBRL(financials.energyIncome ?? 0)}<br />
                                     Custo de energia {formatBRL(financials.energyCost ?? 0)}<br />
-                                    {details.solarEnergy ? (details.solarKwp ? `${details.solarKwp} kWp` : 'Solar GD ativa') : 'Sem geração local'}
+                                    <span className="text-sm font-bold text-foreground">{details.solarEnergy ? (details.solarKwp ? `${details.solarKwp} kWp` : 'Solar GD ativa') : 'Sem geração local'}</span>
                                 </>
                             ) : details.solarEnergy ? 'Compensação GD ativa' : 'Sem geração local'}
                         </span>
