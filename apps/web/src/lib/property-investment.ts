@@ -561,6 +561,12 @@ export function estimateFinancingSplits(
             updates.push({ id: t.id, occurred_on: t.occurred_on, kind: t.kind, amount: t.amount, interest_part: sp.interest_part, principal_part: sp.principal_part, insurance_part: sp.insurance_part, comment: t.comment, source: t.source });
         }
     }
+    // Tarifas are not part of the schedule: any juros/amortização/seguro left on them by older runs is cleared.
+    const staleFees = txs.filter(t => t.kind === "TARIFA" && (t.interest_part !== null || t.principal_part !== null || t.insurance_part !== null));
+    for (const t of staleFees) {
+        updates.push({ id: t.id, occurred_on: t.occurred_on, kind: t.kind, amount: t.amount, interest_part: null, principal_part: null, insurance_part: null, comment: t.comment, source: t.source });
+    }
+    if (staleFees.length > 0) notes.push(`${staleFees.length} tarifa(s) bancária(s) com juros/amortização/seguro preenchidos serão limpas (tarifas não fazem parte do cronograma).`);
     return { splits, updates, totals, endingBalance: balanceFinal, notes };
 }
 
