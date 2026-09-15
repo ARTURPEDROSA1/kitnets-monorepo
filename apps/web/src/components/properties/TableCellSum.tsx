@@ -9,7 +9,7 @@
  *
  * Plain clicks keep working (inputs, selects); only modifier clicks select.
  */
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Sigma, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -66,6 +66,13 @@ export function useCellSum(): CellSumController {
     const isSelected = useCallback((col: string, rowId: string) => selected.has(key(col, rowId)), [selected]);
     const total = useMemo(() => Math.round([...selected.values()].reduce((a, v) => a + v, 0) * 100) / 100, [selected]);
     const clear = useCallback(() => { setSelected(new Map()); last.current = null; }, []);
+    // Esc clears the selection (only while something is selected, so other Esc handlers are not affected)
+    useEffect(() => {
+        if (selected.size === 0) return;
+        const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") clear(); };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [selected.size, clear]);
     return { cellProps, isSelected, count: selected.size, total, clear };
 }
 
@@ -78,7 +85,7 @@ export function CellSumBar({ ctl }: { ctl: CellSumController }) {
             <span><span className="font-semibold text-foreground">{ctl.count}</span> {ctl.count === 1 ? "célula" : "células"}</span>
             <span>Soma <span className="font-bold text-foreground tabular-nums">{formatBRL(ctl.total)}</span></span>
             <span className="text-muted-foreground">Média {formatBRL(ctl.total / ctl.count)}</span>
-            <button type="button" onClick={ctl.clear} className="text-muted-foreground hover:text-foreground" title="Limpar seleção"><X className="w-3.5 h-3.5" /></button>
+            <button type="button" onClick={ctl.clear} className="text-muted-foreground hover:text-foreground" title="Limpar seleção (Esc)"><X className="w-3.5 h-3.5" /></button>
         </div>
     );
 }
