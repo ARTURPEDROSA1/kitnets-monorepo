@@ -813,12 +813,14 @@ export default function PropertyIncomeLedger({
                                         <td {...sel.cellProps("received", month, b.received, "px-2 py-1 text-right", () => cancelDraft(month, "received"))}>{cell("received", b.received)}</td>
                                         <td {...sel.cellProps("other", month, b.other, "px-2 py-1 text-right", () => cancelDraft(month, "other"))}>{cell("other", b.other)}</td>
                                         <td {...sel.cellProps("otherExp", month, b.otherExpenses, "px-2 py-1 text-right", () => cancelDraft(month, "otherExp"))}>{cell("otherExp", b.otherExpenses)}</td>
-                                        <td className="px-2 py-1 text-center">
-                                            <button
-                                                type="button"
-                                                disabled={busy}
-                                                onClick={() => toggleStatus(row)}
-                                                title={row.status === "CONFIRMED" ? "Confirmado — clique para marcar como previsto" : "Previsto — clique para confirmar"}
+                                        <td {...sel.cellProps("status", month, null, "px-2 py-1 text-center")}>
+                                            <span
+                                                role="button"
+                                                tabIndex={0}
+                                                aria-disabled={busy}
+                                                onDoubleClick={() => { if (!busy) toggleStatus(row); }}
+                                                onKeyDown={e => { if (e.key === "Enter" && !busy) toggleStatus(row); }}
+                                                title={row.status === "CONFIRMED" ? "Confirmado — duplo clique para marcar como previsto" : "Previsto — duplo clique para confirmar"}
                                                 className={cn(
                                                     "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold",
                                                     row.status === "CONFIRMED"
@@ -828,7 +830,7 @@ export default function PropertyIncomeLedger({
                                             >
                                                 {row.status === "CONFIRMED" ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
                                                 {row.status === "CONFIRMED" ? "Confirmado" : "Previsto"}
-                                            </button>
+                                            </span>
                                             {row.source !== "MANUAL" && (
                                                 <span className="block text-[9px] text-muted-foreground mt-0.5">
                                                     {row.source === "BANK" ? "banco" : "planilha"}
