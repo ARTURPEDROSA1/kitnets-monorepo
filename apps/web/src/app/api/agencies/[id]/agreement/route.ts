@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/api-route";
-import { AGENCY_EDIT_ROLES, requireAgencyRole, writeAgency } from "@/lib/agencies-server";
+import { AGENCY_EDIT_ROLES, currentAgreementPath, removeAgreementFile, requireAgencyRole, writeAgency } from "@/lib/agencies-server";
 import { AGREEMENT_BUCKET } from "@/lib/agency-agreement";
 import { signStorageUrl } from "@/lib/storage";
 
@@ -63,8 +63,17 @@ export const POST = withAuth<undefined, Params>({ tag: "Agreement Upload" }, asy
     if (typeof startDate === "string" && startDate) patch.agreement_start_date = startDate;
     if (typeof endDate === "string" && endDate) patch.agreement_end_date = endDate;
 
+    const previous = await currentAgreementPath(supabase, params.id);
+
     const { error: dbError } = await writeAgency(supabase, patch, params.id);
-    if (dbError) console.error("[Agreement Upload] DB update error:", dbError);
+    if (dbError) {
+        console.error("[Agreement Upload] DB update error:", dbError);
+        await removeAgreementFile(supabase, path); // don't leave an unreferenced upload behind
+        return NextResponse.json({ error: "Erro ao salvar o contrato." }, { status: 500 });
+    }
+
+    // The bucket keeps only the current agreement.
+    if (previous && previous !== path) await removeAgreementFile(supabase, previous);
 
     const signedUrl = (await signStorageUrl(supabase, AGREEMENT_BUCKET, path)) ?? path;
     return NextResponse.json({ success: true, agreement_url: signedUrl, filename: file.name });
@@ -72,13 +81,19 @@ export const POST = withAuth<undefined, Params>({ tag: "Agreement Upload" }, asy
 
 /**
  * DELETE /api/agencies/[id]/agreement
- * Clears the agreement reference (the file itself is kept in the private bucket).
+ * Removes the agreement file from the bucket and clears the reference.
  */
 export const DELETE = withAuth<undefined, Params>({ tag: "Agreement Delete" }, async ({ params, profileId, supabase }) => {
     await requireAgencyRole(supabase, params.id, profileId, AGENCY_EDIT_ROLES, EDIT_DENIED);
 
-    const { error } = await writeAgency(supabase, { service_agreement_url: null, service_agreement_filename: null }, params.id);
-    if (error) console.error("[Agreement Delete] DB update error:", error);
+    const previous = await currentAgreementPath(supabase, params.id);
 
+    const { error } = await writeAgency(supabase, { service_agreement_url: null, service_agreement_filename: null }, params.id);
+    if (error) {
+        console.error("[Agreement Delete] DB update error:", error);
+        return NextResponse.json({ error: "Erro ao remover o contrato." }, { status: 500 });
+    }
+
+    await removeAgreementFile(supabase, previous);
     return NextResponse.json({ success: true });
 });
