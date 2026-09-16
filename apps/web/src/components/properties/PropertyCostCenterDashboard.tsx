@@ -587,12 +587,12 @@ export default function PropertyCostCenterDashboard({
                         </div>
                         <div className="flex flex-col items-end gap-1.5">
                             <div className="flex flex-wrap items-center justify-end gap-2">
+                                <PeriodFilter value={period} onChange={setPeriod} variant="compact" />
                                 {financials.realIncomeMonth && (
                                     <select value={dreGroup} onChange={e => setDreGroup(e.target.value as DreGroup)} title="Agrupar o DRE" className="h-8 rounded-md border border-input bg-background px-2 text-xs">
                                         {DRE_GROUPS.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
                                     </select>
                                 )}
-                                <PeriodFilter value={period} onChange={setPeriod} className="justify-end" />
                             </div>
                             {period.kind === 'ytd' && financials.realIncomeMonth && (
                                 <label className="inline-flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">

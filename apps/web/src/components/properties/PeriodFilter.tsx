@@ -8,10 +8,12 @@ interface PeriodFilterProps {
     value: PeriodFilterValue;
     onChange: (next: PeriodFilterValue) => void;
     className?: string;
+    /** "compact": a dropdown (YTD…Tudo) + a Personalizado button; the month pickers wrap onto the next line of the parent flex */
+    variant?: "segmented" | "compact";
 }
 
 /** Segmented period selector (YTD · 1–5 anos · Tudo · Personalizado) with month pickers for custom. */
-export default function PeriodFilter({ value, onChange, className }: PeriodFilterProps) {
+export default function PeriodFilter({ value, onChange, className, variant = "segmented" }: PeriodFilterProps) {
     const pick = (kind: PeriodKind) => {
         if (kind === "custom") {
             const now = new Date();
@@ -22,6 +24,56 @@ export default function PeriodFilter({ value, onChange, className }: PeriodFilte
             onChange({ kind });
         }
     };
+
+    const customInputs = value.kind === "custom" && (
+        <div className={cn("inline-flex items-center gap-1.5 text-[11px] text-muted-foreground", variant === "compact" && "basis-full justify-end")}>
+            <input
+                type="month"
+                value={value.start ?? ""}
+                max={value.end}
+                onChange={e => onChange({ ...value, start: e.target.value || undefined })}
+                className="h-7 rounded-md border border-input bg-background px-2 text-[11px] text-foreground"
+                aria-label="Mês inicial"
+            />
+            <span>até</span>
+            <input
+                type="month"
+                value={value.end ?? ""}
+                min={value.start}
+                onChange={e => onChange({ ...value, end: e.target.value || undefined })}
+                className="h-7 rounded-md border border-input bg-background px-2 text-[11px] text-foreground"
+                aria-label="Mês final"
+            />
+        </div>
+    );
+
+    if (variant === "compact") {
+        // display: contents — the select, the button and the pickers lay out inside the parent's flex row
+        return (
+            <div className={cn("contents", className)}>
+                <select
+                    value={value.kind === "custom" ? "" : value.kind}
+                    onChange={e => { if (e.target.value) pick(e.target.value as PeriodKind); }}
+                    title="Período"
+                    aria-label="Período"
+                    className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                >
+                    {value.kind === "custom" && <option value="">Personalizado</option>}
+                    {PERIOD_OPTIONS.filter(o => o.kind !== "custom").map(o => <option key={o.kind} value={o.kind} title={o.title}>{o.label}</option>)}
+                </select>
+                <button
+                    type="button"
+                    onClick={() => pick("custom")}
+                    title="Escolha o mês inicial e final"
+                    className={cn("h-8 rounded-md border px-2.5 text-xs font-semibold transition-colors",
+                        value.kind === "custom" ? "border-emerald-500 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300" : "border-input bg-background text-muted-foreground hover:text-foreground")}
+                >
+                    Personalizado
+                </button>
+                {customInputs}
+            </div>
+        );
+    }
 
     return (
         <div className={cn("flex flex-wrap items-center gap-2", className)}>
@@ -43,27 +95,7 @@ export default function PeriodFilter({ value, onChange, className }: PeriodFilte
                     </button>
                 ))}
             </div>
-            {value.kind === "custom" && (
-                <div className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                    <input
-                        type="month"
-                        value={value.start ?? ""}
-                        max={value.end}
-                        onChange={e => onChange({ ...value, start: e.target.value || undefined })}
-                        className="h-7 rounded-md border border-input bg-background px-2 text-[11px] text-foreground"
-                        aria-label="Mês inicial"
-                    />
-                    <span>até</span>
-                    <input
-                        type="month"
-                        value={value.end ?? ""}
-                        min={value.start}
-                        onChange={e => onChange({ ...value, end: e.target.value || undefined })}
-                        className="h-7 rounded-md border border-input bg-background px-2 text-[11px] text-foreground"
-                        aria-label="Mês final"
-                    />
-                </div>
-            )}
+            {customInputs}
         </div>
     );
 }
