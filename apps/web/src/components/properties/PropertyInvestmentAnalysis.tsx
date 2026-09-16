@@ -259,7 +259,10 @@ export default function PropertyInvestmentAnalysis({ propertyId, bedrooms, inves
                                 {metrics.registerIptuUsed > 0 && <><br />Tributos pagos por você: {formatBRL(metrics.registerIptuUsed)}</>}
                             </>} />
                         <Tile label="Renda líquida acumulada" value={formatBRL(metrics.netIncomeToDate)} tone="blue" icon={<Wallet className="w-4 h-4" />}
-                            hint={`${monthsLabel(metrics.incomeMonths)} com receita · últimos 12 meses ${formatBRL(metrics.noi12m)}`} />
+                            hint={<>
+                                Aluguel líquido + energia líquida − outras despesas
+                                <br />{monthsLabel(metrics.incomeMonths)} com receita · últimos 12 meses {formatBRL(metrics.noi12m)}
+                            </>} />
                         <Tile label="Payback até hoje" value={pctLabel(metrics.paybackPct)} tone={paidBack ? "emerald" : "amber"} icon={<Gauge className="w-4 h-4" />}
                             hint={<>
                                 {paybackHint}
