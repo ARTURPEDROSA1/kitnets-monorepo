@@ -13,7 +13,7 @@
  *   • Shift+click      extends a rectangle from the anchor cell
  *   • Ctrl/Cmd+click   toggles one cell in and out of the selection
  *   • double-click     starts inline editing (focuses the input / opens the select)
- *   • Esc              clears the selection
+ *   • Esc              while editing: cancels the edit (draft discarded, nothing saved); otherwise clears the selection
  * A floating bar shows count, sum and average of the selected numeric cells.
  */
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -21,10 +21,11 @@ import { Sigma, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface CellSumController {
-    cellProps: (col: string, rowId: string, value: number | null | undefined, className?: string) => {
+    cellProps: (col: string, rowId: string, value: number | null | undefined, className?: string, onCancel?: () => void) => {
         onMouseDown: (e: React.MouseEvent) => void;
         onMouseEnter: (e: React.MouseEvent) => void;
         onDoubleClick: (e: React.MouseEvent) => void;
+        onKeyDown: (e: React.KeyboardEvent) => void;
         className: string;
         title?: string;
     };
@@ -62,7 +63,7 @@ export function useCellSum(): CellSumController {
         setSelected(next);
     }, []);
 
-    const cellProps = useCallback((col: string, rowId: string, value: number | null | undefined, className?: string) => {
+    const cellProps = useCallback((col: string, rowId: string, value: number | null | undefined, className?: string, onCancel?: () => void) => {
         // rebuild the grid on every render pass (cells register in DOM order)
         if (!inPass.current) { inPass.current = true; grid.current = { cols: [], rows: [], cells: new Map() }; queueMicrotask(() => { inPass.current = false; }); }
         const g = grid.current;
@@ -96,6 +97,16 @@ export function useCellSum(): CellSumController {
             },
             onMouseEnter: (e: React.MouseEvent) => {
                 if (dragging.current && (e.buttons & 1) && anchor.current) selectRect(anchor.current, me);
+            },
+            onKeyDown: (e: React.KeyboardEvent) => {
+                if (e.key !== "Escape") return;
+                const control = (e.target as HTMLElement).closest("input, select, textarea") as HTMLElement | null;
+                if (!control) return;
+                // cancel the edit: drop the draft first, blur on the next frame so the blur handler sees no draft and saves nothing
+                e.preventDefault();
+                e.stopPropagation();
+                onCancel?.();
+                requestAnimationFrame(() => control.blur());
             },
             onDoubleClick: (e: React.MouseEvent) => {
                 const el = (e.currentTarget as HTMLElement).querySelector("input, select, textarea") as HTMLElement | null;
