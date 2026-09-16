@@ -320,7 +320,7 @@ export default function PropertyCostCenterDashboard({
             for (const d of dreData) {
                 const [y, mm] = d.key!.split('-').map(Number);
                 const q = Math.ceil(mm / 3);
-                if (dreGroup.startsWith('q') && q !== Number(dreGroup[1])) continue;
+                if (/^q[1-4]$/.test(dreGroup) && q !== Number(dreGroup[1])) continue;   // a specific quarter only
                 const gk = dreGroup === 'year' ? `${y}` : `${y}-T${q}`;
                 const label = dreGroup === 'year' ? `${y}` : `${q}T/${y}`;
                 const cur = out.get(gk) ?? { month: label, key: gk, receita: 0, despesas: 0, noi: 0, previsto: false };
