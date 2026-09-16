@@ -47,7 +47,7 @@ output type. Rules:
 |---|---|---|
 | tenants | 3 files, 5 handlers | migrated (reference implementation) |
 | agents | 3 files, 6 handlers (incl. multipart photo upload) | migrated |
-| agencies | 4 files, 8 handlers (role-based: OWNER/ADMIN edit, OWNER delete; logo + agreement uploads) | migrated. `writeAgency` keeps the description-metadata fallback because the `agencies` table has no service-agreement columns yet |
+| agencies | 4 files, 8 handlers (role-based: OWNER/ADMIN edit, OWNER delete; logo + agreement uploads) | migrated. Migration `20260916120000_agency_agreement_columns` added the real agreement columns and unpacked the old description metadata; `writeAgency` still carries the fallback and can lose it once that migration is confirmed in production |
 | properties/*, portfolio, bank, water-bills/orphaned, gateways/claim | 27 handlers | already on `requireProfile`; wrapping them is mechanical |
 | leases, energy-bills/* | 8 files | still `currentUser()` + inline profile lookup + hand-written validation; next candidates |
 | cron/*, gateways/ingest, public calculators, AI endpoints | — | different auth (cron secret, ingest key, per-user limit via `requireUserWithLimit`); not for `withAuth` |

@@ -1,6 +1,7 @@
 import type { AdminSupabase } from "@/lib/api-auth";
 import { conflict, forbidden } from "@/lib/api-route";
 import { packAgencyMetadata, unpackAgencyMetadata, type AgencyMetadata } from "@/lib/agency-metadata";
+import { AGREEMENT_BUCKET, normalizeAgreementUrl } from "@/lib/agency-agreement";
 
 /**
  * Shared server-side pieces for the agencies (imobiliárias) routes.
@@ -114,6 +115,25 @@ export async function writeAgency(
 
     const retry = await run({ ...core, description: packAgencyMetadata(baseDescription, merged) });
     return { agency: (retry.data as Record<string, unknown> | null) ?? null, error: retry.error };
+}
+
+/**
+ * Storage path of the agency's current agreement, whether it sits in the
+ * native column or (rows written before migration 20260916120000) in the
+ * description metadata block.
+ */
+export async function currentAgreementPath(supabase: AdminSupabase, agencyId: string): Promise<string | null> {
+    const { data } = await supabase.from("agencies").select("*").eq("id", agencyId).maybeSingle();
+    if (!data) return null;
+    const merged = unpackAgencyMetadata(data as Record<string, unknown>) as { service_agreement_url?: unknown };
+    return normalizeAgreementUrl(merged.service_agreement_url);
+}
+
+/** Deletes an agreement file from the private documents bucket (only paths under agencies/). */
+export async function removeAgreementFile(supabase: AdminSupabase, path: string | null | undefined): Promise<void> {
+    if (!path || !path.startsWith("agencies/")) return;
+    const { error } = await supabase.storage.from(AGREEMENT_BUCKET).remove([path]);
+    if (error) console.warn("[agencies] could not remove previous agreement file:", path, error.message);
 }
 
 const LOGO_PUBLIC_SEGMENT = `/storage/v1/object/public/${AGENCY_LOGO_BUCKET}/`;
