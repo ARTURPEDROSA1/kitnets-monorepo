@@ -522,7 +522,6 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
                             })}
                         </tbody>
                     </table>
-                    <ColumnMenu columns={TAX_COLUMNS} ctl={cf} />
                     <CellSumBar ctl={sel} />
                     <p className="text-[11px] text-muted-foreground mt-2 mx-2">
                         Escolha “2x…{MAX_INSTALLMENTS}x” para dividir um ano em parcelas e mudar o pagador de cada uma (por exemplo, o proprietário paga as parcelas de um período vago).
@@ -648,6 +647,7 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
                 </DialogContent>
             </Dialog>
 
+            <ColumnMenu columns={TAX_COLUMNS} ctl={cf} />
             <IptuHistoryModal isOpen={historyOpen} onClose={() => setHistoryOpen(false)} rows={rows} />
             <PdfViewerModal isOpen={viewer !== null} onClose={() => setViewer(null)} url={viewer?.url ?? null} title={viewer?.title ?? "Guia do IPTU"} fileName={`${(viewer?.title ?? "iptu").toLowerCase().replace(/\s+/g, "-")}.pdf`} />
         </div>

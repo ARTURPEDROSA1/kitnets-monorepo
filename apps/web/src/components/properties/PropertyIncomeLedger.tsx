@@ -816,7 +816,6 @@ export default function PropertyIncomeLedger({
                             {showAll ? `Mostrar apenas os primeiros ${COLLAPSED_ROWS} meses` : `Mostrar todos os ${cf.rows.length} meses${cf.anyFilter ? " filtrados" : " do período"}`}
                         </button>
                     )}
-                    <ColumnMenu columns={columns} ctl={cf} />
                     <CellSumBar ctl={sel} />
                 </div>
             )}
@@ -825,6 +824,9 @@ export default function PropertyIncomeLedger({
                 Edite qualquer célula e pressione Enter ou saia do campo para salvar. Alterar o aluguel bruto recalcula o valor recebido;
                 alterar a taxa mantém o valor recebido e recalcula o bruto. Integração bancária (Banco Inter) preencherá o valor recebido automaticamente.
             </p>
+
+            {/* Column sort/filter popup: at the root so an empty filter result never unmounts it */}
+            <ColumnMenu columns={columns} ctl={cf} />
 
             {/* Add month dialog */}
             <Dialog open={addOpen} onOpenChange={setAddOpen}>
