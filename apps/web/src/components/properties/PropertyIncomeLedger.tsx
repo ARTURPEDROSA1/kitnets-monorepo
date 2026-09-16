@@ -545,7 +545,7 @@ export default function PropertyIncomeLedger({
     return (
         <div className="bg-card border border-border rounded-2xl p-6 shadow-xs space-y-5">
             {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+            <div className="space-y-3">
                 <div className="space-y-0.5">
                     <h3 className="font-bold text-base text-foreground flex items-center gap-2">
                         <Wallet className="w-4 h-4 text-emerald-600" />
@@ -556,7 +556,7 @@ export default function PropertyIncomeLedger({
                         Aluguel líquido (após a taxa) = recebido − energia; aluguel bruto = líquido ÷ (1 − taxa); receita = bruto + energia; OPEX = taxa + custo de energia + outras despesas (o IPTU pago por você entra pelo registro Tributos do imóvel, no mês do pagamento); NOI = recebido − custos.
                     </p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex flex-wrap items-center gap-2">
                     <Button
                         size="sm"
                         variant="outline"
