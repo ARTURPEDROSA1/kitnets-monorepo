@@ -134,7 +134,7 @@ export default function PropertyCostCenterDashboard({
     // Period shared by the DRE chart and the income ledger (chart + table)
     const [period, setPeriod] = useState<PeriodFilterValue>({ kind: 'ytd' });   // DRE chart opens on the current year
     // YTD only: repeat the latest confirmed month until December so the chart shows the whole year
-    const [forecastYear, setForecastYear] = useState(false);
+    const [forecastYear, setForecastYear] = useState(true);
     // DRE grouping: monthly bars, quarters, years, or one specific quarter of each year
     const [dreGroup, setDreGroup] = useState<ChartGroup>('month');
 

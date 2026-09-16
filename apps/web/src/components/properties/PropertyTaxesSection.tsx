@@ -110,7 +110,7 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
     const [partDrafts, setPartDrafts] = useState<Record<string, PartDraft>>({});
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
     const [historyOpen, setHistoryOpen] = useState(false);
-    const [period, setPeriod] = useState<PeriodFilterValue>({ kind: "all" });   // by payment month (or the exercício when undated)
+    const [period, setPeriod] = useState<PeriodFilterValue>({ kind: "ytd" });   // current year; by payment month (or the exercício when undated)
     const [viewer, setViewer] = useState<{ url: string; title: string } | null>(null);
 
     const flash = (msg: string) => { setNotice(msg); window.setTimeout(() => setNotice(null), 8000); };
