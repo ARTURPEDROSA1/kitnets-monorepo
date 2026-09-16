@@ -19,7 +19,7 @@ export interface PeriodRange {
 }
 
 export const PERIOD_OPTIONS: Array<{ kind: PeriodKind; label: string; title: string }> = [
-    { kind: "ytd", label: "YTD", title: "Do início do ano até o mês atual" },
+    { kind: "ytd", label: "Este ano", title: "Acumulado no ano: de janeiro até o mês atual" },
     { kind: "1y", label: "1 ano", title: "Últimos 12 meses" },
     { kind: "2y", label: "2 anos", title: "Últimos 24 meses" },
     { kind: "3y", label: "3 anos", title: "Últimos 36 meses" },
