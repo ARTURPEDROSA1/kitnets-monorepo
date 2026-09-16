@@ -91,7 +91,20 @@ const parseInput = (s: string): number | null => {
     return n !== null && n >= 0 ? Math.round(n * 100) / 100 : null;
 };
 
-type DraftField = "received" | "energy" | "other" | "otherExp" | "pct" | "gross" | "notes";
+type DraftField = "received" | "energy" | "other" | "otherExp" | "pct" | "gross" | "notes" | "month";
+
+const MONTH_SHORT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+/** "2026-08", "08/2026" or "ago/2026" → "2026-08" (null when not a month) */
+function parseMonthText(text: string): string | null {
+    const t = text.trim().toLowerCase();
+    let m = t.match(/^(\d{4})-(\d{1,2})$/);
+    if (m) { const mm = Number(m[2]); return mm >= 1 && mm <= 12 ? `${m[1]}-${String(mm).padStart(2, "0")}` : null; }
+    m = t.match(/^(\d{1,2})\/(\d{4})$/);
+    if (m) { const mm = Number(m[1]); return mm >= 1 && mm <= 12 ? `${m[2]}-${String(mm).padStart(2, "0")}` : null; }
+    m = t.match(/^([a-z]{3})\/(\d{4})$/);
+    if (m) { const idx = MONTH_SHORT.indexOf(m[1]); return idx >= 0 ? `${m[2]}-${String(idx + 1).padStart(2, "0")}` : null; }
+    return null;
+}
 type Drafts = Record<string, Partial<Record<DraftField, string>>>;
 
 const FIELD_OPTIONS: IncomeField[] = ["gross", "fee_pct", "received", "energy", "other", "other_expenses", "notes", "ignore"];
@@ -222,6 +235,39 @@ export default function PropertyIncomeLedger({
                     next.delete(month);
                     return next;
                 });
+            }
+        },
+        [endpoint, rows, applyRows]
+    );
+
+    /** Moves a row to another month: writes it under the new key, then removes the old one. */
+    const moveMonth = useCallback(
+        async (row: PropertyIncomeRow, target: string) => {
+            if (!endpoint) return;
+            const from = monthKey(row.month);
+            if (target === from) return;
+            if (rows.some(r => monthKey(r.month) === target)) { setError(`Já existe um lançamento em ${formatMonthKey(target)}.`); return; }
+            setSaving(prev => new Set([...prev, from]));
+            setError(null);
+            try {
+                const put = await fetch(endpoint, {
+                    method: "PUT", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ rows: [{
+                        month: target, received_amount: row.received_amount, energy_portion: row.energy_portion, other_income: row.other_income,
+                        other_expenses: row.other_expenses, agency_fee_pct: row.agency_fee_pct, status: row.status, source: row.source,
+                        received_on: row.received_on, notes: row.notes, bank_reference: row.bank_reference,
+                    }] }),
+                });
+                const data = await put.json().catch(() => ({}));
+                if (!put.ok) throw new Error(data.error || "Erro ao mover o mês");
+                const del = await fetch(`${endpoint}?month=${from}`, { method: "DELETE" });
+                if (!del.ok) throw new Error((await del.json().catch(() => ({}))).error || "Erro ao remover o mês antigo");
+                applyRows(((data.rows ?? []) as PropertyIncomeRow[]).filter(r => monthKey(r.month) !== from));
+                setDrafts(prev => { const n = { ...prev }; delete n[from]; return n; });
+            } catch (err) {
+                setError((err as Error).message);
+            } finally {
+                setSaving(prev => { const n = new Set(prev); n.delete(from); return n; });
             }
         },
         [endpoint, rows, applyRows]
@@ -743,8 +789,21 @@ export default function PropertyIncomeLedger({
                                 );
                                 return (
                                     <tr key={row.id} className={cn("border-b border-border/60 hover:bg-muted/30", row.status === "EXPECTED" && "opacity-70")}>
-                                        <td className="px-2 py-1 font-semibold text-foreground whitespace-nowrap">
-                                            {formatMonthKey(month)}
+                                        <td {...sel.cellProps("month", month, null, "px-2 py-1 font-semibold text-foreground whitespace-nowrap", () => cancelDraft(month, "month"))}>
+                                            <MonthCell
+                                                month={month}
+                                                draft={d.month}
+                                                disabled={busy}
+                                                onDraft={text => setDraft(month, "month", text)}
+                                                onCommit={() => {
+                                                    const raw = drafts[month]?.month;
+                                                    if (raw === undefined) return;
+                                                    const target = parseMonthText(raw);
+                                                    cancelDraft(month, "month");
+                                                    if (!target) { setError("Mês inválido: use AAAA-MM ou MM/AAAA."); return; }
+                                                    void moveMonth(row, target);
+                                                }}
+                                            />
                                             {busy && <Loader2 className="inline w-3 h-3 ml-1 animate-spin text-muted-foreground" />}
                                         </td>
                                         <td {...sel.cellProps("gross", month, b.grossRent, "px-2 py-1 text-right", () => cancelDraft(month, "gross"))}>{cell("gross", b.grossRent)}</td>
@@ -1128,5 +1187,25 @@ function SummaryTile({
             <span className="text-lg font-bold text-foreground block tabular-nums">{value}</span>
             <span className="text-[11px] text-muted-foreground block leading-snug break-words">{hint}</span>
         </div>
+    );
+}
+
+/** Month cell: "ago/2026" at rest, "2026-08" while editing (double-click); Enter/blur commits, Esc cancels. */
+function MonthCell({ month, draft, disabled, onDraft, onCommit }: { month: string; draft?: string; disabled?: boolean; onDraft: (text: string) => void; onCommit: () => void }) {
+    const [editing, setEditing] = useState(false);
+    const text = editing ? (draft ?? month) : draft !== undefined ? draft : formatMonthKey(month);
+    return (
+        <input
+            type="text"
+            inputMode="numeric"
+            disabled={disabled}
+            value={text}
+            title="AAAA-MM ou MM/AAAA"
+            onFocus={e => { setEditing(true); requestAnimationFrame(() => e.target.select()); }}
+            onChange={e => onDraft(e.target.value)}
+            onBlur={() => { setEditing(false); onCommit(); }}
+            onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+            className="w-full min-w-[5rem] bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-none px-1.5 py-1 outline-none font-semibold text-foreground"
+        />
     );
 }
