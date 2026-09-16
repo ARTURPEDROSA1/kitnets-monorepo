@@ -8,11 +8,11 @@ interface PeriodFilterProps {
     value: PeriodFilterValue;
     onChange: (next: PeriodFilterValue) => void;
     className?: string;
-    /** "compact": a dropdown (YTD…Tudo) + a Personalizado button; the month pickers wrap onto the next line of the parent flex */
+    /** "compact": one dropdown (Este ano … Tudo, Personalizado); the month pickers follow it inside the parent flex row */
     variant?: "segmented" | "compact";
 }
 
-/** Segmented period selector (YTD · 1–5 anos · Tudo · Personalizado) with month pickers for custom. */
+/** Period selector (Este ano · 1–5 anos · Tudo · Personalizado) with month pickers for custom. */
 export default function PeriodFilter({ value, onChange, className, variant = "segmented" }: PeriodFilterProps) {
     const pick = (kind: PeriodKind) => {
         if (kind === "custom") {
@@ -48,28 +48,18 @@ export default function PeriodFilter({ value, onChange, className, variant = "se
     );
 
     if (variant === "compact") {
-        // display: contents — the select, the button and the pickers lay out inside the parent's flex row
+        // display: contents — the select and the pickers lay out inside the parent's flex row
         return (
             <div className={cn("contents", className)}>
                 <select
-                    value={value.kind === "custom" ? "" : value.kind}
-                    onChange={e => { if (e.target.value) pick(e.target.value as PeriodKind); }}
+                    value={value.kind}
+                    onChange={e => pick(e.target.value as PeriodKind)}
                     title="Período"
                     aria-label="Período"
                     className="h-8 rounded-md border border-input bg-background px-2 text-xs"
                 >
-                    {value.kind === "custom" && <option value="">Personalizado</option>}
-                    {PERIOD_OPTIONS.filter(o => o.kind !== "custom").map(o => <option key={o.kind} value={o.kind} title={o.title}>{o.label}</option>)}
+                    {PERIOD_OPTIONS.map(o => <option key={o.kind} value={o.kind} title={o.title}>{o.label}</option>)}
                 </select>
-                <button
-                    type="button"
-                    onClick={() => pick("custom")}
-                    title="Escolha o mês inicial e final"
-                    className={cn("h-8 rounded-md border px-2.5 text-xs font-semibold transition-colors",
-                        value.kind === "custom" ? "border-emerald-500 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300" : "border-input bg-background text-muted-foreground hover:text-foreground")}
-                >
-                    Personalizado
-                </button>
                 {customInputs}
             </div>
         );
