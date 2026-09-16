@@ -135,6 +135,13 @@ export default function PropertyCostCenterDashboard({
     const [period, setPeriod] = useState<PeriodFilterValue>({ kind: 'ytd' });   // DRE chart opens on the current year
     // YTD only: repeat the latest confirmed month until December so the chart shows the whole year
     const [forecastYear, setForecastYear] = useState(false);
+    // DRE grouping: monthly bars, quarters, years, or one specific quarter of each year
+    type DreGroup = 'month' | 'quarter' | 'year' | 'q1' | 'q2' | 'q3' | 'q4';
+    const [dreGroup, setDreGroup] = useState<DreGroup>('month');
+    const DRE_GROUPS: Array<{ value: DreGroup; label: string }> = [
+        { value: 'month', label: 'Mensal' }, { value: 'quarter', label: 'Trimestral' }, { value: 'year', label: 'Anual' },
+        { value: 'q1', label: '1º trimestre' }, { value: 'q2', label: '2º trimestre' }, { value: 'q3', label: '3º trimestre' }, { value: 'q4', label: '4º trimestre' },
+    ];
 
 
     const totalUnits = propertyType === 'multi'
@@ -262,7 +269,7 @@ export default function PropertyCostCenterDashboard({
             ].filter(item => item.value > 0);
 
         // DRE data: every ledger month in the period (expected months drawn lighter), else a 6-month projection
-        const dreData: { month: string; receita: number; despesas: number; noi: number; previsto: boolean }[] = [];
+        const dreData: { month: string; key?: string; receita: number; despesas: number; noi: number; previsto: boolean }[] = [];
 
         if (periodRows.length > 0) {
             periodRows.forEach((r) => {
@@ -270,6 +277,7 @@ export default function PropertyCostCenterDashboard({
                 const iptu = iptuByMonth.get(monthKey(r.month)) ?? 0;
                 dreData.push({
                     month: formatMonthKey(monthKey(r.month)),
+                    key: monthKey(r.month),
                     receita: Math.round(b.revenue),
                     despesas: Math.round(b.opex + iptu),
                     noi: Math.round(b.noi - iptu),
@@ -283,7 +291,7 @@ export default function PropertyCostCenterDashboard({
                 while (m.slice(0, 4) === year && m < `${year}-12`) {
                     const [y, mm] = m.split('-').map(Number);
                     m = `${y}-${String(mm + 1).padStart(2, '0')}`;
-                    dreData.push({ month: formatMonthKey(m), receita: Math.round(current.revenue), despesas: Math.round(current.opex), noi: Math.round(current.noi), previsto: true });
+                    dreData.push({ month: formatMonthKey(m), key: m, receita: Math.round(current.revenue), despesas: Math.round(current.opex), noi: Math.round(current.noi), previsto: true });
                 }
             }
         } else {
@@ -305,6 +313,23 @@ export default function PropertyCostCenterDashboard({
             }
         }
 
+        // Group the monthly DRE by quarter / year / a specific quarter (real data only: the estimate has no month keys)
+        const groupedDre = (() => {
+            if (dreGroup === 'month' || !dreData.every(d => d.key)) return dreData;
+            const out = new Map<string, typeof dreData[number]>();
+            for (const d of dreData) {
+                const [y, mm] = d.key!.split('-').map(Number);
+                const q = Math.ceil(mm / 3);
+                if (dreGroup.startsWith('q') && q !== Number(dreGroup[1])) continue;
+                const gk = dreGroup === 'year' ? `${y}` : `${y}-T${q}`;
+                const label = dreGroup === 'year' ? `${y}` : `${q}T/${y}`;
+                const cur = out.get(gk) ?? { month: label, key: gk, receita: 0, despesas: 0, noi: 0, previsto: false };
+                cur.receita += d.receita; cur.despesas += d.despesas; cur.noi += d.noi; cur.previsto = cur.previsto || d.previsto;
+                out.set(gk, cur);
+            }
+            return [...out.values()];
+        })();
+
         return {
             realIncomeMonth: latest && hasRealIncome ? formatMonthKey(monthKey(latest.month)) : null,
             occupancyHint,
@@ -318,7 +343,7 @@ export default function PropertyCostCenterDashboard({
             occupancyRate,
             rentedUnitsCount,
             expenseBreakdown,
-            dreData,
+            dreData: groupedDre,
             // only the components that actually cost something this month, e.g. "Taxa + custo de energia"
             opexLabel: current
                 ? ([['Taxa', current.feeAmount], ['custo de energia', current.other], ['outros', current.otherExpenses], ['tributos', iptuNow]] as Array<[string, number]>)
@@ -328,7 +353,7 @@ export default function PropertyCostCenterDashboard({
             energyCost: current ? current.other : null,
             energyNet: current ? Math.round((current.energy - current.other) * 100) / 100 : null,
         };
-    }, [propertyType, details, subUnits, totalUnits, incomeRows, taxRows, period, forecastYear]);
+    }, [propertyType, details, subUnits, totalUnits, incomeRows, taxRows, period, forecastYear, dreGroup]);
 
 
     const propertyTitle = details.propertyName?.trim()
@@ -561,7 +586,14 @@ export default function PropertyCostCenterDashboard({
                             </p>
                         </div>
                         <div className="flex flex-col items-end gap-1.5">
-                            <PeriodFilter value={period} onChange={setPeriod} className="justify-end" />
+                            <div className="flex flex-wrap items-center justify-end gap-2">
+                                {financials.realIncomeMonth && (
+                                    <select value={dreGroup} onChange={e => setDreGroup(e.target.value as DreGroup)} title="Agrupar o DRE" className="h-8 rounded-md border border-input bg-background px-2 text-xs">
+                                        {DRE_GROUPS.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
+                                    </select>
+                                )}
+                                <PeriodFilter value={period} onChange={setPeriod} className="justify-end" />
+                            </div>
                             {period.kind === 'ytd' && financials.realIncomeMonth && (
                                 <label className="inline-flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
                                     <input type="checkbox" className="accent-emerald-600" checked={forecastYear} onChange={e => setForecastYear(e.target.checked)} />
