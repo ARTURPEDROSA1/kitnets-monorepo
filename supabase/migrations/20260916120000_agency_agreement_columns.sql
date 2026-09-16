@@ -57,7 +57,11 @@ BEGIN
         clean := NULLIF(btrim(regexp_replace(r.description, '^<!-- __METADATA__:.*? -->\n?', '')), '');
 
         UPDATE public.agencies
-        SET service_agreement_url      = COALESCE(service_agreement_url,      NULLIF(meta->>'service_agreement_url', '')),
+        SET service_agreement_url      = COALESCE(service_agreement_url,
+                                             -- older rows kept a full storage URL; store the object path only
+                                             NULLIF(regexp_replace(
+                                                 split_part(meta->>'service_agreement_url', '?', 1),
+                                                 '^https?://[^/]+/storage/v1/object/(public|sign|authenticated)/documents/', ''), '')),
             service_agreement_filename = COALESCE(service_agreement_filename, NULLIF(meta->>'service_agreement_filename', '')),
             management_fee             = COALESCE(management_fee,
                                              CASE WHEN meta->>'management_fee' ~ '^[0-9]+(\.[0-9]+)?$'
