@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireProfile } from "@/lib/api-auth";
 import { breakdown, currentMonthKey, monthKey, type PropertyIncomeRow } from "@/lib/property-income";
-import { landlordTaxesForMonth, normalizeInstallments, type PropertyTax } from "@/lib/property-taxes";
+import { landlordIptuForMonth, normalizeInstallments, type PropertyTax } from "@/lib/property-taxes";
 
 export const dynamic = "force-dynamic";
 
@@ -60,7 +60,7 @@ export async function GET() {
             continue;
         }
         const b = breakdown(raw);   // rows arrive newest first, so the first one per property is the latest
-        const iptu = landlordTaxesForMonth(taxesByProperty.get(raw.property_id) ?? [], monthKey(raw.month));
+        const iptu = landlordIptuForMonth(taxesByProperty.get(raw.property_id) ?? [], monthKey(raw.month));
         const opex = Math.round((b.opex + iptu) * 100) / 100;
         const noi = Math.round((b.noi - iptu) * 100) / 100;
         summaries[raw.property_id] = {
