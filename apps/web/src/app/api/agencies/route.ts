@@ -1,317 +1,71 @@
-import { createClient } from '@supabase/supabase-js';
-import { NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
-import {
-    validateCNPJ,
-    parseCNPJ,
-    parsePhoneToE164,
-    normalizeEmail,
-    normalizeWebsite,
-    validatePhone,
-    validateEmail,
-    validateWebsite,
-    parseCEP,
-    validateCEP,
-} from '@/lib/validators';
-import { unpackAgencyMetadata, packAgencyMetadata } from '@/lib/agency-metadata';
-import { normalizeAgreementUrl, withSignedAgreement } from '@/lib/agency-agreement';
+import { NextResponse } from "next/server";
+import { withAuth } from "@/lib/api-route";
+import { agencyInputSchema } from "@/lib/schemas/agency";
+import { agencyUniqueViolation, assertAgencyCnpjUnique, writeAgency } from "@/lib/agencies-server";
+import { unpackAgencyMetadata } from "@/lib/agency-metadata";
+import { withSignedAgreement } from "@/lib/agency-agreement";
 
-function getServiceSupabase() {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!url || !key) throw new Error('Missing Supabase service credentials');
-    return createClient(url, key);
-}
+type MembershipRow = {
+    role?: string | null;
+    agencies?: (Record<string, unknown> & { service_agreement_url?: string | null }) | null;
+};
 
 /**
  * GET /api/agencies
- * Returns all agencies associated with the current user (with their role).
+ * Every agency the account is a member of, with the caller's role and a
+ * signed URL for the (private) service agreement.
  */
-export async function GET() {
-    try {
-        const { userId } = await auth();
-        if (!userId) {
-            return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-        }
+export const GET = withAuth({ tag: "Agencies GET" }, async ({ profileId, supabase }) => {
+    const { data: memberships, error } = await supabase
+        .from("agency_members")
+        .select(`
+            role,
+            agencies!inner(*)
+        `)
+        .eq("user_id", profileId)
+        .is("agencies.deleted_at", null);
 
-        const supabase = getServiceSupabase();
-
-        // Find user's profile
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('clerk_id', userId)
-            .maybeSingle();
-
-        if (!profile) {
-            return NextResponse.json({ agencies: [] });
-        }
-
-        // Fetch all agencies for user's memberships joined in one query
-        const { data: memberships, error: memberError } = await supabase
-            .from('agency_members')
-            .select(`
-                role,
-                agencies!inner(*)
-            `)
-            .eq('user_id', profile.id)
-            .is('agencies.deleted_at', null);
-
-        if (memberError || !memberships || memberships.length === 0) {
-            return NextResponse.json({ agencies: [] });
-        }
-
-        type MembershipRow = {
-            role?: string | null;
-            agencies?: (Record<string, unknown> & { service_agreement_url?: string | null }) | null;
-        };
-        const agenciesWithRole = await Promise.all(
-            (memberships as unknown as MembershipRow[])
-                .filter((m) => m.agencies)
-                .map((m) =>
-                    // Agreements live in a private bucket: hand out a signed URL
-                    withSignedAgreement(
-                        supabase,
-                        unpackAgencyMetadata({
-                            ...m.agencies,
-                            role: m.role || 'VIEWER',
-                        })
-                    )
-                )
-        );
-
-        return NextResponse.json({ agencies: agenciesWithRole });
-    } catch (err) {
-        console.error('[Agencies GET] Error:', err);
-        return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
+    if (error || !memberships || memberships.length === 0) {
+        return NextResponse.json({ agencies: [] });
     }
-}
+
+    const agencies = await Promise.all(
+        (memberships as unknown as MembershipRow[])
+            .filter((m) => m.agencies)
+            .map((m) => withSignedAgreement(supabase, unpackAgencyMetadata({ ...m.agencies, role: m.role || "VIEWER" })))
+    );
+
+    return NextResponse.json({ agencies });
+});
 
 /**
  * POST /api/agencies
- * Creates a new agency and assigns the current user as OWNER.
+ * Creates an agency and makes the caller its OWNER. Validation: lib/schemas/agency.ts.
  */
-export async function POST(request: Request) {
-    try {
-        const { userId } = await auth();
-        if (!userId) {
-            return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-        }
+export const POST = withAuth({ body: agencyInputSchema, tag: "Agencies POST" }, async ({ body, profileId, supabase }) => {
+    await assertAgencyCnpjUnique(supabase, profileId, body.cnpj, {
+        message: "Você já possui uma imobiliária com este CNPJ cadastrada em seu painel.",
+    });
 
-        const body = await request.json();
-
-        // ── Required field validation ────────────────────────────────
-        const errors: Record<string, string> = {};
-
-        if (!body.name?.trim()) {
-            errors.name = 'Nome da imobiliária é obrigatório.';
-        }
-        if (!body.main_phone?.trim()) {
-            errors.main_phone = 'Telefone principal é obrigatório.';
-        } else if (!validatePhone(body.main_phone)) {
-            errors.main_phone = 'Telefone principal inválido.';
-        }
-        if (!body.postal_code?.trim() || !validateCEP(body.postal_code)) {
-            errors.postal_code = 'CEP é obrigatório e deve ter 8 dígitos.';
-        }
-        if (!body.street?.trim()) {
-            errors.street = 'Logradouro é obrigatório.';
-        }
-        if (!body.street_number?.trim()) {
-            errors.street_number = 'Número é obrigatório.';
-        }
-        if (!body.neighborhood?.trim()) {
-            errors.neighborhood = 'Bairro é obrigatório.';
-        }
-        if (!body.city?.trim()) {
-            errors.city = 'Cidade é obrigatória.';
-        }
-        if (!body.state?.trim()) {
-            errors.state = 'Estado é obrigatório.';
-        }
-
-        // ── Optional field validation ────────────────────────────────
-        if (body.cnpj?.trim()) {
-            const cnpjDigits = parseCNPJ(body.cnpj);
-            if (cnpjDigits.length > 0 && !validateCNPJ(cnpjDigits)) {
-                errors.cnpj = 'CNPJ inválido. Verifique os dígitos.';
-            }
-        }
-        if (body.email?.trim() && !validateEmail(body.email)) {
-            errors.email = 'E-mail inválido.';
-        }
-        if (body.additional_phone?.trim() && !validatePhone(body.additional_phone)) {
-            errors.additional_phone = 'Telefone adicional inválido.';
-        }
-        if (body.website?.trim() && !validateWebsite(body.website)) {
-            errors.website = 'Website inválido.';
-        }
-
-        if (Object.keys(errors).length > 0) {
-            return NextResponse.json({ errors }, { status: 400 });
-        }
-
-        const supabase = getServiceSupabase();
-
-        // ── Get user profile ─────────────────────────────────────────
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('clerk_id', userId)
-            .maybeSingle();
-
-        if (!profile) {
-            return NextResponse.json(
-                { error: 'Perfil não encontrado. Faça login novamente.' },
-                { status: 404 }
-            );
-        }
-
-        // Multi-agency: no single-agency constraint — users can create multiple agencies
-
-        // ── CNPJ per-user duplicate check ────────────────────────────
-        const cnpjDigits = body.cnpj?.trim() ? parseCNPJ(body.cnpj) : null;
-        if (cnpjDigits && cnpjDigits.length === 14) {
-            // Check if this specific user already has an active agency with this CNPJ
-            const { data: userMemberships } = await supabase
-                .from('agency_members')
-                .select('agency_id')
-                .eq('user_id', profile.id);
-
-            if (userMemberships && userMemberships.length > 0) {
-                const userAgencyIds = userMemberships.map(m => m.agency_id);
-                const { data: userExistingCnpj } = await supabase
-                    .from('agencies')
-                    .select('id')
-                    .in('id', userAgencyIds)
-                    .eq('cnpj', cnpjDigits)
-                    .is('deleted_at', null)
-                    .maybeSingle();
-
-                if (userExistingCnpj) {
-                    return NextResponse.json(
-                        {
-                            errors: {
-                                cnpj: 'Você já possui uma imobiliária com este CNPJ cadastrada em seu painel.',
-                            },
-                        },
-                        { status: 409 }
-                    );
-                }
-            }
-        }
-
-        // ── Normalize fields ─────────────────────────────────────────
-        const agencyData = {
-            name: body.name.trim(),
-            trade_name: body.trade_name?.trim() || null,
-            cnpj: cnpjDigits && cnpjDigits.length === 14 ? cnpjDigits : null,
-            creci_number: body.creci_number?.trim() || null,
-            creci_state: body.creci_state?.trim() || null,
-            creci_type: body.creci_type?.trim() || null,
-            owner_name: body.owner_name?.trim() || null,
-            main_phone: parsePhoneToE164(body.main_phone),
-            additional_phone: body.additional_phone?.trim()
-                ? parsePhoneToE164(body.additional_phone)
-                : null,
-            main_phone_whatsapp: body.main_phone_whatsapp === true,
-            additional_phone_whatsapp: body.additional_phone_whatsapp === true,
-            email: body.email?.trim() ? normalizeEmail(body.email) : null,
-            website: body.website?.trim() ? normalizeWebsite(body.website) : null,
-            postal_code: parseCEP(body.postal_code),
-            street: body.street.trim(),
-            street_number: body.street_number.trim(),
-            address_complement: body.address_complement?.trim() || null,
-            neighborhood: body.neighborhood.trim(),
-            city: body.city.trim(),
-            state: body.state.trim().toUpperCase(),
-            country: body.country?.trim() || 'BR',
-            description: body.description?.trim() || null,
-            service_agreement_url: normalizeAgreementUrl(body.service_agreement_url),
-            service_agreement_filename: body.service_agreement_filename?.trim() || null,
-            management_fee: body.management_fee ? parseFloat(body.management_fee) : null,
-            agreement_start_date: body.agreement_start_date || null,
-            agreement_end_date: body.agreement_end_date || null,
-            status: 'ACTIVE',
-        };
-
-        // ── Insert agency ────────────────────────────────────────────
-        let agency: any = null;
-        let insertError: any = null;
-
-        const res = await supabase
-            .from('agencies')
-            .insert(agencyData)
-            .select()
-            .single();
-
-        agency = res.data;
-        insertError = res.error;
-
-        // Fallback: if columns like service_agreement_* don't exist yet, pack into description
-        if (insertError && (insertError.code === '42703' || insertError.message?.includes('column'))) {
-            console.warn('[Agencies POST] Column not found, retrying with packed metadata in description:', insertError.message);
-            const { service_agreement_url, service_agreement_filename, management_fee, agreement_start_date, agreement_end_date, ...coreData } = agencyData;
-            const packedDescription = packAgencyMetadata(coreData.description, {
-                service_agreement_url,
-                service_agreement_filename,
-                management_fee,
-                agreement_start_date,
-                agreement_end_date,
-            });
-            const retryRes = await supabase
-                .from('agencies')
-                .insert({ ...coreData, description: packedDescription })
-                .select()
-                .single();
-            agency = retryRes.data;
-            insertError = retryRes.error;
-        }
-
-        if (insertError) {
-            console.error('[Agencies POST] Insert error:', insertError);
-            if (insertError.code === '23505') {
-                return NextResponse.json(
-                    {
-                        errors: {
-                            cnpj: 'Este CNPJ já está cadastrado por outra imobiliária.',
-                        },
-                    },
-                    { status: 409 }
-                );
-            }
-            return NextResponse.json(
-                { error: insertError.message || 'Erro ao criar imobiliária.' },
-                { status: 500 }
-            );
-        }
-
-        // ── Insert OWNER membership ──────────────────────────────────
-        const { error: memberError } = await supabase
-            .from('agency_members')
-            .insert({
-                agency_id: agency.id,
-                user_id: profile.id,
-                role: 'OWNER',
-            });
-
-        if (memberError) {
-            console.error('[Agencies POST] Member insert error:', memberError);
-            // Roll back agency creation
-            await supabase.from('agencies').delete().eq('id', agency.id);
-            return NextResponse.json(
-                { error: 'Erro ao criar vínculo com a imobiliária.' },
-                { status: 500 }
-            );
-        }
-
-        console.log('[Agencies POST] Created agency:', agency.id, 'owner:', profile.id);
-        return NextResponse.json({
-            success: true,
-            agency: await withSignedAgreement(supabase, unpackAgencyMetadata({ ...agency, role: 'OWNER' })),
-        });
-    } catch (err) {
-        console.error('[Agencies POST] Unexpected error:', err);
-        return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
+    const { agency, error } = await writeAgency(supabase, { ...body, status: "ACTIVE" });
+    if (error || !agency) {
+        console.error("[Agencies POST] Insert error:", error);
+        const dup = agencyUniqueViolation(error);
+        if (dup) return NextResponse.json({ errors: dup }, { status: 409 });
+        return NextResponse.json({ error: error?.message || "Erro ao criar imobiliária." }, { status: 500 });
     }
-}
+
+    const { error: memberError } = await supabase
+        .from("agency_members")
+        .insert({ agency_id: agency.id, user_id: profileId, role: "OWNER" });
+    if (memberError) {
+        console.error("[Agencies POST] Member insert error:", memberError);
+        await supabase.from("agencies").delete().eq("id", agency.id as string);
+        return NextResponse.json({ error: "Erro ao criar vínculo com a imobiliária." }, { status: 500 });
+    }
+
+    return NextResponse.json({
+        success: true,
+        agency: await withSignedAgreement(supabase, unpackAgencyMetadata({ ...(agency as NonNullable<MembershipRow["agencies"]>), role: "OWNER" })),
+    });
+});
