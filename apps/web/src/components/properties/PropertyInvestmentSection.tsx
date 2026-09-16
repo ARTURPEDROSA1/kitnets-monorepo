@@ -594,7 +594,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                                         placeholder={enabled ? "" : "—"}
                                         onDraft={text => setDraft(tx.id, field, text)}
                                         onCommit={() => commit(tx, field)}
-                                        className={cn("w-28 disabled:opacity-40", field === "amount" && "font-semibold text-foreground")}
+                                        className={cn("disabled:opacity-40", field === "amount" && "font-semibold text-foreground")}
                                     />
                                 );
                                 return (
@@ -602,14 +602,14 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                                         <td {...sel.cellProps("date", tx.id, null, "px-2 py-1 whitespace-nowrap")}>
                                             <input type="date" disabled={busy} value={d.date ?? tx.occurred_on}
                                                 onChange={e => setDraft(tx.id, "date", e.target.value)} onBlur={() => commit(tx, "date")}
-                                                className="bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-md px-1 py-1 outline-none" />
+                                                className="bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-none w-full min-w-[5rem] px-1 py-1 outline-none" />
                                             {busy && <Loader2 className="inline w-3 h-3 ml-1 animate-spin text-muted-foreground" />}
                                         </td>
                                         <td {...sel.cellProps("kind", tx.id, null, "px-2 py-1")}>
                                             <select disabled={busy} value={d.kind ?? tx.kind}
                                                 onChange={e => { setDraft(tx.id, "kind", e.target.value); }}
                                                 onBlur={() => commit(tx, "kind")}
-                                                className={cn("bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-md px-1 py-1 outline-none",
+                                                className={cn("bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-none w-full min-w-[5rem] px-1 py-1 outline-none",
                                                     KIND_GROUP[tx.kind] === "FINANCIAMENTO" && "text-blue-700 dark:text-blue-400",
                                                     KIND_GROUP[tx.kind] === "CAPEX" && "text-violet-700 dark:text-violet-400",
                                                     KIND_GROUP[tx.kind] === "ENERGIA" && "text-amber-700 dark:text-amber-400",
@@ -629,7 +629,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                                             <input type="text" disabled={busy} value={d.comment ?? (tx.comment ?? "")} placeholder="—"
                                                 onChange={e => setDraft(tx.id, "comment", e.target.value)} onBlur={() => commit(tx, "comment")}
                                                 onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                                                className="w-56 bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-md px-1.5 py-1 outline-none truncate" />
+                                                className="bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-none w-full min-w-[5rem] px-1.5 py-1 outline-none truncate" />
                                         </td>
                                         <td className="px-2 py-1 text-right">
                                             <button type="button" disabled={busy} onClick={() => deleteTx(tx)} title="Excluir"

@@ -721,7 +721,7 @@ export default function PropertyIncomeLedger({
                                         disabled={busy}
                                         onDraft={text => setDraft(month, field, text)}
                                         onCommit={() => commitDraft(row, field)}
-                                        className={cn("w-28", field === "gross" && "text-foreground font-semibold")}
+                                        className={cn("", field === "gross" && "text-foreground font-semibold")}
                                     />
                                 ) : (
                                     <input
@@ -736,7 +736,7 @@ export default function PropertyIncomeLedger({
                                         onKeyDown={e => {
                                             if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                                         }}
-                                        className="w-20 text-right bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-md px-1.5 py-1 outline-none tabular-nums"
+                                        className="text-right bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-none w-full min-w-[5rem] px-1.5 py-1 outline-none tabular-nums"
                                     />
                                 );
                                 return (
@@ -785,7 +785,7 @@ export default function PropertyIncomeLedger({
                                                 onKeyDown={e => {
                                                     if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                                                 }}
-                                                className="w-40 bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-md px-1.5 py-1 outline-none truncate"
+                                                className="bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-none w-full min-w-[5rem] px-1.5 py-1 outline-none truncate"
                                             />
                                         </td>
                                         <td className="px-2 py-1 text-right">
