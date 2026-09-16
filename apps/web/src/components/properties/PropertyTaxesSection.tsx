@@ -26,8 +26,11 @@ import {
     type TaxInstallment,
     type TaxKind,
     type TaxPayer,
+    taxInPeriod,
 } from "@/lib/property-taxes";
 import { IptuHistoryModal } from "./IptuHistoryModal";
+import PeriodFilter from "./PeriodFilter";
+import { periodLabel, periodRange, type PeriodFilterValue } from "@/lib/period-filter";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "./TableColumnFilters";
 import { CellSumBar, useCellSum } from "./TableCellSum";
 import MoneyInput, { parseMoneyText } from "./MoneyInput";
@@ -107,6 +110,7 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
     const [partDrafts, setPartDrafts] = useState<Record<string, PartDraft>>({});
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
     const [historyOpen, setHistoryOpen] = useState(false);
+    const [period, setPeriod] = useState<PeriodFilterValue>({ kind: "all" });   // by payment month (or the exercício when undated)
     const [viewer, setViewer] = useState<{ url: string; title: string } | null>(null);
 
     const flash = (msg: string) => { setNotice(msg); window.setTimeout(() => setNotice(null), 8000); };
@@ -171,7 +175,7 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
 
     // ── Row-level inline editing ────────────────────────────────────────
     const setDraft = (id: string, field: keyof Draft, value: string) =>
-        setDrafts(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
+        setDrafts(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
     const cancelDraft = (id: string, field: keyof Draft) =>
         setDrafts(prev => { const n = { ...prev, [id]: { ...prev[id] } }; delete n[id][field]; return n; });
     const commit = (row: PropertyTax, field: keyof Draft) => {
@@ -325,9 +329,12 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
     };
 
 
-    const summary = useMemo(() => summarizeTaxes(rows), [rows]);
+    const range = useMemo(() => periodRange(period), [period]);
+    /** Rows with a parcela (or the exercício) inside the period — tiles and table follow it. */
+    const inPeriodRows = useMemo(() => rows.filter(r => taxInPeriod(r, range)), [rows, range]);
+    const summary = useMemo(() => summarizeTaxes(inPeriodRows), [inPeriodRows]);
     const reviewTotals = useMemo(() => (extracted ? checkIptuTotals(extracted) : null), [extracted]);
-    const cf = useColumnFilters(rows, TAX_COLUMNS, { key: "year", dir: "desc" });
+    const cf = useColumnFilters(inPeriodRows, TAX_COLUMNS, { key: "year", dir: "desc" });
 
     if (!propertyId) return null;
 
@@ -388,6 +395,17 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
                             <FileText className="w-3.5 h-3.5" /> Ver guia atual (IPTU {currentDoc.year})
                         </button>
                     ) : null} />
+            </div>
+
+            {/* Period (tiles + table) */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <span className="text-xs text-muted-foreground">
+                    Tributos · <span className="font-semibold text-foreground">{periodLabel(period)}</span>
+                    {" · "}{cf.anyFilter ? `${cf.rows.length} de ${inPeriodRows.length}` : inPeriodRows.length} {inPeriodRows.length === 1 ? "registro" : "registros"}
+                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                    <PeriodFilter value={period} onChange={setPeriod} variant="compact" />
+                </div>
             </div>
 
             <FilterChips columns={TAX_COLUMNS} ctl={cf} />

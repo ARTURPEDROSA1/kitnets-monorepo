@@ -42,7 +42,7 @@ import PropertyIncomeLedger from './PropertyIncomeLedger';
 import PropertyInvestmentSection from './PropertyInvestmentSection';
 import PropertyTaxesSection from './PropertyTaxesSection';
 import PropertyInvestmentAnalysis from './PropertyInvestmentAnalysis';
-import PeriodFilter from './PeriodFilter';
+import PeriodFilter, { GroupSelect } from './PeriodFilter';
 import {
     breakdown,
     currentMonthKey,
@@ -51,7 +51,7 @@ import {
     monthKey,
     type PropertyIncomeRow,
 } from '@/lib/property-income';
-import { monthsBetween, periodLabel, periodRange, type PeriodFilterValue } from '@/lib/period-filter';
+import { groupMonthly, monthsBetween, periodLabel, periodRange, type ChartGroup, type PeriodFilterValue } from '@/lib/period-filter';
 import type { PropertyInvestment, PropertyTransaction } from '@/lib/property-investment';
 import { landlordIptuByMonth, landlordTaxTotals, type PropertyTax } from '@/lib/property-taxes';
 import type { PropertyValuation } from '@/lib/property-valuations';
@@ -136,12 +136,7 @@ export default function PropertyCostCenterDashboard({
     // YTD only: repeat the latest confirmed month until December so the chart shows the whole year
     const [forecastYear, setForecastYear] = useState(false);
     // DRE grouping: monthly bars, quarters, years, or one specific quarter of each year
-    type DreGroup = 'month' | 'quarter' | 'year' | 'q1' | 'q2' | 'q3' | 'q4';
-    const [dreGroup, setDreGroup] = useState<DreGroup>('month');
-    const DRE_GROUPS: Array<{ value: DreGroup; label: string }> = [
-        { value: 'month', label: 'Mensal' }, { value: 'quarter', label: 'Trimestral' }, { value: 'year', label: 'Anual' },
-        { value: 'q1', label: '1º trimestre' }, { value: 'q2', label: '2º trimestre' }, { value: 'q3', label: '3º trimestre' }, { value: 'q4', label: '4º trimestre' },
-    ];
+    const [dreGroup, setDreGroup] = useState<ChartGroup>('month');
 
 
     const totalUnits = propertyType === 'multi'
@@ -314,21 +309,9 @@ export default function PropertyCostCenterDashboard({
         }
 
         // Group the monthly DRE by quarter / year / a specific quarter (real data only: the estimate has no month keys)
-        const groupedDre = (() => {
-            if (dreGroup === 'month' || !dreData.every(d => d.key)) return dreData;
-            const out = new Map<string, typeof dreData[number]>();
-            for (const d of dreData) {
-                const [y, mm] = d.key!.split('-').map(Number);
-                const q = Math.ceil(mm / 3);
-                if (/^q[1-4]$/.test(dreGroup) && q !== Number(dreGroup[1])) continue;   // a specific quarter only
-                const gk = dreGroup === 'year' ? `${y}` : `${y}-T${q}`;
-                const label = dreGroup === 'year' ? `${y}` : `${q}T/${y}`;
-                const cur = out.get(gk) ?? { month: label, key: gk, receita: 0, despesas: 0, noi: 0, previsto: false };
-                cur.receita += d.receita; cur.despesas += d.despesas; cur.noi += d.noi; cur.previsto = cur.previsto || d.previsto;
-                out.set(gk, cur);
-            }
-            return [...out.values()];
-        })();
+        const groupedDre = dreData.every(d => d.key)
+            ? groupMonthly(dreData.map(d => ({ ...d, key: d.key! })), dreGroup)
+            : dreData;
 
         return {
             realIncomeMonth: latest && hasRealIncome ? formatMonthKey(monthKey(latest.month)) : null,
@@ -590,9 +573,7 @@ export default function PropertyCostCenterDashboard({
                             <div className="flex flex-wrap items-center gap-2">
                                 <PeriodFilter value={period} onChange={setPeriod} variant="compact" />
                                 {financials.realIncomeMonth && (
-                                    <select value={dreGroup} onChange={e => setDreGroup(e.target.value as DreGroup)} title="Agrupar o DRE" className="h-8 rounded-md border border-input bg-background px-2 text-xs">
-                                        {DRE_GROUPS.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
-                                    </select>
+                                    <GroupSelect value={dreGroup} onChange={setDreGroup} title="Agrupar o DRE" />
                                 )}
                             </div>
                             {period.kind === 'ytd' && financials.realIncomeMonth && (
