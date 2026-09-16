@@ -3,6 +3,7 @@ import type { PropertyTransaction } from "./property-investment";
 import {
     checkIptuTotals,
     effectiveTax,
+    iptuByMonth,
     iptuFromExtraction,
     iptuSeries,
     iptuYearsFromTransactions,
@@ -14,6 +15,8 @@ import {
     parseReferencia,
     splitInstallments,
     summarizeTaxes,
+    taxInPeriod,
+    taxMonths,
     type ExtractedIptu,
     type PropertyTax,
     type TaxInstallment,
@@ -178,5 +181,45 @@ describe("landlordIptuByMonth", () => {
         expect(landlordTaxTotals(rows)).toEqual({ iptu: 2750, itbi: 5000, other: 0, total: 7750 });
         expect(landlordIptuForMonth(rows, "2024-03")).toBe(1200);
         expect(landlordIptuForMonth(rows, "2024-04")).toBe(0);
+    });
+});
+
+describe("taxMonths / taxInPeriod", () => {
+    const parts: TaxInstallment[] = [
+        { seq: 1, amount: 100, paid_by: "TENANT", paid_on: "2025-02-10" },
+        { seq: 2, amount: 100, paid_by: "LANDLORD", paid_on: "2025-03-10" },
+        { seq: 3, amount: 100, paid_by: "LANDLORD", paid_on: null },
+    ];
+    it("uses the parcela payment months, else the row date, else the whole exercício", () => {
+        expect(taxMonths(tax(2025, "IPTU", 300, "TENANT", parts))).toEqual(["2025-02", "2025-03"]);
+        expect(taxMonths({ ...tax(2024, "ITBI", 5000, "LANDLORD"), paid_on: "2024-08-20" })).toEqual(["2024-08"]);
+        expect(taxMonths(tax(2023, "IPTU", 900))).toHaveLength(12);
+        expect(taxMonths(tax(2023, "IPTU", 900))[11]).toBe("2023-12");
+    });
+    it("a row is in the period when any of its months is", () => {
+        const row = tax(2025, "IPTU", 300, "TENANT", parts);
+        expect(taxInPeriod(row, { start: "2025-03", end: "2025-12" })).toBe(true);
+        expect(taxInPeriod(row, { start: "2025-04", end: null })).toBe(false);
+        expect(taxInPeriod(tax(2023, "IPTU", 900), { start: "2023-11", end: "2024-02" })).toBe(true);
+        expect(taxInPeriod(tax(2023, "IPTU", 900), { start: "2024-01", end: null })).toBe(false);
+    });
+});
+
+describe("iptuByMonth", () => {
+    it("puts each parcela in its payment month, split by payer, and skips other taxes", () => {
+        const rows = [
+            tax(2025, "IPTU", 300, "TENANT", [
+                { seq: 1, amount: 100, paid_by: "TENANT", paid_on: "2025-02-10" },
+                { seq: 2, amount: 100, paid_by: "LANDLORD", paid_on: "2025-02-25" },
+                { seq: 3, amount: 100, paid_by: "LANDLORD", paid_on: null },      // undated 3rd parcela → March
+            ]),
+            tax(2024, "IPTU", 500, "LANDLORD"),                                    // undated single amount → January
+            tax(2024, "ITBI", 9000, "LANDLORD"),
+        ];
+        expect(iptuByMonth(rows)).toEqual([
+            { key: "2024-01", month: "jan/2024", inquilino: 0, proprietario: 500, total: 500 },
+            { key: "2025-02", month: "fev/2025", inquilino: 100, proprietario: 100, total: 200 },
+            { key: "2025-03", month: "mar/2025", inquilino: 0, proprietario: 100, total: 100 },
+        ]);
     });
 });

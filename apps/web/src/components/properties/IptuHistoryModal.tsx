@@ -3,7 +3,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ArrowDownRight, ArrowUpRight, Maximize2, Minimize2, Receipt, TrendingUp, X } from "lucide-react";
 import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from "recharts";
-import { effectiveTax, iptuSeries, type PropertyTax } from "@/lib/property-taxes";
+import { effectiveTax, iptuByMonth, iptuSeries, type PropertyTax } from "@/lib/property-taxes";
+import { groupMonthly, inPeriod, periodLabel, periodRange, type ChartGroup, type PeriodFilterValue } from "@/lib/period-filter";
+import PeriodFilter, { GroupSelect } from "./PeriodFilter";
 
 interface IptuHistoryModalProps {
     isOpen: boolean;
@@ -14,19 +16,20 @@ interface IptuHistoryModalProps {
 const formatCurrency = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const pct = (v: number | null) => (v === null ? "—" : `${v > 0 ? "+" : ""}${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`);
 
-type RangeFilter = "YTD" | "1Y" | "2Y" | "3Y" | "4Y" | "5Y" | "ALL";
-const RANGE_OPTIONS: { key: RangeFilter; label: string; years: number }[] = [
-    { key: "1Y", label: "1 ano", years: 1 }, { key: "2Y", label: "2 anos", years: 2 }, { key: "3Y", label: "3 anos", years: 3 },
-    { key: "4Y", label: "4 anos", years: 4 }, { key: "5Y", label: "5 anos", years: 5 }, { key: "ALL", label: "Tudo", years: 0 },
-];
+const GROUP_TITLE: Record<ChartGroup, string> = {
+    month: "IPTU pago por mês", quarter: "IPTU pago por trimestre", year: "IPTU pago por ano",
+    q1: "IPTU pago no 1º trimestre", q2: "IPTU pago no 2º trimestre", q3: "IPTU pago no 3º trimestre", q4: "IPTU pago no 4º trimestre",
+};
 
 /** Year-by-year IPTU history: amount, who paid, taxable value and rate. Same shell as the tariff-history modal. */
 export function IptuHistoryModal({ isOpen, onClose, rows }: IptuHistoryModalProps) {
     const [isMaximized, setIsMaximized] = useState(false);
-    const [range, setRange] = useState<RangeFilter>("ALL");
+    const [period, setPeriod] = useState<PeriodFilterValue>({ kind: "all" });
+    const [group, setGroup] = useState<ChartGroup>("year");
+    const range = useMemo(() => periodRange(period), [period]);
 
     // Reset the view when closing (not in an effect, to avoid a cascading render on open/close)
-    const close = () => { setIsMaximized(false); setRange("ALL"); onClose(); };
+    const close = () => { setIsMaximized(false); setPeriod({ kind: "all" }); setGroup("year"); onClose(); };
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
         if (isOpen) window.addEventListener("keydown", onKey);
@@ -35,13 +38,13 @@ export function IptuHistoryModal({ isOpen, onClose, rows }: IptuHistoryModalProp
     }, [isOpen, onClose]);
 
     const allSeries = useMemo(() => iptuSeries(rows), [rows]);
-    const series = useMemo(() => {
-        const opt = RANGE_OPTIONS.find(o => o.key === range);
-        if (!opt || opt.years === 0 || allSeries.length === 0) return allSeries;
-        const latest = allSeries[allSeries.length - 1].year;
-        const filtered = allSeries.filter(p => p.year > latest - opt.years);
-        return filtered.length > 1 ? filtered : allSeries.slice(-2);
-    }, [allSeries, range]);
+    /** Exercícios that overlap the period (KPIs and the table). */
+    const series = useMemo(
+        () => allSeries.filter(p => (!range.start || `${p.year}-12` >= range.start) && (!range.end || `${p.year}-01` <= range.end)),
+        [allSeries, range]
+    );
+    /** Chart: IPTU by payment month inside the period, grouped like the DRE (cash basis). */
+    const chartPoints = useMemo(() => groupMonthly(iptuByMonth(rows).filter(p => inPeriod(p.key, range)), group), [rows, range, group]);
 
     /** Assessment details per year (taxable value, rate), from the row with the most data. */
     const detailsByYear = useMemo(() => {
@@ -72,8 +75,6 @@ export function IptuHistoryModal({ isOpen, onClose, rows }: IptuHistoryModalProp
     }, [series]);
 
     if (!isOpen) return null;
-
-    const data = series.map(p => ({ year: String(p.year), inquilino: p.byTenant, proprietario: p.byLandlord, total: p.amount }));
 
     return (
         <div
@@ -131,8 +132,8 @@ export function IptuHistoryModal({ isOpen, onClose, rows }: IptuHistoryModalProp
                     <div className="bg-card border border-border rounded-xl p-4 shadow-xs space-y-3">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                             <div className="flex items-center gap-2 flex-wrap">
-                                <h4 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                                    <TrendingUp className="w-4 h-4 text-amber-500" /> Crescimento do IPTU (R$/ano)
+                                <h4 className="text-sm font-semibold text-foreground flex items-center gap-1.5" title={`Cada parcela no mês em que foi paga · ${periodLabel(period)}`}>
+                                    <TrendingUp className="w-4 h-4 text-amber-500" /> {GROUP_TITLE[group]}
                                 </h4>
                                 {stats && stats.delta !== 0 && (
                                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-md flex items-center gap-0.5 ${stats.delta > 0 ? "text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950" : "text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950"}`}>
@@ -142,24 +143,20 @@ export function IptuHistoryModal({ isOpen, onClose, rows }: IptuHistoryModalProp
                                     </span>
                                 )}
                             </div>
-                            <div className="inline-flex rounded-lg border border-border bg-muted/40 p-0.5">
-                                {RANGE_OPTIONS.map(o => (
-                                    <button key={o.key} type="button" onClick={() => setRange(o.key)}
-                                        className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors ${range === o.key ? "bg-background text-foreground shadow-xs border border-border" : "text-muted-foreground hover:text-foreground"}`}>
-                                        {o.label}
-                                    </button>
-                                ))}
+                            <div className="flex flex-wrap items-center gap-2">
+                                <PeriodFilter value={period} onChange={setPeriod} variant="compact" />
+                                <GroupSelect value={group} onChange={setGroup} title="Agrupar o IPTU pago" />
                             </div>
                         </div>
                         <div className={isMaximized ? "h-[380px]" : "h-[260px]"}>
                             <ResponsiveContainer width="100%" height="100%">
-                                <ComposedChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                                <ComposedChart data={chartPoints} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                                    <XAxis dataKey="year" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} />
+                                    <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} />
                                     <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} tickFormatter={(v: number) => `R$ ${v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v}`} />
                                     <Tooltip
                                         formatter={(value, name) => [formatCurrency(Number(value)), name === "total" ? "Total" : name === "inquilino" ? "Inquilino" : "Proprietário"]}
-                                        labelFormatter={l => `Exercício ${l}`}
+                                        labelFormatter={l => (group === "year" ? `Pago em ${l}` : String(l))}
                                         contentStyle={{ backgroundColor: "hsl(var(--background))", borderColor: "hsl(var(--border))", borderRadius: "12px" }}
                                     />
                                     <Legend wrapperStyle={{ paddingTop: "8px", fontSize: "12px" }} formatter={v => (v === "inquilino" ? "Pago pelo inquilino" : v === "proprietario" ? "Pago pelo proprietário" : "Total")} />

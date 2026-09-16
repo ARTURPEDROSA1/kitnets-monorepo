@@ -555,12 +555,14 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
             </div>
 
             {/* Period + table */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2">
                 <span className="text-xs text-muted-foreground">
                     Lançamentos · <span className="font-semibold text-foreground">{periodLabel(period)}</span> · {filtered.length} {filtered.length === 1 ? "lançamento" : "lançamentos"}{cf.anyFilter && inPeriod.length !== filtered.length ? ` de ${inPeriod.length}` : ""} · total {formatBRL(filteredTotal)}
                     {summary.totalOutlay > 0 && <> · desembolso total {formatBRL(summary.totalOutlay)}</>}
                 </span>
-                <PeriodFilter value={period} onChange={setPeriod} />
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <PeriodFilter value={period} onChange={setPeriod} variant="compact" />
+                </div>
             </div>
 
             <FilterChips columns={columns} ctl={cf} />

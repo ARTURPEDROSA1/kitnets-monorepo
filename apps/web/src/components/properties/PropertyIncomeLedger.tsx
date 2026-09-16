@@ -41,11 +41,11 @@ import {
     DialogFooter,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import PeriodFilter from "./PeriodFilter";
+import PeriodFilter, { GroupSelect } from "./PeriodFilter";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "./TableColumnFilters";
 import { CellSumBar, useCellSum } from "./TableCellSum";
 import MoneyInput, { parseMoneyText } from "./MoneyInput";
-import { periodLabel, periodRange, type PeriodFilterValue } from "@/lib/period-filter";
+import { groupMonthly, periodLabel, periodRange, type ChartGroup, type PeriodFilterValue } from "@/lib/period-filter";
 import {
     breakdown,
     buildImportRows,
@@ -125,6 +125,7 @@ export default function PropertyIncomeLedger({
     const period = periodProp ?? localPeriod;
     const setPeriod = onPeriodChange ?? setLocalPeriod;
     const range = useMemo(() => periodRange(period), [period]);
+    const [chartGroup, setChartGroup] = useState<ChartGroup>("month");   // chart only; the table stays monthly
 
     const [rows, setRows] = useState<PropertyIncomeRow[]>([]);
     const sel = useCellSum();
@@ -351,6 +352,7 @@ export default function PropertyIncomeLedger({
                 .map(r => {
                     const b = breakdown(r);
                     return {
+                        key: monthKey(r.month),
                         month: formatMonthKey(monthKey(r.month)),
                         liquido: b.netRent,
                         energia: b.energy,
@@ -360,6 +362,7 @@ export default function PropertyIncomeLedger({
                 }),
         [filtered]
     );
+    const chartPoints = useMemo(() => groupMonthly(chartData, chartGroup), [chartData, chartGroup]);
 
     // ── Add month dialog ────────────────────────────────────────────────
     const [addOpen, setAddOpen] = useState(false);
@@ -698,14 +701,17 @@ export default function PropertyIncomeLedger({
                     Período do gráfico e da tabela · <span className="font-semibold text-foreground">{periodLabel(period)}</span>
                     {" · "}{cf.anyFilter ? `${cf.rows.length} de ${filtered.length}` : filtered.length} {filtered.length === 1 ? "mês" : "meses"}
                 </span>
-                <PeriodFilter value={period} onChange={setPeriod} />
+                <div className="flex flex-wrap items-center gap-2">
+                    <PeriodFilter value={period} onChange={setPeriod} variant="compact" />
+                    <GroupSelect value={chartGroup} onChange={setChartGroup} />
+                </div>
             </div>
 
             {/* Chart */}
-            {chartData.length > 1 && (
+            {chartPoints.length > (chartGroup === "month" ? 1 : 0) && (
                 <div className="h-[220px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                        <ComposedChart data={chartPoints} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                             <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} interval="preserveStartEnd" />
                             <YAxis

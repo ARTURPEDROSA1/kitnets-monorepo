@@ -2,7 +2,17 @@
 
 import React from "react";
 import { cn } from "@/lib/utils";
-import { PERIOD_OPTIONS, type PeriodFilterValue, type PeriodKind } from "@/lib/period-filter";
+import { CHART_GROUPS, PERIOD_OPTIONS, type ChartGroup, type PeriodFilterValue, type PeriodKind } from "@/lib/period-filter";
+
+/** Grouping dropdown (Mensal · Trimestral · Anual · 1º–4º trimestre) that sits next to the compact period dropdown. */
+export function GroupSelect({ value, onChange, title = "Agrupar o gráfico", className }: { value: ChartGroup; onChange: (next: ChartGroup) => void; title?: string; className?: string }) {
+    return (
+        <select value={value} onChange={e => onChange(e.target.value as ChartGroup)} title={title} aria-label={title}
+            className={cn("h-8 rounded-md border border-input bg-background px-2 text-xs", className)}>
+            {CHART_GROUPS.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
+        </select>
+    );
+}
 
 interface PeriodFilterProps {
     value: PeriodFilterValue;

@@ -74,10 +74,46 @@ export function inPeriod(monthKey: string, range: PeriodRange): boolean {
 }
 
 const MONTH_SHORT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
-const fmt = (k: string) => {
+/** `2026-08` → `ago/2026` */
+export const monthLabel = (k: string) => {
     const [y, m] = k.split("-");
     return `${MONTH_SHORT[Number(m) - 1] ?? m}/${y}`;
 };
+const fmt = monthLabel;
+
+// ── Chart grouping (shared by the DRE, Receitas and IPTU charts) ─────────
+export type ChartGroup = "month" | "quarter" | "year" | "q1" | "q2" | "q3" | "q4";
+export const CHART_GROUPS: Array<{ value: ChartGroup; label: string }> = [
+    { value: "month", label: "Mensal" }, { value: "quarter", label: "Trimestral" }, { value: "year", label: "Anual" },
+    { value: "q1", label: "1º trimestre" }, { value: "q2", label: "2º trimestre" }, { value: "q3", label: "3º trimestre" }, { value: "q4", label: "4º trimestre" },
+];
+
+/**
+ * Groups monthly chart points (`key` = `YYYY-MM`, `month` = axis label) by quarter, year or one
+ * specific quarter of each year. Numeric fields are summed, booleans OR'd (a group is "previsto"
+ * when any of its months is), everything else keeps the first month's value.
+ */
+export function groupMonthly<T extends { key: string; month: string }>(points: T[], group: ChartGroup): T[] {
+    if (group === "month") return points;
+    const out = new Map<string, T>();
+    for (const p of points) {
+        const [y, mm] = p.key.split("-").map(Number);
+        const q = Math.ceil(mm / 3);
+        if (/^q[1-4]$/.test(group) && q !== Number(group[1])) continue;
+        const gk = group === "year" ? `${y}` : `${y}-T${q}`;
+        const label = group === "year" ? `${y}` : `${q}T/${y}`;
+        const cur = out.get(gk);
+        if (!cur) { out.set(gk, { ...p, key: gk, month: label }); continue; }
+        const acc = cur as Record<string, unknown>;
+        for (const [k, v] of Object.entries(p)) {
+            if (k === "key" || k === "month") continue;
+            const c = acc[k];
+            if (typeof v === "number" && typeof c === "number") acc[k] = Math.round((c + v) * 100) / 100;
+            else if (typeof v === "boolean" && typeof c === "boolean") acc[k] = c || v;
+        }
+    }
+    return [...out.values()];
+}
 
 export function periodLabel(p: PeriodFilterValue, now = new Date()): string {
     const r = periodRange(p, now);

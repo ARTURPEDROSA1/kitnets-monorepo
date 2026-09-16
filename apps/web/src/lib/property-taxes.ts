@@ -7,12 +7,12 @@
  * in a vacancy. When parcelas exist they are the source of truth for the
  * row's amount and payer split.
  *
- * Informational: KPIs take landlord-paid IPTU from the income ledger's
- * monthly IPTU column and ITBI from the investment ledger, so this register
- * never double counts.
+ * This register is the source of truth for IPTU: what the landlord pays
+ * enters the costs of the month it was paid (DRE, cost centre, analysis).
  */
 import { round2 } from "./property-income";
 import type { PropertyTransaction } from "./property-investment";
+import { inPeriod, monthLabel, type PeriodRange } from "./period-filter";
 
 export type TaxKind = "IPTU" | "ITBI" | "OUTRO";
 export type TaxPayer = "TENANT" | "LANDLORD";
@@ -373,6 +373,51 @@ export function landlordTaxesByMonth(taxes: PropertyTax[], kinds: TaxKind[] = ["
         }
     }
     return out;
+}
+
+/** Payment month of parcela i (without a date: month i of the exercício). */
+const parcelaMonth = (year: number, i: number, paidOn: string | null) => paidOn ? paidOn.slice(0, 7) : `${year}-${String(Math.min(12, i + 1)).padStart(2, "0")}`;
+
+/**
+ * Months (`YYYY-MM`) where a tax row's money falls: each parcela's payment month, the row's
+ * payment month, or — with no dates at all — every month of its exercício.
+ */
+export function taxMonths(row: Pick<PropertyTax, "year" | "paid_on" | "installments">): string[] {
+    const parts = Array.isArray(row.installments) ? row.installments : [];
+    const dated = parts.map(p => p.paid_on?.slice(0, 7)).filter((m): m is string => Boolean(m));
+    if (dated.length) return dated;
+    if (row.paid_on) return [row.paid_on.slice(0, 7)];
+    return Array.from({ length: 12 }, (_, i) => `${row.year}-${String(i + 1).padStart(2, "0")}`);
+}
+
+/** Whether any of the row's months is inside the period. */
+export function taxInPeriod(row: Pick<PropertyTax, "year" | "paid_on" | "installments">, range: PeriodRange): boolean {
+    return taxMonths(row).some(m => inPeriod(m, range));
+}
+
+export interface IptuMonthPoint { key: string; month: string; inquilino: number; proprietario: number; total: number }
+
+/**
+ * IPTU per payment month (cash basis, like the DRE): each parcela in the month it was paid;
+ * without dates, parcela i falls in month i of the exercício and a single amount in January.
+ * Oldest first; feed it to `groupMonthly` for quarters/years.
+ */
+export function iptuByMonth(rows: PropertyTax[]): IptuMonthPoint[] {
+    const out = new Map<string, IptuMonthPoint>();
+    const add = (m: string, payer: TaxPayer, amt: number) => {
+        if (!(amt > 0)) return;
+        const cur = out.get(m) ?? { key: m, month: monthLabel(m), inquilino: 0, proprietario: 0, total: 0 };
+        if (payer === "LANDLORD") cur.proprietario = round2(cur.proprietario + amt); else cur.inquilino = round2(cur.inquilino + amt);
+        cur.total = round2(cur.inquilino + cur.proprietario);
+        out.set(m, cur);
+    };
+    for (const tax of rows) {
+        if (tax.kind !== "IPTU") continue;
+        const parts = Array.isArray(tax.installments) ? tax.installments : [];
+        if (parts.length === 0) add(tax.paid_on ? tax.paid_on.slice(0, 7) : `${tax.year}-01`, tax.paid_by, Number(tax.amount) || 0);
+        else parts.forEach((p, i) => add(parcelaMonth(tax.year, i, p.paid_on), p.paid_by, Number(p.amount) || 0));
+    }
+    return [...out.values()].sort((a, b) => (a.key < b.key ? -1 : 1));
 }
 
 /** IPTU only (kept for callers that split IPTU from the other taxes). */
