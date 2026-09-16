@@ -46,7 +46,7 @@ export default function MoneyInput({ value, draft, onDraft, onCommit, disabled, 
             onChange={e => onDraft(e.target.value)}
             onBlur={() => { setEditing(false); onCommit(); }}
             onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-            className={cn("text-right bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-md px-1.5 py-1 outline-none tabular-nums", className)}
+            className={cn("text-right bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-none w-full min-w-[5rem] px-1.5 py-1 outline-none tabular-nums", className)}
         />
     );
 }

@@ -57,7 +57,7 @@ const parseInput = (s: string): number | null => {
     const n = parseMoneyText(s);
     return n !== null && n >= 0 ? Math.round(n * 100) / 100 : null;
 };
-const BOX = "bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-md px-1.5 py-1 outline-none";
+const BOX = "bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-none w-full min-w-[5rem] px-1.5 py-1 outline-none";
 
 type Draft = Partial<Record<"year" | "kind" | "amount" | "paidBy" | "date" | "comment", string>>;
 type PartDraft = Partial<Record<"amount" | "paidBy" | "date", string>>;
@@ -428,7 +428,7 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
                                             <td {...sel.cellProps("year", row.id, null, "px-2 py-1")}>
                                                 <input type="number" min={1990} max={2100} step={1} disabled={busy} value={d.year ?? String(row.year)}
                                                     onChange={ev => setDraft(row.id, "year", ev.target.value)} onBlur={() => commit(row, "year")}
-                                                    className={cn(BOX, "w-20 font-semibold text-foreground")} />
+                                                    className={cn(BOX, "font-semibold text-foreground")} />
                                                 {busy && <Loader2 className="inline w-3 h-3 ml-1 animate-spin text-muted-foreground" />}
                                                 {row.extracted_at && <span className="block text-[9px] text-muted-foreground pl-1.5" title={`Valor venal ${row.valor_venal_imovel ? formatBRL(Number(row.valor_venal_imovel)) : "—"} · alíquota ${row.aliquota_pct ?? "—"}%`}>guia lida por IA</span>}
                                             </td>
@@ -441,7 +441,7 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
                                                 <MoneyInput value={e.amount} draft={d.amount} disabled={busy}
                                                     onDraft={text => setDraft(row.id, "amount", text)} onCommit={() => commit(row, "amount")}
                                                     title={hasParts ? "Alterar o total redistribui entre as parcelas" : undefined}
-                                                    className="w-32 font-semibold text-foreground" />
+                                                    className="font-semibold text-foreground" />
                                             </td>
                                             <td {...sel.cellProps("payer", row.id, null, "px-2 py-1")}>
                                                 {e.payer === "MIXED" ? (
@@ -461,7 +461,7 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
                                                 <input type="text" disabled={busy} value={d.comment ?? (row.comment ?? "")} placeholder="—"
                                                     onChange={ev => setDraft(row.id, "comment", ev.target.value)} onBlur={() => commit(row, "comment")}
                                                     onKeyDown={ev => { if (ev.key === "Enter") (ev.target as HTMLInputElement).blur(); }}
-                                                    className={cn(BOX, "w-40 truncate")} />
+                                                    className={cn(BOX, "truncate")} />
                                             </td>
                                             <td className="px-2 py-1 whitespace-nowrap">
                                                 {hasParts ? (
@@ -500,7 +500,7 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
                                                     <td className="px-2 py-0.5 text-right">
                                                         <MoneyInput value={part.amount} draft={pd.amount} disabled={busy}
                                                             onDraft={text => setPartDraft(row.id, part.seq, "amount", text)} onCommit={() => commitPart(row, part, "amount")}
-                                                            className="w-32" />
+                                                            className="" />
                                                     </td>
                                                     <td className="px-2 py-0.5">
                                                         <select disabled={busy} value={pd.paidBy ?? part.paid_by} onChange={ev => setPartDraft(row.id, part.seq, "paidBy", ev.target.value)} onBlur={() => commitPart(row, part, "paidBy")}
