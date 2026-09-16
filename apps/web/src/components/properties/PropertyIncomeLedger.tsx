@@ -229,7 +229,9 @@ export default function PropertyIncomeLedger({
 
     // ── Inline editing ──────────────────────────────────────────────────
     const setDraft = (month: string, field: DraftField, value: string) =>
-        setDrafts(prev => ({ ...prev, [month]: { ...prev[month], [field]: value } }));
+        setDrafts(prev => ({ ...prev, [month]: { ...prev[month], [field]: value } }));
+    const cancelDraft = (month: string, field: DraftField) =>
+        setDrafts(prev => { const n = { ...prev, [month]: { ...prev[month] } }; delete n[month][field]; return n; });
 
     const commitDraft = (row: PropertyIncomeRow, field: DraftField) => {
         const month = monthKey(row.month);
@@ -745,13 +747,13 @@ export default function PropertyIncomeLedger({
                                             {formatMonthKey(month)}
                                             {busy && <Loader2 className="inline w-3 h-3 ml-1 animate-spin text-muted-foreground" />}
                                         </td>
-                                        <td {...sel.cellProps("gross", month, b.grossRent, "px-2 py-1 text-right")}>{cell("gross", b.grossRent)}</td>
-                                        <td {...sel.cellProps("pct", month, b.feePct, "px-2 py-1 text-right")}>{cell("pct", b.feePct, "0.5")}</td>
+                                        <td {...sel.cellProps("gross", month, b.grossRent, "px-2 py-1 text-right", () => cancelDraft(month, "gross"))}>{cell("gross", b.grossRent)}</td>
+                                        <td {...sel.cellProps("pct", month, b.feePct, "px-2 py-1 text-right", () => cancelDraft(month, "pct"))}>{cell("pct", b.feePct, "0.5")}</td>
                                         <td {...sel.cellProps("net", month, b.netRent, "px-2 py-1 text-right font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums")}>{formatBRL(b.netRent)}</td>
-                                        <td {...sel.cellProps("energy", month, b.energy, "px-2 py-1 text-right")}>{cell("energy", b.energy)}</td>
-                                        <td {...sel.cellProps("received", month, b.received, "px-2 py-1 text-right")}>{cell("received", b.received)}</td>
-                                        <td {...sel.cellProps("other", month, b.other, "px-2 py-1 text-right")}>{cell("other", b.other)}</td>
-                                        <td {...sel.cellProps("otherExp", month, b.otherExpenses, "px-2 py-1 text-right")}>{cell("otherExp", b.otherExpenses)}</td>
+                                        <td {...sel.cellProps("energy", month, b.energy, "px-2 py-1 text-right", () => cancelDraft(month, "energy"))}>{cell("energy", b.energy)}</td>
+                                        <td {...sel.cellProps("received", month, b.received, "px-2 py-1 text-right", () => cancelDraft(month, "received"))}>{cell("received", b.received)}</td>
+                                        <td {...sel.cellProps("other", month, b.other, "px-2 py-1 text-right", () => cancelDraft(month, "other"))}>{cell("other", b.other)}</td>
+                                        <td {...sel.cellProps("otherExp", month, b.otherExpenses, "px-2 py-1 text-right", () => cancelDraft(month, "otherExp"))}>{cell("otherExp", b.otherExpenses)}</td>
                                         <td className="px-2 py-1 text-center">
                                             <button
                                                 type="button"
@@ -774,7 +776,7 @@ export default function PropertyIncomeLedger({
                                                 </span>
                                             )}
                                         </td>
-                                        <td {...sel.cellProps("notes", month, null, "px-2 py-1")}>
+                                        <td {...sel.cellProps("notes", month, null, "px-2 py-1", () => cancelDraft(month, "notes"))}>
                                             <input
                                                 type="text"
                                                 disabled={busy}
