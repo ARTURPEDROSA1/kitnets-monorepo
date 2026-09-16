@@ -573,7 +573,7 @@ export default function PropertyCostCenterDashboard({
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Chart 1: DRE Mensal (Receita vs Despesa vs NOI) */}
                 <div className="lg:col-span-2 bg-card border border-border rounded-2xl p-6 shadow-xs space-y-4">
-                    <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-3">
+                    <div className="space-y-3">
                         <div className="space-y-0.5">
                             <h3 className="font-bold text-base text-foreground flex items-center gap-2">
                                 <BarChart3 className="w-4 h-4 text-emerald-600" />
@@ -585,8 +585,9 @@ export default function PropertyCostCenterDashboard({
                                     : 'Histórico e projeção de Receitas, Despesas Operacionais e Lucro Líquido (NOI)'}
                             </p>
                         </div>
-                        <div className="flex flex-col items-start lg:items-end gap-1.5 shrink-0">
-                            <div className="flex flex-wrap items-center lg:justify-end gap-2">
+                        {/* toolbar on its own full-width row: the title never gets squeezed when the month pickers appear */}
+                        <div className="flex flex-col items-start gap-1.5">
+                            <div className="flex flex-wrap items-center gap-2">
                                 <PeriodFilter value={period} onChange={setPeriod} variant="compact" />
                                 {financials.realIncomeMonth && (
                                     <select value={dreGroup} onChange={e => setDreGroup(e.target.value as DreGroup)} title="Agrupar o DRE" className="h-8 rounded-md border border-input bg-background px-2 text-xs">

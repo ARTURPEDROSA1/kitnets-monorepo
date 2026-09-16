@@ -26,7 +26,7 @@ export default function PeriodFilter({ value, onChange, className, variant = "se
     };
 
     const customInputs = value.kind === "custom" && (
-        <div className={cn("inline-flex items-center gap-1.5 text-[11px] text-muted-foreground", variant === "compact" && "basis-full justify-end")}>
+        <div className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <input
                 type="month"
                 value={value.start ?? ""}
