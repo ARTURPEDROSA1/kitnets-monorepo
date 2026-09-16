@@ -465,7 +465,7 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
                                                     onKeyDown={ev => { if (ev.key === "Enter") (ev.target as HTMLInputElement).blur(); }}
                                                     className={cn(BOX, "truncate")} />
                                             </td>
-                                            <td className="px-2 py-1 whitespace-nowrap">
+                                            <td {...sel.cellProps("parts", row.id, null, "px-2 py-1 whitespace-nowrap")}>
                                                 {hasParts ? (
                                                     <span className="inline-flex items-center gap-1.5 px-1.5 py-1 border border-transparent">
                                                         <button type="button" onClick={() => toggleExpanded(row.id)} className="text-emerald-700 dark:text-emerald-400 underline underline-offset-2">{parts.length}x</button>
