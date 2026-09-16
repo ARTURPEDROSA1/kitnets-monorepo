@@ -102,7 +102,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
     const [drafts, setDrafts] = useState<Record<string, TxDraft>>({});
     const [showAll, setShowAll] = useState(false);
 
-    const [period, setPeriod] = useState<PeriodFilterValue>({ kind: "all" });
+    const [period, setPeriod] = useState<PeriodFilterValue>({ kind: "ytd" });   // the ledger opens on the current year
 
     const flash = (msg: string) => {
         setNotice(msg);
@@ -176,7 +176,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
 
     // ── Inline editing ──────────────────────────────────────────────────
     const setDraft = (id: string, field: keyof TxDraft, value: string) =>
-        setDrafts(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
+        setDrafts(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
     const cancelDraft = (id: string, field: keyof TxDraft) =>
         setDrafts(prev => { const n = { ...prev, [id]: { ...prev[id] } }; delete n[id][field]; return n; });
 
