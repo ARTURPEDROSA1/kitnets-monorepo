@@ -40,7 +40,7 @@ import {
     type ValuationSource,
 } from "@/lib/property-valuations";
 
-/** One of the four KPI groups: a lettered heading over a 2×2 (or 1×4) grid of cards. */
+/** One of the four KPI groups: a lettered heading over one row of four cards (2×2 on narrow screens). */
 function KpiGroup({ letter, title, hint, children }: { letter: string; title: string; hint: string; children: React.ReactNode }) {
     return (
         <section className="space-y-2">
@@ -49,7 +49,7 @@ function KpiGroup({ letter, title, hint, children }: { letter: string; title: st
                 {title}
                 <span className="font-normal text-muted-foreground">· {hint}</span>
             </h4>
-            <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-2 gap-3">{children}</div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">{children}</div>
         </section>
     );
 }
@@ -375,7 +375,7 @@ export default function PropertyInvestmentAnalysis({ propertyId, bedrooms, inves
                 </div>
             ) : (
                 <>
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-6 gap-y-5">
+                    <div className="space-y-5">
                         {/* A. Capital recovery */}
                         <KpiGroup letter="A" title="Recuperação do capital" hint="quanto do que você investiu já voltou">
                             <Tile label="Capital investido" value={formatBRL(metrics.cashInvested)} tone="emerald" icon={<PiggyBank className="w-4 h-4" />} info={info.invested}
