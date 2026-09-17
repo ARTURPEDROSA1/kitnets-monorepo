@@ -1,234 +1,116 @@
-import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
+import { readJsonBody, withAuth } from "@/lib/api-route";
+import { deletePropertyCascade } from "@/lib/energy-bills-server";
 
 export const dynamic = "force-dynamic";
 
-function getServiceSupabase() {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!url || !key) throw new Error("Missing Supabase service credentials");
-    return createClient(url, key);
-}
+type PropertyRow = { id: string; name: string; electronic_id: string | null };
 
-export async function POST(request: Request) {
-    try {
-        const user = await currentUser();
-        if (!user) {
-            return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-        }
+/**
+ * POST /api/energy-bills/properties/sync-deletion
+ * Called when a rental property is removed from the profile. Either deletes
+ * the matching `properties` row with its cascade (`delete_all`, default) or
+ * keeps it as a standalone consumer unit so energy monitoring continues
+ * (`keep_energy`).
+ */
+export const POST = withAuth({ tag: "sync-deletion" }, async ({ req, profileId, supabase }) => {
+    const body = await readJsonBody(req);
+    const propertyId = typeof body.propertyId === "string" ? body.propertyId : null;
+    const name = typeof body.name === "string" ? body.name : "";
+    const address = typeof body.address === "string" ? body.address : "";
+    const action = body.action === "keep_energy" ? "keep_energy" : "delete_all";
 
-        const body = await request.json();
-        const {
-            propertyId,
-            name,
-            address,
-            action = "delete_all", // "delete_all" | "keep_energy"
-        } = body;
+    let matched: PropertyRow | null = null;
 
-        const supabase = getServiceSupabase();
-
-        // 1. Find user profile
-        const { data: profile } = await supabase
-            .from("profiles")
-            .select("id")
-            .eq("clerk_id", user.id)
+    if (propertyId) {
+        const { data } = await supabase
+            .from("properties")
+            .select("id, name, electronic_id")
+            .eq("id", propertyId)
+            .eq("owner_id", profileId)
             .maybeSingle();
+        matched = (data as PropertyRow | null) ?? null;
+    }
 
-        if (!profile) {
-            return NextResponse.json({ error: "Perfil não encontrado" }, { status: 404 });
-        }
+    if (!matched) {
+        // Legacy fallback for profile properties that never got a properties-table id:
+        // only an exact (case-insensitive) name or address match counts, and an
+        // ambiguous match is treated as no match. Looser matching used to delete the
+        // leases and tenants of an unrelated property.
+        const normName = name.trim().toLowerCase();
+        const normAddress = address.trim().toLowerCase();
 
-        // 2. Locate the corresponding property in public.properties
-        let matchedProp: { id: string; name: string; electronic_id: string | null } | null = null;
-
-        if (propertyId) {
-            const { data } = await supabase
+        if (normName || normAddress) {
+            const { data: ownerProps } = await supabase
                 .from("properties")
-                .select("id, name, electronic_id")
-                .eq("id", propertyId)
-                .eq("owner_id", profile.id)
-                .maybeSingle();
-            matchedProp = data;
+                .select("id, name, address, electronic_id")
+                .eq("owner_id", profileId);
+
+            const candidates = (ownerProps ?? []).filter((p) => {
+                const pName = ((p.name as string) || "").trim().toLowerCase();
+                const pAddr = ((p.address as string) || "").trim().toLowerCase();
+                return (normName !== "" && pName === normName) || (normAddress !== "" && pAddr === normAddress);
+            });
+            matched = candidates.length === 1 ? (candidates[0] as PropertyRow) : null;
         }
+    }
 
-        if (!matchedProp) {
-            // Legacy fallback for profile properties that never got a properties-table id:
-            // only an exact (case-insensitive) name or address match counts. Substring
-            // matching and the "owner has a single row, take it" shortcut used to delete
-            // the leases/tenants of an unrelated property.
-            const normName = name ? String(name).trim().toLowerCase() : "";
-            const normAddress = address ? String(address).trim().toLowerCase() : "";
-
-            if (normName || normAddress) {
-                const { data: ownerProps } = await supabase
-                    .from("properties")
-                    .select("id, name, address, electronic_id")
-                    .eq("owner_id", profile.id);
-
-                const candidates = (ownerProps ?? []).filter(p => {
-                    const pName = (p.name || "").trim().toLowerCase();
-                    const pAddr = (p.address || "").trim().toLowerCase();
-                    return (normName !== "" && pName === normName) || (normAddress !== "" && pAddr === normAddress);
-                });
-
-                // Ambiguous matches are treated as no match rather than picking one.
-                matchedProp = candidates.length === 1 ? candidates[0] : null;
+    if (action === "keep_energy") {
+        if (matched) {
+            let current: Record<string, unknown> = {};
+            try {
+                current = matched.electronic_id ? JSON.parse(matched.electronic_id) : {};
+            } catch {
+                current = {};
             }
+
+            await supabase
+                .from("properties")
+                .update({
+                    electronic_id: JSON.stringify({
+                        ...current,
+                        isStandaloneUc: true,
+                        category: current.category || "outro",
+                        convertedFromRental: true,
+                        convertedAt: new Date().toISOString(),
+                        notes: current.notes || "Convertido de imóvel de aluguel removido",
+                    }),
+                })
+                .eq("id", matched.id);
+
+            return NextResponse.json({ success: true, action: "converted_to_standalone", propertyId: matched.id });
         }
 
-        // 3. Perform action
-        if (action === "keep_energy") {
-            if (matchedProp) {
-                // Convert existing property to a standalone UC
-                let currentPayload: Record<string, any> = {};
-                if (matchedProp.electronic_id) {
-                    try {
-                        currentPayload = JSON.parse(matchedProp.electronic_id);
-                    } catch {
-                        currentPayload = {};
-                    }
-                }
-
-                const updatedElectronic = JSON.stringify({
-                    ...currentPayload,
-                    isStandaloneUc: true,
-                    category: currentPayload.category || "outro",
-                    convertedFromRental: true,
-                    convertedAt: new Date().toISOString(),
-                    notes: currentPayload.notes || "Convertido de imóvel de aluguel removido",
-                });
-
-                await supabase
-                    .from("properties")
-                    .update({ electronic_id: updatedElectronic })
-                    .eq("id", matchedProp.id);
-
-                return NextResponse.json({
-                    success: true,
-                    action: "converted_to_standalone",
-                    propertyId: matchedProp.id,
-                });
-            } else {
-                // Property wasn't in public.properties yet, but user wants to keep energy monitoring:
-                // create it as standalone UC
-                const electronicPayload = JSON.stringify({
+        const { data: created, error } = await supabase
+            .from("properties")
+            .insert({
+                owner_id: profileId,
+                name: name || address || "UC Avulsa",
+                address: address || null,
+                electronic_id: JSON.stringify({
                     isStandaloneUc: true,
                     category: "outro",
                     convertedFromRental: true,
                     convertedAt: new Date().toISOString(),
                     notes: "Criado como UC Avulsa após remoção do imóvel de aluguel",
-                });
+                }),
+            })
+            .select("id")
+            .single();
+        if (error) console.error("[sync-deletion] Error creating standalone UC:", error);
 
-                const { data: newProp, error: insErr } = await supabase
-                    .from("properties")
-                    .insert({
-                        owner_id: profile.id,
-                        name: name || address || "UC Avulsa",
-                        address: address || null,
-                        electronic_id: electronicPayload,
-                    })
-                    .select("id")
-                    .single();
-
-                if (insErr) {
-                    console.error("[sync-deletion] Error creating standalone UC:", insErr);
-                }
-
-                return NextResponse.json({
-                    success: true,
-                    action: "created_standalone",
-                    propertyId: newProp?.id,
-                });
-            }
-        } else {
-            // action === "delete_all"
-            if (matchedProp) {
-                const targetId = matchedProp.id;
-
-                // 1. Unlink gateways
-                await supabase
-                    .from("gateways")
-                    .update({ property_id: null })
-                    .eq("property_id", targetId);
-
-                // 2. Find and delete leases (and their dependent charges, tenants, documents)
-                const { data: propLeases } = await supabase
-                    .from("leases")
-                    .select("id")
-                    .eq("property_id", targetId);
-
-                if (propLeases && propLeases.length > 0) {
-                    const leaseIds = propLeases.map((l: any) => l.id);
-                    await supabase.from("lease_charges").delete().in("lease_id", leaseIds);
-                    await supabase.from("lease_tenants").delete().in("lease_id", leaseIds);
-                    await supabase.from("lease_documents").delete().in("lease_id", leaseIds);
-                    await supabase.from("leases").delete().eq("property_id", targetId);
-                }
-
-                // 3. Delete tenants for this property
-                const { data: propTenants } = await supabase
-                    .from("tenants")
-                    .select("id")
-                    .eq("property_id", targetId);
-
-                if (propTenants && propTenants.length > 0) {
-                    const tenantIds = propTenants.map((t: any) => t.id);
-                    await supabase.from("lease_tenants").delete().in("tenant_id", tenantIds);
-                    await supabase.from("tenants").delete().eq("property_id", targetId);
-                }
-
-                // 4. Orphan water bills (preserve data — user can re-associate later)
-                await supabase
-                    .from("water_bills")
-                    .update({ property_id: null })
-                    .eq("property_id", targetId);
-
-                // 5. Orphan energy bills (preserve data — user can re-associate later)
-                await supabase
-                    .from("energy_bills")
-                    .update({ property_id: null })
-                    .eq("property_id", targetId);
-
-                // 6. Remove files from storage
-                try {
-                    const { data: files } = await supabase.storage
-                        .from("energy-bills")
-                        .list(targetId);
-                    if (files && files.length > 0) {
-                        const paths = files.map(f => `${targetId}/${f.name}`);
-                        await supabase.storage.from("energy-bills").remove(paths);
-                    }
-                } catch (storageErr) {
-                    console.warn("[sync-deletion] Storage cleanup warning:", storageErr);
-                }
-
-                // 7. Delete property record
-                const { error: delErr } = await supabase
-                    .from("properties")
-                    .delete()
-                    .eq("id", targetId);
-
-                if (delErr) {
-                    console.error("[sync-deletion] Properties delete error:", delErr);
-                    return NextResponse.json({ error: delErr.message }, { status: 500 });
-                }
-
-                return NextResponse.json({
-                    success: true,
-                    action: "deleted",
-                    propertyId: targetId,
-                });
-            }
-
-            return NextResponse.json({
-                success: true,
-                action: "none_needed",
-                message: "Imóvel não constava na tabela de energia.",
-            });
-        }
-    } catch (err: any) {
-        console.error("[sync-deletion] Error:", err);
-        return NextResponse.json({ error: err.message || "Erro interno do servidor" }, { status: 500 });
+        return NextResponse.json({ success: true, action: "created_standalone", propertyId: created?.id });
     }
-}
+
+    if (!matched) {
+        return NextResponse.json({ success: true, action: "none_needed", message: "Imóvel não constava na tabela de energia." });
+    }
+
+    const { error } = await deletePropertyCascade(supabase, matched.id, "sync-deletion");
+    if (error) {
+        console.error("[sync-deletion] Properties delete error:", error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, action: "deleted", propertyId: matched.id });
+});

@@ -33,6 +33,20 @@ export const forbidden = (error: string) => new HttpError(403, { error });
 export const conflict = (errors: FieldErrors) => new HttpError(409, { errors });
 export const badRequest = (errors: FieldErrors) => new HttpError(400, { errors });
 
+/**
+ * For handlers that parse their own body (multipart-or-JSON endpoints, payloads
+ * without a form to report field errors to): the JSON object, or a 400.
+ */
+export async function readJsonBody(req: Request): Promise<Record<string, unknown>> {
+    try {
+        const body = await req.json();
+        if (body && typeof body === "object" && !Array.isArray(body)) return body as Record<string, unknown>;
+    } catch {
+        // fall through
+    }
+    throw new HttpError(400, { error: "Corpo da requisição inválido (JSON esperado)." });
+}
+
 /** First message per top-level field; issues without a path land under `_form`. */
 export function fieldErrors(error: z.ZodError): FieldErrors {
     const out: FieldErrors = {};

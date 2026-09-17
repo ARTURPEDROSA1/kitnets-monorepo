@@ -13,7 +13,21 @@ vi.mock("@/lib/rate-limit", () => ({
 }));
 vi.mock("@sentry/nextjs", () => ({ captureException: (...args: unknown[]) => captureException(...args) }));
 
-import { badRequest, fieldErrors, notFound, withAuth } from "./api-route";
+import { badRequest, fieldErrors, notFound, readJsonBody, withAuth } from "./api-route";
+
+describe("readJsonBody", () => {
+    const req = (body: string) => new Request("http://test/api/x", { method: "POST", body });
+
+    it("returns a JSON object", async () => {
+        expect(await readJsonBody(req('{"a":1}'))).toEqual({ a: 1 });
+    });
+
+    it("answers 400 for malformed JSON, arrays and primitives", async () => {
+        for (const bad of ["not json", "[1,2]", "42"]) {
+            await expect(readJsonBody(req(bad))).rejects.toMatchObject({ status: 400 });
+        }
+    });
+});
 
 const ctx = { userId: "user_1", profileId: "profile_1", supabase: {} as never };
 const post = (body: unknown) =>
