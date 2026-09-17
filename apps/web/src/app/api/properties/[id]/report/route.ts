@@ -95,7 +95,7 @@ export async function GET(_request: Request, context: RouteContext) {
         line("Total investido (base de caixa)", m.cashInvested, BRL, "Tudo o que foi pago: entrada, custos de aquisição, prestações, amortizações, quitação, tarifas, reformas, custos, tributos e energia solar");
         line("Renda líquida acumulada", m.netIncomeToDate, BRL, `${m.incomeMonths} meses com receita`);
         line("Payback até hoje", m.paybackPct, PCT, m.paybackReachedOn ? `Atingido em ${formatMonthKey(m.paybackReachedOn)}` : `Falta R$ ${m.remaining.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`);
-        line("Payback previsto", monthOrDash(m.paybackForecastMonth), undefined, m.monthsToPayback !== null ? `${m.monthsToPayback} meses ao ritmo de R$ ${m.monthlyNoiPace.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}/mês` : undefined);
+        line("Payback previsto", monthOrDash(m.paybackForecastMonth), undefined, m.monthsToPayback !== null ? `${m.monthsToPayback} meses · R$ ${m.monthlyNoiPace.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}/mês (média de 12 meses)${m.forecastGrowthPctYear > 0 ? ` + ${m.forecastGrowthPctYear.toLocaleString("pt-BR")}% a.a. (reajuste histórico do aluguel)` : ""}` : undefined);
         line("Renda líquida últimos 12 meses", m.noi12m, BRL);
         line("Yield bruto sobre o valor de compra", m.grossYieldOnPrice, PCT, "12 × aluguel bruto atual ÷ valor de compra");
         line("Yield sobre custo", m.netYieldOnCost, PCT, "Renda líquida anualizada ÷ total investido");

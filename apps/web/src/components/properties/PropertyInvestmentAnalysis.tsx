@@ -218,7 +218,7 @@ export default function PropertyInvestmentAnalysis({ propertyId, bedrooms, inves
     const forecastHint = paidBack
         ? `Renda líquida acumulada supera o investido desde ${metrics.paybackReachedOn ? formatMonthKey(metrics.paybackReachedOn) : "—"}`
         : metrics.monthsToPayback !== null
-            ? `Em ~${yearsLabel(metrics.monthsToPayback)} ao ritmo de ${formatBRL(metrics.monthlyNoiPace)}/mês (média dos últimos 12 meses)${metrics.remainingInstallments > 0 ? ` · ${metrics.remainingInstallments} prestações restantes de ${formatBRL(metrics.monthlyDebtServicePace)}` : ""}`
+            ? `Em ~${yearsLabel(metrics.monthsToPayback)} · ${formatBRL(metrics.monthlyNoiPace)}/mês (média de 12 meses)${metrics.forecastGrowthPctYear > 0 ? ` + ${pctLabel(metrics.forecastGrowthPctYear)} a.a. (reajuste histórico do aluguel)` : ""}${metrics.remainingInstallments > 0 ? ` · ${metrics.remainingInstallments} prestações restantes de ${formatBRL(metrics.monthlyDebtServicePace)}` : ""}`
             : metrics.monthlyNoiPace <= 0
                 ? "Sem renda líquida positiva nos últimos 12 meses"
                 : "Cadastre a aquisição para calcular";
@@ -252,10 +252,14 @@ export default function PropertyInvestmentAnalysis({ propertyId, bedrooms, inves
             example: metrics.paybackPctReal !== null ? <>{brl(metrics.netIncomeToDateReal)} ÷ {brl(metrics.cashInvestedReal)} = {pctLabel(metrics.paybackPctReal)}</> : undefined,
         },
         paybackForecast: {
-            what: "Mês em que a renda líquida acumulada deve alcançar o capital investido, mantendo o ritmo dos últimos 12 meses.",
-            formula: "Mês atual + (capital que falta ÷ renda líquida média mensal dos últimos 12 meses)",
-            example: !paidBack && metrics.monthsToPayback !== null ? <>{brl(metrics.remaining)} ÷ {brl(metrics.monthlyNoiPace)}/mês ≈ {yearsLabel(metrics.monthsToPayback)}</> : undefined,
-            note: "Com financiamento ativo, as prestações que faltam entram como capital ainda a investir. Simule outros ritmos em Cenários.",
+            what: "Mês em que a renda líquida acumulada deve alcançar o capital investido. Parte da renda líquida média dos últimos 12 meses e a faz crescer todo ano pelo reajuste histórico do aluguel deste imóvel.",
+            formula: <>Renda do mês n = média mensal dos últimos 12 meses × (1 + reajuste a.a.)^(n ÷ 12)<br />Payback = primeiro mês em que a soma dessas rendas cobre o capital que falta</>,
+            example: !paidBack && metrics.monthsToPayback !== null ? <>
+                Falta {brl(metrics.remaining)} · ritmo {brl(metrics.monthlyNoiPace)}/mês
+                <br />Reajuste histórico do aluguel: {metrics.rentGrowthPctYear !== null ? `${pctLabel(metrics.rentGrowthPctYear)} a.a.` : "menos de 12 meses de histórico"}{metrics.rentGrowthPctYear !== null && metrics.rentGrowthPctYear !== metrics.forecastGrowthPctYear ? ` (usado: ${pctLabel(metrics.forecastGrowthPctYear)})` : ""}
+                <br />≈ {yearsLabel(metrics.monthsToPayback)}{metrics.forecastGrowthPctYear > 0 && metrics.monthlyNoiPace > 0 ? ` (sem reajuste seriam ${yearsLabel(Math.ceil(metrics.remaining / metrics.monthlyNoiPace))})` : ""}
+            </> : undefined,
+            note: "Reajuste histórico = crescimento anual do aluguel bruto: média dos primeiros 12 meses contra a dos últimos 12 (com menos de dois anos, primeiro mês contra o último). A previsão usa entre 0% e 15% ao ano. Com financiamento ativo, as prestações que faltam entram como capital ainda a investir. Simule outros ritmos em Cenários.",
         },
         netIncome: {
             what: "O que o imóvel já rendeu depois da taxa da administradora e das despesas pagas à parte. Não desconta prestações nem tributos: eles estão no capital investido.",

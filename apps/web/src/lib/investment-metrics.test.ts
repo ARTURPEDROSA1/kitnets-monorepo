@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeInvestmentMetrics, xirr } from "./investment-metrics";
+import { computeInvestmentMetrics, historicalRentGrowth, xirr } from "./investment-metrics";
 import type { PropertyIncomeRow } from "./property-income";
 import type { PropertyInvestment, PropertyTransaction } from "./property-investment";
 import type { PropertyTax } from "./property-taxes";
@@ -176,5 +176,46 @@ describe("computeInvestmentMetrics — value, returns and real payback", () => {
         const none = computeInvestmentMetrics({ investment: inv, transactions: txs, incomeRows: rows, asOf: "2026-09" });
         expect(none.ipcaAvailable).toBe(false);
         expect(none.paybackPctReal).toBeNull();
+    });
+});
+
+describe("historical rent growth and the payback forecast", () => {
+    it("needs a year of history and annualises first vs last month under two years", () => {
+        expect(historicalRentGrowth([])).toBeNull();
+        expect(historicalRentGrowth([{ month: "2025-01", grossRent: 1000 }, { month: "2025-11", grossRent: 1100 }])).toBeNull();
+        expect(historicalRentGrowth([{ month: "2025-01", grossRent: 1000 }, { month: "2026-01", grossRent: 1100 }])).toBe(10);
+        expect(historicalRentGrowth([{ month: "2024-01", grossRent: 1000 }, { month: "2025-07", grossRent: 1000 * Math.pow(1.1, 1.5) }])).toBe(10);
+    });
+    it("with two years or more compares the first and the last 12 months and ignores empty months", () => {
+        const pts = months("2023-01", 36).map((m, i) => ({ month: m, grossRent: i < 12 ? 1000 : i < 24 ? 1050 : 1102.5 }));
+        expect(historicalRentGrowth(pts)).toBe(5);
+        expect(historicalRentGrowth([...pts, { month: "2026-01", grossRent: 0 }])).toBe(5);
+    });
+    it("grows the 12-month pace by the historical rate, so payback comes sooner than at a flat pace", () => {
+        const txs = [tx("2023-01-10", "ENTRADA", 400000)];
+        const flat = months("2023-02", 36).map(m => income(m));
+        const growing = months("2023-02", 36).map((m, i) => income(m, { received_amount: Math.round(3950 * Math.pow(1.08, Math.floor(i / 12))) }));
+        const a = computeInvestmentMetrics({ investment: investment(), transactions: txs, incomeRows: flat, asOf: "2026-01" });
+        const b = computeInvestmentMetrics({ investment: investment(), transactions: txs, incomeRows: growing, asOf: "2026-01" });
+        expect(a.rentGrowthPctYear).toBe(0);
+        expect(a.forecastGrowthPctYear).toBe(0);
+        expect(b.rentGrowthPctYear).toBeGreaterThan(7);
+        expect(b.forecastGrowthPctYear).toBe(b.rentGrowthPctYear);
+        // flat-pace months for b: remaining ÷ pace; the grown forecast must be clearly shorter
+        const flatMonths = Math.ceil(b.remaining / b.monthlyNoiPace);
+        expect(b.monthsToPayback!).toBeLessThan(flatMonths - 6);
+        // the projection's monthly increments rise over time
+        const inc = (i: number) => b.projection[i].cumNoi - b.projection[i - 1].cumNoi;
+        expect(inc(24)).toBeGreaterThan(inc(1));
+    });
+    it("never projects a shrinking rent and caps runaway growth", () => {
+        const txs = [tx("2023-01-10", "ENTRADA", 400000)];
+        const falling = months("2023-02", 36).map((m, i) => income(m, { received_amount: Math.round(3950 * Math.pow(0.9, Math.floor(i / 12))) }));
+        const soaring = months("2023-02", 36).map((m, i) => income(m, { received_amount: Math.round(3950 * Math.pow(1.4, Math.floor(i / 12))) }));
+        const f = computeInvestmentMetrics({ investment: investment(), transactions: txs, incomeRows: falling, asOf: "2026-01" });
+        const g = computeInvestmentMetrics({ investment: investment(), transactions: txs, incomeRows: soaring, asOf: "2026-01" });
+        expect(f.rentGrowthPctYear).toBeLessThan(0);
+        expect(f.forecastGrowthPctYear).toBe(0);
+        expect(g.forecastGrowthPctYear).toBe(15);
     });
 });
