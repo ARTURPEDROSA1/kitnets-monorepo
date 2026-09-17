@@ -333,6 +333,8 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
     /** Rows with a parcela (or the exercício) inside the period — tiles and table follow it. */
     const inPeriodRows = useMemo(() => rows.filter(r => taxInPeriod(r, range)), [rows, range]);
     const summary = useMemo(() => summarizeTaxes(inPeriodRows), [inPeriodRows]);
+    /** Whole register: "IPTU atual" is a current figure and its history link never depends on the period. */
+    const summaryAll = useMemo(() => summarizeTaxes(rows), [rows]);
     const reviewTotals = useMemo(() => (extracted ? checkIptuTotals(extracted) : null), [extracted]);
     const cf = useColumnFilters(inPeriodRows, TAX_COLUMNS, { key: "year", dir: "desc" });
 
@@ -377,13 +379,13 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
                     hint={<>{summary.iptuYears} {summary.iptuYears === 1 ? "ano" : "anos"}{summary.firstYear ? ` · ${summary.firstYear}–${summary.lastYear}` : ""}<br />Média {formatBRL(summary.iptuAvgPerYear)}/ano</>} />
                 <Tile label="Quem pagou o IPTU" value={summary.iptuTotal > 0 ? `${Math.round((summary.iptuByTenant / summary.iptuTotal) * 100)}% inquilino` : "—"} tone="violet" icon={<Landmark className="w-4 h-4" />}
                     hint={<>Inquilino {formatBRL(summary.iptuByTenant)}<br />Proprietário {formatBRL(summary.iptuByLandlord)}</>} />
-                <Tile label="IPTU atual" value={summary.iptuLatest ? formatBRL(summary.iptuLatest.amount) : "—"} tone="amber" icon={<TrendingUp className="w-4 h-4" />}
-                    hint={summary.iptuLatest
-                        ? <>Exercício {summary.iptuLatest.year} · {formatBRL(summary.iptuLatest.amount / 12)}/mês
-                            {summary.iptuGrowthPct !== null && <> · <span className={summary.iptuGrowthPct > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}>{summary.iptuGrowthPct > 0 ? "+" : ""}{summary.iptuGrowthPct}% vs {summary.iptuLatest.year - 1}</span></>}
+                <Tile label="IPTU atual" value={summaryAll.iptuLatest ? formatBRL(summaryAll.iptuLatest.amount) : "—"} tone="amber" icon={<TrendingUp className="w-4 h-4" />}
+                    hint={summaryAll.iptuLatest
+                        ? <>Exercício {summaryAll.iptuLatest.year} · {formatBRL(summaryAll.iptuLatest.amount / 12)}/mês
+                            {summaryAll.iptuGrowthPct !== null && <> · <span className={summaryAll.iptuGrowthPct > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}>{summaryAll.iptuGrowthPct > 0 ? "+" : ""}{summaryAll.iptuGrowthPct}% vs {summaryAll.iptuLatest.year - 1}</span></>}
                         </>
                         : "Nenhum ano registrado"}
-                    action={summary.iptuYears > 1 ? (
+                    action={summaryAll.iptuYears > 1 ? (
                         <button type="button" onClick={() => setHistoryOpen(true)} className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 dark:text-amber-400 hover:underline underline-offset-2">
                             <LineChart className="w-3.5 h-3.5" /> Ver histórico
                         </button>

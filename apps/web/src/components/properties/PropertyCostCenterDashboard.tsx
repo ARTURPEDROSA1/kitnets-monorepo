@@ -43,6 +43,7 @@ import PropertyInvestmentSection from './PropertyInvestmentSection';
 import PropertyTaxesSection from './PropertyTaxesSection';
 import PropertyInvestmentAnalysis from './PropertyInvestmentAnalysis';
 import PeriodFilter, { GroupSelect } from './PeriodFilter';
+import { RentHistoryModal } from './RentHistoryModal';
 import {
     breakdown,
     currentMonthKey,
@@ -135,6 +136,15 @@ export default function PropertyCostCenterDashboard({
     const [period, setPeriod] = useState<PeriodFilterValue>({ kind: 'ytd' });   // DRE chart opens on the current year
     // YTD only: repeat the latest confirmed month until December so the chart shows the whole year
     const [forecastYear, setForecastYear] = useState(true);
+    const [rentHistoryOpen, setRentHistoryOpen] = useState(false);
+    const formatBRL2 = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    /** Built area: Aquisição & financiamento, else the latest IPTU guide that has it. */
+    const areaM2 = useMemo(() => {
+        const own = Number(investmentData.investment?.built_area_m2) || 0;
+        if (own > 0) return own;
+        const fromIptu = [...taxRows].sort((a, b) => b.year - a.year).find(t => Number(t.area_construida) > 0);
+        return fromIptu ? Number(fromIptu.area_construida) : null;
+    }, [investmentData.investment, taxRows]);
     // DRE grouping: monthly bars, quarters, years, or one specific quarter of each year
     const [dreGroup, setDreGroup] = useState<ChartGroup>('month');
 
@@ -317,6 +327,7 @@ export default function PropertyCostCenterDashboard({
             realIncomeMonth: latest && hasRealIncome ? formatMonthKey(monthKey(latest.month)) : null,
             occupancyHint,
             grossMonthlyRevenue,
+            currentGrossRent: current ? current.grossRent : null,
             annualRevenue: grossMonthlyRevenue * 12,
             totalExpenses,
             annualExpenses: totalExpenses * 12,
@@ -450,8 +461,15 @@ export default function PropertyCostCenterDashboard({
             <>
             {/* Row of KPI Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                {/* 1. Receita Bruta */}
-                <div className="p-5 rounded-2xl border border-border bg-card shadow-xs space-y-2">
+                {/* 1. Receita Bruta — with ledger data the card opens the rent history */}
+                <div
+                    className={`p-5 rounded-2xl border border-border bg-card shadow-xs space-y-2 ${financials.realIncomeMonth ? 'cursor-pointer transition-colors hover:border-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500' : ''}`}
+                    {...(financials.realIncomeMonth ? {
+                        role: 'button', tabIndex: 0, title: 'Ver o histórico do aluguel',
+                        onClick: () => setRentHistoryOpen(true),
+                        onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setRentHistoryOpen(true); } },
+                    } : {})}
+                >
                     <div className="flex items-center justify-between text-muted-foreground">
                         <span className="text-xs font-semibold uppercase tracking-wider">Receita Bruta</span>
                         <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600">
@@ -463,7 +481,13 @@ export default function PropertyCostCenterDashboard({
                             {formatBRL(financials.grossMonthlyRevenue)}
                         </span>
                         <span className="text-xs text-muted-foreground block leading-snug">
-                            {financials.realIncomeMonth ? <>{financials.realIncomeMonth}: aluguel + energia<br />Anual {formatBRL(financials.annualRevenue)}</> : `Projeção anual: ${formatBRL(financials.annualRevenue)}`}
+                            {financials.realIncomeMonth ? <>
+                                {financials.realIncomeMonth}: aluguel + energia
+                                <br />Aluguel bruto: {formatBRL2(financials.currentGrossRent ?? 0)}
+                                <br />Valor m²: {areaM2 && financials.currentGrossRent ? formatBRL2(financials.currentGrossRent / areaM2) : <span title="Informe a área construída em Aquisição & financiamento">informe a área</span>}
+                                <br />Anual: {formatBRL(financials.annualRevenue)}
+                                <span className="mt-1 flex items-center gap-1 font-semibold text-emerald-700 dark:text-emerald-400"><TrendingUp className="w-3 h-3" /> Ver histórico</span>
+                            </> : `Projeção anual: ${formatBRL(financials.annualRevenue)}`}
                         </span>
                     </div>
                 </div>
@@ -712,6 +736,8 @@ export default function PropertyCostCenterDashboard({
             <PropertyInvestmentSection propertyId={dbId} incomeRows={incomeRows} landlordTaxes={landlordTaxTotals(taxRows)} onDataChange={setInvestmentData} preloaded={preloadedInvestment} />
 
             {/* Property taxes register: the source of IPTU (landlord payments count in the month paid) */}
+            <RentHistoryModal isOpen={rentHistoryOpen} onClose={() => setRentHistoryOpen(false)} rows={incomeRows} areaM2={areaM2} />
+
             <PropertyTaxesSection propertyId={dbId} onRowsChange={setTaxRows} preloadedRows={overview === undefined ? undefined : overview?.taxes ?? null} />
 
             {/* Multifamily Units Summary (if applicable) */}
