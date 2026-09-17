@@ -136,6 +136,8 @@ describe("computeInvestmentMetrics — value, returns and real payback", () => {
         const m = computeInvestmentMetrics({ investment: inv, transactions: txs, incomeRows: rows, asOf: "2026-09", marketValue: { amount: 130000, valuedOn: "2026-08-01", source: "MANUAL" } });
         expect(m.marketValue).toBe(130000);
         expect(m.appreciationPct).toBeCloseTo(30, 1);
+        expect(m.appreciationPctAnnual).toBeCloseTo(10.8, 0);   // 1.3^(1/2.56 years) − 1
+        expect(base.appreciationPctAnnual).toBeNull();
         expect(m.appreciationGain).toBe(30000);
         expect(m.outstandingBalance).toBe(0);
         expect(m.equity).toBe(130000);
