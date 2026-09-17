@@ -1,102 +1,47 @@
-import { createClient } from '@supabase/supabase-js';
-import { NextResponse } from 'next/server';
-import { currentUser } from '@clerk/nextjs/server';
-
-function getServiceSupabase() {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!url || !key) throw new Error('Missing Supabase service credentials');
-    return createClient(url, key);
-}
+import { NextResponse } from "next/server";
+import { withAuth } from "@/lib/api-route";
 
 /**
  * GET /api/leases/dropdowns
- * Returns properties, tenants, agencies, and agents for form dropdowns.
+ * Properties, tenants, agencies and agents for the lease form's selects.
+ * Agencies come through the membership table, not a direct owner column.
  */
-export async function GET() {
-    try {
-        const user = await currentUser();
-        if (!user) {
-            return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-        }
+export const GET = withAuth({ tag: "Leases Dropdowns GET" }, async ({ profileId, supabase }) => {
+    const [propertiesRes, tenantsRes, membershipsRes, agentsRes] = await Promise.all([
+        supabase.from("properties").select("id, name, electronic_id").eq("owner_id", profileId).order("name", { ascending: true }),
+        supabase.from("tenants").select("id, full_name").eq("user_id", profileId).is("deleted_at", null).order("full_name", { ascending: true }),
+        supabase.from("agency_members").select("agency_id").eq("user_id", profileId),
+        supabase.from("agents").select("id, full_name, agency_id").eq("user_id", profileId).is("deleted_at", null).order("full_name", { ascending: true }),
+    ]);
 
-        const supabase = getServiceSupabase();
-
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('clerk_id', user.id)
-            .maybeSingle();
-
-        if (!profile) {
-            return NextResponse.json({
-                properties: [],
-                tenants: [],
-                agencies: [],
-                agents: [],
-            });
-        }
-
-        // Fetch all dropdown data in parallel
-        // NOTE: Agencies use a membership model (agency_members), not a direct user_id
-        const [propertiesRes, tenantsRes, membershipsRes, agentsRes] = await Promise.all([
-            supabase
-                .from('properties')
-                .select('id, name, electronic_id')
-                .eq('owner_id', profile.id)
-                .order('name', { ascending: true }),
-            supabase
-                .from('tenants')
-                .select('id, full_name')
-                .eq('user_id', profile.id)
-                .is('deleted_at', null)
-                .order('full_name', { ascending: true }),
-            supabase
-                .from('agency_members')
-                .select('agency_id')
-                .eq('user_id', profile.id),
-            supabase
-                .from('agents')
-                .select('id, full_name, agency_id')
-                .eq('user_id', profile.id)
-                .is('deleted_at', null)
-                .order('full_name', { ascending: true }),
-        ]);
-
-        // Fetch agencies from membership IDs
-        let agenciesList: { id: string; name: string }[] = [];
-        const membershipData = membershipsRes.data || [];
-        if (membershipData.length > 0) {
-            const agencyIds = membershipData.map((m: { agency_id: string }) => m.agency_id);
-            const { data: agenciesData } = await supabase
-                .from('agencies')
-                .select('id, name')
-                .in('id', agencyIds)
-                .is('deleted_at', null)
-                .order('name', { ascending: true });
-            agenciesList = agenciesData || [];
-        }
-
-        const rentalProperties = (propertiesRes.data || [])
-            .filter((p: any) => {
-                if (!p.electronic_id) return true;
-                try {
-                    const parsed = JSON.parse(p.electronic_id);
-                    return !parsed.isStandaloneUc;
-                } catch {
-                    return true;
-                }
-            })
-            .map(({ id, name }: any) => ({ id, name }));
-
-        return NextResponse.json({
-            properties: rentalProperties,
-            tenants: tenantsRes.data || [],
-            agencies: agenciesList,
-            agents: agentsRes.data || [],
-        });
-    } catch (err) {
-        console.error('[Leases Dropdowns GET] Error:', err);
-        return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
+    let agencies: { id: string; name: string }[] = [];
+    const agencyIds = (membershipsRes.data || []).map((m) => m.agency_id as string);
+    if (agencyIds.length > 0) {
+        const { data } = await supabase
+            .from("agencies")
+            .select("id, name")
+            .in("id", agencyIds)
+            .is("deleted_at", null)
+            .order("name", { ascending: true });
+        agencies = (data as { id: string; name: string }[] | null) || [];
     }
-}
+
+    // Standalone consumer units are energy-only records, not rentable properties.
+    const properties = (propertiesRes.data || [])
+        .filter((p) => {
+            if (!p.electronic_id) return true;
+            try {
+                return !JSON.parse(p.electronic_id as string).isStandaloneUc;
+            } catch {
+                return true;
+            }
+        })
+        .map(({ id, name }) => ({ id, name }));
+
+    return NextResponse.json({
+        properties,
+        tenants: tenantsRes.data || [],
+        agencies,
+        agents: agentsRes.data || [],
+    });
+});

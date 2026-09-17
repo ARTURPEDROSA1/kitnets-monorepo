@@ -37,6 +37,9 @@ output type. Rules:
   empty string produce the same message.
 - Normalise in the schema (`transform`), never in the route: the route inserts
   the schema's output as-is.
+- Cross-field rules (`superRefine`: "end date after start date", "agency
+  required when agency-managed") only run once every individual field is
+  valid, so their message appears after the field-level errors are fixed.
 - Cross-record checks (uniqueness, ownership, foreign keys) do not belong in
   the schema; put them in `lib/<entity>-server.ts` and throw `badRequest` /
   `conflict` from there (see `lib/tenants-server.ts`).
@@ -48,6 +51,7 @@ output type. Rules:
 | tenants | 3 files, 5 handlers | migrated (reference implementation) |
 | agents | 3 files, 6 handlers (incl. multipart photo upload) | migrated |
 | agencies | 4 files, 8 handlers (role-based: OWNER/ADMIN edit, OWNER delete; logo + agreement uploads) | migrated. Migration `20260916120000_agency_agreement_columns` added the real agreement columns and unpacked the old description metadata; `writeAgency` still carries the fallback and can lose it once that migration is confirmed in production |
+| leases | 5 files, 9 handlers (lease + additional tenants + charges, terminate, dropdowns, private document uploads) | migrated. Additional tenants are now restricted to the account's own tenants |
 | properties/*, portfolio, bank, water-bills/orphaned, gateways/claim | 27 handlers | already on `requireProfile`; wrapping them is mechanical |
-| leases, energy-bills/* | 8 files | still `currentUser()` + inline profile lookup + hand-written validation; next candidates |
+| energy-bills/* | 3 files | still `currentUser()` + inline profile lookup + hand-written validation; last old-style family |
 | cron/*, gateways/ingest, public calculators, AI endpoints | — | different auth (cron secret, ingest key, per-user limit via `requireUserWithLimit`); not for `withAuth` |
