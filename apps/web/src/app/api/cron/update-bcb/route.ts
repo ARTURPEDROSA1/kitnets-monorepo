@@ -1,3 +1,4 @@
+import { refreshIndexPages } from '@/lib/index-cache';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { isAuthorizedCron } from '@/lib/cron-auth';
@@ -88,5 +89,6 @@ export async function GET(request: NextRequest) {
         results.MINIMUM_WAGE = { error: message };
     }
 
+    refreshIndexPages();
     return NextResponse.json({ status: failed ? 'partial' : 'ok', results }, { status: failed ? 500 : 200 });
 }

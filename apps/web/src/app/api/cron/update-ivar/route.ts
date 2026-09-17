@@ -1,3 +1,4 @@
+import { refreshIndexPages } from '@/lib/index-cache';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { isAuthorizedCron } from '@/lib/cron-auth';
@@ -48,6 +49,7 @@ export async function GET(request: NextRequest) {
         const message = writes.length === 0 ? `Sem novidades; último mês ${latest}` : `${plan.inserts.length} mês(es) novo(s): ${plan.inserts.map(p => p.month).join(', ') || '—'}; ${plan.updates.length} atualizado(s): ${plan.updates.map(p => p.month).join(', ') || '—'}`;
         await saveSyncState(db, 'IVAR', writes.length === 0 ? 'unchanged' : 'ok', message, latest);
         console.log('[IVAR]', message);
+        refreshIndexPages();
         return NextResponse.json({ status: writes.length === 0 ? 'unchanged' : 'ok', inserted: plan.inserts.map(p => p.month), updated: plan.updates.map(p => p.month), latest });
     } catch (err) {
         const message = (err as Error).message;

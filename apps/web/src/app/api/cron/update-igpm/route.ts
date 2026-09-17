@@ -1,4 +1,5 @@
 
+import { refreshIndexPages } from '@/lib/index-cache';
 import { NextRequest, NextResponse } from 'next/server';
 import { isAuthorizedCron } from '@/lib/cron-auth';
 import { createClient } from '@supabase/supabase-js';
@@ -88,6 +89,7 @@ export async function GET(request: NextRequest) {
 
                 if (updateError) throw updateError;
 
+                refreshIndexPages();
                 return NextResponse.json({
                     success: true,
                     action: 'updated',
@@ -95,6 +97,7 @@ export async function GET(request: NextRequest) {
                 });
             }
 
+            refreshIndexPages();
             return NextResponse.json({
                 success: true,
                 action: 'skipped',
@@ -119,6 +122,7 @@ export async function GET(request: NextRequest) {
 
         if (insertError) throw insertError;
 
+        refreshIndexPages();
         return NextResponse.json({
             success: true,
             action: 'inserted',
@@ -127,6 +131,7 @@ export async function GET(request: NextRequest) {
 
     } catch (error: any) {
         console.error('Error updating IGP-M:', error);
+        refreshIndexPages();
         return NextResponse.json(
             { success: false, error: error.message },
             { status: 500 }
