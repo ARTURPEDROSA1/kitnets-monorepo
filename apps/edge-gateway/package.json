@@ -9,27 +9,27 @@
         "lint": "eslint src --ext .ts"
     },
     "dependencies": {
-        "@fastify/cors": "^9.0.1",
-        "@fastify/static": "^7.0.1",
-        "@types/node-fetch": "^2.6.13",
-        "dotenv": "^16.4.5",
-        "fastify": "^4.26.1",
-        "modbus-serial": "^8.0.16",
-        "mqtt": "^5.3.5",
-        "node-cron": "^3.0.3",
-        "node-fetch": "^3.3.2",
-        "pino": "^8.19.0",
-        "pino-pretty": "^10.3.1",
-        "sqlite3": "^5.1.7",
-        "zod": "^3.22.4"
+        "@fastify/cors": "9.0.1",
+        "@fastify/static": "7.0.4",
+        "@types/node-fetch": "2.6.13",
+        "dotenv": "16.6.1",
+        "fastify": "4.29.1",
+        "modbus-serial": "8.0.23",
+        "mqtt": "5.14.1",
+        "node-cron": "3.0.3",
+        "node-fetch": "3.3.2",
+        "pino": "8.21.0",
+        "pino-pretty": "10.3.1",
+        "sqlite3": "5.1.7",
+        "zod": "3.25.76"
     },
     "devDependencies": {
-        "@types/mqtt": "^2.5.0",
-        "@types/node": "^20.11.24",
-        "@types/node-cron": "^3.0.11",
-        "@types/sqlite3": "^3.1.11",
-        "eslint": "^8.57.0",
-        "tsx": "^4.7.1",
-        "typescript": "^5.3.3"
+        "@types/mqtt": "2.5.0",
+        "@types/node": "20.19.43",
+        "@types/node-cron": "3.0.11",
+        "@types/sqlite3": "3.1.11",
+        "eslint": "8.57.1",
+        "tsx": "4.21.0",
+        "typescript": "5.9.3"
     }
 }
