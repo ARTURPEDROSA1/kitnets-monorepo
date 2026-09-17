@@ -24,6 +24,20 @@ export type IndexValue = {
     source_url: string | null;
 };
 
+/**
+ * Cached read with the `indices` tag (the index cron jobs revalidate it after writing).
+ * A failed read throws inside the cached function, so the failure is never stored: before this,
+ * one transient Supabase error was cached for an hour and showed as a 404 or an empty page.
+ */
+async function cachedRead<T>(read: () => Promise<T>, keys: string[], fallback: T): Promise<T> {
+    try {
+        return await unstable_cache(read, keys, { revalidate: 3600, tags: ['indices'] })();
+    } catch (err) {
+        console.error(`[indexes] ${keys[0]} failed (not cached):`, (err as Error).message);
+        return fallback;
+    }
+}
+
 async function _getIndexMetadata(code: string): Promise<IndexMetadata | null> {
     const supabase = createStaticClient();
     const { data, error } = await supabase
@@ -33,25 +47,17 @@ async function _getIndexMetadata(code: string): Promise<IndexMetadata | null> {
         .single();
 
     if (error) {
-        console.error(`Error fetching index metadata for ${code}:`, error);
-        return null;
+        if (error.code === 'PGRST116') return null;   // no such index: a real "not found", safe to cache
+        throw new Error(`index metadata ${code}: ${error.message}`);
     }
     return data;
 }
 
 export const getIndexMetadata = (code: string) =>
-    unstable_cache(
-        () => _getIndexMetadata(code),
-        [`index-metadata-${code.toUpperCase()}`],
-        { revalidate: 3600, tags: ['indices'] }
-    )();
+    cachedRead<IndexMetadata | null>(() => _getIndexMetadata(code), [`index-metadata-${code.toUpperCase()}`], null);
 
 export async function getIndexValues(indexId: string, limit = 36): Promise<IndexValue[]> {
-    return unstable_cache(
-        () => _getIndexValues(indexId, limit),
-        [`index-values-${indexId}-${limit}`],
-        { revalidate: 3600, tags: ['indices'] }
-    )();
+    return cachedRead<IndexValue[]>(() => _getIndexValues(indexId, limit), [`index-values-${indexId}-${limit}`], []);
 }
 
 async function _getIndexValues(indexId: string, limit = 36): Promise<IndexValue[]> {
@@ -66,10 +72,7 @@ async function _getIndexValues(indexId: string, limit = 36): Promise<IndexValue[
         .order("reference_date", { ascending: false })
         .limit(fetchLimit);
 
-    if (error) {
-        console.error(`Error fetching index values for ${indexId}:`, error);
-        return [];
-    }
+    if (error) throw new Error(`index values ${indexId}: ${error.message}`);
 
     // Process data to add accumulated fields
     const enrichedData = data.map((item, index, arr) => {
@@ -131,11 +134,7 @@ async function _getIndexValues(indexId: string, limit = 36): Promise<IndexValue[
 }
 
 export async function getIndexValuesByDateRange(indexId: string, startDate?: string, endDate?: string): Promise<IndexValue[]> {
-    return unstable_cache(
-        () => _getIndexValuesByDateRange(indexId, startDate, endDate),
-        [`index-values-${indexId}-${startDate ?? 'none'}-${endDate ?? 'none'}`],
-        { revalidate: 3600, tags: ['indices'] }
-    )();
+    return cachedRead<IndexValue[]>(() => _getIndexValuesByDateRange(indexId, startDate, endDate), [`index-values-${indexId}-${startDate ?? 'none'}-${endDate ?? 'none'}`], []);
 }
 
 async function _getIndexValuesByDateRange(indexId: string, startDate?: string, endDate?: string): Promise<IndexValue[]> {
@@ -185,10 +184,7 @@ async function _getIndexValuesByDateRange(indexId: string, startDate?: string, e
 
     const { data, error } = await query;
 
-    if (error) {
-        console.error(`Error fetching index values for ${indexId}:`, error);
-        return [];
-    }
+    if (error) throw new Error(`index values ${indexId}: ${error.message}`);
 
     // Calculate accumulated values
     const enrichedData = data.map((item, index, arr) => {
@@ -263,10 +259,7 @@ async function _getAllIndexValuesForCalculator(indexId: string): Promise<IndexVa
             .order("reference_date", { ascending: true })
             .range(offset, offset + pageSize - 1);
 
-        if (error) {
-            console.error(`Error fetching all index values for calculator:`, error);
-            break;
-        }
+        if (error) throw new Error(`calculator values ${indexId}: ${error.message}`);
 
         if (data && data.length > 0) {
             for (const item of data) {
@@ -286,11 +279,7 @@ async function _getAllIndexValuesForCalculator(indexId: string): Promise<IndexVa
 }
 
 export const getAllIndexValuesForCalculator = (indexId: string) =>
-    unstable_cache(
-        () => _getAllIndexValuesForCalculator(indexId),
-        [`index-calc-values-${indexId}`],
-        { revalidate: 3600, tags: ['indices'] }
-    )();
+    cachedRead<IndexValueForCalc[]>(() => _getAllIndexValuesForCalculator(indexId), [`index-calc-values-${indexId}`], []);
 
 async function _getAllIndexes(): Promise<IndexMetadata[]> {
     const supabase = createStaticClient();
@@ -299,15 +288,8 @@ async function _getAllIndexes(): Promise<IndexMetadata[]> {
         .select("*")
         .order("code");
 
-    if (error) {
-        return [];
-    }
+    if (error) throw new Error(`all indexes: ${error.message}`);
     return data;
 }
 
-export const getAllIndexes = () =>
-    unstable_cache(
-        _getAllIndexes,
-        ['all-indexes'],
-        { revalidate: 3600, tags: ['indices'] }
-    )();
+export const getAllIndexes = () => cachedRead<IndexMetadata[]>(_getAllIndexes, ['all-indexes'], []);

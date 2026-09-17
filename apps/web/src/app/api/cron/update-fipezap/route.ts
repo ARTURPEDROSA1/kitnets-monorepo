@@ -1,3 +1,4 @@
+import { refreshIndexPages } from '@/lib/index-cache';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { isAuthorizedCron } from '@/lib/cron-auth';
@@ -45,6 +46,7 @@ export async function GET(request: NextRequest) {
         const unchanged = Boolean(state) && (stamp.etag ? stamp.etag === state!.etag : Boolean(stamp.lastModified) && stamp.lastModified === state!.last_modified);
         if (unchanged && !force && !full) {
             await saveState({ last_status: 'unchanged', last_message: null });
+            refreshIndexPages();
             return NextResponse.json({ status: 'unchanged', lastModified: stamp.lastModified });
         }
 
@@ -69,6 +71,7 @@ export async function GET(request: NextRequest) {
         const message = `${rows.length} valores gravados (${from ?? 'histórico completo'} → ${fileLatest}); banco estava em ${dbLatest ?? 'vazio'}`;
         await saveState({ etag: fileStamp.etag ?? stamp.etag, last_modified: fileStamp.lastModified ?? stamp.lastModified, latest_reference_date: fileLatest, last_imported_at: now, last_status: 'imported', last_message: message, rows_upserted: rows.length });
         console.log('[FipeZap]', message);
+        refreshIndexPages();
         return NextResponse.json({ status: 'imported', rows: rows.length, from, latest: fileLatest, previousLatest: dbLatest });
     } catch (err) {
         const message = (err as Error).message;
