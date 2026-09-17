@@ -43,8 +43,8 @@ export default function Tile({ label, value, hint, icon, tone, title, info }: { 
             <span className="text-lg font-bold text-foreground block tabular-nums leading-tight">{value}</span>
             <span className="text-[11px] text-muted-foreground block leading-snug break-words">{hint}</span>
             {info && (
-                <Dialog open={open} onOpenChange={setOpen}>
-                    <DialogContent className="sm:max-w-md">
+                <Dialog open={open} onOpenChange={setOpen} modal={false}>{/* non-modal: no dark overlay, no scroll lock; Esc or a click outside closes it */}
+                    <DialogContent className="sm:max-w-md shadow-2xl border-border">
                         <DialogHeader>
                             <DialogTitle className="flex items-center gap-2 text-base">
                                 <span className={cn("p-1.5 rounded-lg shrink-0", TONES[tone])}>{icon}</span>
