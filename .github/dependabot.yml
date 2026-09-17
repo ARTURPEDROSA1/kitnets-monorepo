@@ -1,0 +1,33 @@
+# Dependencies are pinned to exact versions (see docs/DEPENDENCIES.md), so
+# upgrades only happen through a reviewed PR. Dependabot proposes them once a
+# month, grouped, so there is one PR to look at instead of forty. CI (type-check,
+# lint, tests, gateway build) runs on each.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/" # npm workspaces: one lockfile at the root
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # The edge gateway's fastify 4 → 5 and sqlite3 5 → 6 are planned upgrades
+      # with code changes; keep Dependabot from opening them as one-line bumps.
+      - dependency-name: fastify
+        update-types: [version-update:semver-major]
+      - dependency-name: "@fastify/*"
+        update-types: [version-update:semver-major]
+      - dependency-name: sqlite3
+        update-types: [version-update:semver-major]
+    commit-message:
+      prefix: "chore(deps)"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: "chore(ci)"
