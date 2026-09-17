@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/api-route";
 import { agencyInputSchema } from "@/lib/schemas/agency";
 import { agencyUniqueViolation, assertAgencyCnpjUnique, writeAgency } from "@/lib/agencies-server";
-import { unpackAgencyMetadata } from "@/lib/agency-metadata";
 import { withSignedAgreement } from "@/lib/agency-agreement";
 
 type MembershipRow = {
@@ -32,7 +31,7 @@ export const GET = withAuth({ tag: "Agencies GET" }, async ({ profileId, supabas
     const agencies = await Promise.all(
         (memberships as unknown as MembershipRow[])
             .filter((m) => m.agencies)
-            .map((m) => withSignedAgreement(supabase, unpackAgencyMetadata({ ...m.agencies, role: m.role || "VIEWER" })))
+            .map((m) => withSignedAgreement(supabase, { ...m.agencies, role: m.role || "VIEWER" }))
     );
 
     return NextResponse.json({ agencies });
@@ -66,6 +65,6 @@ export const POST = withAuth({ body: agencyInputSchema, tag: "Agencies POST" }, 
 
     return NextResponse.json({
         success: true,
-        agency: await withSignedAgreement(supabase, unpackAgencyMetadata({ ...(agency as NonNullable<MembershipRow["agencies"]>), role: "OWNER" })),
+        agency: await withSignedAgreement(supabase, { ...(agency as NonNullable<MembershipRow["agencies"]>), role: "OWNER" }),
     });
 });

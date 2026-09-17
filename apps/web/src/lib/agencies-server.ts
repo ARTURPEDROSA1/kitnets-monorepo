@@ -1,6 +1,5 @@
 import type { AdminSupabase } from "@/lib/api-auth";
 import { conflict, forbidden } from "@/lib/api-route";
-import { packAgencyMetadata, unpackAgencyMetadata, type AgencyMetadata } from "@/lib/agency-metadata";
 import { AGREEMENT_BUCKET, normalizeAgreementUrl } from "@/lib/agency-agreement";
 
 /**
@@ -57,76 +56,25 @@ export function agencyUniqueViolation(error: { code?: string } | null): Record<s
     return error?.code === "23505" ? { cnpj: "Este CNPJ já está cadastrado por outra imobiliária." } : null;
 }
 
-const META_KEYS: (keyof AgencyMetadata)[] = [
-    "service_agreement_url",
-    "service_agreement_filename",
-    "management_fee",
-    "agreement_start_date",
-    "agreement_end_date",
-];
-
-const isMissingColumn = (error: { code?: string; message?: string } | null) =>
-    !!error && (error.code === "42703" || !!error.message?.includes("column"));
-
 /**
- * Inserts (no agencyId) or updates an agency row.
- *
- * The production `agencies` table does not (yet) have the service-agreement
- * columns; when Postgres reports them missing, those fields are packed into a
- * metadata block at the top of `description` (lib/agency-metadata.ts), merged
- * with whatever is already stored there. Remove this fallback once a migration
- * adds the real columns.
+ * Inserts (no agencyId) or updates an agency row. The service-agreement fields
+ * are real columns since migration 20260916120000_agency_agreement_columns.
  */
 export async function writeAgency(
     supabase: AdminSupabase,
     data: Record<string, unknown>,
     agencyId?: string
 ): Promise<{ agency: Record<string, unknown> | null; error: { code?: string; message?: string } | null }> {
-    const run = (payload: Record<string, unknown>) =>
-        agencyId
-            ? supabase.from("agencies").update(payload).eq("id", agencyId).select().single()
-            : supabase.from("agencies").insert(payload).select().single();
-
-    const first = await run(data);
-    if (!first.error || !isMissingColumn(first.error)) {
-        return { agency: (first.data as Record<string, unknown> | null) ?? null, error: first.error };
-    }
-
-    console.warn("[agencies] agreement columns missing; packing metadata into description");
-    const core: Record<string, unknown> = { ...data };
-    const meta: AgencyMetadata = {};
-    for (const k of META_KEYS) {
-        if (k in core) {
-            (meta as Record<string, unknown>)[k] = core[k];
-            delete core[k];
-        }
-    }
-
-    let baseDescription = core.description as string | null | undefined;
-    let merged: AgencyMetadata = meta;
-    if (agencyId) {
-        const { data: current } = await supabase.from("agencies").select("description").eq("id", agencyId).maybeSingle();
-        const currentMeta = current ? (unpackAgencyMetadata(current) as Record<string, unknown>) : {};
-        const kept: AgencyMetadata = {};
-        for (const k of META_KEYS) if (currentMeta[k] !== undefined) (kept as Record<string, unknown>)[k] = currentMeta[k];
-        merged = { ...kept, ...meta };
-        if (baseDescription === undefined) baseDescription = (currentMeta.description as string | null | undefined) ?? null;
-    }
-
-    const retry = await run({ ...core, description: packAgencyMetadata(baseDescription, merged) });
-    return { agency: (retry.data as Record<string, unknown> | null) ?? null, error: retry.error };
+    const { data: row, error } = agencyId
+        ? await supabase.from("agencies").update(data).eq("id", agencyId).select().single()
+        : await supabase.from("agencies").insert(data).select().single();
+    return { agency: (row as Record<string, unknown> | null) ?? null, error };
 }
 
-/**
- * Storage path of the agency's current agreement, whether it sits in the
- * native column or (rows written before migration 20260916120000) in the
- * description metadata block.
- */
+/** Storage path of the agency's current agreement in the private documents bucket. */
 export async function currentAgreementPath(supabase: AdminSupabase, agencyId: string): Promise<string | null> {
-    const { data } = await supabase.from("agencies").select("*").eq("id", agencyId).maybeSingle();
-    if (!data) return null;
-    const merged = unpackAgencyMetadata(data as Record<string, unknown>) as { service_agreement_url?: unknown };
-    return normalizeAgreementUrl(merged.service_agreement_url);
+    const { data } = await supabase.from("agencies").select("service_agreement_url").eq("id", agencyId).maybeSingle();
+    return normalizeAgreementUrl(data?.service_agreement_url);
 }
 
 /** Deletes an agreement file from the private documents bucket (only paths under agencies/). */
