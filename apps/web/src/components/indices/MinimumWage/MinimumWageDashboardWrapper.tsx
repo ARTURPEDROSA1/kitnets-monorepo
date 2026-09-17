@@ -13,9 +13,11 @@ interface Props {
     startDate: string;
     endDate: string;
     nextAdjustment?: MinimumWageData | null;
+    /** correction calculator, rendered between the cards and the filter */
+    calculator?: React.ReactNode;
 }
 
-export function MinimumWageDashboardWrapper({ data, latest, startDate, endDate, nextAdjustment }: Props) {
+export function MinimumWageDashboardWrapper({ data, latest, startDate, endDate, nextAdjustment, calculator }: Props) {
     // 1. Calculate Accumulated in Period
     // Formula: (LastValue / FirstValue - 1) * 100
     // Data is sorted DESC (newest first).
@@ -139,6 +141,9 @@ export function MinimumWageDashboardWrapper({ data, latest, startDate, endDate, 
                     </div>
                 </div>
             </div>
+
+            {/* Correction calculator: same position as on every index page (after the cards, before the filter) */}
+            {calculator && <div className="md:col-span-3 min-w-0">{calculator}</div>}
 
             {/* Filter */}
             <div className="md:col-span-3 min-w-0">

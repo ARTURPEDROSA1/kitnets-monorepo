@@ -442,10 +442,8 @@ export default async function IndexPage({ params, searchParams }: Props) {
                         type={(type as string) || 'locacao'}
                         bedrooms={(bedrooms as string) || 'todos'}
                         data={await getFipeZapData(startDateStr, endDateStr, (bedrooms as string) || 'todos')}
+                        calculator={<FipeZapCalculator initialType={(type as string) === 'venda' ? 'venda' : 'locacao'} />}
                     />
-                    <div className="mt-6">
-                        <FipeZapCalculator initialType={(type as string) === 'venda' ? 'venda' : 'locacao'} />
-                    </div>
                 </div>
             )}
 
@@ -457,12 +455,12 @@ export default async function IndexPage({ params, searchParams }: Props) {
                         startDate={startDateStr}
                         endDate={endDateStr}
                         nextAdjustment={minWageNext}
+                        calculator={
+                            <Suspense fallback={<div className="rounded-xl border bg-card shadow-sm p-6 h-48 animate-pulse" />}>
+                                <IPCACalculatorLazy indexCode="REAJUSTE-SALARIO-MINIMO" />
+                            </Suspense>
+                        }
                     />
-                    <div className="mt-6">
-                        <Suspense fallback={<div className="rounded-xl border bg-card shadow-sm p-6 h-48 animate-pulse" />}>
-                            <IPCACalculatorLazy indexCode="REAJUSTE-SALARIO-MINIMO" />
-                        </Suspense>
-                    </div>
                 </div>
             )}
 
@@ -493,12 +491,6 @@ export default async function IndexPage({ params, searchParams }: Props) {
                         </Suspense>
                     )}
 
-                    {/* IPCA/INPC Alert Form */}
-                    {(code === 'IPCA' || code === 'INPC') && (
-                        <Suspense fallback={<div className="rounded-xl border bg-card shadow-sm p-6 h-32 animate-pulse" />}>
-                            <IPCAAlertFormLazy indexCode={code} lang={lang} />
-                        </Suspense>
-                    )}
 
                     {/* Date Filter */}
                     <div className="md:col-span-3 min-w-0">
@@ -589,6 +581,13 @@ export default async function IndexPage({ params, searchParams }: Props) {
                             title="Calendário de divulgação IVAR 2026"
                             items={IVAR_CALENDAR_2026}
                         />
+                    )}
+
+                    {/* IPCA/INPC alert: after the historic table and the calendar, before the explanation text */}
+                    {(code === 'IPCA' || code === 'INPC') && (
+                        <Suspense fallback={<div className="rounded-xl border bg-card shadow-sm p-6 h-32 animate-pulse" />}>
+                            <IPCAAlertFormLazy indexCode={code} lang={lang} />
+                        </Suspense>
                     )}
                 </div>
             )}
@@ -803,14 +802,6 @@ export default async function IndexPage({ params, searchParams }: Props) {
                 </div>
             </div>
 
-            {/* IPCA/INPC Alert Form — Standalone card below CTA */}
-            {(code === 'IPCA' || code === 'INPC') && (
-                <div className="mt-10 w-full">
-                    <Suspense fallback={<div className="rounded-xl border bg-card shadow-sm p-6 h-32 animate-pulse" />}>
-                        <IPCAAlertFormLazy indexCode={code} lang={lang} />
-                    </Suspense>
-                </div>
-            )}
 
             <script
                 type="application/ld+json"
