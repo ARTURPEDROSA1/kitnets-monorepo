@@ -67,7 +67,7 @@ export default function InvestmentScenarios({ metrics, investment }: Props) {
             </button>
             {open && (
                 <div className="px-4 pb-4 space-y-4">
-                    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 text-xs">
+                    <div className={`grid grid-cols-2 md:grid-cols-3 gap-3 text-xs ${financed ? "xl:grid-cols-6" : "xl:grid-cols-5"}`}>
                         <label className="space-y-1">
                             <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Reajuste do aluguel (% a.a.)</span>
                             <input type="number" step="0.1" value={s.rentGrowthPctYear} onChange={num("rentGrowthPctYear")} className={inputCls} />
@@ -75,10 +75,6 @@ export default function InvestmentScenarios({ metrics, investment }: Props) {
                         <label className="space-y-1">
                             <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Vacância (% do tempo)</span>
                             <input type="number" step="1" min="0" max="90" value={s.vacancyPct} onChange={num("vacancyPct")} className={inputCls} />
-                        </label>
-                        <label className="space-y-1">
-                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Amortização extra hoje (R$)</span>
-                            <input type="number" step="1000" min="0" value={s.prepayNow} onChange={num("prepayNow")} disabled={!financed} className={inputCls} title={financed ? "" : "Só com financiamento ativo"} />
                         </label>
                         <label className="space-y-1">
                             <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Valorização (% a.a.)</span>
@@ -95,6 +91,13 @@ export default function InvestmentScenarios({ metrics, investment }: Props) {
                             <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Custos de venda (%)</span>
                             <input type="number" step="0.5" min="0" max="50" value={s.sellingCostPct} onChange={num("sellingCostPct")} className={inputCls} />
                         </label>
+                        {/* last in the row, and only while the financing is still running */}
+                        {financed && (
+                            <label className="space-y-1">
+                                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Amortização extra hoje (R$)</span>
+                                <input type="number" step="1000" min="0" value={s.prepayNow} onChange={num("prepayNow")} className={inputCls} />
+                            </label>
+                        )}
                     </div>
 
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
