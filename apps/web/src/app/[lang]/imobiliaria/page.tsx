@@ -2,7 +2,6 @@ import { auth } from "@clerk/nextjs/server";
 import { createClient } from "@supabase/supabase-js";
 import { getDictionary } from "../../../dictionaries";
 import ImobiliariaContent from "./ImobiliariaContent";
-import { unpackAgencyMetadata } from "@/lib/agency-metadata";
 import { withSignedAgreement } from '@/lib/agency-agreement';
 import type { AgencyWithRole } from "@/types/agency";
 
@@ -54,13 +53,7 @@ async function getInitialAgencies(): Promise<AgencyWithRole[]> {
                 .filter((m) => m.agencies)
                 .map((m) =>
                     // Agreements live in a private bucket: hand out a signed URL
-                    withSignedAgreement(
-                        supabase,
-                        unpackAgencyMetadata({
-                            ...m.agencies,
-                            role: m.role || 'VIEWER',
-                        })
-                    )
+                    withSignedAgreement(supabase, { ...m.agencies, role: m.role || 'VIEWER' })
                 )
         )) as AgencyWithRole[];
     } catch (e) {

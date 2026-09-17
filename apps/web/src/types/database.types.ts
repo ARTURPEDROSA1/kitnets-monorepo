@@ -19,6 +19,8 @@ export type Database = {
           additional_phone: string | null
           additional_phone_whatsapp: boolean | null
           address_complement: string | null
+          agreement_end_date: string | null
+          agreement_start_date: string | null
           city: string
           cnpj: string | null
           country: string
@@ -34,10 +36,13 @@ export type Database = {
           logo_url: string | null
           main_phone: string
           main_phone_whatsapp: boolean | null
+          management_fee: number | null
           name: string
           neighborhood: string
           owner_name: string | null
           postal_code: string
+          service_agreement_filename: string | null
+          service_agreement_url: string | null
           state: string
           status: string
           street: string
@@ -51,6 +56,8 @@ export type Database = {
           additional_phone?: string | null
           additional_phone_whatsapp?: boolean | null
           address_complement?: string | null
+          agreement_end_date?: string | null
+          agreement_start_date?: string | null
           city: string
           cnpj?: string | null
           country?: string
@@ -66,10 +73,13 @@ export type Database = {
           logo_url?: string | null
           main_phone: string
           main_phone_whatsapp?: boolean | null
+          management_fee?: number | null
           name: string
           neighborhood: string
           owner_name?: string | null
           postal_code: string
+          service_agreement_filename?: string | null
+          service_agreement_url?: string | null
           state: string
           status?: string
           street: string
@@ -83,6 +93,8 @@ export type Database = {
           additional_phone?: string | null
           additional_phone_whatsapp?: boolean | null
           address_complement?: string | null
+          agreement_end_date?: string | null
+          agreement_start_date?: string | null
           city?: string
           cnpj?: string | null
           country?: string
@@ -98,10 +110,13 @@ export type Database = {
           logo_url?: string | null
           main_phone?: string
           main_phone_whatsapp?: boolean | null
+          management_fee?: number | null
           name?: string
           neighborhood?: string
           owner_name?: string | null
           postal_code?: string
+          service_agreement_filename?: string | null
+          service_agreement_url?: string | null
           state?: string
           status?: string
           street?: string
@@ -494,6 +509,72 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      bank_transactions: {
+        Row: {
+          amount: number
+          bank: string | null
+          created_at: string
+          destination: string
+          id: string
+          kind: string | null
+          linked_id: string | null
+          memo: string
+          occurred_on: string
+          owner_id: string
+          property_id: string | null
+          reference: string
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          bank?: string | null
+          created_at?: string
+          destination?: string
+          id?: string
+          kind?: string | null
+          linked_id?: string | null
+          memo?: string
+          occurred_on: string
+          owner_id: string
+          property_id?: string | null
+          reference: string
+          source?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          bank?: string | null
+          created_at?: string
+          destination?: string
+          id?: string
+          kind?: string | null
+          linked_id?: string | null
+          memo?: string
+          occurred_on?: string
+          owner_id?: string
+          property_id?: string | null
+          reference?: string
+          source?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_transactions_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_transactions_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       calculator_suggestions: {
         Row: {
@@ -1731,11 +1812,11 @@ export type Database = {
           created_at: string
           energy_portion: number
           id: string
+          iptu_amount: number
           month: string
           notes: string | null
-          other_income: number
           other_expenses: number
-          iptu_amount: number
+          other_income: number
           owner_id: string
           property_id: string
           received_amount: number
@@ -1750,11 +1831,11 @@ export type Database = {
           created_at?: string
           energy_portion?: number
           id?: string
+          iptu_amount?: number
           month: string
           notes?: string | null
-          other_income?: number
           other_expenses?: number
-          iptu_amount?: number
+          other_income?: number
           owner_id: string
           property_id: string
           received_amount?: number
@@ -1769,11 +1850,11 @@ export type Database = {
           created_at?: string
           energy_portion?: number
           id?: string
+          iptu_amount?: number
           month?: string
           notes?: string | null
-          other_income?: number
           other_expenses?: number
-          iptu_amount?: number
+          other_income?: number
           owner_id?: string
           property_id?: string
           received_amount?: number
@@ -1877,213 +1958,96 @@ export type Database = {
           },
         ]
       }
-      property_valuations: {
-        Row: {
-          amount: number
-          created_at: string
-          id: string
-          note: string | null
-          owner_id: string
-          property_id: string
-          source: string
-          updated_at: string
-          valued_on: string
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          id?: string
-          note?: string | null
-          owner_id: string
-          property_id: string
-          source?: string
-          updated_at?: string
-          valued_on: string
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          id?: string
-          note?: string | null
-          owner_id?: string
-          property_id?: string
-          source?: string
-          updated_at?: string
-          valued_on?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "property_valuations_owner_id_fkey"
-            columns: ["owner_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "property_valuations_property_id_fkey"
-            columns: ["property_id"]
-            isOneToOne: false
-            referencedRelation: "properties"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      bank_transactions: {
-        Row: {
-          amount: number
-          bank: string | null
-          created_at: string
-          destination: string
-          id: string
-          kind: string | null
-          linked_id: string | null
-          memo: string
-          occurred_on: string
-          owner_id: string
-          property_id: string | null
-          reference: string
-          source: string
-          updated_at: string
-        }
-        Insert: {
-          amount: number
-          bank?: string | null
-          created_at?: string
-          destination?: string
-          id?: string
-          kind?: string | null
-          linked_id?: string | null
-          memo?: string
-          occurred_on: string
-          owner_id: string
-          property_id?: string | null
-          reference: string
-          source?: string
-          updated_at?: string
-        }
-        Update: {
-          amount?: number
-          bank?: string | null
-          created_at?: string
-          destination?: string
-          id?: string
-          kind?: string | null
-          linked_id?: string | null
-          memo?: string
-          occurred_on?: string
-          owner_id?: string
-          property_id?: string | null
-          reference?: string
-          source?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "bank_transactions_owner_id_fkey"
-            columns: ["owner_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "bank_transactions_property_id_fkey"
-            columns: ["property_id"]
-            isOneToOne: false
-            referencedRelation: "properties"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       property_taxes: {
         Row: {
+          aliquota_pct: number | null
           amount: number
+          area_construida: number | null
+          area_terreno: number | null
+          coleta_lixo: number | null
           comment: string | null
           created_at: string
+          desconto: number | null
+          document_path: string | null
+          extracted_at: string | null
           id: string
+          inscricao: string | null
           installments: Json
           kind: string
+          municipio: string | null
           owner_id: string
           paid_by: string
           paid_on: string | null
           property_id: string
-          updated_at: string
-          year: number
-          municipio: string | null
-          inscricao: string | null
           referencia: string | null
-          vencimento: string | null
-          area_terreno: number | null
-          area_construida: number | null
-          valor_venal_terreno: number | null
-          valor_venal_predial: number | null
-          valor_venal_imovel: number | null
-          aliquota_pct: number | null
-          valor_imposto: number | null
-          coleta_lixo: number | null
           tsa: number | null
-          desconto: number | null
-          document_path: string | null
-          extracted_at: string | null
+          updated_at: string
+          valor_imposto: number | null
+          valor_venal_imovel: number | null
+          valor_venal_predial: number | null
+          valor_venal_terreno: number | null
+          vencimento: string | null
+          year: number
         }
         Insert: {
+          aliquota_pct?: number | null
           amount: number
+          area_construida?: number | null
+          area_terreno?: number | null
+          coleta_lixo?: number | null
           comment?: string | null
           created_at?: string
+          desconto?: number | null
+          document_path?: string | null
+          extracted_at?: string | null
           id?: string
+          inscricao?: string | null
           installments?: Json
           kind: string
+          municipio?: string | null
           owner_id: string
           paid_by?: string
           paid_on?: string | null
           property_id: string
+          referencia?: string | null
+          tsa?: number | null
           updated_at?: string
+          valor_imposto?: number | null
+          valor_venal_imovel?: number | null
+          valor_venal_predial?: number | null
+          valor_venal_terreno?: number | null
+          vencimento?: string | null
           year: number
-          municipio: string | null
-          inscricao: string | null
-          referencia: string | null
-          vencimento: string | null
-          area_terreno: number | null
-          area_construida: number | null
-          valor_venal_terreno: number | null
-          valor_venal_predial: number | null
-          valor_venal_imovel: number | null
-          aliquota_pct: number | null
-          valor_imposto: number | null
-          coleta_lixo: number | null
-          tsa: number | null
-          desconto: number | null
-          document_path: string | null
-          extracted_at: string | null
         }
         Update: {
+          aliquota_pct?: number | null
           amount?: number
+          area_construida?: number | null
+          area_terreno?: number | null
+          coleta_lixo?: number | null
           comment?: string | null
           created_at?: string
+          desconto?: number | null
+          document_path?: string | null
+          extracted_at?: string | null
           id?: string
+          inscricao?: string | null
           installments?: Json
           kind?: string
+          municipio?: string | null
           owner_id?: string
           paid_by?: string
           paid_on?: string | null
           property_id?: string
-          updated_at?: string
-          year?: number
-          municipio?: string | null
-          inscricao?: string | null
           referencia?: string | null
-          vencimento?: string | null
-          area_terreno?: number | null
-          area_construida?: number | null
-          valor_venal_terreno?: number | null
-          valor_venal_predial?: number | null
-          valor_venal_imovel?: number | null
-          aliquota_pct?: number | null
-          valor_imposto?: number | null
-          coleta_lixo?: number | null
           tsa?: number | null
-          desconto?: number | null
-          document_path?: string | null
-          extracted_at?: string | null
+          updated_at?: string
+          valor_imposto?: number | null
+          valor_venal_imovel?: number | null
+          valor_venal_predial?: number | null
+          valor_venal_terreno?: number | null
+          vencimento?: string | null
+          year?: number
         }
         Relationships: [
           {
@@ -2167,6 +2131,75 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      property_valuations: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          note: string | null
+          owner_id: string
+          property_id: string
+          source: string
+          updated_at: string
+          valued_on: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          note?: string | null
+          owner_id: string
+          property_id: string
+          source?: string
+          updated_at?: string
+          valued_on: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          note?: string | null
+          owner_id?: string
+          property_id?: string
+          source?: string
+          updated_at?: string
+          valued_on?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_valuations_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_valuations_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rate_limits: {
+        Row: {
+          hits: number
+          key: string
+          reset_at: string
+        }
+        Insert: {
+          hits?: number
+          key: string
+          reset_at: string
+        }
+        Update: {
+          hits?: number
+          key?: string
+          reset_at?: string
+        }
+        Relationships: []
       }
       readings: {
         Row: {
@@ -2659,6 +2692,15 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      rate_limit_hit: {
+        Args: { p_key: string; p_limit: number; p_window_ms: number }
+        Returns: {
+          allowed: boolean
+          remaining: number
+          resets_at: string
+        }[]
+      }
+      rate_limits_prune: { Args: never; Returns: number }
       upsert_water_bill: {
         Args: {
           p_average_consumption_m3?: number

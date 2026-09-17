@@ -8,7 +8,6 @@ import {
     requireAgencyRole,
     writeAgency,
 } from "@/lib/agencies-server";
-import { unpackAgencyMetadata } from "@/lib/agency-metadata";
 import { withSignedAgreement } from "@/lib/agency-agreement";
 
 type Params = { id: string };
@@ -36,10 +35,10 @@ export const PUT = withAuth<typeof agencyInputSchema, Params>(
 
         return NextResponse.json({
             success: true,
-            agency: await withSignedAgreement(
-                supabase,
-                unpackAgencyMetadata({ ...(agency as Record<string, unknown> & { service_agreement_url?: string | null }), role })
-            ),
+            agency: await withSignedAgreement(supabase, {
+                ...(agency as Record<string, unknown> & { service_agreement_url?: string | null }),
+                role,
+            }),
         });
     }
 );
