@@ -534,7 +534,10 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                 <Tile label="Total investido no imóvel" value={formatBRL(summary.invested + taxes.total)} tone="emerald" icon={<PiggyBank className="w-4 h-4" />}
                     hint={<>Entrada: {formatBRL(summary.downPayment + summary.closingCosts)}<br />Banco: {formatBRL(summary.bankPaid + summary.bankFees)}<br />Reformas: {formatBRL(summary.capex)}<br />Custos do imóvel: {formatBRL(summary.runningCosts + taxes.total)}<br />Energia solar: {formatBRL(summary.solarInvested)}</>} />
                 <Tile label="Pago ao banco" value={formatBRL(summary.bankPaid + summary.bankFees)} tone="blue" icon={<Landmark className="w-4 h-4" />}
-                    hint={<>Prestações: {summary.installments}<br />Juros + seguros: {summary.interestAndInsurance === null ? "—" : formatBRL(summary.interestAndInsurance)}<br />Tarifas: {formatBRL(summary.bankFees)}</>} />
+                    hint={<>Prestações: {summary.installments}<br />Juros + seguros: {summary.interestAndInsurance === null ? "—" : formatBRL(summary.interestAndInsurance)}<br />Tarifas: {formatBRL(summary.bankFees)}
+                        {summary.uncoveredPrincipal !== null && summary.uncoveredPrincipal > 1 && (
+                            <><br /><span className="text-amber-700 dark:text-amber-400" title="Valor financiado − soma das amortizações dos lançamentos. O financiamento está quitado, então falta uma amortização no registro ou alguma foi lançada com valor menor (FGTS, por exemplo). Veja o aviso em Calcular juros e amortização.">Principal sem lançamento: {formatBRL(summary.uncoveredPrincipal)}</span></>
+                        )}</>} />
                 <Tile label="Reformas (capex)" value={formatBRL(summary.capex)} tone="violet" icon={<Hammer className="w-4 h-4" />}
                     hint={`${txs.filter(t => t.kind === "REFORMA").length} lançamentos`} />
                 <Tile label="Custos do imóvel" value={formatBRL(summary.runningCosts + taxes.total)} tone="rose" icon={<Receipt className="w-4 h-4" />}
