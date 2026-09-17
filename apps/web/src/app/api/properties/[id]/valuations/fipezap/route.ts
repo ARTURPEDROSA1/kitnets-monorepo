@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireProfile, getOwnedProperty } from "@/lib/api-auth";
-import { fipezapEstimate } from "@/lib/property-valuations";
+import { fipezapEstimate, purchaseAppraisal } from "@/lib/property-valuations";
 import { fipezapBucket, loadFipezapSaleSeries } from "@/lib/property-valuations-server";
 
 export const dynamic = "force-dynamic";
@@ -37,9 +37,13 @@ export async function POST(request: Request, context: RouteContext) {
         let usedBucket = bucket;
         if (series.length === 0 && bucket !== "total") { series = await loadFipezapSaleSeries(supabase, "total"); usedBucket = "total"; }
         if (series.length === 0) return NextResponse.json({ error: "Série FipeZap indisponível" }, { status: 503 });
-        const estimate = fipezapEstimate(purchasePrice, inv.acquired_on, series);
+        // Bought below/above market: the index starts from the purchase appraisal (laudo), not from the price paid.
+        const { data: appraisals } = await supabase.from("property_valuations").select("valued_on, amount, source").eq("property_id", id).eq("source", "APPRAISAL");
+        const appraisal = purchaseAppraisal((appraisals ?? []) as Array<{ valued_on: string; amount: number; source: "APPRAISAL" }>, inv.acquired_on);
+        const base = appraisal ? appraisal.amount : purchasePrice;
+        const estimate = fipezapEstimate(base, inv.acquired_on, series);
         if (estimate.months === 0) return NextResponse.json({ error: "A série FipeZap não cobre o período desde a compra" }, { status: 422 });
-        return NextResponse.json({ estimate, bucket: usedBucket, purchasePrice, acquiredOn: inv.acquired_on });
+        return NextResponse.json({ estimate, bucket: usedBucket, purchasePrice: base, basis: appraisal ? "APPRAISAL" : "PURCHASE", acquiredOn: inv.acquired_on });
     } catch (err) {
         console.error("[Valuations FipeZap]", (err as Error).message);
         return NextResponse.json({ error: "Erro ao consultar o FipeZap" }, { status: 500 });

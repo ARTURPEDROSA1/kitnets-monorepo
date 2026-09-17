@@ -33,6 +33,7 @@ import { formatDateBR, type PropertyInvestment, type PropertyTransaction } from 
 import type { PropertyTax } from "@/lib/property-taxes";
 import {
     latestValuation,
+    purchaseAppraisal,
     VALUATION_SOURCE_LABELS,
     VALUATION_SOURCES,
     type MonthlyIndexPoint,
@@ -153,6 +154,8 @@ export default function PropertyInvestmentAnalysis({ propertyId, bedrooms, inves
     }, [endpoint, preloadedValuations]);
 
     const latest = useMemo(() => latestValuation(valuations), [valuations]);
+    /** The laudo made for the purchase: shows how far below/above market the property was bought. */
+    const boughtAppraisal = useMemo(() => purchaseAppraisal(valuations, investment?.acquired_on), [valuations, investment?.acquired_on]);
     const metrics = useMemo(
         () => computeInvestmentMetrics({
             investment, transactions, incomeRows, taxes, includeExpected, ipca,
@@ -204,7 +207,7 @@ export default function PropertyInvestmentAnalysis({ propertyId, bedrooms, inves
             const e = d.estimate as { amount: number; factor: number; from: string; to: string; months: number };
             const pct = ((e.factor - 1) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
             const bucket = d.bucket === "total" ? "todos os dormitórios" : `${d.bucket} dorm.`;
-            const note = `FipeZap venda (${bucket}): ${pct}% de ${formatMonthKey(e.from)} a ${formatMonthKey(e.to)} sobre ${formatBRL(d.purchasePrice)}`;
+            const note = `FipeZap venda (${bucket}): ${pct}% de ${formatMonthKey(e.from)} a ${formatMonthKey(e.to)} sobre ${d.basis === "APPRAISAL" ? "a avaliação na compra de " : ""}${formatBRL(d.purchasePrice)}`;
             setDraft({ valued_on: endOfMonth(e.to), amount: e.amount.toFixed(2).replace(".", ","), source: "FIPEZAP", note });
             setFipezapNote(`Estimativa preenchida: ${formatBRL(e.amount)} (${e.months} meses de índice). Confira e clique em Salvar.`);
         } catch (err) { setError((err as Error).message); } finally { setBusy(null); }
@@ -232,6 +235,7 @@ export default function PropertyInvestmentAnalysis({ propertyId, bedrooms, inves
 
     // ── explanations (icon popup on each card) ──────────────────────────
     const price = investment?.purchase_price ? Number(investment.purchase_price) : null;
+    const purchaseDiscountPct = boughtAppraisal && price ? Math.round((1 - price / boughtAppraisal.amount) * 1000) / 10 : null;
     const brl = (v: number | null | undefined) => (v === null || v === undefined ? "—" : formatBRL(v));
     const multipleLabel = metrics.equityMultiple !== null ? `${metrics.equityMultiple.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}×` : "—";
     const info: Record<string, TileInfo> = {
@@ -286,9 +290,13 @@ export default function PropertyInvestmentAnalysis({ propertyId, bedrooms, inves
             example: metrics.capRate !== null ? <>{brl(metrics.monthlyNoiPace * 12)} ÷ {brl(metrics.marketValue)} = {pctLabel(metrics.capRate)}</> : undefined,
         },
         purchasePrice: {
-            what: "Preço de compra do imóvel. É a referência da valorização e do yield bruto. Não inclui ITBI, cartório, reformas nem juros: esses estão no capital investido.",
-            formula: "Valor informado em Aquisição & financiamento",
-            example: price !== null ? <>{brl(price)}{investment?.acquired_on ? ` em ${formatDateBR(investment.acquired_on)}` : ""}</> : undefined,
+            what: "O que você pagou pelo imóvel: o que o vendedor recebeu (entrada + financiamento). É a referência da valorização e do yield bruto. Não inclui ITBI, cartório, reformas nem juros: esses estão no capital investido.",
+            formula: <>Valor informado em Aquisição & financiamento<br />Desconto na compra = 1 − valor de compra ÷ avaliação na compra</>,
+            example: price !== null ? <>
+                {brl(price)}{investment?.acquired_on ? ` em ${formatDateBR(investment.acquired_on)}` : ""}
+                {boughtAppraisal && purchaseDiscountPct !== null && <><br />1 − {brl(price)} ÷ {brl(boughtAppraisal.amount)} = {pctLabel(purchaseDiscountPct)}</>}
+            </> : undefined,
+            note: "Comprou abaixo do mercado? Informe aqui o preço pago e cadastre o laudo do banco em Valor de mercado, como “Avaliação / laudo” com a data da compra. O desconto aparece no card e a estimativa FipeZap passa a partir do laudo, não do preço pago.",
         },
         marketValue: {
             what: "Estimativa de quanto o imóvel vale hoje: a avaliação mais recente que você cadastrou (manual, laudo, anúncios) ou a estimativa pelo índice FipeZap.",
@@ -424,7 +432,10 @@ export default function PropertyInvestmentAnalysis({ propertyId, bedrooms, inves
                         <KpiGroup letter="C" title="Desempenho do ativo" hint="quanto vale o imóvel">
                             <Tile label="Valor de compra" value={price !== null ? formatBRL(price) : "—"} tone="slate" icon={<Tag className="w-4 h-4" />} info={info.purchasePrice}
                                 hint={price !== null
-                                    ? (investment?.acquired_on ? `Comprado em ${formatDateBR(investment.acquired_on)}` : "Data de compra não informada")
+                                    ? <>
+                                        {investment?.acquired_on ? `Comprado em ${formatDateBR(investment.acquired_on)}` : "Data de compra não informada"}
+                                        {boughtAppraisal && <><br />Avaliação na compra: {formatBRL(boughtAppraisal.amount)}{purchaseDiscountPct !== null && purchaseDiscountPct !== 0 && <><br /><span className={purchaseDiscountPct > 0 ? "text-emerald-700 dark:text-emerald-400 font-semibold" : "text-rose-600 dark:text-rose-400 font-semibold"}>{pctLabel(Math.abs(purchaseDiscountPct))} {purchaseDiscountPct > 0 ? "abaixo" : "acima"} da avaliação</span></>}</>}
+                                    </>
                                     : "Informe o valor de compra em Aquisição & financiamento"} />
                             <Tile label="Valor de mercado" value={metrics.marketValue !== null ? formatBRL(metrics.marketValue) : "—"} tone="emerald" icon={<BadgeDollarSign className="w-4 h-4" />} info={info.marketValue}
                                 hint={metrics.marketValue !== null
