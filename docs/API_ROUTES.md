@@ -53,5 +53,5 @@ output type. Rules:
 | agencies | 4 files, 8 handlers (role-based: OWNER/ADMIN edit, OWNER delete; logo + agreement uploads) | migrated. Migration `20260916120000_agency_agreement_columns` added the real agreement columns and unpacked the old description metadata; `writeAgency` still carries the fallback and can lose it once that migration is confirmed in production |
 | leases | 5 files, 9 handlers (lease + additional tenants + charges, terminate, dropdowns, private document uploads) | migrated. Additional tenants are now restricted to the account's own tenants |
 | properties/*, portfolio, bank, water-bills/orphaned, gateways/claim | 27 handlers | already on `requireProfile`; wrapping them is mechanical |
-| energy-bills/* | 3 files | still `currentUser()` + inline profile lookup + hand-written validation; last old-style family |
+| energy-bills/* | 3 files, 8 handlers | migrated. No body schema: the payload comes from the AI extractor, not a form, so handlers use `readJsonBody` and the pure builders in `lib/energy-bills-server.ts` (tested). The property deletion cascade, previously duplicated in two routes, is `deletePropertyCascade` |
 | cron/*, gateways/ingest, public calculators, AI endpoints | — | different auth (cron secret, ingest key, per-user limit via `requireUserWithLimit`); not for `withAuth` |
