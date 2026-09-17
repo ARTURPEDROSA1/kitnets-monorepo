@@ -106,6 +106,7 @@ export async function GET(_request: Request, context: RouteContext) {
         section("Valor de mercado e retornos");
         line("Valor de mercado", m.marketValue, BRL, m.marketValueSource ? `${VALUATION_SOURCE_LABELS[m.marketValueSource as keyof typeof VALUATION_SOURCE_LABELS] ?? m.marketValueSource} · ${m.marketValueOn?.split("-").reverse().join("/") ?? ""}` : "Sem avaliação");
         line("Valorização sobre o valor de compra", m.appreciationPct, PCT, m.appreciationGain !== null ? `R$ ${m.appreciationGain.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : undefined);
+        line("Valorização ao ano (composta)", m.appreciationPctAnnual, PCT, "(valor de mercado ÷ valor de compra)^(1 ÷ anos) − 1");
         line("Saldo devedor", m.outstandingBalance, BRL);
         line("Patrimônio no imóvel", m.equity, BRL, "Valor de mercado − saldo devedor");
         line("Múltiplo (renda + patrimônio) ÷ investido", m.equityMultiple, "0.00\"×\"");

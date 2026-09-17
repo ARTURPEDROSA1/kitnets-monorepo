@@ -129,6 +129,8 @@ export interface InvestmentMetrics {
     marketValueSource: string | null;
     /** market value ÷ purchase price − 1, in % */
     appreciationPct: number | null;
+    /** compound yearly appreciation from the purchase date to the valuation date, in %; null under one year */
+    appreciationPctAnnual: number | null;
     appreciationGain: number | null;
     /** principal − Σ known principal parts while ACTIVE; 0 when paid off / not financed; null when unknown */
     outstandingBalance: number | null;
@@ -216,7 +218,7 @@ export function computeInvestmentMetrics(input: MetricsInput): InvestmentMetrics
         noi12m: 0, cashFlow12m: 0, debtService12m: 0, monthsWithIncome12m: 0, currentGrossRent: null, currentNetRent: null,
         grossYieldOnPrice: null, netYieldOnCost: null, cashOnCash: null, priceToRent: null, dscr: null, irrRealized: null,
         series: [], projection: [], registerIptuUsed: 0,
-        marketValue: null, marketValueOn: null, marketValueSource: null, appreciationPct: null, appreciationGain: null,
+        marketValue: null, marketValueOn: null, marketValueSource: null, appreciationPct: null, appreciationPctAnnual: null, appreciationGain: null,
         outstandingBalance: null, equity: null, equityMultiple: null, totalReturn: null, totalReturnPct: null, irrWithValue: null,
         capRate: null, grossYieldOnValue: null, ipcaAvailable: false, cashInvestedReal: null, netIncomeToDateReal: null, paybackPctReal: null, remainingReal: null,
     });
@@ -361,6 +363,8 @@ export function computeInvestmentMetrics(input: MetricsInput): InvestmentMetrics
     }
     const equity = mv && outstandingBalance !== null ? round2(mv.amount - outstandingBalance) : null;
     const appreciationGain = mv && price > 0 ? round2(mv.amount - price) : null;
+    const heldYears = mv && inv?.acquired_on ? (Date.parse(mv.valuedOn) - Date.parse(inv.acquired_on)) / (365.25 * 86400000) : 0;
+    const appreciationPctAnnual = mv && price > 0 && mv.amount > 0 && heldYears >= 1 ? pct1(Math.pow(mv.amount / price, 1 / heldYears) - 1) : null;
     const totalReturn = appreciationGain !== null ? round2(cumNoi + appreciationGain) : null;
     const irrWithValue = equity !== null && equity > 0
         ? xirr([...flows.slice(0, -1), { date: `${asOf}-15`, amount: round2((flows.at(-1)?.amount ?? 0) + equity) }])
@@ -401,6 +405,7 @@ export function computeInvestmentMetrics(input: MetricsInput): InvestmentMetrics
         marketValueOn: mv?.valuedOn ?? null,
         marketValueSource: mv?.source ?? null,
         appreciationPct: mv && price > 0 ? pct1(mv.amount / price - 1) : null,
+        appreciationPctAnnual,
         appreciationGain,
         outstandingBalance,
         equity,
