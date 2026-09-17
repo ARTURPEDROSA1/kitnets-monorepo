@@ -4,6 +4,7 @@ import { requireUserWithLimit, validateUpload } from "@/lib/session";
 import { HOUR } from "@/lib/rate-limit";
 import { requireProfile, getOwnedProperty } from "@/lib/api-auth";
 import { checkIptuTotals, type ExtractedIptu } from "@/lib/property-taxes";
+import { AI_MODELS, reportAiFallback } from "@/lib/ai-models";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -98,7 +99,7 @@ async function extractWithGemini(base64: string, mimeType: string): Promise<Extr
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error("GEMINI_API_KEY not configured");
     const model = new GoogleGenerativeAI(apiKey).getGenerativeModel({
-        model: "gemini-1.5-flash",
+        model: AI_MODELS.gemini,
         generationConfig: { responseMimeType: "application/json", temperature: 0.1 },
     });
     const result = await model.generateContent([IPTU_PROMPT, { inlineData: { data: base64, mimeType } }]);
@@ -113,7 +114,7 @@ async function extractWithOpenAI(base64: string, mimeType: string): Promise<Extr
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
         body: JSON.stringify({
-            model: "gpt-4o",
+            model: AI_MODELS.openai,
             messages: [{ role: "user", content: [{ type: "text", text: IPTU_PROMPT }, { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}`, detail: "high" } }] }],
             response_format: { type: "json_object" },
             max_tokens: 1200,
@@ -155,6 +156,7 @@ export async function POST(request: Request, context: RouteContext) {
         return NextResponse.json({ success: true, data, method: "gemini-vision" });
     } catch (geminiError) {
         console.warn("[iptu-extract] Gemini failed, trying OpenAI:", (geminiError as Error).message);
+        reportAiFallback("iptu-extract", (geminiError as Error).message);
     }
     try {
         const data = await extractWithOpenAI(base64, mimeType);

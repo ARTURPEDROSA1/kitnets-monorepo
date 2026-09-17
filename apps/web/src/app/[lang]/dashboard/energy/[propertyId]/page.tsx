@@ -41,6 +41,7 @@ import { EnergyDistributorLogo } from "@/components/energy/EnergyDistributorLogo
 import { AddStandaloneUcModal } from "@/components/energy/AddStandaloneUcModal";
 import { EditEnergyBillModal } from "@/components/energy/EditEnergyBillModal";
 import { PdfViewerModal } from "@/components/ui/PdfViewerModal";
+import { solarSavings } from "@/lib/energy-savings";
 import type { OwnerPropertySummary } from "@/app/api/energy-bills/properties/route";
 
 export interface EnergyBillRecord {
@@ -259,10 +260,9 @@ export default function EnergyDashboardPage() {
         const currentAvailability = latestFullBill.availability_cost_amount || 0;
         const currentUnitPrice = latestFullBill.unit_price || 0;
         
-        // Solar savings strictly realized from energy compensated/used locally (avoided tariff cost)
-        const currentSavings = currentCompensated > 0 && currentUnitPrice > 0
-            ? (currentCompensated * currentUnitPrice)
-            : Math.abs(latestFullBill.energy_compensated_amount || 0);
+        // What the utility actually credited on the bill; kWh × tariff only as a marked estimate.
+        const savings = solarSavings(latestFullBill);
+        const currentSavings = savings.amount;
 
         // Period totals
         const totalConsumptionPeriod = filteredBills.reduce((acc, b) => acc + (Number(b.grid_consumption_kwh) || 0), 0);
@@ -279,6 +279,8 @@ export default function EnergyDashboardPage() {
             currentAvailability,
             currentUnitPrice,
             currentSavings,
+            currentSavingsEstimated: savings.estimated,
+            missingCompensatedKwh: savings.missingCompensatedKwh,
             avgConsumptionPeriod,
         };
     }, [latestFullBill, filteredBills]);
@@ -290,9 +292,8 @@ export default function EnergyDashboardPage() {
             .map((b) => {
                 const compensatedKwh = Number(b.solar_compensated_kwh) || 0;
                 const unitPrice = Number(b.unit_price) || 0;
-                const calculatedSavings = compensatedKwh > 0 && unitPrice > 0
-                    ? (compensatedKwh * unitPrice)
-                    : Math.abs(Number(b.energy_compensated_amount) || 0);
+                const billSavings = solarSavings(b);
+                const calculatedSavings = billSavings.amount;
 
                 return {
                     reference_month: b.reference_month,
@@ -305,6 +306,7 @@ export default function EnergyDashboardPage() {
                     total_amount: Number(b.total_amount) || 0,
                     availability_cost_amount: Number(b.availability_cost_amount) || 0,
                     estimated_savings: calculatedSavings,
+                    savings_estimated: billSavings.estimated,
                     unit_price: unitPrice,
                     is_historical_only: b.is_historical_only,
                 };
@@ -674,7 +676,7 @@ export default function EnergyDashboardPage() {
                             <div className="bg-card border border-border rounded-xl p-4 shadow-xs space-y-1 bg-gradient-to-br from-amber-50/40 dark:from-amber-950/20 to-transparent">
                                 <div className="flex items-center justify-between text-muted-foreground">
                                     <span className="text-xs font-semibold uppercase tracking-wider text-amber-600">
-                                        Economia Solar
+                                        Economia Solar{summary.currentSavingsEstimated ? " (estimada)" : ""}
                                     </span>
                                     <Sparkles className="w-4 h-4 text-amber-500" />
                                 </div>
@@ -682,7 +684,9 @@ export default function EnergyDashboardPage() {
                                     {formatCurrency(summary.currentSavings)}
                                 </p>
                                 <p className="text-[11px] text-amber-700/80 dark:text-amber-400">
-                                    {formatNumber(summary.currentCompensated, 0)} kWh compensados no mês
+                                    {summary.missingCompensatedKwh
+                                        ? "kWh compensados não informados: edite a fatura"
+                                        : `${formatNumber(summary.currentCompensated, 0)} kWh compensados no mês`}
                                 </p>
                             </div>
                         </div>

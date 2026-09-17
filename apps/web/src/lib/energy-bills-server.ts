@@ -60,7 +60,8 @@ export function buildMainBillPayload(propertyId: string, bill: Json, historicalC
         injected_reading_previous: numOrNull(bill.injectedReadingPrevious),
         injected_reading_current: numOrNull(bill.injectedReadingCurrent),
         solar_injected_kwh: numOr(bill.solarInjectedKwh, 0),
-        solar_compensated_kwh: numOr(bill.solarCompensatedKwh, 0),
+        // Left empty when the bill did not show it: never derived (see lib/energy-bill-checks.ts).
+        solar_compensated_kwh: numOrNull(bill.solarCompensatedKwh),
         generation_balance_kwh: numOr(bill.generationBalanceKwh, 0),
         unit_price: numOrNull(bill.unitPrice),
         // ANEEL REN 1.000 art. 291: 30/50/100 kWh by connection type, never a flat 100.

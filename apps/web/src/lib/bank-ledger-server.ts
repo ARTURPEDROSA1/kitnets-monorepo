@@ -3,6 +3,7 @@
  * properties, and PDF statement extraction with Gemini.
  */
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { AI_MODELS } from "@/lib/ai-models";
 import type { AdminSupabase } from "./api-auth";
 import type { BankTransaction, PropertyRef } from "./bank-ledger";
 
@@ -48,7 +49,7 @@ export async function extractStatementPdf(base64: string, mimeType: string): Pro
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error("GEMINI_API_KEY not configured");
     const model = new GoogleGenerativeAI(apiKey).getGenerativeModel({
-        model: "gemini-1.5-flash",
+        model: AI_MODELS.gemini,
         generationConfig: { responseMimeType: "application/json", temperature: 0 },
     });
     const result = await model.generateContent([PDF_PROMPT, { inlineData: { data: base64, mimeType } }]);

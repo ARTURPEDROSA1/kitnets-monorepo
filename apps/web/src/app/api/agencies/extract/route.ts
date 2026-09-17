@@ -4,6 +4,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import OpenAI from 'openai';
 import { extractText, getDocumentProxy } from "unpdf";
 import { cropLogoByBox, extractLogoFromPdf, isLogoBox, type PDFDocument } from '@/lib/agency-logo';
+import { AI_MODELS, reportAiFallback } from "@/lib/ai-models";
 
 const getGeminiClient = () => {
     if (!process.env.GEMINI_API_KEY) return null;
@@ -207,7 +208,7 @@ export async function POST(request: NextRequest) {
         if (textContent.trim().length >= 100) {
             const gemini = getGeminiClient();
             if (gemini) {
-                const models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-flash"];
+                const models = [AI_MODELS.gemini];
                 for (const m of models) {
                     try {
                         const model = gemini.getGenerativeModel({ model: m });
@@ -218,6 +219,7 @@ export async function POST(request: NextRequest) {
                         if (extracted) break;
                     } catch (err) {
                         console.warn(`[Agency Extract] Gemini text model ${m} failed:`, err);
+                        reportAiFallback("Agency Extract text", err);
                     }
                 }
             }
@@ -227,7 +229,7 @@ export async function POST(request: NextRequest) {
         if (!extracted && base64ForVision) {
             const gemini = getGeminiClient();
             if (gemini) {
-                const models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-flash"];
+                const models = [AI_MODELS.gemini];
                 for (const m of models) {
                     try {
                         const model = gemini.getGenerativeModel({ model: m });
@@ -244,6 +246,7 @@ export async function POST(request: NextRequest) {
                         if (extracted) break;
                     } catch (err) {
                         console.warn(`[Agency Extract] Gemini vision model ${m} failed:`, err);
+                        reportAiFallback("Agency Extract vision", err);
                     }
                 }
             }
@@ -258,7 +261,7 @@ export async function POST(request: NextRequest) {
 
             if (base64ForVision && mimeType.startsWith("image/")) {
                 const completion = await openai.chat.completions.create({
-                    model: 'gpt-4o',
+                    model: AI_MODELS.openai,
                     messages: [
                         {
                             role: 'user',
@@ -281,7 +284,7 @@ export async function POST(request: NextRequest) {
                 if (content) extracted = parseJsonResponse(content);
             } else if (textContent) {
                 const completion = await openai.chat.completions.create({
-                    model: 'gpt-4o-mini',
+                    model: AI_MODELS.openaiMini,
                     messages: [
                         { role: 'system', content: EXTRACTION_PROMPT },
                         { role: 'user', content: textContent.substring(0, 18000) },
