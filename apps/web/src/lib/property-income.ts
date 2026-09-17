@@ -516,3 +516,53 @@ export function summarize(rows: PropertyIncomeRow[]): IncomeSummary {
         lastMonth: latestRow ? monthKey(latestRow.month) : null,
     };
 }
+
+// ── Rent history (Receita Bruta card → "Histórico do aluguel") ───────────
+export interface RentPoint { key: string; month: string; bruto: number; liquido: number }
+export interface RentAdjustment { month: string; from: number; to: number; pct: number }
+export interface RentYearPoint {
+    year: number;
+    /** confirmed months with rent in the year */
+    months: number;
+    avgGross: number;
+    /** gross rent of the last month recorded in the year */
+    lastGross: number;
+    /** lastGross vs the previous recorded year's lastGross, in %; null for the first year */
+    growthPct: number | null;
+}
+
+/**
+ * Gross-rent history from the confirmed months with rent (vacancy months are left out):
+ * monthly points (oldest first), each change of the rent of 0.5 % or more, and one row per year.
+ */
+export function rentHistory(rows: PropertyIncomeRow[]): { points: RentPoint[]; adjustments: RentAdjustment[]; years: RentYearPoint[] } {
+    const points: RentPoint[] = rows
+        .filter(r => r.status === "CONFIRMED")
+        .map(r => { const b = breakdown(r); const key = monthKey(r.month); return { key, month: formatMonthKey(key), bruto: round2(b.grossRent), liquido: round2(b.netRent) }; })
+        .filter(p => p.bruto > 0)
+        .sort((a, b) => (a.key < b.key ? -1 : 1));
+
+    const adjustments: RentAdjustment[] = [];
+    for (let i = 1; i < points.length; i++) {
+        const from = points[i - 1].bruto, to = points[i].bruto;
+        const pct = Math.round((to / from - 1) * 1000) / 10;
+        if (Math.abs(pct) >= 0.5) adjustments.push({ month: points[i].key, from, to, pct });
+    }
+
+    const byYear = new Map<number, RentPoint[]>();
+    for (const p of points) { const y = Number(p.key.slice(0, 4)); byYear.set(y, [...(byYear.get(y) ?? []), p]); }
+    const ys = [...byYear.keys()].sort((a, b) => a - b);
+    const years: RentYearPoint[] = ys.map((year, i) => {
+        const ps = byYear.get(year)!;
+        const lastGross = ps[ps.length - 1].bruto;
+        const prev = i > 0 ? byYear.get(ys[i - 1])! : null;
+        const prevLast = prev ? prev[prev.length - 1].bruto : 0;
+        return {
+            year, months: ps.length,
+            avgGross: round2(ps.reduce((a, p) => a + p.bruto, 0) / ps.length),
+            lastGross,
+            growthPct: prev && prevLast > 0 ? Math.round((lastGross / prevLast - 1) * 1000) / 10 : null,
+        };
+    });
+    return { points, adjustments, years };
+}
