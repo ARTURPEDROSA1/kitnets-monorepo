@@ -28,7 +28,10 @@ const DEFAULTS = { rentGrowthPctYear: 4.5, vacancyPct: 0, prepayNow: 0, apprecia
 
 export default function InvestmentScenarios({ metrics, investment }: Props) {
     const [open, setOpen] = useState(false);
-    const [s, setS] = useState(DEFAULTS);
+    // rent growth opens on the property's own historical rate (the same the Payback previsto card uses) until the user types one
+    const [raw, setS] = useState<Omit<typeof DEFAULTS, "rentGrowthPctYear"> & { rentGrowthPctYear: number | null }>({ ...DEFAULTS, rentGrowthPctYear: null });
+    const defaultGrowth = metrics.rentGrowthPctYear !== null ? metrics.forecastGrowthPctYear : DEFAULTS.rentGrowthPctYear;
+    const s = useMemo(() => ({ ...raw, rentGrowthPctYear: raw.rentGrowthPctYear ?? defaultGrowth }), [raw, defaultGrowth]);
     const financed = investment?.financing_status === "ACTIVE";
 
     const result = useMemo(() => projectScenario({
@@ -36,7 +39,8 @@ export default function InvestmentScenarios({ metrics, investment }: Props) {
         rentGrowthPctYear: s.rentGrowthPctYear, vacancyPct: s.vacancyPct, prepayNow: financed ? s.prepayNow : 0,
         appreciationPctYear: s.appreciationPctYear, saleYear: s.saleYear > 0 ? s.saleYear : null, sellingCostPct: s.sellingCostPct,
     }), [metrics, investment, s, financed]);
-    const baseline = useMemo(() => projectScenario({ metrics, investment, rentGrowthPctYear: 0, vacancyPct: 0, prepayNow: 0, appreciationPctYear: 0, saleYear: null, sellingCostPct: 0 }), [metrics, investment]);
+    // baseline = the Payback previsto forecast: 12-month pace growing by the historical rent adjustment
+    const baseline = useMemo(() => projectScenario({ metrics, investment, rentGrowthPctYear: metrics.forecastGrowthPctYear, vacancyPct: 0, prepayNow: 0, appreciationPctYear: 0, saleYear: null, sellingCostPct: 0 }), [metrics, investment]);
 
     const chart = useMemo(() => {
         const byMonth = new Map<string, { label: string; base?: number; cen?: number; inv?: number }>();
@@ -135,8 +139,8 @@ export default function InvestmentScenarios({ metrics, investment }: Props) {
                         </div>
                     )}
                     <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-                        <span>O cenário parte da renda líquida média dos últimos 12 meses ({formatBRL(metrics.monthlyNoiPace)}/mês) e do valor de mercado atual{metrics.marketValue === null ? " (sem avaliação: usa o valor de compra)" : ""}. Estimativas, não previsões.</span>
-                        <button type="button" onClick={() => setS(DEFAULTS)} className="inline-flex items-center gap-1 hover:text-foreground shrink-0"><RotateCcw className="w-3 h-3" /> Padrões</button>
+                        <span>O cenário parte da renda líquida média dos últimos 12 meses ({formatBRL(metrics.monthlyNoiPace)}/mês){metrics.rentGrowthPctYear !== null ? `, com o reajuste histórico do aluguel (${metrics.forecastGrowthPctYear.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% a.a.) como padrão` : ""} e do valor de mercado atual{metrics.marketValue === null ? " (sem avaliação: usa o valor de compra)" : ""}. Estimativas, não previsões.</span>
+                        <button type="button" onClick={() => setS({ ...DEFAULTS, rentGrowthPctYear: null })} className="inline-flex items-center gap-1 hover:text-foreground shrink-0"><RotateCcw className="w-3 h-3" /> Padrões</button>
                     </div>
                 </div>
             )}
