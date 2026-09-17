@@ -3,6 +3,7 @@ import { requireUserWithLimit, validateUpload } from '@/lib/session';
 import { HOUR } from '@/lib/rate-limit';
 import OpenAI from 'openai';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { AI_MODELS, reportAiFallback } from "@/lib/ai-models";
 
 // Type for the extraction result
 interface ExtractionResult {
@@ -106,7 +107,7 @@ async function analyzeWithGeminiVision(base64: string, mimeType: string, prompt:
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
-        model: 'gemini-1.5-flash',
+        model: AI_MODELS.gemini,
         generationConfig: { responseMimeType: 'application/json' },
     });
 
@@ -131,7 +132,7 @@ async function analyzeWithGeminiText(text: string, prompt: string): Promise<Extr
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
-        model: 'gemini-1.5-flash',
+        model: AI_MODELS.gemini,
         generationConfig: { responseMimeType: 'application/json' },
     });
 
@@ -151,7 +152,7 @@ async function analyzeWithOpenAIVision(base64: string, mimeType: string, prompt:
 
     const client = new OpenAI({ apiKey });
     const response = await client.chat.completions.create({
-        model: 'gpt-4o',
+        model: AI_MODELS.openai,
         messages: [
             { role: 'system', content: prompt },
             {
@@ -184,7 +185,7 @@ async function analyzeWithOpenAIText(text: string, prompt: string): Promise<Extr
 
     const client = new OpenAI({ apiKey });
     const response = await client.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: AI_MODELS.openaiMini,
         messages: [
             { role: 'system', content: prompt },
             { role: 'user', content: `Here is the document text:\n\n${text}` },
@@ -207,6 +208,7 @@ async function analyzeVision(base64: string, mimeType: string, prompt: string): 
         return { ...result, _provider: 'gemini' };
     } catch (geminiErr) {
         console.warn('[Identity] Gemini Vision failed:', geminiErr);
+        reportAiFallback("Identity vision", geminiErr);
     }
 
     // 2. Fallback to OpenAI
@@ -223,6 +225,7 @@ async function analyzeText(text: string, prompt: string): Promise<ExtractionResu
         return { ...result, _provider: 'gemini' };
     } catch (geminiErr) {
         console.warn('[Identity] Gemini Text failed:', geminiErr);
+        reportAiFallback("Identity text", geminiErr);
     }
 
     // 2. Fallback to OpenAI

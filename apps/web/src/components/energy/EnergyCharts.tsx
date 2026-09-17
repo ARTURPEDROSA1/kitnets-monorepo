@@ -26,6 +26,8 @@ export interface EnergyChartPoint {
     total_amount: number;
     availability_cost_amount: number;
     estimated_savings: number;
+    /** True when the bill had no credited amount and the saving is kWh × tariff. */
+    savings_estimated?: boolean;
     unit_price: number;
     is_historical_only: boolean;
 }
@@ -185,7 +187,7 @@ export function FinancialAnalysisChart({ data, height = 300 }: { data: EnergyCha
                                         <span className="font-bold">{formatCurrency(total)}</span>
                                     </div>
                                     <div className="flex items-center justify-between gap-4 text-emerald-600 dark:text-emerald-400">
-                                        <span>Economia Solar Compensada:</span>
+                                        <span>Economia Solar Compensada{(payload[0]?.payload as EnergyChartPoint | undefined)?.savings_estimated ? " (estimada)" : ""}:</span>
                                         <span className="font-bold">{formatCurrency(savings)}</span>
                                     </div>
 

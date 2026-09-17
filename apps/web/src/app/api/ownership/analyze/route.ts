@@ -5,6 +5,7 @@ import { HOUR } from '@/lib/rate-limit';
 import OpenAI from 'openai';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { DocumentExtractionResult } from '@/types/ownership';
+import { AI_MODELS, reportAiFallback } from "@/lib/ai-models";
 
 // ============================================================
 // STRATEGY 1: PDF text extraction + regex parsing (FREE, instant)
@@ -466,7 +467,7 @@ async function analyzeVisionWithGemini(base64: string, mimeType: string) {
     if (!client) throw new Error("Gemini API Key missing");
 
     const model = client.getGenerativeModel({
-        model: "gemini-1.5-flash",
+        model: AI_MODELS.gemini,
         generationConfig: { responseMimeType: "application/json" }
     });
 
@@ -483,7 +484,7 @@ async function analyzeVisionWithOpenAI(base64: string, mimeType: string) {
     if (!client) throw new Error("OpenAI API Key missing");
 
     const response = await client.chat.completions.create({
-        model: "gpt-4o",
+        model: AI_MODELS.openai,
         messages: [
             { role: "system", content: VISION_PROMPT },
             {
@@ -601,6 +602,7 @@ export async function POST(request: NextRequest) {
                         console.log(`[Ownership] ✅ Gemini Vision successful`);
                     } catch (geminiErr) {
                         console.warn('[Ownership] Gemini Vision failed:', geminiErr);
+                        reportAiFallback("Ownership vision", geminiErr);
                         methods_tried.push('gemini_vision_failed');
                     }
                 }

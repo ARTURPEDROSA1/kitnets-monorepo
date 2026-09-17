@@ -58,6 +58,7 @@ export function EnergyBillUploadModal({
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [extracted, setExtracted] = useState<ExtractedEnergyBill | null>(null);
+    const [warnings, setWarnings] = useState<string[]>([]);
     const [showAdvancedEdit, setShowAdvancedEdit] = useState(false);
     const [dragActive, setDragActive] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -69,6 +70,7 @@ export function EnergyBillUploadModal({
         setSaving(false);
         setError(null);
         setExtracted(null);
+        setWarnings([]);
         setShowAdvancedEdit(false);
         setDragActive(false);
         if (fileInputRef.current) {
@@ -164,6 +166,7 @@ export function EnergyBillUploadModal({
             }
 
             setExtracted(result.data);
+            setWarnings(Array.isArray(result.warnings) ? result.warnings : []);
         } catch (err) {
             console.error("[UploadModal] Extraction error:", err);
             const msg = err instanceof Error ? err.message : "Erro desconhecido";
@@ -377,6 +380,13 @@ export function EnergyBillUploadModal({
                                         <span>Consumo & Energia Solar</span>
                                     </div>
                                     <div className="space-y-1.5 text-xs">
+                                        {warnings.length > 0 && (
+                                            <div className="mb-2 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-2 text-[11px] text-amber-800 dark:text-amber-200 space-y-1">
+                                                {warnings.map((w) => (
+                                                    <p key={w}>⚠ {w}</p>
+                                                ))}
+                                            </div>
+                                        )}
                                         <div className="flex justify-between py-1 border-b border-border/40">
                                             <span className="text-muted-foreground">Consumo da Rede:</span>
                                             <span className="font-semibold text-foreground">
@@ -392,7 +402,7 @@ export function EnergyBillUploadModal({
                                         <div className="flex justify-between py-1 border-b border-border/40">
                                             <span className="text-muted-foreground">Compensada GD:</span>
                                             <span className="font-semibold text-sky-600 dark:text-sky-400">
-                                                {formatNumber(extracted.solarCompensatedKwh, 0)} kWh
+                                                {extracted.solarCompensatedKwh ? `${formatNumber(extracted.solarCompensatedKwh, 0)} kWh` : "—"}
                                             </span>
                                         </div>
                                         <div className="flex justify-between py-1 bg-emerald-50 dark:bg-emerald-950/40 px-2 rounded-md">

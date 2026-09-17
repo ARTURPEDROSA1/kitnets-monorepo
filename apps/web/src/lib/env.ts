@@ -31,6 +31,10 @@ export const serverSchema = z.object({
     // AI extraction: at least one provider is required in production (refined below).
     GEMINI_API_KEY: nonEmpty.optional(),
     OPENAI_API_KEY: nonEmpty.optional(),
+    // Optional model overrides; defaults live in lib/ai-models.ts.
+    GEMINI_MODEL: nonEmpty.optional(),
+    OPENAI_MODEL: nonEmpty.optional(),
+    OPENAI_MINI_MODEL: nonEmpty.optional(),
     // CPF enrichment; the feature is disabled when absent.
     BIGDATACORP_TOKEN: nonEmpty.optional(),
     // Source-map upload at build time only.

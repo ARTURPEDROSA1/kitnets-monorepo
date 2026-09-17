@@ -34,6 +34,7 @@ describe("buildMainBillPayload", () => {
             billing_days: 30,
             grid_consumption_kwh: 0,
             grid_reading_previous: null,
+            solar_compensated_kwh: null,
             flag_type: "Verde",
             availability_cost_kwh: 30,
             total_amount: 0,
