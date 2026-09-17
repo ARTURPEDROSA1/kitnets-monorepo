@@ -15,6 +15,10 @@
         {
             "path": "/api/cron/update-fipezap",
             "schedule": "20 12 * * *"
+        },
+        {
+            "path": "/api/cron/update-bcb",
+            "schedule": "30 12 * * *"
         }
     ]
 }
