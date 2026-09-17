@@ -1,6 +1,5 @@
 import { MetadataRoute } from 'next';
 import { getAllIndexes } from '@/lib/indexes';
-import { getAllArticles } from '@/services/cms';
 
 const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://kitnets.com';
 const languages = ['pt', 'en', 'es'];
@@ -45,10 +44,6 @@ const staticRoutes = [
     'waitlist',
     'calculadoras/multa-atraso-aluguel',
     'calculadoras/multa-rescisao-contrato-aluguel',
-    'conteudos',
-    'conteudos/impostos-e-legislacao',
-    'conteudos/salario-e-renda',
-    'autor/artur-pedrosa',
     'calculadoras/aluguel-na-holding',
     'calculadoras/aluguel-na-pf',
     'calculadoras/imposto-aluguel-pessoa-fisica',
@@ -103,33 +98,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         });
     } catch (error) {
         console.error("Failed to fetch indexes for sitemap", error);
-    }
-
-    // 3. Dynamic Routes: Articles
-    try {
-        const articles = await getAllArticles();
-
-        // Group articles by "key" (category/slug) to build alternates
-        // Since getAllArticles returns one entry per lang/slug combo, we need to regroup content that represents the same article.
-        // Assuming slugs are same across langs? Or we need logic.
-        // Currently, getArticleBySlug queries by translation.slug.
-        // If translation slugs are unique per language, we might not easily know which ES article matches which PT article unless they share a common ID or English slug.
-        // The getAllArticles returns { lang, categorySlug, slug, updatedAt }.
-        // If we simply list all of them with self-referencing alternates for now (or no alternates if we can't match them), it's better than nothing.
-        // IMPROVEMENT: Ideally, we should group by article_id to provide correct hreflang alternates.
-
-        // For now, let's treat them individually to ensure they are indexed.
-        articles.forEach((article) => {
-            sitemapEntry.push({
-                url: `${baseUrl}/${article.lang}/conteudos/${article.categorySlug}/${article.slug}`,
-                lastModified: new Date(article.updatedAt),
-                changeFrequency: 'weekly',
-                priority: 0.7,
-            });
-        });
-
-    } catch (error) {
-        console.error("Failed to fetch articles for sitemap", error);
     }
 
     return sitemapEntry;
