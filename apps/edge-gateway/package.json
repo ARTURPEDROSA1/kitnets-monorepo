@@ -14,8 +14,8 @@
         "@types/node-fetch": "2.6.13",
         "dotenv": "16.6.1",
         "fastify": "4.29.1",
-        "modbus-serial": "8.0.23",
-        "mqtt": "5.14.1",
+        "modbus-serial": "8.0.25",
+        "mqtt": "5.15.2",
         "node-cron": "3.0.3",
         "node-fetch": "3.3.2",
         "pino": "8.21.0",
@@ -29,7 +29,7 @@
         "@types/node-cron": "3.0.11",
         "@types/sqlite3": "3.1.11",
         "eslint": "8.57.1",
-        "tsx": "4.21.0",
+        "tsx": "4.23.13",
         "typescript": "5.9.3"
     }
 }
