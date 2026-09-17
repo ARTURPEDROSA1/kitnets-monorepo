@@ -28,6 +28,10 @@ import {
 
 interface IPCACalculatorProps {
     data: IndexValueForCalc[];
+    /** how the index is written in the texts ("IPCA", "IGP-M", "Selic"…); default "IPCA" */
+    indexLabel?: string;
+    /** Portuguese gender of the index name: "pela Selic", "Última Selic disponível" */
+    feminine?: boolean;
 }
 
 // ────────────────────────────────────────────
@@ -153,7 +157,10 @@ function calculate(
 // Component
 // ────────────────────────────────────────────
 
-export function IPCACalculator({ data }: IPCACalculatorProps) {
+export function IPCACalculator({ data, indexLabel = "IPCA", feminine = false }: IPCACalculatorProps) {
+    const pelo = feminine ? "pela" : "pelo";
+    const artigo = feminine ? "a" : "o";
+    const anchorId = `calculadora-${indexLabel.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-")}`;
     // Boundaries from data
     const earliestMonth = data.length > 0 ? data[0].month : "1995-01";
     const latestMonth = data.length > 0 ? data[data.length - 1].month : "2026-01";
@@ -327,7 +334,7 @@ export function IPCACalculator({ data }: IPCACalculatorProps) {
 
     return (
         <div
-            id="calculadora-ipca"
+            id={anchorId}
             className="md:col-span-3 min-w-0 scroll-mt-20"
         >
             <div className="rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden">
@@ -339,10 +346,10 @@ export function IPCACalculator({ data }: IPCACalculatorProps) {
                         </div>
                         <div>
                             <h3 className="text-lg md:text-xl font-bold tracking-tight">
-                                Calculadora de Correção pelo IPCA
+                                Calculadora de Correção {pelo} {indexLabel}
                             </h3>
                             <p className="text-xs md:text-sm text-muted-foreground">
-                                Simule a correção de um valor pelo IPCA entre duas datas.
+                                Simule a correção de um valor {pelo} {indexLabel} entre duas datas.
                             </p>
                         </div>
                     </div>
@@ -494,10 +501,10 @@ export function IPCACalculator({ data }: IPCACalculatorProps) {
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
                             <Info className="h-3 w-3" />
-                            A correção considera o IPCA a partir do mês seguinte ao inicial até o mês final.
+                            A correção considera {artigo} {indexLabel} a partir do mês seguinte ao inicial até o mês final.
                         </span>
                         <span>
-                            Último IPCA disponível: <strong>{formatMonthLabel(latestMonth)}</strong>
+                            {feminine ? "Última" : "Último"} {indexLabel} disponível: <strong>{formatMonthLabel(latestMonth)}</strong>
                         </span>
                     </div>
 
@@ -551,7 +558,7 @@ export function IPCACalculator({ data }: IPCACalculatorProps) {
                                         {result.accumulatedPercent.toFixed(2).replace(".", ",")}%
                                     </p>
                                     <p className="text-xs text-muted-foreground">
-                                        IPCA acumulado
+                                        {indexLabel} acumulad{artigo}
                                     </p>
                                 </div>
 
@@ -725,7 +732,7 @@ export function IPCACalculator({ data }: IPCACalculatorProps) {
                                                             <thead className="bg-muted/50 text-muted-foreground text-xs uppercase">
                                                                 <tr className="border-b">
                                                                     <th className="p-3 font-medium min-w-[100px]">Mês/Ano</th>
-                                                                    <th className="p-3 font-medium text-right min-w-[100px]">IPCA (%)</th>
+                                                                    <th className="p-3 font-medium text-right min-w-[100px]">{indexLabel} (%)</th>
                                                                     <th className="p-3 font-medium text-right min-w-[120px] hidden sm:table-cell">Fator</th>
                                                                     <th className="p-3 font-medium text-right min-w-[140px]">Valor corrigido</th>
                                                                     <th className="p-3 font-medium text-right min-w-[120px] hidden md:table-cell">Variação (R$)</th>
