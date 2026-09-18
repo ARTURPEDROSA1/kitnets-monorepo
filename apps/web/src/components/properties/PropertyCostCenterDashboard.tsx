@@ -44,6 +44,7 @@ import PropertyTaxesSection from './PropertyTaxesSection';
 import PropertyInvestmentAnalysis from './PropertyInvestmentAnalysis';
 import PeriodFilter, { GroupSelect } from './PeriodFilter';
 import { RentHistoryModal } from './RentHistoryModal';
+import { CardInfoIcon, type TileInfo } from './Tile';
 import {
     breakdown,
     currentMonthKey,
@@ -349,6 +350,40 @@ export default function PropertyCostCenterDashboard({
         };
     }, [propertyType, details, subUnits, totalUnits, incomeRows, taxRows, period, forecastYear, dreGroup]);
 
+    // ── explanations for the five KPI cards (icon popup) ─────────────────
+    const brl = (v: number | null | undefined) => (v === null || v === undefined ? '—' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    const kpiInfo: Record<'revenue' | 'opex' | 'noi' | 'occupancy' | 'energy', TileInfo> = {
+        revenue: {
+            what: 'Tudo o que o inquilino pagou no mês mais recente confirmado: o aluguel bruto (valor de contrato, antes da taxa da administradora) mais a parcela de energia.',
+            formula: <>Receita bruta = aluguel bruto + energia recebida<br />Aluguel bruto = (recebido − energia) ÷ (1 − taxa)<br />Valor m² = aluguel bruto ÷ área construída</>,
+            example: financials.realIncomeMonth ? <>{brl(financials.currentGrossRent)} + {brl(financials.energyIncome)} = {brl(financials.grossMonthlyRevenue)} em {financials.realIncomeMonth}</> : undefined,
+            note: 'Este card mostra o mês mais recente e não segue o período do gráfico. Clique no card para ver o histórico do aluguel.',
+        },
+        opex: {
+            what: 'Custos operacionais do mês mais recente: taxa da administradora, custo de energia, outras despesas e o IPTU que você pagou naquele mês (do registro Tributos do imóvel). Prestações do financiamento e reformas não entram: são investimento.',
+            formula: 'OPEX = taxa da imobiliária + custo de energia + outras despesas + IPTU pago no mês',
+            example: financials.realIncomeMonth ? <>{financials.expenseBreakdown.map(i => `${i.name} ${brl(i.value)}`).join(' + ') || 'sem custos no mês'} = {brl(financials.totalExpenses)}<br />{((financials.totalExpenses / (financials.grossMonthlyRevenue || 1)) * 100).toFixed(0)}% da receita bruta</> : undefined,
+        },
+        noi: {
+            what: 'Resultado operacional líquido: o que sobra da receita depois dos custos operacionais do mês. É a renda que paga o investimento (payback) e a base do yield e do cap rate.',
+            formula: <>NOI = receita bruta − OPEX<br />Margem líquida = NOI ÷ receita bruta</>,
+            example: financials.realIncomeMonth ? <>{brl(financials.grossMonthlyRevenue)} − {brl(financials.totalExpenses)} = {brl(financials.noi)} · margem {financials.margin.toFixed(0)}%</> : undefined,
+        },
+        occupancy: {
+            what: propertyType === 'multi'
+                ? 'Unidades com contrato ativo em relação ao total de unidades do imóvel.'
+                : 'Meses em que houve aluguel em relação aos meses desde o primeiro registro de receita. Vacâncias derrubam o percentual.',
+            formula: propertyType === 'multi' ? 'Ocupação = unidades ativas ÷ total de unidades' : 'Ocupação = meses com aluguel ÷ meses desde o primeiro registro',
+            example: <>{financials.occupancyRate}% · {financials.occupancyHint}</>,
+        },
+        energy: {
+            what: 'Resultado da energia no mês mais recente: o que o inquilino pagou de energia menos a conta de luz que você pagou. Com geração solar, essa diferença é a economia que o sistema gera.',
+            formula: 'Energia líquida = energia recebida − custo de energia',
+            example: financials.energyNet !== null ? <>{brl(financials.energyIncome)} − {brl(financials.energyCost)} = {brl(financials.energyNet)}</> : undefined,
+            note: 'O investimento no sistema solar e quanto dele já voltou estão no card Energia solar de Investimento no imóvel.',
+        },
+    };
+
 
     const propertyTitle = details.propertyName?.trim()
         || (address.street ? `${address.street}${address.number ? `, ${address.number}` : ''}` : `Propriedade ${propertyIndex + 1}`);
@@ -472,9 +507,7 @@ export default function PropertyCostCenterDashboard({
                 >
                     <div className="flex items-center justify-between text-muted-foreground">
                         <span className="text-xs font-semibold uppercase tracking-wider">Receita Bruta</span>
-                        <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600">
-                            <TrendingUp className="w-4 h-4" />
-                        </div>
+                        <CardInfoIcon label="Receita Bruta" info={kpiInfo.revenue} className="p-2 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600" icon={<TrendingUp className="w-4 h-4" />} />
                     </div>
                     <div>
                         <span className="text-xl sm:text-2xl font-bold text-foreground block">
@@ -496,9 +529,7 @@ export default function PropertyCostCenterDashboard({
                 <div className="p-5 rounded-2xl border border-border bg-card shadow-xs space-y-2">
                     <div className="flex items-center justify-between text-muted-foreground">
                         <span className="text-xs font-semibold uppercase tracking-wider">Despesas (OPEX)</span>
-                        <div className="p-2 rounded-lg bg-rose-50 dark:bg-rose-950/40 text-rose-600">
-                            <DollarSign className="w-4 h-4" />
-                        </div>
+                        <CardInfoIcon label="Despesas (OPEX)" info={kpiInfo.opex} className="p-2 bg-rose-50 dark:bg-rose-950/40 text-rose-600" icon={<DollarSign className="w-4 h-4" />} />
                     </div>
                     <div>
                         <span className="text-xl sm:text-2xl font-bold text-rose-600 dark:text-rose-400 block">
@@ -517,9 +548,7 @@ export default function PropertyCostCenterDashboard({
                         <span className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
                             Resultado Líquido (NOI)
                         </span>
-                        <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700">
-                            <Percent className="w-4 h-4" />
-                        </div>
+                        <CardInfoIcon label="Resultado Líquido (NOI)" info={kpiInfo.noi} className="p-2 bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700" icon={<Percent className="w-4 h-4" />} />
                     </div>
                     <div>
                         <span className="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400 block">
@@ -535,9 +564,7 @@ export default function PropertyCostCenterDashboard({
                 <div className="p-5 rounded-2xl border border-border bg-card shadow-xs space-y-2">
                     <div className="flex items-center justify-between text-muted-foreground">
                         <span className="text-xs font-semibold uppercase tracking-wider">Ocupação</span>
-                        <div className="p-2 rounded-lg bg-violet-50 dark:bg-violet-950/40 text-violet-600">
-                            <Users className="w-4 h-4" />
-                        </div>
+                        <CardInfoIcon label="Ocupação" info={kpiInfo.occupancy} className="p-2 bg-violet-50 dark:bg-violet-950/40 text-violet-600" icon={<Users className="w-4 h-4" />} />
                     </div>
                     <div>
                         <span className="text-xl sm:text-2xl font-bold text-foreground block">
@@ -553,9 +580,7 @@ export default function PropertyCostCenterDashboard({
                 <div className="p-5 rounded-2xl border border-border bg-card shadow-xs space-y-2">
                     <div className="flex items-center justify-between text-muted-foreground">
                         <span className="text-xs font-semibold uppercase tracking-wider">Energia & Solar</span>
-                        <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600">
-                            <Sun className="w-4 h-4" />
-                        </div>
+                        <CardInfoIcon label="Energia & Solar" info={kpiInfo.energy} className="p-2 bg-amber-50 dark:bg-amber-950/40 text-amber-600" icon={<Sun className="w-4 h-4" />} />
                     </div>
                     <div>
                         <span className="text-xl sm:text-2xl font-bold text-foreground block">

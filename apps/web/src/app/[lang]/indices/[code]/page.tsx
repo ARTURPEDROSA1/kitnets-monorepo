@@ -442,7 +442,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
                         type={(type as string) || 'locacao'}
                         bedrooms={(bedrooms as string) || 'todos'}
                         data={await getFipeZapData(startDateStr, endDateStr, (bedrooms as string) || 'todos')}
-                        calculator={<FipeZapCalculator initialType={(type as string) === 'venda' ? 'venda' : 'locacao'} />}
+                        calculator={<FipeZapCalculator initialType={(type as string) === 'venda' ? 'venda' : 'locacao'} initialBedrooms={bedrooms as string | undefined} />}
                     />
                 </div>
             )}

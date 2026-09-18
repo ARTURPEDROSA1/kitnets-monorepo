@@ -45,6 +45,7 @@ import PeriodFilter, { GroupSelect } from "./PeriodFilter";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "./TableColumnFilters";
 import { CellSumBar, useCellSum } from "./TableCellSum";
 import MoneyInput, { parseMoneyText } from "./MoneyInput";
+import Tile, { type TileInfo } from "./Tile";
 import { groupMonthly, periodLabel, periodRange, type ChartGroup, type PeriodFilterValue } from "@/lib/period-filter";
 import {
     breakdown,
@@ -341,6 +342,36 @@ export default function PropertyIncomeLedger({
     const visible = showAll ? cf.rows : cf.rows.slice(0, COLLAPSED_ROWS);
     /** Totals over the confirmed months inside the selected period (tiles 2–5). */
     const periodSummary = useMemo(() => summarize(filtered), [filtered]);
+    // explanations for the five tiles (icon popup)
+    const months = periodSummary.confirmedMonths;
+    const ledgerInfo: Record<"gross" | "received" | "net" | "energy" | "fee", TileInfo> = {
+        gross: {
+            what: "O aluguel de contrato somado nos meses confirmados do período: o valor antes da taxa da administradora, sem a energia.",
+            formula: <>Aluguel bruto do mês = (recebido − energia) ÷ (1 − taxa %)<br />No período = Σ dos meses confirmados</>,
+            example: months ? <>{formatBRL(periodSummary.totalGross)} em {months} {months === 1 ? "mês" : "meses"} · {periodLabel(period)}</> : undefined,
+            note: "Meses marcados como previstos ficam fora dos totais.",
+        },
+        received: {
+            what: "O que entrou na sua conta nos meses confirmados: o aluguel líquido mais a parcela de energia paga pelo inquilino.",
+            formula: <>Recebido = aluguel líquido + energia<br />No período = Σ dos meses confirmados</>,
+            example: months ? <>{formatBRL(periodSummary.totalNetRent)} + {formatBRL(periodSummary.totalEnergy)} = {formatBRL(periodSummary.totalReceived)}</> : undefined,
+        },
+        net: {
+            what: "O aluguel depois da taxa da administradora e sem a energia: o que o imóvel rende de aluguel de fato.",
+            formula: <>Aluguel líquido = recebido − energia<br />Média = total ÷ meses confirmados</>,
+            example: months ? <>{formatBRL(periodSummary.totalReceived)} − {formatBRL(periodSummary.totalEnergy)} = {formatBRL(periodSummary.totalNetRent)} · média {formatBRL(periodSummary.totalNetRent / months)}/mês</> : undefined,
+        },
+        energy: {
+            what: "A energia paga pelo inquilino no período, a conta de luz que você pagou e o resultado. Com geração solar, o resultado é a economia que o sistema gera.",
+            formula: "Resultado = energia recebida − custo de energia",
+            example: months ? <>{formatBRL(periodSummary.totalEnergy)} − {formatBRL(periodSummary.totalOther)} = {formatBRL(periodSummary.totalEnergy - periodSummary.totalOther)}</> : undefined,
+        },
+        fee: {
+            what: "Quanto foi para a administradora no período. Com a autogestão no Kitnets.com esse valor ficaria com você.",
+            formula: <>Taxa do mês = aluguel bruto × taxa %<br />No período = Σ dos meses confirmados</>,
+            example: months ? <>{formatBRL(periodSummary.totalFee)} em {months} {months === 1 ? "mês" : "meses"}</> : undefined,
+        },
+    };
     // Fee pre-fill: last month's fee when set, else the property default, else 10 %
     const lastRowPct = sorted.length ? Number(sorted[0].agency_fee_pct) : 0;
     const lastPct = lastRowPct > 0 ? lastRowPct : defaultAgencyFeePct > 0 ? defaultAgencyFeePct : DEFAULT_AGENCY_FEE_PCT;
@@ -650,30 +681,33 @@ export default function PropertyIncomeLedger({
                 </div>
             )}
 
-            {/* Summary tiles: "Aluguel bruto" is the current month; the other four follow the period filter below */}
+            {/* Summary tiles: the five follow the period filter below */}
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-                <SummaryTile
+                <Tile
                     label="Aluguel bruto no período"
                     value={formatBRL(periodSummary.totalGross)}
                     hint={periodSummary.confirmedMonths ? "Valor de contrato somado" : "Nenhum mês confirmado no período"}
                     icon={<Landmark className="w-4 h-4" />}
                     tone="emerald"
+                    info={ledgerInfo.gross}
                 />
-                <SummaryTile
+                <Tile
                     label="Recebido no período"
                     value={formatBRL(periodSummary.totalReceived)}
                     hint={periodSummary.confirmedMonths ? `${periodSummary.confirmedMonths} ${periodSummary.confirmedMonths === 1 ? "mês" : "meses"} · ${periodLabel(period)}` : `Nenhum mês confirmado · ${periodLabel(period)}`}
                     icon={<Wallet className="w-4 h-4" />}
                     tone="blue"
+                    info={ledgerInfo.received}
                 />
-                <SummaryTile
+                <Tile
                     label="Aluguel líquido no período"
                     value={formatBRL(periodSummary.totalNetRent)}
                     hint={periodSummary.confirmedMonths ? `Média ${formatBRL(periodSummary.totalNetRent / periodSummary.confirmedMonths)}/mês` : "—"}
                     icon={<CheckCircle2 className="w-4 h-4" />}
                     tone="violet"
+                    info={ledgerInfo.net}
                 />
-                <SummaryTile
+                <Tile
                     label="Energia Solar no período"
                     value={formatBRL(periodSummary.totalEnergy)}
                     hint={
@@ -685,13 +719,15 @@ export default function PropertyIncomeLedger({
                     }
                     icon={<Zap className="w-4 h-4" />}
                     tone="amber"
+                    info={ledgerInfo.energy}
                 />
-                <SummaryTile
+                <Tile
                     label="Taxa da imobiliária no período"
                     value={formatBRL(periodSummary.totalFee)}
                     hint="Economia potencial com autogestão no Kitnets.com"
                     icon={<Building2 className="w-4 h-4" />}
                     tone="rose"
+                    info={ledgerInfo.fee}
                 />
             </div>
 
@@ -1170,30 +1206,6 @@ export default function PropertyIncomeLedger({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </div>
-    );
-}
-
-function SummaryTile({
-    label, value, hint, icon, tone,
-}: {
-    label: string; value: string; hint: React.ReactNode; icon: React.ReactNode; tone: "emerald" | "blue" | "violet" | "amber" | "rose";
-}) {
-    const tones = {
-        emerald: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600",
-        blue: "bg-blue-50 dark:bg-blue-950/40 text-blue-600",
-        violet: "bg-violet-50 dark:bg-violet-950/40 text-violet-600",
-        amber: "bg-amber-50 dark:bg-amber-950/40 text-amber-600",
-        rose: "bg-rose-50 dark:bg-rose-950/40 text-rose-600",
-    } as const;
-    return (
-        <div className="p-3.5 rounded-xl border border-border/80 bg-muted/20 space-y-1 flex flex-col">
-            <div className="flex items-start justify-between gap-2 text-muted-foreground">
-                <span className="text-[10px] font-semibold uppercase tracking-wider leading-tight">{label}</span>
-                <span className={cn("p-1.5 rounded-lg shrink-0", tones[tone])}>{icon}</span>
-            </div>
-            <span className="text-lg font-bold text-foreground block tabular-nums">{value}</span>
-            <span className="text-[11px] text-muted-foreground block leading-snug break-words">{hint}</span>
         </div>
     );
 }
