@@ -1,5 +1,6 @@
 "use client";
 
+import { ReturnToPropertyLink, useReturnPropertyId } from '@/components/properties/ReturnToPropertyLink';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@kitnets/ui';
 import { Input } from '@/components/ui/input';
@@ -706,7 +707,10 @@ export default function ImobiliariaContent({ lang, initialAgencies }: Imobiliari
         setPageState('editing');
     }, []);
 
-    // Deep link: /imobiliaria?agency=<id> opens that agency's detail (the property page's agency link)
+    // Opened from a property's "Contrato de Aluguel" card (?property=<id>): offers the way back
+    const returnPropertyId = useReturnPropertyId();
+
+    // Deep link: /imobiliaria?agency=<id> lands on that agency's page (the property page's agency link)
     const deepLinkDone = useRef(false);
     useEffect(() => {
         if (deepLinkDone.current || pageState !== 'list') return;
@@ -715,8 +719,8 @@ export default function ImobiliariaContent({ lang, initialAgencies }: Imobiliari
         const target = agencies.find(a => a.id === id);
         if (!target) return;   // the list is still loading
         deepLinkDone.current = true;
-        setSelectedAgencyForDetail(target);
-    }, [pageState, agencies]);
+        startEditing(target);
+    }, [pageState, agencies, startEditing]);
 
     // ── Service Agreement File handlers ──────────────────────────────
 
@@ -1499,6 +1503,7 @@ export default function ImobiliariaContent({ lang, initialAgencies }: Imobiliari
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {/* Page Header */}
             <div className="mb-8 space-y-4">
+                <ReturnToPropertyLink propertyId={returnPropertyId} className="flex w-fit" />
                 <button
                     type="button"
                     onClick={cancelForm}

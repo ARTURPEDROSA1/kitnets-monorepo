@@ -26,7 +26,20 @@ export const GET = withAuth({ tag: "Leases GET" }, async ({ profileId, supabase 
         return NextResponse.json({ error: "Erro ao carregar contratos." }, { status: 500 });
     }
 
-    return NextResponse.json({ leases: (leases || []).map((l) => flattenLease(l as Record<string, unknown>)) });
+    // how many files each lease has, so the list can offer "open the contract" without loading them all
+    const ids = (leases || []).map((l) => String((l as Record<string, unknown>).id));
+    const counts = new Map<string, number>();
+    if (ids.length > 0) {
+        const { data: docs } = await supabase.from("lease_documents").select("lease_id").in("lease_id", ids);
+        for (const d of docs || []) counts.set(d.lease_id, (counts.get(d.lease_id) ?? 0) + 1);
+    }
+
+    return NextResponse.json({
+        leases: (leases || []).map((l) => {
+            const flat = flattenLease(l as Record<string, unknown>);
+            return { ...flat, document_count: counts.get(String(flat.id)) ?? 0 };
+        }),
+    });
 });
 
 /**

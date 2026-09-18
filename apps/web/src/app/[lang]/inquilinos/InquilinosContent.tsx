@@ -1,5 +1,6 @@
 "use client";
 
+import { ReturnToPropertyLink, useReturnPropertyId } from '@/components/properties/ReturnToPropertyLink';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Button } from '@kitnets/ui';
 import { Input } from '@/components/ui/input';
@@ -499,6 +500,9 @@ export default function InquilinosContent({ lang }: InquilinosContentProps) {
         setPageState('editing');
     }, []);
 
+    // Opened from a property's "Contrato de Aluguel" card (?property=<id>): offers the way back
+    const returnPropertyId = useReturnPropertyId();
+
     // Deep link: /inquilinos?tenant=<id> opens that tenant (the property page's tenant link)
     const deepLinkDone = useRef(false);
     useEffect(() => {
@@ -878,6 +882,7 @@ export default function InquilinosContent({ lang }: InquilinosContentProps) {
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {/* Page Header */}
             <div className="mb-8">
+                <ReturnToPropertyLink propertyId={returnPropertyId} className="mb-4 flex w-fit" />
                 <button
                     onClick={cancelForm}
                     className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"

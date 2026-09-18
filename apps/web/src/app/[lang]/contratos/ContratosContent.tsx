@@ -1,5 +1,6 @@
 "use client";
 
+import { ReturnToPropertyLink, useReturnPropertyId } from '@/components/properties/ReturnToPropertyLink';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Button } from '@kitnets/ui';
 import { Input } from '@/components/ui/input';
@@ -606,6 +607,28 @@ export default function ContratosContent({ lang }: { lang: string }) {
         }
     };
 
+    // Opened from a property's "Contrato de Aluguel" card (?property=<id>): offers the way back
+    const returnPropertyId = useReturnPropertyId();
+
+    /** Opens the lease's contract file (the CONTRACT document, else the most recent one) in the viewer. */
+    const [openingDocFor, setOpeningDocFor] = useState<string | null>(null);
+    const openContractFile = async (lease: LeaseWithDetails) => {
+        setOpeningDocFor(lease.id);
+        try {
+            const res = await fetch(`/api/leases/${lease.id}`);
+            const data = await res.json();
+            const docs = ((data.lease?.documents ?? []) as Array<{ document_type: string; file_name: string; file_url: string }>);
+            const doc = docs.find(d => d.document_type === 'CONTRACT') ?? docs[0];
+            if (!doc) return;
+            if (/\.pdf$/i.test(doc.file_name)) setViewingDoc({ url: doc.file_url, title: lease.reference_name || 'Contrato de locação', fileName: doc.file_name });
+            else window.open(doc.file_url, '_blank', 'noopener,noreferrer');
+        } catch {
+            console.error('Error opening the contract file');
+        } finally {
+            setOpeningDocFor(null);
+        }
+    };
+
     // Deep link: /contratos?lease=<id> opens that contract (the property page's "Contrato" link)
     const deepLinkDone = useRef(false);
     useEffect(() => {
@@ -616,7 +639,6 @@ export default function ContratosContent({ lang }: { lang: string }) {
         if (!target) return;   // the list is still loading
         deepLinkDone.current = true;
         void handleEdit(target);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pageState, leases]);
 
     // ── Delete ────────────────────────────────────────────────────
@@ -729,6 +751,7 @@ export default function ContratosContent({ lang }: { lang: string }) {
     if (pageState === 'form' || pageState === 'editing') {
         return (
             <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
+                <ReturnToPropertyLink propertyId={returnPropertyId} />
                 {/* Header */}
                 <div className="flex items-center gap-3">
                     <Button variant="ghost" size="icon" onClick={() => { resetForm(); setPageState('list'); }}>
@@ -1475,7 +1498,12 @@ export default function ContratosContent({ lang }: { lang: string }) {
                                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setExpandedId(isExpanded ? null : lease.id)}>
                                         {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                                     </Button>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(lease)}>
+                                    {(lease.document_count ?? 0) > 0 && (
+                                        <Button variant="ghost" size="icon" className="h-8 w-8" title="Abrir o PDF do contrato" aria-label="Abrir o PDF do contrato" disabled={openingDocFor === lease.id} onClick={() => openContractFile(lease)}>
+                                            {openingDocFor === lease.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4 text-blue-600" />}
+                                        </Button>
+                                    )}
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" title="Editar contrato" onClick={() => handleEdit(lease)}>
                                         <PenLine className="h-4 w-4" />
                                     </Button>
                                     {displayStatus === 'ACTIVE' && (
