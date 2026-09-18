@@ -87,6 +87,9 @@ export interface LeaseCharge {
     label: string | null;
     responsibility: ChargeResponsibility;
     amount: number | null;
+    /** Index that readjusts the amount (same values as the rent's), when the lease says. */
+    adjustment_index: string | null;
+    adjustment_notes: string | null;
 }
 
 export interface LeaseDocument {
@@ -144,6 +147,8 @@ export interface ChargeFormItem {
     label: string;
     responsibility: ChargeResponsibility;
     amount: string;                 // String for currency input
+    adjustment_index: string;
+    adjustment_notes: string;
 }
 
 // ── Dropdown option types ────────────────────────────────────────────

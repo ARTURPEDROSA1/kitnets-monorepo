@@ -185,6 +185,16 @@ const ADJUSTMENT_OPTIONS = [
     { value: 'NONE', label: 'Sem reajuste automático' },
 ];
 
+const CHARGE_ADJUSTMENT_OPTIONS = [
+    { value: '', label: 'Não informado' },
+    { value: 'IPCA', label: 'IPCA' },
+    { value: 'IGP_M', label: 'IGP-M' },
+    { value: 'INPC', label: 'INPC' },
+    { value: 'IVAR', label: 'IVAR' },
+    { value: 'CUSTOM', label: 'Outra regra' },
+    { value: 'NONE', label: 'Valor fixo (sem reajuste)' },
+];
+
 // Same limits as POST /api/leases/[id]/documents.
 const DOCUMENT_MIME_TYPES = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
 const DOCUMENT_MAX_SIZE = 5 * 1024 * 1024;
@@ -538,6 +548,8 @@ export default function ContratosContent({ lang }: { lang: string }) {
             label: c.label,
             responsibility: c.responsibility,
             amount: toMask(c.amount),
+            adjustment_index: c.adjustment_index || '',
+            adjustment_notes: c.adjustment_notes || '',
         })));
         // Everything the AI filled must be in sight for the review.
         setOpenSections(prev => ({
@@ -596,6 +608,8 @@ export default function ContratosContent({ lang }: { lang: string }) {
                     label: c.label || '',
                     responsibility: c.responsibility,
                     amount: c.amount ? maskCurrency((c.amount * 100).toFixed(0)) : '',
+                    adjustment_index: c.adjustment_index || '',
+                    adjustment_notes: c.adjustment_notes || '',
                 }))
             );
 
@@ -1158,81 +1172,117 @@ export default function ContratosContent({ lang }: { lang: string }) {
                     onToggle={() => toggleSection('charges')}
                 >
                     {charges.map((charge, idx) => (
-                        <div key={idx} className="flex flex-col gap-2 rounded-lg border border-border p-3 sm:flex-row sm:items-end sm:gap-3">
-                            <div className="flex-1">
-                                <Label className="text-xs">Tipo</Label>
-                                <select
-                                    className="flex h-9 w-full rounded-md border bg-background px-2 py-1 text-sm"
-                                    value={charge.charge_type}
-                                    onChange={e => {
-                                        const next = [...charges];
-                                        next[idx].charge_type = e.target.value as ChargeType;
-                                        setCharges(next);
-                                    }}
-                                >
-                                    {CHARGE_TYPES.map(ct => (
-                                        <option key={ct.value} value={ct.value}>{ct.label}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            {charge.charge_type === 'OTHER' && (
+                        <div key={idx} className="space-y-2 rounded-lg border border-border p-3">
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
                                 <div className="flex-1">
-                                    <Label className="text-xs">Descrição</Label>
-                                    <Input
-                                        value={charge.label}
+                                    <Label className="text-xs">Tipo</Label>
+                                    <select
+                                        className="flex h-9 w-full rounded-md border bg-background px-2 py-1 text-sm"
+                                        value={charge.charge_type}
                                         onChange={e => {
                                             const next = [...charges];
-                                            next[idx].label = e.target.value;
+                                            next[idx].charge_type = e.target.value as ChargeType;
                                             setCharges(next);
                                         }}
-                                        placeholder="Descreva..."
+                                    >
+                                        {CHARGE_TYPES.map(ct => (
+                                            <option key={ct.value} value={ct.value}>{ct.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {charge.charge_type === 'OTHER' && (
+                                    <div className="flex-1">
+                                        <Label className="text-xs">Descrição</Label>
+                                        <Input
+                                            value={charge.label}
+                                            onChange={e => {
+                                                const next = [...charges];
+                                                next[idx].label = e.target.value;
+                                                setCharges(next);
+                                            }}
+                                            placeholder="Descreva..."
+                                            className="h-9"
+                                        />
+                                    </div>
+                                )}
+
+                                <div className="w-full sm:w-44">
+                                    <Label className="text-xs">Responsabilidade</Label>
+                                    <select
+                                        className="flex h-9 w-full rounded-md border bg-background px-2 py-1 text-sm"
+                                        value={charge.responsibility}
+                                        onChange={e => {
+                                            const next = [...charges];
+                                            next[idx].responsibility = e.target.value as ChargeResponsibility;
+                                            setCharges(next);
+                                        }}
+                                    >
+                                        {RESPONSIBILITY_OPTIONS.map(r => (
+                                            <option key={r.value} value={r.value}>{r.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="w-full sm:w-32">
+                                    <Label className="text-xs">Valor (R$)</Label>
+                                    <Input
+                                        value={charge.amount}
+                                        onChange={e => {
+                                            const next = [...charges];
+                                            next[idx].amount = maskCurrency(e.target.value);
+                                            setCharges(next);
+                                        }}
+                                        placeholder="0,00"
                                         className="h-9"
                                     />
                                 </div>
-                            )}
 
-                            <div className="w-full sm:w-44">
-                                <Label className="text-xs">Responsabilidade</Label>
-                                <select
-                                    className="flex h-9 w-full rounded-md border bg-background px-2 py-1 text-sm"
-                                    value={charge.responsibility}
-                                    onChange={e => {
-                                        const next = [...charges];
-                                        next[idx].responsibility = e.target.value as ChargeResponsibility;
-                                        setCharges(next);
-                                    }}
-                                >
-                                    {RESPONSIBILITY_OPTIONS.map(r => (
-                                        <option key={r.value} value={r.value}>{r.label}</option>
-                                    ))}
-                                </select>
+                                <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => setCharges(prev => prev.filter((_, i) => i !== idx))}>
+                                    <X className="h-4 w-4" />
+                                </Button>
                             </div>
 
-                            <div className="w-full sm:w-32">
-                                <Label className="text-xs">Valor (R$)</Label>
-                                <Input
-                                    value={charge.amount}
-                                    onChange={e => {
-                                        const next = [...charges];
-                                        next[idx].amount = maskCurrency(e.target.value);
-                                        setCharges(next);
-                                    }}
-                                    placeholder="0,00"
-                                    className="h-9"
-                                />
+                            {/* How this charge's amount is readjusted (often not the rent's index) */}
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
+                                <div className="w-full sm:w-52">
+                                    <Label className="text-xs">Reajuste do encargo</Label>
+                                    <select
+                                        className="flex h-9 w-full rounded-md border bg-background px-2 py-1 text-sm"
+                                        value={charge.adjustment_index}
+                                        onChange={e => {
+                                            const next = [...charges];
+                                            next[idx].adjustment_index = e.target.value;
+                                            setCharges(next);
+                                        }}
+                                    >
+                                        {CHARGE_ADJUSTMENT_OPTIONS.map(opt => (
+                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="flex-1">
+                                    <Label className="text-xs">Regra de reajuste (opcional)</Label>
+                                    <Input
+                                        value={charge.adjustment_notes}
+                                        onChange={e => {
+                                            const next = [...charges];
+                                            next[idx].adjustment_notes = e.target.value;
+                                            setCharges(next);
+                                        }}
+                                        placeholder="Ex: Fixo por 12 meses; revisto conforme o consumo"
+                                        maxLength={300}
+                                        className="h-9"
+                                    />
+                                </div>
                             </div>
-
-                            <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => setCharges(prev => prev.filter((_, i) => i !== idx))}>
-                                <X className="h-4 w-4" />
-                            </Button>
                         </div>
                     ))}
 
                     <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setCharges(prev => [...prev, { charge_type: 'CONDOMINIUM', label: '', responsibility: 'TENANT', amount: '' }])}
+                        onClick={() => setCharges(prev => [...prev, { charge_type: 'CONDOMINIUM', label: '', responsibility: 'TENANT', amount: '', adjustment_index: '', adjustment_notes: '' }])}
                     >
                         <Plus className="mr-1 h-4 w-4" /> Adicionar Encargo
                     </Button>

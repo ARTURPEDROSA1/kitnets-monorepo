@@ -69,6 +69,18 @@ function getChargeLabel(type: string): string {
     return map[type] || type;
 }
 
+function getChargeAdjustmentLabel(index: string): string {
+    const map: Record<string, string> = {
+        IPCA: 'IPCA',
+        IGP_M: 'IGP-M',
+        INPC: 'INPC',
+        IVAR: 'IVAR',
+        CUSTOM: 'Outra regra',
+        NONE: 'Valor fixo',
+    };
+    return map[index] || index;
+}
+
 function getResponsibilityLabel(resp: string): string {
     switch (resp) {
         case 'TENANT': return 'Inquilino';
@@ -219,7 +231,8 @@ export default function LeaseProfileCard({
                                 <tr className="border-b text-left text-xs text-muted-foreground">
                                     <th className="pb-2 pr-4">Tipo</th>
                                     <th className="pb-2 pr-4">Responsabilidade</th>
-                                    <th className="pb-2">Valor</th>
+                                    <th className="pb-2 pr-4">Valor</th>
+                                    <th className="pb-2">Reajuste</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -229,7 +242,13 @@ export default function LeaseProfileCard({
                                             {c.charge_type === 'OTHER' && c.label ? c.label : getChargeLabel(c.charge_type)}
                                         </td>
                                         <td className="py-2 pr-4">{getResponsibilityLabel(c.responsibility)}</td>
-                                        <td className="py-2">{c.amount ? formatCurrency(c.amount) : '—'}</td>
+                                        <td className="py-2 pr-4">{c.amount ? formatCurrency(c.amount) : '—'}</td>
+                                        <td className="py-2">
+                                            {c.adjustment_index ? getChargeAdjustmentLabel(c.adjustment_index) : c.adjustment_notes ? '' : '—'}
+                                            {c.adjustment_notes && (
+                                                <span className="block text-xs text-muted-foreground">{c.adjustment_notes}</span>
+                                            )}
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>

@@ -18,7 +18,7 @@ const valid = {
     next_adjustment_date: "2027-01-31",
     status: "ACTIVE",
     additional_tenants: [{ tenant_id: "tenant-2", role: "CO_TENANT" }, { tenant_id: "", role: "CO_TENANT" }, { tenant_id: "x", role: "BOSS" }],
-    charges: [{ charge_type: "WATER", responsibility: "TENANT", amount: "80,00", label: " Água " }, { charge_type: "PIZZA", responsibility: "TENANT" }],
+    charges: [{ charge_type: "WATER", responsibility: "TENANT", amount: "80,00", label: " Água ", adjustment_index: "IPCA", adjustment_notes: " Anual " }, { charge_type: "PIZZA", responsibility: "TENANT" }],
 };
 
 describe("leaseInputSchema", () => {
@@ -34,7 +34,7 @@ describe("leaseInputSchema", () => {
         expect(out.lease.agency_id).toBeNull();
         expect(out.lease.agent_id).toBeNull();
         expect(out.additional_tenants).toEqual([{ tenant_id: "tenant-2", role: "CO_TENANT" }]);
-        expect(out.charges).toEqual([{ charge_type: "WATER", label: "Água", responsibility: "TENANT", amount: 80 }]);
+        expect(out.charges).toEqual([{ charge_type: "WATER", label: "Água", responsibility: "TENANT", amount: 80, adjustment_index: "IPCA", adjustment_notes: "Anual" }]);
     });
 
     it("reports the form's messages for missing required fields", () => {
