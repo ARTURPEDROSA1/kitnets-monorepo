@@ -156,6 +156,28 @@ function readCardsCache(key: string): CachedCard[] {
     return cards;
 }
 
+/**
+ * Sub-units after a save: whatever is on screen now, plus the media the save uploaded.
+ * A save only swaps a unit object when it uploaded that unit's pending files, so fields
+ * typed while the save was in flight are never rolled back to the saved snapshot.
+ */
+function mergeUploadedUnitMedia(current: SubUnit[], saved: SubUnit[], uploaded: SubUnit[]): SubUnit[] {
+    return current.map((unit, si) => {
+        const before = saved[si];
+        const after = uploaded[si];
+        if (!before || !after || before === after) return unit;
+        const newPhotoUrls = (after.photos || []).filter(url => !(before.photos || []).includes(url));
+        const newVideoUrls = (after.videos || []).filter(url => !(before.videos || []).includes(url));
+        return {
+            ...unit,
+            photos: [...(unit.photos || []), ...newPhotoUrls],
+            videos: [...(unit.videos || []), ...newVideoUrls],
+            newPhotos: (unit.newPhotos || []).filter(file => !(before.newPhotos || []).includes(file)),
+            newVideos: (unit.newVideos || []).filter(file => !(before.newVideos || []).includes(file)),
+        };
+    });
+}
+
 export default function ProfileContent({ dict, view = 'full' }: ProfileContentProps) {
     const { isLoaded, user } = useUser();
     const p = dict.profile;
@@ -459,6 +481,20 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
     const [generatingUnitDescriptionIdx, setGeneratingUnitDescriptionIdx] = useState<number | null>(null);
     const [descriptionPurpose, setDescriptionPurpose] = useState<{ venda: boolean; aluguel: boolean }>({ venda: false, aluguel: true });
     const [importingContractIdx, setImportingContractIdx] = useState<number | null>(null);
+
+    // Sub-units save inline, with no "Confirmar" of their own: a typed field persists when it
+    // loses focus; selects, checkboxes, media and add/remove persist right away. Edits flag the
+    // units as dirty, a save request bumps the counter and the effect below handleSave runs it.
+    const unitsDirtyRef = useRef(false);
+    const unitsSavePendingRef = useRef(false);
+    const [unitsSaveRequest, setUnitsSaveRequest] = useState(0);
+    const [unitsSaveState, setUnitsSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+    const requestUnitsSave = useCallback(() => {
+        if (!unitsDirtyRef.current) return; // focus left a field nobody changed
+        unitsSavePendingRef.current = true;
+        setUnitsSaveState('saving');
+        setUnitsSaveRequest(n => n + 1);
+    }, []);
 
     // Administrator data (only for PJ)
     const [adminData, setAdminData] = useState({
@@ -1215,6 +1251,8 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                     updated[unitIndex] = { ...updated[unitIndex], description: data.description };
                     return { ...prev, subUnits: updated };
                 });
+                unitsDirtyRef.current = true;
+                requestUnitsSave();
             } else {
                 alert('Não foi possível gerar a descrição. Tente novamente.');
             }
@@ -1260,6 +1298,8 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                     updated[unitIndex] = unit;
                     return { ...prev, subUnits: updated };
                 });
+                unitsDirtyRef.current = true;
+                requestUnitsSave();
                 alert(`Dados extraídos com sucesso! Confira e ajuste os campos preenchidos.${d.tenantName ? '\nInquilino: ' + d.tenantName : ''}${d.startDate ? '\nInício: ' + d.startDate : ''}${d.endDate ? '\nTérmino: ' + d.endDate : ''}${d.rentValue ? '\nAluguel: R$ ' + d.rentValue : ''}`);
             } else {
                 alert(result.error || 'Não foi possível extrair dados do contrato.');
@@ -1489,15 +1529,16 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
         }
     };
 
-    const handleSave = async (silent = false, propertiesOverride?: PropertyState[]) => {
-        if (!user || isSaving) return;
+    /** Resolves true once everything is persisted, false when the save was skipped or failed */
+    const handleSave = async (silent = false, propertiesOverride?: PropertyState[]): Promise<boolean> => {
+        if (!user || isSaving) return false;
         setIsSaving(true);
         try {
             const token = await getToken({ template: 'supabase' });
             if (!token) {
                 alert(p.alerts.authError);
                 setIsSaving(false);
-                return;
+                return false;
             }
 
             const sb = await getSupabase();
@@ -1798,7 +1839,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             videos: uploaded.videos,
                             savedPhotos: uploaded.savedPhotos,
                             savedVideos: uploaded.savedVideos,
-                            subUnits: uploaded.subUnits,
+                            subUnits: mergeUploadedUnitMedia(currentProp.subUnits, properties[idx]?.subUnits ?? [], uploaded.subUnits),
                             ownershipFiles: uploaded.ownershipFiles,
                             savedProofs: uploaded.savedProofs,
                             profilePhotoUrl: uploaded.profilePhotoUrl,
@@ -1861,14 +1902,35 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                 }, 2000);
             }
 
+            return true;
         } catch (err: unknown) {
             console.error('Error saving profile:', err);
             const errorMessage = (err as Error).message || String(err);
             alert(`${p.alerts.saveError}: ${errorMessage}`);
+            return false;
         } finally {
             setIsSaving(false);
         }
     };
+
+    // Inline save of the sub-units (see unitsDirtyRef). Always calls the latest handleSave,
+    // so the save carries the state of the render that followed the edit.
+    const handleSaveRef = useRef(handleSave);
+    useEffect(() => { handleSaveRef.current = handleSave; });
+    useEffect(() => {
+        // While another save runs the request stays pending: this re-runs when isSaving clears
+        if (!unitsSavePendingRef.current || isSaving) return;
+        unitsSavePendingRef.current = false;
+        unitsDirtyRef.current = false;
+        void handleSaveRef.current(true).then(ok => {
+            if (!ok) unitsDirtyRef.current = true; // the next blur or change retries
+            setUnitsSaveState(ok ? 'saved' : 'error');
+        });
+    }, [unitsSaveRequest, isSaving]);
+    // Leaving the page with an edit still unsaved (e.g. a save was running at blur time)
+    useEffect(() => () => {
+        if (unitsDirtyRef.current) void handleSaveRef.current(true);
+    }, []);
 
     const handleDeleteAccount = async () => {
         setIsDeleting(true);
@@ -2108,6 +2170,11 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
         const setPDetailsOpen = (v: boolean | ((p: boolean) => boolean)) => setPropField('detailsInitialOpen', v);
         const setPDetails = (v: PropertyDetails | ((p: PropertyDetails) => PropertyDetails)) => setPropField('details', v);
         const setPSubUnits = (v: SubUnit[] | ((p: SubUnit[]) => SubUnit[])) => setPropField('subUnits', v);
+        // Edits made in the sub-unit cards, which save inline (see unitsDirtyRef)
+        const setPSubUnitsInline = (v: SubUnit[]) => {
+            unitsDirtyRef.current = true;
+            setPSubUnits(v);
+        };
         const setPPhotos = (v: File[] | ((p: File[]) => File[])) => setPropField('photos', v);
         const setPSavedPhotos = (v: string[] | ((p: string[]) => string[])) => setPropField('savedPhotos', v);
         const setPVideos = (v: File[] | ((p: File[]) => File[])) => setPropField('videos', v);
@@ -3000,7 +3067,9 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             details={pDetails}
                             units={pSubUnits}
                             onDetailsChange={setPDetails}
-                            onUnitsChange={setPSubUnits}
+                            onUnitsChange={setPSubUnitsInline}
+                            onCommit={requestUnitsSave}
+                            saveState={unitsSaveState}
                             onGenerateDescription={(unitIdx) => generateUnitDescription(propIdx, unitIdx)}
                             generatingDescriptionIdx={generatingUnitDescriptionIdx}
                             onImportContract={(unitIdx, file) => importContract(propIdx, unitIdx, file)}
@@ -3177,7 +3246,9 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             details={pDetails}
                             units={pSubUnits}
                             onDetailsChange={setPDetails}
-                            onUnitsChange={setPSubUnits}
+                            onUnitsChange={setPSubUnitsInline}
+                            onCommit={requestUnitsSave}
+                            saveState={unitsSaveState}
                             onGenerateDescription={(unitIdx) => generateUnitDescription(propIdx, unitIdx)}
                             generatingDescriptionIdx={generatingUnitDescriptionIdx}
                             onImportContract={(unitIdx, file) => importContract(propIdx, unitIdx, file)}
