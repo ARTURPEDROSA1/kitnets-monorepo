@@ -1,0 +1,76 @@
+name: ai-models-check
+
+# Every Monday, make one tiny real call with each AI model configured in
+# apps/web/src/lib/ai-models.ts. The app falls back from Gemini to OpenAI when
+# a call fails, so a retired model keeps "working" while costing more; this job
+# fails when a provider says a model is gone, and the summary names a working
+# replacement. A busy provider is retried and never fails the job.
+#
+# Secrets: GEMINI_API_KEY (required), OPENAI_API_KEY (optional),
+#          SENTRY_DSN (optional: cron monitor "kitnets-ai-models-check").
+# Variables (optional): GEMINI_MODEL, OPENAI_MODEL, OPENAI_MINI_MODEL. Set them
+#          only if the same overrides exist in Vercel, so both check the same names.
+
+on:
+  schedule:
+    - cron: "0 9 * * 1" # Mondays 09:00 UTC = 06:00 America/Sao_Paulo
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-models-check
+  cancel-in-progress: false
+
+env:
+  MONITOR_SLUG: kitnets-ai-models-check
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+      GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+      OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+      OPENAI_MINI_MODEL: ${{ vars.OPENAI_MINI_MODEL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Sentry cron check-in (start)
+        if: env.SENTRY_DSN != ''
+        run: |
+          key=$(sed -E 's#https://([^@]+)@.*#\1#' <<<"$SENTRY_DSN")
+          host=$(sed -E 's#https://[^@]+@([^/]+)/.*#\1#' <<<"$SENTRY_DSN")
+          project=$(sed -E 's#.*/([0-9]+)$#\1#' <<<"$SENTRY_DSN")
+          echo "::add-mask::$key"
+          url="https://$host/api/$project/cron/$MONITOR_SLUG/$key/"
+          id=$(node -e 'console.log(require("crypto").randomUUID())')
+          curl -sS -w '[http %{http_code}]\n' -X POST "$url" -H 'Content-Type: application/json' -d '{
+            "check_in_id": "'"$id"'",
+            "status": "in_progress",
+            "monitor_config": {
+              "schedule": { "type": "crontab", "value": "0 9 * * 1" },
+              "checkin_margin": 120, "max_runtime": 15, "timezone": "UTC",
+              "failure_issue_threshold": 1, "recovery_threshold": 1
+            }
+          }' || true
+          echo "SENTRY_CHECKIN_URL=$url" >> "$GITHUB_ENV"
+          echo "SENTRY_CHECKIN_ID=$id" >> "$GITHUB_ENV"
+
+      - name: Check the configured models
+        run: node scripts/check-ai-models.mjs
+
+      - name: Sentry cron check-in (finish)
+        if: always() && env.SENTRY_CHECKIN_URL != ''
+        run: |
+          status=ok; [ "${{ job.status }}" = "success" ] || status=error
+          curl -sS -w '[http %{http_code}]\n' -X POST "$SENTRY_CHECKIN_URL" -H 'Content-Type: application/json' \
+            -d "{\"check_in_id\": \"$SENTRY_CHECKIN_ID\", \"status\": \"$status\"}"

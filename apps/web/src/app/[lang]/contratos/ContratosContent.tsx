@@ -28,10 +28,12 @@ import {
     Ban,
     PenLine,
     Eye,
+    Sparkles,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import LeaseProfileCard from '@/components/contratos/LeaseProfileCard';
+import LeaseImportModal, { type LeaseImportResult } from '@/components/contratos/LeaseImportModal';
 import { PdfViewerModal } from '@/components/ui/PdfViewerModal';
 import { Badge } from '@/components/ui/badge';
 import type {
@@ -182,6 +184,10 @@ const ADJUSTMENT_OPTIONS = [
     { value: 'NONE', label: 'Sem reajuste automático' },
 ];
 
+// Same limits as POST /api/leases/[id]/documents.
+const DOCUMENT_MIME_TYPES = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+const DOCUMENT_MAX_SIZE = 5 * 1024 * 1024;
+
 const DOCUMENT_TYPE_OPTIONS = [
     { value: 'CONTRACT', label: 'Contrato' },
     { value: 'ADDENDUM', label: 'Aditivo' },
@@ -242,6 +248,12 @@ export default function ContratosContent({ lang }: { lang: string }) {
     const [terminateReason, setTerminateReason] = useState('');
     const [terminating, setTerminating] = useState(false);
 
+    // AI import ("Novo Contrato" → upload the lease agreement)
+    const [importOpen, setImportOpen] = useState(false);
+    const [aiImported, setAiImported] = useState(false);
+    // The imported agreement, attached as the CONTRACT document once the lease exists.
+    const [importedFile, setImportedFile] = useState<File | null>(null);
+
     // ── Fetch leases ──────────────────────────────────────────────
 
     const fetchLeases = useCallback(async () => {
@@ -262,8 +274,10 @@ export default function ContratosContent({ lang }: { lang: string }) {
             setTenants(data.tenants || []);
             setAgencies(data.agencies || []);
             setAgents(data.agents || []);
+            return data as { properties?: LeasePropertyOption[]; tenants?: LeaseTenantOption[] };
         } catch {
             console.error('Error fetching dropdowns');
+            return null;
         }
     }, []);
 
@@ -348,6 +362,8 @@ export default function ContratosContent({ lang }: { lang: string }) {
         setEditingId(null);
         setWarning(null);
         setExistingDocuments([]);
+        setAiImported(false);
+        setImportedFile(null);
         setOpenSections({
             property_tenant: true,
             terms: true,
@@ -463,6 +479,17 @@ export default function ContratosContent({ lang }: { lang: string }) {
                 setWarning(data.warning);
             }
 
+            if (!editingId && importedFile && data.lease?.id) {
+                try {
+                    const docData = new FormData();
+                    docData.append('file', importedFile);
+                    docData.append('document_type', 'CONTRACT');
+                    await fetch(`/api/leases/${data.lease.id}/documents`, { method: 'POST', body: docData });
+                } catch {
+                    console.error('Error attaching imported contract');
+                }
+            }
+
             resetForm();
             await fetchLeases();
             setPageState('list');
@@ -471,6 +498,59 @@ export default function ContratosContent({ lang }: { lang: string }) {
         } finally {
             setSaving(false);
         }
+    };
+
+    // ── AI import ─────────────────────────────────────────────────
+
+    const handleImportComplete = async (result: LeaseImportResult) => {
+        // The import may have just created the property, the agency and the tenants.
+        const dropdowns = await fetchDropdowns();
+        const { lease } = result.data;
+        const toMask = (n: number | null) => (n ? maskCurrency((n * 100).toFixed(0)) : '');
+
+        const propertyName = dropdowns?.properties?.find(p => p.id === result.propertyId)?.name;
+        const tenantName = dropdowns?.tenants?.find(t => t.id === result.primaryTenantId)?.full_name;
+        const year = lease.start_date ? lease.start_date.slice(0, 4) : new Date().getFullYear();
+
+        resetForm();
+        setForm({
+            ...EMPTY_FORM,
+            reference_name: propertyName && tenantName ? `${propertyName} - ${tenantName} - ${year}` : '',
+            property_id: result.propertyId,
+            primary_tenant_id: result.primaryTenantId,
+            management_type: result.agencyId ? 'AGENCY' : 'SELF_MANAGED',
+            agency_id: result.agencyId,
+            start_date: formatDateBR(lease.start_date),
+            end_date: formatDateBR(lease.end_date),
+            monthly_rent: toMask(lease.monthly_rent),
+            rent_due_day: lease.rent_due_day?.toString() || '',
+            security_deposit: toMask(lease.security_deposit),
+            deposit_months: lease.deposit_months?.toString() || '',
+            adjustment_index: lease.adjustment_index || '',
+            adjustment_frequency: lease.adjustment_frequency?.toString() || '12',
+            status: lease.end_date && lease.end_date < toISODate(new Date()) ? 'EXPIRED' : 'ACTIVE',
+            notes: lease.notes || '',
+        });
+        setAdditionalTenants(result.additionalTenants);
+        setCharges(result.data.charges.map(c => ({
+            charge_type: c.charge_type,
+            label: c.label,
+            responsibility: c.responsibility,
+            amount: toMask(c.amount),
+        })));
+        // Everything the AI filled must be in sight for the review.
+        setOpenSections(prev => ({
+            ...prev,
+            adjustment: !!lease.adjustment_index,
+            charges: result.data.charges.length > 0,
+            notes: !!lease.notes,
+        }));
+        setImportedFile(
+            DOCUMENT_MIME_TYPES.includes(result.file.type) && result.file.size <= DOCUMENT_MAX_SIZE ? result.file : null
+        );
+        setAiImported(true);
+        setImportOpen(false);
+        setPageState('form');
     };
 
     // ── Edit ──────────────────────────────────────────────────────
@@ -655,6 +735,21 @@ export default function ContratosContent({ lang }: { lang: string }) {
                     <div className="flex items-start gap-2 rounded-lg border border-yellow-300 bg-yellow-50 p-3 dark:border-yellow-700 dark:bg-yellow-950">
                         <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-yellow-600" />
                         <p className="text-sm text-yellow-800 dark:text-yellow-200">{warning}</p>
+                    </div>
+                )}
+
+                {aiImported && (
+                    <div className="flex items-start gap-3.5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-800 dark:bg-amber-950/30">
+                        <div className="shrink-0 rounded-xl bg-amber-100 p-2 text-amber-600 dark:bg-amber-900/50">
+                            <Sparkles className="h-5 w-5" />
+                        </div>
+                        <div className="space-y-1">
+                            <p className="text-sm font-semibold text-foreground">Dados preenchidos automaticamente via IA!</p>
+                            <p className="text-xs leading-relaxed text-muted-foreground">
+                                As informações foram extraídas do contrato enviado. Revise todos os campos antes de salvar.
+                                {importedFile && ' O arquivo enviado será anexado aos documentos do contrato.'}
+                            </p>
+                        </div>
                     </div>
                 )}
 
@@ -1249,7 +1344,7 @@ export default function ContratosContent({ lang }: { lang: string }) {
                         {leases.length} {leases.length === 1 ? 'contrato registrado' : 'contratos registrados'}
                     </p>
                 </div>
-                <Button onClick={() => { resetForm(); setPageState('form'); }}>
+                <Button onClick={() => { resetForm(); setImportOpen(true); }}>
                     <Plus className="mr-2 h-4 w-4" /> Novo Contrato
                 </Button>
             </div>
@@ -1472,6 +1567,21 @@ export default function ContratosContent({ lang }: { lang: string }) {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* AI import of a lease agreement */}
+            {importOpen && (
+                <LeaseImportModal
+                    properties={properties}
+                    agencies={agencies}
+                    onClose={() => {
+                        setImportOpen(false);
+                        // The import may have created records before it was cancelled.
+                        fetchDropdowns();
+                    }}
+                    onManual={() => { setImportOpen(false); setPageState('form'); }}
+                    onComplete={handleImportComplete}
+                />
             )}
 
             {/* In-App PDF Document Viewer */}

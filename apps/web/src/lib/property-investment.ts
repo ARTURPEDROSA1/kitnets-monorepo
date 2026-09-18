@@ -240,6 +240,8 @@ export interface InvestmentSummary {
     installments: number;
     /** Σ known interest + insurance parts, else bankPaid − principal when the loan is paid off, else null */
     interestAndInsurance: number | null;
+    /** paid-off loans with every split known: financed principal − Σ amortisation parts (> 0 = principal that no recorded payment covers); else null */
+    uncoveredPrincipal: number | null;
     capex: number;
     /** UTILIDADES + OUTROS (taxes are tracked in the taxes register) */
     runningCosts: number;
@@ -260,6 +262,7 @@ export function summarizeInvestment(txs: PropertyTransaction[], inv: PropertyInv
     let installments = 0;
     let knownParts = 0;
     let hasParts = false;
+    let debtRows = 0, principalKnownRows = 0, principalParts = 0;
     let first: string | null = null;
     let last: string | null = null;
     for (const t of txs) {
@@ -270,6 +273,10 @@ export function summarizeInvestment(txs: PropertyTransaction[], inv: PropertyInv
             hasParts = true;
             knownParts += (Number(t.interest_part) || 0) + (Number(t.insurance_part) || 0);
         }
+        if (t.kind === "PRESTACAO" || t.kind === "AMORTIZACAO" || t.kind === "QUITACAO") {
+            debtRows++;
+            if (t.principal_part !== null && t.principal_part !== undefined) { principalKnownRows++; principalParts += Number(t.principal_part) || 0; }
+        }
         if (!first || t.occurred_on < first) first = t.occurred_on;
         if (!last || t.occurred_on > last) last = t.occurred_on;
     }
@@ -278,6 +285,9 @@ export function summarizeInvestment(txs: PropertyTransaction[], inv: PropertyInv
     const runningCosts = round2(byKind.UTILIDADES + byKind.OUTROS);
     const bankFees = byKind.TARIFA;
     const invested = round2(byKind.ENTRADA + byKind.CUSTOS_AQUISICAO + bankPaid + bankFees + capex + runningCosts + byKind.ENERGIA_SOLAR);
+    const uncoveredPrincipal = inv?.financing_status === "PAID_OFF" && inv.principal && debtRows > 0 && principalKnownRows === debtRows
+        ? round2(Number(inv.principal) - principalParts)
+        : null;
     let interestAndInsurance: number | null = null;
     if (hasParts) interestAndInsurance = round2(knownParts);
     else if (inv?.financing_status === "PAID_OFF" && inv.principal && bankPaid > 0) {
@@ -288,6 +298,7 @@ export function summarizeInvestment(txs: PropertyTransaction[], inv: PropertyInv
         downPayment: byKind.ENTRADA,
         closingCosts: byKind.CUSTOS_AQUISICAO,
         bankPaid,
+        uncoveredPrincipal,
         installments,
         interestAndInsurance,
         capex,
@@ -412,15 +423,21 @@ export function estimateFinancingSplits(
 
     /**
      * One pass over the rows. Interest is contractual (balance × rate). Insurance (MIP + DFI + admin)
-     * is modelled as proportional to the balance, `f × segRate × balance`, where segRate comes from
-     * the first regular instalment (where the SAC/PRICE schedule is exact) and `f` is the calibration
-     * factor. Amortisation is whatever is left of the payment.
+     * is modelled as proportional to the balance, `f × segRate × balance` (`f` = calibration factor).
+     * Amortisation is what is left of the payment, never above the scheduled amortisation: a bank does
+     * not amortise extra inside an instalment, so any excess (first-period interest, TAC) reads as
+     * insurance/charges.
+     *
+     * `segRate === null` is the schedule pass: every instalment amortises as scheduled and the leftover
+     * is its insurance. The median of those leftovers ÷ balance is the insurance rate, so one irregular
+     * instalment cannot skew it.
      */
-    const walk = (f: number) => {
+    const walk = (f: number, segRate: number | null) => {
         let balance = principal0;
         let remaining = inv.term_months!;
         let first = true;
-        let segRate: number | null = null;
+        const ratios: number[] = [];
+        let firstShortfall: { date: string; diff: number } | null = null;
         let balanceBeforePayoff: number | null = null;
         const splits: FinancingSplit[] = [];
         const notes: string[] = [];
@@ -474,17 +491,19 @@ export function estimateFinancingSplits(
                             interest = amount;
                             notes.push(`${formatDateBR(t.occurred_on)}: prestação (${amount.toFixed(2)}) menor que os juros estimados — confira o valor.`);
                         } else {
-                            if (segRate === null && !proRata) {
-                                // first full instalment: the schedule is exact, so the leftover is the real insurance
-                                const seg0 = Math.max(0, amount - interest - round2(sch.amort));
-                                segRate = balance > 0 ? seg0 / balance : 0;
-                            }
+                            const schedAmort = round2(sch.amort);
                             // pro-rata first instalment (interest by days is approximate): keep the scheduled amortisation
-                            insurance = segRate === null
-                                ? round2(Math.max(0, amount - interest - round2(sch.amort)))
-                                : round2(Math.min(amount - interest, f * segRate * balance));
-                            principal = round2(Math.min(balance, Math.max(0, amount - interest - insurance)));
+                            const wantInsurance = segRate === null || proRata ? 0 : f * segRate * balance;
+                            principal = round2(Math.min(balance, schedAmort, Math.max(0, amount - interest - wantInsurance)));
                             insurance = round2(amount - interest - principal);
+                            if (!proRata) {
+                                if (segRate === null) { if (insurance > 0) ratios.push(insurance / balance); }
+                                else {
+                                    // an instalment clearly below the schedule means the real balance was already lower than the ledger says
+                                    const expected = interest + schedAmort + segRate * balance;
+                                    if (!firstShortfall && amount < expected - Math.max(30, expected * 0.03)) firstShortfall = { date: t.occurred_on, diff: round2(expected - amount) };
+                                }
+                            }
                         }
                         remaining = Math.max(1, remaining - 1);
                         first = false;
@@ -506,19 +525,23 @@ export function estimateFinancingSplits(
                 splits.push({ id: t.id, occurred_on: t.occurred_on, kind: t.kind, amount, interest_part: interest, principal_part: principal, insurance_part: insurance, balance_after: balance, kept: keep });
             }
         }
-        return { splits, totals, notes, balance, balanceBeforePayoff };
+        return { splits, totals, notes, balance, balanceBeforePayoff, ratios, firstShortfall };
     };
+
+    // Insurance rate: median over the regular instalments of the schedule pass.
+    const ratios = [...walk(1, null).ratios].sort((a, b) => a - b);
+    const segRate = ratios.length === 0 ? 0 : ratios.length % 2 ? ratios[(ratios.length - 1) / 2] : (ratios[ratios.length / 2 - 1] + ratios[ratios.length / 2]) / 2;
 
     // ── Calibration (paid-off loans with a QUITACAO row) ─────────────────────
     // The payoff clears the balance, so the balance right before it must equal the payoff amount.
     // Interest is contractual; the free parameter is the insurance scale `f` (more insurance →
     // less amortisation → higher balance), solved by bisection. Without a payoff, f = 1.
     let f = 1;
-    let r = walk(1);
+    let r = walk(1, segRate);
     const notes: string[] = [];
     if (inv.financing_status === "PAID_OFF" && payoffId && r.balanceBeforePayoff !== null) {
         const payoff = round2(Number(byId.get(payoffId)!.amount) || 0);
-        const residualAt = (x: number) => { const w = walk(x); return w.balanceBeforePayoff === null ? 0 : w.balanceBeforePayoff - payoff; };
+        const residualAt = (x: number) => { const w = walk(x, segRate); return w.balanceBeforePayoff === null ? 0 : w.balanceBeforePayoff - payoff; };
         const r1 = residualAt(1);
         // A payoff larger than the balance already reads as interest/fees; only a leftover balance needs calibration.
         if (r1 > 1) {
@@ -527,7 +550,10 @@ export function estimateFinancingSplits(
             if (rLo > 0) {
                 // Even with zero insurance the balance does not close: some principal was paid outside
                 // the statement (FGTS, for instance). Keep the modelled insurance and say so.
-                notes.push(`Sobra saldo de ${round2(rLo).toFixed(2)} na quitação mesmo sem seguros: provavelmente uma amortização não registrada (FGTS, por exemplo). Cadastre-a como “Amortização extra” e recalcule.`);
+                const hint = r.firstShortfall
+                    ? ` A prestação de ${formatDateBR(r.firstShortfall.date)} veio ${r.firstShortfall.diff.toFixed(2)} abaixo do previsto para o saldo estimado: a amortização que falta deve ser de pouco antes dessa data.`
+                    : "";
+                notes.push(`Sobra saldo de ${round2(r1).toFixed(2)} na quitação: falta uma amortização no registro, ou alguma foi lançada com valor menor (FGTS, por exemplo).${hint} Corrija ou cadastre-a como “Amortização extra” e recalcule.`);
                 f = 1;
             } else if (rHi <= 0) {
                 f = 1;
@@ -542,14 +568,14 @@ export function estimateFinancingSplits(
                     notes.push(`Seguros estimados ${f > 1 ? "aumentados" : "reduzidos"} em ${(Math.abs(f - 1) * 100).toFixed(1)}% em relação à 1ª prestação para que a amortização total feche com o valor financiado.`);
                 }
             }
-            r = walk(f);
+            r = walk(f, segRate);
         }
     }
     const splits = r.splits;
     const totals = r.totals;
     const balanceFinal = r.balance;
     for (const n of r.notes) if (!notes.includes(n)) notes.push(n);
-    if (inv.financing_status === "PAID_OFF" && balanceFinal > 1) {
+    if (inv.financing_status === "PAID_OFF" && balanceFinal > 1 && !notes.some(n => n.startsWith("Sobra saldo"))) {
         notes.push(`Saldo estimado após a quitação: ${balanceFinal.toFixed(2)}. Ajuste a amortização nas linhas em que souber o valor exato.`);
     }
 

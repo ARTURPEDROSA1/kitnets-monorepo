@@ -3,6 +3,7 @@ import { requireUserWithLimit, validateUpload } from "@/lib/session";
 import { HOUR } from "@/lib/rate-limit";
 import { extractText, getDocumentProxy } from "unpdf";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { AI_MODELS, reportAiFallback } from "@/lib/ai-models";
 
 // ── Regex-based bill field parser ────────────────────────────────────
 
@@ -190,7 +191,7 @@ async function extractWithGemini(base64: string, mimeType: string): Promise<Extr
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
-        model: "gemini-1.5-flash",
+        model: AI_MODELS.gemini,
         generationConfig: { responseMimeType: "application/json" },
     });
 
@@ -216,7 +217,7 @@ async function extractWithOpenAI(base64: string, mimeType: string): Promise<Extr
             "Authorization": `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-            model: "gpt-4o",
+            model: AI_MODELS.openai,
             messages: [
                 {
                     role: "user",
@@ -328,6 +329,7 @@ export async function POST(request: Request) {
             });
         } catch (geminiError) {
             console.warn("[extract-bill] Gemini Vision failed:", geminiError);
+            reportAiFallback("extract-bill vision", geminiError);
         }
 
         // ── STRATEGY 3: OpenAI GPT-4o Vision (PAID — last resort) ───────

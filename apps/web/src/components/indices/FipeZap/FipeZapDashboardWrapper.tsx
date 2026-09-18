@@ -4,6 +4,7 @@ import { FipeZapChart } from "@/components/indices/FipeZap/FipeZapChart";
 import { FipeZapHeatmap } from "@/components/indices/FipeZap/FipeZapHeatmap";
 import { FipeZapTable } from "@/components/indices/FipeZap/FipeZapTable";
 import { FipeZapContext } from "@/lib/fipezap";
+import type { ReactNode } from "react";
 
 interface Props {
     startDate: string;
@@ -11,9 +12,11 @@ interface Props {
     type: string;
     bedrooms: string;
     data: FipeZapContext;
+    /** correction calculator, rendered between the cards and the filter */
+    calculator?: ReactNode;
 }
 
-export function FipeZapDashboardWrapper({ startDate, endDate, type, bedrooms, data }: Props) {
+export function FipeZapDashboardWrapper({ startDate, endDate, type, bedrooms, data, calculator }: Props) {
     if (!data) {
         return <div className="p-10 text-center text-muted-foreground">Dados indísponíveis no momento.</div>;
     }
@@ -28,16 +31,17 @@ export function FipeZapDashboardWrapper({ startDate, endDate, type, bedrooms, da
 
     return (
         <div className="space-y-6">
-            {/* Unified Filter - Placed at the top */}
+            {/* Same order as every index page: cards, calculator, filter, chart, heatmap, table */}
+            <FipeZapKPIs data={data} currentYear={currentYear} />
+
+            {calculator}
+
             <FipeZapFilter
                 defaultType={type}
                 defaultBedrooms={bedrooms}
                 defaultStartDate={startDate}
                 defaultEndDate={endDate}
             />
-
-            {/* KPI Section - Dynamic based on active type */}
-            <FipeZapKPIs data={data} currentYear={currentYear} />
 
             {/* Dynamic Content based on Type */}
             <div className="grid gap-6">

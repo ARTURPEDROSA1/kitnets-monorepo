@@ -3,6 +3,7 @@ import { requireUserWithLimit } from '@/lib/session';
 import { HOUR } from '@/lib/rate-limit';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import OpenAI from 'openai';
+import { AI_MODELS, reportAiFallback } from "@/lib/ai-models";
 
 const getGeminiClient = () => {
     if (!process.env.GEMINI_API_KEY) return null;
@@ -106,13 +107,14 @@ export async function POST(request: NextRequest) {
         const gemini = getGeminiClient();
         if (gemini) {
             try {
-                const model = gemini.getGenerativeModel({ model: "gemini-2.0-flash" });
+                const model = gemini.getGenerativeModel({ model: AI_MODELS.gemini });
                 const result = await model.generateContent([
                     { text: SYSTEM_PROMPT + '\n\n' + context }
                 ]);
                 description = result.response.text().trim();
             } catch (err) {
                 console.warn('[AI Description] Gemini failed:', err);
+                reportAiFallback("AI Description", err);
             }
         }
 
@@ -123,7 +125,7 @@ export async function POST(request: NextRequest) {
                 return NextResponse.json({ error: 'AI service unavailable' }, { status: 503 });
             }
             const completion = await openai.chat.completions.create({
-                model: 'gpt-4o-mini',
+                model: AI_MODELS.openaiMini,
                 messages: [
                     { role: 'system', content: SYSTEM_PROMPT },
                     { role: 'user', content: context },

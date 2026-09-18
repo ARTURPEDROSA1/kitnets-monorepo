@@ -94,8 +94,12 @@ export interface InvestmentMetrics {
     /** months from asOf until payback at the current pace, or null when not computable */
     monthsToPayback: number | null;
     paybackForecastMonth: string | null;
-    /** monthly NOI pace used for the forecast (trailing 12 months) */
+    /** monthly NOI pace the forecast starts from (trailing 12 months) */
     monthlyNoiPace: number;
+    /** the property's own gross-rent growth per year, in % (may be negative); null with under 12 months of history */
+    rentGrowthPctYear: number | null;
+    /** growth applied to the pace in the forecast: the historical rate limited to 0–15 % a year */
+    forecastGrowthPctYear: number;
     /** monthly debt service still assumed for the forecast while the loan is active */
     monthlyDebtServicePace: number;
     remainingInstallments: number;
@@ -129,6 +133,8 @@ export interface InvestmentMetrics {
     marketValueSource: string | null;
     /** market value ÷ purchase price − 1, in % */
     appreciationPct: number | null;
+    /** compound yearly appreciation from the purchase date to the valuation date, in %; null under one year */
+    appreciationPctAnnual: number | null;
     appreciationGain: number | null;
     /** principal − Σ known principal parts while ACTIVE; 0 when paid off / not financed; null when unknown */
     outstandingBalance: number | null;
@@ -157,6 +163,29 @@ export interface InvestmentMetrics {
 const INVEST_KINDS = new Set(["ENTRADA", "CUSTOS_AQUISICAO", "PRESTACAO", "AMORTIZACAO", "QUITACAO", "TARIFA", "REFORMA", "UTILIDADES", "OUTROS", "ENERGIA_SOLAR"]);
 const DEBT_KINDS = new Set(["PRESTACAO", "AMORTIZACAO", "QUITACAO"]);
 const MAX_FORECAST_MONTHS = 600;
+
+export const MAX_FORECAST_GROWTH_PCT = 15;
+
+/**
+ * The property's own rent growth per year, in %, from the gross rent (contract value) of the counted months.
+ * With two years or more: average of the first 12 months vs average of the last 12 (one odd month cannot
+ * distort it). With one to two years: first month vs last month. Under 12 months of span: null.
+ */
+export function historicalRentGrowth(points: Array<{ month: string; grossRent: number }>): number | null {
+    const ms = points.filter(p => p.grossRent > 0).sort((a, b) => (a.month < b.month ? -1 : 1));
+    if (ms.length < 2) return null;
+    const mean = (xs: typeof ms) => xs.reduce((a, p) => a + p.grossRent, 0) / xs.length;
+    let from: number, to: number, months: number;
+    if (ms.length >= 24) {
+        from = mean(ms.slice(0, 12)); to = mean(ms.slice(-12));
+        months = monthsBetween(ms[0].month, ms[ms.length - 12].month);
+    } else {
+        from = ms[0].grossRent; to = ms[ms.length - 1].grossRent;
+        months = monthsBetween(ms[0].month, ms[ms.length - 1].month);
+    }
+    if (months < 12 || from <= 0 || to <= 0) return null;
+    return Math.round((Math.pow(to / from, 12 / months) - 1) * 1000) / 10;
+}
 
 /** Annualised internal rate of return of dated flows (Newton, bisection fallback). Null when no sign change. */
 export function xirr(flows: Array<{ date: string; amount: number }>): number | null {
@@ -212,11 +241,11 @@ export function computeInvestmentMetrics(input: MetricsInput): InvestmentMetrics
     const empty = (): InvestmentMetrics => ({
         asOf, firstMonth: null, monthsTracked: 0, incomeMonths: 0, expectedMonthsExcluded: expectedExcluded,
         cashInvested: 0, netIncomeToDate: 0, paybackPct: 0, remaining: 0, paybackReachedOn: null,
-        monthsToPayback: null, paybackForecastMonth: null, monthlyNoiPace: 0, monthlyDebtServicePace: 0, remainingInstallments: 0,
+        monthsToPayback: null, paybackForecastMonth: null, monthlyNoiPace: 0, rentGrowthPctYear: null, forecastGrowthPctYear: 0, monthlyDebtServicePace: 0, remainingInstallments: 0,
         noi12m: 0, cashFlow12m: 0, debtService12m: 0, monthsWithIncome12m: 0, currentGrossRent: null, currentNetRent: null,
         grossYieldOnPrice: null, netYieldOnCost: null, cashOnCash: null, priceToRent: null, dscr: null, irrRealized: null,
         series: [], projection: [], registerIptuUsed: 0,
-        marketValue: null, marketValueOn: null, marketValueSource: null, appreciationPct: null, appreciationGain: null,
+        marketValue: null, marketValueOn: null, marketValueSource: null, appreciationPct: null, appreciationPctAnnual: null, appreciationGain: null,
         outstandingBalance: null, equity: null, equityMultiple: null, totalReturn: null, totalReturnPct: null, irrWithValue: null,
         capRate: null, grossYieldOnValue: null, ipcaAvailable: false, cashInvestedReal: null, netIncomeToDateReal: null, paybackPctReal: null, remainingReal: null,
     });
@@ -306,6 +335,11 @@ export function computeInvestmentMetrics(input: MetricsInput): InvestmentMetrics
     // pace: average over the months that actually have income data (a brand-new ledger is not diluted by empty months)
     const noiPace = monthsWithIncome12m > 0 ? round2(last12.filter(p => p.hasIncome).reduce((a, p) => a + p.noi, 0) / monthsWithIncome12m) : 0;
 
+    // growth of the pace: the property's own rent history (rent is adjusted every year), limited to a sane band
+    const rentGrowthPctYear = historicalRentGrowth(series);
+    const forecastGrowthPctYear = Math.min(MAX_FORECAST_GROWTH_PCT, Math.max(0, rentGrowthPctYear ?? 0));
+    const growth = forecastGrowthPctYear / 100;
+
     // ── financing still running? ────────────────────────────────────────
     const inv = input.investment;
     const financed = inv?.financing_status === "ACTIVE";
@@ -327,7 +361,7 @@ export function computeInvestmentMetrics(input: MetricsInput): InvestmentMetrics
             pi++;
             const debtThisMonth = pi <= remainingInstallments ? debtPace : 0;
             pInv = round2(pInv + debtThisMonth);
-            pNoi = round2(pNoi + noiPace);
+            pNoi = round2(pNoi + noiPace * Math.pow(1 + growth, pi / 12));   // same compounding as the scenarios
             gap = round2(pInv - pNoi);
             projection.push({ month: shiftMonthKey(asOf, pi), cumInvested: pInv, cumNoi: pNoi });
         }
@@ -361,6 +395,8 @@ export function computeInvestmentMetrics(input: MetricsInput): InvestmentMetrics
     }
     const equity = mv && outstandingBalance !== null ? round2(mv.amount - outstandingBalance) : null;
     const appreciationGain = mv && price > 0 ? round2(mv.amount - price) : null;
+    const heldYears = mv && inv?.acquired_on ? (Date.parse(mv.valuedOn) - Date.parse(inv.acquired_on)) / (365.25 * 86400000) : 0;
+    const appreciationPctAnnual = mv && price > 0 && mv.amount > 0 && heldYears >= 1 ? pct1(Math.pow(mv.amount / price, 1 / heldYears) - 1) : null;
     const totalReturn = appreciationGain !== null ? round2(cumNoi + appreciationGain) : null;
     const irrWithValue = equity !== null && equity > 0
         ? xirr([...flows.slice(0, -1), { date: `${asOf}-15`, amount: round2((flows.at(-1)?.amount ?? 0) + equity) }])
@@ -380,6 +416,8 @@ export function computeInvestmentMetrics(input: MetricsInput): InvestmentMetrics
         monthsToPayback,
         paybackForecastMonth,
         monthlyNoiPace: noiPace,
+        rentGrowthPctYear,
+        forecastGrowthPctYear,
         monthlyDebtServicePace: debtPace,
         remainingInstallments,
         noi12m,
@@ -401,6 +439,7 @@ export function computeInvestmentMetrics(input: MetricsInput): InvestmentMetrics
         marketValueOn: mv?.valuedOn ?? null,
         marketValueSource: mv?.source ?? null,
         appreciationPct: mv && price > 0 ? pct1(mv.amount / price - 1) : null,
+        appreciationPctAnnual,
         appreciationGain,
         outstandingBalance,
         equity,

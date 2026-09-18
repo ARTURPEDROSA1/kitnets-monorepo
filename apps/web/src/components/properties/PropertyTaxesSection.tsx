@@ -30,6 +30,7 @@ import {
 } from "@/lib/property-taxes";
 import { IptuHistoryModal } from "./IptuHistoryModal";
 import PeriodFilter from "./PeriodFilter";
+import Tile, { type TileInfo } from "./Tile";
 import { periodLabel, periodRange, type PeriodFilterValue } from "@/lib/period-filter";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "./TableColumnFilters";
 import { CellSumBar, useCellSum } from "./TableCellSum";
@@ -333,6 +334,31 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
     /** Rows with a parcela (or the exercício) inside the period — tiles and table follow it. */
     const inPeriodRows = useMemo(() => rows.filter(r => taxInPeriod(r, range)), [rows, range]);
     const summary = useMemo(() => summarizeTaxes(inPeriodRows), [inPeriodRows]);
+    /** Whole register: "IPTU atual" is a current figure and its history link never depends on the period. */
+    const summaryAll = useMemo(() => summarizeTaxes(rows), [rows]);
+    // explanations for the four tiles (icon popup)
+    const taxInfo: Record<"total" | "payer" | "current" | "other", TileInfo> = {
+        total: {
+            what: "Soma do IPTU de todos os exercícios dentro do período selecionado, pago por quem for (inquilino ou proprietário).",
+            formula: <>IPTU acumulado = Σ IPTU dos exercícios no período<br />Média = acumulado ÷ anos</>,
+            example: summary.iptuYears ? <>{formatBRL(summary.iptuTotal)} em {summary.iptuYears} {summary.iptuYears === 1 ? "ano" : "anos"} · média {formatBRL(summary.iptuAvgPerYear)}/ano</> : undefined,
+        },
+        payer: {
+            what: "Como o IPTU se dividiu entre inquilino e proprietário, parcela a parcela. Só a parte do proprietário entra nos custos do imóvel, no mês do pagamento.",
+            formula: "% inquilino = IPTU pago pelo inquilino ÷ IPTU total",
+            example: summary.iptuTotal > 0 ? <>{formatBRL(summary.iptuByTenant)} ÷ {formatBRL(summary.iptuTotal)} = {Math.round((summary.iptuByTenant / summary.iptuTotal) * 100)}% inquilino · proprietário {formatBRL(summary.iptuByLandlord)}</> : undefined,
+        },
+        current: {
+            what: "O IPTU do exercício mais recente do registro e a variação contra o exercício anterior. Não segue o período: é o valor vigente.",
+            formula: <>Por mês = IPTU do exercício ÷ 12<br />Variação = IPTU do exercício ÷ IPTU do anterior − 1</>,
+            example: summaryAll.iptuLatest ? <>Exercício {summaryAll.iptuLatest.year}: {formatBRL(summaryAll.iptuLatest.amount)} · {formatBRL(summaryAll.iptuLatest.amount / 12)}/mês{summaryAll.iptuGrowthPct !== null ? ` · ${summaryAll.iptuGrowthPct > 0 ? "+" : ""}${summaryAll.iptuGrowthPct}% vs ${summaryAll.iptuLatest.year - 1}` : ""}</> : undefined,
+        },
+        other: {
+            what: "ITBI e os outros tributos pagos por você no período (cartório, averbações…). Entram no capital investido como custo de aquisição, não nos custos mensais.",
+            formula: "ITBI + outros tributos",
+            example: <>{formatBRL(summary.itbi)} + {formatBRL(summary.other)} = {formatBRL(summary.itbi + summary.other)}</>,
+        },
+    };
     const reviewTotals = useMemo(() => (extracted ? checkIptuTotals(extracted) : null), [extracted]);
     const cf = useColumnFilters(inPeriodRows, TAX_COLUMNS, { key: "year", dir: "desc" });
 
@@ -373,22 +399,24 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
 
             {/* Tiles */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-                <Tile label="IPTU acumulado" value={formatBRL(summary.iptuTotal)} tone="rose" icon={<Receipt className="w-4 h-4" />}
+                <Tile label="IPTU acumulado" value={formatBRL(summary.iptuTotal)} tone="rose" icon={<Receipt className="w-4 h-4" />} info={taxInfo.total}
                     hint={<>{summary.iptuYears} {summary.iptuYears === 1 ? "ano" : "anos"}{summary.firstYear ? ` · ${summary.firstYear}–${summary.lastYear}` : ""}<br />Média {formatBRL(summary.iptuAvgPerYear)}/ano</>} />
-                <Tile label="Quem pagou o IPTU" value={summary.iptuTotal > 0 ? `${Math.round((summary.iptuByTenant / summary.iptuTotal) * 100)}% inquilino` : "—"} tone="violet" icon={<Landmark className="w-4 h-4" />}
+                <Tile label="Quem pagou o IPTU" value={summary.iptuTotal > 0 ? `${Math.round((summary.iptuByTenant / summary.iptuTotal) * 100)}% inquilino` : "—"} tone="violet" icon={<Landmark className="w-4 h-4" />} info={taxInfo.payer}
                     hint={<>Inquilino {formatBRL(summary.iptuByTenant)}<br />Proprietário {formatBRL(summary.iptuByLandlord)}</>} />
-                <Tile label="IPTU atual" value={summary.iptuLatest ? formatBRL(summary.iptuLatest.amount) : "—"} tone="amber" icon={<TrendingUp className="w-4 h-4" />}
-                    hint={summary.iptuLatest
-                        ? <>Exercício {summary.iptuLatest.year} · {formatBRL(summary.iptuLatest.amount / 12)}/mês
-                            {summary.iptuGrowthPct !== null && <> · <span className={summary.iptuGrowthPct > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}>{summary.iptuGrowthPct > 0 ? "+" : ""}{summary.iptuGrowthPct}% vs {summary.iptuLatest.year - 1}</span></>}
+                <Tile label="IPTU atual" value={summaryAll.iptuLatest ? formatBRL(summaryAll.iptuLatest.amount) : "—"} tone="amber" icon={<TrendingUp className="w-4 h-4" />} info={taxInfo.current}
+                    hint={summaryAll.iptuLatest
+                        ? <>Exercício {summaryAll.iptuLatest.year} · {formatBRL(summaryAll.iptuLatest.amount / 12)}/mês
+                            {summaryAll.iptuGrowthPct !== null && <> · <span className={summaryAll.iptuGrowthPct > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}>{summaryAll.iptuGrowthPct > 0 ? "+" : ""}{summaryAll.iptuGrowthPct}% vs {summaryAll.iptuLatest.year - 1}</span></>}
                         </>
                         : "Nenhum ano registrado"}
-                    action={summary.iptuYears > 1 ? (
-                        <button type="button" onClick={() => setHistoryOpen(true)} className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 dark:text-amber-400 hover:underline underline-offset-2">
+                    title={summaryAll.iptuYears > 1 ? "Ver o histórico do IPTU" : undefined}
+                    onClick={summaryAll.iptuYears > 1 ? () => setHistoryOpen(true) : undefined}
+                    action={summaryAll.iptuYears > 1 ? (
+                        <span className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 dark:text-amber-400">
                             <LineChart className="w-3.5 h-3.5" /> Ver histórico
-                        </button>
+                        </span>
                     ) : null} />
-                <Tile label="ITBI e outros" value={formatBRL(summary.itbi + summary.other)} tone="blue" icon={<Scale className="w-4 h-4" />}
+                <Tile label="ITBI e outros" value={formatBRL(summary.itbi + summary.other)} tone="blue" icon={<Scale className="w-4 h-4" />} info={taxInfo.other}
                     hint={<>ITBI {formatBRL(summary.itbi)}<br />Outros {formatBRL(summary.other)}</>}
                     action={currentDoc ? (
                         <button type="button" onClick={() => setViewer({ url: currentDoc.document_url!, title: `IPTU ${currentDoc.year}` })} className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 dark:text-blue-400 hover:underline underline-offset-2">
@@ -676,23 +704,3 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     return <div className="space-y-1.5"><Label>{label}</Label>{children}</div>;
 }
 
-function Tile({ label, value, hint, icon, tone, action }: { label: string; value: string; hint: React.ReactNode; icon: React.ReactNode; tone: "emerald" | "blue" | "violet" | "amber" | "rose"; action?: React.ReactNode }) {
-    const tones = {
-        emerald: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600",
-        blue: "bg-blue-50 dark:bg-blue-950/40 text-blue-600",
-        violet: "bg-violet-50 dark:bg-violet-950/40 text-violet-600",
-        amber: "bg-amber-50 dark:bg-amber-950/40 text-amber-600",
-        rose: "bg-rose-50 dark:bg-rose-950/40 text-rose-600",
-    } as const;
-    return (
-        <div className="p-3.5 rounded-xl border border-border/80 bg-muted/20 space-y-1 flex flex-col">
-            <div className="flex items-start justify-between gap-2 text-muted-foreground">
-                <span className="text-[10px] font-semibold uppercase tracking-wider leading-tight">{label}</span>
-                <span className={cn("p-1.5 rounded-lg shrink-0", tones[tone])}>{icon}</span>
-            </div>
-            <span className="text-lg font-bold text-foreground block tabular-nums leading-tight">{value}</span>
-            <span className="text-[11px] text-muted-foreground block leading-snug break-words">{hint}</span>
-            {action}
-        </div>
-    );
-}

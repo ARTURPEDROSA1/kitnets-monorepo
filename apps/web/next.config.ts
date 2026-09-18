@@ -26,6 +26,17 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // The blog (conteúdos, author and tag pages) was removed in 2026-09: articles aged too fast to keep current.
+  // Old URLs, with or without the language prefix, go to the language home instead of a 404.
+  async redirects() {
+    const sections = "conteudos|contents|autor|tag";
+    return [
+      { source: `/:lang(pt|en|es)/:section(${sections})/:path*`, destination: "/:lang", permanent: true },
+      { source: `/:lang(pt|en|es)/:section(${sections})`, destination: "/:lang", permanent: true },
+      { source: `/:section(${sections})/:path*`, destination: "/", permanent: true },
+      { source: `/:section(${sections})`, destination: "/", permanent: true },
+    ];
+  },
   // exceljs (income .xlsx template/import) uses Node streams; keep it out of the bundler.
   serverExternalPackages: ["exceljs"],
   experimental: {

@@ -176,8 +176,56 @@ describe("estimateFinancingSplits", () => {
     it("flags a residual balance after payoff and missing terms", () => {
         const r = estimateFinancingSplits(inv, [fin("2018-06-05", "PRESTACAO", 3850.04), fin("2018-08-25", "QUITACAO", 1000)]);
         expect(r.endingBalance).toBeGreaterThan(1);
-        expect(r.notes.some(n => n.includes("Saldo estimado"))).toBe(true);
+        expect(r.notes.some(n => n.startsWith("Sobra saldo"))).toBe(true);
+        expect(r.notes.some(n => n.includes("Saldo estimado"))).toBe(false);   // one warning, not two
         expect(estimateFinancingSplits({ ...inv, principal: null }, [fin("2018-06-05", "PRESTACAO", 100)]).notes[0]).toContain("Preencha");
+    });
+
+    it("takes the insurance rate from the median instalment, so one irregular instalment cannot skew the rest", () => {
+        // SAC 285.665,16 / 360 m: amortisation 793,51; insurance 0,045 % of the balance. The 2nd instalment carries R$ 800 of extra charges.
+        const rate = 0.0906 / 12, amort = 285665.16 / 360;
+        let bal = 285665.16;
+        const rows: PropertyTransaction[] = [];
+        for (let i = 0; i < 8; i++) {
+            const month = String(6 + i).padStart(2, "0");
+            const amount = Math.round((bal * rate + amort + bal * 0.00045 + (i === 1 ? 800 : 0)) * 100) / 100;
+            rows.push(fin(`2018-${month}-05`, "PRESTACAO", amount));
+            bal -= amort;
+        }
+        const r = estimateFinancingSplits({ ...inv, contract_date: null, financing_status: "ACTIVE", paid_off_on: null }, rows);
+        expect(r.splits[1].principal_part).toBeCloseTo(793.51, 1);            // never above the schedule…
+        expect(r.splits[1].insurance_part).toBeGreaterThan(900);              // …the excess reads as charges
+        for (const sp of r.splits.slice(2)) {
+            expect(sp.principal_part).toBeCloseTo(793.51, 0);
+            expect(sp.insurance_part).toBeGreaterThan(115);
+            expect(sp.insurance_part).toBeLessThan(135);
+        }
+    });
+
+    it("says where an amortisation is missing when the payoff does not close the balance", () => {
+        // regular instalments, then one that the bank computed on a balance R$ 20.000 lower than the ledger shows
+        const rate = 0.0906 / 12;
+        let bal = 285665.16, remaining = 360;
+        const rows: PropertyTransaction[] = [];
+        for (let i = 0; i < 6; i++) {
+            if (i === 3) bal -= 20000;   // amortisation that never reached the ledger
+            const a = bal / remaining;
+            rows.push(fin(`2018-${String(6 + i).padStart(2, "0")}-05`, "PRESTACAO", Math.round((bal * rate + a + bal * 0.00045) * 100) / 100));
+            bal -= a; remaining--;
+        }
+        rows.push(fin("2018-12-05", "QUITACAO", Math.round(bal * 100) / 100));
+        const r = estimateFinancingSplits({ ...inv, contract_date: null }, rows);
+        const note = r.notes.find(n => n.startsWith("Sobra saldo"));
+        expect(note).toBeDefined();
+        expect(note).toContain("05/09/2018");
+        expect(r.endingBalance).toBeGreaterThan(19000);
+        expect(r.endingBalance).toBeLessThan(21000);
+        // the summary exposes the same gap once the splits are saved
+        const saved = rows.map(t => { const sp = r.splits.find(x => x.id === t.id)!; return { ...t, interest_part: sp.interest_part, principal_part: sp.principal_part, insurance_part: sp.insurance_part }; });
+        const sum = summarizeInvestment(saved, { ...inv, contract_date: null });
+        expect(sum.uncoveredPrincipal).toBeCloseTo(r.endingBalance, 1);
+        expect(sum.interestAndInsurance! - sum.uncoveredPrincipal!).toBeCloseTo(sum.bankPaid - 285665.16, 1);
+        expect(summarizeInvestment(rows, inv).uncoveredPrincipal).toBeNull();   // splits unknown
     });
 
     it("clears stale parts on tarifas and keeps them out of the schedule", () => {

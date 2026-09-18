@@ -9,6 +9,8 @@ import { IndexHeatmapLazy } from '@/components/indices/IndexHeatmapLazy';
 import { IndexDateFilterLazy } from '@/components/indices/IndexDateFilterLazy';
 import { IndexHistoryTableLazy } from '@/components/indices/IndexHistoryTableLazy';
 import { IPCACalculatorLazy } from '@/components/indices/IPCACalculatorLazy';
+import { FipeZapCalculator } from '@/components/indices/FipeZap/FipeZapCalculator';
+import { CALCULATOR_INDEXES } from '@/lib/index-calculator';
 import { IPCAAlertFormLazy } from '@/components/indices/IPCAAlertFormLazy';
 import Link from 'next/link';
 import { ArrowLeft, MapPinned, Home, CalendarDays, Hourglass } from 'lucide-react';
@@ -147,6 +149,8 @@ export default async function IndexPage({ params, searchParams }: Props) {
     if (!metadata) {
         notFound();
     }
+    // The index code is ASCII ("REAJUSTE-SALARIO-MINIMO"); the heading needs the real spelling.
+    const minWageTitle = indexContent?.title ?? ({ pt: 'Reajuste do Salário Mínimo', en: 'Minimum Wage Adjustment', es: 'Reajuste del Salario Mínimo' } as Record<string, string>)[lang] ?? 'Reajuste do Salário Mínimo';
 
     const startDateStr = typeof startDate === 'string' ? startDate : defaultStartDate;
     const endDateStr = typeof endDate === 'string' ? endDate : defaultEndDate;
@@ -375,7 +379,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
                         {(code === 'IPCA' || code === 'INPC') && indexContent?.title
                             ? indexContent.title
                             : code === 'REAJUSTE-SALARIO-MINIMO'
-                                ? metadata.code.replace(/-/g, ' ')
+                                ? minWageTitle
                                 : metadata.code
                         }
                     </h1>
@@ -423,8 +427,8 @@ export default async function IndexPage({ params, searchParams }: Props) {
                     </div>
                 ) : (
                     <p className="max-w-3xl text-muted-foreground/80">
-                        {t.followEvolution} {code === 'REAJUSTE-SALARIO-MINIMO' ? metadata.code.replace(/-/g, ' ') : metadata.code}, {t.updatedMonthly}
-                        {t.source}: <strong>{metadata.source}</strong>.
+                        {t.followEvolution} {code === 'REAJUSTE-SALARIO-MINIMO' ? minWageTitle : metadata.code}, {t.updatedMonthly}
+                        {metadata.source ? <> {t.source}: <strong>{metadata.source}</strong>.</> : null}
                     </p>
                 )}
             </div>
@@ -438,6 +442,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
                         type={(type as string) || 'locacao'}
                         bedrooms={(bedrooms as string) || 'todos'}
                         data={await getFipeZapData(startDateStr, endDateStr, (bedrooms as string) || 'todos')}
+                        calculator={<FipeZapCalculator initialType={(type as string) === 'venda' ? 'venda' : 'locacao'} initialBedrooms={bedrooms as string | undefined} />}
                     />
                 </div>
             )}
@@ -450,6 +455,11 @@ export default async function IndexPage({ params, searchParams }: Props) {
                         startDate={startDateStr}
                         endDate={endDateStr}
                         nextAdjustment={minWageNext}
+                        calculator={
+                            <Suspense fallback={<div className="rounded-xl border bg-card shadow-sm p-6 h-48 animate-pulse" />}>
+                                <IPCACalculatorLazy indexCode="REAJUSTE-SALARIO-MINIMO" />
+                            </Suspense>
+                        }
                     />
                 </div>
             )}
@@ -474,19 +484,13 @@ export default async function IndexPage({ params, searchParams }: Props) {
                         }}
                     />
 
-                    {/* IPCA/INPC Correction Calculator */}
-                    {(code === 'IPCA' || code === 'INPC') && (
+                    {/* Correction calculator: every index with a monthly series */}
+                    {CALCULATOR_INDEXES[code] && (
                         <Suspense fallback={<div className="rounded-xl border bg-card shadow-sm p-6 h-48 animate-pulse" />}>
                             <IPCACalculatorLazy indexCode={code} />
                         </Suspense>
                     )}
 
-                    {/* IPCA/INPC Alert Form */}
-                    {(code === 'IPCA' || code === 'INPC') && (
-                        <Suspense fallback={<div className="rounded-xl border bg-card shadow-sm p-6 h-32 animate-pulse" />}>
-                            <IPCAAlertFormLazy indexCode={code} lang={lang} />
-                        </Suspense>
-                    )}
 
                     {/* Date Filter */}
                     <div className="md:col-span-3 min-w-0">
@@ -577,6 +581,13 @@ export default async function IndexPage({ params, searchParams }: Props) {
                             title="Calendário de divulgação IVAR 2026"
                             items={IVAR_CALENDAR_2026}
                         />
+                    )}
+
+                    {/* IPCA/INPC alert: after the historic table and the calendar, before the explanation text */}
+                    {(code === 'IPCA' || code === 'INPC') && (
+                        <Suspense fallback={<div className="rounded-xl border bg-card shadow-sm p-6 h-32 animate-pulse" />}>
+                            <IPCAAlertFormLazy indexCode={code} lang={lang} />
+                        </Suspense>
                     )}
                 </div>
             )}
@@ -791,14 +802,6 @@ export default async function IndexPage({ params, searchParams }: Props) {
                 </div>
             </div>
 
-            {/* IPCA/INPC Alert Form — Standalone card below CTA */}
-            {(code === 'IPCA' || code === 'INPC') && (
-                <div className="mt-10 w-full">
-                    <Suspense fallback={<div className="rounded-xl border bg-card shadow-sm p-6 h-32 animate-pulse" />}>
-                        <IPCAAlertFormLazy indexCode={code} lang={lang} />
-                    </Suspense>
-                </div>
-            )}
 
             <script
                 type="application/ld+json"

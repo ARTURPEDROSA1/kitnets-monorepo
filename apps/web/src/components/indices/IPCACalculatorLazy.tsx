@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { IndexValueForCalc } from "@/lib/indexes";
 import { useState, useEffect } from "react";
+import { resolveCalculatorIndex } from "@/lib/index-calculator";
 
 const IPCACalculator = dynamic(
     () => import("./IPCACalculator").then((mod) => mod.IPCACalculator),
@@ -28,16 +29,18 @@ const IPCACalculator = dynamic(
 );
 
 interface Props {
+    /** a key of CALCULATOR_INDEXES (IPCA, IGPM, SELIC, FIPEZAP-LOCACAO, REAJUSTE-SALARIO-MINIMO…), or a FipeZap one with a bedroom suffix (FIPEZAP-VENDA-2) */
     indexCode: string;
 }
 
 export function IPCACalculatorLazy({ indexCode }: Props) {
+    const spec = resolveCalculatorIndex(indexCode)?.spec;
     const [data, setData] = useState<IndexValueForCalc[] | null>(null);
 
     useEffect(() => {
         fetch(`/api/indices/${indexCode.toLowerCase()}/calculator-data`)
             .then(res => res.json())
-            .then(setData)
+            .then(json => setData(Array.isArray(json) ? json : []))   // an error payload hides the calculator
             .catch(() => setData([]));
     }, [indexCode]);
 
@@ -57,5 +60,5 @@ export function IPCACalculatorLazy({ indexCode }: Props) {
 
     if (data.length === 0) return null;
 
-    return <IPCACalculator data={data} />;
+    return <IPCACalculator data={data} indexLabel={spec?.label ?? indexCode} feminine={spec?.feminine} />;
 }

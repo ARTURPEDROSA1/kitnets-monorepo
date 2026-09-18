@@ -37,6 +37,25 @@ export interface ValuationInput {
 }
 
 /** Newest valuation on or before `asOf` (`YYYY-MM` or `YYYY-MM-DD`), or null. */
+export const PURCHASE_APPRAISAL_WINDOW_DAYS = 120;
+
+/**
+ * The appraisal made for the purchase (the bank's laudo, for instance): the "Avaliação / laudo" closest to the
+ * purchase date, within 120 days of it. A property bought below (or above) market has a purchase price that
+ * differs from this value; index-based estimates (FipeZap) must start from the appraisal, not from the price paid.
+ */
+export function purchaseAppraisal(rows: Array<Pick<PropertyValuation, "valued_on" | "amount" | "source">>, acquiredOn: string | null | undefined): { valued_on: string; amount: number } | null {
+    if (!acquiredOn) return null;
+    const t0 = Date.parse(acquiredOn.slice(0, 10));
+    let best: { valued_on: string; amount: number } | null = null, bestGap = Infinity;
+    for (const r of rows) {
+        if (r.source !== "APPRAISAL" || !(Number(r.amount) > 0)) continue;
+        const gap = Math.abs(Date.parse(r.valued_on.slice(0, 10)) - t0) / 86400000;
+        if (gap <= PURCHASE_APPRAISAL_WINDOW_DAYS && gap < bestGap) { best = { valued_on: r.valued_on, amount: Number(r.amount) }; bestGap = gap; }
+    }
+    return best;
+}
+
 export function latestValuation(rows: PropertyValuation[], asOf?: string): PropertyValuation | null {
     const limit = asOf ? (asOf.length === 7 ? `${asOf}-31` : asOf) : null;
     let best: PropertyValuation | null = null;

@@ -19,13 +19,13 @@ import {
     YAxis,
 } from "recharts";
 import {
-    Activity, AlertCircle, BadgeDollarSign, CalendarClock, FileSpreadsheet, Gauge, Landmark, Loader2, Percent, PiggyBank, Plus, Scale, Sparkles, Target, Trash2, TrendingUp, Wallet,
+    Activity, AlertCircle, BadgeDollarSign, Banknote, CalendarClock, Coins, FileSpreadsheet, Gauge, Landmark, Layers, Loader2, Percent, PiggyBank, Plus, Scale, Sparkles, Tag, Target, Trash2, TrendingUp, Wallet,
 } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import Tile from "./Tile";
+import Tile, { type TileInfo } from "./Tile";
 import InvestmentScenarios from "./InvestmentScenarios";
 import { computeInvestmentMetrics, type InvestmentMetrics } from "@/lib/investment-metrics";
 import { formatMonthKey, type PropertyIncomeRow } from "@/lib/property-income";
@@ -33,12 +33,38 @@ import { formatDateBR, type PropertyInvestment, type PropertyTransaction } from 
 import type { PropertyTax } from "@/lib/property-taxes";
 import {
     latestValuation,
+    purchaseAppraisal,
     VALUATION_SOURCE_LABELS,
     VALUATION_SOURCES,
     type MonthlyIndexPoint,
     type PropertyValuation,
     type ValuationSource,
 } from "@/lib/property-valuations";
+
+/** One of the four KPI groups: a lettered heading over one row of four cards (2×2 on narrow screens). */
+function KpiGroup({ letter, title, hint, children }: { letter: string; title: string; hint: string; children: React.ReactNode }) {
+    return (
+        <section className="space-y-2">
+            <h4 className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs font-semibold text-foreground">
+                <span className="inline-flex w-5 h-5 items-center justify-center rounded-md bg-emerald-600 text-white text-[10px] font-bold">{letter}</span>
+                {title}
+                <span className="font-normal text-muted-foreground">· {hint}</span>
+            </h4>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">{children}</div>
+        </section>
+    );
+}
+
+/** Card value with two labelled figures, one per line. */
+function TwoLines({ a, b }: { a: [string, string]; b: [string, string] }) {
+    return (
+        <span className="flex flex-col gap-0.5 text-sm leading-snug">
+            {[a, b].map(([k, v]) => (
+                <span key={k}><span className="font-medium text-muted-foreground">{k}:</span> <span className="font-bold">{v}</span></span>
+            ))}
+        </span>
+    );
+}
 
 interface Props {
     propertyId?: string;
@@ -128,6 +154,8 @@ export default function PropertyInvestmentAnalysis({ propertyId, bedrooms, inves
     }, [endpoint, preloadedValuations]);
 
     const latest = useMemo(() => latestValuation(valuations), [valuations]);
+    /** The laudo made for the purchase: shows how far below/above market the property was bought. */
+    const boughtAppraisal = useMemo(() => purchaseAppraisal(valuations, investment?.acquired_on), [valuations, investment?.acquired_on]);
     const metrics = useMemo(
         () => computeInvestmentMetrics({
             investment, transactions, incomeRows, taxes, includeExpected, ipca,
@@ -179,7 +207,7 @@ export default function PropertyInvestmentAnalysis({ propertyId, bedrooms, inves
             const e = d.estimate as { amount: number; factor: number; from: string; to: string; months: number };
             const pct = ((e.factor - 1) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
             const bucket = d.bucket === "total" ? "todos os dormitórios" : `${d.bucket} dorm.`;
-            const note = `FipeZap venda (${bucket}): ${pct}% de ${formatMonthKey(e.from)} a ${formatMonthKey(e.to)} sobre ${formatBRL(d.purchasePrice)}`;
+            const note = `FipeZap venda (${bucket}): ${pct}% de ${formatMonthKey(e.from)} a ${formatMonthKey(e.to)} sobre ${d.basis === "APPRAISAL" ? "a avaliação na compra de " : ""}${formatBRL(d.purchasePrice)}`;
             setDraft({ valued_on: endOfMonth(e.to), amount: e.amount.toFixed(2).replace(".", ","), source: "FIPEZAP", note });
             setFipezapNote(`Estimativa preenchida: ${formatBRL(e.amount)} (${e.months} meses de índice). Confira e clique em Salvar.`);
         } catch (err) { setError((err as Error).message); } finally { setBusy(null); }
@@ -193,7 +221,7 @@ export default function PropertyInvestmentAnalysis({ propertyId, bedrooms, inves
     const forecastHint = paidBack
         ? `Renda líquida acumulada supera o investido desde ${metrics.paybackReachedOn ? formatMonthKey(metrics.paybackReachedOn) : "—"}`
         : metrics.monthsToPayback !== null
-            ? `Em ~${yearsLabel(metrics.monthsToPayback)} ao ritmo de ${formatBRL(metrics.monthlyNoiPace)}/mês (média dos últimos 12 meses)${metrics.remainingInstallments > 0 ? ` · ${metrics.remainingInstallments} prestações restantes de ${formatBRL(metrics.monthlyDebtServicePace)}` : ""}`
+            ? `Em ~${yearsLabel(metrics.monthsToPayback)} · ${formatBRL(metrics.monthlyNoiPace)}/mês (média de 12 meses)${metrics.forecastGrowthPctYear > 0 ? ` + ${pctLabel(metrics.forecastGrowthPctYear)} a.a. (reajuste histórico do aluguel)` : ""}${metrics.remainingInstallments > 0 ? ` · ${metrics.remainingInstallments} prestações restantes de ${formatBRL(metrics.monthlyDebtServicePace)}` : ""}`
             : metrics.monthlyNoiPace <= 0
                 ? "Sem renda líquida positiva nos últimos 12 meses"
                 : "Cadastre a aquisição para calcular";
@@ -204,6 +232,109 @@ export default function PropertyInvestmentAnalysis({ propertyId, bedrooms, inves
             : "Fluxos realizados até hoje, sem venda nem valorização";
     const valueSourceLabel = metrics.marketValueSource ? (VALUATION_SOURCE_LABELS[metrics.marketValueSource as ValuationSource] ?? metrics.marketValueSource) : null;
     const needValue = <>Cadastre uma avaliação em <button type="button" onClick={() => setDialogOpen(true)} className="underline underline-offset-2 text-foreground">Valor de mercado</button></>;
+
+    // ── explanations (icon popup on each card) ──────────────────────────
+    const price = investment?.purchase_price ? Number(investment.purchase_price) : null;
+    const purchaseDiscountPct = boughtAppraisal && price ? Math.round((1 - price / boughtAppraisal.amount) * 1000) / 10 : null;
+    const brl = (v: number | null | undefined) => (v === null || v === undefined ? "—" : formatBRL(v));
+    const multipleLabel = metrics.equityMultiple !== null ? `${metrics.equityMultiple.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}×` : "—";
+    const info: Record<string, TileInfo> = {
+        invested: {
+            what: "Tudo o que saiu do seu bolso por causa deste imóvel, do sinal até hoje. É a base de todos os indicadores de retorno.",
+            formula: "Entrada + custos de aquisição + prestações + amortizações + quitação + tarifas bancárias + reformas + custos do imóvel + tributos pagos por você + energia solar",
+            example: <>{brl(metrics.cashInvested)} em {monthsLabel(metrics.monthsTracked)}{metrics.registerIptuUsed > 0 && <><br />dos quais {brl(metrics.registerIptuUsed)} em tributos (IPTU, ITBI e outros)</>}</>,
+            note: "O detalhamento está nos cards de Investimento no imóvel.",
+        },
+        paybackNominal: {
+            what: "Quanto do capital investido já voltou como renda do imóvel, em valores da época, sem corrigir pela inflação.",
+            formula: "Renda líquida acumulada ÷ capital investido",
+            example: <>{brl(metrics.netIncomeToDate)} ÷ {brl(metrics.cashInvested)} = {pctLabel(metrics.paybackPct)}</>,
+        },
+        paybackReal: {
+            what: "O mesmo payback, com cada pagamento e cada recebimento corrigido pelo IPCA até hoje. Mostra a recuperação em poder de compra. Como o dinheiro investido no passado vale mais hoje, costuma ficar abaixo do nominal.",
+            formula: "Σ renda líquida corrigida pelo IPCA ÷ Σ capital investido corrigido pelo IPCA",
+            example: metrics.paybackPctReal !== null ? <>{brl(metrics.netIncomeToDateReal)} ÷ {brl(metrics.cashInvestedReal)} = {pctLabel(metrics.paybackPctReal)}</> : undefined,
+        },
+        paybackForecast: {
+            what: "Mês em que a renda líquida acumulada deve alcançar o capital investido. Parte da renda líquida média dos últimos 12 meses e a faz crescer todo ano pelo reajuste histórico do aluguel deste imóvel.",
+            formula: <>Renda do mês n = média mensal dos últimos 12 meses × (1 + reajuste a.a.)^(n ÷ 12)<br />Payback = primeiro mês em que a soma dessas rendas cobre o capital que falta</>,
+            example: !paidBack && metrics.monthsToPayback !== null ? <>
+                Falta {brl(metrics.remaining)} · ritmo {brl(metrics.monthlyNoiPace)}/mês
+                <br />Reajuste histórico do aluguel: {metrics.rentGrowthPctYear !== null ? `${pctLabel(metrics.rentGrowthPctYear)} a.a.` : "menos de 12 meses de histórico"}{metrics.rentGrowthPctYear !== null && metrics.rentGrowthPctYear !== metrics.forecastGrowthPctYear ? ` (usado: ${pctLabel(metrics.forecastGrowthPctYear)})` : ""}
+                <br />≈ {yearsLabel(metrics.monthsToPayback)}{metrics.forecastGrowthPctYear > 0 && metrics.monthlyNoiPace > 0 ? ` (sem reajuste seriam ${yearsLabel(Math.ceil(metrics.remaining / metrics.monthlyNoiPace))})` : ""}
+            </> : undefined,
+            note: "Reajuste histórico = crescimento anual do aluguel bruto: média dos primeiros 12 meses contra a dos últimos 12 (com menos de dois anos, primeiro mês contra o último). A previsão usa entre 0% e 15% ao ano. Com financiamento ativo, as prestações que faltam entram como capital ainda a investir. Simule outros ritmos em Cenários.",
+        },
+        netIncome: {
+            what: "O que o imóvel já rendeu depois da taxa da administradora e das despesas pagas à parte. Não desconta prestações nem tributos: eles estão no capital investido.",
+            formula: "Σ meses (aluguel líquido + energia recebida − custo de energia − outras despesas)",
+            example: <>{brl(metrics.netIncomeToDate)} em {monthsLabel(metrics.incomeMonths)} com receita<br />Últimos 12 meses: {brl(metrics.noi12m)}</>,
+        },
+        yield: {
+            what: "Quanto o aluguel rende por ano. O bruto compara o aluguel de contrato com o preço pago e é o número que o mercado anuncia. O líquido sobre custo usa a renda que sobrou de verdade e tudo o que você investiu.",
+            formula: <>Bruto sobre compra = 12 × aluguel bruto atual ÷ valor de compra<br />Líquido sobre custo = renda líquida anualizada ÷ capital investido</>,
+            example: <>
+                {metrics.currentGrossRent && price ? <>12 × {brl(metrics.currentGrossRent)} ÷ {brl(price)} = {pctLabel(metrics.grossYieldOnPrice)}</> : "Bruto: informe o valor de compra e o aluguel"}
+                <br />{brl(metrics.monthlyNoiPace * 12)} ÷ {brl(metrics.cashInvested)} = {pctLabel(metrics.netYieldOnCost)}
+            </>,
+            note: "Renda líquida anualizada = média mensal dos últimos 12 meses × 12.",
+        },
+        cashOnCash: {
+            what: "Retorno anual do dinheiro que você colocou, depois de pagar as prestações do financiamento. Sem financiamento ativo é igual ao yield líquido sobre custo.",
+            formula: "(Renda líquida dos últimos 12 meses − prestações dos últimos 12 meses) ÷ capital investido",
+            example: <>({brl(metrics.noi12m)} − {brl(metrics.debtService12m)}) ÷ {brl(metrics.cashInvested)} = {pctLabel(metrics.cashOnCash)}</>,
+        },
+        capRate: {
+            what: "Taxa de capitalização: a renda líquida anual como percentual do valor de mercado de hoje. Serve para comparar este imóvel com outros investimentos ao preço atual, não ao preço que você pagou.",
+            formula: "Renda líquida anualizada ÷ valor de mercado",
+            example: metrics.capRate !== null ? <>{brl(metrics.monthlyNoiPace * 12)} ÷ {brl(metrics.marketValue)} = {pctLabel(metrics.capRate)}</> : undefined,
+        },
+        purchasePrice: {
+            what: "O que você pagou pelo imóvel: o que o vendedor recebeu (entrada + financiamento). É a referência da valorização e do yield bruto. Não inclui ITBI, cartório, reformas nem juros: esses estão no capital investido.",
+            formula: <>Valor informado em Aquisição & financiamento<br />Desconto na compra = 1 − valor de compra ÷ avaliação na compra</>,
+            example: price !== null ? <>
+                {brl(price)}{investment?.acquired_on ? ` em ${formatDateBR(investment.acquired_on)}` : ""}
+                {boughtAppraisal && purchaseDiscountPct !== null && <><br />1 − {brl(price)} ÷ {brl(boughtAppraisal.amount)} = {pctLabel(purchaseDiscountPct)}</>}
+            </> : undefined,
+            note: "Comprou abaixo do mercado? Informe aqui o preço pago e cadastre o laudo do banco em Valor de mercado, como “Avaliação / laudo” com a data da compra. O desconto aparece no card e a estimativa FipeZap passa a partir do laudo, não do preço pago.",
+        },
+        marketValue: {
+            what: "Estimativa de quanto o imóvel vale hoje: a avaliação mais recente que você cadastrou (manual, laudo, anúncios) ou a estimativa pelo índice FipeZap.",
+            formula: <>Avaliação mais recente<br />FipeZap = valor de compra × variação do índice da cidade desde a compra</>,
+            example: metrics.marketValue !== null ? <>{brl(metrics.marketValue)} · {valueSourceLabel} · {formatDateBR(metrics.marketValueOn)}</> : undefined,
+        },
+        appreciation: {
+            what: "Quanto o imóvel valorizou desde a compra, no total e ao ano (taxa composta).",
+            formula: <>Total = valor de mercado ÷ valor de compra − 1<br />Ao ano = (valor de mercado ÷ valor de compra)^(1 ÷ anos) − 1</>,
+            example: metrics.appreciationPct !== null ? <>{brl(metrics.marketValue)} ÷ {brl(price)} − 1 = {pctLabel(metrics.appreciationPct)}{metrics.appreciationPctAnnual !== null && <><br />≈ {pctLabel(metrics.appreciationPctAnnual)} ao ano</>}</> : undefined,
+            note: "A taxa ao ano aparece a partir de um ano entre a compra e a avaliação.",
+        },
+        equity: {
+            what: "A parte do imóvel que é sua: o valor de mercado menos o que ainda deve ao banco. Com o financiamento quitado, é o próprio valor de mercado.",
+            formula: "Valor de mercado − saldo devedor",
+            example: metrics.equity !== null ? <>{brl(metrics.marketValue)} − {brl(metrics.outstandingBalance ?? 0)} = {brl(metrics.equity)}</> : undefined,
+        },
+        totalGain: {
+            what: "Tudo o que o imóvel já gerou: a renda que entrou mais a valorização, que ainda está no imóvel e só vira dinheiro na venda.",
+            formula: "Renda líquida acumulada + (valor de mercado − valor de compra)",
+            example: metrics.totalReturn !== null ? <>{brl(metrics.netIncomeToDate)} + {brl(metrics.appreciationGain)} = {brl(metrics.totalReturn)}</> : undefined,
+        },
+        totalGainPct: {
+            what: "O ganho total como percentual de tudo o que você investiu. Acima de 100% o imóvel já gerou mais do que custou.",
+            formula: "Ganho total ÷ capital investido",
+            example: metrics.totalReturnPct !== null ? <>{brl(metrics.totalReturn)} ÷ {brl(metrics.cashInvested)} = {pctLabel(metrics.totalReturnPct)}</> : undefined,
+        },
+        irr: {
+            what: "Taxa interna de retorno: o rendimento anual composto que iguala todos os pagamentos e recebimentos nas datas em que aconteceram. A realizada considera só o caixa, sem vender, e por isso fica negativa até o payback. A TIR com valor do imóvel soma o patrimônio como se você vendesse hoje: é a que se compara com CDI ou Tesouro.",
+            formula: "Taxa r que zera Σ fluxo ÷ (1 + r)^(anos desde o primeiro fluxo)",
+            example: <>Realizada: {metrics.irrRealized !== null ? `${pctLabel(metrics.irrRealized)} a.a.` : "—"}<br />Com valor do imóvel: {metrics.irrWithValue !== null ? `${pctLabel(metrics.irrWithValue)} a.a.` : "—"}</>,
+        },
+        multiple: {
+            what: "Quantas vezes o capital investido voltou, somando a renda já recebida e o patrimônio que você tem no imóvel. 1,50× significa R$ 1,50 para cada R$ 1,00 investido.",
+            formula: "(Renda líquida acumulada + patrimônio no imóvel) ÷ capital investido",
+            example: metrics.equityMultiple !== null ? <>({brl(metrics.netIncomeToDate)} + {brl(metrics.equity)}) ÷ {brl(metrics.cashInvested)} = {multipleLabel}</> : undefined,
+        },
+    };
 
     return (
         <div className="bg-card border border-border rounded-2xl p-6 shadow-xs space-y-5">
@@ -252,60 +383,89 @@ export default function PropertyInvestmentAnalysis({ propertyId, bedrooms, inves
                 </div>
             ) : (
                 <>
-                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-                        <Tile label="Total investido" value={formatBRL(metrics.cashInvested)} tone="emerald" icon={<PiggyBank className="w-4 h-4" />}
-                            hint={<>
-                                Desde {metrics.firstMonth ? formatMonthKey(metrics.firstMonth) : "—"} · {monthsLabel(metrics.monthsTracked)} acompanhados
-                                {metrics.registerIptuUsed > 0 && <><br />Tributos pagos por você: {formatBRL(metrics.registerIptuUsed)}</>}
-                            </>} />
-                        <Tile label="Renda líquida acumulada" value={formatBRL(metrics.netIncomeToDate)} tone="blue" icon={<Wallet className="w-4 h-4" />}
-                            hint={<>
-                                Aluguel líquido + energia líquida − outras despesas
-                                <br />{monthsLabel(metrics.incomeMonths)} com receita · últimos 12 meses {formatBRL(metrics.noi12m)}
-                            </>} />
-                        <Tile label="Payback até hoje" value={pctLabel(metrics.paybackPct)} tone={paidBack ? "emerald" : "amber"} icon={<Gauge className="w-4 h-4" />}
-                            hint={<>
-                                {paybackHint}
-                                <span className="block mt-1.5 h-1.5 rounded-full bg-muted overflow-hidden">
-                                    <span className={`block h-full ${paidBack ? "bg-emerald-500" : "bg-amber-500"}`} style={{ width: `${Math.min(100, Math.max(0, metrics.paybackPct))}%` }} />
-                                </span>
-                            </>} />
-                        <Tile label="Payback previsto" value={forecastValue} tone={paidBack ? "emerald" : "violet"} icon={<CalendarClock className="w-4 h-4" />} hint={forecastHint} />
-                        <Tile label="Yield bruto / sobre custo" value={<>{pctLabel(metrics.grossYieldOnPrice)} <span className="text-muted-foreground font-medium">/ {pctLabel(metrics.netYieldOnCost)}</span></>} tone="blue" icon={<Percent className="w-4 h-4" />}
-                            hint={<>
-                                Bruto = 12 × aluguel bruto atual{metrics.currentGrossRent ? ` (${formatBRL(metrics.currentGrossRent)})` : ""} ÷ valor de compra
-                                <br />Sobre custo = renda líquida anualizada ÷ total investido
-                                {metrics.priceToRent !== null && <><br />Preço ÷ aluguel anual: {metrics.priceToRent.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}×</>}
-                            </>} />
-                        <Tile label={financed ? "Cash-on-cash / TIR" : "TIR realizada"} tone={metrics.irrRealized !== null && metrics.irrRealized >= 0 ? "emerald" : "slate"} icon={<TrendingUp className="w-4 h-4" />}
-                            value={financed ? <>{pctLabel(metrics.cashOnCash)} <span className="text-muted-foreground font-medium">/ {pctLabel(metrics.irrRealized)}</span></> : `${pctLabel(metrics.irrRealized)} a.a.`}
-                            hint={financed
-                                ? <>Cash-on-cash = fluxo após prestações (12 m) ÷ investido{metrics.dscr !== null && <> · DSCR {metrics.dscr.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</>}<br />{irrHint}</>
-                                : irrHint} />
-                    </div>
+                    <div className="space-y-5">
+                        {/* A. Capital recovery */}
+                        <KpiGroup letter="A" title="Recuperação do capital" hint="quanto do que você investiu já voltou">
+                            <Tile label="Capital investido" value={formatBRL(metrics.cashInvested)} tone="emerald" icon={<PiggyBank className="w-4 h-4" />} info={info.invested}
+                                hint={<>
+                                    Desde {metrics.firstMonth ? formatMonthKey(metrics.firstMonth) : "—"} · {monthsLabel(metrics.monthsTracked)}
+                                    {metrics.registerIptuUsed > 0 && <><br />Tributos pagos por você: {formatBRL(metrics.registerIptuUsed)}</>}
+                                </>} />
+                            <Tile label="Payback nominal" value={pctLabel(metrics.paybackPct)} tone={paidBack ? "emerald" : "amber"} icon={<Gauge className="w-4 h-4" />} info={info.paybackNominal}
+                                hint={<>
+                                    {paybackHint}
+                                    <span className="block mt-1.5 h-1.5 rounded-full bg-muted overflow-hidden">
+                                        <span className={`block h-full ${paidBack ? "bg-emerald-500" : "bg-amber-500"}`} style={{ width: `${Math.min(100, Math.max(0, metrics.paybackPct))}%` }} />
+                                    </span>
+                                </>} />
+                            <Tile label="Payback real (IPCA)" value={metrics.paybackPctReal !== null ? pctLabel(metrics.paybackPctReal) : "—"} tone="amber" icon={<Activity className="w-4 h-4" />} info={info.paybackReal}
+                                hint={metrics.paybackPctReal !== null
+                                    ? <>Em valores de hoje: investido {formatK(metrics.cashInvestedReal ?? 0)} · renda {formatK(metrics.netIncomeToDateReal ?? 0)}{metrics.remainingReal ? <><br />Falta {formatBRL(metrics.remainingReal)}</> : <><br />Recuperado</>}</>
+                                    : "Série IPCA indisponível no momento"} />
+                            <Tile label="Payback previsto" value={forecastValue} tone={paidBack ? "emerald" : "violet"} icon={<CalendarClock className="w-4 h-4" />} hint={forecastHint} info={info.paybackForecast} />
+                        </KpiGroup>
 
-                    {/* Value and returns */}
-                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-                        <Tile label="Valor de mercado" value={metrics.marketValue !== null ? formatBRL(metrics.marketValue) : "—"} tone="emerald" icon={<BadgeDollarSign className="w-4 h-4" />}
-                            hint={metrics.marketValue !== null
-                                ? <>{valueSourceLabel} · {formatDateBR(metrics.marketValueOn)} · <button type="button" onClick={() => setDialogOpen(true)} className="underline underline-offset-2 hover:text-foreground">avaliações</button>{metrics.capRate !== null && <><br />Cap rate {pctLabel(metrics.capRate)} · yield bruto sobre valor {pctLabel(metrics.grossYieldOnValue)}</>}</>
-                                : needValue} />
-                        <Tile label="Valorização" value={metrics.appreciationPct !== null ? pctLabel(metrics.appreciationPct) : "—"} tone={metrics.appreciationPct !== null && metrics.appreciationPct < 0 ? "rose" : "emerald"} icon={<TrendingUp className="w-4 h-4" />}
-                            hint={metrics.appreciationGain !== null
-                                ? `${metrics.appreciationGain >= 0 ? "+" : ""}${formatBRL(metrics.appreciationGain)} sobre o valor de compra${investment?.acquired_on ? ` (${formatDateBR(investment.acquired_on)})` : ""}`
-                                : investment?.purchase_price ? needValue : "Informe o valor de compra em Aquisição & financiamento"} />
-                        <Tile label="Patrimônio no imóvel" value={metrics.equity !== null ? formatBRL(metrics.equity) : "—"} tone="violet" icon={<Landmark className="w-4 h-4" />}
-                            hint={metrics.equity !== null
-                                ? <>Valor de mercado − saldo devedor{metrics.outstandingBalance ? ` (${formatBRL(metrics.outstandingBalance)})` : ""}{metrics.equityMultiple !== null && <><br />Múltiplo: (renda + patrimônio) ÷ investido = {metrics.equityMultiple.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}×</>}</>
-                                : metrics.marketValue !== null ? "Saldo devedor desconhecido: calcule juros e amortização das prestações" : needValue} />
-                        <Tile label="TIR com valorização" value={metrics.irrWithValue !== null ? `${pctLabel(metrics.irrWithValue)} a.a.` : "—"} tone={metrics.irrWithValue !== null && metrics.irrWithValue >= 0 ? "emerald" : "slate"} icon={<Scale className="w-4 h-4" />}
-                            hint={metrics.irrWithValue !== null ? "Fluxos realizados + patrimônio no imóvel como saída hoje (valor estimado)" : needValue} />
-                        <Tile label="Retorno total" value={metrics.totalReturn !== null ? formatBRL(metrics.totalReturn) : "—"} tone="blue" icon={<Wallet className="w-4 h-4" />}
-                            hint={metrics.totalReturn !== null ? `Renda líquida acumulada + valorização = ${pctLabel(metrics.totalReturnPct)} do investido` : needValue} />
-                        <Tile label="Payback real (IPCA)" value={metrics.paybackPctReal !== null ? pctLabel(metrics.paybackPctReal) : "—"} tone="amber" icon={<Gauge className="w-4 h-4" />}
-                            hint={metrics.paybackPctReal !== null
-                                ? <>Em valores de hoje: investido {formatK(metrics.cashInvestedReal ?? 0)} · renda {formatK(metrics.netIncomeToDateReal ?? 0)}{metrics.remainingReal ? <><br />Falta {formatBRL(metrics.remainingReal)}</> : <><br />Recuperado</>}</>
-                                : "Série IPCA indisponível no momento"} />
+                        {/* B. Rental performance */}
+                        <KpiGroup letter="B" title="Desempenho do aluguel" hint="o que o imóvel rende por ano">
+                            <Tile label="Renda líquida acumulada" value={formatBRL(metrics.netIncomeToDate)} tone="blue" icon={<Wallet className="w-4 h-4" />} info={info.netIncome}
+                                hint={<>
+                                    Aluguel líquido + energia líquida − outras despesas
+                                    <br />{monthsLabel(metrics.incomeMonths)} com receita · últimos 12 meses {formatBRL(metrics.noi12m)}
+                                </>} />
+                            <Tile label="Yield" tone="blue" icon={<Percent className="w-4 h-4" />} info={info.yield}
+                                value={<TwoLines a={["Bruto sobre compra", pctLabel(metrics.grossYieldOnPrice)]} b={["Líquido sobre custo", pctLabel(metrics.netYieldOnCost)]} />}
+                                hint={<>
+                                    {metrics.currentGrossRent ? <>Aluguel bruto atual: {formatBRL(metrics.currentGrossRent)}</> : "Sem aluguel registrado"}
+                                    {metrics.priceToRent !== null && <><br />Preço ÷ aluguel anual: {metrics.priceToRent.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}×</>}
+                                </>} />
+                            <Tile label="Cash-on-cash" value={pctLabel(metrics.cashOnCash)} tone="violet" icon={<Banknote className="w-4 h-4" />} info={info.cashOnCash}
+                                hint={financed
+                                    ? <>Fluxo após prestações (12 m): {formatBRL(metrics.cashFlow12m)}{metrics.dscr !== null && <><br />DSCR: {metrics.dscr.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</>}</>
+                                    : <>Fluxo de caixa (12 m): {formatBRL(metrics.cashFlow12m)}<br />Sem prestações: igual ao yield líquido</>} />
+                            <Tile label="Cap rate" value={metrics.capRate !== null ? pctLabel(metrics.capRate) : "—"} tone="emerald" icon={<Target className="w-4 h-4" />} info={info.capRate}
+                                hint={metrics.capRate !== null
+                                    ? <>Renda líquida anual ÷ valor de mercado{metrics.grossYieldOnValue !== null && <><br />Yield bruto sobre valor: {pctLabel(metrics.grossYieldOnValue)}</>}</>
+                                    : needValue} />
+                        </KpiGroup>
+
+                        {/* C. Asset performance */}
+                        <KpiGroup letter="C" title="Desempenho do ativo" hint="quanto vale o imóvel">
+                            <Tile label="Valor de compra" value={price !== null ? formatBRL(price) : "—"} tone="slate" icon={<Tag className="w-4 h-4" />} info={info.purchasePrice}
+                                hint={price !== null
+                                    ? <>
+                                        {investment?.acquired_on ? `Comprado em ${formatDateBR(investment.acquired_on)}` : "Data de compra não informada"}
+                                        {boughtAppraisal && <><br />Avaliação na compra: {formatBRL(boughtAppraisal.amount)}{purchaseDiscountPct !== null && purchaseDiscountPct !== 0 && <><br /><span className={purchaseDiscountPct > 0 ? "text-emerald-700 dark:text-emerald-400 font-semibold" : "text-rose-600 dark:text-rose-400 font-semibold"}>{pctLabel(Math.abs(purchaseDiscountPct))} {purchaseDiscountPct > 0 ? "abaixo" : "acima"} da avaliação</span></>}</>}
+                                    </>
+                                    : "Informe o valor de compra em Aquisição & financiamento"} />
+                            <Tile label="Valor de mercado" value={metrics.marketValue !== null ? formatBRL(metrics.marketValue) : "—"} tone="emerald" icon={<BadgeDollarSign className="w-4 h-4" />} info={info.marketValue}
+                                hint={metrics.marketValue !== null
+                                    ? <>{valueSourceLabel} · {formatDateBR(metrics.marketValueOn)}<br /><button type="button" onClick={() => setDialogOpen(true)} className="underline underline-offset-2 hover:text-foreground">Ver avaliações</button></>
+                                    : needValue} />
+                            <Tile label="Valorização" tone={metrics.appreciationPct !== null && metrics.appreciationPct < 0 ? "rose" : "emerald"} icon={<TrendingUp className="w-4 h-4" />} info={info.appreciation}
+                                value={metrics.appreciationPct !== null
+                                    ? <>{pctLabel(metrics.appreciationPct)}{metrics.appreciationPctAnnual !== null && <span className="text-muted-foreground font-medium text-sm"> / ~{pctLabel(metrics.appreciationPctAnnual)} a.a.</span>}</>
+                                    : "—"}
+                                hint={metrics.appreciationGain !== null
+                                    ? `${metrics.appreciationGain >= 0 ? "+" : ""}${formatBRL(metrics.appreciationGain)} sobre o valor de compra`
+                                    : price !== null ? needValue : "Informe o valor de compra em Aquisição & financiamento"} />
+                            <Tile label="Patrimônio no imóvel" value={metrics.equity !== null ? formatBRL(metrics.equity) : "—"} tone="violet" icon={<Landmark className="w-4 h-4" />} info={info.equity}
+                                hint={metrics.equity !== null
+                                    ? <>Valor de mercado − saldo devedor<br />Saldo devedor: {formatBRL(metrics.outstandingBalance ?? 0)}</>
+                                    : metrics.marketValue !== null ? "Saldo devedor desconhecido: calcule juros e amortização das prestações" : needValue} />
+                        </KpiGroup>
+
+                        {/* D. Overall investment performance */}
+                        <KpiGroup letter="D" title="Desempenho total do investimento" hint="renda + valorização">
+                            <Tile label="Ganho total" value={metrics.totalReturn !== null ? formatBRL(metrics.totalReturn) : "—"} tone="blue" icon={<Coins className="w-4 h-4" />} info={info.totalGain}
+                                hint={metrics.totalReturn !== null ? <>Renda líquida: {formatBRL(metrics.netIncomeToDate)}<br />Valorização: {formatBRL(metrics.appreciationGain ?? 0)}</> : needValue} />
+                            <Tile label="Ganho total ÷ investido" value={metrics.totalReturnPct !== null ? pctLabel(metrics.totalReturnPct) : "—"} tone={metrics.totalReturnPct !== null && metrics.totalReturnPct >= 100 ? "emerald" : "amber"} icon={<Percent className="w-4 h-4" />} info={info.totalGainPct}
+                                hint={metrics.totalReturnPct !== null ? "Acima de 100% o imóvel já gerou mais do que custou" : needValue} />
+                            <Tile label="TIR" tone={metrics.irrWithValue !== null && metrics.irrWithValue >= 0 ? "emerald" : "slate"} icon={<Scale className="w-4 h-4" />} info={info.irr}
+                                value={<TwoLines a={["Realizada", metrics.irrRealized !== null ? `${pctLabel(metrics.irrRealized)} a.a.` : "—"]} b={["Com valor do imóvel", metrics.irrWithValue !== null ? `${pctLabel(metrics.irrWithValue)} a.a.` : "—"]} />}
+                                hint={metrics.irrWithValue === null && metrics.irrRealized !== null ? <>{irrHint}<br />{needValue}</> : irrHint} />
+                            <Tile label="Múltiplo do patrimônio" value={metrics.equityMultiple !== null ? `${metrics.equityMultiple.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}×` : "—"} tone="violet" icon={<Layers className="w-4 h-4" />} info={info.multiple}
+                                hint={metrics.equityMultiple !== null ? "(Renda líquida + patrimônio) ÷ capital investido" : needValue} />
+                        </KpiGroup>
                     </div>
 
                     {/* Payback curve */}

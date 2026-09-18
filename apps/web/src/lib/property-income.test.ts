@@ -7,6 +7,7 @@ import {
     parseMoney,
     parseSheet,
     receivedFromGross,
+    rentHistory,
     suggestMapping,
     summarize,
     type PropertyIncomeRow,
@@ -75,5 +76,36 @@ describe("summarize", () => {
         expect(s.totalRevenue).toBe(8700);
         expect(s.totalNoi).toBe(7700);
         expect(s.confirmedMonths).toBe(2);
+    });
+});
+
+describe("rentHistory", () => {
+    const row = (m: string, received: number, over: Partial<PropertyIncomeRow> = {}): PropertyIncomeRow => ({
+        id: m, property_id: "p", month: `${m}-01`, received_on: null, received_amount: received, energy_portion: 0,
+        other_income: 0, other_expenses: 0, iptu_amount: 0, agency_fee_pct: 10, status: "CONFIRMED", source: "MANUAL", bank_reference: null, notes: null,
+        ...over,
+    });
+    // gross = received ÷ 0.9 → 900 → 1000, 945 → 1050
+    const rows = [
+        row("2024-11", 900), row("2024-12", 900),
+        row("2025-01", 900), row("2025-02", 0), row("2025-03", 945), row("2025-12", 945),
+        row("2026-01", 945, { status: "EXPECTED" }),
+    ];
+    it("keeps confirmed months with rent, oldest first", () => {
+        const h = rentHistory(rows);
+        expect(h.points.map(p => p.key)).toEqual(["2024-11", "2024-12", "2025-01", "2025-03", "2025-12"]);
+        expect(h.points[0]).toMatchObject({ month: "nov/2024", bruto: 1000, liquido: 900 });
+    });
+    it("lists each change of the rent, skipping the vacancy month", () => {
+        expect(rentHistory(rows).adjustments).toEqual([{ month: "2025-03", from: 1000, to: 1050, pct: 5 }]);
+    });
+    it("summarises by year with growth on the end-of-year rent", () => {
+        expect(rentHistory(rows).years).toEqual([
+            { year: 2024, months: 2, avgGross: 1000, lastGross: 1000, growthPct: null },
+            { year: 2025, months: 3, avgGross: 1033.33, lastGross: 1050, growthPct: 5 },
+        ]);
+    });
+    it("handles an empty ledger", () => {
+        expect(rentHistory([])).toEqual({ points: [], adjustments: [], years: [] });
     });
 });

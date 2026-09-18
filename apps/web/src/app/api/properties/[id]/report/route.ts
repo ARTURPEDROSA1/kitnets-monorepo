@@ -95,7 +95,7 @@ export async function GET(_request: Request, context: RouteContext) {
         line("Total investido (base de caixa)", m.cashInvested, BRL, "Tudo o que foi pago: entrada, custos de aquisição, prestações, amortizações, quitação, tarifas, reformas, custos, tributos e energia solar");
         line("Renda líquida acumulada", m.netIncomeToDate, BRL, `${m.incomeMonths} meses com receita`);
         line("Payback até hoje", m.paybackPct, PCT, m.paybackReachedOn ? `Atingido em ${formatMonthKey(m.paybackReachedOn)}` : `Falta R$ ${m.remaining.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`);
-        line("Payback previsto", monthOrDash(m.paybackForecastMonth), undefined, m.monthsToPayback !== null ? `${m.monthsToPayback} meses ao ritmo de R$ ${m.monthlyNoiPace.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}/mês` : undefined);
+        line("Payback previsto", monthOrDash(m.paybackForecastMonth), undefined, m.monthsToPayback !== null ? `${m.monthsToPayback} meses · R$ ${m.monthlyNoiPace.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}/mês (média de 12 meses)${m.forecastGrowthPctYear > 0 ? ` + ${m.forecastGrowthPctYear.toLocaleString("pt-BR")}% a.a. (reajuste histórico do aluguel)` : ""}` : undefined);
         line("Renda líquida últimos 12 meses", m.noi12m, BRL);
         line("Yield bruto sobre o valor de compra", m.grossYieldOnPrice, PCT, "12 × aluguel bruto atual ÷ valor de compra");
         line("Yield sobre custo", m.netYieldOnCost, PCT, "Renda líquida anualizada ÷ total investido");
@@ -106,6 +106,7 @@ export async function GET(_request: Request, context: RouteContext) {
         section("Valor de mercado e retornos");
         line("Valor de mercado", m.marketValue, BRL, m.marketValueSource ? `${VALUATION_SOURCE_LABELS[m.marketValueSource as keyof typeof VALUATION_SOURCE_LABELS] ?? m.marketValueSource} · ${m.marketValueOn?.split("-").reverse().join("/") ?? ""}` : "Sem avaliação");
         line("Valorização sobre o valor de compra", m.appreciationPct, PCT, m.appreciationGain !== null ? `R$ ${m.appreciationGain.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : undefined);
+        line("Valorização ao ano (composta)", m.appreciationPctAnnual, PCT, "(valor de mercado ÷ valor de compra)^(1 ÷ anos) − 1");
         line("Saldo devedor", m.outstandingBalance, BRL);
         line("Patrimônio no imóvel", m.equity, BRL, "Valor de mercado − saldo devedor");
         line("Múltiplo (renda + patrimônio) ÷ investido", m.equityMultiple, "0.00\"×\"");

@@ -61,7 +61,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
     const pathname = usePathname();
     const { setTheme, theme } = useTheme();
     const { isSignedIn } = useAuth();
-    const [sidebarView, setSidebarView] = React.useState<'main' | 'rent-filters' | 'buy-filters' | 'launches-filters' | 'calculators-menu' | 'indices-menu' | 'contents-menu'>('main');
+    const [sidebarView, setSidebarView] = React.useState<'main' | 'rent-filters' | 'buy-filters' | 'launches-filters' | 'calculators-menu' | 'indices-menu'>('main');
     const [expandedSections, setExpandedSections] = React.useState<Record<string, boolean>>({});
     const [isMobileOpen, setIsMobileOpen] = React.useState(false);
     // Server renders expanded; the client snapshot takes over after hydration.
@@ -102,8 +102,6 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
             setSidebarView('buy-filters');
         } else if (pathname.includes('/lancamentos')) {
             setSidebarView('launches-filters');
-        } else if (pathname.includes('/conteudos') || pathname.includes('/contents')) {
-            setSidebarView('contents-menu');
         } else {
             setSidebarView('main');
         }
@@ -291,19 +289,6 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                             >
                                                 <LineChart className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                 <span className="ms-3 sidebar-label">Indicadores</span>
-                                            </Link>
-                                        </li>
-
-                                        <li>
-                                            <Link
-                                                title={navCollapsed ? dict.menu.contents : undefined}
-                                                href={lang === 'pt' ? '/conteudos' : `/${lang}/conteudos`}
-                                                onClick={() => setSidebarView('contents-menu')}
-                                                aria-current={isActive(lang === 'pt' ? '/conteudos' : `/${lang}/conteudos`) ? "page" : undefined}
-                                                className={`sidebar-item w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/conteudos' : `/${lang}/conteudos`) ? 'bg-accent' : ''}`}
-                                            >
-                                                <FileText className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                <span className="ms-3 sidebar-label">{dict.menu.contents}</span>
                                             </Link>
                                         </li>
 
@@ -827,39 +812,6 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                     </li>
                                 ))}
                             </ul>
-                        </div>
-                    ) : sidebarView === 'contents-menu' ? (
-                        <div className="space-y-4">
-                            <button onClick={backToMain} className="flex items-center text-sm text-muted-foreground hover:text-foreground mb-4">
-                                <span className="mr-1">←</span> {dict.menu.back}
-                            </button>
-
-                            <h2 className="text-lg font-semibold text-foreground">{dict.menu.contents}</h2>
-
-                            <div className="space-y-6">
-                                <div className="space-y-1">
-                                    <ul className="space-y-1 font-medium">
-                                        <li>
-                                            <Link
-                                                href={lang === 'pt' ? '/conteudos/impostos-e-legislacao' : `/${lang}/conteudos/impostos-e-legislacao`}
-                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
-                                            >
-                                                <FileText className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                <span className="ms-3 text-sm">{dict.menu.taxesAndLegislation}</span>
-                                            </Link>
-                                        </li>
-                                        <li>
-                                            <Link
-                                                href={lang === 'pt' ? '/conteudos/salario-e-renda' : `/${lang}/conteudos/salario-e-renda`}
-                                                className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
-                                            >
-                                                <FileText className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                <span className="ms-3 text-sm">{dict.menu.salariesAndIncome}</span>
-                                            </Link>
-                                        </li>
-                                    </ul>
-                                </div>
-                            </div>
                         </div>
                     ) : null}
 

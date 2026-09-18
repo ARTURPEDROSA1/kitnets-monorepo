@@ -4,6 +4,7 @@ import { HOUR } from "@/lib/rate-limit";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import OpenAI from 'openai';
 import { extractText, getDocumentProxy } from "unpdf";
+import { AI_MODELS, reportAiFallback } from "@/lib/ai-models";
 
 const getGeminiClient = () => {
     if (!process.env.GEMINI_API_KEY) return null;
@@ -117,13 +118,14 @@ export async function POST(request: NextRequest) {
             const gemini = getGeminiClient();
             if (gemini) {
                 try {
-                    const model = gemini.getGenerativeModel({ model: "gemini-2.0-flash" });
+                    const model = gemini.getGenerativeModel({ model: AI_MODELS.gemini });
                     const result = await model.generateContent([
                         { text: EXTRACTION_PROMPT + "\n\nConteúdo do contrato:\n\n" + textContent.substring(0, 15000) }
                     ]);
                     extracted = parseJsonResponse(result.response.text());
                 } catch (err) {
                     console.warn("[Contract Extract] Gemini text failed:", err);
+                    reportAiFallback("Contract Extract text", err);
                 }
             }
         }
@@ -133,7 +135,7 @@ export async function POST(request: NextRequest) {
             const gemini = getGeminiClient();
             if (gemini) {
                 try {
-                    const model = gemini.getGenerativeModel({ model: "gemini-2.0-flash" });
+                    const model = gemini.getGenerativeModel({ model: AI_MODELS.gemini });
                     const result = await model.generateContent([
                         { text: EXTRACTION_PROMPT },
                         {
@@ -146,6 +148,7 @@ export async function POST(request: NextRequest) {
                     extracted = parseJsonResponse(result.response.text());
                 } catch (err) {
                     console.warn("[Contract Extract] Gemini vision failed:", err);
+                    reportAiFallback("Contract Extract vision", err);
                 }
             }
         }
@@ -160,7 +163,7 @@ export async function POST(request: NextRequest) {
             if (base64ForVision) {
                 // Vision with image
                 const completion = await openai.chat.completions.create({
-                    model: 'gpt-4o',
+                    model: AI_MODELS.openai,
                     messages: [
                         {
                             role: 'user',
@@ -184,7 +187,7 @@ export async function POST(request: NextRequest) {
             } else if (textContent) {
                 // Text-based extraction with OpenAI
                 const completion = await openai.chat.completions.create({
-                    model: 'gpt-4o-mini',
+                    model: AI_MODELS.openaiMini,
                     messages: [
                         { role: 'system', content: EXTRACTION_PROMPT },
                         { role: 'user', content: textContent.substring(0, 15000) },

@@ -3,7 +3,8 @@ import { requireUserWithLimit, validateUpload } from "@/lib/session";
 import { HOUR } from "@/lib/rate-limit";
 import { extractText, getDocumentProxy } from "unpdf";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { resolveAvailabilityKwh } from "@/lib/energy-availability";
+import { extractionWarnings, normalizeExtractedNumbers } from "@/lib/energy-bill-checks";
+import { AI_MODELS, reportAiFallback } from "@/lib/ai-models";
 
 export const dynamic = "force-dynamic";
 
@@ -223,24 +224,8 @@ export function postProcessExtractedBill(data: ExtractedEnergyBill): ExtractedEn
         console.log(`[postProcess] Computed fallback dailyAvgKwh: ${data.dailyAvgKwh}`);
     }
 
-    // 4. Solar Compensated kWh validation
-    // If solarCompensatedKwh is 0 or null, check if there was compensated or SCEE exempt activity
-    if (!data.solarCompensatedKwh || data.solarCompensatedKwh === 0) {
-        const hasSolarActivity = (data.energyCompensatedAmount && Math.abs(data.energyCompensatedAmount) > 0) ||
-                                (data.energySceeExemptAmount && data.energySceeExemptAmount > 0) ||
-                                (data.generationBalanceKwh && data.generationBalanceKwh > 0);
-
-        if (hasSolarActivity && data.gridConsumptionKwh && data.gridConsumptionKwh > 0) {
-            const availKwh = resolveAvailabilityKwh(data.availabilityCostKwh, data.installationClass);
-            // In CEMIG, the compensated amount is typically the consumption above availability cost
-            if (data.gridConsumptionKwh > availKwh) {
-                const estimatedCompensated = data.gridConsumptionKwh - availKwh;
-                console.log(`[postProcess] Inferred solarCompensatedKwh from consumption - availability (${data.gridConsumptionKwh} - ${availKwh}): ${estimatedCompensated}`);
-                data.solarCompensatedKwh = estimatedCompensated;
-            }
-        }
-    }
-
+    // No inference for a missing "energia compensada": the extractor never invents
+    // values. extractionWarnings() tells the user what to fill in instead.
     return data;
 }
 
@@ -250,7 +235,7 @@ function parseJsonContent(content: string): ExtractedEnergyBill {
         cleaned = cleaned.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
     }
     const parsed = JSON.parse(cleaned);
-    return postProcessExtractedBill(parsed);
+    return postProcessExtractedBill(normalizeExtractedNumbers(parsed));
 }
 
 async function extractWithGemini(base64: string, mimeType: string): Promise<ExtractedEnergyBill> {
@@ -259,7 +244,7 @@ async function extractWithGemini(base64: string, mimeType: string): Promise<Extr
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
-        model: "gemini-1.5-flash",
+        model: AI_MODELS.gemini,
         generationConfig: {
             responseMimeType: "application/json",
             temperature: 0.1,
@@ -286,7 +271,7 @@ async function extractWithOpenAI(base64: string, mimeType: string): Promise<Extr
             Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-            model: "gpt-4o",
+            model: AI_MODELS.openai,
             messages: [
                 {
                     role: "user",
@@ -353,10 +338,12 @@ export async function POST(request: Request) {
             return NextResponse.json({
                 success: true,
                 data: extracted,
+                warnings: extractionWarnings(extracted),
                 method: "gemini-vision",
             });
         } catch (geminiError) {
             console.warn("[extract-energy-bill] Gemini Vision failed, attempting OpenAI fallback:", geminiError);
+            reportAiFallback("extract-energy-bill vision", geminiError);
         }
 
         // 2. Try OpenAI GPT-4o Vision (Fallback)
@@ -367,6 +354,7 @@ export async function POST(request: Request) {
             return NextResponse.json({
                 success: true,
                 data: extracted,
+                warnings: extractionWarnings(extracted),
                 method: "gpt-4o-vision",
             });
         } catch (openaiError) {

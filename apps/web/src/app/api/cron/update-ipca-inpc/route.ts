@@ -1,4 +1,5 @@
 
+import { refreshIndexPages } from '@/lib/index-cache';
 import { NextRequest, NextResponse } from 'next/server';
 import { isAuthorizedCron } from '@/lib/cron-auth';
 import { createClient } from '@supabase/supabase-js';
@@ -208,6 +209,7 @@ export async function GET(request: NextRequest) {
 
     if (!isDisclosureDay && !force) {
         console.log(`[IPCA/INPC] Not a disclosure day (${todayBRT}). Skipping.`);
+        refreshIndexPages();
         return NextResponse.json({
             success: true,
             action: 'not-disclosure-day',
@@ -224,6 +226,7 @@ export async function GET(request: NextRequest) {
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !supabaseServiceKey) {
+        refreshIndexPages();
         return NextResponse.json(
             { success: false, error: 'Missing Supabase credentials' },
             { status: 500 }
@@ -289,6 +292,7 @@ export async function GET(request: NextRequest) {
     const ipcaOk = (results.ipca as Record<string, unknown>)?.success === true;
     const inpcOk = (results.inpc as Record<string, unknown>)?.success === true;
 
+    refreshIndexPages();
     return NextResponse.json(
         { success: ipcaOk && inpcOk, ...results },
         { status: ipcaOk && inpcOk ? 200 : 207 } // 207 Multi-Status if partial failure
