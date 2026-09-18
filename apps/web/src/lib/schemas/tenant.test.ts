@@ -31,6 +31,12 @@ describe("tenantInputSchema", () => {
         expect(out.notes).toBeNull();
     });
 
+    it("accepts a tenant without a phone (imported from a lease agreement)", () => {
+        const noPhone = { ...valid, main_phone: undefined };
+        expect(tenantInputSchema.parse(noPhone).main_phone).toBeNull();
+        expect(tenantInputSchema.parse({ ...valid, main_phone: "" }).main_phone).toBeNull();
+    });
+
     it("reports the form's messages for missing required fields", () => {
         const r = tenantInputSchema.safeParse({});
         expect(r.success).toBe(false);
@@ -38,7 +44,7 @@ describe("tenantInputSchema", () => {
             const e = fieldErrors(r.error);
             expect(e.full_name).toBe("Nome completo é obrigatório.");
             expect(e.cpf).toBe("CPF é obrigatório.");
-            expect(e.main_phone).toBe("Telefone principal é obrigatório.");
+            expect(e.main_phone).toBeUndefined();
             expect(e.property_id).toBe("Imóvel é obrigatório.");
             expect(e.management_type).toBe("Tipo de gestão é obrigatório.");
         }

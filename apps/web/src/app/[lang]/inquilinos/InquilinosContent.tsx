@@ -87,7 +87,7 @@ function tenantToFormData(tenant: TenantWithDetails): TenantFormData {
     return {
         full_name: tenant.full_name || '',
         cpf: tenant.cpf ? formatCPF(tenant.cpf) : '',
-        main_phone: formatPhone(tenant.main_phone),
+        main_phone: tenant.main_phone ? formatPhone(tenant.main_phone) : '',
         email: tenant.email || '',
         date_of_birth: formatDateBR(tenant.date_of_birth),
         rg: tenant.rg || '',
@@ -267,7 +267,7 @@ export default function InquilinosContent({ lang }: InquilinosContentProps) {
             result = result.filter(t =>
                 t.full_name.toLowerCase().includes(q) ||
                 t.cpf.includes(q.replace(/\D/g, '')) ||
-                formatPhone(t.main_phone).includes(q) ||
+                (t.main_phone ? formatPhone(t.main_phone) : '').includes(q) ||
                 (t.property_name && t.property_name.toLowerCase().includes(q))
             );
         }
@@ -379,9 +379,7 @@ export default function InquilinosContent({ lang }: InquilinosContentProps) {
             }
         }
 
-        if (!form.main_phone.trim()) {
-            errs.main_phone = 'Telefone principal é obrigatório.';
-        } else if (!validatePhone(form.main_phone)) {
+        if (form.main_phone.trim() && !validatePhone(form.main_phone)) {
             errs.main_phone = 'Telefone inválido. Use (XX) XXXXX-XXXX.';
         }
 
@@ -757,7 +755,7 @@ export default function InquilinosContent({ lang }: InquilinosContentProps) {
 
                                         {/* Phone (desktop) */}
                                         <span className="hidden lg:inline text-sm text-muted-foreground shrink-0">
-                                            {formatPhone(tenant.main_phone)}
+                                            {tenant.main_phone ? formatPhone(tenant.main_phone) : '—'}
                                         </span>
 
                                         {/* Status badge */}
@@ -936,7 +934,7 @@ export default function InquilinosContent({ lang }: InquilinosContentProps) {
 
                         {/* Main phone */}
                         <div id="field-main_phone">
-                            <Label htmlFor="main_phone">Telefone principal <span className="text-red-500">*</span></Label>
+                            <Label htmlFor="main_phone">Telefone principal</Label>
                             <Input
                                 id="main_phone"
                                 value={form.main_phone}

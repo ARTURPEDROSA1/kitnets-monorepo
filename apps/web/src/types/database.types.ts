@@ -2269,7 +2269,7 @@ export type Database = {
           emergency_contact_phone: string | null
           full_name: string
           id: string
-          main_phone: string
+          main_phone: string | null
           management_type: string
           move_in_date: string | null
           move_out_date: string | null
@@ -2302,7 +2302,7 @@ export type Database = {
           emergency_contact_phone?: string | null
           full_name: string
           id?: string
-          main_phone: string
+          main_phone?: string | null
           management_type: string
           move_in_date?: string | null
           move_out_date?: string | null
@@ -2335,7 +2335,7 @@ export type Database = {
           emergency_contact_phone?: string | null
           full_name?: string
           id?: string
-          main_phone?: string
+          main_phone?: string | null
           management_type?: string
           move_in_date?: string | null
           move_out_date?: string | null

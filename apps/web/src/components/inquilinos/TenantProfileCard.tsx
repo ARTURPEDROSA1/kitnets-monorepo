@@ -114,7 +114,7 @@ export default function TenantProfileCard({ tenant, lang, onEdit, onDelete }: Te
                     {tenant.email && (
                         <InfoRow label="E-mail" value={tenant.email} href={`mailto:${tenant.email}`} />
                     )}
-                    <InfoRow label="Telefone principal" value={formatPhone(tenant.main_phone)} />
+                    <InfoRow label="Telefone principal" value={tenant.main_phone ? formatPhone(tenant.main_phone) : '—'} />
                     {tenant.additional_phone && (
                         <InfoRow label="Telefone adicional" value={formatPhone(tenant.additional_phone)} />
                     )}
