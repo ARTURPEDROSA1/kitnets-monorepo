@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import {
     ChevronDown, ChevronUp, Settings2, Sun, Droplets, Zap, Flame,
     Landmark, Wifi, Plus, Trash2, Home, BedDouble, Car, Shirt, Wind, CookingPot,
-    DoorOpen, Building2, Camera, Video, Bath, FileText, Wand2, Loader2, UploadCloud, ArrowRight, Copy
+    DoorOpen, Building2, Camera, Video, Bath, FileText, Wand2, Loader2, UploadCloud, ArrowRight, Copy, CheckCircle2
 } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { cn } from "@/lib/utils";
@@ -642,6 +642,9 @@ interface SubUnitsSectionProps {
     importingContractIdx?: number | null;
     initialOpenIdx?: number | null;
     propertyIndex?: number;
+    /** Asks the page to persist the units: on blur of a typed field, right after any other change */
+    onCommit?: () => void;
+    saveState?: 'idle' | 'saving' | 'saved' | 'error';
 }
 
 const UNIT_TYPE_OPTIONS = [
@@ -667,6 +670,8 @@ export function SubUnitsSection({
     importingContractIdx,
     initialOpenIdx,
     propertyIndex,
+    onCommit,
+    saveState = 'idle',
 }: SubUnitsSectionProps) {
     // A unit is "complete" when all mandatory fields are filled
     const isUnitComplete = (unit: SubUnit): boolean => {
@@ -698,10 +703,13 @@ export function SubUnitsSection({
         return firstIncomplete >= 0 ? firstIncomplete : null;
     });
 
-    const updateUnit = (index: number, partial: Partial<SubUnit>) => {
+    // Typed fields are persisted when they lose focus (onBlur of the list below);
+    // selects, checkboxes, media and add/remove pass `commit` to persist right away.
+    const updateUnit = (index: number, partial: Partial<SubUnit>, commit = false) => {
         const updated = [...units];
         updated[index] = { ...updated[index], ...partial };
         onUnitsChange(updated);
+        if (commit) onCommit?.();
     };
 
     const updateUnitCondo = (index: number, field: keyof SubUnit["condominiumIncludes"], val: boolean) => {
@@ -711,12 +719,17 @@ export function SubUnitsSection({
             condominiumIncludes: { ...updated[index].condominiumIncludes, [field]: val },
         };
         onUnitsChange(updated);
+        onCommit?.();
     };
 
     const removeUnit = (index: number) => {
+        // The removal is persisted right away, so it asks first
+        const label = units[index]?.name || `Unidade ${index + 1}`;
+        if (!window.confirm(`Excluir "${label}"? Esta ação não pode ser desfeita.`)) return;
         const updated = units.filter((_, i) => i !== index);
         onDetailsChange({ ...details, numberOfUnits: updated.length });
         onUnitsChange(updated);
+        onCommit?.();
     };
 
     const duplicateUnit = (index: number) => {
@@ -736,6 +749,7 @@ export function SubUnitsSection({
         newUnits.splice(index + 1, 0, cloned);
         onDetailsChange({ ...details, numberOfUnits: newUnits.length });
         onUnitsChange(newUnits);
+        onCommit?.();
         setOpenUnitIndex(index + 1);
     };
 
@@ -746,7 +760,7 @@ export function SubUnitsSection({
         const remaining = 10 - totalPhotos;
         if (remaining <= 0) { alert("Máximo de 10 fotos por unidade."); return; }
         const newFiles = Array.from(e.target.files).slice(0, remaining);
-        updateUnit(idx, { newPhotos: [...(unit.newPhotos || []), ...newFiles] });
+        updateUnit(idx, { newPhotos: [...(unit.newPhotos || []), ...newFiles] }, true);
         e.target.value = '';
     };
 
@@ -757,37 +771,57 @@ export function SubUnitsSection({
         const remaining = 2 - totalVideos;
         if (remaining <= 0) { alert("Máximo de 2 vídeos por unidade."); return; }
         const newFiles = Array.from(e.target.files).slice(0, remaining);
-        updateUnit(idx, { newVideos: [...(unit.newVideos || []), ...newFiles] });
+        updateUnit(idx, { newVideos: [...(unit.newVideos || []), ...newFiles] }, true);
         e.target.value = '';
     };
 
     const removeUnitNewPhoto = (unitIdx: number, photoIdx: number) => {
         const unit = units[unitIdx];
-        updateUnit(unitIdx, { newPhotos: (unit.newPhotos || []).filter((_, i) => i !== photoIdx) });
+        updateUnit(unitIdx, { newPhotos: (unit.newPhotos || []).filter((_, i) => i !== photoIdx) }, true);
     };
 
     const removeUnitNewVideo = (unitIdx: number, videoIdx: number) => {
         const unit = units[unitIdx];
-        updateUnit(unitIdx, { newVideos: (unit.newVideos || []).filter((_, i) => i !== videoIdx) });
+        updateUnit(unitIdx, { newVideos: (unit.newVideos || []).filter((_, i) => i !== videoIdx) }, true);
     };
 
     const removeUnitSavedPhoto = (unitIdx: number, url: string) => {
         const unit = units[unitIdx];
-        updateUnit(unitIdx, { photos: (unit.photos || []).filter(u => u !== url) });
+        updateUnit(unitIdx, { photos: (unit.photos || []).filter(u => u !== url) }, true);
     };
 
     const removeUnitSavedVideo = (unitIdx: number, url: string) => {
         const unit = units[unitIdx];
-        updateUnit(unitIdx, { videos: (unit.videos || []).filter(u => u !== url) });
+        updateUnit(unitIdx, { videos: (unit.videos || []).filter(u => u !== url) }, true);
     };
 
     return (
-        <div className="space-y-3">
+        <div
+            className="space-y-3"
+            onBlur={(e) => {
+                // Focus left a typed field: persist what was typed (a no-op when nothing changed)
+                const tag = (e.target as HTMLElement).tagName;
+                if (tag === 'INPUT' || tag === 'TEXTAREA') onCommit?.();
+            }}
+        >
             <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
                     <Home className="w-5 h-5 text-primary" />
                     Sub-unidades ({units.length})
                 </h3>
+                {saveState !== 'idle' && (
+                    <span
+                        role="status"
+                        className={cn(
+                            "ml-auto mr-3 flex items-center gap-1 text-xs",
+                            saveState === 'error' ? "text-destructive" : "text-muted-foreground"
+                        )}
+                    >
+                        {saveState === 'saving' && <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Salvando...</>}
+                        {saveState === 'saved' && <><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Alterações salvas</>}
+                        {saveState === 'error' && 'Não foi possível salvar'}
+                    </span>
+                )}
                 <Button
                     variant="outline"
                     size="sm"
@@ -798,6 +832,7 @@ export function SubUnitsSection({
                         const newUnits = [...units, defaultSubUnit(units.length)];
                         onUnitsChange(newUnits);
                         onDetailsChange({ ...details, numberOfUnits: newUnits.length });
+                        onCommit?.();
                         setOpenUnitIndex(newUnits.length - 1);
                     }}
                 >
@@ -925,7 +960,7 @@ export function SubUnitsSection({
                                     <select
                                         className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                                         value={unit.unitType || ''}
-                                        onChange={(e) => updateUnit(idx, { unitType: e.target.value as SubUnit['unitType'] })}
+                                        onChange={(e) => updateUnit(idx, { unitType: e.target.value as SubUnit['unitType'] }, true)}
                                     >
                                         {UNIT_TYPE_OPTIONS.map(opt => (
                                             <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -1006,13 +1041,13 @@ export function SubUnitsSection({
                             <div className="flex flex-wrap gap-5">
                                 <Checkbox
                                     checked={unit.garage}
-                                    onChange={(val) => updateUnit(idx, { garage: val })}
+                                    onChange={(val) => updateUnit(idx, { garage: val }, true)}
                                     label="Garagem"
                                     icon={<Car className="w-4 h-4" />}
                                 />
                                 <Checkbox
                                     checked={unit.kitchenCabinets}
-                                    onChange={(val) => updateUnit(idx, { kitchenCabinets: val })}
+                                    onChange={(val) => updateUnit(idx, { kitchenCabinets: val }, true)}
                                     label="Armários de Cozinha"
                                     icon={<CookingPot className="w-4 h-4" />}
                                 />
@@ -1023,7 +1058,7 @@ export function SubUnitsSection({
                                 <SelectField
                                     label="Lavanderia"
                                     value={unit.laundry}
-                                    onChange={(val) => updateUnit(idx, { laundry: val as SubUnit["laundry"] })}
+                                    onChange={(val) => updateUnit(idx, { laundry: val as SubUnit["laundry"] }, true)}
                                     icon={<Shirt className="w-4 h-4 text-muted-foreground" />}
                                     options={[
                                         { value: "none", label: "Não possui" },
@@ -1034,7 +1069,7 @@ export function SubUnitsSection({
                                 <SelectField
                                     label="Ar-Condicionado"
                                     value={unit.ac}
-                                    onChange={(val) => updateUnit(idx, { ac: val as SubUnit["ac"] })}
+                                    onChange={(val) => updateUnit(idx, { ac: val as SubUnit["ac"] }, true)}
                                     icon={<Wind className="w-4 h-4 text-muted-foreground" />}
                                     options={[
                                         { value: "none", label: "Não possui" },
@@ -1045,7 +1080,7 @@ export function SubUnitsSection({
                                 <SelectField
                                     label="Cooktop"
                                     value={unit.cooktop}
-                                    onChange={(val) => updateUnit(idx, { cooktop: val as SubUnit["cooktop"] })}
+                                    onChange={(val) => updateUnit(idx, { cooktop: val as SubUnit["cooktop"] }, true)}
                                     icon={<CookingPot className="w-4 h-4 text-muted-foreground" />}
                                     options={[
                                         { value: "none", label: "Não possui" },
@@ -1060,7 +1095,7 @@ export function SubUnitsSection({
                             <div className="space-y-3 pt-2 border-t border-border">
                                 <Checkbox
                                     checked={unit.condominium}
-                                    onChange={(val) => updateUnit(idx, { condominium: val })}
+                                    onChange={(val) => updateUnit(idx, { condominium: val }, true)}
                                     label="Condomínio"
                                     icon={<Building2 className="w-4 h-4" />}
                                 />
