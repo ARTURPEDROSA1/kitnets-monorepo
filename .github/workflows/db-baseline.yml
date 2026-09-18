@@ -67,7 +67,7 @@ jobs:
           supabase gen types typescript --linked --schema public > apps/web/src/types/database.types.ts
 
       - name: Open pull request
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v8
         with:
           branch: chore/db-baseline
           delete-branch: true
