@@ -27,7 +27,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import PeriodFilter from "./PeriodFilter";
-import Tile from "./Tile";
+import Tile, { type TileInfo } from "./Tile";
 import { CellSumBar, useCellSum } from "./TableCellSum";
 import MoneyInput, { parseMoneyText } from "./MoneyInput";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "./TableColumnFilters";
@@ -472,6 +472,41 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
     const paidOffMonths = investment?.financing_status === "PAID_OFF" && investment.paid_off_on && paidOffStart
         ? Math.max(1, monthsBetween(paidOffStart.slice(0, 7), investment.paid_off_on.slice(0, 7)))
         : null;
+    // explanations for the six tiles (icon popup)
+    const investInfo: Record<"total" | "bank" | "capex" | "costs" | "financing" | "solar", TileInfo> = {
+        total: {
+            what: "Tudo o que saiu do seu bolso por este imóvel, do sinal até hoje. Cada linha do card é um grupo de lançamentos; os tributos vêm do registro Tributos do imóvel.",
+            formula: "Entrada + banco + reformas + custos do imóvel + energia solar",
+            example: <>{formatBRL(summary.downPayment + summary.closingCosts)} + {formatBRL(summary.bankPaid + summary.bankFees)} + {formatBRL(summary.capex)} + {formatBRL(summary.runningCosts + taxes.total)} + {formatBRL(summary.solarInvested)} = {formatBRL(summary.invested + taxes.total)}</>,
+            note: "É o capital investido usado no payback e nos indicadores de retorno da Análise do investimento.",
+        },
+        bank: {
+            what: "Tudo o que foi para o banco do financiamento: prestações, amortizações extras, quitação e tarifas. Juros + seguros é a parte que não abateu a dívida, calculada em Calcular juros e amortização.",
+            formula: <>Pago ao banco = prestações + amortizações + quitação + tarifas<br />Juros + seguros = Σ juros e seguros das prestações</>,
+            example: <>{formatBRL(summary.bankPaid)} + {formatBRL(summary.bankFees)} de tarifas = {formatBRL(summary.bankPaid + summary.bankFees)} em {summary.installments} prestações</>,
+        },
+        capex: {
+            what: "Obras e melhorias lançadas como Reforma. Entram no capital investido, não nas despesas do mês.",
+            formula: "Σ lançamentos do tipo Reforma",
+            example: <>{formatBRL(summary.capex)} em {txs.filter(t => t.kind === "REFORMA").length} lançamentos</>,
+        },
+        costs: {
+            what: "Custos do imóvel que não são financiamento nem reforma: utilidades e outros lançados no investimento, mais os tributos pagos por você no registro (IPTU, ITBI e outros).",
+            formula: "Utilidades + outros + IPTU + ITBI + outros tributos",
+            example: <>{formatBRL(summary.byKind.UTILIDADES)} + {formatBRL(summary.byKind.OUTROS)} + {formatBRL(taxes.iptu)} + {formatBRL(taxes.itbi)} + {formatBRL(taxes.other)} = {formatBRL(summary.runningCosts + taxes.total)}</>,
+            note: "Só o IPTU pago por você entra nas despesas do mês (DRE); ITBI e outros tributos são investimento.",
+        },
+        financing: {
+            what: "Os dados do contrato informados em Aquisição & financiamento e, quando quitado, em quantos meses a dívida foi paga contra o prazo contratado.",
+            formula: "Quitado em = meses entre o contrato (ou a 1ª prestação) e a quitação",
+            example: investment && investment.financing_status !== "NONE" ? <>{[investment.lender, investment.financing_system, investment.principal ? formatBRL(investment.principal) : null].filter(Boolean).join(" · ")}{paidOffMonths !== null ? ` · quitado em ${paidOffMonths} meses${investment.term_months ? ` de ${investment.term_months}` : ""}` : ""}</> : undefined,
+        },
+        solar: {
+            what: "O investimento no sistema solar (lançamentos Energia solar) e quanto dele já voltou: a energia paga pelo inquilino menos o custo de energia, mês a mês.",
+            formula: <>Recuperado = Σ (energia recebida − custo de energia)<br />Falta = investido − recuperado</>,
+            example: solar.invested > 0 ? <>{formatBRL(solar.recovered)} de {formatBRL(solar.invested)} = {solar.pct}%{solar.remaining > 0 ? ` · falta ${formatBRL(solar.remaining)}` : " · recuperado"}</> : undefined,
+        },
+    };
     const financingHint = investment && investment.financing_status !== "NONE"
         ? <>
             {[investment.lender, investment.financing_system, investment.principal ? formatBRL(investment.principal) : null, investment.term_months ? `${investment.term_months} meses` : null, investment.annual_rate ? `${investment.annual_rate}% a.a.` : null].filter(Boolean).join(" · ")}
@@ -531,16 +566,16 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
 
             {/* Tiles */}
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-                <Tile label="Total investido no imóvel" value={formatBRL(summary.invested + taxes.total)} tone="emerald" icon={<PiggyBank className="w-4 h-4" />}
+                <Tile label="Total investido no imóvel" value={formatBRL(summary.invested + taxes.total)} tone="emerald" icon={<PiggyBank className="w-4 h-4" />} info={investInfo.total}
                     hint={<>Entrada: {formatBRL(summary.downPayment + summary.closingCosts)}<br />Banco: {formatBRL(summary.bankPaid + summary.bankFees)}<br />Reformas: {formatBRL(summary.capex)}<br />Custos do imóvel: {formatBRL(summary.runningCosts + taxes.total)}<br />Energia solar: {formatBRL(summary.solarInvested)}</>} />
-                <Tile label="Pago ao banco" value={formatBRL(summary.bankPaid + summary.bankFees)} tone="blue" icon={<Landmark className="w-4 h-4" />}
+                <Tile label="Pago ao banco" value={formatBRL(summary.bankPaid + summary.bankFees)} tone="blue" icon={<Landmark className="w-4 h-4" />} info={investInfo.bank}
                     hint={<>Prestações: {summary.installments}<br />Juros + seguros: {summary.interestAndInsurance === null ? "—" : formatBRL(summary.interestAndInsurance)}<br />Tarifas: {formatBRL(summary.bankFees)}</>} />
-                <Tile label="Reformas (capex)" value={formatBRL(summary.capex)} tone="violet" icon={<Hammer className="w-4 h-4" />}
+                <Tile label="Reformas (capex)" value={formatBRL(summary.capex)} tone="violet" icon={<Hammer className="w-4 h-4" />} info={investInfo.capex}
                     hint={`${txs.filter(t => t.kind === "REFORMA").length} lançamentos`} />
-                <Tile label="Custos do imóvel" value={formatBRL(summary.runningCosts + taxes.total)} tone="rose" icon={<Receipt className="w-4 h-4" />}
+                <Tile label="Custos do imóvel" value={formatBRL(summary.runningCosts + taxes.total)} tone="rose" icon={<Receipt className="w-4 h-4" />} info={investInfo.costs}
                     hint={<>Utilidades: {formatBRL(summary.byKind.UTILIDADES)}<br />Outros: {formatBRL(summary.byKind.OUTROS)}<br />IPTU: {formatBRL(taxes.iptu)}<br />ITBI: {formatBRL(taxes.itbi)}{taxes.other > 0 && <><br />Outros tributos: {formatBRL(taxes.other)}</>}</>} />
-                <Tile label="Financiamento" value={financingLabel} tone="blue" icon={<Banknote className="w-4 h-4" />} hint={financingHint} />
-                <Tile label="Energia solar" value={formatBRL(solar.invested)} tone="amber" icon={<Sun className="w-4 h-4" />}
+                <Tile label="Financiamento" value={financingLabel} tone="blue" icon={<Banknote className="w-4 h-4" />} hint={financingHint} info={investInfo.financing} />
+                <Tile label="Energia solar" value={formatBRL(solar.invested)} tone="amber" icon={<Sun className="w-4 h-4" />} info={investInfo.solar}
                     hint={
                         <>
                             Recuperado {formatBRL(solar.recovered)} ({solar.pct}%)<br />
