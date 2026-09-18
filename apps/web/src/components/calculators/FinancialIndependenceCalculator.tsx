@@ -650,7 +650,7 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
                                 <XAxis dataKey="year" stroke="#9CA3AF" tickFormatter={(val) => `${val}a`} />
                                 <YAxis stroke="#9CA3AF" tickFormatter={(val) => new Intl.NumberFormat(lang === 'pt' ? 'pt-BR' : 'en-US', { notation: "compact" }).format(val)} />
                                 <RechartsTooltip
-                                    formatter={(val: number | undefined) => formatCurrency(val || 0)}
+                                    formatter={(val) => formatCurrency(Number(val) || 0)}
                                     labelFormatter={(val) => `${tableLabels?.year} ${val}`}
                                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                                 />
@@ -672,7 +672,7 @@ export function FinancialIndependenceCalculator({ dict, lang }: { dict: Dictiona
                                 <XAxis dataKey="year" stroke="#9CA3AF" tickFormatter={(val) => `${val}a`} />
                                 <YAxis stroke="#9CA3AF" tickFormatter={(val) => new Intl.NumberFormat(lang === 'pt' ? 'pt-BR' : 'en-US', { notation: "compact" }).format(val)} />
                                 <RechartsTooltip
-                                    formatter={(val: number | undefined) => formatCurrency(val || 0)}
+                                    formatter={(val) => formatCurrency(Number(val) || 0)}
                                     labelFormatter={(val) => `${tableLabels?.year} ${val}`}
                                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                                 />

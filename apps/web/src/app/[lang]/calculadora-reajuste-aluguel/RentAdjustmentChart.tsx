@@ -43,7 +43,7 @@ export default function RentAdjustmentChart({ data, color }: RentAdjustmentChart
                     />
                     <Tooltip
                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                        formatter={(val: number | string | undefined) => [`${Number(val || 0).toFixed(2)}%`, `Variação`]}
+                        formatter={(val) => [`${Number(val || 0).toFixed(2)}%`, `Variação`]}
                     />
                     <Area
                         type="monotone"

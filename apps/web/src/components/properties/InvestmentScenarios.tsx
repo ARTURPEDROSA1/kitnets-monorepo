@@ -153,7 +153,7 @@ export default function InvestmentScenarios({ metrics, investment }: Props) {
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                                     <XAxis dataKey="label" stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} interval="preserveStartEnd" minTickGap={28} />
                                     <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} width={64} tickFormatter={(v: number) => formatK(v)} />
-                                    <RechartsTooltip formatter={(value: number | string | undefined, name: string | undefined) => [formatBRL(Number(value ?? 0)), name ?? ""]} contentStyle={{ backgroundColor: "hsl(var(--background))", borderColor: "hsl(var(--border))", borderRadius: "12px", fontSize: 12 }} />
+                                    <RechartsTooltip formatter={(value, name) => [formatBRL(Number(value ?? 0)), name ?? ""]} contentStyle={{ backgroundColor: "hsl(var(--background))", borderColor: "hsl(var(--border))", borderRadius: "12px", fontSize: 12 }} />
                                     <Legend wrapperStyle={{ paddingTop: "6px", fontSize: "12px" }} />
                                     <Line type="stepAfter" dataKey="inv" name="Investido acumulado" stroke="#10b981" strokeWidth={1.5} strokeDasharray="4 4" dot={false} isAnimationActive={false} connectNulls />
                                     <Line type="monotone" dataKey="base" name="Renda acumulada (ritmo atual)" stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="4 4" dot={false} isAnimationActive={false} connectNulls />

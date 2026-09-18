@@ -550,7 +550,7 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
                                                 <Cell key={`cell-${index}`} fill={entry.color} />
                                             ))}
                                         </Pie>
-                                        <Tooltip formatter={(value: number | undefined) => formatCurrency(value || 0)} />
+                                        <Tooltip formatter={(value) => formatCurrency(Number(value) || 0)} />
                                         <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '11px' }} />
                                     </PieChart>
                                 </ResponsiveContainer>
@@ -571,7 +571,7 @@ export function HoldingRentalTaxCalculator({ lang }: { dict: Dictionary; lang: s
                                         <YAxis unit="%" fontSize={11} domain={['dataMin - 1', 'dataMax + 1']} axisLine={false} tickLine={false} />
                                         <Tooltip
                                             contentStyle={{ borderRadius: '8px', fontSize: '12px' }}
-                                            formatter={(value: number | undefined) => [formatPercent(value || 0), 'Alíquota Efetiva']}
+                                            formatter={(value) => [formatPercent(Number(value) || 0), 'Alíquota Efetiva']}
                                             labelFormatter={(l) => `Ano ${l}`}
                                         />
                                         <ReferenceLine x={2026} stroke="#ef4444" strokeDasharray="3 3" label={{ position: 'top', value: 'Legacy', fontSize: 10, fill: '#ef4444' }} />

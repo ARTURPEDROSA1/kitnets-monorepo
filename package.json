@@ -28,7 +28,7 @@
     },
     "devDependencies": {
         "dotenv": "17.4.2",
-        "prettier": "3.7.4",
+        "prettier": "3.9.6",
         "turbo": "2.10.12",
         "supabase": "2.117.0"
     },

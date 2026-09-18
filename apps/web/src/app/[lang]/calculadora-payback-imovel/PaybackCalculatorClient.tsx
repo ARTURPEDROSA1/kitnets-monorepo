@@ -158,7 +158,7 @@ export default function PaybackCalculatorClient() {
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                                     <XAxis dataKey="label" stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} interval="preserveStartEnd" minTickGap={28} />
                                     <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} width={64} tickFormatter={(v: number) => formatK(v)} />
-                                    <RechartsTooltip formatter={(value: number | string | undefined, name: string | undefined) => [formatBRL2(Number(value ?? 0)), name ?? ""]} contentStyle={{ backgroundColor: "hsl(var(--background))", borderColor: "hsl(var(--border))", borderRadius: "12px", fontSize: 12 }} />
+                                    <RechartsTooltip formatter={(value, name) => [formatBRL2(Number(value ?? 0)), name ?? ""]} contentStyle={{ backgroundColor: "hsl(var(--background))", borderColor: "hsl(var(--border))", borderRadius: "12px", fontSize: 12 }} />
                                     <Legend wrapperStyle={{ paddingTop: "8px", fontSize: "12px" }} />
                                     <Area type="stepAfter" dataKey="investido" name="Pago acumulado" stroke="#10b981" strokeWidth={2} fill="url(#pb-inv)" dot={false} isAnimationActive={false} />
                                     <Line type="monotone" dataKey="renda" name="Renda líquida acumulada" stroke="#3b82f6" strokeWidth={2.5} dot={false} isAnimationActive={false} />
