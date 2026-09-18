@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Button } from '@kitnets/ui';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -605,6 +605,19 @@ export default function ContratosContent({ lang }: { lang: string }) {
             console.error('Error loading lease for edit');
         }
     };
+
+    // Deep link: /contratos?lease=<id> opens that contract (the property page's "Contrato" link)
+    const deepLinkDone = useRef(false);
+    useEffect(() => {
+        if (deepLinkDone.current || pageState !== 'list') return;
+        const id = new URLSearchParams(window.location.search).get('lease');
+        if (!id) { deepLinkDone.current = true; return; }
+        const target = leases.find(l => l.id === id);
+        if (!target) return;   // the list is still loading
+        deepLinkDone.current = true;
+        void handleEdit(target);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pageState, leases]);
 
     // ── Delete ────────────────────────────────────────────────────
 

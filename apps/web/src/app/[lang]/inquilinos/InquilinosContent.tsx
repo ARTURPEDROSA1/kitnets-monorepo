@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Button } from '@kitnets/ui';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -498,6 +498,18 @@ export default function InquilinosContent({ lang }: InquilinosContentProps) {
         setEditingTenant(tenant);
         setPageState('editing');
     }, []);
+
+    // Deep link: /inquilinos?tenant=<id> opens that tenant (the property page's tenant link)
+    const deepLinkDone = useRef(false);
+    useEffect(() => {
+        if (deepLinkDone.current || pageState !== 'list') return;
+        const id = new URLSearchParams(window.location.search).get('tenant');
+        if (!id) { deepLinkDone.current = true; return; }
+        const target = tenants.find(t => t.id === id);
+        if (!target) return;   // the list is still loading
+        deepLinkDone.current = true;
+        startEditing(target);
+    }, [pageState, tenants, startEditing]);
 
     const cancelForm = useCallback(() => {
         setErrors({});

@@ -44,6 +44,7 @@ import PropertyTaxesSection from './PropertyTaxesSection';
 import PropertyInvestmentAnalysis from './PropertyInvestmentAnalysis';
 import PeriodFilter, { GroupSelect } from './PeriodFilter';
 import { RentHistoryModal } from './RentHistoryModal';
+import PropertyLeaseCard from './PropertyLeaseCard';
 import { CardInfoIcon, type TileInfo } from './Tile';
 import {
     breakdown,
@@ -736,6 +737,9 @@ export default function PropertyCostCenterDashboard({
             </div>
             </>
             )}
+
+            {/* Lease at a glance: term, due date, adjustment index and links (below the DRE row) */}
+            <PropertyLeaseCard propertyId={dbId} lang={lang} />
 
             {/* Real income ledger (monthly, editable, importable) */}
             <PropertyIncomeLedger

@@ -706,6 +706,18 @@ export default function ImobiliariaContent({ lang, initialAgencies }: Imobiliari
         setPageState('editing');
     }, []);
 
+    // Deep link: /imobiliaria?agency=<id> opens that agency's detail (the property page's agency link)
+    const deepLinkDone = useRef(false);
+    useEffect(() => {
+        if (deepLinkDone.current || pageState !== 'list') return;
+        const id = new URLSearchParams(window.location.search).get('agency');
+        if (!id) { deepLinkDone.current = true; return; }
+        const target = agencies.find(a => a.id === id);
+        if (!target) return;   // the list is still loading
+        deepLinkDone.current = true;
+        setSelectedAgencyForDetail(target);
+    }, [pageState, agencies]);
+
     // ── Service Agreement File handlers ──────────────────────────────
 
     const handleAgreementSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
