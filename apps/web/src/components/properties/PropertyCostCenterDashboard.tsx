@@ -678,13 +678,14 @@ export default function PropertyCostCenterDashboard({
                                     outerRadius={80}
                                     paddingAngle={3}
                                     dataKey="value"
+                                    nameKey="name"
                                 >
                                     {financials.expenseBreakdown.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                     ))}
                                 </Pie>
                                 <RechartsTooltip
-                                    formatter={(value: any) => [formatBRL(Number(value)), 'Valor Mensal']}
+                                    formatter={(value, name) => [formatBRL(Number(value)), String(name)]}   // the slice's cost description, e.g. Taxa da imobiliária
                                     contentStyle={{
                                         backgroundColor: 'hsl(var(--background))',
                                         borderColor: 'hsl(var(--border))',
