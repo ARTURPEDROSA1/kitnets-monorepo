@@ -9,7 +9,6 @@ import {
     Sun,
     Trash2,
     ArrowRight,
-    CheckCircle2,
     Zap,
     Droplets,
     Flame,
@@ -238,35 +237,30 @@ export default function PropertySquareCard({
                     </button>
                 </div>
 
-                {/* Badges Row */}
-                <div className="flex flex-wrap items-center gap-2">
+                {/* Badges row: property type and solar side by side (never wraps; the solar label truncates on narrow cards) */}
+                <div className="flex flex-nowrap items-center gap-2 min-w-0">
                     {/* Typology Badge */}
                     {propertyType === 'multi' ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-800">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 bg-violet-50 text-violet-700 border border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-800">
                             <Building2 className="w-3.5 h-3.5 text-violet-500" />
                             Multifamiliar ({totalUnits} {totalUnits === 1 ? 'unidade' : 'unidades'})
                         </span>
                     ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800">
                             <Home className="w-3.5 h-3.5 text-blue-500" />
                             Unifamiliar
                         </span>
                     )}
 
-                    {/* Status Badge */}
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                        Cadastro Ativo
-                    </span>
 
                     {/* Solar Energy Badge */}
                     {details.solarEnergy ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60">
-                            <Sun className="w-3.5 h-3.5 text-amber-500" />
-                            {details.solarKwp ? `Solar GD • ${details.solarKwp} kWp` : 'Solar GD Ativa'}
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium min-w-0 bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60">
+                            <Sun className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                            <span className="truncate">{details.solarKwp ? `Solar GD • ${details.solarKwp} kWp` : 'Solar GD Ativa'}</span>
                         </span>
                     ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-normal bg-muted text-muted-foreground">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-normal whitespace-nowrap bg-muted text-muted-foreground">
                             Sem energia solar
                         </span>
                     )}
