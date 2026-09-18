@@ -409,10 +409,12 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
                             {summaryAll.iptuGrowthPct !== null && <> · <span className={summaryAll.iptuGrowthPct > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}>{summaryAll.iptuGrowthPct > 0 ? "+" : ""}{summaryAll.iptuGrowthPct}% vs {summaryAll.iptuLatest.year - 1}</span></>}
                         </>
                         : "Nenhum ano registrado"}
+                    title={summaryAll.iptuYears > 1 ? "Ver o histórico do IPTU" : undefined}
+                    onClick={summaryAll.iptuYears > 1 ? () => setHistoryOpen(true) : undefined}
                     action={summaryAll.iptuYears > 1 ? (
-                        <button type="button" onClick={() => setHistoryOpen(true)} className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 dark:text-amber-400 hover:underline underline-offset-2">
+                        <span className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 dark:text-amber-400">
                             <LineChart className="w-3.5 h-3.5" /> Ver histórico
-                        </button>
+                        </span>
                     ) : null} />
                 <Tile label="ITBI e outros" value={formatBRL(summary.itbi + summary.other)} tone="blue" icon={<Scale className="w-4 h-4" />} info={taxInfo.other}
                     hint={<>ITBI {formatBRL(summary.itbi)}<br />Outros {formatBRL(summary.other)}</>}

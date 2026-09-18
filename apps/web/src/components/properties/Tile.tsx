@@ -72,9 +72,19 @@ export function CardInfoIcon({ label, icon, info, className }: { label: string; 
 }
 
 /** Small KPI card used by the property sections (label, icon, value, hint). With `info`, the icon opens an explanation popup. */
-export default function Tile({ label, value, hint, icon, tone, title, info, action }: { label: string; value: React.ReactNode; hint: React.ReactNode; icon: React.ReactNode; tone: TileTone; title?: string; info?: TileInfo; action?: React.ReactNode }) {
+export default function Tile({ label, value, hint, icon, tone, title, info, action, onClick }: { label: string; value: React.ReactNode; hint: React.ReactNode; icon: React.ReactNode; tone: TileTone; title?: string; info?: TileInfo; action?: React.ReactNode; /** makes the whole card a button (the info icon keeps its own click) */ onClick?: () => void }) {
+    const clickable = onClick ? {
+        role: "button" as const,
+        tabIndex: 0,
+        onClick,
+        onKeyDown: (e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } },
+    } : {};
     return (
-        <div className="p-3.5 rounded-xl border border-border/80 bg-muted/20 space-y-1 flex flex-col" title={title}>
+        <div
+            className={cn("p-3.5 rounded-xl border border-border/80 bg-muted/20 space-y-1 flex flex-col", onClick && "cursor-pointer transition-colors hover:border-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500")}
+            title={title}
+            {...clickable}
+        >
             <div className="flex items-start justify-between gap-2 text-muted-foreground">
                 <span className="text-[10px] font-semibold uppercase tracking-wider leading-tight">{label}</span>
                 <CardInfoIcon label={label} icon={icon} info={info} className={TILE_TONES[tone]} />
