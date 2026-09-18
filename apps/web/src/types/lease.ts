@@ -56,6 +56,8 @@ export interface Lease {
 
 /** Lease returned by GET /api/leases — includes joined names */
 export interface LeaseWithDetails extends Lease {
+    /** files attached to the lease (list endpoint only) */
+    document_count?: number;
     property_name: string | null;
     primary_tenant_name: string | null;
     agency_name: string | null;

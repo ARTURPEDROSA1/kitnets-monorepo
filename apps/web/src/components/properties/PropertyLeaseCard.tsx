@@ -175,17 +175,17 @@ export default function PropertyLeaseCard({ propertyId, lang = "pt" }: { propert
 
                     {/* Links */}
                     <div className="flex flex-wrap items-center gap-2">
-                        <Link href={`/${lang}/inquilinos?tenant=${lease.primary_tenant_id}`} className={linkCls} title="Abrir o inquilino principal">
+                        <Link href={`/${lang}/inquilinos?tenant=${lease.primary_tenant_id}&property=${propertyId}`} className={linkCls} title="Abrir o inquilino principal">
                             <User className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">{lease.primary_tenant_name ?? "Inquilino principal"}</span>
                         </Link>
                         {lease.agency_id ? (
-                            <Link href={`/${lang}/imobiliaria?agency=${lease.agency_id}`} className={linkCls} title="Abrir a imobiliária do contrato">
+                            <Link href={`/${lang}/imobiliaria?agency=${lease.agency_id}&property=${propertyId}`} className={linkCls} title="Abrir a imobiliária do contrato">
                                 <Building2 className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">{lease.agency_name ?? "Imobiliária"}</span>
                             </Link>
                         ) : (
                             <span className="inline-flex items-center gap-1.5 h-8 px-3 text-xs text-muted-foreground"><Building2 className="w-3.5 h-3.5" /> {lease.management_type === "SELF_MANAGED" ? "Gestão própria, sem imobiliária" : lease.agent_name ? `Corretor: ${lease.agent_name}` : "Sem imobiliária"}</span>
                         )}
-                        <Link href={`/${lang}/contratos?lease=${lease.id}`} className={linkCls} title="Abrir o contrato em Contratos">
+                        <Link href={`/${lang}/contratos?lease=${lease.id}&property=${propertyId}`} className={linkCls} title="Abrir o contrato em Contratos">
                             <FileSignature className="w-3.5 h-3.5 shrink-0" /> Contrato
                         </Link>
                         {contract && (
