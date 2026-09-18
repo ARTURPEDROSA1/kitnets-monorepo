@@ -55,7 +55,7 @@ const additionalTenants = z.unknown().transform((v) =>
 
 const charges = z.unknown().transform((v) =>
     (Array.isArray(v) ? v : [])
-        .filter((c): c is { charge_type: string; responsibility: string; label?: unknown; amount?: unknown } =>
+        .filter((c): c is { charge_type: string; responsibility: string; label?: unknown; amount?: unknown; adjustment_index?: unknown; adjustment_notes?: unknown } =>
             !!c && typeof c === "object" &&
             includes(LEASE_CHARGE_TYPES, (c as { charge_type?: unknown }).charge_type) &&
             includes(LEASE_RESPONSIBILITIES, (c as { responsibility?: unknown }).responsibility))
@@ -64,6 +64,8 @@ const charges = z.unknown().transform((v) =>
             label: typeof c.label === "string" && c.label.trim() ? c.label.trim().slice(0, 200) : null,
             responsibility: c.responsibility,
             amount: c.amount == null || c.amount === "" ? null : parseCurrencyBR(c.amount as string | number),
+            adjustment_index: includes(LEASE_ADJUSTMENT, c.adjustment_index) ? c.adjustment_index : null,
+            adjustment_notes: typeof c.adjustment_notes === "string" && c.adjustment_notes.trim() ? c.adjustment_notes.trim().slice(0, 300) : null,
         }))
 );
 

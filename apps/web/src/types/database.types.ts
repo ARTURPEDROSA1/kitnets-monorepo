@@ -1124,6 +1124,8 @@ export type Database = {
       }
       lease_charges: {
         Row: {
+          adjustment_index: string | null
+          adjustment_notes: string | null
           amount: number | null
           charge_type: string
           id: string
@@ -1132,6 +1134,8 @@ export type Database = {
           responsibility: string
         }
         Insert: {
+          adjustment_index?: string | null
+          adjustment_notes?: string | null
           amount?: number | null
           charge_type: string
           id?: string
@@ -1140,6 +1144,8 @@ export type Database = {
           responsibility?: string
         }
         Update: {
+          adjustment_index?: string | null
+          adjustment_notes?: string | null
           amount?: number | null
           charge_type?: string
           id?: string

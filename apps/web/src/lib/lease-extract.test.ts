@@ -34,9 +34,10 @@ describe("normalizeLeaseExtraction", () => {
             charges: [
                 { charge_type: "IPTU", responsibility: "LANDLORD", amount: null },
                 { charge_type: "iptu", responsibility: "TENANT" },
+                { charge_type: "WATER", responsibility: "TENANT", adjustment_notes: "Trocar a titularidade em 30 dias." },
                 { charge_type: "CONDOMINIUM", responsibility: "??", amount: "350.00" },
                 { charge_type: "LIXO" },
-                { charge_type: "OTHER", label: "Taxa de energia elétrica", responsibility: "locatário", amount: "300,00" },
+                { charge_type: "OTHER", label: "Taxa de energia elétrica", responsibility: "locatário", amount: "300,00", adjustment_index: "IPCA/IBGE", adjustment_notes: "Reajuste anual pelo IPCA." },
                 { charge_type: "OTHER", label: "Taxa de lixo", responsibility: "INCLUSO" },
             ],
             tenants: [
@@ -62,10 +63,11 @@ describe("normalizeLeaseExtraction", () => {
         expect(out.lease.notes).toContain("Multa de 3 aluguéis.");
 
         expect(out.charges).toEqual([
-            { charge_type: "IPTU", label: "", responsibility: "LANDLORD", amount: null },
-            { charge_type: "CONDOMINIUM", label: "", responsibility: "TENANT", amount: 350 },
-            { charge_type: "ELECTRICITY", label: "", responsibility: "TENANT", amount: 300 },
-            { charge_type: "OTHER", label: "Taxa de lixo", responsibility: "INCLUDED", amount: null },
+            { charge_type: "IPTU", label: "", responsibility: "LANDLORD", amount: null, adjustment_index: null, adjustment_notes: null },
+            { charge_type: "WATER", label: "", responsibility: "TENANT", amount: null, adjustment_index: null, adjustment_notes: null },
+            { charge_type: "CONDOMINIUM", label: "", responsibility: "TENANT", amount: 350, adjustment_index: null, adjustment_notes: null },
+            { charge_type: "ELECTRICITY", label: "", responsibility: "TENANT", amount: 300, adjustment_index: "IPCA", adjustment_notes: "Reajuste anual pelo IPCA." },
+            { charge_type: "OTHER", label: "Taxa de lixo", responsibility: "INCLUDED", amount: null, adjustment_index: null, adjustment_notes: null },
         ]);
 
         // The primary comes first, the duplicate CPF and the nameless entry are dropped.

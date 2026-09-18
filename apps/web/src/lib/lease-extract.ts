@@ -47,7 +47,9 @@ Retorne SOMENTE um JSON válido (sem markdown, sem explicações) com esta estru
             "charge_type": "CONDOMINIUM | IPTU | WATER | ELECTRICITY | GAS | INTERNET | OTHER",
             "label": "descrição, somente quando charge_type = OTHER",
             "responsibility": "TENANT (pago pelo inquilino) | LANDLORD (pago pelo proprietário) | INCLUDED (incluso no aluguel)",
-            "amount": "valor mensal em R$ se constar, ex: 350.00, ou null"
+            "amount": "valor mensal em R$ se constar, ex: 350.00, ou null",
+            "adjustment_index": "índice que reajusta ESTE encargo: IPCA | IGP_M | INPC | IVAR | CUSTOM (outra regra) | NONE (valor fixo, sem reajuste), ou null se o contrato não disser",
+            "adjustment_notes": "SOMENTE a regra de reajuste do valor deste encargo, em poucas palavras (ex: 'Fixo por 12 meses; revisto conforme o consumo na renovação'); null se o contrato não tratar do reajuste dele"
         }
     ],
     "tenants": [
@@ -99,6 +101,7 @@ Regras:
 - Extraia valores EXATOS do documento. NÃO invente dados: o que não constar é null (ou lista vazia).
 - Converta decimais brasileiros: "1.500,00" → "1500.00". Converta datas: "01/03/2026" → "2026-03-01".
 - Liste em "charges" somente os encargos que o contrato menciona.
+- ENERGIA ELÉTRICA e CONDOMÍNIO com valor fixo cobrado junto com o aluguel (comum em kitnets e imóveis com várias unidades: "taxa de energia de R$ 300,00", "condomínio de R$ 150,00") SEMPRE entram em "charges" com o "amount" e com a regra de reajuste do próprio encargo, que pode ser diferente da do aluguel. Se o contrato disser que o encargo é reajustado "pelo mesmo índice do aluguel", repita o índice do aluguel.
 - "confidence" (0.0 a 1.0) reflete a qualidade geral da extração.`;
 
 // ── Extracted shape ──────────────────────────────────────────────────
@@ -155,6 +158,8 @@ export interface ExtractedCharge {
     label: string;
     responsibility: (typeof LEASE_RESPONSIBILITIES)[number];
     amount: number | null;
+    adjustment_index: (typeof LEASE_ADJUSTMENT)[number] | null;
+    adjustment_notes: string | null;
 }
 
 export interface ExtractedLease {
@@ -336,6 +341,9 @@ export function normalizeLeaseExtraction(raw: unknown): ExtractedLease {
             label: type === "OTHER" ? text(c.label, 100) ?? "" : "",
             responsibility: responsibility(c.responsibility),
             amount: money(c.amount),
+            adjustment_index: adjustmentIndex(c.adjustment_index),
+            // Models park any remark about the charge here; a readjustment rule needs an amount or an index to be about.
+            adjustment_notes: money(c.amount) || adjustmentIndex(c.adjustment_index) ? text(c.adjustment_notes, 300) : null,
         });
     }
 
