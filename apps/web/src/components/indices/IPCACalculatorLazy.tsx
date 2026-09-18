@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { IndexValueForCalc } from "@/lib/indexes";
 import { useState, useEffect } from "react";
-import { CALCULATOR_INDEXES } from "@/lib/index-calculator";
+import { resolveCalculatorIndex } from "@/lib/index-calculator";
 
 const IPCACalculator = dynamic(
     () => import("./IPCACalculator").then((mod) => mod.IPCACalculator),
@@ -29,12 +29,12 @@ const IPCACalculator = dynamic(
 );
 
 interface Props {
-    /** a key of CALCULATOR_INDEXES: IPCA, IGPM, SELIC, FIPEZAP-LOCACAO, REAJUSTE-SALARIO-MINIMO… */
+    /** a key of CALCULATOR_INDEXES (IPCA, IGPM, SELIC, FIPEZAP-LOCACAO, REAJUSTE-SALARIO-MINIMO…), or a FipeZap one with a bedroom suffix (FIPEZAP-VENDA-2) */
     indexCode: string;
 }
 
 export function IPCACalculatorLazy({ indexCode }: Props) {
-    const spec = CALCULATOR_INDEXES[indexCode.toUpperCase()];
+    const spec = resolveCalculatorIndex(indexCode)?.spec;
     const [data, setData] = useState<IndexValueForCalc[] | null>(null);
 
     useEffect(() => {

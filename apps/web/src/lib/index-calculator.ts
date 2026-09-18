@@ -3,8 +3,8 @@
  *
  * The calculator compounds a monthly variation series (`{ month, value % }`). Indexes stored in
  * `economic_index_values` already are one. FipeZap comes from `fipezap_series` (monthly variation,
- * all bedrooms) and the minimum wage is turned into one: 0 % every month, and the adjustment in the
- * month a new wage took effect.
+ * national, for all bedrooms or one bedroom bucket) and the minimum wage is turned into one: 0 %
+ * every month, and the adjustment in the month a new wage took effect.
  */
 export interface CalcSeriesPoint { month: string; value: number }   // same shape as IndexValueForCalc
 
@@ -30,6 +30,46 @@ export const CALCULATOR_INDEXES: Record<string, CalculatorIndex> = {
     "FIPEZAP-VENDA": { label: "FipeZap Venda", source: "fipezap", key: "venda" },
     "REAJUSTE-SALARIO-MINIMO": { label: "Salário Mínimo", source: "minimum-wage" },
 };
+
+/** `fipezap_series.dormitorios`: the national figure for all units, or one bedroom bucket. */
+export type FipezapBucket = "total" | "1" | "2" | "3" | "4";
+
+export const FIPEZAP_BUCKETS: Array<{ value: FipezapBucket; label: string }> = [
+    { value: "total", label: "Todos os dormitórios" },
+    { value: "1", label: "1 dormitório" },
+    { value: "2", label: "2 dormitórios" },
+    { value: "3", label: "3 dormitórios" },
+    { value: "4", label: "4+ dormitórios" },
+];
+
+export const isFipezapBucket = (v: unknown): v is FipezapBucket => FIPEZAP_BUCKETS.some(b => b.value === v);
+
+/** Calculator code of a FipeZap series for a bedroom bucket: `FIPEZAP-VENDA`, `FIPEZAP-VENDA-2`… */
+export function fipezapCalculatorCode(type: "locacao" | "venda", bucket: FipezapBucket): string {
+    const base = type === "venda" ? "FIPEZAP-VENDA" : "FIPEZAP-LOCACAO";
+    return bucket === "total" ? base : `${base}-${bucket}`;
+}
+
+export interface ResolvedCalculatorIndex {
+    /** the CALCULATOR_INDEXES key (upper case) */
+    code: string;
+    spec: CalculatorIndex;
+    /** bedroom bucket; only meaningful for source "fipezap" */
+    dormitorios: FipezapBucket;
+}
+
+/**
+ * Looks a calculator code up, accepting a bedroom suffix on the FipeZap ones:
+ * `fipezap-venda-2` → the FIPEZAP-VENDA spec for 2-bedroom units. Unknown codes → null.
+ */
+export function resolveCalculatorIndex(code: string): ResolvedCalculatorIndex | null {
+    const upper = code.toUpperCase();
+    const direct = CALCULATOR_INDEXES[upper];
+    if (direct) return { code: upper, spec: direct, dormitorios: "total" };
+    const m = /^(FIPEZAP-(?:LOCACAO|VENDA))-([1-4])$/.exec(upper);
+    if (!m) return null;
+    return { code: m[1], spec: CALCULATOR_INDEXES[m[1]], dormitorios: m[2] as FipezapBucket };
+}
 
 const nextMonth = (month: string): string => {
     const [y, m] = month.split("-").map(Number);

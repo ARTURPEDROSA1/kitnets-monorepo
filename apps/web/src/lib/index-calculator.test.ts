@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CALCULATOR_INDEXES, minimumWageMonthlySeries } from "./index-calculator";
+import { CALCULATOR_INDEXES, fipezapCalculatorCode, minimumWageMonthlySeries, resolveCalculatorIndex } from "./index-calculator";
 
 describe("CALCULATOR_INDEXES", () => {
     it("covers every index page", () => {
@@ -9,6 +9,26 @@ describe("CALCULATOR_INDEXES", () => {
         expect(CALCULATOR_INDEXES.IGPM.label).toBe("IGP-M");
         expect(CALCULATOR_INDEXES.SELIC).toMatchObject({ label: "Selic", feminine: true });
         expect(CALCULATOR_INDEXES.IPCA.feminine).toBeUndefined();
+    });
+});
+
+describe("resolveCalculatorIndex", () => {
+    it("finds a plain code in any case, for all bedrooms", () => {
+        expect(resolveCalculatorIndex("ipca")).toEqual({ code: "IPCA", spec: CALCULATOR_INDEXES.IPCA, dormitorios: "total" });
+        expect(resolveCalculatorIndex("FIPEZAP-VENDA")).toMatchObject({ code: "FIPEZAP-VENDA", dormitorios: "total" });
+    });
+    it("reads a bedroom suffix on the FipeZap codes only", () => {
+        expect(resolveCalculatorIndex("fipezap-venda-2")).toEqual({ code: "FIPEZAP-VENDA", spec: CALCULATOR_INDEXES["FIPEZAP-VENDA"], dormitorios: "2" });
+        expect(resolveCalculatorIndex("FIPEZAP-LOCACAO-4")).toMatchObject({ code: "FIPEZAP-LOCACAO", dormitorios: "4" });
+        expect(resolveCalculatorIndex("FIPEZAP-VENDA-5")).toBeNull();
+        expect(resolveCalculatorIndex("FIPEZAP-VENDA-TOTAL")).toBeNull();
+        expect(resolveCalculatorIndex("IPCA-2")).toBeNull();
+        expect(resolveCalculatorIndex("NOPE")).toBeNull();
+    });
+    it("round-trips the codes the FipeZap calculator builds", () => {
+        expect(fipezapCalculatorCode("venda", "total")).toBe("FIPEZAP-VENDA");
+        expect(fipezapCalculatorCode("locacao", "3")).toBe("FIPEZAP-LOCACAO-3");
+        expect(resolveCalculatorIndex(fipezapCalculatorCode("locacao", "3"))).toMatchObject({ code: "FIPEZAP-LOCACAO", dormitorios: "3" });
     });
 });
 
