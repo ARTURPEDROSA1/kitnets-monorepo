@@ -43,9 +43,8 @@ export const tenantInputSchema = z
         cpf: requiredText("CPF é obrigatório.", 20)
             .refine((v) => validateCPF(parseCPF(v)), "CPF inválido. Verifique os dígitos.")
             .transform((v) => parseCPF(v)),
-        main_phone: requiredText("Telefone principal é obrigatório.", 40)
-            .refine((v) => validatePhone(v), "Telefone principal inválido.")
-            .transform((v) => parsePhoneToE164(v)),
+        // Optional: a tenant imported from a lease agreement has no phone yet.
+        main_phone: optionalPhone("Telefone principal inválido."),
         email: optionalText(200)
             .refine((v) => v == null || validateEmail(v), "E-mail inválido.")
             .transform((v) => (v ? normalizeEmail(v) : null)),

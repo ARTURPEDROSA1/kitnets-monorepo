@@ -10,7 +10,7 @@ export interface Tenant {
     // Personal (required)
     full_name: string;
     cpf: string;                          // Digits only: "12345678901"
-    main_phone: string;                   // E.164
+    main_phone: string | null;            // E.164
     email: string | null;
 
     // Personal (optional)

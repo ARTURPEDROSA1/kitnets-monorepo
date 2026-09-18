@@ -763,7 +763,7 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                                                     {fieldError(t.errors, 'cpf')}
                                                 </div>
                                                 <div>
-                                                    <Label className="text-xs">Telefone *</Label>
+                                                    <Label className="text-xs">Telefone</Label>
                                                     <Input className="h-9" value={t.main_phone} onChange={e => updateTenant(idx, { main_phone: maskPhone(e.target.value) })} placeholder="(00) 00000-0000" />
                                                     {fieldError(t.errors, 'main_phone')}
                                                 </div>
