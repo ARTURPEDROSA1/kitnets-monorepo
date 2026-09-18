@@ -489,7 +489,7 @@ export function CompoundInterestCalculator({ dict, lang }: CompoundInterestCalcu
                             />
                             <Tooltip
                                 contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                formatter={(value: number | undefined) => formatCurrency(value || 0)}
+                                formatter={(value) => formatCurrency(Number(value) || 0)}
                                 labelFormatter={(label) => `${t.table.period} ${label}`}
                             />
                             <Legend />

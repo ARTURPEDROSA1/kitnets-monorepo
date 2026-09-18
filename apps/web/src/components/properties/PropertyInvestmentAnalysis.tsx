@@ -497,7 +497,7 @@ export default function PropertyInvestmentAnalysis({ propertyId, bedrooms, inves
                                     <XAxis dataKey="label" stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} interval="preserveStartEnd" minTickGap={28} />
                                     <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} width={64} tickFormatter={(v: number) => formatK(v)} />
                                     <RechartsTooltip
-                                        formatter={(value: number | string | undefined, name: string | undefined) => [formatBRL(Number(value ?? 0)), name ?? ""]}
+                                        formatter={(value, name) => [formatBRL(Number(value ?? 0)), name ?? ""]}
                                         labelFormatter={(l: React.ReactNode) => String(l)}
                                         contentStyle={{ backgroundColor: "hsl(var(--background))", borderColor: "hsl(var(--border))", borderRadius: "12px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", fontSize: 12 }}
                                     />

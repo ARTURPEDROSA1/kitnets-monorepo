@@ -54,7 +54,7 @@ export function IndexChart({ data, indexCode }: IndexChartProps) {
                             borderRadius: '8px',
                             color: 'hsl(var(--card-foreground))'
                         }}
-                        formatter={(value: number | string | undefined) => [`${value}%`, indexCode]}
+                        formatter={(value) => [`${value}%`, indexCode]}
                     />
                     <Legend wrapperStyle={{ paddingTop: '20px' }} />
                     <Line
