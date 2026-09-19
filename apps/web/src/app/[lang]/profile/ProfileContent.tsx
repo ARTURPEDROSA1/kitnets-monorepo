@@ -746,12 +746,13 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                         ownershipFiles: [],
                         savedProofs: primaryProofs,
                         profilePhotoUrl: primaryProfilePhoto,
-                        // Collapse filled sections
+                        // Collapse filled sections; a multi property opens with all of them
+                        // collapsed, so its units are in reach (the /imoveis card does the same on open)
                         ownershipSectionOpen: primaryProofs.length === 0,
-                        addressSectionOpen: !primaryPropAddr.street,
-                        photosSectionOpen: primaryPhotos.length < 2,
-                        descriptionSectionOpen: !primaryPropAddr.description,
-                        detailsInitialOpen: !primaryPropDetails?.propertyName,
+                        addressSectionOpen: profile.property_type !== 'multi' && !primaryPropAddr.street,
+                        photosSectionOpen: profile.property_type !== 'multi' && primaryPhotos.length < 2,
+                        descriptionSectionOpen: profile.property_type !== 'multi' && !primaryPropAddr.description,
+                        detailsInitialOpen: profile.property_type !== 'multi' && !primaryPropDetails?.propertyName,
                         subUnitOpenIdx: null,
                         showAddressCard: Boolean(primaryProofs.length > 0 || primaryPropAddr.street || primaryPropAddr.cep || primaryPropDetails?.propertyName || primaryPropDetails?.totalSqMeters || primaryPhotos.length > 0 || primaryVideos.length > 0 || primaryPropAddr.description),
                         showDetailsCard: Boolean(primaryPropAddr.street || primaryPropAddr.cep || primaryPropDetails?.propertyName || primaryPropDetails?.totalSqMeters || primaryPhotos.length > 0 || primaryVideos.length > 0 || primaryPropAddr.description),
@@ -813,10 +814,10 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                 savedProofs: combinedProofs,
                                 profilePhotoUrl: (apTyped.profilePhotoUrl as string) || (Array.isArray(apTyped.savedPhotos) && apTyped.savedPhotos.length > 0 ? (apTyped.savedPhotos[0] as string) : null),
                                 ownershipSectionOpen: combinedProofs.length === 0,
-                                addressSectionOpen: true,
-                                photosSectionOpen: true,
-                                descriptionSectionOpen: true,
-                                detailsInitialOpen: true,
+                                addressSectionOpen: propType !== 'multi',
+                                photosSectionOpen: propType !== 'multi',
+                                descriptionSectionOpen: propType !== 'multi',
+                                detailsInitialOpen: propType !== 'multi',
                                 subUnitOpenIdx: null,
                                 showAddressCard: typeof apTyped.showAddressCard === 'boolean' ? apTyped.showAddressCard : Boolean(hasAddDocs || hasAddAddr || hasAddDetails || hasAddPhotos || hasAddDesc),
                                 showDetailsCard: typeof apTyped.showDetailsCard === 'boolean' ? apTyped.showDetailsCard : Boolean(hasAddAddr || hasAddDetails || hasAddPhotos || hasAddDesc),
@@ -3479,6 +3480,15 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                 investment: prop.id ? portfolio?.properties[prop.id] ?? null : null,
                                             }}
                                             onSelect={() => {
+                                                // A multi property always opens with its sections collapsed,
+                                                // whatever was left open on the previous visit
+                                                updateProperty(originalIdx, prev => prev.propertyType !== 'multi' ? prev : {
+                                                    ...prev,
+                                                    addressSectionOpen: false,
+                                                    detailsInitialOpen: false,
+                                                    photosSectionOpen: false,
+                                                    descriptionSectionOpen: false,
+                                                });
                                                 setSelectedPropertyIdx(originalIdx);
                                                 setImoveisViewMode('manage');
                                                 window.scrollTo({ top: 0, behavior: 'smooth' });
