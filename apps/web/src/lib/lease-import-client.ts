@@ -1,14 +1,11 @@
 import type { LeaseImportResult } from "@/components/contratos/LeaseImportModal";
 import type { LeaseWithDetails } from "@/types/lease";
+import { attachLeaseContract } from "@/lib/lease-upload-client";
 
 /**
  * Turns a reviewed lease import straight into a lease, for the places that import without opening
  * the Contratos form (the unit cards on the Imóveis page). Browser-side: goes through the API routes.
  */
-
-// Same limits as POST /api/leases/[id]/documents.
-const DOCUMENT_MIME_TYPES = ["application/pdf", "image/jpeg", "image/jpg", "image/png"];
-const DOCUMENT_MAX_SIZE = 5 * 1024 * 1024;
 
 export interface ImportedLeaseOutcome {
     ok: boolean;
@@ -59,19 +56,6 @@ export function leasePayloadFromImport(
     };
 }
 
-async function attachContract(leaseId: string, file: File): Promise<boolean> {
-    if (!DOCUMENT_MIME_TYPES.includes(file.type) || file.size > DOCUMENT_MAX_SIZE) return false;
-    try {
-        const body = new FormData();
-        body.append("file", file);
-        body.append("document_type", "CONTRACT");
-        const res = await fetch(`/api/leases/${leaseId}/documents`, { method: "POST", body });
-        return res.ok;
-    } catch {
-        return false;
-    }
-}
-
 export async function createLeaseFromImport(
     result: LeaseImportResult,
     opts: { unitId: string | null; referenceName: string }
@@ -94,7 +78,7 @@ export async function createLeaseFromImport(
                 l.start_date === payload.start_date
         );
         if (existing) {
-            const attached = (existing.document_count ?? 0) > 0 || (await attachContract(existing.id, result.file));
+            const attached = (existing.document_count ?? 0) > 0 || (await attachLeaseContract(existing.id, result.file, result.storagePath));
             return { ok: true, leaseId: existing.id, alreadyExisted: true, fileSkipped: !attached };
         }
     } catch {
@@ -108,6 +92,6 @@ export async function createLeaseFromImport(
         return { ok: false, errors: fieldErrors.length > 0 ? fieldErrors : [typeof json.error === "string" ? json.error : "Não foi possível criar o contrato."] };
     }
 
-    const attached = await attachContract(json.lease.id as string, result.file);
+    const attached = await attachLeaseContract(json.lease.id as string, result.file, result.storagePath);
     return { ok: true, leaseId: json.lease.id as string, warning: (json.warning as string | null) ?? null, fileSkipped: !attached };
 }
