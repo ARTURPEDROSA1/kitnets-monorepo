@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireProfile, getOwnedProperty } from "@/lib/api-auth";
-import { LEASE_DOCUMENTS_BUCKET } from "@/lib/leases-server";
+import { LEASE_DOCUMENTS_BUCKET, syncLeaseUnitNames } from "@/lib/leases-server";
 import { signStorageUrl } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +27,7 @@ export async function GET(_request: Request, context: RouteContext) {
 
     const { data, error } = await supabase
         .from("leases")
-        .select("id, unit_id, reference_name, status, start_date")
+        .select("id, property_id, unit_id, unit_name, reference_name, status, start_date")
         .eq("user_id", profileId)
         .eq("property_id", id)
         .not("unit_id", "is", null)
@@ -39,7 +39,7 @@ export async function GET(_request: Request, context: RouteContext) {
     }
 
     const chosen = new Map<string, { id: string; reference_name: string | null; status: string }>();
-    for (const lease of data ?? []) {
+    for (const lease of await syncLeaseUnitNames(supabase, profileId, data ?? [])) {
         const unitId = lease.unit_id as string;
         const current = chosen.get(unitId);
         if (!current || (!IN_FORCE.has(current.status) && IN_FORCE.has(lease.status))) {

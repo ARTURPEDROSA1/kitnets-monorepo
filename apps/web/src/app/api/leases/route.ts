@@ -6,6 +6,7 @@ import {
     activeLeaseWarning,
     assertLeaseRelations,
     flattenLease,
+    syncLeaseUnitNames,
     writeLeaseChildren,
 } from "@/lib/leases-server";
 
@@ -14,7 +15,7 @@ import {
  * The account's leases (soft-deleted excluded) with property, tenant, agency and agent names.
  */
 export const GET = withAuth({ tag: "Leases GET" }, async ({ profileId, supabase }) => {
-    const { data: leases, error } = await supabase
+    const { data: rows, error } = await supabase
         .from("leases")
         .select(LEASE_SELECT_WITH_NAMES)
         .eq("user_id", profileId)
@@ -25,6 +26,7 @@ export const GET = withAuth({ tag: "Leases GET" }, async ({ profileId, supabase 
         console.error("[Leases GET] Error:", error);
         return NextResponse.json({ error: "Erro ao carregar contratos." }, { status: 500 });
     }
+    const leases = await syncLeaseUnitNames(supabase, profileId, (rows || []) as unknown as Record<string, unknown>[]);
 
     // how many files each lease has, so the list can offer "open the contract" without loading them all
     const ids = (leases || []).map((l) => String((l as Record<string, unknown>).id));
