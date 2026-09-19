@@ -22,6 +22,12 @@ const valid = {
 };
 
 describe("leaseInputSchema", () => {
+    it("keeps the unit of a multi-unit property; none means the whole property", () => {
+        expect(leaseInputSchema.parse({ ...valid, unit_id: " unit-7 " }).lease.unit_id).toBe("unit-7");
+        expect(leaseInputSchema.parse({ ...valid, unit_id: "" }).lease.unit_id).toBeNull();
+        expect(leaseInputSchema.parse(valid).lease.unit_id).toBeNull();
+    });
+
     it("normalises a valid payload into lease, tenants and charges", () => {
         const out = leaseInputSchema.parse(valid);
         expect(out.lease.reference_name).toBe("Kitnet 3");

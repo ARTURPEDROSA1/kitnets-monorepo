@@ -73,6 +73,8 @@ export const leaseInputSchema = z
     .object({
         reference_name: optionalText(200),
         property_id: requiredText("Selecione um imóvel."),
+        /** A unit of a multi-unit property; empty = the whole property. */
+        unit_id: optionalText(64),
         primary_tenant_id: requiredText("Selecione um inquilino."),
         management_type: z.enum(LEASE_MANAGEMENT, { errorMap: () => ({ message: "Tipo de gestão é obrigatório." }) }),
         agency_id: optionalText(64),

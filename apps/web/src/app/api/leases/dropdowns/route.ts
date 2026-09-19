@@ -1,17 +1,19 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/api-route";
+import { loadPropertyUnits } from "@/lib/property-units-server";
 
 /**
  * GET /api/leases/dropdowns
- * Properties, tenants, agencies and agents for the lease form's selects.
+ * Properties (a multi-unit one with its units), tenants, agencies and agents for the lease form's selects.
  * Agencies come through the membership table, not a direct owner column.
  */
 export const GET = withAuth({ tag: "Leases Dropdowns GET" }, async ({ profileId, supabase }) => {
-    const [propertiesRes, tenantsRes, membershipsRes, agentsRes] = await Promise.all([
+    const [propertiesRes, tenantsRes, membershipsRes, agentsRes, unitsByProperty] = await Promise.all([
         supabase.from("properties").select("id, name, electronic_id").eq("owner_id", profileId).order("name", { ascending: true }),
         supabase.from("tenants").select("id, full_name").eq("user_id", profileId).is("deleted_at", null).order("full_name", { ascending: true }),
         supabase.from("agency_members").select("agency_id").eq("user_id", profileId),
         supabase.from("agents").select("id, full_name, agency_id").eq("user_id", profileId).is("deleted_at", null).order("full_name", { ascending: true }),
+        loadPropertyUnits(supabase, profileId),
     ]);
 
     let agencies: { id: string; name: string }[] = [];
@@ -36,7 +38,7 @@ export const GET = withAuth({ tag: "Leases Dropdowns GET" }, async ({ profileId,
                 return true;
             }
         })
-        .map(({ id, name }) => ({ id, name }));
+        .map(({ id, name }) => ({ id, name, units: unitsByProperty.get(id as string) ?? [] }));
 
     return NextResponse.json({
         properties,

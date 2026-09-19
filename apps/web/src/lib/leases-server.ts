@@ -1,6 +1,7 @@
 import type { AdminSupabase } from "@/lib/api-auth";
 import { badRequest, notFound } from "@/lib/api-route";
 import type { LeaseInput } from "@/lib/schemas/lease";
+import { findPropertyUnit } from "@/lib/property-units-server";
 
 /**
  * Shared server-side pieces for the leases (contratos) routes.
@@ -47,8 +48,11 @@ export async function loadOwnedLease(
     return data as Record<string, unknown>;
 }
 
-/** Property and tenant must belong to the account; agency and agent must be reachable by it. */
-export async function assertLeaseRelations(supabase: AdminSupabase, profileId: string, lease: LeaseInput["lease"]): Promise<void> {
+/**
+ * Property and tenant must belong to the account; agency and agent must be reachable by it;
+ * a unit must be one of the property's. Resolves the unit's current name, stored with the lease.
+ */
+export async function assertLeaseRelations(supabase: AdminSupabase, profileId: string, lease: LeaseInput["lease"]): Promise<{ unit_name: string | null }> {
     const { data: property } = await supabase
         .from("properties")
         .select("id")
@@ -56,6 +60,13 @@ export async function assertLeaseRelations(supabase: AdminSupabase, profileId: s
         .eq("owner_id", profileId)
         .maybeSingle();
     if (!property) throw badRequest({ property_id: "Imóvel não encontrado ou não pertence à sua conta." });
+
+    let unitName: string | null = null;
+    if (lease.unit_id) {
+        const unit = await findPropertyUnit(supabase, profileId, lease.property_id, lease.unit_id);
+        if (!unit) throw badRequest({ property_id: "Unidade não encontrada neste imóvel." });
+        unitName = unit.name;
+    }
 
     const { data: tenant } = await supabase
         .from("tenants")
@@ -94,9 +105,14 @@ export async function assertLeaseRelations(supabase: AdminSupabase, profileId: s
             .maybeSingle();
         if (!agent) throw badRequest({ agent_id: "Corretor não encontrado." });
     }
+
+    return { unit_name: unitName };
 }
 
-/** A non-blocking warning when the property already has another active lease. */
+/**
+ * A non-blocking warning when what is being rented already has another active lease.
+ * Units of the same property do not clash with each other; a whole-property lease clashes with all.
+ */
 export async function activeLeaseWarning(
     supabase: AdminSupabase,
     profileId: string,
@@ -106,18 +122,20 @@ export async function activeLeaseWarning(
     if (lease.status !== "ACTIVE") return null;
     let q = supabase
         .from("leases")
-        .select("id, reference_name")
+        .select("id, reference_name, unit_id")
         .eq("property_id", lease.property_id)
         .eq("user_id", profileId)
         .eq("status", "ACTIVE")
         .is("deleted_at", null);
     if (excludeLeaseId) q = q.neq("id", excludeLeaseId);
-    const { data } = await q.limit(1);
-    if (!data || data.length === 0) return null;
-    const name = (data[0].reference_name as string | null) || "Sem referência";
+    const { data } = await q;
+    const clash = (data || []).find((other) => !lease.unit_id || !other.unit_id || other.unit_id === lease.unit_id);
+    if (!clash) return null;
+    const name = (clash.reference_name as string | null) || "Sem referência";
+    const what = lease.unit_id && clash.unit_id ? "Esta unidade" : "Este imóvel";
     return excludeLeaseId
-        ? `Este imóvel já possui outro contrato ativo: "${name}".`
-        : `Este imóvel já possui um contrato ativo: "${name}". Salvando mesmo assim.`;
+        ? `${what} já possui outro contrato ativo: "${name}".`
+        : `${what} já possui um contrato ativo: "${name}". Salvando mesmo assim.`;
 }
 
 /**

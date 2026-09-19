@@ -47,12 +47,12 @@ export const GET = withAuth({ tag: "Leases GET" }, async ({ profileId, supabase 
  * Creates a lease with its additional tenants and charges. Validation: lib/schemas/lease.ts.
  */
 export const POST = withAuth({ body: leaseInputSchema, tag: "Leases POST" }, async ({ body, profileId, supabase }) => {
-    await assertLeaseRelations(supabase, profileId, body.lease);
+    const { unit_name } = await assertLeaseRelations(supabase, profileId, body.lease);
     const warning = await activeLeaseWarning(supabase, profileId, body.lease);
 
     const { data: lease, error } = await supabase
         .from("leases")
-        .insert({ user_id: profileId, ...body.lease })
+        .insert({ user_id: profileId, ...body.lease, unit_name })
         .select()
         .single();
 
