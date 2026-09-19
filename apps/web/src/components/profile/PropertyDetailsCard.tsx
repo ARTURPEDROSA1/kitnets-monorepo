@@ -8,10 +8,11 @@ import { Label } from "@/components/ui/label";
 import {
     ChevronDown, ChevronUp, Settings2, Sun, Droplets, Zap, Flame,
     Landmark, Wifi, Plus, Trash2, Home, BedDouble, Car, Shirt, Wind, CookingPot,
-    DoorOpen, Building2, Camera, Video, Bath, FileText, Wand2, Loader2, UploadCloud, ArrowRight, Copy, CheckCircle2
+    DoorOpen, Building2, Camera, Video, Bath, FileText, FileSignature, Wand2, Loader2, UploadCloud, ArrowRight, Copy, CheckCircle2
 } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { cn } from "@/lib/utils";
+import { PdfViewerModal } from "@/components/ui/PdfViewerModal";
 
 // ── Types ──────────────────────────────────────────────────────────
 export interface PropertyDetails {
@@ -645,9 +646,18 @@ interface SubUnitsSectionProps {
     importingContractIdx?: number | null;
     initialOpenIdx?: number | null;
     propertyIndex?: number;
+    /** The lease agreement file of each unit that has one, by unit id (GET /api/properties/[id]/unit-leases) */
+    unitContracts?: Record<string, UnitContractFile | undefined>;
     /** Asks the page to persist the units: on blur of a typed field, right after any other change */
     onCommit?: () => void;
     saveState?: 'idle' | 'saving' | 'saved' | 'error';
+}
+
+export interface UnitContractFile {
+    file_url: string;
+    file_name: string;
+    mime_type: string | null;
+    reference_name?: string | null;
 }
 
 const UNIT_TYPE_OPTIONS = [
@@ -673,9 +683,12 @@ export function SubUnitsSection({
     importingContractIdx,
     initialOpenIdx,
     propertyIndex,
+    unitContracts,
     onCommit,
     saveState = 'idle',
 }: SubUnitsSectionProps) {
+    const [contractViewer, setContractViewer] = useState<UnitContractFile | null>(null);
+
     // A unit is "complete" when all mandatory fields are filled
     const isUnitComplete = (unit: SubUnit): boolean => {
         const totalPhotos = (unit.photos?.length || 0) + (unit.newPhotos?.length || 0);
@@ -884,6 +897,24 @@ export function SubUnitsSection({
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
+                            {unit.id && unitContracts?.[unit.id] && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 h-8 w-8 p-0"
+                                    title="Ver contrato de locação"
+                                    aria-label="Ver contrato de locação"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        const contract = unitContracts[unit.id as string] as UnitContractFile;
+                                        // Only PDFs open in the viewer; a photo of the agreement opens in a new tab
+                                        if (contract.mime_type === 'application/pdf' || contract.file_name.toLowerCase().endsWith('.pdf')) setContractViewer(contract);
+                                        else window.open(contract.file_url, '_blank', 'noopener,noreferrer');
+                                    }}
+                                >
+                                    <FileSignature className="w-4 h-4" />
+                                </Button>
+                            )}
                             <Button
                                 variant="ghost"
                                 size="sm"
@@ -1295,6 +1326,14 @@ export function SubUnitsSection({
                     )}
                 </div>
             ))}
+
+            <PdfViewerModal
+                isOpen={contractViewer !== null}
+                onClose={() => setContractViewer(null)}
+                url={contractViewer?.file_url ?? null}
+                title={contractViewer?.reference_name || "Contrato de locação"}
+                fileName={contractViewer?.file_name ?? "contrato.pdf"}
+            />
         </div>
     );
 }
