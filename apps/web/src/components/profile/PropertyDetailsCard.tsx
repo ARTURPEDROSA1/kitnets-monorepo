@@ -54,6 +54,8 @@ export interface PropertyDetails {
 export type UnitType = 'kitnet' | 'studio' | 'apartment' | 'house' | 'bedroom' | 'commercial_room' | 'garage' | 'other' | '';
 
 export interface SubUnit {
+    /** Stable identity: leases point to a unit through it (leases.unit_id). Units saved before it existed get one on the server. */
+    id?: string;
     name: string;
     unitType: UnitType;
     sqMeters: string;
@@ -87,6 +89,7 @@ export interface SubUnit {
 }
 
 export const defaultSubUnit = (index: number): SubUnit => ({
+    id: crypto.randomUUID(),
     name: `Unidade ${index + 1}`,
     unitType: '',
     sqMeters: "",
@@ -736,6 +739,7 @@ export function SubUnitsSection({
         const source = units[index];
         const cloned: SubUnit = {
             ...source,
+            id: crypto.randomUUID(),
             name: `${source.name || `Unidade ${index + 1}`} (cópia)`,
             // Clone amenity/condo objects so they're independent
             condominiumIncludes: { ...source.condominiumIncludes },

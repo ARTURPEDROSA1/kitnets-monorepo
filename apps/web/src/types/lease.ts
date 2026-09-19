@@ -18,6 +18,10 @@ export interface Lease {
 
     // Property & tenant
     property_id: string;
+    /** Unit of a multi-unit property (id in the owner's profile JSON); null = the whole property */
+    unit_id: string | null;
+    /** The unit's name when the lease was last saved */
+    unit_name: string | null;
     primary_tenant_id: string;
 
     // Management
@@ -110,6 +114,7 @@ export interface LeaseFormData {
 
     // Property & tenant
     property_id: string;
+    unit_id: string;                // '' = the whole property
     primary_tenant_id: string;
 
     // Management
@@ -156,6 +161,8 @@ export interface ChargeFormItem {
 export interface LeasePropertyOption {
     id: string;
     name: string;
+    /** Rentable units of a multi-unit property; empty for a single-unit one */
+    units?: { id: string; name: string }[];
 }
 
 export interface LeaseTenantOption {

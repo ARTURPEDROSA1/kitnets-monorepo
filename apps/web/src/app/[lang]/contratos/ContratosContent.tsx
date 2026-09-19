@@ -137,11 +137,15 @@ function computeDisplayStatus(lease: LeaseWithDetails): LeaseStatus {
     return lease.status;
 }
 
+/** Separates property and unit in the value of the form's "Imóvel" select */
+const UNIT_SEP = '::';
+
 // ── Empty form ───────────────────────────────────────────────────────
 
 const EMPTY_FORM: LeaseFormData = {
     reference_name: '',
     property_id: '',
+    unit_id: '',
     primary_tenant_id: '',
     management_type: 'SELF_MANAGED',
     agency_id: '',
@@ -235,6 +239,8 @@ export default function ContratosContent({ lang }: { lang: string }) {
     const [searchQuery, setSearchQuery] = useState('');
     const [filterStatus, setFilterStatus] = useState('');
     const [filterProperty, setFilterProperty] = useState('');
+    // Name stored with the lease being edited, shown if its unit no longer exists in the property
+    const [savedUnitName, setSavedUnitName] = useState('');
     const [filterManagement, setFilterManagement] = useState('');
 
     // Collapsible form sections
@@ -313,6 +319,7 @@ export default function ContratosContent({ lang }: { lang: string }) {
                 const searchable = [
                     l.reference_name,
                     l.property_name,
+                    l.unit_name,
                     l.primary_tenant_name,
                 ].filter(Boolean).join(' ').toLowerCase();
                 if (!searchable.includes(q)) return false;
@@ -367,6 +374,7 @@ export default function ContratosContent({ lang }: { lang: string }) {
 
     const resetForm = () => {
         setForm({ ...EMPTY_FORM });
+        setSavedUnitName('');
         setAdditionalTenants([]);
         setCharges([]);
         setErrors({});
@@ -445,6 +453,7 @@ export default function ContratosContent({ lang }: { lang: string }) {
         const payload = {
             reference_name: form.reference_name,
             property_id: form.property_id,
+            unit_id: form.unit_id || null,
             primary_tenant_id: form.primary_tenant_id,
             management_type: form.management_type,
             agency_id: form.agency_id || null,
@@ -575,9 +584,11 @@ export default function ContratosContent({ lang }: { lang: string }) {
             const data = await res.json();
             const full = data.lease as LeaseWithDetails;
 
+            setSavedUnitName(full.unit_name || '');
             setForm({
                 reference_name: full.reference_name || '',
                 property_id: full.property_id,
+                unit_id: full.unit_id || '',
                 primary_tenant_id: full.primary_tenant_id,
                 management_type: full.management_type,
                 agency_id: full.agency_id || '',
@@ -738,9 +749,10 @@ export default function ContratosContent({ lang }: { lang: string }) {
         const prop = properties.find(p => p.id === form.property_id);
         const tenant = tenants.find(t => t.id === form.primary_tenant_id);
         if (!prop || !tenant) return '';
+        const unit = prop.units?.find(u => u.id === form.unit_id);
         const year = new Date().getFullYear();
-        return `${prop.name} - ${tenant.full_name} - ${year}`;
-    }, [form.property_id, form.primary_tenant_id, properties, tenants]);
+        return `${unit ? `${prop.name} · ${unit.name}` : prop.name} - ${tenant.full_name} - ${year}`;
+    }, [form.property_id, form.unit_id, form.primary_tenant_id, properties, tenants]);
 
     // Filtered agents based on management type / agency
     const filteredAgents = useMemo(() => {
@@ -836,13 +848,31 @@ export default function ContratosContent({ lang }: { lang: string }) {
                         <Label>Imóvel *</Label>
                         <select
                             className={cn('flex h-10 w-full rounded-md border bg-background px-3 py-2 text-sm', errors.property_id && 'border-red-500')}
-                            value={form.property_id}
-                            onChange={e => updateForm('property_id', e.target.value)}
+                            value={form.unit_id ? `${form.property_id}${UNIT_SEP}${form.unit_id}` : form.property_id}
+                            onChange={e => {
+                                // A multi-unit property lists "the whole property" plus each of its units
+                                const [propertyId, unitId = ''] = e.target.value.split(UNIT_SEP);
+                                setForm(prev => ({ ...prev, unit_id: unitId }));
+                                updateForm('property_id', propertyId);
+                            }}
                         >
                             <option value="">Selecione um imóvel...</option>
-                            {properties.map(p => (
-                                <option key={p.id} value={p.id}>{p.name}</option>
-                            ))}
+                            {properties.map(p => {
+                                const units = p.units ?? [];
+                                if (units.length === 0) return <option key={p.id} value={p.id}>{p.name}</option>;
+                                const unitGone = form.property_id === p.id && !!form.unit_id && !units.some(u => u.id === form.unit_id);
+                                return (
+                                    <optgroup key={p.id} label={p.name}>
+                                        {units.map(u => (
+                                            <option key={u.id} value={`${p.id}${UNIT_SEP}${u.id}`}>{p.name} · {u.name}</option>
+                                        ))}
+                                        {unitGone && (
+                                            <option value={`${p.id}${UNIT_SEP}${form.unit_id}`}>{p.name} · {savedUnitName || 'Unidade'} (removida do imóvel)</option>
+                                        )}
+                                        <option value={p.id}>{p.name} · Imóvel inteiro (todas as unidades)</option>
+                                    </optgroup>
+                                );
+                            })}
                         </select>
                         {errors.property_id && <p className="mt-1 text-xs text-red-500">{errors.property_id}</p>}
                     </div>
@@ -1524,7 +1554,7 @@ export default function ContratosContent({ lang }: { lang: string }) {
                                     </div>
                                     <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                                         <span className="flex items-center gap-1">
-                                            <Home className="h-3.5 w-3.5" /> {lease.property_name || '—'}
+                                            <Home className="h-3.5 w-3.5" /> {lease.property_name || '—'}{lease.unit_name ? ` · ${lease.unit_name}` : ''}
                                         </span>
                                         <span className="flex items-center gap-1">
                                             <Users className="h-3.5 w-3.5" /> {lease.primary_tenant_name || '—'}

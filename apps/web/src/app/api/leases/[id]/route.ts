@@ -55,12 +55,12 @@ export const PUT = withAuth<typeof leaseInputSchema, Params>(
     { body: leaseInputSchema, tag: "Lease PUT" },
     async ({ body, params, profileId, supabase }) => {
         await loadOwnedLease(supabase, params.id, profileId);
-        await assertLeaseRelations(supabase, profileId, body.lease);
+        const { unit_name } = await assertLeaseRelations(supabase, profileId, body.lease);
         const warning = await activeLeaseWarning(supabase, profileId, body.lease, params.id);
 
         const { data: lease, error } = await supabase
             .from("leases")
-            .update(body.lease)
+            .update({ ...body.lease, unit_name })
             .eq("id", params.id)
             .select()
             .single();

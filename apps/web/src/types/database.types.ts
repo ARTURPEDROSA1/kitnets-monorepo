@@ -1265,6 +1265,8 @@ export type Database = {
           status: string
           termination_date: string | null
           termination_reason: string | null
+          unit_id: string | null
+          unit_name: string | null
           updated_at: string
           user_id: string
         }
@@ -1292,6 +1294,8 @@ export type Database = {
           status?: string
           termination_date?: string | null
           termination_reason?: string | null
+          unit_id?: string | null
+          unit_name?: string | null
           updated_at?: string
           user_id: string
         }
@@ -1319,6 +1323,8 @@ export type Database = {
           status?: string
           termination_date?: string | null
           termination_reason?: string | null
+          unit_id?: string | null
+          unit_name?: string | null
           updated_at?: string
           user_id?: string
         }
