@@ -1,7 +1,8 @@
 import type { AdminSupabase } from "@/lib/api-auth";
 import { badRequest, notFound } from "@/lib/api-route";
 import type { LeaseInput } from "@/lib/schemas/lease";
-import { findPropertyUnit } from "@/lib/property-units-server";
+import { findPropertyUnit, loadPropertyUnits } from "@/lib/property-units-server";
+import { refreshedLeaseUnitNames } from "@/lib/lease-unit-names";
 
 /**
  * Shared server-side pieces for the leases (contratos) routes.
@@ -28,6 +29,30 @@ export function flattenLease(l: Record<string, unknown>): Record<string, unknown
         agency: undefined,
         agent: undefined,
     };
+}
+
+/**
+ * Units are renamed on the Imóveis page, which knows nothing about leases: the routes that read leases
+ * call this so `unit_name` and the suggested reference follow the unit's current name (rules in
+ * lib/lease-unit-names.ts). Stores what changed and returns the rows up to date.
+ */
+export async function syncLeaseUnitNames<T extends Record<string, unknown>>(supabase: AdminSupabase, profileId: string, leases: T[]): Promise<T[]> {
+    if (!leases.some((l) => l.unit_id)) return leases;
+    const unitsByProperty = await loadPropertyUnits(supabase, profileId);
+
+    return Promise.all(leases.map(async (lease) => {
+        const units = lease.unit_id ? unitsByProperty.get(String(lease.property_id)) : undefined;
+        const at = units ? units.findIndex((u) => u.id === lease.unit_id) : -1;
+        if (!units || at < 0) return lease; // whole-property lease, or the unit is gone: the snapshot stays
+        const fresh = refreshedLeaseUnitNames(
+            { unit_name: (lease.unit_name as string | null) ?? null, reference_name: (lease.reference_name as string | null) ?? null },
+            { name: units[at].name, position: at + 1 }
+        );
+        if (!fresh) return lease;
+        const { error } = await supabase.from("leases").update(fresh).eq("id", String(lease.id)).eq("user_id", profileId);
+        if (error) console.error("[Lease unit names] Could not update lease", lease.id, error.message);
+        return { ...lease, ...fresh };
+    }));
 }
 
 /** The lease row if it exists, is not deleted and belongs to the account; 404 otherwise. */

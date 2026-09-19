@@ -8,6 +8,7 @@ import {
     assertLeaseRelations,
     flattenLease,
     loadOwnedLease,
+    syncLeaseUnitNames,
     writeLeaseChildren,
 } from "@/lib/leases-server";
 import { signStorageUrl } from "@/lib/storage";
@@ -19,7 +20,7 @@ type Params = { id: string };
  * The lease with names, additional tenants, charges and documents (signed URLs).
  */
 export const GET = withAuth<undefined, Params>({ tag: "Lease GET" }, async ({ params, profileId, supabase }) => {
-    const lease = await loadOwnedLease(supabase, params.id, profileId, LEASE_SELECT_WITH_NAMES);
+    const [lease] = await syncLeaseUnitNames(supabase, profileId, [await loadOwnedLease(supabase, params.id, profileId, LEASE_SELECT_WITH_NAMES)]);
 
     const [tenantsRes, chargesRes, docsRes] = await Promise.all([
         supabase.from("lease_tenants").select("*, tenant:tenants!tenant_id(full_name)").eq("lease_id", params.id),

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireProfile, getOwnedProperty } from "@/lib/api-auth";
-import { LEASE_DOCUMENTS_BUCKET, LEASE_SELECT_WITH_NAMES, flattenLease } from "@/lib/leases-server";
+import { LEASE_DOCUMENTS_BUCKET, LEASE_SELECT_WITH_NAMES, flattenLease, syncLeaseUnitNames } from "@/lib/leases-server";
 import { signStorageUrl } from "@/lib/storage";
 import { loadPropertyUnits } from "@/lib/property-units-server";
 import { pickPropertyLeases, type LeasePick } from "@/lib/property-leases";
@@ -42,7 +42,9 @@ export async function GET(_request: Request, context: RouteContext) {
 
     // Units in the order of the Imóveis page, with their current names (only needed when a lease names a unit)
     const units = rows.some(l => l.unit_id) ? (await loadPropertyUnits(supabase, profileId)).get(id) ?? [] : [];
-    const { shown, others } = pickPropertyLeases(rows, units.map(u => u.id));
+    const picked = pickPropertyLeases(rows, units.map(u => u.id));
+    const shown = await syncLeaseUnitNames(supabase, profileId, picked.shown);
+    const others = picked.others;
 
     const { data: docs } = await supabase
         .from("lease_documents")
