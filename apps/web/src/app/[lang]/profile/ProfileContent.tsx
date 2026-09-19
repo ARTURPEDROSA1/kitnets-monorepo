@@ -7,7 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Image from 'next/image';
 import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera, Video, Sparkles, Save, UploadCloud, Home, Building2, User, ShieldCheck, Fingerprint, ChevronDown, ChevronUp, Wand2, Plus, ArrowRight, Minus, Edit3, X, Search, Sun, ArrowLeft } from 'lucide-react';
-import PropertyDetailsCard, { PropertyDetails, SubUnit, SubUnitsSection, Checkbox as DetailCheckbox, defaultSubUnit } from '@/components/profile/PropertyDetailsCard';
+import PropertyDetailsCard, { PropertyDetails, SubUnit, SubUnitsSection, Checkbox as DetailCheckbox, defaultSubUnit, type UnitContractFile } from '@/components/profile/PropertyDetailsCard';
+import LeaseImportModal, { type LeaseImportResult } from '@/components/contratos/LeaseImportModal';
+import { createLeaseFromImport } from '@/lib/lease-import-client';
+import type { LeaseAgencyOption, LeasePropertyOption } from '@/types/lease';
 import PropertyDocumentsCard, { DocCategory } from '@/components/profile/PropertyDocumentsCard';
 import { DeletePropertyModal } from '@/components/profile/DeletePropertyModal';
 import PropertySquareCard, { type PropertyRealIncome, type PropertyCardInvestment } from '@/components/properties/PropertySquareCard';
@@ -481,6 +484,32 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
     const [generatingUnitDescriptionIdx, setGeneratingUnitDescriptionIdx] = useState<number | null>(null);
     const [descriptionPurpose, setDescriptionPurpose] = useState<{ venda: boolean; aluguel: boolean }>({ venda: false, aluguel: true });
     const [importingContractIdx, setImportingContractIdx] = useState<number | null>(null);
+    // "Enviar Contrato" on a unit card: the Contratos import (tenant, agency, lease) bound to that unit
+    const [unitLeaseImport, setUnitLeaseImport] = useState<{ propIdx: number; unitIdx: number; file: File } | null>(null);
+    const [leaseImportOptions, setLeaseImportOptions] = useState<{ properties: LeasePropertyOption[]; agencies: LeaseAgencyOption[] }>({ properties: [], agencies: [] });
+    // Lease agreement file of each unit, by properties.id then unit id (the icon on the unit cards)
+    const [unitContracts, setUnitContracts] = useState<Record<string, Record<string, UnitContractFile>>>({});
+    const loadUnitContracts = useCallback(async (propertyId: string) => {
+        try {
+            const res = await fetch(`/api/properties/${propertyId}/unit-leases`);
+            if (!res.ok) return;
+            const json = await res.json();
+            const byUnit: Record<string, UnitContractFile> = {};
+            for (const [unitId, lease] of Object.entries((json.units || {}) as Record<string, { reference_name: string | null; contract: UnitContractFile | null }>)) {
+                if (lease.contract) byUnit[unitId] = { ...lease.contract, reference_name: lease.reference_name };
+            }
+            setUnitContracts(prev => ({ ...prev, [propertyId]: byUnit }));
+        } catch { /* the icon just stays hidden */ }
+    }, []);
+    // Loaded with the properties and again each time one is opened (the file links are signed and expire)
+    const multiPropertyIds = useMemo(
+        () => properties.filter(p => p.propertyType === 'multi' && p.id).map(p => p.id as string).join(','),
+        [properties]
+    );
+    useEffect(() => {
+        if (!propertiesLoaded || !multiPropertyIds) return;
+        for (const id of multiPropertyIds.split(',')) void loadUnitContracts(id);
+    }, [propertiesLoaded, multiPropertyIds, selectedPropertyIdx, loadUnitContracts]);
 
     // Sub-units save inline, with no "Confirmar" of their own: a typed field persists when it
     // loses focus; selects, checkboxes, media and add/remove persist right away. Edits flag the
@@ -1266,6 +1295,17 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
 
     // ── Contract Import ────────────────────────────────────────────
     const importContract = async (propIdx: number, unitIndex: number, file: File) => {
+        // With a property row and a unit id the agreement becomes a lease on that unit (review modal);
+        // otherwise (property not registered yet) it only fills the unit's fields, as before.
+        const target = properties[propIdx];
+        if (target?.id && target.subUnits[unitIndex]?.id) {
+            setUnitLeaseImport({ propIdx, unitIdx: unitIndex, file });
+            fetch('/api/leases/dropdowns')
+                .then(res => res.json())
+                .then(d => setLeaseImportOptions({ properties: d.properties || [], agencies: d.agencies || [] }))
+                .catch(() => { /* the modal still matches on the server; only its pick lists stay empty */ });
+            return;
+        }
         setImportingContractIdx(unitIndex);
         try {
             const formDataUpload = new FormData();
@@ -1310,6 +1350,56 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
         } finally {
             setImportingContractIdx(null);
         }
+    };
+
+    /** The review modal settled tenant and agency: create the unit's lease and attach the agreement. */
+    const completeUnitLeaseImport = async (result: LeaseImportResult): Promise<string[] | void> => {
+        if (!unitLeaseImport) return;
+        const { propIdx, unitIdx } = unitLeaseImport;
+        const prop = properties[propIdx];
+        const unit = prop?.subUnits[unitIdx];
+        if (!prop?.id || !unit?.id) return ['Unidade não encontrada. Recarregue a página e tente novamente.'];
+
+        const { lease, tenants: readTenants } = result.data;
+        const tenantName = (readTenants.find(t => t.role === 'PRIMARY') ?? readTenants[0])?.full_name || '';
+        const unitName = unit.name || `Unidade ${unitIdx + 1}`;
+        const propName = prop.details?.propertyName || `Propriedade ${propIdx + 1}`;
+        const year = lease.start_date ? lease.start_date.slice(0, 4) : String(new Date().getFullYear());
+
+        const outcome = await createLeaseFromImport(result, {
+            unitId: unit.id,
+            referenceName: [`${propName} · ${unitName}`, tenantName, year].filter(Boolean).join(' - '),
+        });
+        if (!outcome.ok) return outcome.errors ?? ['Não foi possível criar o contrato.'];
+
+        // The unit card and the property dashboard read rent, tenant and term from the unit itself
+        if (!outcome.alreadyExisted) {
+            const inForce = !lease.end_date || lease.end_date >= new Date().toISOString().slice(0, 10);
+            updateProperty(propIdx, prev => {
+                const updated = [...prev.subUnits];
+                const at = updated.findIndex(u => u.id === unit.id);
+                if (at < 0) return prev;
+                updated[at] = {
+                    ...updated[at],
+                    ...(lease.monthly_rent ? { rentValue: lease.monthly_rent.toFixed(2) } : {}),
+                    ...(inForce ? { status: 'rented' as const } : {}),
+                    ...(tenantName ? { tenantName } : {}),
+                    ...(lease.start_date ? { contractStart: lease.start_date } : {}),
+                    ...(lease.end_date ? { contractEnd: lease.end_date } : {}),
+                };
+                return { ...prev, subUnits: updated };
+            });
+            unitsDirtyRef.current = true;
+            requestUnitsSave();
+        }
+
+        setUnitLeaseImport(null);
+        void loadUnitContracts(prop.id);
+        alert([
+            outcome.alreadyExisted ? 'Este contrato já estava cadastrado: nada foi duplicado.' : `Contrato criado para ${unitName}.`,
+            outcome.warning,
+            outcome.fileSkipped ? 'O arquivo não pôde ser anexado (aceitos: PDF, JPG ou PNG até 5MB). Anexe-o em Contratos.' : null,
+        ].filter(Boolean).join('\n'));
     };
 
     const analyzeDocument = async (file: File, targetPropIdx?: number) => {
@@ -3071,6 +3161,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             onUnitsChange={setPSubUnitsInline}
                             onCommit={requestUnitsSave}
                             saveState={unitsSaveState}
+                            unitContracts={prop.id ? unitContracts[prop.id] : undefined}
                             onGenerateDescription={(unitIdx) => generateUnitDescription(propIdx, unitIdx)}
                             generatingDescriptionIdx={generatingUnitDescriptionIdx}
                             onImportContract={(unitIdx, file) => importContract(propIdx, unitIdx, file)}
@@ -3250,6 +3341,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             onUnitsChange={setPSubUnitsInline}
                             onCommit={requestUnitsSave}
                             saveState={unitsSaveState}
+                            unitContracts={prop.id ? unitContracts[prop.id] : undefined}
                             onGenerateDescription={(unitIdx) => generateUnitDescription(propIdx, unitIdx)}
                             generatingDescriptionIdx={generatingUnitDescriptionIdx}
                             onImportContract={(unitIdx, file) => importContract(propIdx, unitIdx, file)}
@@ -3275,6 +3367,21 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                         <p className="text-xs mt-1 text-red-600 dark:text-red-400">Verifique se o JWT template &quot;supabase&quot; está configurado no Clerk. Abra o console do navegador (F12) para mais detalhes.</p>
                     </div>
                 </div>
+            )}
+
+            {unitLeaseImport && properties[unitLeaseImport.propIdx]?.id && (
+                <LeaseImportModal
+                    properties={leaseImportOptions.properties}
+                    agencies={leaseImportOptions.agencies}
+                    initialFile={unitLeaseImport.file}
+                    fixedProperty={{
+                        id: properties[unitLeaseImport.propIdx].id as string,
+                        label: `${properties[unitLeaseImport.propIdx].details?.propertyName || 'Imóvel'} · ${properties[unitLeaseImport.propIdx].subUnits[unitLeaseImport.unitIdx]?.name || `Unidade ${unitLeaseImport.unitIdx + 1}`}`,
+                    }}
+                    createsLease
+                    onClose={() => setUnitLeaseImport(null)}
+                    onComplete={completeUnitLeaseImport}
+                />
             )}
 
             {showSuccess && (

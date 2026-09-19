@@ -43,9 +43,19 @@ interface Props {
     properties: LeasePropertyOption[];
     agencies: LeaseAgencyOption[];
     onClose: () => void;
-    /** "Digitar manualmente": open the empty form. */
-    onManual: () => void;
-    onComplete: (result: LeaseImportResult) => void | Promise<void>;
+    /** "Digitar manualmente": open the empty form. Without it the option is not offered. */
+    onManual?: () => void;
+    /**
+     * Receives what was settled. A caller that creates the lease itself (`createsLease`)
+     * returns the messages to show when it could not; the modal then stays open.
+     */
+    onComplete: (result: LeaseImportResult) => void | string[] | Promise<void | string[]>;
+    /** Import started from a known property (a unit card on Imóveis): nothing to match or create */
+    fixedProperty?: { id: string; label: string };
+    /** A file already picked outside: skips the upload step */
+    initialFile?: File;
+    /** The caller creates the lease on completion instead of opening the form */
+    createsLease?: boolean;
 }
 
 type FieldErrors = Record<string, string>;
@@ -106,7 +116,7 @@ function errorsFrom(json: Record<string, unknown>, fallback: string): FieldError
     return { _form: typeof json.error === 'string' ? json.error : fallback };
 }
 
-export default function LeaseImportModal({ properties, agencies, onClose, onManual, onComplete }: Props) {
+export default function LeaseImportModal({ properties, agencies, onClose, onManual, onComplete, fixedProperty, initialFile, createsLease }: Props) {
     const [step, setStep] = useState<'upload' | 'review'>('upload');
     const [isExtracting, setIsExtracting] = useState(false);
     const [extractError, setExtractError] = useState<string | null>(null);
@@ -136,6 +146,7 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
 
     const [tenantDrafts, setTenantDrafts] = useState<TenantDraft[]>([]);
     const [applying, setApplying] = useState(false);
+    const [completeErrors, setCompleteErrors] = useState<string[]>([]);
 
     const busy = isExtracting || applying;
 
@@ -187,8 +198,8 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
             const p = extracted.property;
             const streetAndNumber = [p?.street, p?.street_number].filter(Boolean).join(', ');
             setPropertyMatch(matches.property ?? null);
-            setPropertyId(matches.property?.id ?? '');
-            setPropertyMode(matches.property ? 'existing' : p ? 'create' : 'skip');
+            setPropertyId(fixedProperty?.id ?? matches.property?.id ?? '');
+            setPropertyMode(fixedProperty || matches.property ? 'existing' : p ? 'create' : 'skip');
             setPropertyDraft(p ? {
                 // "Apartamento 302" alone says little in a list of properties: add the street (unless the name has it).
                 name: (p.name && p.street && p.name.toLowerCase().includes(p.street.toLowerCase())
@@ -248,6 +259,14 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
         }
     };
 
+    const startedRef = useRef(false);
+    useEffect(() => {
+        if (!initialFile || startedRef.current) return;
+        startedRef.current = true;
+        void handleUpload(initialFile);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [initialFile]);
+
     // ── Step 2: create what the user approved, then hand over ─────
 
     const updateTenant = (idx: number, patch: Partial<TenantDraft>) => {
@@ -259,6 +278,7 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
         setApplying(true);
         setPropertyErrors({});
         setAgencyErrors({});
+        setCompleteErrors([]);
 
         try {
             // 1. Property. Each successful step flips to "existing", so a retry after a later failure creates nothing twice.
@@ -336,7 +356,7 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
 
             const linked = drafts.filter(t => t.tenantId);
             const primary = linked.find(t => t.role === 'PRIMARY') ?? linked[0];
-            await onComplete({
+            const problems = await onComplete({
                 file,
                 data,
                 propertyId: finalPropertyId,
@@ -346,6 +366,7 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                     .filter(t => t !== primary)
                     .map(t => ({ tenant_id: t.tenantId, role: t.role === 'OCCUPANT' ? 'OCCUPANT' : 'CO_TENANT' })),
             });
+            if (problems && problems.length > 0) setCompleteErrors(problems);
         } catch {
             setPropertyErrors(prev => ({ ...prev, _form: 'Erro de conexão. Tente novamente.' }));
         } finally {
@@ -505,7 +526,7 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                             </div>
                         )}
 
-                        <div className="mt-6 flex flex-col items-center justify-between gap-3 border-t border-border/80 pt-5 sm:flex-row">
+                        {onManual && <div className="mt-6 flex flex-col items-center justify-between gap-3 border-t border-border/80 pt-5 sm:flex-row">
                             <span className="text-center text-xs text-muted-foreground sm:text-left">Prefere não enviar um documento agora?</span>
                             <Button
                                 type="button"
@@ -517,7 +538,7 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                                 <Edit3 className="h-3.5 w-3.5" />
                                 Digitar manualmente
                             </Button>
-                        </div>
+                        </div>}
                     </div>
                 )}
 
@@ -536,7 +557,11 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                             <section className="space-y-3 rounded-xl border border-border p-4">
                                 <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground"><Home className="h-4 w-4" /> Imóvel</h3>
 
-                                {propertySettled ? (
+                                {fixedProperty ? (
+                                    <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-2.5 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">
+                                        <CheckCircle2 className="h-4 w-4 shrink-0" /> <span>Contrato de: <strong>{fixedProperty.label}</strong></span>
+                                    </div>
+                                ) : propertySettled ? (
                                     matchedBanner(
                                         createdProperty?.id === propertyId
                                             ? <>Imóvel criado: <strong>{createdProperty?.name}</strong></>
@@ -562,7 +587,7 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                                     </>
                                 )}
 
-                                {propertyMode === 'existing' && !propertySettled && (
+                                {!fixedProperty && propertyMode === 'existing' && !propertySettled && (
                                     <select className={selectClass} value={propertyId} onChange={e => setPropertyId(e.target.value)} disabled={applying}>
                                         <option value="">Selecione um imóvel...</option>
                                         {propertyOptions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -780,17 +805,28 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                             </section>
                         </div>
 
+                        {completeErrors.length > 0 && (
+                            <div className="mx-6 mb-2 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400 sm:mx-7">
+                                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                <div>
+                                    <p className="font-semibold">Os cadastros foram feitos, mas o contrato não pôde ser criado:</p>
+                                    {completeErrors.map(msg => <p key={msg}>{msg}</p>)}
+                                    <p className="mt-1">Complete-o em Contratos → Novo Contrato.</p>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Footer */}
                         <div className="flex flex-col gap-3 border-t border-border p-4 sm:flex-row sm:items-center sm:justify-between sm:px-7">
                             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                 <FileText className="h-3.5 w-3.5 shrink-0" />
-                                <span className="truncate">{createLabels.length > 0 ? `Será criado: ${createLabels.join(', ')}.` : 'Nenhum cadastro novo será criado.'}</span>
+                                <span className="truncate">{createLabels.length > 0 || createsLease ? `Será criado: ${[...createLabels, createsLease ? 'contrato' : null].filter(Boolean).join(', ')}.` : 'Nenhum cadastro novo será criado.'}</span>
                             </p>
                             <div className="flex shrink-0 justify-end gap-2">
                                 <Button type="button" variant="outline" onClick={onClose} disabled={applying}>Cancelar</Button>
                                 <Button type="button" onClick={handleApply} disabled={applying}>
                                     {applying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                                    {createLabels.length > 0 ? 'Criar e preencher contrato' : 'Preencher contrato'}
+                                    {createsLease ? 'Criar contrato' : createLabels.length > 0 ? 'Criar e preencher contrato' : 'Preencher contrato'}
                                 </Button>
                             </div>
                         </div>
