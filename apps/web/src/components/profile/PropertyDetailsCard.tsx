@@ -648,6 +648,8 @@ interface SubUnitsSectionProps {
     propertyIndex?: number;
     /** The lease agreement file of each unit that has one, by unit id (GET /api/properties/[id]/unit-leases) */
     unitContracts?: Record<string, UnitContractFile | undefined>;
+    /** Ids of the units that already have a lease: their import offer shrinks to the button */
+    leasedUnitIds?: string[];
     /** Asks the page to persist the units: on blur of a typed field, right after any other change */
     onCommit?: () => void;
     saveState?: 'idle' | 'saving' | 'saved' | 'error';
@@ -684,10 +686,12 @@ export function SubUnitsSection({
     initialOpenIdx,
     propertyIndex,
     unitContracts,
+    leasedUnitIds,
     onCommit,
     saveState = 'idle',
 }: SubUnitsSectionProps) {
     const [contractViewer, setContractViewer] = useState<UnitContractFile | null>(null);
+    const unitHasLease = (unit: SubUnit) => !!unit.id && (!!leasedUnitIds?.includes(unit.id) || !!unitContracts?.[unit.id]);
 
     // A unit is "complete" when all mandatory fields are filled
     const isUnitComplete = (unit: SubUnit): boolean => {
@@ -949,14 +953,21 @@ export function SubUnitsSection({
                     {/* Unit Content */}
                     {openUnitIndex === idx && (
                         <div className="px-5 pb-5 space-y-5 border-t border-border pt-4 animate-in fade-in slide-in-from-top-1 duration-200">
-                            {/* Import Contract Button — at very top */}
+                            {/* Import Contract Button — at very top. The explanation is for the first import:
+                                a unit that already has a lease keeps only the button (a renewal, a new tenant). */}
                             {onImportContract && (
-                                <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                                    <UploadCloud className="w-5 h-5 text-blue-600 flex-shrink-0" />
-                                    <div className="flex-1">
-                                        <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Importar Contrato de Aluguel</p>
-                                        <p className="text-xs text-blue-600 dark:text-blue-400">Envie um PDF ou imagem do contrato — a IA extrairá os dados automaticamente</p>
-                                    </div>
+                                <div className={unitHasLease(unit)
+                                    ? "flex justify-end"
+                                    : "flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg"}>
+                                    {!unitHasLease(unit) && (
+                                        <>
+                                            <UploadCloud className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                                            <div className="flex-1">
+                                                <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Importar Contrato de Aluguel</p>
+                                                <p className="text-xs text-blue-600 dark:text-blue-400">Envie um PDF ou imagem do contrato — a IA extrairá os dados automaticamente</p>
+                                            </div>
+                                        </>
+                                    )}
                                     <div className="relative">
                                         <input
                                             type="file"

@@ -489,6 +489,8 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
     const [leaseImportOptions, setLeaseImportOptions] = useState<{ properties: LeasePropertyOption[]; agencies: LeaseAgencyOption[] }>({ properties: [], agencies: [] });
     // Lease agreement file of each unit, by properties.id then unit id (the icon on the unit cards)
     const [unitContracts, setUnitContracts] = useState<Record<string, Record<string, UnitContractFile>>>({});
+    // Units that have a lease, with or without a file, by properties.id
+    const [leasedUnits, setLeasedUnits] = useState<Record<string, string[]>>({});
     const loadUnitContracts = useCallback(async (propertyId: string) => {
         try {
             const res = await fetch(`/api/properties/${propertyId}/unit-leases`);
@@ -499,6 +501,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                 if (lease.contract) byUnit[unitId] = { ...lease.contract, reference_name: lease.reference_name };
             }
             setUnitContracts(prev => ({ ...prev, [propertyId]: byUnit }));
+            setLeasedUnits(prev => ({ ...prev, [propertyId]: Object.keys(json.units || {}) }));
         } catch { /* the icon just stays hidden */ }
     }, []);
     // Loaded with the properties and again each time one is opened (the file links are signed and expire)
@@ -3162,6 +3165,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             onCommit={requestUnitsSave}
                             saveState={unitsSaveState}
                             unitContracts={prop.id ? unitContracts[prop.id] : undefined}
+                            leasedUnitIds={prop.id ? leasedUnits[prop.id] : undefined}
                             onGenerateDescription={(unitIdx) => generateUnitDescription(propIdx, unitIdx)}
                             generatingDescriptionIdx={generatingUnitDescriptionIdx}
                             onImportContract={(unitIdx, file) => importContract(propIdx, unitIdx, file)}
@@ -3342,6 +3346,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             onCommit={requestUnitsSave}
                             saveState={unitsSaveState}
                             unitContracts={prop.id ? unitContracts[prop.id] : undefined}
+                            leasedUnitIds={prop.id ? leasedUnits[prop.id] : undefined}
                             onGenerateDescription={(unitIdx) => generateUnitDescription(propIdx, unitIdx)}
                             generatingDescriptionIdx={generatingUnitDescriptionIdx}
                             onImportContract={(unitIdx, file) => importContract(propIdx, unitIdx, file)}
