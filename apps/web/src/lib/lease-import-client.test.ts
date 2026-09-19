@@ -5,6 +5,7 @@ import { leasePayloadFromImport } from "./lease-import-client";
 
 const result = {
     file: new File(["x"], "contrato.pdf", { type: "application/pdf" }),
+    storagePath: null,
     propertyId: "prop-1",
     agencyId: "agency-1",
     primaryTenantId: "tenant-1",

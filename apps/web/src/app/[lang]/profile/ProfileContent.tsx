@@ -1401,7 +1401,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
         alert([
             outcome.alreadyExisted ? 'Este contrato já estava cadastrado: nada foi duplicado.' : `Contrato criado para ${unitName}.`,
             outcome.warning,
-            outcome.fileSkipped ? 'O arquivo não pôde ser anexado (aceitos: PDF, JPG ou PNG até 5MB). Anexe-o em Contratos.' : null,
+            outcome.fileSkipped ? 'O arquivo não pôde ser anexado ao contrato. Anexe-o em Contratos.' : null,
         ].filter(Boolean).join('\n'));
     };
 

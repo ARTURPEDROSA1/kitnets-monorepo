@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import { formatCNPJ, formatCPF, maskCEP, maskCNPJ, maskCPF, maskPhone } from '@/lib/validators';
 import type { ExtractedLease, ExtractedTenantRole, MatchResult } from '@/lib/lease-extract';
 import type { AdditionalTenantFormItem, LeaseAgencyOption, LeasePropertyOption } from '@/types/lease';
+import { ROUTE_BODY_SAFE_SIZE, stageLeaseFile } from '@/lib/lease-upload-client';
 
 /**
  * "Novo Contrato" entry point: upload a lease agreement, let the AI read it,
@@ -32,6 +33,8 @@ import type { AdditionalTenantFormItem, LeaseAgencyOption, LeasePropertyOption }
 export interface LeaseImportResult {
     /** The uploaded agreement, attached to the lease once it is saved. */
     file: File;
+    /** Where the agreement already sits in storage (uploaded directly): the lease adopts it instead of a second upload */
+    storagePath: string | null;
     data: ExtractedLease;
     propertyId: string;
     agencyId: string;
@@ -124,6 +127,7 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [file, setFile] = useState<File | null>(null);
+    const [storagePath, setStoragePath] = useState<string | null>(null);
     const [data, setData] = useState<ExtractedLease | null>(null);
 
     const [propertyMode, setPropertyMode] = useState<EntityMode>('skip');
@@ -180,9 +184,25 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
         setIsExtracting(true);
         setExtractError(null);
         try {
-            const formData = new FormData();
-            formData.append('file', picked);
-            const res = await fetch('/api/leases/extract', { method: 'POST', body: formData });
+            // Straight to storage: a route body stops at 4.5 MB, less than many signed, scanned leases
+            const staged = await stageLeaseFile(picked);
+            let res: Response;
+            if ('path' in staged) {
+                setStoragePath(staged.path);
+                res = await fetch('/api/leases/extract', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ storage_path: staged.path }),
+                });
+            } else if (picked.size <= ROUTE_BODY_SAFE_SIZE) {
+                setStoragePath(null);
+                const formData = new FormData();
+                formData.append('file', picked);
+                res = await fetch('/api/leases/extract', { method: 'POST', body: formData });
+            } else {
+                setExtractError(staged.error);
+                return;
+            }
             const json = await res.json().catch(() => ({}));
             if (!res.ok || !json.data) {
                 setExtractError(json.error || 'Não foi possível extrair os dados do contrato. Tente novamente ou preencha manualmente.');
@@ -358,6 +378,7 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
             const primary = linked.find(t => t.role === 'PRIMARY') ?? linked[0];
             const problems = await onComplete({
                 file,
+                storagePath,
                 data,
                 propertyId: finalPropertyId,
                 agencyId: finalAgencyId,

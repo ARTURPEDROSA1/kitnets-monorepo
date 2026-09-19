@@ -35,6 +35,7 @@ import {
 import { cn } from '@/lib/utils';
 import LeaseProfileCard from '@/components/contratos/LeaseProfileCard';
 import LeaseImportModal, { type LeaseImportResult } from '@/components/contratos/LeaseImportModal';
+import { attachLeaseContract } from '@/lib/lease-upload-client';
 import { PdfViewerModal } from '@/components/ui/PdfViewerModal';
 import { Badge } from '@/components/ui/badge';
 import type {
@@ -270,6 +271,8 @@ export default function ContratosContent({ lang }: { lang: string }) {
     const [aiImported, setAiImported] = useState(false);
     // The imported agreement, attached as the CONTRACT document once the lease exists.
     const [importedFile, setImportedFile] = useState<File | null>(null);
+    // The imported agreement when it already sits in storage (direct upload): the saved lease adopts it
+    const [importedStoragePath, setImportedStoragePath] = useState<string | null>(null);
 
     // ── Fetch leases ──────────────────────────────────────────────
 
@@ -383,6 +386,7 @@ export default function ContratosContent({ lang }: { lang: string }) {
         setExistingDocuments([]);
         setAiImported(false);
         setImportedFile(null);
+        setImportedStoragePath(null);
         setOpenSections({
             property_tenant: true,
             terms: true,
@@ -500,14 +504,8 @@ export default function ContratosContent({ lang }: { lang: string }) {
             }
 
             if (!editingId && importedFile && data.lease?.id) {
-                try {
-                    const docData = new FormData();
-                    docData.append('file', importedFile);
-                    docData.append('document_type', 'CONTRACT');
-                    await fetch(`/api/leases/${data.lease.id}/documents`, { method: 'POST', body: docData });
-                } catch {
-                    console.error('Error attaching imported contract');
-                }
+                const attached = await attachLeaseContract(data.lease.id, importedFile, importedStoragePath);
+                if (!attached) console.error('Error attaching imported contract');
             }
 
             resetForm();
@@ -567,8 +565,10 @@ export default function ContratosContent({ lang }: { lang: string }) {
             charges: result.data.charges.length > 0,
             notes: !!lease.notes,
         }));
+        // A file already in storage is adopted whatever its size; one that still has to go through the route must fit it
+        setImportedStoragePath(result.storagePath);
         setImportedFile(
-            DOCUMENT_MIME_TYPES.includes(result.file.type) && result.file.size <= DOCUMENT_MAX_SIZE ? result.file : null
+            result.storagePath || (DOCUMENT_MIME_TYPES.includes(result.file.type) && result.file.size <= DOCUMENT_MAX_SIZE) ? result.file : null
         );
         setAiImported(true);
         setImportOpen(false);
