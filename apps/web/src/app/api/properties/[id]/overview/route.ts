@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-const INCOME_COLUMNS = "id, property_id, month, unit_id, unit_name, received_on, received_amount, energy_portion, other_income, other_expenses, condo_amount, iptu_amount, agency_fee_pct, status, source, bank_reference, notes, created_at, updated_at";
+const INCOME_COLUMNS = "id, property_id, month, unit_id, unit_name, received_on, received_amount, energy_portion, other_income, other_expenses, condo_amount, fee_on_condo, iptu_amount, agency_fee_pct, status, source, bank_reference, notes, created_at, updated_at";
 const TX_COLUMNS = "id, property_id, occurred_on, kind, amount, interest_part, principal_part, insurance_part, comment, source, bank_reference, created_at, updated_at";
 const INV_COLUMNS = "property_id, purchase_price, acquired_on, built_area_m2, lender, contract_number, financing_system, principal, annual_rate, term_months, contract_date, first_due_date, financing_status, paid_off_on, notes, created_at, updated_at";
 

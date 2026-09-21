@@ -39,7 +39,7 @@ const MAX_ROWS = 600;
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 const SELECT_COLUMNS =
-    "id, property_id, month, unit_id, unit_name, received_on, received_amount, energy_portion, other_income, other_expenses, condo_amount, iptu_amount, agency_fee_pct, status, source, bank_reference, notes, created_at, updated_at";
+    "id, property_id, month, unit_id, unit_name, received_on, received_amount, energy_portion, other_income, other_expenses, condo_amount, fee_on_condo, iptu_amount, agency_fee_pct, status, source, bank_reference, notes, created_at, updated_at";
 
 function money(value: unknown): number | null | undefined {
     if (value === undefined) return undefined;
@@ -64,6 +64,7 @@ function normalizeRow(r: PropertyIncomeRow): PropertyIncomeRow {
         other_income: Number(r.other_income) || 0,
         other_expenses: Number(r.other_expenses) || 0,
         condo_amount: Number(r.condo_amount) || 0,
+        fee_on_condo: r.fee_on_condo === true,
         unit_id: r.unit_id ?? null,
         unit_name: r.unit_name ?? null,
         iptu_amount: Number(r.iptu_amount) || 0,
@@ -119,6 +120,8 @@ interface ValidatedInput {
     /** spreadsheet imports send the unit's name instead of its id */
     unit_name?: string | null;
     condo_amount?: number;
+    /** the agency's % applies to rent + condominium (true) or to the rent only (false) */
+    fee_on_condo?: boolean;
     received_amount?: number;
     gross_rent?: number;   // derived into received_amount at merge time, never stored
     energy_portion?: number;
@@ -157,6 +160,10 @@ function validateInput(raw: unknown, index: number): { row: ValidatedInput } | {
         return { error: `Linha ${index + 1} (${r.month}): taxa da imobiliária deve estar entre 0 e 99,99` };
     }
     if (pct !== undefined) row.agency_fee_pct = pct;
+    if (r.fee_on_condo !== undefined) {
+        if (typeof r.fee_on_condo !== "boolean") return { error: `Linha ${index + 1} (${r.month}): fee_on_condo deve ser verdadeiro ou falso` };
+        row.fee_on_condo = r.fee_on_condo;
+    }
 
     if (r.status !== undefined) {
         if (!INCOME_STATUSES.includes(r.status)) return { error: `Linha ${index + 1} (${r.month}): status inválido` };
@@ -253,6 +260,7 @@ export async function PUT(request: Request, context: RouteContext) {
                     other_income: 0,
                     other_expenses: 0,
                     condo_amount: 0,
+                    fee_on_condo: false,
                     iptu_amount: 0,
                     agency_fee_pct: 0,
                     status: "CONFIRMED",
@@ -271,15 +279,18 @@ export async function PUT(request: Request, context: RouteContext) {
                 owner_id: profileId,
                 month: `${month}-01`,
             };
-            // Gross rent from a lease sheet: derive what lands in the account
-            // using the merged fee / energy values for that month (the energy
+            // Gross rent from a lease sheet: derive the deposit using the merged fee, energy
+            // and condominium values for that month (the condominium comes inside the deposit,
+            // less the fee when the agency charges it on the condominium too; the energy
             // cost is paid separately and does not affect it).
             // An explicit received_amount in the same row always wins (bank truth).
             if (gross_rent !== undefined && fields.received_amount === undefined) {
                 record.received_amount = receivedFromGross(
                     gross_rent,
                     Number(record.agency_fee_pct) || 0,
-                    Number(record.energy_portion) || 0
+                    Number(record.energy_portion) || 0,
+                    Number(record.condo_amount) || 0,
+                    record.fee_on_condo === true
                 );
             }
             merged.set(key, record);

@@ -240,8 +240,17 @@ describe("multi-unit ledgers and the condominium fee", () => {
         expect(multi.monthlyNoiPace).toBe(single.monthlyNoiPace * 2);
         expect(multi.currentGrossRent).toBe(8000);
 
-        const withCondo = computeInvestmentMetrics({ investment: investment(), transactions: txs, incomeRows: oneRow.map(r => ({ ...r, condo_amount: 300 })), asOf: "2026-07" });
-        expect(withCondo.netIncomeToDate).toBe(single.netIncomeToDate - 6 * 300);
-        expect(withCondo.currentGrossRent).toBe(single.currentGrossRent);      // a cost never changes the rent
+        // condominium of 300 paid by the tenant inside the deposit, fee on the rent only: it comes in and goes out
+        const run = (over: Partial<PropertyIncomeRow>) => computeInvestmentMetrics({ investment: investment(), transactions: txs, incomeRows: oneRow.map(r => ({ ...r, condo_amount: 300, ...over })), asOf: "2026-07" });
+        const paid = run({ received_amount: 4250 });
+        expect(paid.netIncomeToDate).toBe(single.netIncomeToDate);
+        expect(paid.currentGrossRent).toBe(single.currentGrossRent);           // the condominium never changes the rent
+        // fee on rent + condominium: the agency keeps 10 % of the 300 too, and the property bears it
+        const feeOnAll = run({ received_amount: 4220, fee_on_condo: true });
+        expect(feeOnAll.netIncomeToDate).toBe(single.netIncomeToDate - 6 * 30);
+        expect(feeOnAll.currentGrossRent).toBe(single.currentGrossRent);
+        // vacant: nothing comes in and the condominium is still due
+        const vacant = run({ received_amount: 0, energy_portion: 0, other_income: 0 });
+        expect(vacant.netIncomeToDate).toBe(-6 * 300);
     });
 });

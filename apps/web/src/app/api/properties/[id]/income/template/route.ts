@@ -36,12 +36,22 @@ export async function GET(request: Request, context: RouteContext) {
         if (fillLedger) {
             const { data, error } = await supabase
                 .from("property_income_months")
-                .select("id, property_id, month, unit_id, unit_name, received_on, received_amount, energy_portion, other_income, other_expenses, condo_amount, iptu_amount, agency_fee_pct, status, source, bank_reference, notes")
+                .select("id, property_id, month, unit_id, unit_name, received_on, received_amount, energy_portion, other_income, other_expenses, condo_amount, fee_on_condo, iptu_amount, agency_fee_pct, status, source, bank_reference, notes")
                 .eq("property_id", id)
                 .order("month", { ascending: false });
             if (error) throw new Error(error.message);
             rows = (data ?? []) as unknown as PropertyIncomeRow[];
         }
+
+        // the agreement with the agency, as the latest row with a condominium has it
+        const { data: lastCondo } = await supabase
+            .from("property_income_months")
+            .select("fee_on_condo")
+            .eq("property_id", id)
+            .gt("condo_amount", 0)
+            .order("month", { ascending: false })
+            .limit(1)
+            .maybeSingle();
 
         const propertyName = String(property.name ?? "Imóvel").trim() || "Imóvel";
         // a multi-unit property gets the unit names: one empty row per month and unit, and a dropdown in "Unidade"
@@ -51,6 +61,7 @@ export async function GET(request: Request, context: RouteContext) {
             units: units.map(u => u.name),
             feePct: Number.isFinite(fee) ? fee : 10,
             months: Number.isFinite(months) && months > 0 ? months : 12,
+            feeOnCondo: lastCondo?.fee_on_condo === true,
             rows,
         });
         const slug = propertyName

@@ -15,7 +15,7 @@ const roundTrip = async (buffer: Buffer) => {
 describe("income Excel template", () => {
     it("exports the ledger with unit and condominium and imports it back unchanged", async () => {
         const ledger = [
-            row("2026-09", "Kitnet 1", 900, { condo_amount: 120.5, notes: "reajuste" }),
+            row("2026-09", "Kitnet 1", 1008.45, { condo_amount: 120.5, fee_on_condo: true, notes: "reajuste" }),   // (1000 + 120,50) × 0,9
             row("2026-09", "Kitnet 2", 1250, { energy_portion: 200, other_income: 80, other_expenses: 35 }),
             row("2026-08", null, 3950, { energy_portion: 350 }),
         ];
@@ -24,8 +24,9 @@ describe("income Excel template", () => {
         expect(rows).toHaveLength(3);
         expect(rows[0]).toMatchObject({ month: "2026-08", received_amount: 3950, energy_portion: 350 });
         expect(rows[0].unit_name).toBeUndefined();
-        expect(rows[1]).toMatchObject({ month: "2026-09", unit_name: "Kitnet 1", gross_rent: 1000, received_amount: 900, condo_amount: 120.5, notes: "reajuste" });
+        expect(rows[1]).toMatchObject({ month: "2026-09", unit_name: "Kitnet 1", gross_rent: 1000, received_amount: 1008.45, condo_amount: 120.5, fee_on_condo: true, notes: "reajuste" });
         expect(rows[2]).toMatchObject({ month: "2026-09", unit_name: "Kitnet 2", received_amount: 1250, energy_portion: 200, other_income: 80, other_expenses: 35 });
+        expect(rows[2].fee_on_condo).toBeUndefined();   // no condominium: the cell stays blank
     });
 
     it("the empty template of a multi-unit property has one row per month and unit, and imports nothing until it is filled", async () => {

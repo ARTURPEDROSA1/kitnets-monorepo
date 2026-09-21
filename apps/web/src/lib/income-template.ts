@@ -39,8 +39,13 @@ export interface IncomeTemplateOptions {
     rows?: PropertyIncomeRow[];
     /** Names of the property's units (multi-unit property). The empty template gets one row per month and unit, and the "Unidade" column a dropdown. */
     units?: string[];
+    /** Empty template: the "Taxa sobre o condomínio" column starts as Sim (the agency charges its % on rent + condominium). Default Não. */
+    feeOnCondo?: boolean;
     now?: Date;
 }
+
+/** Cells of the "Taxa sobre o condomínio" column (read back by `parseYesNo`). */
+const YES = "Sim", NO = "Não";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const fmtDate = (d: Date) => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
@@ -81,6 +86,7 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
         { key: "other", width: 20 },
         { key: "otherExpenses", width: 20 },
         { key: "condo", width: 18 },
+        { key: "feeOnCondo", width: 20 },
         { key: "notes", width: 44 },
     ];
 
@@ -99,18 +105,20 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
     ws.getCell("B3").font = { name: "Calibri", size: 9, italic: true, color: { argb: `FF${MUTED}` } };
 
     // Instructions (row 5)
-    ws.mergeCells("A5:J5");
+    ws.mergeCells("A5:K5");
     ws.getCell("A5").value =
         "Aluguel bruto = valor do contrato. Taxa = % que a imobiliária retém. Valor recebido = o que entrou na sua conta " +
         "(já calculado pela fórmula; sobrescreva com o valor real do extrato quando tiver). Energia = parcela paga pelo inquilino " +
         "referente à energia solar (vai para o centro de energia). Custo de energia = a conta de luz que você paga no mês; " +
-        "Outras despesas = outros custos pagos por você (reparos, taxas); Condomínio = a taxa de condomínio paga por você. " +
+        "Outras despesas = outros custos pagos por você (reparos, taxas). Condomínio = o condomínio da unidade no mês: despesa do imóvel, devida mesmo " +
+        "com a unidade vaga; alugada, o inquilino paga e a imobiliária repassa dentro do mesmo depósito. Taxa sobre o condomínio = Sim quando a imobiliária cobra a taxa sobre aluguel + condomínio, " +
+        "Não quando cobra só sobre o aluguel e repassa o condomínio integralmente. " +
         "Unidade = a kitnet / apartamento da linha, em imóveis com várias unidades (em branco = o imóvel inteiro). " +
         "O IPTU não entra aqui: registre-o em Tributos do imóvel. " +
-        "Custos à parte não alteram o valor recebido. Recebido = bruto × (1 − taxa) + energia.";
+        "Custos à parte não alteram o valor recebido. Recebido = bruto × (1 − taxa) + energia + condomínio (menos a taxa, quando ela incide sobre ele).";
     ws.getCell("A5").alignment = { wrapText: true, vertical: "top" };
     ws.getCell("A5").font = { name: "Calibri", size: 9, color: { argb: `FF${MUTED}` } };
-    ws.getRow(5).height = 56;
+    ws.getRow(5).height = 70;
 
     // Header (row 7)
     const HEADER_ROW = 7;
@@ -126,8 +134,8 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
     header.height = 30;
 
     // Rows (newest first: current month at the top, like the ledger on screen)
-    // A Mês · B Unidade · C Aluguel bruto · D Taxa · E Valor recebido · F Energia · G Custo de energia · H Outras despesas · I Condomínio · J Comentários
-    const LAST_COL = 10;
+    // A Mês · B Unidade · C Aluguel bruto · D Taxa · E Valor recebido · F Energia · G Custo de energia · H Outras despesas · I Condomínio · J Taxa sobre o condomínio · K Comentários
+    const LAST_COL = 11;
     for (let i = 0; i < months; i++) {
         const rowIdx = HEADER_ROW + 1 + i;
         const row = ws.getRow(rowIdx);
@@ -150,10 +158,13 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
             row.getCell(7).value = b.other;
             row.getCell(8).value = b.otherExpenses;
             row.getCell(9).value = b.condo;
-            row.getCell(10).value = ledger.notes ?? null;   // status is re-derived from the month on import
+            row.getCell(10).value = b.condo > 0 ? (b.feeOnCondo ? YES : NO) : null;
+            row.getCell(11).value = ledger.notes ?? null;   // status is re-derived from the month on import
         } else {
             row.getCell(4).value = feePct;
-            row.getCell(5).value = { formula: `IF(C${r}="","",ROUND(C${r}*(1-D${r}/100)+F${r},2))`, result: "" };
+            row.getCell(10).value = opts.feeOnCondo ? YES : NO;
+            // deposit = rent after the fee + energy + the tenant's condominium (less the fee when it applies to it; none when vacant)
+            row.getCell(5).value = { formula: `IF(C${r}="","",ROUND(C${r}*(1-D${r}/100)+F${r}+IF(C${r}>0,I${r}*(1-IF(J${r}="${YES}",D${r}/100,0)),0),2))`, result: "" };
         }
 
         // zebra by month, so the units of one month read as a block
@@ -162,7 +173,7 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
             const cell = row.getCell(c);
             cell.border = thin;
             cell.font = { name: "Calibri", size: 10, color: { argb: `FF${INK}` } };
-            cell.alignment = { vertical: "middle", horizontal: c === 1 ? "center" : c === 2 || c === LAST_COL ? "left" : "right" };
+            cell.alignment = { vertical: "middle", horizontal: c === 1 || c === 10 ? "center" : c === 2 || c === LAST_COL ? "left" : "right" };
             if (c === 5) {
                 cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${CALC}` } };
             } else if (monthIndex % 2 === 1) {
@@ -189,6 +200,10 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
             type: "decimal", operator: "between", formulae: [0, 99.99], allowBlank: true,
             showErrorMessage: true, errorTitle: "Taxa inválida", error: "Informe a taxa em % entre 0 e 99,99 (ex.: 10).",
         };
+        ws.getCell(`J${r}`).dataValidation = {
+            type: "list", allowBlank: true, formulae: [`"${YES},${NO}"`],
+            showErrorMessage: true, errorTitle: "Valor inválido", error: "Escolha Sim (taxa sobre aluguel + condomínio) ou Não (taxa só sobre o aluguel).",
+        };
         for (const col of ["C", "E", "F", "G", "H", "I"]) {
             ws.getCell(`${col}${r}`).dataValidation = {
                 type: "decimal", operator: "greaterThanOrEqual", formulae: [0], allowBlank: true,
@@ -207,7 +222,7 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
         ["Kitnets.com — Receitas de aluguel", "", "title"],
         ["Como usar", "", "h"],
         ["1.", "Preencha a aba “Receitas”: uma linha por mês, com a data no formato dd/mm/aaaa. Em imóveis com várias unidades (kitnets, apartamentos), use uma linha por mês e por unidade, com o nome da unidade na coluna Unidade.", "p"],
-        ["2.", "Informe o Aluguel bruto (valor do contrato) e a Taxa da imobiliária em %. O Valor recebido é calculado automaticamente; substitua pelo valor real do extrato bancário quando quiser.", "p"],
+        ["2.", "Informe o Aluguel bruto (valor do contrato, sem o condomínio) e a Taxa da imobiliária em %. O Valor recebido é calculado automaticamente; substitua pelo valor real do extrato bancário quando quiser.", "p"],
         ["3.", "Se o inquilino paga uma parcela referente à energia solar, informe em Energia (vai para o centro de energia). A conta de luz que você paga no mês vai em Custo de energia; outros custos pagos por você vão em Outras despesas.", "p"],
         ["4.", "Os meses vêm do mais recente para o mais antigo. Para acrescentar meses, arraste a última linha para baixo (a fórmula de Valor recebido é copiada junto). Meses futuros são importados como “previstos”.", "p"],
         ["5.", "Salve o arquivo (.xlsx) e importe em Kitnets.com › Imóveis › Gerenciar Imóvel › Importar planilha. As colunas são reconhecidas automaticamente.", "p"],
@@ -216,21 +231,24 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
         ["Unidade", "Nome da unidade, exatamente como está cadastrada no imóvel (ex.: Kitnet 3). Deixe em branco quando a linha é do imóvel inteiro. Um nome que não existe no imóvel impede a importação.", "p"],
         ["Aluguel bruto (R$)", "Valor do aluguel no contrato, antes da taxa da imobiliária.", "p"],
         ["Taxa imobiliária (%)", "Percentual retido pela imobiliária (ex.: 10). Use 0 quando você mesmo administra o imóvel.", "p"],
-        ["Valor recebido (R$)", "O que efetivamente entrou na sua conta: bruto × (1 − taxa) + energia.", "p"],
+        ["Valor recebido (R$)", "O depósito da imobiliária: bruto × (1 − taxa) + energia + condomínio pago pelo inquilino (menos a taxa, quando ela incide sobre ele).", "p"],
         ["Energia (R$)", "Parcela do pagamento do inquilino referente à energia (solar).", "p"],
         ["Custo de energia (R$)", "A conta de luz do imóvel paga por você no mês. É um custo à parte: não altera o valor recebido, reduz o resultado (NOI). Sempre positivo.", "p"],
         ["Outras despesas (R$)", "Outros custos do imóvel pagos por você no mês (reparos, taxas, vistoria). Também à parte: não altera o recebido, reduz o NOI. Sempre positivo.", "p"],
-        ["Condomínio (R$)", "A taxa de condomínio paga por você no mês. Custo à parte, como as outras despesas: não altera o recebido, reduz o NOI. Sempre positivo.", "p"],
+        ["Condomínio (R$)", "O condomínio da unidade no mês. É despesa do imóvel e entra no NOI, devida mesmo com a unidade vaga. Com a unidade alugada, o inquilino paga aluguel + condomínio à imobiliária, que repassa tudo em um único depósito: o valor faz parte do Valor recebido e compensa a despesa. Unidade vaga: aluguel 0, recebido 0 e o condomínio preenchido.", "p"],
+        ["Taxa sobre o condomínio", "Sim = a imobiliária cobra a taxa sobre o valor total (aluguel + condomínio); Não = cobra só sobre o aluguel e repassa o condomínio integralmente. Em branco vale como Não.", "p"],
         ["Comentários", "Texto livre (reajuste, vacância, troca de inquilino).", "p"],
         ["Cálculos no Kitnets.com", "", "h"],
-        ["Aluguel líquido", "recebido − energia (o aluguel após a taxa da imobiliária)", "p"],
+        ["Condomínio no depósito", "condomínio × (1 − taxa/100) quando a taxa incide sobre ele; senão, o condomínio inteiro; zero com a unidade vaga", "p"],
+        ["Aluguel líquido", "recebido − energia − condomínio no depósito (o aluguel após a taxa da imobiliária)", "p"],
         ["Aluguel bruto", "líquido ÷ (1 − taxa/100), quando o bruto não é informado", "p"],
-        ["Receita bruta", "aluguel bruto + energia (tudo o que o inquilino paga no mês)", "p"],
+        ["Receita bruta", "aluguel bruto + energia + condomínio pago pelo inquilino (tudo o que o inquilino paga no mês)", "p"],
         ["Despesas (OPEX)", "taxa da imobiliária + custo de energia + outras despesas + condomínio (+ IPTU pago por você, no mês do pagamento, vindo de Tributos do imóvel)", "p"],
         ["Resultado (NOI)", "receita bruta − OPEX = recebido − custo de energia − outras despesas − condomínio", "p"],
         ["Taxa acumulada", "bruto − líquido, somado mês a mês: a economia potencial ao administrar o imóvel pelo Kitnets.com.", "p"],
         ["Exemplo", "", "h"],
         ["Bruto 4.000 · Taxa 10 % · Energia 350 · Custo de energia 109,80 · Outras 50", "Recebido 3.950 · Aluguel líquido 3.600 · Receita bruta 4.350 · OPEX 559,80 · NOI 3.790,20", "p"],
+        ["Com condomínio de 250", "Taxa só sobre o aluguel: recebido 4.200, taxa 400, NOI 3.790,20 (o condomínio entra e sai). Taxa sobre aluguel + condomínio: recebido 4.175, taxa 425, NOI 3.765,20. Unidade vaga: recebido 0, NOI −250.", "p"],
     ];
     lines.forEach(([a, b, kind], i) => {
         const row = info.getRow(i + 1);

@@ -10,7 +10,12 @@
  *                    historical name; it is a cost, stored ≥ 0)
  *   other_expenses   OTHER EXPENSES the owner pays for the month (repairs,
  *                    fees…), also outside the transfer (cost, ≥ 0)
- *   condo_amount     CONDOMINIUM fee the owner pays for the month (cost, ≥ 0)
+ *   condo_amount     CONDOMINIUM due by the unit for the month (≥ 0). An expense of the property: it is due
+ *                    even when the unit is vacant (it will be the revenue of the condominium cost centre).
+ *                    While the unit is rented the tenant pays it: the agency collects rent + condominium in
+ *                    one payment and forwards both in the same deposit, so it is part of `received_amount`.
+ *   fee_on_condo     the agency charges its % on rent + condominium (true) or on the rent only (false, the
+ *                    condominium is forwarded in full). Depends on the landlord's agreement with the agency.
  *   iptu_amount      legacy column, no longer used: IPTU comes from the taxes
  *                    register (Tributos do imóvel) in the month it was paid
  *   unit_id          sub-unit of a multi-unit property the row belongs to (NULL =
@@ -18,10 +23,14 @@
  *   agency_fee_pct   % the agency kept before crediting the owner
  *
  * Derived:
- *   net_rent   = received − energy                (rent after the agency fee)
+ *   condo_in   = the condominium inside the deposit: condominium × (1 − pct/100) when the fee applies to it,
+ *                else the condominium in full; never more than received − energy (a vacant unit, with nothing
+ *                received, has no tenant paying it)
+ *   condo_paid = what the tenant paid as condominium = condo_in ÷ (1 − pct/100) when the fee applies, else condo_in
+ *   net_rent   = received − energy − condo_in     (rent after the agency fee)
  *   gross_rent = net_rent ÷ (1 − pct/100)         (contract value)
- *   fee        = gross_rent − net_rent
- *   revenue    = gross_rent + energy              (everything the tenant pays)
+ *   fee        = (gross_rent − net_rent) + (condo_paid − condo_in)   (everything the agency kept)
+ *   revenue    = gross_rent + energy + condo_paid (everything the tenant pays)
  *   opex       = fee + energy cost + other expenses + condominium   (IPTU is added per month from the taxes register)
  *   noi        = revenue − opex = received − energy cost − other expenses − condominium
  *
@@ -33,6 +42,9 @@
  *
  * Example: gross 4.000, fee 10 %, energy 350, energy cost 109,80, other 50 →
  * received 3.950, net 3.600, fee 400, revenue 4.350, opex 559,80, noi 3.790,20.
+ * With a condominium of 250, paid by the tenant: fee on the rent only → received 4.200, fee 400, noi 3.790,20
+ * (the condominium comes in and goes out); fee on rent + condominium → received 4.175, fee 425, noi 3.765,20.
+ * The same unit vacant: received 0, noi −250.
  */
 
 export type IncomeStatus = "EXPECTED" | "CONFIRMED";
@@ -52,8 +64,15 @@ export interface PropertyIncomeRow {
     /** energy cost (historical column name) */
     other_income: number;
     other_expenses: number;
-    /** condominium fee paid by the owner for the month (cost, ≥ 0) */
+    /** condominium due by the unit for the month (expense, ≥ 0); paid by the tenant inside the deposit while the unit is rented */
     condo_amount?: number;
+    /** the agency's % applies to rent + condominium (true) or to the rent only (false) */
+    fee_on_condo?: boolean;
+    /**
+     * Only on rows built by `aggregateIncomeByMonth`: the month's condominium inside the deposits and the
+     * agency's cut of it, added unit by unit (units differ: one may be vacant, agreements may differ).
+     */
+    condo_split?: { in: number; fee: number };
     /** sub-unit of a multi-unit property (profile JSON id); null/undefined = the whole property */
     unit_id?: string | null;
     /** the unit's name when the row was saved */
@@ -77,11 +96,12 @@ export interface IncomeRowInput {
     /** spreadsheet imports: the unit's name, resolved to `unit_id` by the server */
     unit_name?: string | null;
     condo_amount?: number;
+    fee_on_condo?: boolean;
     received_amount?: number;
     /**
      * Not stored. When present and `received_amount` is absent, the server
      * derives `received_amount` from it using the (merged) fee, energy and
-     * other values: received = gross × (1 − pct/100) + energy + other.
+     * condominium values (`receivedFromGross`).
      * When both are sent, `received_amount` wins.
      */
     gross_rent?: number;
@@ -104,13 +124,24 @@ export interface IncomeBreakdown {
     other: number;
     /** other expenses paid by the owner for the month (≥ 0) */
     otherExpenses: number;
-    /** condominium fee paid by the owner for the month (≥ 0) */
+    /** condominium due for the month (expense, ≥ 0) */
     condo: number;
+    /** the agency's % applies to the condominium too */
+    feeOnCondo: boolean;
+    /** condominium inside the deposit, after the agency's cut (0 when the unit is vacant) */
+    condoIn: number;
+    /** condominium the tenant paid (= condoIn + condoFee) */
+    condoPaid: number;
+    /** the agency's cut of the condominium (0 when the fee applies to the rent only) */
+    condoFee: number;
     netRent: number;
     grossRent: number;
+    /** the agency's cut of the rent (gross rent − net rent) */
+    rentFee: number;
+    /** everything the agency kept: rentFee + condoFee */
     feeAmount: number;
     feePct: number;
-    /** gross rent + energy income (everything the tenant pays for the month) */
+    /** gross rent + energy income + condominium paid by the tenant (everything the tenant pays for the month) */
     revenue: number;
     /** agency fee + energy cost + other expenses + condominium */
     opex: number;
@@ -130,7 +161,7 @@ function clampPct(pct: number): number {
 }
 
 export function breakdown(
-    row: Pick<PropertyIncomeRow, "received_amount" | "energy_portion" | "other_income" | "agency_fee_pct"> & { other_expenses?: number; condo_amount?: number }
+    row: Pick<PropertyIncomeRow, "received_amount" | "energy_portion" | "other_income" | "agency_fee_pct"> & { other_expenses?: number; condo_amount?: number; fee_on_condo?: boolean; condo_split?: { in: number; fee: number } }
 ): IncomeBreakdown {
     const received = Number(row.received_amount) || 0;
     const energy = Number(row.energy_portion) || 0;
@@ -138,29 +169,54 @@ export function breakdown(
     const otherExpenses = Number(row.other_expenses) || 0;
     const condo = Number(row.condo_amount) || 0;
     const feePct = clampPct(Number(row.agency_fee_pct) || 0);
-    const netRent = round2(received - energy);
-    const grossRent = feePct > 0 ? round2(netRent / (1 - feePct / 100)) : netRent;
-    const feeAmount = round2(grossRent - netRent);
+    const feeOnCondo = Boolean(row.fee_on_condo);
+    const keep = 1 - feePct / 100;
+    let condoIn: number, condoFee: number;
+    if (row.condo_split) {
+        condoIn = row.condo_split.in;
+        condoFee = row.condo_split.fee;
+    } else {
+        // the deposit carries the condominium only while a tenant pays it: never more than what came in
+        condoIn = Math.min(feeOnCondo ? round2(condo * keep) : condo, Math.max(0, round2(received - energy)));
+        condoFee = feeOnCondo && feePct > 0 ? round2(condoIn / keep - condoIn) : 0;
+    }
+    const condoPaid = round2(condoIn + condoFee);
+    const netRent = round2(received - energy - condoIn);
+    const grossRent = feePct > 0 ? round2(netRent / keep) : netRent;
+    const rentFee = round2(grossRent - netRent);
+    const feeAmount = round2(rentFee + condoFee);
     return {
         received,
         energy,
         other,
         otherExpenses,
         condo,
+        feeOnCondo,
+        condoIn,
+        condoPaid,
+        condoFee,
         netRent,
         grossRent,
+        rentFee,
         feeAmount,
         feePct,
-        revenue: round2(grossRent + energy),
+        revenue: round2(grossRent + energy + condoPaid),
         opex: round2(feeAmount + other + otherExpenses + condo),
         noi: round2(received - other - otherExpenses - condo),
     };
 }
 
-/** Inverse of `breakdown`: what lands in the account for a given gross rent (the energy cost is paid separately). */
-export function receivedFromGross(grossRent: number, feePct: number, energy: number): number {
+/**
+ * Inverse of `breakdown`: the deposit for a given gross rent (the energy cost is paid separately).
+ * The tenant's condominium comes inside the deposit: in full when the fee applies to the rent only, less the
+ * fee otherwise. Without rent there is no tenant (vacancy), so no condominium comes in: it is only a cost.
+ */
+export function receivedFromGross(grossRent: number, feePct: number, energy: number, condo = 0, feeOnCondo = false): number {
     const pct = clampPct(feePct);
-    return round2((Number(grossRent) || 0) * (1 - pct / 100) + (Number(energy) || 0));
+    const k = 1 - pct / 100;
+    const gross = Number(grossRent) || 0;
+    const condoIn = gross > 0 ? (feeOnCondo ? round2((Number(condo) || 0) * k) : Number(condo) || 0) : 0;
+    return round2(gross * k + (Number(energy) || 0) + condoIn);
 }
 
 /** `2026-09-01` or `2026-09` → `2026-09` */
@@ -178,7 +234,7 @@ export function incomeRowKey(row: { month: string; unit_id?: string | null }): s
  * ledger through this, so a multi-unit property behaves like any other.
  *   • a month with confirmed rows counts only those (a unit still marked "previsto" has not paid yet);
  *     a month with no confirmed row is the sum of its expected rows, marked EXPECTED;
- *   • the fee % is the effective one (total fee ÷ total gross rent), so `breakdown` of the result gives
+ *   • the fee % is the effective one (fee on the rent ÷ total gross rent), so `breakdown` of the result gives
  *     back the summed gross rent, fee and net rent exactly;
  *   • a month with a single row is returned as it is.
  * Order: months in the order they first appear.
@@ -195,11 +251,12 @@ export function aggregateIncomeByMonth(rows: PropertyIncomeRow[]): PropertyIncom
         if (all.length === 1) { out.push(all[0]); continue; }
         const confirmed = all.filter(r => r.status === "CONFIRMED");
         const list = confirmed.length > 0 ? confirmed : all;
-        let received = 0, energy = 0, other = 0, otherExpenses = 0, condo = 0, gross = 0, fee = 0;
+        let received = 0, energy = 0, other = 0, otherExpenses = 0, condo = 0, condoIn = 0, condoFee = 0, gross = 0, fee = 0;
         for (const r of list) {
             const b = breakdown(r);
-            received += b.received; energy += b.energy; other += b.other; otherExpenses += b.otherExpenses; condo += b.condo;
-            gross += b.grossRent; fee += b.feeAmount;
+            received += b.received; energy += b.energy; other += b.other; otherExpenses += b.otherExpenses;
+            condo += b.condo; condoIn += b.condoIn; condoFee += b.condoFee;
+            gross += b.grossRent; fee += b.rentFee;
         }
         const dates = list.map(r => r.received_on).filter((d): d is string => Boolean(d)).sort();
         const sources = new Set(list.map(r => r.source));
@@ -213,6 +270,10 @@ export function aggregateIncomeByMonth(rows: PropertyIncomeRow[]): PropertyIncom
             other_income: round2(other),
             other_expenses: round2(otherExpenses),
             condo_amount: round2(condo),
+            fee_on_condo: condoFee > 0,
+            // units differ (one may be vacant, agreements may differ): the month carries the condominium
+            // that came inside the deposits and the agency's cut of it, added unit by unit
+            condo_split: { in: round2(condoIn), fee: round2(condoFee) },
             unit_id: null,
             unit_name: null,
             iptu_amount: 0,
@@ -403,17 +464,18 @@ export const INCOME_TEMPLATE_HEADERS = [
     "Custo de energia (R$)",
     "Outras despesas (R$)",
     "Condomínio (R$)",
+    "Taxa sobre o condomínio (Sim/Não)",
     "Comentários",
 ] as const;
 
 /** Columns added in 2026-09: templates exported before that do not have them and still import. */
-const OPTIONAL_TEMPLATE_HEADERS = ["Unidade", "Condomínio (R$)"];
+const OPTIONAL_TEMPLATE_HEADERS = ["Unidade", "Condomínio (R$)", "Taxa sobre o condomínio (Sim/Não)"];
 
 const normHeader = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
 
 /** True when the sheet's headers are the Kitnets.com template headers (order and text). */
 export function isIncomeTemplate(headers: string[]): boolean {
-    // older templates carried an "IPTU (R$)" column (ignored on import) and lacked "Unidade" / "Condomínio (R$)":
+    // older templates carried an "IPTU (R$)" column (ignored on import) and lacked "Unidade" / "Condomínio (R$)" / "Taxa sobre o condomínio":
     // the columns every version has must be there, in order
     const optional = new Set(OPTIONAL_TEMPLATE_HEADERS.map(normHeader));
     const core = (list: readonly string[]) => list.map(normHeader).filter(h => !optional.has(h) && !/^iptu/.test(h));
@@ -421,11 +483,12 @@ export function isIncomeTemplate(headers: string[]): boolean {
     return want.every((h, i) => got[i] === h);
 }
 
-export type IncomeField = "unit" | "gross" | "fee_pct" | "received" | "energy" | "other" | "other_expenses" | "condo" | "notes" | "ignore";
+export type IncomeField = "unit" | "gross" | "fee_pct" | "received" | "energy" | "other" | "other_expenses" | "condo" | "fee_on_condo" | "notes" | "ignore";
 
 export const INCOME_FIELD_LABELS: Record<IncomeField, string> = {
     unit: "Unidade (nome da kitnet / apartamento)",
-    condo: "Condomínio (pago por você)",
+    condo: "Condomínio (despesa da unidade; o inquilino paga no depósito)",
+    fee_on_condo: "Taxa incide sobre o condomínio? (Sim / Não)",
     gross: "Aluguel bruto (contrato)",
     fee_pct: "Taxa da imobiliária (%)",
     received: "Valor recebido (líquido da imobiliária)",
@@ -447,7 +510,7 @@ export function suggestMapping(headers: string[], dateColumn: number): IncomeFie
         const h = raw.trim().toLowerCase();
         if (!h) return "ignore";
         if (/coment|observa|obs\b|notes?$|descri/.test(h)) return "notes";
-        if (/condom/.test(h)) return "condo";
+        if (/condom/.test(h)) return /taxa|incide|fee/.test(h) ? "fee_on_condo" : "condo";
         if (/^unidade|^unit\b|kitnet|^apto|apartamento/.test(h)) return "unit";
         if (/custo de energia|custo energia|energy cost|conta de luz|conta de energia/.test(h)) return "other";
         if (/iptu/.test(h)) return "ignore";   // IPTU lives in Tributos do imóvel
@@ -466,8 +529,18 @@ export function suggestMapping(headers: string[], dateColumn: number): IncomeFie
     });
 }
 
+/** "Sim", "s", "yes", "x", "1", "true" → true · "Não", "n", "no", "0", "false" → false · anything else → null */
+export function parseYesNo(raw: string | null | undefined): boolean | null {
+    const t = String(raw ?? "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    if (/^(sim|s|yes|y|x|1|true|verdadeiro)$/.test(t)) return true;
+    if (/^(nao|n|no|0|false|falso)$/.test(t)) return false;
+    return null;
+}
+
 export interface BuildImportOptions {
     agencyFeePct: number;
+    /** for rows without a "Taxa sobre o condomínio" cell: the fee applies to the condominium too */
+    feeOnCondo?: boolean;
     /** Months after this one are marked EXPECTED. Defaults to the current month. */
     todayMonth?: string;
 }
@@ -492,6 +565,7 @@ export function buildImportRows(sheet: ParsedSheet, mapping: IncomeField[], opts
             line: r.line,
             month: r.month,
             agency_fee_pct: opts.agencyFeePct,
+            ...(opts.feeOnCondo ? { fee_on_condo: true } : {}),
             source: "IMPORT",
             status: r.month > today ? "EXPECTED" : "CONFIRMED",
         };
@@ -508,6 +582,11 @@ export function buildImportRows(sheet: ParsedSheet, mapping: IncomeField[], opts
             if (field === "unit") {
                 const t = cell.trim();
                 if (t) row.unit_name = t.slice(0, 120);   // the server resolves the name to the unit
+                return;
+            }
+            if (field === "fee_on_condo") {
+                const yes = parseYesNo(cell);
+                if (yes !== null) row.fee_on_condo = yes;
                 return;
             }
             const value = parseMoney(cell);
@@ -562,16 +641,17 @@ export interface IncomeSummary {
     totalReceived: number;          // confirmed, all time
     totalNetRent: number;           // confirmed, all time
     totalEnergy: number;            // confirmed, all time
-    totalFee: number;               // agency fees kept before crediting, all time = potential saving of self-management
+    totalFee: number;               // agency fees kept before crediting (on the rent and, when agreed, on the condominium), all time = potential saving of self-management
     fee12m: number;
     totalGross: number;             // gross rent (contract value), confirmed, all time
     totalOther: number;             // energy cost, all time
     other12m: number;
     totalOtherExpenses: number;     // other expenses, all time
     otherExpenses12m: number;
-    totalCondo: number;             // condominium fees, all time
+    totalCondo: number;             // condominium due (expense), all time
+    totalCondoIn: number;           // condominium that came inside the deposits (after the agency's cut, when it applies), all time
     condo12m: number;
-    totalNoi: number;               // revenue − opex (= received − energy cost), all time
+    totalNoi: number;               // revenue − opex (= received − energy cost − other expenses − condominium), all time
     noi12m: number;
     totalRevenue: number;           // gross rent + energy income, all time
     revenue12m: number;
@@ -608,6 +688,7 @@ export function summarize(allRows: PropertyIncomeRow[]): IncomeSummary {
         totalOtherExpenses: sum(confirmed, b => b.otherExpenses),
         otherExpenses12m: sum(last12, b => b.otherExpenses),
         totalCondo: sum(confirmed, b => b.condo),
+        totalCondoIn: sum(confirmed, b => b.condoIn),
         condo12m: sum(last12, b => b.condo),
         totalNoi: sum(confirmed, b => b.noi),
         noi12m: sum(last12, b => b.noi),
