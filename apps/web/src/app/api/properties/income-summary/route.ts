@@ -35,7 +35,7 @@ export async function GET() {
 
     const { data, error } = await supabase
         .from("property_income_months")
-        .select("id, property_id, month, unit_id, received_on, received_amount, energy_portion, other_income, other_expenses, condo_amount, iptu_amount, agency_fee_pct, status, source, bank_reference, notes")
+        .select("id, property_id, month, unit_id, received_on, received_amount, energy_portion, other_income, other_expenses, condo_amount, fee_on_condo, iptu_amount, agency_fee_pct, status, source, bank_reference, notes")
         .eq("owner_id", profileId)
         .eq("status", "CONFIRMED")
         .lte("month", `${currentMonthKey()}-01`)

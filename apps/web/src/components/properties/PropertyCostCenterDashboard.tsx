@@ -362,7 +362,7 @@ export default function PropertyCostCenterDashboard({
     const kpiInfo: Record<'revenue' | 'opex' | 'noi' | 'occupancy' | 'energy', TileInfo> = {
         revenue: {
             what: 'Tudo o que o inquilino pagou no mês mais recente confirmado: o aluguel bruto (valor de contrato, antes da taxa da administradora) mais a parcela de energia.',
-            formula: <>Receita bruta = aluguel bruto + energia recebida<br />Aluguel bruto = (recebido − energia) ÷ (1 − taxa)<br />Valor m² = aluguel bruto ÷ área construída</>,
+            formula: <>Receita bruta = aluguel bruto + energia recebida + condomínio pago pelo inquilino<br />Aluguel bruto = (recebido − energia − condomínio no depósito) ÷ (1 − taxa)<br />Valor m² = aluguel bruto ÷ área construída</>,
             example: financials.realIncomeMonth ? <>{brl(financials.currentGrossRent)} + {brl(financials.energyIncome)} = {brl(financials.grossMonthlyRevenue)} em {financials.realIncomeMonth}</> : undefined,
             note: 'Este card mostra o mês mais recente e não segue o período do gráfico. Clique no card para ver o histórico do aluguel.',
         },
@@ -620,7 +620,7 @@ export default function PropertyCostCenterDashboard({
                             </h3>
                             <p className="text-xs text-muted-foreground">
                                 {financials.realIncomeMonth
-                                    ? `Receita (aluguel bruto + energia), despesas (taxa + custo de energia + outras + condomínio + IPTU pago por você no mês) e NOI reais · ${periodLabel(period)}; meses previstos em tom claro`
+                                    ? `Receita (aluguel bruto + energia + condomínio pago pelo inquilino), despesas (taxa + custo de energia + outras + condomínio + IPTU pago por você no mês) e NOI reais · ${periodLabel(period)}; meses previstos em tom claro`
                                     : 'Histórico e projeção de Receitas, Despesas Operacionais e Lucro Líquido (NOI)'}
                             </p>
                         </div>

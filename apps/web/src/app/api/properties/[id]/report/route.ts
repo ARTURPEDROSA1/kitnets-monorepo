@@ -37,7 +37,7 @@ export async function GET(_request: Request, context: RouteContext) {
         const [inv, txs, income, taxes, valuations, ipca] = await Promise.all([
             supabase.from("property_investments").select("*").eq("property_id", id).maybeSingle(),
             supabase.from("property_transactions").select("id, property_id, occurred_on, kind, amount, interest_part, principal_part, insurance_part, comment, source, bank_reference").eq("property_id", id).order("occurred_on", { ascending: true }),
-            supabase.from("property_income_months").select("id, property_id, month, unit_id, unit_name, received_on, received_amount, energy_portion, other_income, other_expenses, condo_amount, iptu_amount, agency_fee_pct, status, source, bank_reference, notes").eq("property_id", id).order("month", { ascending: true }),
+            supabase.from("property_income_months").select("id, property_id, month, unit_id, unit_name, received_on, received_amount, energy_portion, other_income, other_expenses, condo_amount, fee_on_condo, iptu_amount, agency_fee_pct, status, source, bank_reference, notes").eq("property_id", id).order("month", { ascending: true }),
             loadTaxRows(supabase, id),
             loadValuations(supabase, id),
             loadIpcaSeries(supabase).catch(() => []),
@@ -150,13 +150,14 @@ export async function GET(_request: Request, context: RouteContext) {
             { header: "Mês", key: "month", width: 12 }, { header: "Unidade", key: "unit", width: 18 }, { header: "Aluguel bruto", key: "gross", width: 14 }, { header: "Taxa (%)", key: "pct", width: 10 },
             { header: "Aluguel líquido", key: "net", width: 15 }, { header: "Energia", key: "energy", width: 12 }, { header: "Recebido", key: "received", width: 13 },
             { header: "Custo de energia", key: "other", width: 16 }, { header: "Outras despesas", key: "otherExp", width: 16 }, { header: "Condomínio", key: "condo", width: 13 },
+            { header: "Taxa sobre o condomínio", key: "feeOnCondo", width: 14 }, { header: "Taxa da imobiliária (R$)", key: "fee", width: 16 },
             { header: "NOI", key: "noi", width: 13 }, { header: "Status", key: "status", width: 12 }, { header: "Comentários", key: "notes", width: 40 },
         ];
         for (const r of incomeRows) {
             const b = breakdown(r);
-            sr.addRow({ month: formatMonthKey(monthKey(r.month)), unit: r.unit_name ?? "", gross: b.grossRent, pct: b.feePct, net: b.netRent, energy: b.energy, received: b.received, other: b.other, otherExp: b.otherExpenses, condo: b.condo, noi: b.noi, status: r.status === "CONFIRMED" ? "Confirmado" : "Previsto", notes: r.notes ?? "" });
+            sr.addRow({ month: formatMonthKey(monthKey(r.month)), unit: r.unit_name ?? "", gross: b.grossRent, pct: b.feePct, net: b.netRent, energy: b.energy, received: b.received, other: b.other, otherExp: b.otherExpenses, condo: b.condo, feeOnCondo: b.condo > 0 ? (b.feeOnCondo ? "Sim" : "Não") : "", fee: b.feeAmount, noi: b.noi, status: r.status === "CONFIRMED" ? "Confirmado" : "Previsto", notes: r.notes ?? "" });
         }
-        styleTable(sr, ["gross", "net", "energy", "received", "other", "otherExp", "condo", "noi"]);
+        styleTable(sr, ["gross", "net", "energy", "received", "other", "otherExp", "condo", "fee", "noi"]);
 
         // ── Investimento ────────────────────────────────────────────────
         const si = wb.addWorksheet("Investimento");

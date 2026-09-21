@@ -1821,6 +1821,7 @@ export type Database = {
         Row: {
           agency_fee_pct: number
           condo_amount: number
+          fee_on_condo: boolean
           bank_reference: string | null
           created_at: string
           energy_portion: number
@@ -1843,6 +1844,7 @@ export type Database = {
         Insert: {
           agency_fee_pct?: number
           condo_amount?: number
+          fee_on_condo?: boolean
           bank_reference?: string | null
           created_at?: string
           energy_portion?: number
@@ -1865,6 +1867,7 @@ export type Database = {
         Update: {
           agency_fee_pct?: number
           condo_amount?: number
+          fee_on_condo?: boolean
           bank_reference?: string | null
           created_at?: string
           energy_portion?: number

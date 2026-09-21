@@ -289,7 +289,8 @@ export function computeInvestmentMetrics(input: MetricsInput): InvestmentMetrics
             const b = breakdown(row);
             netRent = b.netRent;
             gross = b.grossRent;
-            propertyOpex = b.otherExpenses + b.condo;
+            // the condominium is due every month; what the tenant paid of it came inside the deposit (not in netRent)
+            propertyOpex = b.otherExpenses + b.condo - b.condoIn;
             energyNet = b.energy - b.other;
             lastGross = b.grossRent;
             lastNet = b.netRent;

@@ -115,7 +115,7 @@ function parseMonthText(text: string): string | null {
 }
 type Drafts = Record<string, Partial<Record<DraftField, string>>>;
 
-const FIELD_OPTIONS: IncomeField[] = ["unit", "gross", "fee_pct", "received", "energy", "other", "other_expenses", "condo", "notes", "ignore"];
+const FIELD_OPTIONS: IncomeField[] = ["unit", "gross", "fee_pct", "received", "energy", "other", "other_expenses", "condo", "fee_on_condo", "notes", "ignore"];
 const IMPORT_CHUNK = 300;
 const DEFAULT_AGENCY_FEE_PCT = 10;
 const COLLAPSED_ROWS = 24;
@@ -274,7 +274,7 @@ export default function PropertyIncomeLedger({
                     method: "PUT", headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ rows: [{
                         ...target, received_amount: row.received_amount, energy_portion: row.energy_portion, other_income: row.other_income,
-                        other_expenses: row.other_expenses, condo_amount: row.condo_amount ?? 0, agency_fee_pct: row.agency_fee_pct, status: row.status, source: row.source,
+                        other_expenses: row.other_expenses, condo_amount: row.condo_amount ?? 0, fee_on_condo: row.fee_on_condo ?? false, agency_fee_pct: row.agency_fee_pct, status: row.status, source: row.source,
                         received_on: row.received_on, notes: row.notes, bank_reference: row.bank_reference,
                     }] }),
                 });
@@ -323,26 +323,50 @@ export default function PropertyIncomeLedger({
         if (value === null) return clear();
 
         if (field === "gross") {
-            const received = receivedFromGross(value, b.feePct, b.energy);
+            const received = receivedFromGross(value, b.feePct, b.energy, b.condo, b.feeOnCondo);
             if (received === b.received) return clear();
             return void putRows([{ ...ident, received_amount: received }]);
+        }
+        if (field === "condo") {
+            if (value === b.condo) return clear();
+            // the tenant's condominium comes inside the deposit: the rent stays, the deposit follows
+            return void putRows([{ ...ident, condo_amount: value, ...keepRent(row) }]);
         }
         const key =
             field === "received" ? "received_amount"
                 : field === "energy" ? "energy_portion"
                     : field === "other" ? "other_income"
                         : field === "otherExp" ? "other_expenses"
-                            : field === "condo" ? "condo_amount"
-                                : "agency_fee_pct";
+                            : "agency_fee_pct";
         if (field === "pct" && value >= 100) return clear();
         if (value === (Number(row[key]) || 0)) return clear();
         putRows([{ ...ident, [key]: value }]);
+    };
+
+    /**
+     * Changing the condominium (or whether the fee reaches it) keeps the row's gross rent and lets the server
+     * recalculate the deposit. A deposit read from the bank is a fact, so there the rent follows instead.
+     */
+    const keepRent = (row: PropertyIncomeRow): Pick<IncomeRowInput, "gross_rent"> =>
+        row.source === "BANK" ? {} : { gross_rent: breakdown(row).grossRent };
+
+    const toggleFeeOnCondo = (row: PropertyIncomeRow) =>
+        putRows([{ month: monthKey(row.month), unit_id: row.unit_id ?? null, fee_on_condo: !row.fee_on_condo, ...keepRent(row) }]);
+
+    /** The agreement with the agency is usually one for the whole property: applies it to every row with a condominium. */
+    const setFeeOnCondoAll = (value: boolean) => {
+        const targets = rows.filter(r => (Number(r.condo_amount) || 0) > 0 && Boolean(r.fee_on_condo) !== value);
+        if (targets.length > 0) void putRows(targets.map(r => ({ month: monthKey(r.month), unit_id: r.unit_id ?? null, fee_on_condo: value, ...keepRent(r) })));
     };
 
     const toggleStatus = (row: PropertyIncomeRow) =>
         putRows([{ month: monthKey(row.month), unit_id: row.unit_id ?? null, status: row.status === "CONFIRMED" ? "EXPECTED" : "CONFIRMED" }]);
 
     // ── Derived ─────────────────────────────────────────────────────────
+    /** Rows with a condominium: only then the "fee on the condominium" column and selector show up. */
+    const condoRows = useMemo(() => rows.filter(r => (Number(r.condo_amount) || 0) > 0), [rows]);
+    const hasCondo = condoRows.length > 0;
+    const condoFeeMode: "rent" | "all" | "mixed" = !hasCondo || condoRows.every(r => !r.fee_on_condo) ? "rent" : condoRows.every(r => r.fee_on_condo) ? "all" : "mixed";
     const sorted = useMemo(() => [...rows].sort((a, b) => (a.month !== b.month ? (a.month < b.month ? 1 : -1) : (a.unit_name ?? "").localeCompare(b.unit_name ?? "", "pt-BR", { numeric: true }))), [rows]);
     /** Rows inside the selected period (newest first) — drives the chart and the table. */
     const filtered = useMemo(() => filterRowsByPeriod(sorted, range), [sorted, range]);
@@ -356,15 +380,21 @@ export default function PropertyIncomeLedger({
         }] : []),
         { key: "gross", label: "Aluguel bruto", kind: "number", align: "right", get: r => breakdown(r).grossRent },
         { key: "pct", label: "Taxa %", kind: "number", align: "right", sum: false, get: r => Number(r.agency_fee_pct) || 0 },
-        { key: "net", label: "Aluguel líquido", kind: "number", align: "right", title: "Recebido − energia (aluguel após a taxa)", get: r => breakdown(r).netRent },
+        { key: "net", label: "Aluguel líquido", kind: "number", align: "right", title: "Recebido − energia − condomínio que veio no depósito (aluguel após a taxa)", get: r => breakdown(r).netRent },
         { key: "energy", label: "Energia", kind: "number", align: "right", title: "Parcela de energia paga pelo inquilino (centro solar)", get: r => breakdown(r).energy },
         { key: "received", label: "Recebido", kind: "number", align: "right", title: "O que entrou na conta", get: r => breakdown(r).received },
         { key: "other", label: "Custo de energia", kind: "number", align: "right", title: "Conta de luz paga no mês (custo à parte; não altera o recebido)", get: r => breakdown(r).other },
         { key: "otherExp", label: "Outras despesas", kind: "number", align: "right", title: "Outros custos pagos à parte no mês (reparos, taxas); não alteram o recebido", get: r => breakdown(r).otherExpenses },
-        { key: "condo", label: "Condomínio", kind: "number", align: "right", title: "Taxa de condomínio paga por você no mês (custo à parte; não altera o recebido)", get: r => breakdown(r).condo },
+        { key: "condo", label: "Condomínio", kind: "number", align: "right", title: "Condomínio da unidade no mês: despesa do imóvel, devida mesmo com a unidade vaga. Com a unidade alugada, o inquilino paga e o valor vem dentro do depósito da imobiliária.", get: r => breakdown(r).condo },
+        ...(hasCondo ? [{
+            key: "feeOnCondo", label: "Taxa s/ cond.", kind: "enum" as const, align: "center" as const,
+            title: "A taxa da imobiliária incide também sobre o condomínio? Marcado = sobre aluguel + condomínio; desmarcado = só sobre o aluguel (condomínio repassado integralmente).",
+            get: (r: PropertyIncomeRow) => (r.fee_on_condo ? "yes" : "no"),
+            options: [{ value: "yes", label: "Aluguel + condomínio" }, { value: "no", label: "Só o aluguel" }],
+        }] : []),
         { key: "status", label: "Status", kind: "enum", align: "center", get: r => r.status, options: [{ value: "CONFIRMED", label: "Confirmado" }, { value: "EXPECTED", label: "Previsto" }] },
         { key: "notes", label: "Comentários", kind: "text", get: r => r.notes ?? "" },
-    ], [multiUnit, units]);
+    ], [multiUnit, units, hasCondo]);
     const cf = useColumnFilters(filtered, columns, { key: "month", dir: "desc" });
     /** Months in the period (a multi-unit property has several rows per month). */
     const monthCount = useMemo(() => new Set(filtered.map(r => monthKey(r.month))).size, [filtered]);
@@ -376,19 +406,20 @@ export default function PropertyIncomeLedger({
     const ledgerInfo: Record<"gross" | "received" | "net" | "energy" | "fee", TileInfo> = {
         gross: {
             what: "O aluguel de contrato somado nos meses confirmados do período: o valor antes da taxa da administradora, sem a energia.",
-            formula: <>Aluguel bruto do mês = (recebido − energia) ÷ (1 − taxa %)<br />No período = Σ dos meses confirmados</>,
+            formula: <>Aluguel bruto do mês = (recebido − energia − condomínio no depósito) ÷ (1 − taxa %)<br />No período = Σ dos meses confirmados</>,
             example: months ? <>{formatBRL(periodSummary.totalGross)} em {months} {months === 1 ? "mês" : "meses"} · {periodLabel(period)}</> : undefined,
             note: "Meses marcados como previstos ficam fora dos totais.",
         },
         received: {
-            what: "O que entrou na sua conta nos meses confirmados: o aluguel líquido mais a parcela de energia paga pelo inquilino.",
-            formula: <>Recebido = aluguel líquido + energia<br />No período = Σ dos meses confirmados</>,
-            example: months ? <>{formatBRL(periodSummary.totalNetRent)} + {formatBRL(periodSummary.totalEnergy)} = {formatBRL(periodSummary.totalReceived)}</> : undefined,
+            what: "O que a imobiliária depositou nos meses confirmados: o aluguel líquido, a parcela de energia e o condomínio pagos pelo inquilino.",
+            formula: <>Recebido = aluguel líquido + energia + condomínio no depósito<br />No período = Σ dos meses confirmados</>,
+            example: months ? <>{formatBRL(periodSummary.totalNetRent)} + {formatBRL(periodSummary.totalEnergy)}{periodSummary.totalCondoIn > 0 && <> + {formatBRL(periodSummary.totalCondoIn)}</>} = {formatBRL(periodSummary.totalReceived)}</> : undefined,
+            note: hasCondo ? "O condomínio é despesa do imóvel (devida mesmo com a unidade vaga). Com a unidade alugada o inquilino paga e o valor vem no depósito: integral quando a taxa incide só sobre o aluguel, líquido da taxa quando incide sobre aluguel + condomínio." : undefined,
         },
         net: {
             what: "O aluguel depois da taxa da administradora e sem a energia: o que o imóvel rende de aluguel de fato.",
-            formula: <>Aluguel líquido = recebido − energia<br />Média = total ÷ meses confirmados</>,
-            example: months ? <>{formatBRL(periodSummary.totalReceived)} − {formatBRL(periodSummary.totalEnergy)} = {formatBRL(periodSummary.totalNetRent)} · média {formatBRL(periodSummary.totalNetRent / months)}/mês</> : undefined,
+            formula: <>Aluguel líquido = recebido − energia − condomínio no depósito<br />Média = total ÷ meses confirmados</>,
+            example: months ? <>{formatBRL(periodSummary.totalReceived)} − {formatBRL(periodSummary.totalEnergy)}{periodSummary.totalCondoIn > 0 && <> − {formatBRL(periodSummary.totalCondoIn)}</>} = {formatBRL(periodSummary.totalNetRent)} · média {formatBRL(periodSummary.totalNetRent / months)}/mês</> : undefined,
         },
         energy: {
             what: "A energia paga pelo inquilino no período, a conta de luz que você pagou e o resultado. Com geração solar, o resultado é a economia que o sistema gera.",
@@ -397,8 +428,9 @@ export default function PropertyIncomeLedger({
         },
         fee: {
             what: "Quanto foi para a administradora no período. Com a autogestão no Kitnets.com esse valor ficaria com você.",
-            formula: <>Taxa do mês = aluguel bruto × taxa %<br />No período = Σ dos meses confirmados</>,
+            formula: <>Taxa do mês = aluguel bruto × taxa %{hasCondo && <> (+ condomínio × taxa %, quando a taxa incide sobre o condomínio)</>}<br />No período = Σ dos meses confirmados</>,
             example: months ? <>{formatBRL(periodSummary.totalFee)} em {months} {months === 1 ? "mês" : "meses"}</> : undefined,
+            note: hasCondo ? "O acordo com a imobiliária define a base da taxa: só o aluguel (o condomínio é repassado integralmente) ou o valor total (aluguel + condomínio). Ajuste no seletor acima da tabela ou na coluna “Taxa s/ cond.”." : undefined,
         },
     };
     // Fee pre-fill: last month's fee when set, else the property default, else 10 %
@@ -426,7 +458,9 @@ export default function PropertyIncomeLedger({
 
     // ── Add month dialog ────────────────────────────────────────────────
     const [addOpen, setAddOpen] = useState(false);
-    const [addForm, setAddForm] = useState({ month: currentMonthKey(), unit: "", gross: "", received: "", energy: "", other: "", otherExp: "", condo: "", pct: "", notes: "" });
+    const [addForm, setAddForm] = useState({ month: currentMonthKey(), unit: "", gross: "", received: "", energy: "", other: "", otherExp: "", condo: "", feeOnCondo: false, pct: "", notes: "" });
+    /** The agency agreement seen in the latest row with a condominium (of the unit, else of the ledger). */
+    const lastFeeOnCondo = (unitId: string) => Boolean((sorted.find(r => (r.unit_id ?? "") === unitId && (Number(r.condo_amount) || 0) > 0) ?? sorted.find(r => (Number(r.condo_amount) || 0) > 0))?.fee_on_condo);
     /** Pre-fill from the latest row of a unit ("" = whole property); falls back to the latest row of the ledger. */
     const lastRowFor = (unitId: string) => sorted.find(r => (r.unit_id ?? "") === unitId) ?? (multiUnit ? undefined : sorted[0]);
 
@@ -449,6 +483,7 @@ export default function PropertyIncomeLedger({
             other: last ? toInput(last.other) : "",
             otherExp: "",
             condo: last && last.condo > 0 ? toInput(last.condo) : "",
+            feeOnCondo: lastFeeOnCondo(unit),
             pct: toInput(last && last.feePct > 0 ? last.feePct : lastPct),
             notes: "",
         });
@@ -458,7 +493,7 @@ export default function PropertyIncomeLedger({
     const recalcFromGross = (form: typeof addForm) => {
         const gross = parseInput(form.gross);
         if (gross === null) return form;
-        const received = receivedFromGross(gross, parseInput(form.pct) ?? 0, parseInput(form.energy) ?? 0);
+        const received = receivedFromGross(gross, parseInput(form.pct) ?? 0, parseInput(form.energy) ?? 0, parseInput(form.condo) ?? 0, form.feeOnCondo);
         return { ...form, received: toInput(received) };
     };
     const recalcFromReceived = (form: typeof addForm) => {
@@ -468,6 +503,8 @@ export default function PropertyIncomeLedger({
             received_amount: received,
             energy_portion: parseInput(form.energy) ?? 0,
             other_income: parseInput(form.other) ?? 0,
+            condo_amount: parseInput(form.condo) ?? 0,
+            fee_on_condo: form.feeOnCondo,
             agency_fee_pct: parseInput(form.pct) ?? 0,
         });
         return { ...form, gross: toInput(b.grossRent) };
@@ -486,6 +523,7 @@ export default function PropertyIncomeLedger({
                 other_income: parseInput(addForm.other) ?? 0,
                 other_expenses: parseInput(addForm.otherExp) ?? 0,
                 condo_amount: parseInput(addForm.condo) ?? 0,
+                fee_on_condo: addForm.feeOnCondo && (parseInput(addForm.condo) ?? 0) > 0,
                 agency_fee_pct: parseInput(addForm.pct) ?? 0,
                 status: month > currentMonthKey() ? "EXPECTED" : "CONFIRMED",
                 source: "MANUAL",
@@ -675,7 +713,8 @@ export default function PropertyIncomeLedger({
                     </h3>
                     <p className="text-xs text-muted-foreground">
                         O que entrou na conta a cada mês. A parcela de energia vai para o centro de energia solar; custo de energia e outras despesas são custos pagos à parte.
-                        Aluguel líquido (após a taxa) = recebido − energia; aluguel bruto = líquido ÷ (1 − taxa); receita = bruto + energia; OPEX = taxa + custo de energia + outras despesas + condomínio (o IPTU pago por você entra pelo registro Tributos do imóvel, no mês do pagamento); NOI = recebido − custos.
+                        O condomínio é despesa do imóvel, devida mesmo com a unidade vaga; com a unidade alugada o inquilino paga e o valor vem dentro do depósito da imobiliária. A taxa da imobiliária pode incidir só sobre o aluguel ou sobre aluguel + condomínio.
+                        Aluguel líquido (após a taxa) = recebido − energia − condomínio no depósito; aluguel bruto = líquido ÷ (1 − taxa); receita = bruto + energia + condomínio pago pelo inquilino; OPEX = taxa + custo de energia + outras despesas + condomínio (o IPTU pago por você entra pelo registro Tributos do imóvel, no mês do pagamento); NOI = recebido − custos.
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -736,7 +775,9 @@ export default function PropertyIncomeLedger({
                 <Tile
                     label="Recebido no período"
                     value={formatBRL(periodSummary.totalReceived)}
-                    hint={periodSummary.confirmedMonths ? `${periodSummary.confirmedMonths} ${periodSummary.confirmedMonths === 1 ? "mês" : "meses"} · ${periodLabel(period)}` : `Nenhum mês confirmado · ${periodLabel(period)}`}
+                    hint={periodSummary.confirmedMonths
+                        ? <>{periodSummary.confirmedMonths} {periodSummary.confirmedMonths === 1 ? "mês" : "meses"} · {periodLabel(period)}{periodSummary.totalCondoIn > 0 && <><br />inclui condomínio {formatBRL(periodSummary.totalCondoIn)}</>}</>
+                        : `Nenhum mês confirmado · ${periodLabel(period)}`}
                     icon={<Wallet className="w-4 h-4" />}
                     tone="blue"
                     info={ledgerInfo.received}
@@ -782,6 +823,19 @@ export default function PropertyIncomeLedger({
                 </span>
                 <div className="flex flex-wrap items-center gap-2">
                     <PeriodFilter value={period} onChange={setPeriod} variant="compact" />
+                    {hasCondo && (
+                        <select
+                            value={condoFeeMode}
+                            disabled={saving.size > 0}
+                            onChange={e => setFeeOnCondoAll(e.target.value === "all")}
+                            title="Acordo com a imobiliária: a taxa de administração incide só sobre o aluguel (o condomínio é repassado integralmente) ou sobre o valor total (aluguel + condomínio). Vale para todos os lançamentos com condomínio; cada linha pode ser ajustada na coluna “Taxa s/ cond.”."
+                            className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                        >
+                            {condoFeeMode === "mixed" && <option value="mixed" disabled>Taxa: varia por lançamento</option>}
+                            <option value="rent">Taxa só sobre o aluguel</option>
+                            <option value="all">Taxa sobre aluguel + condomínio</option>
+                        </select>
+                    )}
                     <ColumnVisibilityButton ctl={vis} />
                     <GroupSelect value={chartGroup} onChange={setChartGroup} />
                 </div>
@@ -918,6 +972,18 @@ export default function PropertyIncomeLedger({
                                         {show("other") && <td {...sel.cellProps("other", rk, b.other, "px-2 py-1 text-right", () => cancelDraft(rk, "other"))}>{cell("other", b.other)}</td>}
                                         {show("otherExp") && <td {...sel.cellProps("otherExp", rk, b.otherExpenses, "px-2 py-1 text-right", () => cancelDraft(rk, "otherExp"))}>{cell("otherExp", b.otherExpenses)}</td>}
                                         {show("condo") && <td {...sel.cellProps("condo", rk, b.condo, "px-2 py-1 text-right", () => cancelDraft(rk, "condo"))}>{cell("condo", b.condo)}</td>}
+                                        {hasCondo && show("feeOnCondo") && <td {...sel.cellProps("feeOnCondo", rk, null, "px-2 py-1 text-center")}>
+                                            <input
+                                                type="checkbox"
+                                                className="accent-emerald-600 align-middle"
+                                                disabled={busy || b.condo <= 0}
+                                                checked={b.condo > 0 && b.feeOnCondo}
+                                                onChange={() => toggleFeeOnCondo(row)}
+                                                title={b.condo <= 0 ? "Sem condomínio neste lançamento"
+                                                    : b.feeOnCondo ? `Taxa sobre aluguel + condomínio: ${formatBRL(b.condoFee)} de taxa sobre o condomínio, ${formatBRL(b.condoIn)} repassados`
+                                                        : `Taxa só sobre o aluguel: condomínio repassado integralmente (${formatBRL(b.condoIn)})`}
+                                            />
+                                        </td>}
                                         {show("status") && <td {...sel.cellProps("status", rk, null, "px-2 py-1 text-center")}>
                                             <span
                                                 role="button"
@@ -1032,7 +1098,7 @@ export default function PropertyIncomeLedger({
                                         const lastRow = lastRowFor(unit);
                                         const last = lastRow ? breakdown(lastRow) : null;
                                         // each unit has its own rent: start from that unit's latest row
-                                        setAddForm(f => ({ ...f, unit, gross: last ? toInput(last.grossRent) : "", received: last ? toInput(last.received) : "", energy: last ? toInput(last.energy) : "", other: last ? toInput(last.other) : "", condo: last && last.condo > 0 ? toInput(last.condo) : "", pct: toInput(last && last.feePct > 0 ? last.feePct : lastPct) }));
+                                        setAddForm(f => ({ ...f, unit, gross: last ? toInput(last.grossRent) : "", received: last ? toInput(last.received) : "", energy: last ? toInput(last.energy) : "", other: last ? toInput(last.other) : "", condo: last && last.condo > 0 ? toInput(last.condo) : "", feeOnCondo: lastFeeOnCondo(unit), pct: toInput(last && last.feePct > 0 ? last.feePct : lastPct) }));
                                     }}
                                     className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
                                 >
@@ -1094,10 +1160,23 @@ export default function PropertyIncomeLedger({
                                 <Input
                                     type="number" step="0.01" min={0} placeholder="0.00"
                                     value={addForm.condo}
-                                    onChange={e => setAddForm(f => ({ ...f, condo: e.target.value }))}
+                                    onChange={e => setAddForm(f => recalcFromGross({ ...f, condo: e.target.value }))}
                                 />
                             </div>
                         </div>
+                        <label className={cn("flex items-start gap-2 text-xs text-muted-foreground select-none", (parseInput(addForm.condo) ?? 0) > 0 ? "cursor-pointer" : "opacity-60")}>
+                            <input
+                                type="checkbox"
+                                className="mt-0.5 accent-emerald-600"
+                                disabled={(parseInput(addForm.condo) ?? 0) <= 0}
+                                checked={addForm.feeOnCondo && (parseInput(addForm.condo) ?? 0) > 0}
+                                onChange={e => setAddForm(f => recalcFromGross({ ...f, feeOnCondo: e.target.checked }))}
+                            />
+                            <span>
+                                <span className="font-semibold text-foreground">A taxa da imobiliária incide também sobre o condomínio</span> — marque se a imobiliária cobra a taxa sobre o valor total (aluguel + condomínio).
+                                Desmarcado, a taxa incide só sobre o aluguel e o condomínio é repassado integralmente. O condomínio pago pelo inquilino vem dentro do valor recebido; com a unidade vaga (aluguel 0) ele entra só como despesa.
+                            </span>
+                        </label>
                         <div className="space-y-1.5">
                             <Label>Comentários</Label>
                             <Input value={addForm.notes} placeholder="Opcional" onChange={e => setAddForm(f => ({ ...f, notes: e.target.value }))} />
@@ -1110,9 +1189,15 @@ export default function PropertyIncomeLedger({
                                         received_amount: parseInput(addForm.received) ?? 0,
                                         energy_portion: parseInput(addForm.energy) ?? 0,
                                         other_income: parseInput(addForm.other) ?? 0,
+                                        condo_amount: parseInput(addForm.condo) ?? 0,
+                                        fee_on_condo: addForm.feeOnCondo,
                                         agency_fee_pct: parseInput(addForm.pct) ?? 0,
                                     }).netRent)}
                                 </span>
+                                {(parseInput(addForm.condo) ?? 0) > 0 && (() => {
+                                    const c = breakdown({ received_amount: parseInput(addForm.received) ?? 0, energy_portion: parseInput(addForm.energy) ?? 0, other_income: 0, condo_amount: parseInput(addForm.condo) ?? 0, fee_on_condo: addForm.feeOnCondo, agency_fee_pct: parseInput(addForm.pct) ?? 0 });
+                                    return <> · condomínio no depósito: <span className="font-semibold text-foreground">{formatBRL(c.condoIn)}</span>{c.condoFee > 0 && <> (taxa de {formatBRL(c.condoFee)})</>} · taxa total: <span className="font-semibold text-foreground">{formatBRL(c.feeAmount)}</span></>;
+                                })()}
                                 {addForm.month > currentMonthKey() && " · será marcado como previsto"}
                             </p>
                         )}
