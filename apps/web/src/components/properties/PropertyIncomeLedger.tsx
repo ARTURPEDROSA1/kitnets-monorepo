@@ -47,6 +47,7 @@ import { CellSumBar, useCellSum } from "./TableCellSum";
 import MoneyInput, { parseMoneyText } from "./MoneyInput";
 import Tile, { type TileInfo } from "./Tile";
 import { ColumnVisibilityButton, ColumnVisibilityMenu, useColumnVisibility } from "./TableColumnVisibility";
+import { columnTableKey } from "@/lib/ui-preferences";
 import { groupMonthly, periodLabel, periodRange, type ChartGroup, type PeriodFilterValue } from "@/lib/period-filter";
 import {
     breakdown,
@@ -131,7 +132,8 @@ export default function PropertyIncomeLedger({
     units = NO_UNITS,
 }: PropertyIncomeLedgerProps) {
     const multiUnit = units.length > 0;
-    const vis = useColumnVisibility("income-ledger", { locked: ["month"] });
+    // hidden columns are remembered in the user's account, separately for properties rented as a whole and unit by unit
+    const vis = useColumnVisibility(columnTableKey("income-ledger", multiUnit ? "multi" : "single"), { locked: ["month"], legacyKey: multiUnit ? "income-ledger" : undefined });
     const [localPeriod, setLocalPeriod] = useState<PeriodFilterValue>({ kind: "all" });   // the ledger opens on the whole history
     const period = periodProp ?? localPeriod;
     const setPeriod = onPeriodChange ?? setLocalPeriod;
