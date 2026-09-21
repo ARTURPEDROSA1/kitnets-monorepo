@@ -1820,6 +1820,7 @@ export type Database = {
       property_income_months: {
         Row: {
           agency_fee_pct: number
+          condo_amount: number
           bank_reference: string | null
           created_at: string
           energy_portion: number
@@ -1835,10 +1836,13 @@ export type Database = {
           received_on: string | null
           source: string
           status: string
+          unit_id: string | null
+          unit_name: string | null
           updated_at: string
         }
         Insert: {
           agency_fee_pct?: number
+          condo_amount?: number
           bank_reference?: string | null
           created_at?: string
           energy_portion?: number
@@ -1854,10 +1858,13 @@ export type Database = {
           received_on?: string | null
           source?: string
           status?: string
+          unit_id?: string | null
+          unit_name?: string | null
           updated_at?: string
         }
         Update: {
           agency_fee_pct?: number
+          condo_amount?: number
           bank_reference?: string | null
           created_at?: string
           energy_portion?: number
@@ -1873,6 +1880,8 @@ export type Database = {
           received_on?: string | null
           source?: string
           status?: string
+          unit_id?: string | null
+          unit_name?: string | null
           updated_at?: string
         }
         Relationships: [

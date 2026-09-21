@@ -41,7 +41,7 @@ async function ownsProperty(supabase: AdminSupabase, ownerId: string, propertyId
 /** Inflow → the property's income month: adds to a BANK month, replaces a hand-entered amount, or creates the month. */
 async function routeIncome(supabase: AdminSupabase, ownerId: string, row: CommitRow): Promise<string | null> {
     const month = `${row.date.slice(0, 7)}-01`;
-    const { data: existing } = await supabase.from("property_income_months").select("id, received_amount, source, agency_fee_pct").eq("property_id", row.property_id!).eq("month", month).maybeSingle();
+    const { data: existing } = await supabase.from("property_income_months").select("id, received_amount, source, agency_fee_pct").eq("property_id", row.property_id!).eq("month", month).is("unit_id", null).maybeSingle();
     let feePct = 0;
     if (!existing) {
         const { data: last } = await supabase.from("property_income_months").select("agency_fee_pct").eq("property_id", row.property_id!).order("month", { ascending: false }).limit(1).maybeSingle();
@@ -49,11 +49,11 @@ async function routeIncome(supabase: AdminSupabase, ownerId: string, row: Commit
     }
     const received = existing && existing.source === "BANK" ? Math.round(((Number(existing.received_amount) || 0) + row.amount) * 100) / 100 : row.amount;
     const record = {
-        property_id: row.property_id!, owner_id: ownerId, month,
+        property_id: row.property_id!, owner_id: ownerId, month, unit_id: null,   // bank inflows are not tied to a unit
         received_amount: received, received_on: row.date, status: "CONFIRMED", source: "BANK", bank_reference: row.reference,
         ...(existing ? {} : { energy_portion: 0, other_income: 0, other_expenses: 0, iptu_amount: 0, agency_fee_pct: feePct, notes: row.memo.slice(0, 200) }),
     };
-    const { data, error } = await supabase.from("property_income_months").upsert(record, { onConflict: "property_id,month" }).select("id").single();
+    const { data, error } = await supabase.from("property_income_months").upsert(record, { onConflict: "property_id,month,unit_id" }).select("id").single();
     if (error) throw new Error(error.message);
     return data?.id ?? null;
 }

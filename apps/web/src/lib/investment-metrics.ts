@@ -29,7 +29,7 @@
  * flow, cap rate. With an IPCA series: every month's invested and NOI restated in
  * today's money for a real (inflation-adjusted) payback.
  */
-import { breakdown, currentMonthKey, monthKey, round2, type PropertyIncomeRow } from "./property-income";
+import { aggregateIncomeByMonth, breakdown, currentMonthKey, monthKey, round2, type PropertyIncomeRow } from "./property-income";
 import { monthsBetween, shiftMonthKey } from "./period-filter";
 import { KIND_GROUP, type PropertyInvestment, type PropertyTransaction } from "./property-investment";
 import { landlordTaxesByMonth, type PropertyTax } from "./property-taxes";
@@ -225,7 +225,8 @@ const pct1 = (n: number) => Math.round(n * 1000) / 10;
 export function computeInvestmentMetrics(input: MetricsInput): InvestmentMetrics {
     const asOf = input.asOf ?? currentMonthKey();
     const txs = input.transactions.filter(t => monthKey(t.occurred_on) <= asOf);
-    const incomeAll = input.incomeRows.filter(r => monthKey(r.month) <= asOf);
+    // one row per month (a multi-unit property has one row per unit; a unit still "previsto" does not count yet)
+    const incomeAll = aggregateIncomeByMonth(input.incomeRows.filter(r => monthKey(r.month) <= asOf));
     const counted = incomeAll.filter(r => r.status === "CONFIRMED" || input.includeExpected);
     const expectedExcluded = incomeAll.length - counted.length;
     const registerIptu = landlordTaxesByMonth(input.taxes ?? []);
@@ -288,7 +289,7 @@ export function computeInvestmentMetrics(input: MetricsInput): InvestmentMetrics
             const b = breakdown(row);
             netRent = b.netRent;
             gross = b.grossRent;
-            propertyOpex = b.otherExpenses;
+            propertyOpex = b.otherExpenses + b.condo;
             energyNet = b.energy - b.other;
             lastGross = b.grossRent;
             lastNet = b.netRent;

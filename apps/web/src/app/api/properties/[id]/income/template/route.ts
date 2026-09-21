@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireProfile, getOwnedProperty } from "@/lib/api-auth";
 import { buildIncomeTemplate } from "@/lib/income-template";
 import type { PropertyIncomeRow } from "@/lib/property-income";
+import { loadPropertyUnits } from "@/lib/property-units-server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -35,7 +36,7 @@ export async function GET(request: Request, context: RouteContext) {
         if (fillLedger) {
             const { data, error } = await supabase
                 .from("property_income_months")
-                .select("id, property_id, month, received_on, received_amount, energy_portion, other_income, other_expenses, iptu_amount, agency_fee_pct, status, source, bank_reference, notes")
+                .select("id, property_id, month, unit_id, unit_name, received_on, received_amount, energy_portion, other_income, other_expenses, condo_amount, iptu_amount, agency_fee_pct, status, source, bank_reference, notes")
                 .eq("property_id", id)
                 .order("month", { ascending: false });
             if (error) throw new Error(error.message);
@@ -43,8 +44,11 @@ export async function GET(request: Request, context: RouteContext) {
         }
 
         const propertyName = String(property.name ?? "Imóvel").trim() || "Imóvel";
+        // a multi-unit property gets the unit names: one empty row per month and unit, and a dropdown in "Unidade"
+        const units = (await loadPropertyUnits(supabase, profileId)).get(id) ?? [];
         const buffer = await buildIncomeTemplate({
             propertyName,
+            units: units.map(u => u.name),
             feePct: Number.isFinite(fee) ? fee : 10,
             months: Number.isFinite(months) && months > 0 ? months : 12,
             rows,
