@@ -139,6 +139,11 @@ export default function PropertyCostCenterDashboard({
     // YTD only: repeat the latest confirmed month until December so the chart shows the whole year
     const [forecastYear, setForecastYear] = useState(true);
     const [rentHistoryOpen, setRentHistoryOpen] = useState(false);
+    /** Units of a multi-unit property: the income ledger then keeps one row per month and unit. */
+    const ledgerUnits = useMemo(
+        () => (propertyType === 'multi' ? subUnits.filter(u => u.id).map((u, i) => ({ id: u.id as string, name: u.name || `Kitnet ${i + 1}` })) : []),
+        [propertyType, subUnits]
+    );
     const formatBRL2 = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 });
     /** Built area: Aquisição & financiamento, else the latest IPTU guide that has it. */
     const areaM2 = useMemo(() => {
@@ -265,6 +270,7 @@ export default function PropertyCostCenterDashboard({
                 { name: 'Taxa da imobiliária', value: Math.round(current.feeAmount) },
                 { name: 'Custo de energia', value: Math.round(current.other) },
                 { name: 'Outras despesas', value: Math.round(current.otherExpenses) },
+                { name: 'Condomínio', value: Math.round(current.condo) },
                 { name: 'IPTU', value: Math.round(iptuNow) },
             ].filter(item => item.value > 0)
             : [
@@ -342,7 +348,7 @@ export default function PropertyCostCenterDashboard({
             dreData: groupedDre,
             // only the components that actually cost something this month, e.g. "Taxa + custo de energia"
             opexLabel: current
-                ? ([['Taxa', current.feeAmount], ['custo de energia', current.other], ['outros', current.otherExpenses], ['IPTU', iptuNow]] as Array<[string, number]>)
+                ? ([['Taxa', current.feeAmount], ['custo de energia', current.other], ['outros', current.otherExpenses], ['condomínio', current.condo], ['IPTU', iptuNow]] as Array<[string, number]>)
                     .filter(([, v]) => v > 0).map(([n]) => n).join(' + ')
                 : '',
             energyIncome: current ? current.energy : null,
@@ -361,8 +367,8 @@ export default function PropertyCostCenterDashboard({
             note: 'Este card mostra o mês mais recente e não segue o período do gráfico. Clique no card para ver o histórico do aluguel.',
         },
         opex: {
-            what: 'Custos operacionais do mês mais recente: taxa da administradora, custo de energia, outras despesas e o IPTU que você pagou naquele mês (do registro Tributos do imóvel). Prestações do financiamento e reformas não entram: são investimento.',
-            formula: 'OPEX = taxa da imobiliária + custo de energia + outras despesas + IPTU pago no mês',
+            what: 'Custos operacionais do mês mais recente: taxa da administradora, custo de energia, outras despesas, condomínio e o IPTU que você pagou naquele mês (do registro Tributos do imóvel). Prestações do financiamento e reformas não entram: são investimento.',
+            formula: 'OPEX = taxa da imobiliária + custo de energia + outras despesas + condomínio + IPTU pago no mês',
             example: financials.realIncomeMonth ? <>{financials.expenseBreakdown.map(i => `${i.name} ${brl(i.value)}`).join(' + ') || 'sem custos no mês'} = {brl(financials.totalExpenses)}<br />{((financials.totalExpenses / (financials.grossMonthlyRevenue || 1)) * 100).toFixed(0)}% da receita bruta</> : undefined,
         },
         noi: {
@@ -614,7 +620,7 @@ export default function PropertyCostCenterDashboard({
                             </h3>
                             <p className="text-xs text-muted-foreground">
                                 {financials.realIncomeMonth
-                                    ? `Receita (aluguel bruto + energia), despesas (taxa + custo de energia + outras + IPTU pago por você no mês) e NOI reais · ${periodLabel(period)}; meses previstos em tom claro`
+                                    ? `Receita (aluguel bruto + energia), despesas (taxa + custo de energia + outras + condomínio + IPTU pago por você no mês) e NOI reais · ${periodLabel(period)}; meses previstos em tom claro`
                                     : 'Histórico e projeção de Receitas, Despesas Operacionais e Lucro Líquido (NOI)'}
                             </p>
                         </div>
@@ -748,6 +754,7 @@ export default function PropertyCostCenterDashboard({
                 onRowsChange={setIncomeRows}
                 onLoadingChange={setIncomeLoading}
                 preloadedRows={overview === undefined ? undefined : overview?.income ?? null}
+                units={ledgerUnits}
             />
 
             {/* Payback, forecast, yields and IRR from the three ledgers */}

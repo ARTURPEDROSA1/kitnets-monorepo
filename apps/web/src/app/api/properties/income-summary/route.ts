@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireProfile } from "@/lib/api-auth";
-import { breakdown, currentMonthKey, monthKey, type PropertyIncomeRow } from "@/lib/property-income";
+import { aggregateIncomeByMonth, breakdown, currentMonthKey, monthKey, type PropertyIncomeRow } from "@/lib/property-income";
 import { landlordIptuForMonth, normalizeInstallments, type PropertyTax } from "@/lib/property-taxes";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +35,7 @@ export async function GET() {
 
     const { data, error } = await supabase
         .from("property_income_months")
-        .select("property_id, month, received_amount, energy_portion, other_income, other_expenses, iptu_amount, agency_fee_pct, status")
+        .select("id, property_id, month, unit_id, received_on, received_amount, energy_portion, other_income, other_expenses, condo_amount, iptu_amount, agency_fee_pct, status, source, bank_reference, notes")
         .eq("owner_id", profileId)
         .eq("status", "CONFIRMED")
         .lte("month", `${currentMonthKey()}-01`)
@@ -53,25 +53,26 @@ export async function GET() {
     }
 
     const summaries: Record<string, PropertyIncomeSnapshot> = {};
-    for (const raw of (data ?? []) as unknown as Array<Pick<PropertyIncomeRow, "property_id" | "month" | "received_amount" | "energy_portion" | "other_income" | "other_expenses" | "iptu_amount" | "agency_fee_pct">>) {
-        const existing = summaries[raw.property_id];
-        if (existing) {
-            existing.confirmedMonths += 1;
-            continue;
-        }
-        const b = breakdown(raw);   // rows arrive newest first, so the first one per property is the latest
-        const iptu = landlordIptuForMonth(taxesByProperty.get(raw.property_id) ?? [], monthKey(raw.month));
+    // a multi-unit property has one row per unit and month: the card shows the latest MONTH, all units added
+    const byProperty = new Map<string, PropertyIncomeRow[]>();
+    for (const raw of (data ?? []) as unknown as PropertyIncomeRow[]) byProperty.set(raw.property_id, [...(byProperty.get(raw.property_id) ?? []), raw]);
+    for (const [propertyId, list] of byProperty) {
+        const monthly = aggregateIncomeByMonth(list).sort((x, y) => (x.month < y.month ? 1 : -1));
+        const latest = monthly[0];
+        if (!latest) continue;
+        const b = breakdown(latest);
+        const iptu = landlordIptuForMonth(taxesByProperty.get(propertyId) ?? [], monthKey(latest.month));
         const opex = Math.round((b.opex + iptu) * 100) / 100;
         const noi = Math.round((b.noi - iptu) * 100) / 100;
-        summaries[raw.property_id] = {
-            month: monthKey(raw.month),
+        summaries[propertyId] = {
+            month: monthKey(latest.month),
             grossRent: b.grossRent,
             received: b.received,
             revenue: b.revenue,
             opex,
             noi,
             margin: b.revenue > 0 ? Math.round((noi / b.revenue) * 1000) / 10 : 0,
-            confirmedMonths: 1,
+            confirmedMonths: monthly.length,
         };
     }
 

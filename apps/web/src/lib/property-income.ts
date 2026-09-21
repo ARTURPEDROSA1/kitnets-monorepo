@@ -10,8 +10,11 @@
  *                    historical name; it is a cost, stored ≥ 0)
  *   other_expenses   OTHER EXPENSES the owner pays for the month (repairs,
  *                    fees…), also outside the transfer (cost, ≥ 0)
+ *   condo_amount     CONDOMINIUM fee the owner pays for the month (cost, ≥ 0)
  *   iptu_amount      legacy column, no longer used: IPTU comes from the taxes
  *                    register (Tributos do imóvel) in the month it was paid
+ *   unit_id          sub-unit of a multi-unit property the row belongs to (NULL =
+ *                    the whole property); a month can hold one row per unit
  *   agency_fee_pct   % the agency kept before crediting the owner
  *
  * Derived:
@@ -19,8 +22,11 @@
  *   gross_rent = net_rent ÷ (1 − pct/100)         (contract value)
  *   fee        = gross_rent − net_rent
  *   revenue    = gross_rent + energy              (everything the tenant pays)
- *   opex       = fee + energy cost + other expenses   (IPTU is added per month from the taxes register)
- *   noi        = revenue − opex = received − energy cost − other expenses
+ *   opex       = fee + energy cost + other expenses + condominium   (IPTU is added per month from the taxes register)
+ *   noi        = revenue − opex = received − energy cost − other expenses − condominium
+ *
+ * Everything outside the ledger table (DRE, payback, yield, rent history) works on one figure per month:
+ * `aggregateIncomeByMonth` adds a month's unit rows into one row.
  *
  * Costs never change received / net / gross rent — they are paid separately,
  * so they only lower NOI through OPEX.
@@ -46,6 +52,12 @@ export interface PropertyIncomeRow {
     /** energy cost (historical column name) */
     other_income: number;
     other_expenses: number;
+    /** condominium fee paid by the owner for the month (cost, ≥ 0) */
+    condo_amount?: number;
+    /** sub-unit of a multi-unit property (profile JSON id); null/undefined = the whole property */
+    unit_id?: string | null;
+    /** the unit's name when the row was saved */
+    unit_name?: string | null;
     /** legacy, ignored by the money model (IPTU comes from the taxes register) */
     iptu_amount: number;
     agency_fee_pct: number;
@@ -57,9 +69,14 @@ export interface PropertyIncomeRow {
     updated_at?: string;
 }
 
-/** Partial row sent to PUT. Only the fields present are overwritten. `month` is `YYYY-MM`. */
+/** Partial row sent to PUT. Only the fields present are overwritten. `month` is `YYYY-MM`; a row is identified by month + unit. */
 export interface IncomeRowInput {
     month: string;
+    /** sub-unit the row belongs to; null/absent = the whole property */
+    unit_id?: string | null;
+    /** spreadsheet imports: the unit's name, resolved to `unit_id` by the server */
+    unit_name?: string | null;
+    condo_amount?: number;
     received_amount?: number;
     /**
      * Not stored. When present and `received_amount` is absent, the server
@@ -87,15 +104,17 @@ export interface IncomeBreakdown {
     other: number;
     /** other expenses paid by the owner for the month (≥ 0) */
     otherExpenses: number;
+    /** condominium fee paid by the owner for the month (≥ 0) */
+    condo: number;
     netRent: number;
     grossRent: number;
     feeAmount: number;
     feePct: number;
     /** gross rent + energy income (everything the tenant pays for the month) */
     revenue: number;
-    /** agency fee + energy cost + other expenses */
+    /** agency fee + energy cost + other expenses + condominium */
     opex: number;
-    /** revenue − opex (= received − energy cost − other expenses) */
+    /** revenue − opex (= received − energy cost − other expenses − condominium) */
     noi: number;
 }
 
@@ -111,12 +130,13 @@ function clampPct(pct: number): number {
 }
 
 export function breakdown(
-    row: Pick<PropertyIncomeRow, "received_amount" | "energy_portion" | "other_income" | "agency_fee_pct"> & { other_expenses?: number }
+    row: Pick<PropertyIncomeRow, "received_amount" | "energy_portion" | "other_income" | "agency_fee_pct"> & { other_expenses?: number; condo_amount?: number }
 ): IncomeBreakdown {
     const received = Number(row.received_amount) || 0;
     const energy = Number(row.energy_portion) || 0;
     const other = Number(row.other_income) || 0;
     const otherExpenses = Number(row.other_expenses) || 0;
+    const condo = Number(row.condo_amount) || 0;
     const feePct = clampPct(Number(row.agency_fee_pct) || 0);
     const netRent = round2(received - energy);
     const grossRent = feePct > 0 ? round2(netRent / (1 - feePct / 100)) : netRent;
@@ -126,13 +146,14 @@ export function breakdown(
         energy,
         other,
         otherExpenses,
+        condo,
         netRent,
         grossRent,
         feeAmount,
         feePct,
         revenue: round2(grossRent + energy),
-        opex: round2(feeAmount + other + otherExpenses),
-        noi: round2(received - other - otherExpenses),
+        opex: round2(feeAmount + other + otherExpenses + condo),
+        noi: round2(received - other - otherExpenses - condo),
     };
 }
 
@@ -145,6 +166,64 @@ export function receivedFromGross(grossRent: number, feePct: number, energy: num
 /** `2026-09-01` or `2026-09` → `2026-09` */
 export function monthKey(dateOrMonth: string): string {
     return dateOrMonth.slice(0, 7);
+}
+
+/** Identity of a ledger row: its month and its unit (`2026-09|` for the whole property). */
+export function incomeRowKey(row: { month: string; unit_id?: string | null }): string {
+    return `${monthKey(row.month)}|${row.unit_id ?? ""}`;
+}
+
+/**
+ * One row per month: a month's unit rows added together. Everything outside the ledger table reads the
+ * ledger through this, so a multi-unit property behaves like any other.
+ *   • a month with confirmed rows counts only those (a unit still marked "previsto" has not paid yet);
+ *     a month with no confirmed row is the sum of its expected rows, marked EXPECTED;
+ *   • the fee % is the effective one (total fee ÷ total gross rent), so `breakdown` of the result gives
+ *     back the summed gross rent, fee and net rent exactly;
+ *   • a month with a single row is returned as it is.
+ * Order: months in the order they first appear.
+ */
+export function aggregateIncomeByMonth(rows: PropertyIncomeRow[]): PropertyIncomeRow[] {
+    const groups = new Map<string, PropertyIncomeRow[]>();
+    for (const r of rows) {
+        const k = monthKey(r.month);
+        const list = groups.get(k);
+        if (list) list.push(r); else groups.set(k, [r]);
+    }
+    const out: PropertyIncomeRow[] = [];
+    for (const [k, all] of groups) {
+        if (all.length === 1) { out.push(all[0]); continue; }
+        const confirmed = all.filter(r => r.status === "CONFIRMED");
+        const list = confirmed.length > 0 ? confirmed : all;
+        let received = 0, energy = 0, other = 0, otherExpenses = 0, condo = 0, gross = 0, fee = 0;
+        for (const r of list) {
+            const b = breakdown(r);
+            received += b.received; energy += b.energy; other += b.other; otherExpenses += b.otherExpenses; condo += b.condo;
+            gross += b.grossRent; fee += b.feeAmount;
+        }
+        const dates = list.map(r => r.received_on).filter((d): d is string => Boolean(d)).sort();
+        const sources = new Set(list.map(r => r.source));
+        out.push({
+            id: `month-${k}`,
+            property_id: list[0].property_id,
+            month: `${k}-01`,
+            received_on: dates.length ? dates[dates.length - 1] : null,
+            received_amount: round2(received),
+            energy_portion: round2(energy),
+            other_income: round2(other),
+            other_expenses: round2(otherExpenses),
+            condo_amount: round2(condo),
+            unit_id: null,
+            unit_name: null,
+            iptu_amount: 0,
+            agency_fee_pct: gross > 0 ? (fee / gross) * 100 : 0,
+            status: confirmed.length > 0 ? "CONFIRMED" : "EXPECTED",
+            source: sources.size === 1 ? list[0].source : "MANUAL",
+            bank_reference: null,
+            notes: null,
+        });
+    }
+    return out;
 }
 
 /** `2026-09` → `set/2026` */
@@ -316,27 +395,37 @@ export function parseSheet(text: string): ParsedSheet {
  */
 export const INCOME_TEMPLATE_HEADERS = [
     "Mês (dd/mm/aaaa)",
+    "Unidade",
     "Aluguel bruto (R$)",
     "Taxa imobiliária (%)",
     "Valor recebido (R$)",
     "Energia (R$)",
     "Custo de energia (R$)",
     "Outras despesas (R$)",
+    "Condomínio (R$)",
     "Comentários",
 ] as const;
+
+/** Columns added in 2026-09: templates exported before that do not have them and still import. */
+const OPTIONAL_TEMPLATE_HEADERS = ["Unidade", "Condomínio (R$)"];
 
 const normHeader = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
 
 /** True when the sheet's headers are the Kitnets.com template headers (order and text). */
 export function isIncomeTemplate(headers: string[]): boolean {
-    // older templates carried an "IPTU (R$)" column; it is ignored on import
-    const hs = headers.filter(h => !/^iptu/.test(normHeader(h)));
-    return INCOME_TEMPLATE_HEADERS.every((h, i) => normHeader(hs[i] ?? "") === normHeader(h));
+    // older templates carried an "IPTU (R$)" column (ignored on import) and lacked "Unidade" / "Condomínio (R$)":
+    // the columns every version has must be there, in order
+    const optional = new Set(OPTIONAL_TEMPLATE_HEADERS.map(normHeader));
+    const core = (list: readonly string[]) => list.map(normHeader).filter(h => !optional.has(h) && !/^iptu/.test(h));
+    const got = core(headers), want = core(INCOME_TEMPLATE_HEADERS);
+    return want.every((h, i) => got[i] === h);
 }
 
-export type IncomeField = "gross" | "fee_pct" | "received" | "energy" | "other" | "other_expenses" | "notes" | "ignore";
+export type IncomeField = "unit" | "gross" | "fee_pct" | "received" | "energy" | "other" | "other_expenses" | "condo" | "notes" | "ignore";
 
 export const INCOME_FIELD_LABELS: Record<IncomeField, string> = {
+    unit: "Unidade (nome da kitnet / apartamento)",
+    condo: "Condomínio (pago por você)",
     gross: "Aluguel bruto (contrato)",
     fee_pct: "Taxa da imobiliária (%)",
     received: "Valor recebido (líquido da imobiliária)",
@@ -358,6 +447,8 @@ export function suggestMapping(headers: string[], dateColumn: number): IncomeFie
         const h = raw.trim().toLowerCase();
         if (!h) return "ignore";
         if (/coment|observa|obs\b|notes?$|descri/.test(h)) return "notes";
+        if (/condom/.test(h)) return "condo";
+        if (/^unidade|^unit\b|kitnet|^apto|apartamento/.test(h)) return "unit";
         if (/custo de energia|custo energia|energy cost|conta de luz|conta de energia/.test(h)) return "other";
         if (/iptu/.test(h)) return "ignore";   // IPTU lives in Tributos do imóvel
         if (/acc|acum|saldo|investimento|total|custo|admin|prestac|amortiza|utilidade/.test(h)) return "ignore";
@@ -388,7 +479,8 @@ export interface ImportPreviewRow extends IncomeRowInput {
 /**
  * Turns a parsed sheet + column mapping into PUT rows. Rows whose mapped
  * money cells are all blank are skipped; an explicit "0,00" is kept
- * (vacancy). Duplicate months keep the row with more filled cells.
+ * (vacancy). A row is a month + a unit (the "Unidade" column, when mapped); duplicates of the same
+ * month and unit keep the row with more filled cells.
  */
 export function buildImportRows(sheet: ParsedSheet, mapping: IncomeField[], opts: BuildImportOptions): ImportPreviewRow[] {
     const today = opts.todayMonth ?? currentMonthKey();
@@ -413,6 +505,11 @@ export function buildImportRows(sheet: ParsedSheet, mapping: IncomeField[], opts
                 if (t) row.notes = t.slice(0, 500);
                 return;
             }
+            if (field === "unit") {
+                const t = cell.trim();
+                if (t) row.unit_name = t.slice(0, 120);   // the server resolves the name to the unit
+                return;
+            }
             const value = parseMoney(cell);
             if (value === null) return;
             const abs = Math.max(0, value);
@@ -428,15 +525,17 @@ export function buildImportRows(sheet: ParsedSheet, mapping: IncomeField[], opts
             else if (field === "energy") row.energy_portion = abs;
             else if (field === "other") row.other_income = abs;
             else if (field === "other_expenses") row.other_expenses = abs;
+            else if (field === "condo") row.condo_amount = abs;
         });
         if (filled === 0) continue;
-        const existing = byMonth.get(r.month);
-        if (!existing || filled > existing.filled) byMonth.set(r.month, { row, filled });
+        const key = `${r.month}|${(row.unit_name ?? "").trim().toLowerCase()}`;
+        const existing = byMonth.get(key);
+        if (!existing || filled > existing.filled) byMonth.set(key, { row, filled });
     }
 
     return Array.from(byMonth.values())
         .map(v => v.row)
-        .sort((a, b) => (a.month < b.month ? -1 : 1));
+        .sort((a, b) => (a.month !== b.month ? (a.month < b.month ? -1 : 1) : (a.unit_name ?? "").localeCompare(b.unit_name ?? "", "pt-BR", { numeric: true })));
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -470,6 +569,8 @@ export interface IncomeSummary {
     other12m: number;
     totalOtherExpenses: number;     // other expenses, all time
     otherExpenses12m: number;
+    totalCondo: number;             // condominium fees, all time
+    condo12m: number;
     totalNoi: number;               // revenue − opex (= received − energy cost), all time
     noi12m: number;
     totalRevenue: number;           // gross rent + energy income, all time
@@ -481,7 +582,8 @@ export interface IncomeSummary {
     lastMonth: string | null;
 }
 
-export function summarize(rows: PropertyIncomeRow[]): IncomeSummary {
+export function summarize(allRows: PropertyIncomeRow[]): IncomeSummary {
+    const rows = aggregateIncomeByMonth(allRows);   // months, not unit rows: "12 meses" and "latest" mean months
     const confirmed = rows
         .filter(r => r.status === "CONFIRMED")
         .sort((a, b) => (a.month < b.month ? -1 : 1));
@@ -505,6 +607,8 @@ export function summarize(rows: PropertyIncomeRow[]): IncomeSummary {
         other12m: sum(last12, b => b.other),
         totalOtherExpenses: sum(confirmed, b => b.otherExpenses),
         otherExpenses12m: sum(last12, b => b.otherExpenses),
+        totalCondo: sum(confirmed, b => b.condo),
+        condo12m: sum(last12, b => b.condo),
         totalNoi: sum(confirmed, b => b.noi),
         noi12m: sum(last12, b => b.noi),
         totalRevenue: sum(confirmed, b => b.revenue),
@@ -536,7 +640,7 @@ export interface RentYearPoint {
  * monthly points (oldest first), each change of the rent of 0.5 % or more, and one row per year.
  */
 export function rentHistory(rows: PropertyIncomeRow[]): { points: RentPoint[]; adjustments: RentAdjustment[]; years: RentYearPoint[] } {
-    const points: RentPoint[] = rows
+    const points: RentPoint[] = aggregateIncomeByMonth(rows)
         .filter(r => r.status === "CONFIRMED")
         .map(r => { const b = breakdown(r); const key = monthKey(r.month); return { key, month: formatMonthKey(key), bruto: round2(b.grossRent), liquido: round2(b.netRent) }; })
         .filter(p => p.bruto > 0)

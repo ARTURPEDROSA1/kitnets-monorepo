@@ -37,6 +37,8 @@ export interface IncomeTemplateOptions {
     months?: number;
     /** When given, the sheet is filled with these ledger rows (export) instead of empty months. */
     rows?: PropertyIncomeRow[];
+    /** Names of the property's units (multi-unit property). The empty template gets one row per month and unit, and the "Unidade" column a dropdown. */
+    units?: string[];
     now?: Date;
 }
 
@@ -45,10 +47,19 @@ const fmtDate = (d: Date) => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.g
 
 export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<Buffer> {
     const now = opts.now ?? new Date();
+    const unitNames = (opts.units ?? []).map(u => u.trim()).filter(Boolean);
+    const byUnit = (a: string | null | undefined, b: string | null | undefined) => (a ?? "").localeCompare(b ?? "", "pt-BR", { numeric: true });
     const exportRows = opts.rows
-        ? [...opts.rows].sort((a, b) => (a.month < b.month ? 1 : -1))   // newest first
+        ? [...opts.rows].sort((a, b) => (a.month !== b.month ? (a.month < b.month ? 1 : -1) : byUnit(a.unit_name, b.unit_name)))   // newest first, units in order
         : null;
-    const months = exportRows ? Math.max(exportRows.length, 1) : Math.min(Math.max(opts.months ?? 12, 1), 120);
+    const emptyMonths = Math.min(Math.max(opts.months ?? 12, 1), 120);
+    // Sheet rows: the exported ledger, or empty months (one per unit on a multi-unit property)
+    const firstMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const plan: Array<{ date: Date; unit: string | null; ledger?: PropertyIncomeRow }> = exportRows
+        ? exportRows.map(l => ({ date: new Date(Number(l.month.slice(0, 4)), Number(l.month.slice(5, 7)) - 1, 1), unit: l.unit_name ?? null, ledger: l }))
+        : Array.from({ length: emptyMonths }, (_, i) => new Date(firstMonth.getFullYear(), firstMonth.getMonth() - i, 1))
+            .flatMap(date => (unitNames.length ? unitNames.map(unit => ({ date, unit })) : [{ date, unit: null as string | null }]));
+    const months = Math.max(plan.length, 1);
     const feePct = Number.isFinite(opts.feePct) ? Math.min(Math.max(opts.feePct, 0), 99.99) : 10;
 
     const wb = new ExcelJS.Workbook();
@@ -62,12 +73,14 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
     });
     ws.columns = [
         { key: "month", width: 18 },
+        { key: "unit", width: 22 },
         { key: "gross", width: 20 },
         { key: "fee", width: 20 },
         { key: "received", width: 20 },
         { key: "energy", width: 16 },
         { key: "other", width: 20 },
         { key: "otherExpenses", width: 20 },
+        { key: "condo", width: 18 },
         { key: "notes", width: 44 },
     ];
 
@@ -86,16 +99,18 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
     ws.getCell("B3").font = { name: "Calibri", size: 9, italic: true, color: { argb: `FF${MUTED}` } };
 
     // Instructions (row 5)
-    ws.mergeCells("A5:H5");
+    ws.mergeCells("A5:J5");
     ws.getCell("A5").value =
         "Aluguel bruto = valor do contrato. Taxa = % que a imobiliária retém. Valor recebido = o que entrou na sua conta " +
         "(já calculado pela fórmula; sobrescreva com o valor real do extrato quando tiver). Energia = parcela paga pelo inquilino " +
         "referente à energia solar (vai para o centro de energia). Custo de energia = a conta de luz que você paga no mês; " +
-        "Outras despesas = outros custos pagos por você (reparos, taxas). O IPTU não entra aqui: registre-o em Tributos do imóvel. " +
+        "Outras despesas = outros custos pagos por você (reparos, taxas); Condomínio = a taxa de condomínio paga por você. " +
+        "Unidade = a kitnet / apartamento da linha, em imóveis com várias unidades (em branco = o imóvel inteiro). " +
+        "O IPTU não entra aqui: registre-o em Tributos do imóvel. " +
         "Custos à parte não alteram o valor recebido. Recebido = bruto × (1 − taxa) + energia.";
     ws.getCell("A5").alignment = { wrapText: true, vertical: "top" };
     ws.getCell("A5").font = { name: "Calibri", size: 9, color: { argb: `FF${MUTED}` } };
-    ws.getRow(5).height = 44;
+    ws.getRow(5).height = 56;
 
     // Header (row 7)
     const HEADER_ROW = 7;
@@ -110,48 +125,47 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
     });
     header.height = 30;
 
-    // Month rows (newest first: current month at the top, like the ledger on screen)
-    const first = new Date(now.getFullYear(), now.getMonth(), 1);
+    // Rows (newest first: current month at the top, like the ledger on screen)
+    // A Mês · B Unidade · C Aluguel bruto · D Taxa · E Valor recebido · F Energia · G Custo de energia · H Outras despesas · I Condomínio · J Comentários
+    const LAST_COL = 10;
     for (let i = 0; i < months; i++) {
         const rowIdx = HEADER_ROW + 1 + i;
         const row = ws.getRow(rowIdx);
         const r = rowIdx;
-        const ledger = exportRows ? exportRows[i] : undefined;
-        const monthDate = ledger
-            ? new Date(Number(ledger.month.slice(0, 4)), Number(ledger.month.slice(5, 7)) - 1, 1)
-            : new Date(first.getFullYear(), first.getMonth() - i, 1);
+        const item = plan[i] ?? { date: firstMonth, unit: null };
+        const ledger = item.ledger;
 
-        row.getCell(1).value = monthDate;
+        row.getCell(1).value = item.date;
         row.getCell(1).numFmt = DATE_FMT;
-        row.getCell(2).numFmt = CURRENCY_FMT;
-        row.getCell(3).numFmt = PCT_FMT;
-        row.getCell(4).numFmt = CURRENCY_FMT;
-        row.getCell(5).numFmt = CURRENCY_FMT;
-        row.getCell(6).numFmt = CURRENCY_FMT;
-        row.getCell(7).numFmt = CURRENCY_FMT;
+        row.getCell(2).value = item.unit;
+        row.getCell(4).numFmt = PCT_FMT;
+        for (const c of [3, 5, 6, 7, 8, 9]) row.getCell(c).numFmt = CURRENCY_FMT;
 
         if (ledger) {
             const b = breakdown(ledger);
-            row.getCell(2).value = b.grossRent;
-            row.getCell(3).value = b.feePct;
-            row.getCell(4).value = b.received;           // real value, not the formula
-            row.getCell(5).value = b.energy;
-            row.getCell(6).value = b.other;
-            row.getCell(7).value = b.otherExpenses;
-            row.getCell(8).value = ledger.notes ?? null;   // status is re-derived from the month on import
+            row.getCell(3).value = b.grossRent;
+            row.getCell(4).value = b.feePct;
+            row.getCell(5).value = b.received;           // real value, not the formula
+            row.getCell(6).value = b.energy;
+            row.getCell(7).value = b.other;
+            row.getCell(8).value = b.otherExpenses;
+            row.getCell(9).value = b.condo;
+            row.getCell(10).value = ledger.notes ?? null;   // status is re-derived from the month on import
         } else {
-            row.getCell(3).value = feePct;
-            row.getCell(4).value = { formula: `IF(B${r}="","",ROUND(B${r}*(1-C${r}/100)+E${r},2))`, result: "" };
+            row.getCell(4).value = feePct;
+            row.getCell(5).value = { formula: `IF(C${r}="","",ROUND(C${r}*(1-D${r}/100)+F${r},2))`, result: "" };
         }
 
-        for (let c = 1; c <= 8; c++) {
+        // zebra by month, so the units of one month read as a block
+        const monthIndex = plan.slice(0, i + 1).reduce((n, p, k) => (k > 0 && p.date.getTime() !== plan[k - 1].date.getTime() ? n + 1 : n), 0);
+        for (let c = 1; c <= LAST_COL; c++) {
             const cell = row.getCell(c);
             cell.border = thin;
             cell.font = { name: "Calibri", size: 10, color: { argb: `FF${INK}` } };
-            cell.alignment = { vertical: "middle", horizontal: c === 1 ? "center" : c === 9 ? "left" : "right" };
-            if (c === 4) {
+            cell.alignment = { vertical: "middle", horizontal: c === 1 ? "center" : c === 2 || c === LAST_COL ? "left" : "right" };
+            if (c === 5) {
                 cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${CALC}` } };
-            } else if (i % 2 === 1) {
+            } else if (monthIndex % 2 === 1) {
                 cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${ZEBRA}` } };
             }
         }
@@ -165,11 +179,17 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
             type: "date", operator: "greaterThan", formulae: ["DATE(2000,1,1)"], allowBlank: true,
             showErrorMessage: true, errorTitle: "Data inválida", error: "Use uma data no formato dd/mm/aaaa.",
         };
-        ws.getCell(`C${r}`).dataValidation = {
+        if (unitNames.length > 0 && unitNames.join(",").length < 250) {
+            ws.getCell(`B${r}`).dataValidation = {
+                type: "list", allowBlank: true, formulae: [`"${unitNames.map(u => u.replace(/"/g, "").replace(/,/g, " ")).join(",")}"`],
+                showErrorMessage: true, errorTitle: "Unidade inválida", error: "Escolha uma unidade da lista (ou deixe em branco para o imóvel inteiro).",
+            };
+        }
+        ws.getCell(`D${r}`).dataValidation = {
             type: "decimal", operator: "between", formulae: [0, 99.99], allowBlank: true,
             showErrorMessage: true, errorTitle: "Taxa inválida", error: "Informe a taxa em % entre 0 e 99,99 (ex.: 10).",
         };
-        for (const col of ["B", "D", "E", "F", "G", "H"]) {
+        for (const col of ["C", "E", "F", "G", "H", "I"]) {
             ws.getCell(`${col}${r}`).dataValidation = {
                 type: "decimal", operator: "greaterThanOrEqual", formulae: [0], allowBlank: true,
                 showErrorMessage: true, errorTitle: "Valor inválido", error: "Informe um valor em reais maior ou igual a zero.",
@@ -186,26 +206,28 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
     const lines: Array<[string, string, "title" | "h" | "p"]> = [
         ["Kitnets.com — Receitas de aluguel", "", "title"],
         ["Como usar", "", "h"],
-        ["1.", "Preencha a aba “Receitas”: uma linha por mês, com a data no formato dd/mm/aaaa.", "p"],
+        ["1.", "Preencha a aba “Receitas”: uma linha por mês, com a data no formato dd/mm/aaaa. Em imóveis com várias unidades (kitnets, apartamentos), use uma linha por mês e por unidade, com o nome da unidade na coluna Unidade.", "p"],
         ["2.", "Informe o Aluguel bruto (valor do contrato) e a Taxa da imobiliária em %. O Valor recebido é calculado automaticamente; substitua pelo valor real do extrato bancário quando quiser.", "p"],
         ["3.", "Se o inquilino paga uma parcela referente à energia solar, informe em Energia (vai para o centro de energia). A conta de luz que você paga no mês vai em Custo de energia; outros custos pagos por você vão em Outras despesas.", "p"],
         ["4.", "Os meses vêm do mais recente para o mais antigo. Para acrescentar meses, arraste a última linha para baixo (a fórmula de Valor recebido é copiada junto). Meses futuros são importados como “previstos”.", "p"],
         ["5.", "Salve o arquivo (.xlsx) e importe em Kitnets.com › Imóveis › Gerenciar Imóvel › Importar planilha. As colunas são reconhecidas automaticamente.", "p"],
         ["Colunas", "", "h"],
         ["Mês", "Data de referência do mês (qualquer dia do mês serve).", "p"],
+        ["Unidade", "Nome da unidade, exatamente como está cadastrada no imóvel (ex.: Kitnet 3). Deixe em branco quando a linha é do imóvel inteiro. Um nome que não existe no imóvel impede a importação.", "p"],
         ["Aluguel bruto (R$)", "Valor do aluguel no contrato, antes da taxa da imobiliária.", "p"],
         ["Taxa imobiliária (%)", "Percentual retido pela imobiliária (ex.: 10). Use 0 quando você mesmo administra o imóvel.", "p"],
         ["Valor recebido (R$)", "O que efetivamente entrou na sua conta: bruto × (1 − taxa) + energia.", "p"],
         ["Energia (R$)", "Parcela do pagamento do inquilino referente à energia (solar).", "p"],
         ["Custo de energia (R$)", "A conta de luz do imóvel paga por você no mês. É um custo à parte: não altera o valor recebido, reduz o resultado (NOI). Sempre positivo.", "p"],
         ["Outras despesas (R$)", "Outros custos do imóvel pagos por você no mês (reparos, taxas, vistoria). Também à parte: não altera o recebido, reduz o NOI. Sempre positivo.", "p"],
+        ["Condomínio (R$)", "A taxa de condomínio paga por você no mês. Custo à parte, como as outras despesas: não altera o recebido, reduz o NOI. Sempre positivo.", "p"],
         ["Comentários", "Texto livre (reajuste, vacância, troca de inquilino).", "p"],
         ["Cálculos no Kitnets.com", "", "h"],
         ["Aluguel líquido", "recebido − energia (o aluguel após a taxa da imobiliária)", "p"],
         ["Aluguel bruto", "líquido ÷ (1 − taxa/100), quando o bruto não é informado", "p"],
         ["Receita bruta", "aluguel bruto + energia (tudo o que o inquilino paga no mês)", "p"],
-        ["Despesas (OPEX)", "taxa da imobiliária + custo de energia + outras despesas (+ IPTU pago por você, no mês do pagamento, vindo de Tributos do imóvel)", "p"],
-        ["Resultado (NOI)", "receita bruta − OPEX = recebido − custo de energia − outras despesas", "p"],
+        ["Despesas (OPEX)", "taxa da imobiliária + custo de energia + outras despesas + condomínio (+ IPTU pago por você, no mês do pagamento, vindo de Tributos do imóvel)", "p"],
+        ["Resultado (NOI)", "receita bruta − OPEX = recebido − custo de energia − outras despesas − condomínio", "p"],
         ["Taxa acumulada", "bruto − líquido, somado mês a mês: a economia potencial ao administrar o imóvel pelo Kitnets.com.", "p"],
         ["Exemplo", "", "h"],
         ["Bruto 4.000 · Taxa 10 % · Energia 350 · Custo de energia 109,80 · Outras 50", "Recebido 3.950 · Aluguel líquido 3.600 · Receita bruta 4.350 · OPEX 559,80 · NOI 3.790,20", "p"],

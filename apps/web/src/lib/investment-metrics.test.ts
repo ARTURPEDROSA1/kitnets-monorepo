@@ -93,9 +93,16 @@ describe("computeInvestmentMetrics", () => {
         expect(m.projection.at(-1)!.cumNoi).toBeGreaterThanOrEqual(m.projection.at(-1)!.cumInvested);
         expect(m.dscr).toBeCloseTo((8 * 3850) / 16000, 2);
 
-        const withExpected = computeInvestmentMetrics({ investment: inv, transactions: txs, incomeRows: [...rows, income("2026-09", { status: "EXPECTED" })], asOf: "2026-09" });
+        // September still "previsto": it is left out by default and counted with includeExpected
+        const septemberExpected = [...rows.filter(r => !r.month.startsWith("2026-09")), income("2026-09", { status: "EXPECTED" })];
+        const withExpected = computeInvestmentMetrics({ investment: inv, transactions: txs, incomeRows: septemberExpected, asOf: "2026-09" });
         expect(withExpected.expectedMonthsExcluded).toBe(1);
-        expect(computeInvestmentMetrics({ investment: inv, transactions: txs, incomeRows: [...rows, income("2026-09", { status: "EXPECTED" })], asOf: "2026-09", includeExpected: true }).incomeMonths).toBe(9);
+        expect(withExpected.incomeMonths).toBe(7);
+        expect(computeInvestmentMetrics({ investment: inv, transactions: txs, incomeRows: septemberExpected, asOf: "2026-09", includeExpected: true }).incomeMonths).toBe(8);
+        // a month with a confirmed row and a unit still "previsto" is a confirmed month: nothing is excluded
+        const mixedMonth = computeInvestmentMetrics({ investment: inv, transactions: txs, incomeRows: [...rows, income("2026-09", { status: "EXPECTED", id: "u2", unit_id: "u2" })], asOf: "2026-09" });
+        expect(mixedMonth.expectedMonthsExcluded).toBe(0);
+        expect(mixedMonth.netIncomeToDate).toBe(m.netIncomeToDate);
     });
 
     it("counts the solar system as investment and net energy income as income", () => {
@@ -217,5 +224,24 @@ describe("historical rent growth and the payback forecast", () => {
         expect(f.rentGrowthPctYear).toBeLessThan(0);
         expect(f.forecastGrowthPctYear).toBe(0);
         expect(g.forecastGrowthPctYear).toBe(15);
+    });
+});
+
+describe("multi-unit ledgers and the condominium fee", () => {
+    const txs = [tx("2026-01-10", "ENTRADA", 100000)];
+    it("adds the units of a month together and treats the condominium as a cost", () => {
+        // income() = received 3950, energy 350, energy cost 100, fee 10 % → NOI 3850 per row
+        const oneRow = months("2026-02", 6).map(m => income(m));
+        const twoUnits = months("2026-02", 6).flatMap(m => [income(m, { id: `${m}-a`, unit_id: "a" }), income(m, { id: `${m}-b`, unit_id: "b" })]);
+        const single = computeInvestmentMetrics({ investment: investment(), transactions: txs, incomeRows: oneRow, asOf: "2026-07" });
+        const multi = computeInvestmentMetrics({ investment: investment(), transactions: txs, incomeRows: twoUnits, asOf: "2026-07" });
+        expect(multi.incomeMonths).toBe(6);                                   // months, not rows
+        expect(multi.netIncomeToDate).toBe(single.netIncomeToDate * 2);
+        expect(multi.monthlyNoiPace).toBe(single.monthlyNoiPace * 2);
+        expect(multi.currentGrossRent).toBe(8000);
+
+        const withCondo = computeInvestmentMetrics({ investment: investment(), transactions: txs, incomeRows: oneRow.map(r => ({ ...r, condo_amount: 300 })), asOf: "2026-07" });
+        expect(withCondo.netIncomeToDate).toBe(single.netIncomeToDate - 6 * 300);
+        expect(withCondo.currentGrossRent).toBe(single.currentGrossRent);      // a cost never changes the rent
     });
 });

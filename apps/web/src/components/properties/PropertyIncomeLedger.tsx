@@ -46,6 +46,7 @@ import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDe
 import { CellSumBar, useCellSum } from "./TableCellSum";
 import MoneyInput, { parseMoneyText } from "./MoneyInput";
 import Tile, { type TileInfo } from "./Tile";
+import { ColumnVisibilityButton, ColumnVisibilityMenu, useColumnVisibility } from "./TableColumnVisibility";
 import { groupMonthly, periodLabel, periodRange, type ChartGroup, type PeriodFilterValue } from "@/lib/period-filter";
 import {
     breakdown,
@@ -57,6 +58,8 @@ import {
     isIncomeTemplate,
     monthKey,
     parseSheet,
+    aggregateIncomeByMonth,
+    incomeRowKey,
     receivedFromGross,
     suggestMapping,
     summarize,
@@ -81,7 +84,11 @@ interface PropertyIncomeLedgerProps {
     onPeriodChange?: (next: PeriodFilterValue) => void;
     /** Rows loaded by the parent (overview): undefined = fetch here, null = parent still loading, array = use as is. */
     preloadedRows?: PropertyIncomeRow[] | null;
+    /** Units of a multi-unit property: the ledger then holds one row per month and unit (a "Unidade" column and select appear). */
+    units?: Array<{ id: string; name: string }>;
 }
+
+const NO_UNITS: Array<{ id: string; name: string }> = [];
 
 const formatBRL = (val: number) =>
     val.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -92,7 +99,7 @@ const parseInput = (s: string): number | null => {
     return n !== null && n >= 0 ? Math.round(n * 100) / 100 : null;
 };
 
-type DraftField = "received" | "energy" | "other" | "otherExp" | "pct" | "gross" | "notes" | "month";
+type DraftField = "received" | "energy" | "other" | "otherExp" | "condo" | "pct" | "gross" | "notes" | "month";
 
 const MONTH_SHORT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 /** "2026-08", "08/2026" or "ago/2026" → "2026-08" (null when not a month) */
@@ -108,7 +115,7 @@ function parseMonthText(text: string): string | null {
 }
 type Drafts = Record<string, Partial<Record<DraftField, string>>>;
 
-const FIELD_OPTIONS: IncomeField[] = ["gross", "fee_pct", "received", "energy", "other", "other_expenses", "notes", "ignore"];
+const FIELD_OPTIONS: IncomeField[] = ["unit", "gross", "fee_pct", "received", "energy", "other", "other_expenses", "condo", "notes", "ignore"];
 const IMPORT_CHUNK = 300;
 const DEFAULT_AGENCY_FEE_PCT = 10;
 const COLLAPSED_ROWS = 24;
@@ -121,7 +128,10 @@ export default function PropertyIncomeLedger({
     period: periodProp,
     onPeriodChange,
     preloadedRows,
+    units = NO_UNITS,
 }: PropertyIncomeLedgerProps) {
+    const multiUnit = units.length > 0;
+    const vis = useColumnVisibility("income-ledger", { locked: ["month"] });
     const [localPeriod, setLocalPeriod] = useState<PeriodFilterValue>({ kind: "all" });   // the ledger opens on the whole history
     const period = periodProp ?? localPeriod;
     const setPeriod = onPeriodChange ?? setLocalPeriod;
@@ -143,9 +153,10 @@ export default function PropertyIncomeLedger({
 
     const endpoint = propertyId ? `/api/properties/${propertyId}/income` : null;
 
+    // The ledger keeps one row per month and unit; everything above it (DRE, payback, rent history) works per month.
     const applyRows = useCallback((next: PropertyIncomeRow[]) => {
         setRows(next);
-        onRowsChangeRef.current?.(next);
+        onRowsChangeRef.current?.(aggregateIncomeByMonth(next));
     }, []);
 
     // ── Load ────────────────────────────────────────────────────────────
@@ -189,7 +200,7 @@ export default function PropertyIncomeLedger({
     const putRows = useCallback(
         async (inputs: IncomeRowInput[]) => {
             if (!endpoint) return;
-            const months = inputs.map(r => r.month);
+            const months = inputs.map(r => incomeRowKey(r));   // row identity: month + unit
             setSaving(prev => new Set([...prev, ...months]));
             setError(null);
             try {
@@ -219,22 +230,23 @@ export default function PropertyIncomeLedger({
         [endpoint, applyRows]
     );
 
-    const deleteMonth = useCallback(
-        async (month: string) => {
+    const deleteRow = useCallback(
+        async (row: PropertyIncomeRow) => {
             if (!endpoint) return;
-            if (!window.confirm(`Excluir o mês ${formatMonthKey(month)}?`)) return;
-            setSaving(prev => new Set([...prev, month]));
+            const month = monthKey(row.month), rk = incomeRowKey(row);
+            if (!window.confirm(`Excluir ${formatMonthKey(month)}${row.unit_name ? ` · ${row.unit_name}` : ""}?`)) return;
+            setSaving(prev => new Set([...prev, rk]));
             try {
-                const res = await fetch(`${endpoint}?month=${month}`, { method: "DELETE" });
+                const res = await fetch(`${endpoint}?month=${month}${row.unit_id ? `&unit=${encodeURIComponent(row.unit_id)}` : ""}`, { method: "DELETE" });
                 const data = await res.json().catch(() => ({}));
                 if (!res.ok) throw new Error(data.error || "Erro ao excluir");
-                applyRows(rows.filter(r => monthKey(r.month) !== month));
+                applyRows(rows.filter(r => incomeRowKey(r) !== rk));
             } catch (err) {
                 setError((err as Error).message);
             } finally {
                 setSaving(prev => {
                     const next = new Set(prev);
-                    next.delete(month);
+                    next.delete(rk);
                     return next;
                 });
             }
@@ -242,61 +254,69 @@ export default function PropertyIncomeLedger({
         [endpoint, rows, applyRows]
     );
 
-    /** Moves a row to another month: writes it under the new key, then removes the old one. */
-    const moveMonth = useCallback(
-        async (row: PropertyIncomeRow, target: string) => {
+    /** Moves a row to another month and/or unit: writes it under the new identity, then removes the old one. */
+    const moveRow = useCallback(
+        async (row: PropertyIncomeRow, to: { month?: string; unit_id?: string | null }) => {
             if (!endpoint) return;
-            const from = monthKey(row.month);
-            if (target === from) return;
-            if (rows.some(r => monthKey(r.month) === target)) { setError(`Já existe um lançamento em ${formatMonthKey(target)}.`); return; }
-            setSaving(prev => new Set([...prev, from]));
+            const fromMonth = monthKey(row.month), fromKey = incomeRowKey(row);
+            const target = { month: to.month ?? fromMonth, unit_id: to.unit_id === undefined ? row.unit_id ?? null : to.unit_id };
+            const targetKey = incomeRowKey(target);
+            if (targetKey === fromKey) return;
+            if (rows.some(r => incomeRowKey(r) === targetKey)) {
+                const unitName = target.unit_id ? units.find(u => u.id === target.unit_id)?.name : null;
+                setError(`Já existe um lançamento em ${formatMonthKey(target.month)}${unitName ? ` para ${unitName}` : multiUnit ? " para o imóvel inteiro" : ""}.`);
+                return;
+            }
+            setSaving(prev => new Set([...prev, fromKey]));
             setError(null);
             try {
                 const put = await fetch(endpoint, {
                     method: "PUT", headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ rows: [{
-                        month: target, received_amount: row.received_amount, energy_portion: row.energy_portion, other_income: row.other_income,
-                        other_expenses: row.other_expenses, agency_fee_pct: row.agency_fee_pct, status: row.status, source: row.source,
+                        ...target, received_amount: row.received_amount, energy_portion: row.energy_portion, other_income: row.other_income,
+                        other_expenses: row.other_expenses, condo_amount: row.condo_amount ?? 0, agency_fee_pct: row.agency_fee_pct, status: row.status, source: row.source,
                         received_on: row.received_on, notes: row.notes, bank_reference: row.bank_reference,
                     }] }),
                 });
                 const data = await put.json().catch(() => ({}));
-                if (!put.ok) throw new Error(data.error || "Erro ao mover o mês");
-                const del = await fetch(`${endpoint}?month=${from}`, { method: "DELETE" });
-                if (!del.ok) throw new Error((await del.json().catch(() => ({}))).error || "Erro ao remover o mês antigo");
-                applyRows(((data.rows ?? []) as PropertyIncomeRow[]).filter(r => monthKey(r.month) !== from));
-                setDrafts(prev => { const n = { ...prev }; delete n[from]; return n; });
+                if (!put.ok) throw new Error(data.error || "Erro ao mover o lançamento");
+                const del = await fetch(`${endpoint}?month=${fromMonth}${row.unit_id ? `&unit=${encodeURIComponent(row.unit_id)}` : ""}`, { method: "DELETE" });
+                if (!del.ok) throw new Error((await del.json().catch(() => ({}))).error || "Erro ao remover o lançamento antigo");
+                applyRows(((data.rows ?? []) as PropertyIncomeRow[]).filter(r => incomeRowKey(r) !== fromKey));
+                setDrafts(prev => { const n = { ...prev }; delete n[fromKey]; return n; });
             } catch (err) {
                 setError((err as Error).message);
             } finally {
-                setSaving(prev => { const n = new Set(prev); n.delete(from); return n; });
+                setSaving(prev => { const n = new Set(prev); n.delete(fromKey); return n; });
             }
         },
-        [endpoint, rows, applyRows]
+        [endpoint, rows, applyRows, units, multiUnit]
     );
 
     // ── Inline editing ──────────────────────────────────────────────────
-    const setDraft = (month: string, field: DraftField, value: string) =>
-        setDrafts(prev => ({ ...prev, [month]: { ...prev[month], [field]: value } }));
-    const cancelDraft = (month: string, field: DraftField) =>
-        setDrafts(prev => { const n = { ...prev, [month]: { ...prev[month] } }; delete n[month][field]; return n; });
+    // drafts are keyed by the row's identity (month + unit), like `saving`
+    const setDraft = (rk: string, field: DraftField, value: string) =>
+        setDrafts(prev => ({ ...prev, [rk]: { ...prev[rk], [field]: value } }));
+    const cancelDraft = (rk: string, field: DraftField) =>
+        setDrafts(prev => { const n = { ...prev, [rk]: { ...prev[rk] } }; delete n[rk][field]; return n; });
 
     const commitDraft = (row: PropertyIncomeRow, field: DraftField) => {
-        const month = monthKey(row.month);
-        const raw = drafts[month]?.[field];
+        const rk = incomeRowKey(row);
+        const ident = { month: monthKey(row.month), unit_id: row.unit_id ?? null };
+        const raw = drafts[rk]?.[field];
         if (raw === undefined) return;
         const b = breakdown(row);
         const clear = () =>
             setDrafts(prev => {
-                const next = { ...prev, [month]: { ...prev[month] } };
-                delete next[month][field];
+                const next = { ...prev, [rk]: { ...prev[rk] } };
+                delete next[rk][field];
                 return next;
             });
 
         if (field === "notes") {
             const notes = raw.trim() ? raw.trim().slice(0, 500) : null;
             if (notes === (row.notes ?? null)) return clear();
-            return void putRows([{ month, notes }]);
+            return void putRows([{ ...ident, notes }]);
         }
 
         const value = parseInput(raw);
@@ -305,29 +325,35 @@ export default function PropertyIncomeLedger({
         if (field === "gross") {
             const received = receivedFromGross(value, b.feePct, b.energy);
             if (received === b.received) return clear();
-            return void putRows([{ month, received_amount: received }]);
+            return void putRows([{ ...ident, received_amount: received }]);
         }
         const key =
             field === "received" ? "received_amount"
                 : field === "energy" ? "energy_portion"
                     : field === "other" ? "other_income"
                         : field === "otherExp" ? "other_expenses"
-                            : "agency_fee_pct";
+                            : field === "condo" ? "condo_amount"
+                                : "agency_fee_pct";
         if (field === "pct" && value >= 100) return clear();
-        if (value === Number(row[key])) return clear();
-        putRows([{ month, [key]: value }]);
+        if (value === (Number(row[key]) || 0)) return clear();
+        putRows([{ ...ident, [key]: value }]);
     };
 
     const toggleStatus = (row: PropertyIncomeRow) =>
-        putRows([{ month: monthKey(row.month), status: row.status === "CONFIRMED" ? "EXPECTED" : "CONFIRMED" }]);
+        putRows([{ month: monthKey(row.month), unit_id: row.unit_id ?? null, status: row.status === "CONFIRMED" ? "EXPECTED" : "CONFIRMED" }]);
 
     // ── Derived ─────────────────────────────────────────────────────────
-    const sorted = useMemo(() => [...rows].sort((a, b) => (a.month < b.month ? 1 : -1)), [rows]);
+    const sorted = useMemo(() => [...rows].sort((a, b) => (a.month !== b.month ? (a.month < b.month ? 1 : -1) : (a.unit_name ?? "").localeCompare(b.unit_name ?? "", "pt-BR", { numeric: true }))), [rows]);
     /** Rows inside the selected period (newest first) — drives the chart and the table. */
     const filtered = useMemo(() => filterRowsByPeriod(sorted, range), [sorted, range]);
     // Excel-style column sort & filters on top of the period filter (table only; the chart follows the period)
     const columns = useMemo<ColumnDef<PropertyIncomeRow>[]>(() => [
         { key: "month", label: "Mês", kind: "month", get: r => monthKey(r.month) },
+        ...(multiUnit ? [{
+            key: "unit", label: "Unidade", kind: "enum" as const, title: "Unidade do imóvel a que o lançamento pertence",
+            get: (r: PropertyIncomeRow) => r.unit_id ?? "",
+            options: [...units.map(u => ({ value: u.id, label: u.name })), { value: "", label: "Imóvel inteiro" }],
+        }] : []),
         { key: "gross", label: "Aluguel bruto", kind: "number", align: "right", get: r => breakdown(r).grossRent },
         { key: "pct", label: "Taxa %", kind: "number", align: "right", sum: false, get: r => Number(r.agency_fee_pct) || 0 },
         { key: "net", label: "Aluguel líquido", kind: "number", align: "right", title: "Recebido − energia (aluguel após a taxa)", get: r => breakdown(r).netRent },
@@ -335,10 +361,13 @@ export default function PropertyIncomeLedger({
         { key: "received", label: "Recebido", kind: "number", align: "right", title: "O que entrou na conta", get: r => breakdown(r).received },
         { key: "other", label: "Custo de energia", kind: "number", align: "right", title: "Conta de luz paga no mês (custo à parte; não altera o recebido)", get: r => breakdown(r).other },
         { key: "otherExp", label: "Outras despesas", kind: "number", align: "right", title: "Outros custos pagos à parte no mês (reparos, taxas); não alteram o recebido", get: r => breakdown(r).otherExpenses },
+        { key: "condo", label: "Condomínio", kind: "number", align: "right", title: "Taxa de condomínio paga por você no mês (custo à parte; não altera o recebido)", get: r => breakdown(r).condo },
         { key: "status", label: "Status", kind: "enum", align: "center", get: r => r.status, options: [{ value: "CONFIRMED", label: "Confirmado" }, { value: "EXPECTED", label: "Previsto" }] },
         { key: "notes", label: "Comentários", kind: "text", get: r => r.notes ?? "" },
-    ], []);
+    ], [multiUnit, units]);
     const cf = useColumnFilters(filtered, columns, { key: "month", dir: "desc" });
+    /** Months in the period (a multi-unit property has several rows per month). */
+    const monthCount = useMemo(() => new Set(filtered.map(r => monthKey(r.month))).size, [filtered]);
     const visible = showAll ? cf.rows : cf.rows.slice(0, COLLAPSED_ROWS);
     /** Totals over the confirmed months inside the selected period (tiles 2–5). */
     const periodSummary = useMemo(() => summarize(filtered), [filtered]);
@@ -378,7 +407,7 @@ export default function PropertyIncomeLedger({
 
     const chartData = useMemo(
         () =>
-            [...filtered]
+            aggregateIncomeByMonth(filtered)
                 .sort((a, b) => (a.month < b.month ? -1 : 1))
                 .map(r => {
                     const b = breakdown(r);
@@ -397,7 +426,9 @@ export default function PropertyIncomeLedger({
 
     // ── Add month dialog ────────────────────────────────────────────────
     const [addOpen, setAddOpen] = useState(false);
-    const [addForm, setAddForm] = useState({ month: currentMonthKey(), gross: "", received: "", energy: "", other: "", otherExp: "", pct: "", notes: "" });
+    const [addForm, setAddForm] = useState({ month: currentMonthKey(), unit: "", gross: "", received: "", energy: "", other: "", otherExp: "", condo: "", pct: "", notes: "" });
+    /** Pre-fill from the latest row of a unit ("" = whole property); falls back to the latest row of the ledger. */
+    const lastRowFor = (unitId: string) => sorted.find(r => (r.unit_id ?? "") === unitId) ?? (multiUnit ? undefined : sorted[0]);
 
     const openAdd = () => {
         const next = new Date();
@@ -405,15 +436,20 @@ export default function PropertyIncomeLedger({
         const suggestion = sorted.length && sorted[0].status === "CONFIRMED" && monthKey(sorted[0].month) === currentMonthKey()
             ? currentMonthKey(next)
             : currentMonthKey();
-        const last = sorted[0] ? breakdown(sorted[0]) : null;
+        // multi-unit: start on the first unit that has no row in the suggested month yet
+        const unit = multiUnit ? (units.find(u => !rows.some(r => monthKey(r.month) === suggestion && r.unit_id === u.id)) ?? units[0]).id : "";
+        const lastRow = lastRowFor(unit);
+        const last = lastRow ? breakdown(lastRow) : null;
         setAddForm({
             month: suggestion,
+            unit,
             gross: last ? toInput(last.grossRent) : "",
             received: last ? toInput(last.received) : "",
             energy: last ? toInput(last.energy) : "",
             other: last ? toInput(last.other) : "",
             otherExp: "",
-            pct: toInput(lastPct),
+            condo: last && last.condo > 0 ? toInput(last.condo) : "",
+            pct: toInput(last && last.feePct > 0 ? last.feePct : lastPct),
             notes: "",
         });
         setAddOpen(true);
@@ -444,10 +480,12 @@ export default function PropertyIncomeLedger({
         await putRows([
             {
                 month,
+                unit_id: multiUnit && addForm.unit ? addForm.unit : null,
                 received_amount: received,
                 energy_portion: parseInput(addForm.energy) ?? 0,
                 other_income: parseInput(addForm.other) ?? 0,
                 other_expenses: parseInput(addForm.otherExp) ?? 0,
+                condo_amount: parseInput(addForm.condo) ?? 0,
                 agency_fee_pct: parseInput(addForm.pct) ?? 0,
                 status: month > currentMonthKey() ? "EXPECTED" : "CONFIRMED",
                 source: "MANUAL",
@@ -578,6 +616,9 @@ export default function PropertyIncomeLedger({
         return buildImportRows(sheet, mapping, { agencyFeePct: parseInput(importPct) ?? 0 });
     }, [sheet, mapping, importPct]);
 
+    /** The sheet names units: the preview and the messages then talk about entries, not months. */
+    const importHasUnits = importRows.some(r => r.unit_name);
+
     const runImportRows = async (rows: ImportPreviewRow[], replace = replaceAll) => {
         if (!endpoint || rows.length === 0) return;
         setImporting(true);
@@ -602,7 +643,8 @@ export default function PropertyIncomeLedger({
             setDrafts({});
             // Close the dialog so the user sees the result in the ledger; confirm with a short notice.
             setImportOpen(false);
-            setImportNotice(`${rows.length} ${rows.length === 1 ? "mês importado" : "meses importados"}${replace ? " · registro anterior substituído" : ""}`);
+            const perUnit = rows.some(r => r.unit_name);
+            setImportNotice(`${rows.length} ${perUnit ? (rows.length === 1 ? "lançamento importado" : "lançamentos importados") : rows.length === 1 ? "mês importado" : "meses importados"}${replace ? " · registro anterior substituído" : ""}`);
             window.setTimeout(() => setImportNotice(null), 8000);
         } catch (err) {
             setImportError((err as Error).message);
@@ -633,7 +675,7 @@ export default function PropertyIncomeLedger({
                     </h3>
                     <p className="text-xs text-muted-foreground">
                         O que entrou na conta a cada mês. A parcela de energia vai para o centro de energia solar; custo de energia e outras despesas são custos pagos à parte.
-                        Aluguel líquido (após a taxa) = recebido − energia; aluguel bruto = líquido ÷ (1 − taxa); receita = bruto + energia; OPEX = taxa + custo de energia + outras despesas (o IPTU pago por você entra pelo registro Tributos do imóvel, no mês do pagamento); NOI = recebido − custos.
+                        Aluguel líquido (após a taxa) = recebido − energia; aluguel bruto = líquido ÷ (1 − taxa); receita = bruto + energia; OPEX = taxa + custo de energia + outras despesas + condomínio (o IPTU pago por você entra pelo registro Tributos do imóvel, no mês do pagamento); NOI = recebido − custos.
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -735,10 +777,12 @@ export default function PropertyIncomeLedger({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <span className="text-xs text-muted-foreground">
                     Período do gráfico e da tabela · <span className="font-semibold text-foreground">{periodLabel(period)}</span>
-                    {" · "}{cf.anyFilter ? `${cf.rows.length} de ${filtered.length}` : filtered.length} {filtered.length === 1 ? "mês" : "meses"}
+                    {" · "}{monthCount} {monthCount === 1 ? "mês" : "meses"}
+                    {(multiUnit || cf.anyFilter) && <>{" · "}{cf.anyFilter ? `${cf.rows.length} de ${filtered.length}` : filtered.length} {filtered.length === 1 ? "lançamento" : "lançamentos"}</>}
                 </span>
                 <div className="flex flex-wrap items-center gap-2">
                     <PeriodFilter value={period} onChange={setPeriod} variant="compact" />
+                    <ColumnVisibilityButton ctl={vis} />
                     <GroupSelect value={chartGroup} onChange={setChartGroup} />
                 </div>
             </div>
@@ -794,22 +838,24 @@ export default function PropertyIncomeLedger({
                 </div>
             ) : (
                 <div className="overflow-x-auto -mx-2">
-                    <table className="w-full text-xs min-w-[1040px]">
+                    <table className="w-full text-xs" style={{ minWidth: `${Math.max(480, columns.filter(c => !vis.isHidden(c.key)).length * 104)}px` }}>
                         <thead>
-                            <ColumnHeaders columns={columns} ctl={cf} trailing={<th className="px-2 py-2" />} />
+                            <ColumnHeaders columns={columns} ctl={cf} visibility={vis} trailing={<th className="px-2 py-2" />} />
                         </thead>
                         <tbody>
                             {visible.map(row => {
                                 const month = monthKey(row.month);
+                                const rk = incomeRowKey(row);   // identity of the row: month + unit
                                 const b = breakdown(row);
-                                const d = drafts[month] ?? {};
-                                const busy = saving.has(month);
+                                const d = drafts[rk] ?? {};
+                                const busy = saving.has(rk);
+                                const show = (key: string) => !vis.isHidden(key);
                                 const cell = (field: DraftField, value: number, step = "0.01") => field !== "pct" ? (
                                     <MoneyInput
                                         value={value}
                                         draft={d[field]}
                                         disabled={busy}
-                                        onDraft={text => setDraft(month, field, text)}
+                                        onDraft={text => setDraft(rk, field, text)}
                                         onCommit={() => commitDraft(row, field)}
                                         className={cn("", field === "gross" && "text-foreground font-semibold")}
                                     />
@@ -821,7 +867,7 @@ export default function PropertyIncomeLedger({
                                         min={0}
                                         disabled={busy}
                                         value={d[field] ?? toInput(value)}
-                                        onChange={e => setDraft(month, field, e.target.value)}
+                                        onChange={e => setDraft(rk, field, e.target.value)}
                                         onBlur={() => commitDraft(row, field)}
                                         onKeyDown={e => {
                                             if (e.key === "Enter") (e.target as HTMLInputElement).blur();
@@ -831,31 +877,48 @@ export default function PropertyIncomeLedger({
                                 );
                                 return (
                                     <tr key={row.id} className={cn("border-b border-border/60 hover:bg-muted/30", row.status === "EXPECTED" && "opacity-70")}>
-                                        <td {...sel.cellProps("month", month, null, "px-2 py-1 font-semibold text-foreground whitespace-nowrap", () => cancelDraft(month, "month"))}>
+                                        <td {...sel.cellProps("month", rk, null, "px-2 py-1 font-semibold text-foreground whitespace-nowrap", () => cancelDraft(rk, "month"))}>
                                             <MonthCell
                                                 month={month}
                                                 draft={d.month}
                                                 disabled={busy}
-                                                onDraft={text => setDraft(month, "month", text)}
+                                                onDraft={text => setDraft(rk, "month", text)}
                                                 onCommit={() => {
-                                                    const raw = drafts[month]?.month;
+                                                    const raw = drafts[rk]?.month;
                                                     if (raw === undefined) return;
                                                     const target = parseMonthText(raw);
-                                                    cancelDraft(month, "month");
+                                                    cancelDraft(rk, "month");
                                                     if (!target) { setError("Mês inválido: use AAAA-MM ou MM/AAAA."); return; }
-                                                    void moveMonth(row, target);
+                                                    void moveRow(row, { month: target });
                                                 }}
                                             />
                                             {busy && <Loader2 className="inline w-3 h-3 ml-1 animate-spin text-muted-foreground" />}
                                         </td>
-                                        <td {...sel.cellProps("gross", month, b.grossRent, "px-2 py-1 text-right", () => cancelDraft(month, "gross"))}>{cell("gross", b.grossRent)}</td>
-                                        <td {...sel.cellProps("pct", month, b.feePct, "px-2 py-1 text-right", () => cancelDraft(month, "pct"))}>{cell("pct", b.feePct, "0.5")}</td>
-                                        <td {...sel.cellProps("net", month, b.netRent, "px-2 py-1 text-right font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums")}>{formatBRL(b.netRent)}</td>
-                                        <td {...sel.cellProps("energy", month, b.energy, "px-2 py-1 text-right", () => cancelDraft(month, "energy"))}>{cell("energy", b.energy)}</td>
-                                        <td {...sel.cellProps("received", month, b.received, "px-2 py-1 text-right", () => cancelDraft(month, "received"))}>{cell("received", b.received)}</td>
-                                        <td {...sel.cellProps("other", month, b.other, "px-2 py-1 text-right", () => cancelDraft(month, "other"))}>{cell("other", b.other)}</td>
-                                        <td {...sel.cellProps("otherExp", month, b.otherExpenses, "px-2 py-1 text-right", () => cancelDraft(month, "otherExp"))}>{cell("otherExp", b.otherExpenses)}</td>
-                                        <td {...sel.cellProps("status", month, null, "px-2 py-1 text-center")}>
+                                        {multiUnit && show("unit") && (
+                                            <td {...sel.cellProps("unit", rk, null, "px-2 py-1 whitespace-nowrap")}>
+                                                <select
+                                                    disabled={busy}
+                                                    value={row.unit_id ?? ""}
+                                                    onChange={e => void moveRow(row, { unit_id: e.target.value || null })}
+                                                    title="Unidade a que o lançamento pertence (duplo clique para trocar)"
+                                                    className="bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-none w-full min-w-[7rem] px-1 py-1 outline-none text-xs"
+                                                >
+                                                    {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                                                    {/* a unit that was removed from the property keeps its saved name */}
+                                                    {row.unit_id && !units.some(u => u.id === row.unit_id) && <option value={row.unit_id}>{row.unit_name ?? "Unidade removida"}</option>}
+                                                    <option value="">Imóvel inteiro</option>
+                                                </select>
+                                            </td>
+                                        )}
+                                        {show("gross") && <td {...sel.cellProps("gross", rk, b.grossRent, "px-2 py-1 text-right", () => cancelDraft(rk, "gross"))}>{cell("gross", b.grossRent)}</td>}
+                                        {show("pct") && <td {...sel.cellProps("pct", rk, b.feePct, "px-2 py-1 text-right", () => cancelDraft(rk, "pct"))}>{cell("pct", b.feePct, "0.5")}</td>}
+                                        {show("net") && <td {...sel.cellProps("net", rk, b.netRent, "px-2 py-1 text-right font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums")}>{formatBRL(b.netRent)}</td>}
+                                        {show("energy") && <td {...sel.cellProps("energy", rk, b.energy, "px-2 py-1 text-right", () => cancelDraft(rk, "energy"))}>{cell("energy", b.energy)}</td>}
+                                        {show("received") && <td {...sel.cellProps("received", rk, b.received, "px-2 py-1 text-right", () => cancelDraft(rk, "received"))}>{cell("received", b.received)}</td>}
+                                        {show("other") && <td {...sel.cellProps("other", rk, b.other, "px-2 py-1 text-right", () => cancelDraft(rk, "other"))}>{cell("other", b.other)}</td>}
+                                        {show("otherExp") && <td {...sel.cellProps("otherExp", rk, b.otherExpenses, "px-2 py-1 text-right", () => cancelDraft(rk, "otherExp"))}>{cell("otherExp", b.otherExpenses)}</td>}
+                                        {show("condo") && <td {...sel.cellProps("condo", rk, b.condo, "px-2 py-1 text-right", () => cancelDraft(rk, "condo"))}>{cell("condo", b.condo)}</td>}
+                                        {show("status") && <td {...sel.cellProps("status", rk, null, "px-2 py-1 text-center")}>
                                             <span
                                                 role="button"
                                                 tabIndex={0}
@@ -878,28 +941,28 @@ export default function PropertyIncomeLedger({
                                                     {row.source === "BANK" ? "banco" : "planilha"}
                                                 </span>
                                             )}
-                                        </td>
-                                        <td {...sel.cellProps("notes", month, null, "px-2 py-1", () => cancelDraft(month, "notes"))}>
+                                        </td>}
+                                        {show("notes") && <td {...sel.cellProps("notes", rk, null, "px-2 py-1", () => cancelDraft(rk, "notes"))}>
                                             <input
                                                 type="text"
                                                 disabled={busy}
                                                 value={d.notes ?? (row.notes ?? "")}
                                                 placeholder="—"
-                                                onChange={e => setDraft(month, "notes", e.target.value)}
+                                                onChange={e => setDraft(rk, "notes", e.target.value)}
                                                 onBlur={() => commitDraft(row, "notes")}
                                                 onKeyDown={e => {
                                                     if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                                                 }}
                                                 className="bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-none w-full min-w-[5rem] px-1.5 py-1 outline-none truncate"
                                             />
-                                        </td>
+                                        </td>}
                                         <td className="px-2 py-1 text-right">
                                             <button
                                                 type="button"
                                                 disabled={busy}
-                                                onClick={() => deleteMonth(month)}
+                                                onClick={() => deleteRow(row)}
                                                 className="p-1 rounded-md text-muted-foreground hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
-                                                title="Excluir mês"
+                                                title={multiUnit ? "Excluir lançamento" : "Excluir mês"}
                                             >
                                                 <Trash2 className="w-3.5 h-3.5" />
                                             </button>
@@ -930,6 +993,7 @@ export default function PropertyIncomeLedger({
 
             {/* Column sort/filter popup: at the root so an empty filter result never unmounts it */}
             <ColumnMenu columns={columns} ctl={cf} />
+            <ColumnVisibilityMenu columns={columns} ctl={vis} />
 
             {/* Add month dialog */}
             <Dialog open={addOpen} onOpenChange={setAddOpen}>
@@ -958,6 +1022,28 @@ export default function PropertyIncomeLedger({
                                 />
                             </div>
                         </div>
+                        {multiUnit && (
+                            <div className="space-y-1.5">
+                                <Label>Unidade</Label>
+                                <select
+                                    value={addForm.unit}
+                                    onChange={e => {
+                                        const unit = e.target.value;
+                                        const lastRow = lastRowFor(unit);
+                                        const last = lastRow ? breakdown(lastRow) : null;
+                                        // each unit has its own rent: start from that unit's latest row
+                                        setAddForm(f => ({ ...f, unit, gross: last ? toInput(last.grossRent) : "", received: last ? toInput(last.received) : "", energy: last ? toInput(last.energy) : "", other: last ? toInput(last.other) : "", condo: last && last.condo > 0 ? toInput(last.condo) : "", pct: toInput(last && last.feePct > 0 ? last.feePct : lastPct) }));
+                                    }}
+                                    className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+                                >
+                                    {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                                    <option value="">Imóvel inteiro (sem unidade)</option>
+                                </select>
+                                {rows.some(r => monthKey(r.month) === addForm.month && (r.unit_id ?? "") === addForm.unit) && (
+                                    <p className="text-[11px] text-amber-700 dark:text-amber-400">Esta unidade já tem um lançamento neste mês: salvar vai atualizá-lo.</p>
+                                )}
+                            </div>
+                        )}
                         <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-1.5">
                                 <Label>Aluguel bruto (R$)</Label>
@@ -1004,9 +1090,17 @@ export default function PropertyIncomeLedger({
                                 />
                             </div>
                             <div className="space-y-1.5">
-                                <Label>Comentários</Label>
-                                <Input value={addForm.notes} placeholder="Opcional" onChange={e => setAddForm(f => ({ ...f, notes: e.target.value }))} />
+                                <Label>Condomínio (R$)</Label>
+                                <Input
+                                    type="number" step="0.01" min={0} placeholder="0.00"
+                                    value={addForm.condo}
+                                    onChange={e => setAddForm(f => ({ ...f, condo: e.target.value }))}
+                                />
                             </div>
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label>Comentários</Label>
+                            <Input value={addForm.notes} placeholder="Opcional" onChange={e => setAddForm(f => ({ ...f, notes: e.target.value }))} />
                         </div>
                         {parseInput(addForm.received) !== null && (
                             <p className="text-xs text-muted-foreground">
@@ -1147,7 +1241,7 @@ export default function PropertyIncomeLedger({
                         {importRows.length > 0 && (
                             <div className="space-y-2">
                                 <p className="text-xs text-muted-foreground">
-                                    <span className="font-semibold text-foreground">{importRows.length} meses</span> reconhecidos
+                                    <span className="font-semibold text-foreground">{importRows.length} {importHasUnits ? "lançamentos (um por mês e unidade)" : "meses"}</span> reconhecidos
                                     ({formatMonthKey(importRows[0].month)} → {formatMonthKey(importRows[importRows.length - 1].month)}),{" "}
                                     {importRows.filter(r => r.status === "EXPECTED").length} futuros marcados como previstos.
                                 </p>
@@ -1156,25 +1250,29 @@ export default function PropertyIncomeLedger({
                                         <thead className="bg-muted/40 text-[10px] uppercase text-muted-foreground">
                                             <tr>
                                                 <th className="text-left px-2 py-1">Mês</th>
+                                                {importHasUnits && <th className="text-left px-2 py-1">Unidade</th>}
                                                 <th className="text-right px-2 py-1">Bruto</th>
                                                 <th className="text-right px-2 py-1">Taxa</th>
                                                 <th className="text-right px-2 py-1">Recebido</th>
                                                 <th className="text-right px-2 py-1">Energia</th>
                                                 <th className="text-right px-2 py-1">Custo de energia</th>
                                                 <th className="text-right px-2 py-1">Outras despesas</th>
+                                                <th className="text-right px-2 py-1">Condomínio</th>
                                                 <th className="text-left px-2 py-1">Comentários</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {importRows.slice(-6).reverse().map(r => (
-                                                <tr key={r.month} className="border-t border-border/60">
+                                                <tr key={`${r.month}|${r.unit_name ?? ""}`} className="border-t border-border/60">
                                                     <td className="px-2 py-1 font-semibold">{formatMonthKey(r.month)}</td>
+                                                    {importHasUnits && <td className="px-2 py-1">{r.unit_name ?? "Imóvel inteiro"}</td>}
                                                     <td className="px-2 py-1 text-right tabular-nums">{r.gross_rent !== undefined ? formatBRL(r.gross_rent) : "—"}</td>
                                                     <td className="px-2 py-1 text-right tabular-nums">{r.agency_fee_pct !== undefined ? `${r.agency_fee_pct}%` : "—"}</td>
                                                     <td className="px-2 py-1 text-right tabular-nums">{r.received_amount !== undefined ? formatBRL(r.received_amount) : r.gross_rent !== undefined ? "calculado" : "—"}</td>
                                                     <td className="px-2 py-1 text-right tabular-nums">{r.energy_portion !== undefined ? formatBRL(r.energy_portion) : "—"}</td>
                                                     <td className="px-2 py-1 text-right tabular-nums">{r.other_income !== undefined ? formatBRL(r.other_income) : "—"}</td>
                                                     <td className="px-2 py-1 text-right tabular-nums">{r.other_expenses !== undefined ? formatBRL(r.other_expenses) : "—"}</td>
+                                                    <td className="px-2 py-1 text-right tabular-nums">{r.condo_amount !== undefined ? formatBRL(r.condo_amount) : "—"}</td>
                                                     <td className="px-2 py-1 truncate max-w-[180px]">{r.notes ?? ""}</td>
                                                 </tr>
                                             ))}
@@ -1201,7 +1299,7 @@ export default function PropertyIncomeLedger({
                             {importing && <Loader2 className="w-4 h-4 animate-spin" />}
                             {importDone !== null && !importing
                                 ? "Importar novamente"
-                                : `Importar ${importRows.length > 0 ? `${importRows.length} meses` : ""}`}
+                                : `Importar ${importRows.length > 0 ? `${importRows.length} ${importHasUnits ? "lançamentos" : "meses"}` : ""}`}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

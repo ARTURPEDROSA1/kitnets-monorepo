@@ -9,7 +9,9 @@ import {
     type IncomeSource,
     type IncomeStatus,
     type PropertyIncomeRow,
+    incomeRowKey,
 } from "@/lib/property-income";
+import { loadPropertyUnits } from "@/lib/property-units-server";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +21,10 @@ export const dynamic = "force-dynamic";
  *   GET    /api/properties/[id]/income              → { rows }   (newest month first)
  *   PUT    /api/properties/[id]/income  { rows, replace? } → { rows }   merge-upsert by month;
  *                                       replace: true wipes the property's months first
- *   DELETE /api/properties/[id]/income?month=YYYY-MM → { ok }
+ *   DELETE /api/properties/[id]/income?month=YYYY-MM[&unit=<unit id>] → { ok }
+ *
+ * A row is a month + a unit (`unit_id`, NULL = the whole property): a multi-unit property holds one row per
+ * unit and month. PUT rows carry `unit_id`, or `unit_name` from spreadsheets (matched to the property's units).
  *
  * PUT semantics: for each input row only the fields present are
  * overwritten; missing fields keep their stored value (or the default
@@ -34,7 +39,7 @@ const MAX_ROWS = 600;
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 const SELECT_COLUMNS =
-    "id, property_id, month, received_on, received_amount, energy_portion, other_income, other_expenses, iptu_amount, agency_fee_pct, status, source, bank_reference, notes, created_at, updated_at";
+    "id, property_id, month, unit_id, unit_name, received_on, received_amount, energy_portion, other_income, other_expenses, condo_amount, iptu_amount, agency_fee_pct, status, source, bank_reference, notes, created_at, updated_at";
 
 function money(value: unknown): number | null | undefined {
     if (value === undefined) return undefined;
@@ -58,6 +63,9 @@ function normalizeRow(r: PropertyIncomeRow): PropertyIncomeRow {
         energy_portion: Number(r.energy_portion) || 0,
         other_income: Number(r.other_income) || 0,
         other_expenses: Number(r.other_expenses) || 0,
+        condo_amount: Number(r.condo_amount) || 0,
+        unit_id: r.unit_id ?? null,
+        unit_name: r.unit_name ?? null,
         iptu_amount: Number(r.iptu_amount) || 0,
         agency_fee_pct: Number(r.agency_fee_pct) || 0,
     };
@@ -68,7 +76,8 @@ async function loadRows(supabase: AdminSupabase, propertyId: string) {
         .from(TABLE)
         .select(SELECT_COLUMNS)
         .eq("property_id", propertyId)
-        .order("month", { ascending: false });
+        .order("month", { ascending: false })
+        .order("unit_name", { ascending: true, nullsFirst: true });
     if (error) throw new Error(error.message);
     return ((data ?? []) as unknown as PropertyIncomeRow[]).map(normalizeRow);
 }
@@ -105,6 +114,11 @@ export async function GET(_request: Request, context: RouteContext) {
 
 interface ValidatedInput {
     month: string;
+    /** undefined = not sent (whole property); null = whole property; string = a unit id */
+    unit_id?: string | null;
+    /** spreadsheet imports send the unit's name instead of its id */
+    unit_name?: string | null;
+    condo_amount?: number;
     received_amount?: number;
     gross_rent?: number;   // derived into received_amount at merge time, never stored
     energy_portion?: number;
@@ -127,7 +141,13 @@ function validateInput(raw: unknown, index: number): { row: ValidatedInput } | {
     }
     const row: ValidatedInput = { month: r.month };
 
-    for (const key of ["received_amount", "gross_rent", "energy_portion", "other_income", "other_expenses", "iptu_amount"] as const) {
+    if (r.unit_id !== undefined && r.unit_id !== null && typeof r.unit_id !== "string") return { error: `Linha ${index + 1} (${r.month}): unidade inválida` };
+    if (typeof r.unit_id === "string" && r.unit_id.trim()) row.unit_id = r.unit_id.trim().slice(0, 120);
+    else if (r.unit_id === null) row.unit_id = null;
+    const unitName = text(r.unit_name, 120);
+    if (unitName) row.unit_name = unitName;
+
+    for (const key of ["received_amount", "gross_rent", "energy_portion", "other_income", "other_expenses", "condo_amount", "iptu_amount"] as const) {
         const v = money(r[key]);
         if (v === null) return { error: `Linha ${index + 1} (${r.month}): ${key} deve ser um número ≥ 0` };
         if (v !== undefined) row[key] = v;
@@ -188,18 +208,42 @@ export async function PUT(request: Request, context: RouteContext) {
         inputs.push(v.row);
     }
 
+    // Units: an id must belong to this property; a name (spreadsheet) is matched to the property's units.
+    const needsUnits = inputs.some(i => i.unit_id || i.unit_name);
+    const units = needsUnits ? (await loadPropertyUnits(supabase, profileId)).get(propertyId) ?? [] : [];
+    const normName = (v: string) => v.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ");
+    for (const input of inputs) {
+        if (input.unit_id) {
+            const unit = units.find(u => u.id === input.unit_id);
+            if (!unit) return NextResponse.json({ error: `${input.month}: a unidade informada não pertence a este imóvel` }, { status: 400 });
+            input.unit_name = unit.name;
+        } else if (input.unit_name) {
+            const unit = units.find(u => normName(u.name) === normName(input.unit_name!));
+            if (!unit) {
+                const valid = units.map(u => u.name).join(", ");
+                return NextResponse.json({ error: `${input.month}: unidade “${input.unit_name}” não encontrada neste imóvel.${valid ? ` Unidades: ${valid}.` : " Este imóvel não tem unidades cadastradas: deixe a coluna Unidade em branco."}` }, { status: 400 });
+            }
+            input.unit_id = unit.id;
+            input.unit_name = unit.name;
+        } else {
+            input.unit_id = null;
+            input.unit_name = null;
+        }
+    }
+
     try {
         if (replaceAll) {
             const { error: delError } = await supabase.from(TABLE).delete().eq("property_id", propertyId);
             if (delError) throw new Error(delError.message);
         }
         const existing = new Map(
-            replaceAll ? [] : (await loadRows(supabase, propertyId)).map(r => [r.month.slice(0, 7), r] as const)
+            replaceAll ? [] : (await loadRows(supabase, propertyId)).map(r => [incomeRowKey(r), r] as const)
         );
         const merged = new Map<string, Record<string, unknown>>();
 
         for (const input of inputs) {
-            const prev = merged.get(input.month) ?? existing.get(input.month);
+            const key = incomeRowKey(input);
+            const prev = merged.get(key) ?? existing.get(key);
             const base: Record<string, unknown> = prev
                 ? { ...prev }
                 : {
@@ -208,6 +252,7 @@ export async function PUT(request: Request, context: RouteContext) {
                     energy_portion: 0,
                     other_income: 0,
                     other_expenses: 0,
+                    condo_amount: 0,
                     iptu_amount: 0,
                     agency_fee_pct: 0,
                     status: "CONFIRMED",
@@ -237,12 +282,12 @@ export async function PUT(request: Request, context: RouteContext) {
                     Number(record.energy_portion) || 0
                 );
             }
-            merged.set(month, record);
+            merged.set(key, record);
         }
 
         const { error } = await supabase
             .from(TABLE)
-            .upsert(Array.from(merged.values()), { onConflict: "property_id,month" });
+            .upsert(Array.from(merged.values()), { onConflict: "property_id,month,unit_id" });
         if (error) throw new Error(error.message);
 
         const rows = await loadRows(supabase, propertyId);
@@ -266,11 +311,10 @@ export async function DELETE(request: Request, context: RouteContext) {
         return NextResponse.json({ error: "month inválido (use AAAA-MM)" }, { status: 400 });
     }
 
-    const { error } = await supabase
-        .from(TABLE)
-        .delete()
-        .eq("property_id", propertyId)
-        .eq("month", `${month}-01`);
+    // ?unit=<id> removes that unit's row; without it, the whole-property row of the month
+    const unit = (searchParams.get("unit") ?? "").trim();
+    const base = supabase.from(TABLE).delete().eq("property_id", propertyId).eq("month", `${month}-01`);
+    const { error } = await (unit ? base.eq("unit_id", unit) : base.is("unit_id", null));
     if (error) {
         console.error("[Income DELETE]", error.message);
         return NextResponse.json({ error: "Erro ao excluir mês" }, { status: 500 });
