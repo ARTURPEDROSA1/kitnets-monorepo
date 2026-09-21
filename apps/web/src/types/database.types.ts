@@ -2516,6 +2516,35 @@ export type Database = {
         }
         Relationships: []
       }
+      user_ui_preferences: {
+        Row: {
+          key: string
+          profile_id: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          key: string
+          profile_id: string
+          updated_at?: string
+          value: Json
+        }
+        Update: {
+          key?: string
+          profile_id?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_ui_preferences_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       water_bills: {
         Row: {
           average_consumption_m3: number | null

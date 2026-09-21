@@ -3,17 +3,21 @@
 /**
  * Hide / show table columns, Excel style.
  *
- *   const vis = useColumnVisibility("income-ledger", { locked: ["month"] });
+ *   const vis = useColumnVisibility(columnTableKey("income-ledger", multiUnit ? "multi" : "single"), { locked: ["month"] });
  *   <ColumnHeaders columns={columns} ctl={cf} visibility={vis} />          // right-click a header → menu
  *   {!vis.isHidden("energy") && <td>…</td>}                                  // body cells follow
  *   <ColumnVisibilityButton ctl={vis} />                                     // same menu, for touch screens
  *   <ColumnVisibilityMenu columns={columns} ctl={vis} />                     // once, at the section root
  *
- * The choice is kept per table in localStorage, so it survives reloads on that device.
+ * The choice belongs to the user's account (`/api/profiles/preferences`), per table key, so it is there on any
+ * device the user signs in on. A table that looks different per kind of property uses one key per kind
+ * (`income-ledger:single`, `income-ledger:multi`). localStorage keeps a copy, so the table opens right away
+ * with the last choice made on this device while the account's copy loads.
  */
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Check, Columns3, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { hiddenColumnsPrefKey, sanitizeHiddenColumns } from "@/lib/ui-preferences";
 
 export interface ColumnVisibility {
     isHidden: (key: string) => boolean;
@@ -30,32 +34,97 @@ export interface ColumnVisibility {
 
 const storageName = (key: string) => `kitnets:hidden-columns:${key}`;
 
-function readStored(key: string, fallback: string[]): Set<string> {
-    if (typeof window === "undefined") return new Set(fallback);
+/** This device's copy of a table's hidden columns; null when it has none. */
+function readLocal(key: string): string[] | null {
+    if (typeof window === "undefined") return null;
     try {
         const raw = window.localStorage.getItem(storageName(key));
-        if (raw === null) return new Set(fallback);
-        const parsed: unknown = JSON.parse(raw);
-        return new Set(Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string") : fallback);
+        return raw === null ? null : sanitizeHiddenColumns(JSON.parse(raw));
     } catch {
-        return new Set(fallback);
+        return null;
     }
 }
 
-export function useColumnVisibility(storageKey: string, opts: { locked?: string[]; defaultHidden?: string[] } = {}): ColumnVisibility {
+function writeLocal(key: string, hidden: string[]) {
+    try { window.localStorage.setItem(storageName(key), JSON.stringify(hidden)); } catch { /* private mode: keep it for this visit */ }
+}
+
+// ── The account's copy ──────────────────────────────────────────────────────
+// One GET per page load serves every table; writes are debounced per table key.
+const ACCOUNT_TTL_MS = 60_000;
+let account: { at: number; load: Promise<Record<string, string[]>> } | null = null;
+const pendingSaves = new Map<string, ReturnType<typeof setTimeout>>();
+
+function loadAccountColumns(): Promise<Record<string, string[]>> {
+    if (!account || Date.now() - account.at > ACCOUNT_TTL_MS) {
+        const load = fetch("/api/profiles/preferences")
+            .then(res => (res.ok ? res.json() : {}))
+            .then((data: { hiddenColumns?: Record<string, string[]> }) => data.hiddenColumns ?? {})
+            .catch(() => ({}));   // signed out or offline: this device's copy still works
+        account = { at: Date.now(), load };
+    }
+    return account.load;
+}
+
+function saveAccountColumns(key: string, hidden: string[]) {
+    if (!hiddenColumnsPrefKey(key)) return;
+    // later reads in this page load see the new choice without another request
+    if (account) account = { at: account.at, load: account.load.then(all => ({ ...all, [key]: hidden })) };
+    clearTimeout(pendingSaves.get(key));
+    pendingSaves.set(key, setTimeout(() => {
+        pendingSaves.delete(key);
+        void fetch("/api/profiles/preferences", {
+            method: "PUT", headers: { "Content-Type": "application/json" }, keepalive: true,
+            body: JSON.stringify({ hiddenColumns: { [key]: hidden } }),
+        }).catch(() => { /* the device's copy keeps the choice; the next change tries again */ });
+    }, 600));
+}
+
+export interface ColumnVisibilityOptions {
+    locked?: string[];
+    defaultHidden?: string[];
+    /** Key this table used before it had one per kind of property: its choice on this device seeds the new key once. */
+    legacyKey?: string;
+}
+
+export function useColumnVisibility(storageKey: string, opts: ColumnVisibilityOptions = {}): ColumnVisibility {
     const locked = opts.locked ?? [];
-    const [hidden, setHidden] = useState<Set<string>>(() => readStored(storageKey, opts.defaultHidden ?? []));
+    const { legacyKey, defaultHidden } = opts;
+    const initial = (key: string) => new Set(readLocal(key) ?? (legacyKey ? readLocal(legacyKey) : null) ?? defaultHidden ?? []);
+    const [state, setState] = useState(() => ({ key: storageKey, hidden: initial(storageKey) }));
+    // the key changes when the table turns out to be of another kind (the property's units arrive): start from that key's copy
+    if (state.key !== storageKey) setState({ key: storageKey, hidden: initial(storageKey) });
+    const hidden = state.hidden;
     const [menu, setMenu] = useState<ColumnVisibility["menu"]>(null);
+    /** Table keys the user changed in this visit: the account's copy, arriving late, must not undo that. */
+    const touched = useRef(new Set<string>());
 
-    const update = useCallback((fn: (prev: Set<string>) => Set<string>) => {
-        setHidden(prev => {
-            const next = fn(prev);
-            try { window.localStorage.setItem(storageName(storageKey), JSON.stringify([...next])); } catch { /* private mode: keep it for this visit */ }
-            return next;
+    useEffect(() => {
+        let alive = true;
+        void loadAccountColumns().then(all => {
+            if (!alive || touched.current.has(storageKey)) return;
+            const remote = all[storageKey];
+            if (remote) {
+                writeLocal(storageKey, remote);
+                setState(prev => (prev.key === storageKey ? { key: storageKey, hidden: new Set(remote) } : prev));
+            } else {
+                // first time this table is seen in the account: the choice made on this device becomes the account's
+                const local = readLocal(storageKey) ?? (legacyKey ? readLocal(legacyKey) : null);
+                if (local && local.length > 0) { writeLocal(storageKey, local); saveAccountColumns(storageKey, local); }
+            }
         });
-    }, [storageKey]);
+        return () => { alive = false; };
+    }, [storageKey, legacyKey]);
 
-    const isLocked = useCallback((key: string) => locked.includes(key), [locked]);   // eslint-disable-line react-hooks/exhaustive-deps
+    const update = (fn: (prev: Set<string>) => Set<string>) => {
+        const next = fn(hidden);
+        touched.current.add(storageKey);
+        writeLocal(storageKey, [...next]);
+        saveAccountColumns(storageKey, [...next]);
+        setState({ key: storageKey, hidden: next });
+    };
+
+    const isLocked = (key: string) => locked.includes(key);
     return {
         isHidden: key => hidden.has(key) && !locked.includes(key),
         isLocked,
