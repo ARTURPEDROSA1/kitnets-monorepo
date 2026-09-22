@@ -173,7 +173,7 @@ export default function CondominioContent({ lang }: { lang: string }) {
                         </Link>
                     </div>
                     {error && <ErrorBox text={error} />}
-                    <CondominiumLedger key={selected.property_id} propertyId={selected.property_id} />
+                    <CondominiumLedger key={selected.property_id} propertyId={selected.property_id} lang={lang} />
                 </>
             ) : (
                 <>

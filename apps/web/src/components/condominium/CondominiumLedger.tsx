@@ -7,10 +7,11 @@
  * to add them up. Above it, the period's totals and the DRE chart.
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, Building, Loader2, Percent, Receipt, Trash2, TrendingUp, Wallet } from "lucide-react";
+import { AlertCircle, Building, ExternalLink, Loader2, Percent, Receipt, Trash2, TrendingUp, Wallet } from "lucide-react";
+import Link from "next/link";
 import { Bar, CartesianGrid, Cell, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from "recharts";
 import { cn } from "@/lib/utils";
-import { CONDO_COST_KEYS, CONDO_COST_LABELS, summarizeCondominium, type CondoCostKey, type CondominiumCostInput, type CondominiumMonth } from "@/lib/condominium";
+import { CONDO_COST_KEYS, CONDO_COST_LABELS, isAutoCostKey, summarizeCondominium, type CondoCostKey, type CondominiumCostInput, type CondominiumMonth } from "@/lib/condominium";
 import { formatMonthKey } from "@/lib/property-income";
 import { groupMonthly, periodLabel, periodRange, type ChartGroup, type PeriodFilterValue } from "@/lib/period-filter";
 import { columnTableKey } from "@/lib/ui-preferences";
@@ -26,7 +27,12 @@ const COLLAPSED_ROWS = 24;
 
 type DraftField = CondoCostKey | "notes";
 
-export default function CondominiumLedger({ propertyId }: { propertyId: string }) {
+export default function CondominiumLedger({ propertyId, lang = "pt" }: { propertyId: string; lang?: string }) {
+    /** Where the two derived columns are fed from: the energy bills and the property's taxes register. */
+    const source = useMemo((): Record<"energy_cost" | "iptu_amount", { href: string; label: string; title: string }> => ({
+        energy_cost: { href: `/${lang}/dashboard/energy/${propertyId}`, label: "faturas de energia", title: "Vem de Gestão de Energia Solar & Consumo: o “Valor a pagar” da fatura do mês. Envie a fatura lá e o valor entra aqui sozinho." },
+        iptu_amount: { href: `/${lang}/imoveis?id=${propertyId}`, label: "Tributos do imóvel", title: "Vem de Tributos do imóvel: o IPTU pago por você, no mês do pagamento. Registre o carnê lá e o valor entra aqui sozinho." },
+    }), [lang, propertyId]);
     const endpoint = `/api/properties/${propertyId}/condominium`;
     const [months, setMonths] = useState<CondominiumMonth[] | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -116,11 +122,11 @@ export default function CondominiumLedger({ propertyId }: { propertyId: string }
     const columns = useMemo<ColumnDef<CondominiumMonth>[]>(() => [
         { key: "month", label: "Mês", kind: "month", get: r => r.month },
         { key: "revenue", label: "Receita", kind: "number", align: "right", title: "Condomínio cobrado das unidades no mês (soma da coluna Condomínio de Receitas de Aluguel)", get: r => r.revenue },
-        ...CONDO_COST_KEYS.map(k => ({ key: k, label: CONDO_COST_LABELS[k], kind: "number" as const, align: "right" as const, get: (r: CondominiumMonth) => r[k] })),
+        ...CONDO_COST_KEYS.map(k => ({ key: k, label: CONDO_COST_LABELS[k], kind: "number" as const, align: "right" as const, title: isAutoCostKey(k) ? source[k].title : undefined, get: (r: CondominiumMonth) => r[k] })),
         { key: "totalCost", label: "Total de custos", kind: "number", align: "right", get: r => r.totalCost },
         { key: "result", label: "Resultado", kind: "number", align: "right", title: "Receita − custos", get: r => r.result },
         { key: "notes", label: "Descrição", kind: "text", get: r => r.notes ?? "" },
-    ], []);
+    ], [source]);
     const cf = useColumnFilters(filtered, columns, { key: "month", dir: "desc" });
     const visible = showAll ? cf.rows : cf.rows.slice(0, COLLAPSED_ROWS);
     const show = (key: string) => !vis.isHidden(key);
@@ -132,7 +138,7 @@ export default function CondominiumLedger({ propertyId }: { propertyId: string }
             example: summary.months ? <>{formatBRL(summary.revenue)} em {summary.months} {summary.months === 1 ? "mês" : "meses"} · {periodLabel(period)}</> : undefined,
         },
         cost: {
-            what: "O que o condomínio gastou no período: energia das áreas comuns, internet, água, IPTU e manutenção, conforme a tabela abaixo.",
+            what: "O que o condomínio gastou no período. Energia vem das faturas de energia do imóvel (Valor a pagar) e IPTU de Tributos do imóvel, lançados uma vez só; internet, água e manutenção são digitados na tabela abaixo.",
             formula: "Custos = energia + internet + água + IPTU + manutenção",
             example: summary.months ? <>{CONDO_COST_KEYS.map(k => `${CONDO_COST_LABELS[k]} ${formatBRL(summary.byCost[k])}`).join(" · ")}</> : undefined,
         },
@@ -213,7 +219,8 @@ export default function CondominiumLedger({ propertyId }: { propertyId: string }
                     <h3 className="font-bold text-base text-foreground flex items-center gap-2"><Receipt className="w-4 h-4 text-rose-600" /> Custos do condomínio</h3>
                     <p className="text-xs text-muted-foreground">
                         Um mês por linha, criado sozinho para cada mês em que alguma unidade do imóvel tem aluguel em Receitas de Aluguel. A receita vem de lá;
-                        edite os custos nas células (Enter ou Tab para salvar). Clique no cabeçalho para ordenar e filtrar, com o botão direito para ocultar colunas; clique nas células para somá-las.
+                        Energia vem das <Link href={source.energy_cost.href} className="text-emerald-700 dark:text-emerald-400 hover:underline">faturas de energia</Link> (Valor a pagar) e IPTU de <Link href={source.iptu_amount.href} className="text-emerald-700 dark:text-emerald-400 hover:underline">Tributos do imóvel</Link>, uma entrada só.
+                        Internet, água e manutenção você digita nas células (Enter ou Tab para salvar). Clique no cabeçalho para ordenar e filtrar, com o botão direito para ocultar colunas; clique nas células para somá-las.
                     </p>
                 </div>
 
@@ -245,7 +252,17 @@ export default function CondominiumLedger({ propertyId }: { propertyId: string }
                                                 {busy && <Loader2 className="inline w-3 h-3 ml-1 animate-spin text-muted-foreground" />}
                                             </td>
                                             {show("revenue") && <td {...sel.cellProps("revenue", row.month, row.revenue, "px-2 py-1 text-right font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums")} title={row.units ? `${row.units} ${row.units === 1 ? "unidade" : "unidades"} com condomínio no mês` : "Nenhuma unidade com condomínio neste mês em Receitas de Aluguel"}>{formatBRL(row.revenue)}</td>}
-                                            {CONDO_COST_KEYS.map(k => show(k) && <td key={k} {...sel.cellProps(k, row.month, row[k], "px-2 py-1 text-right", () => cancelDraft(row.month, k))}>{cell(k)}</td>)}
+                                            {CONDO_COST_KEYS.map(k => show(k) && (isAutoCostKey(k) ? (
+                                                <td key={k} {...sel.cellProps(k, row.month, row[k], "px-2 py-1 text-right tabular-nums text-muted-foreground")} title={source[k].title}>
+                                                    {row[k] > 0 ? formatBRL(row[k]) : (
+                                                        <Link href={source[k].href} onClick={e => e.stopPropagation()} className="inline-flex items-center gap-1 text-[11px] text-emerald-700 dark:text-emerald-400 hover:underline" title={`Sem valor neste mês · abrir ${source[k].label}`}>
+                                                            — <ExternalLink className="w-3 h-3" />
+                                                        </Link>
+                                                    )}
+                                                </td>
+                                            ) : (
+                                                <td key={k} {...sel.cellProps(k, row.month, row[k], "px-2 py-1 text-right", () => cancelDraft(row.month, k))}>{cell(k)}</td>
+                                            )))}
                                             {show("totalCost") && <td {...sel.cellProps("totalCost", row.month, row.totalCost, "px-2 py-1 text-right font-semibold text-rose-600 tabular-nums")}>{formatBRL(row.totalCost)}</td>}
                                             {show("result") && <td {...sel.cellProps("result", row.month, row.result, cn("px-2 py-1 text-right font-semibold tabular-nums", row.result < 0 ? "text-rose-600" : "text-foreground"))}>{formatBRL(row.result)}</td>}
                                             {show("notes") && <td {...sel.cellProps("notes", row.month, null, "px-2 py-1", () => cancelDraft(row.month, "notes"))}>

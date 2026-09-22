@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getOwnedProperty, requireProfile } from "@/lib/api-auth";
 import { MONTH_KEY_REGEX } from "@/lib/property-income";
-import { CONDO_COST_KEYS, type CondominiumCostInput } from "@/lib/condominium";
+import { CONDO_COST_KEYS, isAutoCostKey, type CondominiumCostInput } from "@/lib/condominium";
 import { CONDO_COSTS_TABLE as TABLE, loadCosts, loadMonths } from "@/lib/condominium-server";
 
 export const dynamic = "force-dynamic";
@@ -11,8 +11,9 @@ export const dynamic = "force-dynamic";
  *   PUT    /api/properties/[id]/condominium { rows }       → { months, costs }   merge upsert, one row per month
  *   DELETE /api/properties/[id]/condominium?month=YYYY-MM  → { ok }             removes the month's cost row
  *
- * `months` (lib/condominium.ts) joins the condominium charged in the income ledger (revenue) with the
- * cost rows of `condominium_months`, newest first. `costs` are the raw cost rows.
+ * `months` (lib/condominium.ts) joins the condominium charged in the income ledger (revenue), the energy
+ * bills and the landlord's IPTU (energy_cost / iptu_amount, read-only here) and the cost rows of
+ * `condominium_months`, newest first. `costs` are the raw cost rows.
  */
 
 const MAX_ROWS = 300;
@@ -47,6 +48,7 @@ function validate(raw: unknown, index: number): { row: CondominiumCostInput } | 
     const row: CondominiumCostInput = { month: r.month };
     for (const key of CONDO_COST_KEYS) {
         if (r[key] === undefined) continue;
+        if (isAutoCostKey(key)) return { error: `Linha ${index + 1} (${r.month}): ${key === "energy_cost" ? "a energia vem das faturas de energia do imóvel" : "o IPTU vem de Tributos do imóvel"}, não é digitado aqui` };
         const v = Number(r[key]);
         if (!Number.isFinite(v) || v < 0 || v > 1e9) return { error: `Linha ${index + 1} (${r.month}): ${key} deve ser um número ≥ 0` };
         row[key] = Math.round(v * 100) / 100;
