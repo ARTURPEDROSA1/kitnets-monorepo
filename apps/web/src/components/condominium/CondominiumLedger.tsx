@@ -31,7 +31,7 @@ export default function CondominiumLedger({ propertyId, lang = "pt" }: { propert
     /** Where the two derived columns are fed from: the energy bills and the property's taxes register. */
     const source = useMemo((): Record<"energy_cost" | "iptu_amount", { href: string; label: string; title: string }> => ({
         energy_cost: { href: `/${lang}/dashboard/energy/${propertyId}`, label: "faturas de energia", title: "Vem de Gestão de Energia Solar & Consumo: o “Valor a pagar” da fatura do mês. Envie a fatura lá e o valor entra aqui sozinho." },
-        iptu_amount: { href: `/${lang}/imoveis?id=${propertyId}`, label: "Tributos do imóvel", title: "Vem de Tributos do imóvel: o IPTU pago por você, no mês do pagamento. Registre o carnê lá e o valor entra aqui sozinho." },
+        iptu_amount: { href: `/${lang}/imoveis?id=${propertyId}`, label: "Tributos do imóvel", title: "Vem de Tributos do imóvel: o IPTU pago por você, no mês do pagamento, a partir de jan/2025 (antes disso o IPTU fica com o imóvel). Registre o carnê lá e o valor entra aqui sozinho." },
     }), [lang, propertyId]);
     const endpoint = `/api/properties/${propertyId}/condominium`;
     const [months, setMonths] = useState<CondominiumMonth[] | null>(null);

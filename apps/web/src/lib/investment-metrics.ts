@@ -32,7 +32,7 @@
 import { aggregateIncomeByMonth, breakdown, currentMonthKey, monthKey, round2, type PropertyIncomeRow } from "./property-income";
 import { monthsBetween, shiftMonthKey } from "./period-filter";
 import { KIND_GROUP, type PropertyInvestment, type PropertyTransaction } from "./property-investment";
-import { landlordTaxesByMonth, type PropertyTax } from "./property-taxes";
+import { landlordTaxesByMonth, type PropertyTax, type TaxScope } from "./property-taxes";
 import { priceLevelFactors, type MonthlyIndexPoint } from "./property-valuations";
 
 export interface MetricsInput {
@@ -40,6 +40,8 @@ export interface MetricsInput {
     transactions: PropertyTransaction[];
     incomeRows: PropertyIncomeRow[];
     taxes?: PropertyTax[];
+    /** which landlord taxes count (a multi-unit property leaves the condominium's IPTU out) */
+    taxScope?: TaxScope;
     /** `YYYY-MM`; defaults to the current month */
     asOf?: string;
     /** count EXPECTED income months as if confirmed (default false) */
@@ -229,7 +231,7 @@ export function computeInvestmentMetrics(input: MetricsInput): InvestmentMetrics
     const incomeAll = aggregateIncomeByMonth(input.incomeRows.filter(r => monthKey(r.month) <= asOf));
     const counted = incomeAll.filter(r => r.status === "CONFIRMED" || input.includeExpected);
     const expectedExcluded = incomeAll.length - counted.length;
-    const registerIptu = landlordTaxesByMonth(input.taxes ?? []);
+    const registerIptu = landlordTaxesByMonth(input.taxes ?? [], undefined, input.taxScope);
 
     // ── month buckets ───────────────────────────────────────────────────
     const months = new Set<string>();

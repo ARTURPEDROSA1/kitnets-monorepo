@@ -1,7 +1,7 @@
 import type { AdminSupabase } from "@/lib/api-auth";
 import type { PropertyIncomeRow } from "@/lib/property-income";
 import { buildCondominiumMonths, type CondominiumAutoCosts, type CondominiumCostRow, type CondominiumMonth } from "@/lib/condominium";
-import { landlordIptuByMonth } from "@/lib/property-taxes";
+import { condominiumIptuByMonth } from "@/lib/property-taxes";
 import { loadTaxRows } from "@/lib/property-taxes-server";
 
 /** Server-side readers of the condominium cost centre (lib/condominium.ts holds the pure maths). */
@@ -47,7 +47,7 @@ export async function loadAutoCosts(supabase: AdminSupabase, propertyId: string)
         loadTaxRows(supabase, propertyId),
     ]);
     if (error) throw new Error(error.message);
-    return { energy: energyByMonth((bills ?? []) as BillRecord[], propertyId), iptu: landlordIptuByMonth(taxes) };
+    return { energy: energyByMonth((bills ?? []) as BillRecord[], propertyId), iptu: condominiumIptuByMonth(taxes) };
 }
 
 /** One property's condominium months (revenue from the income ledger, energy and IPTU from their registers, its cost rows), newest first. */
@@ -78,7 +78,7 @@ export async function loadMonthsByProperty(supabase: AdminSupabase, profileId: s
         out.set(id, buildCondominiumMonths(
             ((income ?? []) as unknown as Array<PropertyIncomeRow & { property_id: string }>).filter(r => r.property_id === id),
             ((costs ?? []) as CostRecord[]).filter(c => c.property_id === id).map(toCostRow),
-            { energy: energyByMonth((bills ?? []) as BillRecord[], id), iptu: landlordIptuByMonth(taxes[i]) }
+            { energy: energyByMonth((bills ?? []) as BillRecord[], id), iptu: condominiumIptuByMonth(taxes[i]) }
         ));
     });
     return out;

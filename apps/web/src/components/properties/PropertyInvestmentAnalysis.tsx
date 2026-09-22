@@ -30,7 +30,7 @@ import InvestmentScenarios from "./InvestmentScenarios";
 import { computeInvestmentMetrics, type InvestmentMetrics } from "@/lib/investment-metrics";
 import { formatMonthKey, type PropertyIncomeRow } from "@/lib/property-income";
 import { formatDateBR, type PropertyInvestment, type PropertyTransaction } from "@/lib/property-investment";
-import type { PropertyTax } from "@/lib/property-taxes";
+import type { PropertyTax, TaxScope } from "@/lib/property-taxes";
 import {
     latestValuation,
     purchaseAppraisal,
@@ -74,6 +74,8 @@ interface Props {
     transactions: PropertyTransaction[];
     incomeRows: PropertyIncomeRow[];
     taxes: PropertyTax[];
+    /** a multi-unit property leaves the condominium's IPTU out of its own analysis */
+    taxScope?: TaxScope;
     loading?: boolean;
     /** Valuations loaded by the parent (overview): undefined = fetch here. */
     preloadedValuations?: PropertyValuation[] | null;
@@ -123,7 +125,7 @@ function buildChart(m: InvestmentMetrics, real: boolean): ChartPoint[] {
 type Draft = { valued_on: string; amount: string; source: ValuationSource; note: string };
 const emptyDraft = (): Draft => ({ valued_on: todayIso(), amount: "", source: "MANUAL", note: "" });
 
-export default function PropertyInvestmentAnalysis({ propertyId, bedrooms, investment, transactions, incomeRows, taxes, loading, preloadedValuations }: Props) {
+export default function PropertyInvestmentAnalysis({ propertyId, bedrooms, investment, transactions, incomeRows, taxes, taxScope, loading, preloadedValuations }: Props) {
     const [includeExpected, setIncludeExpected] = useState(false);
     const [realMode, setRealMode] = useState(false);
 
@@ -158,10 +160,10 @@ export default function PropertyInvestmentAnalysis({ propertyId, bedrooms, inves
     const boughtAppraisal = useMemo(() => purchaseAppraisal(valuations, investment?.acquired_on), [valuations, investment?.acquired_on]);
     const metrics = useMemo(
         () => computeInvestmentMetrics({
-            investment, transactions, incomeRows, taxes, includeExpected, ipca,
+            investment, transactions, incomeRows, taxes, taxScope, includeExpected, ipca,
             marketValue: latest ? { amount: latest.amount, valuedOn: latest.valued_on, source: latest.source } : null,
         }),
-        [investment, transactions, incomeRows, taxes, includeExpected, ipca, latest]
+        [investment, transactions, incomeRows, taxes, taxScope, includeExpected, ipca, latest]
     );
     const real = realMode && metrics.ipcaAvailable;
     const chart = useMemo(() => buildChart(metrics, real), [metrics, real]);

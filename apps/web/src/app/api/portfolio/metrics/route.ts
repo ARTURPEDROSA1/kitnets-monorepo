@@ -3,7 +3,8 @@ import { requireProfile } from "@/lib/api-auth";
 import { computeInvestmentMetrics } from "@/lib/investment-metrics";
 import type { PropertyIncomeRow } from "@/lib/property-income";
 import type { PropertyInvestment, PropertyTransaction } from "@/lib/property-investment";
-import { normalizeInstallments, type PropertyTax } from "@/lib/property-taxes";
+import { normalizeInstallments, taxScopeForProperty, type PropertyTax } from "@/lib/property-taxes";
+import { loadPropertyUnits } from "@/lib/property-units-server";
 import { latestValuation, type PropertyValuation } from "@/lib/property-valuations";
 import { loadIpcaSeries } from "@/lib/property-valuations-server";
 
@@ -58,7 +59,7 @@ export async function GET() {
     if ("response" in authed) return authed.response;
     const { profileId, supabase } = authed.ctx;
 
-    const [props, invs, txs, incomes, taxes, vals, ipca] = await Promise.all([
+    const [props, invs, txs, incomes, taxes, vals, ipca, units] = await Promise.all([
         supabase.from("properties").select("id").eq("owner_id", profileId),
         supabase.from("property_investments").select("property_id, purchase_price, acquired_on, built_area_m2, lender, contract_number, financing_system, principal, annual_rate, term_months, contract_date, first_due_date, financing_status, paid_off_on, notes").eq("owner_id", profileId),
         supabase.from("property_transactions").select("id, property_id, occurred_on, kind, amount, interest_part, principal_part, insurance_part, comment, source, bank_reference").eq("owner_id", profileId),
@@ -66,6 +67,7 @@ export async function GET() {
         supabase.from("property_taxes").select("id, property_id, year, kind, amount, paid_by, paid_on, comment, installments").eq("owner_id", profileId),
         supabase.from("property_valuations").select("id, property_id, valued_on, amount, source, note, created_at").eq("owner_id", profileId),
         loadIpcaSeries(supabase).catch(() => []),
+        loadPropertyUnits(supabase, profileId),
     ]);
     const failed = [props, invs, txs, incomes, taxes, vals].find(r => r.error);
     if (failed?.error) {
@@ -97,6 +99,7 @@ export async function GET() {
         const m = computeInvestmentMetrics({
             investment: inv ? { ...inv, purchase_price: Number(inv.purchase_price) || 0, principal: inv.principal === null ? null : Number(inv.principal) } : null,
             transactions, incomeRows, taxes: taxRows, ipca,
+            taxScope: taxScopeForProperty((units.get(p.id)?.length ?? 0) > 0),
             marketValue: latest ? { amount: latest.amount, valuedOn: latest.valued_on, source: latest.source } : null,
         });
         if (m.cashInvested <= 0) continue;

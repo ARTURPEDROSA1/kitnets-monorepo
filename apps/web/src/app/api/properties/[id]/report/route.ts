@@ -4,7 +4,8 @@ import { requireProfile, getOwnedProperty } from "@/lib/api-auth";
 import { computeInvestmentMetrics } from "@/lib/investment-metrics";
 import { breakdown, formatMonthKey, monthKey, type PropertyIncomeRow } from "@/lib/property-income";
 import { KIND_LABELS, type PropertyInvestment, type PropertyTransaction } from "@/lib/property-investment";
-import { effectiveTax, TAX_KINDS } from "@/lib/property-taxes";
+import { effectiveTax, taxScopeForProperty, TAX_KINDS } from "@/lib/property-taxes";
+import { loadPropertyUnits } from "@/lib/property-units-server";
 import { loadTaxRows } from "@/lib/property-taxes-server";
 import { latestValuation, VALUATION_SOURCE_LABELS } from "@/lib/property-valuations";
 import { loadIpcaSeries, loadValuations } from "@/lib/property-valuations-server";
@@ -34,13 +35,14 @@ export async function GET(_request: Request, context: RouteContext) {
     const propertyName = String(property.name ?? "Imóvel");
 
     try {
-        const [inv, txs, income, taxes, valuations, ipca] = await Promise.all([
+        const [inv, txs, income, taxes, valuations, ipca, units] = await Promise.all([
             supabase.from("property_investments").select("*").eq("property_id", id).maybeSingle(),
             supabase.from("property_transactions").select("id, property_id, occurred_on, kind, amount, interest_part, principal_part, insurance_part, comment, source, bank_reference").eq("property_id", id).order("occurred_on", { ascending: true }),
             supabase.from("property_income_months").select("id, property_id, month, unit_id, unit_name, received_on, received_amount, energy_portion, other_income, other_expenses, condo_amount, fee_on_condo, iptu_amount, agency_fee_pct, status, source, bank_reference, notes").eq("property_id", id).order("month", { ascending: true }),
             loadTaxRows(supabase, id),
             loadValuations(supabase, id),
             loadIpcaSeries(supabase).catch(() => []),
+            loadPropertyUnits(supabase, profileId),
         ]);
         if (txs.error) throw new Error(txs.error.message);
         if (income.error) throw new Error(income.error.message);
@@ -52,6 +54,7 @@ export async function GET(_request: Request, context: RouteContext) {
         const latest = latestValuation(valuations);
         const m = computeInvestmentMetrics({
             investment, transactions, incomeRows, taxes, ipca,
+            taxScope: taxScopeForProperty((units.get(id)?.length ?? 0) > 0),
             marketValue: latest ? { amount: latest.amount, valuedOn: latest.valued_on, source: latest.source } : null,
         });
 
