@@ -18,7 +18,7 @@ import { columnTableKey } from "@/lib/ui-preferences";
 import PeriodFilter, { GroupSelect } from "@/components/properties/PeriodFilter";
 import Tile, { type TileInfo } from "@/components/properties/Tile";
 import MoneyInput from "@/components/properties/MoneyInput";
-import { ColumnHeaders, useColumnFilters, type ColumnDef } from "@/components/properties/TableColumnFilters";
+import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "@/components/properties/TableColumnFilters";
 import { ColumnVisibilityMenu, useColumnVisibility } from "@/components/properties/TableColumnVisibility";
 import { CellSumBar, useCellSum } from "@/components/properties/TableCellSum";
 
@@ -233,6 +233,7 @@ export default function CondominiumLedger({ propertyId }: { propertyId: string }
                 <span className="text-xs text-muted-foreground">
                     {periodLabel(period)} · {filtered.length} {filtered.length === 1 ? "mês" : "meses"}{cf.anyFilter && ` · ${cf.rows.length} de ${filtered.length}`}
                 </span>
+                <FilterChips columns={columns} ctl={cf} />
 
                 {filtered.length === 0 ? (
                     <p className="text-sm text-muted-foreground py-6 text-center">Nenhum mês no período.</p>
@@ -287,6 +288,7 @@ export default function CondominiumLedger({ propertyId }: { propertyId: string }
                         )}
                     </div>
                 )}
+                <ColumnMenu columns={columns} ctl={cf} />
                 <ColumnVisibilityMenu columns={columns} ctl={vis} />
                 <CellSumBar ctl={sel} />
             </div>
