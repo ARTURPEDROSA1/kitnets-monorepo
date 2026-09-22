@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
  * A condominium belongs to one multi-unit property (a property with units) and a property has one condominium.
  */
 
-const COLUMNS = "id, property_id, name, notes, created_at, updated_at";
+const COLUMNS = "id, property_id, name, notes, solar_payback_from_result, created_at, updated_at";
 
 export async function GET() {
     const authed = await requireProfile();
@@ -36,7 +36,7 @@ export async function GET() {
         const condominiums: Condominium[] = rows.map(r => {
             const p = (props ?? []).find(x => x.id === r.property_id);
             return {
-                id: r.id, property_id: r.property_id, name: r.name, notes: r.notes ?? null,
+                id: r.id, property_id: r.property_id, name: r.name, notes: r.notes ?? null, solar_payback_from_result: r.solar_payback_from_result === true,
                 property_name: p?.name || "Imóvel",
                 property_address: [p?.address, p?.city, p?.state].filter(Boolean).join(", "),
                 units: units.get(r.property_id)?.length ?? 0,

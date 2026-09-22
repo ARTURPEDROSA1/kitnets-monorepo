@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildCondominiumMonths, condominiumKpis, condoTotalCost, summarizeCondominium, type CondominiumCostRow } from "./condominium";
+import { buildCondominiumMonths, condominiumKpis, condominiumResultByMonth, condoTotalCost, summarizeCondominium, type CondominiumCostRow } from "./condominium";
+import { solarPayback } from "./property-investment";
 import type { PropertyIncomeRow } from "./property-income";
 
 const income = (m: string, unit: string, condo: number, status: "CONFIRMED" | "EXPECTED" = "CONFIRMED"): PropertyIncomeRow => ({
@@ -47,6 +48,19 @@ describe("condominium months", () => {
         expect(months[0]).toMatchObject({ energy_cost: 180.4, water_cost: 329.16, iptu_amount: 0, internet_cost: 40, totalCost: 549.56, result: -249.56 });
         expect(months[1]).toMatchObject({ energy_cost: 0, water_cost: 0, iptu_amount: 90, totalCost: 90, result: 210 });
         expect(months[2]).toMatchObject({ revenue: 0, energy_cost: 150, hasCosts: false, expected: false });   // a bill alone makes the month
+    });
+
+    it("its monthly result can count towards the solar payback", () => {
+        const months = buildCondominiumMonths(
+            [income("2026-09", "u1", 300), income("2026-08", "u1", 300), income("2026-10", "u1", 300, "EXPECTED")],
+            [cost("2026-09", { internet_cost: 100 }), cost("2026-08", { internet_cost: 400 })]
+        );
+        const byMonth = condominiumResultByMonth(months);
+        expect([...byMonth]).toEqual([["2026-10", 300], ["2026-09", 200], ["2026-08", -100]].filter(([m]) => m !== "2026-10"));
+        // solar system of 10.000; the tenants' energy nets 50 per confirmed month; the condominium adds 200 − 100
+        const rows = [income("2026-09", "u1", 300), income("2026-08", "u1", 300)].map(r => ({ ...r, energy_portion: 80, other_income: 30 }));
+        expect(solarPayback(10000, rows)).toMatchObject({ recovered: 100, extraRecovered: 0, pct: 1 });
+        expect(solarPayback(10000, rows, byMonth)).toMatchObject({ recovered: 200, extraRecovered: 100, pct: 2, remaining: 9800 });
     });
 
     it("summarises revenue, costs by kind, result and margin", () => {

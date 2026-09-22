@@ -60,7 +60,7 @@ import { groupMonthly, monthsBetween, periodLabel, periodRange, type ChartGroup,
 import type { PropertyInvestment, PropertyTransaction } from '@/lib/property-investment';
 import { landlordIptuByMonth, landlordTaxTotals, taxScopeForProperty, type PropertyTax } from '@/lib/property-taxes';
 import type { PropertyValuation } from '@/lib/property-valuations';
-import type { CondominiumMonth } from '@/lib/condominium';
+import { condominiumResultByMonth, type CondominiumMonth } from '@/lib/condominium';
 
 interface PropertyCostCenterDashboardProps {
     propertyIndex: number;
@@ -112,19 +112,26 @@ export default function PropertyCostCenterDashboard({
     const [taxRows, setTaxRows] = useState<PropertyTax[]>([]);
     // Condomínio cost centre of a multi-unit property (page Condomínio): feeds the Condomínio card and the ledger's tile
     const [condoMonthsLoaded, setCondoMonthsLoaded] = useState<CondominiumMonth[]>([]);
+    /** the condominium record's settings (null while the property has no condominium) */
+    const [condoSettings, setCondoSettings] = useState<{ name: string; solar_payback_from_result: boolean } | null>(null);
     useEffect(() => {
         if (!dbId || propertyType !== 'multi') return;
         let cancelled = false;
         fetch(`/api/properties/${dbId}/condominium`)
             .then(async res => {
                 const data = await res.json().catch(() => null);
-                if (!cancelled && res.ok && data) setCondoMonthsLoaded(data.months ?? []);
+                if (!cancelled && res.ok && data) { setCondoMonthsLoaded(data.months ?? []); setCondoSettings(data.condominium ?? null); }
             })
             .catch(() => { /* the card then shows only the condominium charged */ });
         return () => { cancelled = true; };
     }, [dbId, propertyType]);
     const condoMonths = propertyType === 'multi' ? condoMonthsLoaded : [];
     const condoCosts = useMemo(() => Object.fromEntries(condoMonths.map(m => [m.month, m.totalCost])), [condoMonths]);
+    // the owner may count the condominium's monthly result towards the solar payback (setting on the Condomínio page)
+    const solarExtra = useMemo(
+        () => (propertyType === 'multi' && condoSettings?.solar_payback_from_result ? { byMonth: condominiumResultByMonth(condoMonths), label: condoSettings.name } : undefined),
+        [propertyType, condoSettings, condoMonths]
+    );
     // One request for every ledger of the property (auth + ownership once); sections fall back to their own fetches if it fails.
     type Overview = { income: PropertyIncomeRow[]; investment: PropertyInvestment | null; transactions: PropertyTransaction[]; taxes: PropertyTax[]; valuations: PropertyValuation[] };
     const [overview, setOverview] = useState<Overview | null | undefined>(dbId ? null : undefined);
@@ -848,7 +855,7 @@ export default function PropertyCostCenterDashboard({
             />
 
             {/* Investment ledger: acquisition, financing, capex, running costs, solar */}
-            <PropertyInvestmentSection propertyId={dbId} incomeRows={incomeRows} landlordTaxes={landlordTaxTotals(taxRows, taxScope)} onDataChange={setInvestmentData} preloaded={preloadedInvestment} />
+            <PropertyInvestmentSection propertyId={dbId} incomeRows={incomeRows} landlordTaxes={landlordTaxTotals(taxRows, taxScope)} solarExtra={solarExtra} onDataChange={setInvestmentData} preloaded={preloadedInvestment} />
 
             {/* Property taxes register: the source of IPTU (landlord payments count in the month paid) */}
             <RentHistoryModal isOpen={rentHistoryOpen} onClose={() => setRentHistoryOpen(false)} rows={incomeRows} areaM2={areaM2} />

@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { getOwnedProperty, requireProfile } from "@/lib/api-auth";
 import { MONTH_KEY_REGEX } from "@/lib/property-income";
 import { CONDO_COST_KEYS, isAutoCostKey, type CondominiumCostInput } from "@/lib/condominium";
-import { CONDO_COSTS_TABLE as TABLE, loadCosts, loadMonths } from "@/lib/condominium-server";
+import { CONDO_COSTS_TABLE as TABLE, CONDOMINIUMS_TABLE, loadCosts, loadMonths } from "@/lib/condominium-server";
 
 export const dynamic = "force-dynamic";
 
 /**
- *   GET    /api/properties/[id]/condominium                → { months, costs }
+ *   GET    /api/properties/[id]/condominium                → { months, costs, condominium }   condominium = the record (id, name, settings) or null
  *   PUT    /api/properties/[id]/condominium { rows }       → { months, costs }   merge upsert, one row per month
  *   DELETE /api/properties/[id]/condominium?month=YYYY-MM  → { ok }             removes the month's cost row
  *
@@ -35,7 +35,11 @@ export async function GET(_request: Request, context: RouteContext) {
     const r = await resolveProperty(context);
     if ("response" in r) return r.response;
     try {
-        return NextResponse.json(await loadMonths(r.ctx.supabase, r.ctx.propertyId));
+        const [months, { data: condominium }] = await Promise.all([
+            loadMonths(r.ctx.supabase, r.ctx.propertyId),
+            r.ctx.supabase.from(CONDOMINIUMS_TABLE).select("id, name, solar_payback_from_result").eq("property_id", r.ctx.propertyId).maybeSingle(),
+        ]);
+        return NextResponse.json({ ...months, condominium: condominium ?? null });
     } catch (err) {
         console.error("[Condominium GET]", (err as Error).message);
         return NextResponse.json({ error: "Erro ao carregar o condomínio" }, { status: 500 });
