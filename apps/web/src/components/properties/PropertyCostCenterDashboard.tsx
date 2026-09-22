@@ -10,6 +10,7 @@ import {
     Building2,
     Home,
     Sun,
+    Building,
     Zap,
     FileText,
     AlertCircle,
@@ -58,6 +59,7 @@ import { groupMonthly, monthsBetween, periodLabel, periodRange, type ChartGroup,
 import type { PropertyInvestment, PropertyTransaction } from '@/lib/property-investment';
 import { landlordIptuByMonth, landlordTaxTotals, type PropertyTax } from '@/lib/property-taxes';
 import type { PropertyValuation } from '@/lib/property-valuations';
+import type { CondominiumMonth } from '@/lib/condominium';
 
 interface PropertyCostCenterDashboardProps {
     propertyIndex: number;
@@ -107,6 +109,21 @@ export default function PropertyCostCenterDashboard({
     // Investment header + transactions (fed by PropertyInvestmentSection) and taxes (fed by PropertyTaxesSection) for the analysis
     const [investmentData, setInvestmentData] = useState<{ investment: PropertyInvestment | null; transactions: PropertyTransaction[]; loading: boolean }>({ investment: null, transactions: [], loading: Boolean(dbId) });
     const [taxRows, setTaxRows] = useState<PropertyTax[]>([]);
+    // Condomínio cost centre of a multi-unit property (page Condomínio): feeds the Condomínio card and the ledger's tile
+    const [condoMonthsLoaded, setCondoMonthsLoaded] = useState<CondominiumMonth[]>([]);
+    useEffect(() => {
+        if (!dbId || propertyType !== 'multi') return;
+        let cancelled = false;
+        fetch(`/api/properties/${dbId}/condominium`)
+            .then(async res => {
+                const data = await res.json().catch(() => null);
+                if (!cancelled && res.ok && data) setCondoMonthsLoaded(data.months ?? []);
+            })
+            .catch(() => { /* the card then shows only the condominium charged */ });
+        return () => { cancelled = true; };
+    }, [dbId, propertyType]);
+    const condoMonths = propertyType === 'multi' ? condoMonthsLoaded : [];
+    const condoCosts = useMemo(() => Object.fromEntries(condoMonths.map(m => [m.month, m.totalCost])), [condoMonths]);
     // One request for every ledger of the property (auth + ownership once); sections fall back to their own fetches if it fails.
     type Overview = { income: PropertyIncomeRow[]; investment: PropertyInvestment | null; transactions: PropertyTransaction[]; taxes: PropertyTax[]; valuations: PropertyValuation[] };
     const [overview, setOverview] = useState<Overview | null | undefined>(dbId ? null : undefined);
@@ -333,6 +350,8 @@ export default function PropertyCostCenterDashboard({
 
         return {
             realIncomeMonth: latest && hasRealIncome ? formatMonthKey(monthKey(latest.month)) : null,
+            realIncomeKey: latest && hasRealIncome ? monthKey(latest.month) : null,
+            latestCondo: current ? current.condo : null,
             occupancyHint,
             grossMonthlyRevenue,
             currentGrossRent: current ? current.grossRent : null,
@@ -359,7 +378,22 @@ export default function PropertyCostCenterDashboard({
 
     // ── explanations for the five KPI cards (icon popup) ─────────────────
     const brl = (v: number | null | undefined) => (v === null || v === undefined ? '—' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-    const kpiInfo: Record<'revenue' | 'opex' | 'noi' | 'occupancy' | 'energy', TileInfo> = {
+    // Condomínio card (multi-unit): the latest month of the income ledger, its costs from the Condomínio page
+    const condoCard = (() => {
+        if (propertyType !== 'multi') return null;
+        const month = financials.realIncomeKey;
+        const fromLedger = month ? condoMonths.find(m => m.month === month) : undefined;
+        const revenue = fromLedger ? fromLedger.revenue : financials.latestCondo ?? 0;
+        const cost = fromLedger ? fromLedger.totalCost : 0;
+        return { month, revenue, cost, result: Math.round((revenue - cost) * 100) / 100, hasCosts: Boolean(fromLedger?.hasCosts) };
+    })();
+    const kpiInfo: Record<'revenue' | 'opex' | 'noi' | 'occupancy' | 'energy' | 'condo', TileInfo> = {
+        condo: {
+            what: 'O condomínio das unidades como centro de custos, no mês mais recente: o que as unidades pagam de condomínio, o que o condomínio gastou (energia das áreas comuns, internet, água, IPTU, manutenção) e o resultado.',
+            formula: 'Resultado = condomínio das unidades − custos do condomínio',
+            example: condoCard ? <>{brl(condoCard.revenue)} − {brl(condoCard.cost)} = {brl(condoCard.result)}{condoCard.month ? ` em ${formatMonthKey(condoCard.month)}` : ''}</> : undefined,
+            note: 'Os custos são lançados na página Condomínio (menu lateral), mês a mês.',
+        },
         revenue: {
             what: 'Tudo o que o inquilino pagou no mês mais recente confirmado: o aluguel bruto (valor de contrato, antes da taxa da administradora) mais a parcela de energia.',
             formula: <>Receita bruta = aluguel bruto + energia recebida + condomínio pago pelo inquilino<br />Aluguel bruto = (recebido − energia − condomínio no depósito) ÷ (1 − taxa)<br />Valor m² = aluguel bruto ÷ área construída</>,
@@ -583,7 +617,25 @@ export default function PropertyCostCenterDashboard({
                     </div>
                 </div>
 
-                {/* 5. Energia Solar & Utilidades */}
+                {/* 5. Condomínio (multi-unit) or Energia Solar & Utilidades */}
+                {condoCard ? (
+                <div className="p-5 rounded-2xl border border-border bg-card shadow-xs space-y-2">
+                    <div className="flex items-center justify-between text-muted-foreground">
+                        <span className="text-xs font-semibold uppercase tracking-wider">Condomínio</span>
+                        <CardInfoIcon label="Condomínio" info={kpiInfo.condo} className="p-2 bg-amber-50 dark:bg-amber-950/40 text-amber-600" icon={<Building className="w-4 h-4" />} />
+                    </div>
+                    <div>
+                        <span className="text-xl sm:text-2xl font-bold text-foreground block">
+                            {formatBRL(condoCard.revenue)}
+                        </span>
+                        <span className="text-xs text-muted-foreground block leading-snug">
+                            Condomínio {formatBRL(condoCard.revenue)}{condoCard.month ? ` · ${formatMonthKey(condoCard.month)}` : ''}<br />
+                            Custo {condoCard.hasCosts ? formatBRL(condoCard.cost) : <Link href={`${lang === 'pt' ? '' : `/${lang}`}/condominio?property=${dbId ?? ''}`} className="text-emerald-700 dark:text-emerald-400 hover:underline">lançar na página Condomínio</Link>}<br />
+                            Resultado <span className={cn('text-sm', condoCard.result < 0 ? 'text-rose-600' : 'text-foreground')}>{formatBRL(condoCard.result)}</span>
+                        </span>
+                    </div>
+                </div>
+                ) : (
                 <div className="p-5 rounded-2xl border border-border bg-card shadow-xs space-y-2">
                     <div className="flex items-center justify-between text-muted-foreground">
                         <span className="text-xs font-semibold uppercase tracking-wider">Energia & Solar</span>
@@ -606,6 +658,7 @@ export default function PropertyCostCenterDashboard({
                         </span>
                     </div>
                 </div>
+                )}
             </div>
 
             {/* Visual Interactive Charts Section */}
@@ -755,6 +808,7 @@ export default function PropertyCostCenterDashboard({
                 onLoadingChange={setIncomeLoading}
                 preloadedRows={overview === undefined ? undefined : overview?.income ?? null}
                 units={ledgerUnits}
+                condominiumCosts={propertyType === 'multi' ? condoCosts : undefined}
             />
 
             {/* Payback, forecast, yields and IRR from the three ledgers */}

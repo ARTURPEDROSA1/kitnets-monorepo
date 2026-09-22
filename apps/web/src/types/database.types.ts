@@ -2516,6 +2516,66 @@ export type Database = {
         }
         Relationships: []
       }
+      condominium_months: {
+        Row: {
+          created_at: string
+          energy_cost: number
+          id: string
+          internet_cost: number
+          iptu_amount: number
+          maintenance_cost: number
+          month: string
+          notes: string | null
+          owner_id: string
+          property_id: string
+          updated_at: string
+          water_cost: number
+        }
+        Insert: {
+          created_at?: string
+          energy_cost?: number
+          id?: string
+          internet_cost?: number
+          iptu_amount?: number
+          maintenance_cost?: number
+          month: string
+          notes?: string | null
+          owner_id: string
+          property_id: string
+          updated_at?: string
+          water_cost?: number
+        }
+        Update: {
+          created_at?: string
+          energy_cost?: number
+          id?: string
+          internet_cost?: number
+          iptu_amount?: number
+          maintenance_cost?: number
+          month?: string
+          notes?: string | null
+          owner_id?: string
+          property_id?: string
+          updated_at?: string
+          water_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "condominium_months_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "condominium_months_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_ui_preferences: {
         Row: {
           key: string

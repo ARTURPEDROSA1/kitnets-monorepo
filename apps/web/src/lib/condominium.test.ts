@@ -1,0 +1,44 @@
+import { describe, expect, it } from "vitest";
+import { buildCondominiumMonths, condoTotalCost, summarizeCondominium, type CondominiumCostRow } from "./condominium";
+import type { PropertyIncomeRow } from "./property-income";
+
+const income = (m: string, unit: string, condo: number, status: "CONFIRMED" | "EXPECTED" = "CONFIRMED"): PropertyIncomeRow => ({
+    id: `${m}-${unit}`, property_id: "p", month: `${m}-01`, received_on: null, received_amount: 1000, energy_portion: 0,
+    other_income: 0, other_expenses: 0, condo_amount: condo, unit_id: unit, unit_name: unit, iptu_amount: 0, agency_fee_pct: 10,
+    status, source: "MANUAL", bank_reference: null, notes: null,
+});
+const cost = (m: string, over: Partial<CondominiumCostRow> = {}): CondominiumCostRow => ({
+    id: m, property_id: "p", month: `${m}-01`, energy_cost: 0, internet_cost: 0, water_cost: 0, iptu_amount: 0, maintenance_cost: 0, notes: null, ...over,
+});
+
+describe("condominium months", () => {
+    it("adds the units' condominium as the month's revenue and subtracts the month's costs", () => {
+        const months = buildCondominiumMonths(
+            [income("2026-09", "u1", 250), income("2026-09", "u2", 250), income("2026-09", "u3", 0), income("2026-08", "u1", 250)],
+            [cost("2026-09", { energy_cost: 120.5, water_cost: 80, notes: "lâmpadas" })]
+        );
+        expect(months.map(m => m.month)).toEqual(["2026-09", "2026-08"]);
+        expect(months[0]).toMatchObject({ revenue: 500, units: 2, totalCost: 200.5, result: 299.5, hasCosts: true, notes: "lâmpadas", expected: false });
+        expect(months[1]).toMatchObject({ revenue: 250, units: 1, totalCost: 0, result: 250, hasCosts: false });
+    });
+
+    it("keeps a month that only has costs, and flags a month whose units are all still expected", () => {
+        const months = buildCondominiumMonths([income("2026-10", "u1", 250, "EXPECTED")], [cost("2026-07", { maintenance_cost: 900 })]);
+        expect(months.map(m => m.month)).toEqual(["2026-10", "2026-07"]);
+        expect(months[0]).toMatchObject({ revenue: 250, expected: true });
+        expect(months[1]).toMatchObject({ revenue: 0, units: 0, totalCost: 900, result: -900, expected: false });
+        expect(condoTotalCost({ energy_cost: 1.1, internet_cost: 2.2 })).toBe(3.3);
+    });
+
+    it("summarises revenue, costs by kind, result and margin", () => {
+        const months = buildCondominiumMonths(
+            [income("2026-09", "u1", 300), income("2026-08", "u1", 300)],
+            [cost("2026-09", { energy_cost: 100, internet_cost: 50 }), cost("2026-08", { water_cost: 30 })]
+        );
+        const s = summarizeCondominium(months);
+        expect(s).toMatchObject({ months: 2, revenue: 600, totalCost: 180, result: 420, marginPct: 70 });
+        expect(s.byCost).toEqual({ energy_cost: 100, internet_cost: 50, water_cost: 30, iptu_amount: 0, maintenance_cost: 0 });
+        expect(s.latest?.month).toBe("2026-09");
+        expect(summarizeCondominium([]).marginPct).toBeNull();
+    });
+});

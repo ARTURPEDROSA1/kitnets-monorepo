@@ -1,0 +1,131 @@
+/**
+ * Condomínio cost centre — pure helpers shared by the API route, the Condomínio page and the property page.
+ *
+ * A multi-unit property's landlord also runs its condominium. Its revenue is the condominium charged to
+ * every unit (`condo_amount` in the income ledger, one row per month and unit; a vacant unit still owes it).
+ * Its costs live in `condominium_months`: one row per property and month. Result = revenue − costs.
+ */
+import { monthKey, type PropertyIncomeRow } from "./property-income";
+
+export const CONDO_COST_KEYS = ["energy_cost", "internet_cost", "water_cost", "iptu_amount", "maintenance_cost"] as const;
+export type CondoCostKey = (typeof CONDO_COST_KEYS)[number];
+
+export const CONDO_COST_LABELS: Record<CondoCostKey, string> = {
+    energy_cost: "Energia",
+    internet_cost: "Internet",
+    water_cost: "Água",
+    iptu_amount: "IPTU",
+    maintenance_cost: "Manutenção",
+};
+
+/** Cost row as stored / returned by the API. `month` is ISO `YYYY-MM-DD` (first day). */
+export interface CondominiumCostRow {
+    id: string;
+    property_id: string;
+    month: string;
+    energy_cost: number;
+    internet_cost: number;
+    water_cost: number;
+    iptu_amount: number;
+    maintenance_cost: number;
+    notes: string | null;
+    updated_at?: string;
+}
+
+/** Partial row sent to PUT: only the fields present are overwritten. `month` is `YYYY-MM`. */
+export interface CondominiumCostInput extends Partial<Record<CondoCostKey, number>> {
+    month: string;
+    notes?: string | null;
+}
+
+/** One month of the condominium: the revenue from the income ledger and the costs from its own row. */
+export interface CondominiumMonth extends Record<CondoCostKey, number> {
+    /** `YYYY-MM` */
+    month: string;
+    /** condominium charged to the units in the month (before the agency's fee) */
+    revenue: number;
+    /** units that carry a condominium in the month */
+    units: number;
+    /** every unit's row of the month is still "previsto" (no revenue confirmed yet) */
+    expected: boolean;
+    totalCost: number;
+    result: number;
+    /** the month has a cost row (its costs were entered, even if all zero) */
+    hasCosts: boolean;
+    notes: string | null;
+}
+
+const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+const num = (v: unknown) => Number(v) || 0;
+
+export function condoTotalCost(row: Partial<Record<CondoCostKey, number>>): number {
+    return r2(CONDO_COST_KEYS.reduce((acc, k) => acc + num(row[k]), 0));
+}
+
+/**
+ * Months of the condominium, newest first: every month with a condominium in the income ledger and every
+ * month with a cost row. A month's revenue adds the `condo_amount` of all its unit rows (confirmed or
+ * expected: the condominium is owed either way).
+ */
+export function buildCondominiumMonths(incomeRows: PropertyIncomeRow[], costRows: CondominiumCostRow[]): CondominiumMonth[] {
+    const months = new Map<string, CondominiumMonth>();
+    const blank = (m: string): CondominiumMonth => ({
+        month: m, revenue: 0, units: 0, expected: false,
+        energy_cost: 0, internet_cost: 0, water_cost: 0, iptu_amount: 0, maintenance_cost: 0,
+        totalCost: 0, result: 0, hasCosts: false, notes: null,
+    });
+    const confirmed = new Set<string>();
+    for (const r of incomeRows) {
+        const condo = num(r.condo_amount);
+        if (condo <= 0) continue;
+        const m = monthKey(r.month);
+        const cur = months.get(m) ?? blank(m);
+        cur.revenue = r2(cur.revenue + condo);
+        cur.units++;
+        if (r.status === "CONFIRMED") confirmed.add(m);
+        months.set(m, cur);
+    }
+    for (const c of costRows) {
+        const m = monthKey(c.month);
+        const cur = months.get(m) ?? blank(m);
+        for (const k of CONDO_COST_KEYS) cur[k] = num(c[k]);
+        cur.hasCosts = true;
+        cur.notes = c.notes ?? null;
+        months.set(m, cur);
+    }
+    for (const cur of months.values()) {
+        cur.expected = cur.units > 0 && !confirmed.has(cur.month);
+        cur.totalCost = condoTotalCost(cur);
+        cur.result = r2(cur.revenue - cur.totalCost);
+    }
+    return [...months.values()].sort((a, b) => (a.month < b.month ? 1 : -1));
+}
+
+export interface CondominiumSummary {
+    months: number;
+    revenue: number;
+    totalCost: number;
+    result: number;
+    /** result ÷ revenue, in %; null without revenue */
+    marginPct: number | null;
+    byCost: Record<CondoCostKey, number>;
+    /** the newest month, or null */
+    latest: CondominiumMonth | null;
+}
+
+/** Totals over a list of months (already filtered by period). */
+export function summarizeCondominium(months: CondominiumMonth[]): CondominiumSummary {
+    const byCost: Record<CondoCostKey, number> = { energy_cost: 0, internet_cost: 0, water_cost: 0, iptu_amount: 0, maintenance_cost: 0 };
+    let revenue = 0, totalCost = 0;
+    for (const m of months) {
+        revenue += m.revenue; totalCost += m.totalCost;
+        for (const k of CONDO_COST_KEYS) byCost[k] = r2(byCost[k] + m[k]);
+    }
+    revenue = r2(revenue); totalCost = r2(totalCost);
+    const sorted = [...months].sort((a, b) => (a.month < b.month ? 1 : -1));
+    return {
+        months: months.length, revenue, totalCost, result: r2(revenue - totalCost),
+        marginPct: revenue > 0 ? Math.round(((revenue - totalCost) / revenue) * 1000) / 10 : null,
+        byCost, latest: sorted[0] ?? null,
+    };
+}

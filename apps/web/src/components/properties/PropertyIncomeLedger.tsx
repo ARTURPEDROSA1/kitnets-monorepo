@@ -8,6 +8,7 @@ import {
     Trash2,
     Wallet,
     Zap,
+    Building,
     Loader2,
     CheckCircle2,
     Clock,
@@ -85,6 +86,8 @@ interface PropertyIncomeLedgerProps {
     onPeriodChange?: (next: PeriodFilterValue) => void;
     /** Rows loaded by the parent (overview): undefined = fetch here, null = parent still loading, array = use as is. */
     preloadedRows?: PropertyIncomeRow[] | null;
+    /** Condomínio cost centre of a multi-unit property: total cost per month (`YYYY-MM`), for the "Condomínio no período" tile. */
+    condominiumCosts?: Record<string, number>;
     /** Units of a multi-unit property: the ledger then holds one row per month and unit (a "Unidade" column and select appear). */
     units?: Array<{ id: string; name: string }>;
 }
@@ -130,6 +133,7 @@ export default function PropertyIncomeLedger({
     onPeriodChange,
     preloadedRows,
     units = NO_UNITS,
+    condominiumCosts,
 }: PropertyIncomeLedgerProps) {
     const multiUnit = units.length > 0;
     // hidden columns are remembered in the user's account, separately for properties rented as a whole and unit by unit
@@ -397,7 +401,12 @@ export default function PropertyIncomeLedger({
     const periodSummary = useMemo(() => summarize(filtered), [filtered]);
     // explanations for the five tiles (icon popup)
     const months = periodSummary.confirmedMonths;
-    const ledgerInfo: Record<"gross" | "received" | "net" | "energy" | "fee", TileInfo> = {
+    /** Costs of the condominium inside the period (multi-unit properties; from the Condomínio page). */
+    const condoCostPeriod = useMemo(
+        () => Object.entries(condominiumCosts ?? {}).filter(([k]) => (!range.start || k >= range.start) && (!range.end || k <= range.end)).reduce((acc, [, v]) => acc + (Number(v) || 0), 0),
+        [condominiumCosts, range]
+    );
+    const ledgerInfo: Record<"gross" | "received" | "net" | "energy" | "condo" | "fee", TileInfo> = {
         gross: {
             what: "O aluguel de contrato somado nos meses confirmados do período: o valor antes da taxa da administradora, sem a energia.",
             formula: <>Aluguel bruto do mês = (recebido − energia − condomínio no depósito) ÷ (1 − taxa %)<br />No período = Σ dos meses confirmados</>,
@@ -419,6 +428,12 @@ export default function PropertyIncomeLedger({
             what: "A energia paga pelo inquilino no período, a conta de luz que você pagou e o resultado. Com geração solar, o resultado é a economia que o sistema gera.",
             formula: "Resultado = energia recebida − custo de energia",
             example: months ? <>{formatBRL(periodSummary.totalEnergy)} − {formatBRL(periodSummary.totalOther)} = {formatBRL(periodSummary.totalEnergy - periodSummary.totalOther)}</> : undefined,
+        },
+        condo: {
+            what: "O condomínio das unidades como centro de custos: o que as unidades pagam de condomínio nos meses confirmados do período, o que o condomínio gastou (energia das áreas comuns, internet, água, IPTU, manutenção, registrados na página Condomínio) e o resultado.",
+            formula: <>Condomínio = Σ da coluna Condomínio (meses confirmados)<br />Resultado = condomínio − custos</>,
+            example: months ? <>{formatBRL(periodSummary.totalCondo)} − {formatBRL(condoCostPeriod)} = {formatBRL(periodSummary.totalCondo - condoCostPeriod)}</> : undefined,
+            note: "Os custos do condomínio são lançados em Condomínio, no menu lateral.",
         },
         fee: {
             what: "Quanto foi para a administradora no período. Com a autogestão no Kitnets.com esse valor ficaria com você.",
@@ -784,6 +799,22 @@ export default function PropertyIncomeLedger({
                     tone="violet"
                     info={ledgerInfo.net}
                 />
+                {multiUnit ? (
+                    <Tile
+                        label="Condomínio no período"
+                        value={formatBRL(periodSummary.totalCondo)}
+                        hint={
+                            <>
+                                Custo {formatBRL(condoCostPeriod)}
+                                <br />
+                                Resultado {formatBRL(periodSummary.totalCondo - condoCostPeriod)}
+                            </>
+                        }
+                        icon={<Building className="w-4 h-4" />}
+                        tone="amber"
+                        info={ledgerInfo.condo}
+                    />
+                ) : (
                 <Tile
                     label="Energia Solar no período"
                     value={formatBRL(periodSummary.totalEnergy)}
@@ -798,6 +829,7 @@ export default function PropertyIncomeLedger({
                     tone="amber"
                     info={ledgerInfo.energy}
                 />
+                )}
                 <Tile
                     label="Taxa da imobiliária no período"
                     value={formatBRL(periodSummary.totalFee)}
