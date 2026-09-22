@@ -46,7 +46,7 @@ import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDe
 import { CellSumBar, useCellSum } from "./TableCellSum";
 import MoneyInput, { parseMoneyText } from "./MoneyInput";
 import Tile, { type TileInfo } from "./Tile";
-import { ColumnVisibilityButton, ColumnVisibilityMenu, useColumnVisibility } from "./TableColumnVisibility";
+import { ColumnVisibilityMenu, useColumnVisibility } from "./TableColumnVisibility";
 import { columnTableKey } from "@/lib/ui-preferences";
 import { groupMonthly, periodLabel, periodRange, type ChartGroup, type PeriodFilterValue } from "@/lib/period-filter";
 import {
@@ -355,20 +355,12 @@ export default function PropertyIncomeLedger({
     const toggleFeeOnCondo = (row: PropertyIncomeRow) =>
         putRows([{ month: monthKey(row.month), unit_id: row.unit_id ?? null, fee_on_condo: !row.fee_on_condo, ...keepRent(row) }]);
 
-    /** The agreement with the agency is usually one for the whole property: applies it to every row with a condominium. */
-    const setFeeOnCondoAll = (value: boolean) => {
-        const targets = rows.filter(r => (Number(r.condo_amount) || 0) > 0 && Boolean(r.fee_on_condo) !== value);
-        if (targets.length > 0) void putRows(targets.map(r => ({ month: monthKey(r.month), unit_id: r.unit_id ?? null, fee_on_condo: value, ...keepRent(r) })));
-    };
-
     const toggleStatus = (row: PropertyIncomeRow) =>
         putRows([{ month: monthKey(row.month), unit_id: row.unit_id ?? null, status: row.status === "CONFIRMED" ? "EXPECTED" : "CONFIRMED" }]);
 
     // ── Derived ─────────────────────────────────────────────────────────
-    /** Rows with a condominium: only then the "fee on the condominium" column and selector show up. */
-    const condoRows = useMemo(() => rows.filter(r => (Number(r.condo_amount) || 0) > 0), [rows]);
-    const hasCondo = condoRows.length > 0;
-    const condoFeeMode: "rent" | "all" | "mixed" = !hasCondo || condoRows.every(r => !r.fee_on_condo) ? "rent" : condoRows.every(r => r.fee_on_condo) ? "all" : "mixed";
+    /** Only a ledger with a condominium shows the "fee on the condominium" column. */
+    const hasCondo = useMemo(() => rows.some(r => (Number(r.condo_amount) || 0) > 0), [rows]);
     const sorted = useMemo(() => [...rows].sort((a, b) => (a.month !== b.month ? (a.month < b.month ? 1 : -1) : (a.unit_name ?? "").localeCompare(b.unit_name ?? "", "pt-BR", { numeric: true }))), [rows]);
     /** Rows inside the selected period (newest first) — drives the chart and the table. */
     const filtered = useMemo(() => filterRowsByPeriod(sorted, range), [sorted, range]);
@@ -432,7 +424,7 @@ export default function PropertyIncomeLedger({
             what: "Quanto foi para a administradora no período. Com a autogestão no Kitnets.com esse valor ficaria com você.",
             formula: <>Taxa do mês = aluguel bruto × taxa %{hasCondo && <> (+ condomínio × taxa %, quando a taxa incide sobre o condomínio)</>}<br />No período = Σ dos meses confirmados</>,
             example: months ? <>{formatBRL(periodSummary.totalFee)} em {months} {months === 1 ? "mês" : "meses"}</> : undefined,
-            note: hasCondo ? "O acordo com a imobiliária define a base da taxa: só o aluguel (o condomínio é repassado integralmente) ou o valor total (aluguel + condomínio). Ajuste no seletor acima da tabela ou na coluna “Taxa s/ cond.”." : undefined,
+            note: hasCondo ? "O acordo com a imobiliária define a base da taxa: só o aluguel (o condomínio é repassado integralmente) ou o valor total (aluguel + condomínio). Ajuste na coluna “Taxa s/ cond.” de cada lançamento." : undefined,
         },
     };
     // Fee pre-fill: last month's fee when set, else the property default, else 10 %
@@ -825,20 +817,6 @@ export default function PropertyIncomeLedger({
                 </span>
                 <div className="flex flex-wrap items-center gap-2">
                     <PeriodFilter value={period} onChange={setPeriod} variant="compact" />
-                    {hasCondo && (
-                        <select
-                            value={condoFeeMode}
-                            disabled={saving.size > 0}
-                            onChange={e => setFeeOnCondoAll(e.target.value === "all")}
-                            title="Acordo com a imobiliária: a taxa de administração incide só sobre o aluguel (o condomínio é repassado integralmente) ou sobre o valor total (aluguel + condomínio). Vale para todos os lançamentos com condomínio; cada linha pode ser ajustada na coluna “Taxa s/ cond.”."
-                            className="h-8 rounded-md border border-input bg-background px-2 text-xs"
-                        >
-                            {condoFeeMode === "mixed" && <option value="mixed" disabled>Taxa: varia por lançamento</option>}
-                            <option value="rent">Taxa só sobre o aluguel</option>
-                            <option value="all">Taxa sobre aluguel + condomínio</option>
-                        </select>
-                    )}
-                    <ColumnVisibilityButton ctl={vis} />
                     <GroupSelect value={chartGroup} onChange={setChartGroup} />
                 </div>
             </div>
