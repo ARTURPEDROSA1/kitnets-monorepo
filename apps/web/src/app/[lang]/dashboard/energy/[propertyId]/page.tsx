@@ -47,7 +47,7 @@ import { cn } from "@/lib/utils";
 import { columnTableKey } from "@/lib/ui-preferences";
 import { CellSumBar, useCellSum } from "@/components/properties/TableCellSum";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "@/components/properties/TableColumnFilters";
-import { ColumnVisibilityButton, ColumnVisibilityMenu, useColumnVisibility } from "@/components/properties/TableColumnVisibility";
+import { ColumnVisibilityMenu, useColumnVisibility } from "@/components/properties/TableColumnVisibility";
 import { parseMoneyText } from "@/components/properties/MoneyInput";
 
 export interface EnergyBillRecord {
@@ -889,19 +889,13 @@ export default function EnergyDashboardPage() {
 
                     {/* Histórico de Consumo (spreadsheet-style table: sort/filter per column, hide columns, select cells to sum) */}
                     <div className="bg-card border border-border rounded-xl shadow-xs">
-                        <div className="px-6 py-4 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-muted/20 rounded-t-xl">
+                        <div className="px-6 py-4 border-b border-border bg-muted/20 rounded-t-xl">
                             <div>
                                 <h3 className="text-base font-semibold text-foreground">Histórico de Consumo Detalhado</h3>
                                 <p className="text-xs text-muted-foreground mt-0.5">
-                                    Registros de consumo, injeção solar, saldo de créditos e custos por ciclo de faturamento · clique no cabeçalho para ordenar e filtrar; selecione células para somar; duplo clique ou Enter edita na própria célula; o lápis abre a fatura completa
+                                    Registros de consumo, injeção solar, saldo de créditos e custos por ciclo de faturamento · clique no cabeçalho para ordenar e filtrar (botão direito: colunas); selecione células para somar; duplo clique ou Enter edita na própria célula; o lápis abre a fatura completa
                                 </p>
                                 {inlineError && <p className="text-xs text-red-600 mt-1">{inlineError}</p>}
-                            </div>
-                            <div className="flex items-center gap-2 self-start sm:self-auto">
-                                <ColumnVisibilityButton ctl={vis} />
-                                <span className="text-xs font-mono text-muted-foreground bg-muted px-2.5 py-1 rounded-md">
-                                    {cf.anyFilter ? `${cf.rows.length} de ${filteredBills.length}` : filteredBills.length} {filteredBills.length === 1 ? "registro" : "registros"}
-                                </span>
                             </div>
                         </div>
 
