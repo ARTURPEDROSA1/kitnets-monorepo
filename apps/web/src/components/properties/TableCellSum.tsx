@@ -13,6 +13,8 @@
  *   • Shift+click      extends a rectangle from the anchor cell
  *   • Ctrl/Cmd+click   toggles one cell in and out of the selection
  *   • double-click     starts inline editing (focuses the input / opens the select)
+ *   • arrows / Tab     move the selected cell (Shift+arrows extend the rectangle from the anchor)
+ *   • Enter / F2       start editing the selected cell; Enter while editing commits and moves down
  *   • Esc              while editing: cancels the edit (draft discarded, nothing saved); otherwise clears the selection
  * A floating bar shows count, sum and average of the selected numeric cells. Sums are R$ unless
  * the column has its own unit: useCellSum({ formatByCol: { cons: v => `${v} kWh` } }).
@@ -34,6 +36,8 @@ export interface CellSumController {
         onKeyDown: (e: React.KeyboardEvent) => void;
         className: string;
         title?: string;
+        /** lets the keyboard navigation find the cell in the DOM */
+        "data-cell": string;
     };
     isSelected: (col: string, rowId: string) => boolean;
     /** count / sum over the current selection (numeric cells only for the sum); `format` prints the sum in the selected column's unit */
@@ -46,6 +50,22 @@ const formatBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", 
 const formatPlain = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 const key = (col: string, rowId: string) => `${col}::${rowId}`;
 const colOf = (k: string) => k.slice(0, k.indexOf("::"));
+const cellElement = (k: string) => document.querySelector<HTMLElement>(`[data-cell="${CSS.escape(k)}"]`);
+const isTyping = () => {
+    const el = document.activeElement as HTMLElement | null;
+    return !!el && (el.tagName === "INPUT" || el.tagName === "SELECT" || el.tagName === "TEXTAREA" || el.isContentEditable);
+};
+/** Focuses the input / select inside a cell (double-click, Enter, F2). */
+function startEdit(cell: HTMLElement) {
+    const el = cell.querySelector("input, select, textarea") as HTMLElement | null;
+    if (!el || (el as HTMLInputElement).disabled) return;
+    el.focus();
+    if (el instanceof HTMLInputElement && (el.type === "text" || el.type === "number")) el.select();
+    const picker = el as HTMLElement & { showPicker?: () => void };
+    if ((el instanceof HTMLSelectElement || (el instanceof HTMLInputElement && el.type === "date")) && typeof picker.showPicker === "function") {
+        try { picker.showPicker(); } catch { /* not allowed outside a user gesture in some browsers */ }
+    }
+}
 
 interface Grid { cols: string[]; rows: string[]; cells: Map<string, number | null> }
 
@@ -56,6 +76,8 @@ export function useCellSum(options: CellSumOptions = {}): CellSumController {
     const grid = useRef<Grid>({ cols: [], rows: [], cells: new Map() });
     const inPass = useRef(false);
     const anchor = useRef<{ col: string; rowId: string } | null>(null);
+    /** the active cell: where the keyboard moves from (the far end of a Shift-selected rectangle) */
+    const cursor = useRef<{ col: string; rowId: string } | null>(null);
     const dragging = useRef(false);
 
     const selectRect = useCallback((a: { col: string; rowId: string }, b: { col: string; rowId: string }) => {
@@ -73,6 +95,27 @@ export function useCellSum(options: CellSumOptions = {}): CellSumController {
         setSelected(next);
     }, []);
 
+    /** Moves the active cell by (dc, dr) in grid order, skipping gaps; Shift extends the rectangle from the anchor. */
+    const moveBy = useCallback((dc: number, dr: number, extend: boolean) => {
+        const g = grid.current;
+        const cur = cursor.current ?? anchor.current;
+        if (!cur) return;
+        let c = g.cols.indexOf(cur.col), r = g.rows.indexOf(cur.rowId);
+        if (c < 0 || r < 0) return;
+        let next: { col: string; rowId: string } | null = null;
+        for (;;) {
+            c += dc; r += dr;
+            if (c < 0 || r < 0 || c >= g.cols.length || r >= g.rows.length) break;
+            if (g.cells.has(key(g.cols[c], g.rows[r]))) { next = { col: g.cols[c], rowId: g.rows[r] }; break; }
+        }
+        if (!next) return;
+        const k = key(next.col, next.rowId);
+        if (extend && anchor.current) selectRect(anchor.current, next);
+        else { setSelected(new Set([k])); anchor.current = next; }
+        cursor.current = next;
+        requestAnimationFrame(() => cellElement(k)?.scrollIntoView({ block: "nearest", inline: "nearest" }));
+    }, [selectRect]);
+
     const cellProps = useCallback((col: string, rowId: string, value: number | null | undefined, className?: string, onCancel?: () => void) => {
         // rebuild the grid on every render pass (cells register in DOM order)
         if (!inPass.current) { inPass.current = true; grid.current = { cols: [], rows: [], cells: new Map() }; queueMicrotask(() => { inPass.current = false; }); }
@@ -84,7 +127,8 @@ export function useCellSum(options: CellSumOptions = {}): CellSumController {
         const k = key(col, rowId);
         const me = { col, rowId };
         return {
-            title: "Clique: selecionar · arraste ou Shift+clique: intervalo · Ctrl+clique: adicionar · duplo clique: editar",
+            "data-cell": k,
+            title: "Clique: selecionar · arraste ou Shift+clique: intervalo · Ctrl+clique: adicionar · duplo clique ou Enter: editar · setas: navegar",
             className: cn(className, "cursor-cell", selected.has(k) && "bg-emerald-100 dark:bg-emerald-900/40 ring-1 ring-inset ring-emerald-400"),
             onMouseDown: (e: React.MouseEvent) => {
                 if (e.button !== 0) return;
@@ -104,32 +148,30 @@ export function useCellSum(options: CellSumOptions = {}): CellSumController {
                     anchor.current = me;
                     dragging.current = true;
                 }
+                cursor.current = me;
             },
             onMouseEnter: (e: React.MouseEvent) => {
-                if (dragging.current && (e.buttons & 1) && anchor.current) selectRect(anchor.current, me);
+                if (dragging.current && (e.buttons & 1) && anchor.current) { selectRect(anchor.current, me); cursor.current = me; }
             },
             onKeyDown: (e: React.KeyboardEvent) => {
-                if (e.key !== "Escape") return;
                 const control = (e.target as HTMLElement).closest("input, select, textarea") as HTMLElement | null;
                 if (!control) return;
-                // cancel the edit: drop the draft first, blur on the next frame so the blur handler sees no draft and saves nothing
-                e.preventDefault();
-                e.stopPropagation();
-                onCancel?.();
-                requestAnimationFrame(() => control.blur());
-            },
-            onDoubleClick: (e: React.MouseEvent) => {
-                const el = (e.currentTarget as HTMLElement).querySelector("input, select, textarea") as HTMLElement | null;
-                if (!el || (el as HTMLInputElement).disabled) return;
-                el.focus();
-                if (el instanceof HTMLInputElement && (el.type === "text" || el.type === "number")) el.select();
-                const picker = el as HTMLElement & { showPicker?: () => void };
-                if ((el instanceof HTMLSelectElement || (el instanceof HTMLInputElement && el.type === "date")) && typeof picker.showPicker === "function") {
-                    try { picker.showPicker(); } catch { /* not allowed outside a user gesture in some browsers */ }
+                if (e.key === "Escape") {
+                    // cancel the edit: drop the draft first, blur on the next frame so the blur handler sees no draft and saves nothing
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onCancel?.();
+                    requestAnimationFrame(() => control.blur());
+                } else if (e.key === "Enter" && control.tagName !== "TEXTAREA") {
+                    // the input blurs itself on Enter (commit); then, like a spreadsheet, the selection moves down
+                    cursor.current = me;
+                    anchor.current = me;
+                    requestAnimationFrame(() => { if (!isTyping()) moveBy(0, 1, false); });
                 }
             },
+            onDoubleClick: (e: React.MouseEvent) => startEdit(e.currentTarget as HTMLElement),
         };
-    }, [selected, selectRect]);
+    }, [selected, selectRect, moveBy]);
 
     useEffect(() => {
         const up = () => { dragging.current = false; };
@@ -138,12 +180,30 @@ export function useCellSum(options: CellSumOptions = {}): CellSumController {
     }, []);
 
     const clear = useCallback(() => { setSelected(new Set()); anchor.current = null; dragging.current = false; }, []);
+    // Keyboard, while cells are selected and no input has the focus
     useEffect(() => {
         if (selected.size === 0) return;
-        const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") clear(); };
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === "Escape") { if (!isTyping()) clear(); return; }
+            if (isTyping() || e.ctrlKey || e.metaKey || e.altKey) return;
+            const cur = cursor.current ?? anchor.current;
+            if (!cur) return;
+            if (e.key === "Enter" || e.key === "F2") {
+                const el = cellElement(key(cur.col, cur.rowId));
+                if (el) { e.preventDefault(); startEdit(el); }
+                return;
+            }
+            const delta =
+                e.key === "ArrowUp" ? [0, -1] : e.key === "ArrowDown" ? [0, 1]
+                    : e.key === "ArrowLeft" ? [-1, 0] : e.key === "ArrowRight" ? [1, 0]
+                        : e.key === "Tab" ? [e.shiftKey ? -1 : 1, 0] : null;
+            if (!delta) return;
+            e.preventDefault();
+            moveBy(delta[0], delta[1], e.shiftKey && e.key !== "Tab");
+        };
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
-    }, [selected.size, clear]);
+    }, [selected.size, clear, moveBy]);
 
     const isSelected = useCallback((col: string, rowId: string) => selected.has(key(col, rowId)), [selected]);
     const stats = useCallback(() => {
