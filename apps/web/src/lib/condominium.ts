@@ -74,7 +74,7 @@ export function buildCondominiumMonths(incomeRows: PropertyIncomeRow[], costRows
         energy_cost: 0, internet_cost: 0, water_cost: 0, iptu_amount: 0, maintenance_cost: 0,
         totalCost: 0, result: 0, hasCosts: false, notes: null,
     });
-    const confirmed = new Set<string>();
+    const confirmed = new Set<string>(), withIncome = new Set<string>();
     for (const r of incomeRows) {
         const condo = num(r.condo_amount);
         if (condo <= 0 && num(r.received_amount) <= 0) continue;   // a vacant unit with no condominium adds nothing
@@ -84,6 +84,7 @@ export function buildCondominiumMonths(incomeRows: PropertyIncomeRow[], costRows
             cur.revenue = r2(cur.revenue + condo);
             cur.units++;
         }
+        withIncome.add(m);
         if (r.status === "CONFIRMED") confirmed.add(m);
         months.set(m, cur);
     }
@@ -96,7 +97,7 @@ export function buildCondominiumMonths(incomeRows: PropertyIncomeRow[], costRows
         months.set(m, cur);
     }
     for (const cur of months.values()) {
-        cur.expected = (cur.units > 0 || cur.revenue === 0 && !cur.hasCosts) && !confirmed.has(cur.month) && incomeRows.some(r => monthKey(r.month) === cur.month);
+        cur.expected = withIncome.has(cur.month) && !confirmed.has(cur.month);   // every unit of the month still 'previsto'
         cur.totalCost = condoTotalCost(cur);
         cur.result = r2(cur.revenue - cur.totalCost);
     }
