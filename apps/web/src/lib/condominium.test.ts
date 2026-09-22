@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCondominiumMonths, condoTotalCost, summarizeCondominium, type CondominiumCostRow } from "./condominium";
+import { buildCondominiumMonths, condominiumKpis, condoTotalCost, summarizeCondominium, type CondominiumCostRow } from "./condominium";
 import type { PropertyIncomeRow } from "./property-income";
 
 const income = (m: string, unit: string, condo: number, status: "CONFIRMED" | "EXPECTED" = "CONFIRMED"): PropertyIncomeRow => ({
@@ -40,5 +40,18 @@ describe("condominium months", () => {
         expect(s.byCost).toEqual({ energy_cost: 100, internet_cost: 50, water_cost: 30, iptu_amount: 0, maintenance_cost: 0 });
         expect(s.latest?.month).toBe("2026-09");
         expect(summarizeCondominium([]).marginPct).toBeNull();
+    });
+
+    it("card figures: the latest month and the current year to date", () => {
+        const months = buildCondominiumMonths(
+            [income("2026-09", "u1", 300), income("2026-01", "u1", 300), income("2025-12", "u1", 300)],
+            [cost("2026-09", { energy_cost: 100 }), cost("2025-12", { energy_cost: 50 })]
+        );
+        const k = condominiumKpis(months, new Date(2026, 8, 21));
+        expect(k.latest?.month).toBe("2026-09");
+        expect(k.latest).toMatchObject({ revenue: 300, totalCost: 100, result: 200 });
+        expect(k).toMatchObject({ months: 3, monthsWithCosts: 2, year: 2026 });
+        expect(k.ytd).toEqual({ revenue: 600, totalCost: 100, result: 500, marginPct: 83.3, months: 2 });
+        expect(condominiumKpis([], new Date(2026, 0, 1))).toMatchObject({ latest: null, months: 0, ytd: { revenue: 0, marginPct: null } });
     });
 });

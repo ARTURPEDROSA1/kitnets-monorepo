@@ -630,7 +630,7 @@ export default function PropertyCostCenterDashboard({
                         </span>
                         <span className="text-xs text-muted-foreground block leading-snug">
                             Condomínio {formatBRL(condoCard.revenue)}{condoCard.month ? ` · ${formatMonthKey(condoCard.month)}` : ''}<br />
-                            Custo {condoCard.hasCosts ? formatBRL(condoCard.cost) : <Link href={`${lang === 'pt' ? '' : `/${lang}`}/condominio?property=${dbId ?? ''}`} className="text-emerald-700 dark:text-emerald-400 hover:underline">lançar na página Condomínio</Link>}<br />
+                            Custo {condoCard.hasCosts ? formatBRL(condoCard.cost) : <Link href={`${lang === 'pt' ? '' : `/${lang}`}/condominio?property=${dbId ?? ''}`} className="text-emerald-700 dark:text-emerald-400 hover:underline">lançar em Condomínio</Link>}<br />
                             Resultado <span className={cn('text-sm', condoCard.result < 0 ? 'text-rose-600' : 'text-foreground')}>{formatBRL(condoCard.result)}</span>
                         </span>
                     </div>
