@@ -1,120 +1,236 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
-import { ArrowLeft, FileText, TrendingUp, DollarSign, Droplets, Calendar, ChevronDown, Eye, EyeOff, BadgeDollarSign, Plus, Pencil, Trash2, CalendarRange } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
+import { Button } from "@kitnets/ui";
+import {
+    ArrowLeft,
+    BarChart3,
+    Building2,
+    Calendar,
+    DollarSign,
+    Droplets,
+    FileText,
+    Gauge,
+    Link2,
+    MapPin,
+    Pencil,
+    Plus,
+    Trash2,
+    TrendingUp,
+} from "lucide-react";
 import { ConsumptionChart } from "@/components/dashboard/ConsumptionChart";
+import { cn } from "@/lib/utils";
+import { columnTableKey } from "@/lib/ui-preferences";
+import { CellSumBar, useCellSum } from "@/components/properties/TableCellSum";
+import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "@/components/properties/TableColumnFilters";
+import { ColumnVisibilityMenu, useColumnVisibility } from "@/components/properties/TableColumnVisibility";
+import { parseMoneyText } from "@/components/properties/MoneyInput";
+
+/**
+ * Water bills dashboard of one property (/dashboard/billing/<propertyId>).
+ * Source of truth: the water utility's bills (water_bills). The optional
+ * ?gateway= query only keeps a way back to the founder-only gateway page.
+ */
 
 interface Bill {
     id: string;
     reference_month: string;
-    meter_number: string;
-    previous_reading: number;
-    current_reading: number;
+    meter_number: string | null;
+    previous_reading: number | null;
+    current_reading: number | null;
     consumption_m3: number;
-    billed_consumption_m3: number;
-    reading_date: string;
-    due_date: string;
+    billed_consumption_m3: number | null;
+    reading_date: string | null;
+    reading_date_orig: string | null;
+    due_date: string | null;
     water_tariff: number;
     sewage_tariff: number;
     water_basic_fee: number;
     sewage_basic_fee: number;
     total_amount: number;
-    effective_rate_per_m3: number;
-    occurrence_code: string;
+    effective_rate_per_m3: number | null;
+    occurrence_code: string | null;
+    average_consumption_m3: number | null;
+    notes: string | null;
+    bill_pdf_url: string | null;
 }
 
 interface Property {
     id: string;
     name: string;
-    address: string;
-    city: string;
-    state: string;
-    zip: string;
-    connection_code: string;
+    address: string | null;
+    city: string | null;
+    state: string | null;
+    zip: string | null;
+    connection_code: string | null;
 }
 
 const MONTH_NAMES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-const FILTER_OPTIONS = [12, 24, 36, 48, 60] as const;
+const PERIODS = [
+    { label: "12 Meses", val: 12 },
+    { label: "24 Meses", val: 24 },
+    { label: "36 Meses", val: 36 },
+    { label: "60 Meses", val: 60 },
+    { label: "Tudo", val: 0 },
+];
 
-function formatMonth(ref: string): string {
+const formatMonth = (ref: string) => {
     const [year, month] = ref.split("-");
-    return `${MONTH_NAMES[parseInt(month) - 1]}/${year}`;
-}
-
-function formatCurrency(value: number): string {
-    return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
-
-function formatNumber(value: number, decimals = 1): string {
-    return value.toLocaleString("pt-BR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-}
-
-function formatDate(dateStr: string | null): string {
+    const name = MONTH_NAMES[parseInt(month, 10) - 1];
+    return name ? `${name}/${year}` : ref;
+};
+const formatCurrency = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const formatNumber = (v: number, decimals = 1) => v.toLocaleString("pt-BR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+const formatDate = (dateStr: string | null) => {
     if (!dateStr) return "-";
-    const [y, m, d] = dateStr.substring(0, 10).split("-");
-    return `${d}/${m}/${y}`;
+    const [y, m, d] = dateStr.slice(0, 10).split("-");
+    return d && m && y ? `${d}/${m}/${y}` : dateStr;
+};
+const formatM3 = (decimals: number) => (v: number) => `${formatNumber(v, decimals)} m³`;
+const formatRate = (v: number) => `R$ ${formatNumber(v, 2)}/m³`;
+const num = (v: unknown): number | null => {
+    if (v === null || v === undefined || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+};
+
+/** PostgREST returns numeric columns as strings: normalise once. */
+function normaliseBill(raw: Record<string, unknown>): Bill {
+    const consumption = num(raw.consumption_m3) ?? 0;
+    const total = num(raw.total_amount) ?? 0;
+    return {
+        id: String(raw.id),
+        reference_month: String(raw.reference_month),
+        meter_number: (raw.meter_number as string | null) ?? null,
+        previous_reading: num(raw.previous_reading),
+        current_reading: num(raw.current_reading),
+        consumption_m3: consumption,
+        billed_consumption_m3: num(raw.billed_consumption_m3),
+        reading_date: (raw.reading_date as string | null) ?? null,
+        reading_date_orig: (raw.reading_date_orig as string | null) ?? null,
+        due_date: (raw.due_date as string | null) ?? null,
+        water_tariff: num(raw.water_tariff) ?? 0,
+        sewage_tariff: num(raw.sewage_tariff) ?? 0,
+        water_basic_fee: num(raw.water_basic_fee) ?? 0,
+        sewage_basic_fee: num(raw.sewage_basic_fee) ?? 0,
+        total_amount: total,
+        effective_rate_per_m3: num(raw.effective_rate_per_m3) ?? (consumption > 0 ? Math.round((total / consumption) * 100) / 100 : null),
+        occurrence_code: (raw.occurrence_code as string | null) ?? null,
+        average_consumption_m3: num(raw.average_consumption_m3),
+        notes: (raw.notes as string | null) ?? null,
+        bill_pdf_url: (raw.bill_pdf_url as string | null) ?? null,
+    };
 }
 
-const MASK = "••••••";
-const MASK_CURRENCY = "R$ •••";
+/** Body of POST /api/water-bills (upsert on property + month) for a whole bill. */
+function toBillInput(b: Bill) {
+    return {
+        referenceMonth: b.reference_month,
+        meterNumber: b.meter_number,
+        previousReading: b.previous_reading,
+        currentReading: b.current_reading,
+        consumptionM3: b.consumption_m3,
+        billedConsumptionM3: b.billed_consumption_m3,
+        readingDate: b.reading_date?.slice(0, 10) ?? null,
+        readingDateOrig: b.reading_date_orig?.slice(0, 10) ?? null,
+        dueDate: b.due_date?.slice(0, 10) ?? null,
+        totalAmount: b.total_amount,
+        waterTariff: b.water_tariff,
+        sewageTariff: b.sewage_tariff,
+        waterBasicFee: b.water_basic_fee,
+        sewageBasicFee: b.sewage_basic_fee,
+        occurrenceCode: b.occurrence_code,
+        averageConsumptionM3: b.average_consumption_m3,
+        notes: b.notes,
+    };
+}
+
+/** Bill fields edited straight in the table (double-click / Enter on the cell) */
+type InlineField = "consumption_m3" | "billed_consumption_m3" | "previous_reading" | "current_reading" | "water_tariff" | "sewage_tariff" | "water_basic_fee" | "sewage_basic_fee" | "total_amount";
+
+const CELL_INPUT = "text-right bg-transparent border border-transparent hover:border-border focus:border-blue-500 focus:bg-background rounded-none w-full min-w-[4rem] px-1.5 py-1 outline-none tabular-nums";
+
+/** Editable number cell: formatted with its unit at rest, a plain number while editing. */
+function UnitInput({ value, draft, onDraft, onCommit, decimals, prefix = "", suffix = "", dashWhenEmpty, disabled, className }: {
+    value: number | null | undefined;
+    draft?: string;
+    onDraft: (text: string) => void;
+    onCommit: () => void;
+    decimals: number;
+    prefix?: string;
+    suffix?: string;
+    /** show "-" for null / 0 */
+    dashWhenEmpty?: boolean;
+    disabled?: boolean;
+    className?: string;
+}) {
+    const [editing, setEditing] = useState(false);
+    const fmt = (n: number) => `${prefix}${formatNumber(n, decimals)}${suffix}`;
+    const empty = value === null || value === undefined || !Number.isFinite(value) || (dashWhenEmpty && value <= 0);
+    const parsedDraft = draft !== undefined ? parseMoneyText(draft) : null;
+    const rest = draft !== undefined ? (parsedDraft === null ? draft : fmt(parsedDraft)) : empty ? "-" : fmt(value as number);
+    const text = editing ? (draft ?? (value === null || value === undefined ? "" : String(Number((value as number).toFixed(decimals))))) : rest;
+    return (
+        <input
+            type="text"
+            inputMode="decimal"
+            disabled={disabled}
+            value={text}
+            onFocus={ev => { setEditing(true); requestAnimationFrame(() => ev.target.select()); }}
+            onChange={ev => onDraft(ev.target.value)}
+            onBlur={() => { setEditing(false); onCommit(); }}
+            onKeyDown={ev => { if (ev.key === "Enter") (ev.target as HTMLInputElement).blur(); }}
+            className={cn(CELL_INPUT, className)}
+        />
+    );
+}
 
 export default function BillingPage() {
     const params = useParams();
     const searchParams = useSearchParams();
-    const lang = params.lang as string;
+    const lang = (params.lang as string) || "pt";
     const propertyId = params.propertyId as string;
     const gatewayId = searchParams.get("gateway");
 
     const [property, setProperty] = useState<Property | null>(null);
     const [bills, setBills] = useState<Bill[]>([]);
     const [loading, setLoading] = useState(true);
-    const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
-    const [showAddress, setShowAddress] = useState(false);
-    const [showValues, setShowValues] = useState(true);
     const [deletingId, setDeletingId] = useState<string | null>(null);
-    const [monthsFilter, setMonthsFilter] = useState<number | "custom">(12);
-    const [customStart, setCustomStart] = useState(""); // "YYYY-MM"
-    const [customEnd, setCustomEnd] = useState("");     // "YYYY-MM"
+    const [filterMonths, setFilterMonths] = useState<number>(12);
 
     // Orphaned bills (property_id IS NULL — from deleted properties)
-    const [orphanedBills, setOrphanedBills] = useState<{ id: string; reference_month: string; meter_number: string; consumption_m3: number; total_amount: number }[]>([]);
+    const [orphanedBills, setOrphanedBills] = useState<{ id: string; reference_month: string }[]>([]);
     const [claimingOrphans, setClaimingOrphans] = useState(false);
 
+    const fetchBills = async () => {
+        const res = await fetch(`/api/water-bills?propertyId=${encodeURIComponent(propertyId)}`);
+        if (!res.ok) return;
+        const { property: propData, bills: billsData } = await res.json();
+        if (propData) setProperty(propData);
+        if (Array.isArray(billsData)) setBills(billsData.map(normaliseBill));
+    };
+
     useEffect(() => {
-        const fetchData = async () => {
+        (async () => {
             setLoading(true);
-
-            // Property details + bills (server verifies ownership)
             try {
-                const res = await fetch(`/api/water-bills?propertyId=${encodeURIComponent(propertyId)}`);
-                if (res.ok) {
-                    const { property: propData, bills: billsData } = await res.json();
-                    if (propData) setProperty(propData);
-                    if (billsData) setBills(billsData);
-                }
+                await fetchBills();
             } catch (err) {
-                console.error("Failed to load water bills:", err);
+                console.error("[WaterDashboard] Failed to load water bills:", err);
+            } finally {
+                setLoading(false);
             }
-
-            setLoading(false);
-
-            // Check for orphaned bills (from deleted properties)
             try {
                 const res = await fetch("/api/water-bills/orphaned");
                 if (res.ok) {
                     const { bills: orphans } = await res.json();
-                    if (orphans?.length > 0) {
-                        setOrphanedBills(orphans);
-                    }
+                    if (Array.isArray(orphans) && orphans.length > 0) setOrphanedBills(orphans);
                 }
-            } catch {
-                // Silent — not critical
-            }
-        };
-
-        fetchData();
+            } catch { /* not critical */ }
+        })();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [propertyId]);
 
     const handleClaimOrphans = async () => {
@@ -124,153 +240,241 @@ export default function BillingPage() {
             const res = await fetch("/api/water-bills/orphaned", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    billIds: orphanedBills.map(b => b.id),
-                    propertyId,
-                }),
+                body: JSON.stringify({ billIds: orphanedBills.map(b => b.id), propertyId }),
             });
             if (res.ok) {
-                // Re-fetch bills to include the newly claimed ones
-                const refetch = await fetch(`/api/water-bills?propertyId=${encodeURIComponent(propertyId)}`);
-                if (refetch.ok) {
-                    const { bills: billsData } = await refetch.json();
-                    if (billsData) setBills(billsData);
-                }
+                await fetchBills();
                 setOrphanedBills([]);
             }
         } catch (err) {
-            console.error("Failed to claim orphaned bills:", err);
+            console.error("[WaterDashboard] Failed to claim orphaned bills:", err);
         } finally {
             setClaimingOrphans(false);
         }
     };
 
-    // ── Filter bills by month range ─────────────────────────────
-    const filteredBills = useMemo(() => {
-        if (monthsFilter === "custom") {
-            return bills.filter((b) => {
-                if (customStart && b.reference_month < customStart) return false;
-                if (customEnd && b.reference_month > customEnd) return false;
-                return true;
+    const handleDelete = async (bill: Bill) => {
+        if (!confirm(`Excluir a conta de ${formatMonth(bill.reference_month)}?`)) return;
+        setDeletingId(bill.id);
+        try {
+            const res = await fetch("/api/delete-bill", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ billId: bill.id }),
             });
+            const result = await res.json().catch(() => ({}));
+            if (res.ok && result.success) setBills(prev => prev.filter(b => b.id !== bill.id));
+            else alert(result.error || "Erro ao excluir conta");
+        } finally {
+            setDeletingId(null);
         }
+    };
+
+    // ── Period (charts + table) ─────────────────────────────────────────
+    const filteredBills = useMemo(() => {
+        if (bills.length === 0 || filterMonths === 0) return bills;
         const now = new Date();
-        const cutoff = new Date(now.getFullYear(), now.getMonth() - monthsFilter, 1);
+        const cutoff = new Date(now.getFullYear(), now.getMonth() - filterMonths, 1);
         const cutoffStr = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, "0")}`;
-        return bills.filter((b) => b.reference_month >= cutoffStr);
-    }, [bills, monthsFilter, customStart, customEnd]);
+        return bills.filter(b => b.reference_month >= cutoffStr);
+    }, [bills, filterMonths]);
 
+    const latest = bills[0] ?? null;   // API returns newest first
 
-    // ── Derived data ──────────────────────────────────────────
-    const summaryStats = useMemo(() => {
+    const summary = useMemo(() => {
         if (filteredBills.length === 0) return null;
-        const totalCost = filteredBills.reduce((sum, b) => sum + Number(b.total_amount), 0);
-        const totalConsumption = filteredBills.reduce((sum, b) => sum + Number(b.consumption_m3), 0);
-        const avgMonthlyCost = totalCost / filteredBills.length;
-        const avgMonthlyConsumption = totalConsumption / filteredBills.length;
-        const latestRate = Number(filteredBills[0].effective_rate_per_m3);
-        const highestBill = filteredBills.reduce((max, b) => Number(b.total_amount) > Number(max.total_amount) ? b : max, filteredBills[0]);
-        return { totalCost, totalConsumption, avgMonthlyCost, avgMonthlyConsumption, latestRate, highestBill };
+        const totalCost = filteredBills.reduce((s, b) => s + b.total_amount, 0);
+        const totalM3 = filteredBills.reduce((s, b) => s + b.consumption_m3, 0);
+        const highest = filteredBills.reduce((max, b) => (b.total_amount > max.total_amount ? b : max), filteredBills[0]);
+        return {
+            months: filteredBills.length,
+            totalCost,
+            totalM3,
+            avgCost: totalCost / filteredBills.length,
+            avgM3: totalM3 / filteredBills.length,
+            highest,
+        };
     }, [filteredBills]);
 
-    // Chart data: consumption + cost by month (chronological)
-    const chartData = useMemo(() => {
-        return [...filteredBills]
+    const chartData = useMemo(
+        () => [...filteredBills]
             .sort((a, b) => a.reference_month.localeCompare(b.reference_month))
-            .map((b) => ({
-                date_label: formatMonth(b.reference_month),
-                consumption: Number(b.consumption_m3),
-                cost: Number(b.total_amount),
-                rate: Number(b.effective_rate_per_m3),
-            }));
-    }, [filteredBills]);
+            .map(b => ({ date_label: formatMonth(b.reference_month), consumption: b.consumption_m3, cost: b.total_amount })),
+        [filteredBills],
+    );
 
-    // ── Loading state ─────────────────────────────────────────
+    // ── Spreadsheet-style history table ─────────────────────────────────
+    const columns = useMemo<ColumnDef<Bill>[]>(() => [
+        { key: "month", label: "Mês/Ano", kind: "month", get: b => b.reference_month.slice(0, 7) },
+        { key: "consumption", label: "Consumo", kind: "number", align: "right", formatSum: formatM3(1), title: "Consumo medido (m³)", get: b => b.consumption_m3 },
+        { key: "billed", label: "Faturado", kind: "number", align: "right", formatSum: formatM3(1), title: "Consumo faturado (m³)", get: b => b.billed_consumption_m3 },
+        { key: "prevReading", label: "Leit. anterior", kind: "number", align: "right", sum: false, get: b => b.previous_reading },
+        { key: "currReading", label: "Leit. atual", kind: "number", align: "right", sum: false, get: b => b.current_reading },
+        { key: "readingDate", label: "Data leitura", kind: "date", align: "right", get: b => b.reading_date?.slice(0, 10) ?? null },
+        { key: "dueDate", label: "Vencimento", kind: "date", align: "right", get: b => b.due_date?.slice(0, 10) ?? null },
+        { key: "waterTariff", label: "Tarifa água", kind: "number", align: "right", get: b => b.water_tariff },
+        { key: "sewageTariff", label: "Tarifa esgoto", kind: "number", align: "right", get: b => b.sewage_tariff },
+        { key: "waterFee", label: "TBOA", kind: "number", align: "right", title: "Tarifa básica operacional de água", get: b => b.water_basic_fee },
+        { key: "sewageFee", label: "TBOE", kind: "number", align: "right", title: "Tarifa básica operacional de esgoto", get: b => b.sewage_basic_fee },
+        { key: "total", label: "Valor", kind: "number", align: "right", get: b => b.total_amount },
+        { key: "rate", label: "R$/m³", kind: "number", align: "right", sum: false, title: "Valor ÷ consumo", get: b => b.effective_rate_per_m3 },
+        { key: "occurrence", label: "Ocorrência", kind: "text", get: b => b.occurrence_code ?? "" },
+    ], []);
+    const cf = useColumnFilters(filteredBills, columns, { key: "month", dir: "desc" });
+    const vis = useColumnVisibility(columnTableKey("water-bills"), {
+        locked: ["month"],
+        defaultHidden: ["prevReading", "currReading", "readingDate", "waterTariff", "sewageTariff", "waterFee", "sewageFee", "occurrence"],
+    });
+    const sel = useCellSum({ formatByCol: { consumption: formatM3(1), billed: formatM3(1), prevReading: v => formatNumber(v, 0), currReading: v => formatNumber(v, 1), rate: formatRate } });
+
+    // Inline edits: draft while typing, save on blur/Enter through the upsert (optimistic, reverted on failure)
+    const [drafts, setDrafts] = useState<Record<string, string>>({});
+    const [savingCells, setSavingCells] = useState<Set<string>>(new Set());
+    const [inlineError, setInlineError] = useState<string | null>(null);
+    const draftKey = (id: string, field: InlineField) => `${id}:${field}`;
+    const setDraft = (id: string, field: InlineField, text: string) => setDrafts(d => ({ ...d, [draftKey(id, field)]: text }));
+    const cancelDraft = (id: string, field: InlineField) => setDrafts(d => { const n = { ...d }; delete n[draftKey(id, field)]; return n; });
+    const commitDraft = async (b: Bill, field: InlineField) => {
+        const k = draftKey(b.id, field);
+        const raw = drafts[k];
+        if (raw === undefined) return;
+        cancelDraft(b.id, field);
+        const value = parseMoneyText(raw);
+        if (value === null || value < 0) return;
+        if (value === (b[field] ?? 0)) return;
+        if ((field === "consumption_m3" || field === "total_amount") && value <= 0) {
+            setInlineError(field === "consumption_m3" ? "O consumo deve ser maior que zero." : "O valor da conta deve ser maior que zero.");
+            return;
+        }
+        const next: Bill = { ...b, [field]: value };
+        if (field === "consumption_m3" || field === "total_amount") {
+            next.effective_rate_per_m3 = next.consumption_m3 > 0 ? Math.round((next.total_amount / next.consumption_m3) * 100) / 100 : null;
+        }
+        setBills(prev => prev.map(x => (x.id === b.id ? next : x)));
+        setSavingCells(prev => new Set(prev).add(k));
+        setInlineError(null);
+        try {
+            const res = await fetch("/api/water-bills", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ propertyId, bill: toBillInput(next) }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) throw new Error(data.error || "Erro ao salvar a conta");
+        } catch (err) {
+            console.error("[WaterDashboard] Inline edit failed:", err);
+            setBills(prev => prev.map(x => (x.id === b.id ? b : x)));
+            setInlineError(err instanceof Error ? err.message : "Erro ao salvar a conta");
+        } finally {
+            setSavingCells(prev => { const n = new Set(prev); n.delete(k); return n; });
+        }
+    };
+
+    const editHref = (month?: string) => {
+        const query = [gatewayId ? `gateway=${gatewayId}` : "", month ? `edit=${month}` : ""].filter(Boolean).join("&");
+        return `/${lang}/dashboard/billing/${propertyId}/new${query ? `?${query}` : ""}`;
+    };
+
+    // ── Loading ─────────────────────────────────────────────────────────
     if (loading) {
         return (
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <div className="animate-pulse space-y-6">
-                    <div className="h-8 bg-muted rounded w-64" />
-                    <div className="h-4 bg-muted rounded w-48" />
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {[...Array(4)].map((_, i) => (
-                            <div key={i} className="h-28 bg-muted rounded-xl" />
-                        ))}
-                    </div>
-                    <div className="h-80 bg-muted rounded-xl" />
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-pulse space-y-6">
+                <div className="h-8 bg-muted rounded w-64" />
+                <div className="h-4 bg-muted rounded w-48" />
+                <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3.5">
+                    {[...Array(7)].map((_, i) => <div key={i} className="h-28 bg-muted rounded-xl" />)}
                 </div>
+                <div className="h-80 bg-muted rounded-xl" />
             </div>
         );
     }
 
-    const backHref = gatewayId
-        ? `/${lang}/dashboard/gateway/${gatewayId}`
-        : `/${lang}/dashboard`;
-
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            {/* ── Header ─────────────────────────────────────── */}
-            <div className="mb-8">
-                <Link
-                    href={backHref}
-                    className="flex items-center text-sm text-muted-foreground hover:text-foreground mb-4"
-                >
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Voltar
-                </Link>
-
-                <div className="flex items-start justify-between">
-                    <div>
-                        <div className="flex items-center gap-3">
-                            <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
-                                <FileText className="w-8 h-8 text-primary" />
-                                Histórico de Contas
-                            </h1>
-                            {/* Privacy toggles */}
-                            <div className="flex items-center gap-1 ml-2">
-                                <button
-                                    onClick={() => setShowAddress(!showAddress)}
-                                    className="p-2 rounded-lg hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
-                                    title={showAddress ? "Ocultar dados do imóvel" : "Mostrar dados do imóvel"}
-                                >
-                                    {showAddress ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
-                                </button>
-                                <button
-                                    onClick={() => setShowValues(!showValues)}
-                                    className={`p-2 rounded-lg hover:bg-muted/50 transition-colors ${showValues ? "text-muted-foreground hover:text-foreground" : "text-muted-foreground/50 hover:text-foreground"}`}
-                                    title={showValues ? "Ocultar valores em R$" : "Mostrar valores em R$"}
-                                >
-                                    <BadgeDollarSign className={`w-5 h-5 ${!showValues ? "opacity-40" : ""}`} />
-                                </button>
-                            </div>
-                        </div>
-                        {property && (
-                            <div className="mt-2 space-y-1">
-                                <p className="text-muted-foreground">{showAddress ? property.name : MASK}</p>
-                                <p className="text-sm text-muted-foreground">{showAddress ? `${property.address} — ${property.city}/${property.state}` : MASK}</p>
-                                {property.connection_code && (
-                                    <p className="text-xs text-muted-foreground font-mono">Ligação: {showAddress ? property.connection_code : MASK}</p>
-                                )}
-                            </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+            {/* Header & Navigation */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Link href={`/${lang}/dashboard/water`} className="inline-flex items-center font-medium hover:text-foreground transition-colors">
+                            <ArrowLeft className="w-4 h-4 mr-1" />
+                            Gestão de Água
+                        </Link>
+                        <span className="text-border">•</span>
+                        <Link href={`/${lang}/imoveis`} className="inline-flex items-center font-medium hover:text-foreground transition-colors">
+                            Imóveis
+                        </Link>
+                        {gatewayId && (
+                            <>
+                                <span className="text-border">•</span>
+                                <Link href={`/${lang}/dashboard/gateway/${gatewayId}`} className="inline-flex items-center font-medium hover:text-foreground transition-colors">
+                                    Gateway
+                                </Link>
+                            </>
                         )}
                     </div>
-                    <div className="text-right">
-                        <Link
-                            href={`/${lang}/dashboard/billing/${propertyId}/new${gatewayId ? `?gateway=${gatewayId}` : ""}`}
-                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground text-sm font-semibold rounded-lg hover:bg-primary/90 transition-colors shadow-sm mb-2"
-                        >
-                            <Plus className="w-4 h-4" />
-                            Nova Conta
-                        </Link>
-                        <p className="text-sm text-muted-foreground">{filteredBills.length} de {bills.length} contas</p>
-                        {bills[0] && <p className="font-mono text-sm text-muted-foreground">Hidrômetro: {showAddress ? bills[0].meter_number : MASK}</p>}
+
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                        <div className="p-2.5 bg-blue-100 dark:bg-blue-900/50 rounded-xl text-blue-600 self-start sm:self-auto">
+                            <Droplets className="w-6 h-6" />
+                        </div>
+                        <div>
+                            <div className="flex flex-wrap items-center gap-3">
+                                <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">Gestão de Água & Contas</h1>
+                                {property && (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-blue-50 text-blue-800 dark:bg-blue-950/60 dark:text-blue-200 border border-blue-200 dark:border-blue-800">
+                                        <Building2 className="w-3.5 h-3.5 text-blue-600" />
+                                        {property.name}
+                                    </span>
+                                )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                                {property?.address && (
+                                    <span className="text-xs text-muted-foreground flex items-center gap-1 mr-1">
+                                        <MapPin className="w-3 h-3" />
+                                        {property.address}{property.city ? ` — ${property.city}${property.state ? `/${property.state}` : ""}` : ""}
+                                    </span>
+                                )}
+                                {property?.connection_code && (
+                                    <span className="text-xs bg-muted text-muted-foreground px-2.5 py-0.5 rounded-full font-mono flex items-center gap-1">
+                                        <Link2 className="w-3 h-3" />
+                                        Ligação: {property.connection_code}
+                                    </span>
+                                )}
+                                {latest?.meter_number && (
+                                    <span className="text-xs bg-muted text-muted-foreground px-2.5 py-0.5 rounded-full font-mono flex items-center gap-1">
+                                        <Gauge className="w-3 h-3" />
+                                        Hidrômetro: {latest.meter_number}
+                                    </span>
+                                )}
+                                <span className="text-xs bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                                    <Droplets className="w-3 h-3" />
+                                    Água principal (paga pelo proprietário)
+                                </span>
+                            </div>
+                        </div>
                     </div>
+                </div>
+
+                {/* Header Actions */}
+                <div className="flex flex-wrap items-center gap-2.5 self-start md:self-auto">
+                    <Link href={`/${lang}/imoveis?id=${propertyId}`}>
+                        <Button variant="outline" className="gap-2 text-sm font-medium text-blue-700 border-blue-300 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/30">
+                            <ArrowLeft className="w-4 h-4" />
+                            Voltar ao Imóvel
+                        </Button>
+                    </Link>
+                    <Link href={editHref()}>
+                        <Button className="bg-blue-600 hover:bg-blue-700 text-white gap-2 font-medium shadow-sm">
+                            <Plus className="w-4 h-4" />
+                            Nova Conta de Água
+                        </Button>
+                    </Link>
                 </div>
             </div>
 
-            {/* ── Orphaned Bills Banner ─────────────────────── */}
+            {/* Orphaned bills */}
             {orphanedBills.length > 0 && (
-                <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl flex items-center justify-between gap-4">
+                <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
                         <FileText className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
                         <div>
@@ -292,312 +496,250 @@ export default function BillingPage() {
                 </div>
             )}
 
-            {/* ── Month Filter ─────────────────────────────── */}
-            <div className="flex flex-col gap-2 mb-8">
-                {/* Preset buttons row */}
-                <div className="flex items-center gap-1 flex-wrap bg-background border border-border rounded-lg p-1">
-                    {FILTER_OPTIONS.map((months) => (
-                        <button
-                            key={months}
-                            onClick={() => setMonthsFilter(months)}
-                            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${monthsFilter === months
-                                ? "bg-primary text-primary-foreground shadow-sm"
-                                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                                }`}
-                        >
-                            {months === 12 ? "12 meses" : `${months / 12} anos`}
-                        </button>
-                    ))}
-                    <button
-                        onClick={() => {
-                            setMonthsFilter("custom");
-                            if (bills.length > 0 && !customStart) {
-                                const sorted = [...bills].sort((a, b) => a.reference_month.localeCompare(b.reference_month));
-                                setCustomStart(sorted[0].reference_month);
-                                setCustomEnd(sorted[sorted.length - 1].reference_month);
-                            }
-                        }}
-                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors whitespace-nowrap flex items-center gap-1.5 ${monthsFilter === "custom"
-                            ? "bg-primary text-primary-foreground shadow-sm"
-                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                            }`}
-                    >
-                        <CalendarRange className="w-3.5 h-3.5" />
-                        Período
-                    </button>
+            {bills.length === 0 ? (
+                /* Empty state */
+                <div className="border-2 border-dashed border-border rounded-2xl p-12 text-center bg-card space-y-4">
+                    <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/40 text-blue-600 rounded-3xl flex items-center justify-center mx-auto">
+                        <Droplets className="w-8 h-8" />
+                    </div>
+                    <div className="space-y-1.5 max-w-md mx-auto">
+                        <h3 className="text-lg font-semibold text-foreground">Nenhuma conta de água ainda</h3>
+                        <p className="text-sm text-muted-foreground">Importe a conta da concessionária para acompanhar consumo, tarifa e custo mês a mês.</p>
+                    </div>
+                    <Link href={editHref()}>
+                        <Button className="bg-blue-600 hover:bg-blue-700 text-white gap-2 font-medium">
+                            <Plus className="w-4 h-4" />
+                            Importar primeira conta
+                        </Button>
+                    </Link>
                 </div>
+            ) : (
+                <>
+                    {/* KPI tiles: current bill + period */}
+                    {latest && summary && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3.5">
+                            <div className="bg-card border border-blue-300 dark:border-blue-800/60 rounded-xl p-4 shadow-xs space-y-1 bg-gradient-to-br from-blue-50/40 dark:from-blue-950/20 to-transparent">
+                                <div className="flex items-center justify-between text-muted-foreground">
+                                    <span className="text-xs font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-400">Consumo atual</span>
+                                    <Droplets className="w-4 h-4 text-blue-600" />
+                                </div>
+                                <p className="text-2xl font-black text-blue-800 dark:text-blue-200">
+                                    {formatNumber(latest.consumption_m3, 0)} <span className="text-sm font-normal">m³</span>
+                                </p>
+                                <p className="text-[11px] text-blue-600/90 dark:text-blue-400">Conta de {formatMonth(latest.reference_month)}</p>
+                            </div>
+                            <div className="bg-card border border-border rounded-xl p-4 shadow-xs space-y-1">
+                                <div className="flex items-center justify-between text-muted-foreground">
+                                    <span className="text-xs font-semibold uppercase tracking-wider">Valor a pagar</span>
+                                    <DollarSign className="w-4 h-4" />
+                                </div>
+                                <p className="text-2xl font-bold text-foreground">{formatCurrency(latest.total_amount)}</p>
+                                <p className="text-[11px] text-muted-foreground">Vencimento {formatDate(latest.due_date)}</p>
+                            </div>
+                            <div className="bg-card border border-border rounded-xl p-4 shadow-xs space-y-1">
+                                <div className="flex items-center justify-between text-muted-foreground">
+                                    <span className="text-xs font-semibold uppercase tracking-wider">Tarifa efetiva</span>
+                                    <TrendingUp className="w-4 h-4" />
+                                </div>
+                                <p className="text-2xl font-bold text-foreground">
+                                    {latest.effective_rate_per_m3 !== null ? `R$ ${formatNumber(latest.effective_rate_per_m3, 2)}` : "-"}
+                                    <span className="text-sm font-normal text-muted-foreground"> /m³</span>
+                                </p>
+                                <p className="text-[11px] text-muted-foreground">Valor ÷ consumo da conta atual</p>
+                            </div>
+                            <div className="bg-card border border-border rounded-xl p-4 shadow-xs space-y-1">
+                                <div className="flex items-center justify-between text-muted-foreground">
+                                    <span className="text-xs font-semibold uppercase tracking-wider">Leitura</span>
+                                    <Gauge className="w-4 h-4" />
+                                </div>
+                                <p className="text-2xl font-bold text-foreground tabular-nums">
+                                    {latest.current_reading !== null ? formatNumber(latest.current_reading, 0) : "-"}
+                                </p>
+                                <p className="text-[11px] text-muted-foreground">
+                                    {latest.previous_reading !== null ? `anterior ${formatNumber(latest.previous_reading, 0)} · ` : ""}{formatDate(latest.reading_date)}
+                                </p>
+                            </div>
+                            <div className="bg-card border border-border rounded-xl p-4 shadow-xs space-y-1">
+                                <div className="flex items-center justify-between text-muted-foreground">
+                                    <span className="text-xs font-semibold uppercase tracking-wider">Média mensal</span>
+                                    <BarChart3 className="w-4 h-4" />
+                                </div>
+                                <p className="text-2xl font-bold text-foreground">{formatCurrency(summary.avgCost)}</p>
+                                <p className="text-[11px] text-muted-foreground">{formatNumber(summary.avgM3, 1)} m³/mês · {summary.months} {summary.months === 1 ? "mês" : "meses"}</p>
+                            </div>
+                            <div className="bg-card border border-border rounded-xl p-4 shadow-xs space-y-1">
+                                <div className="flex items-center justify-between text-muted-foreground">
+                                    <span className="text-xs font-semibold uppercase tracking-wider">Total no período</span>
+                                    <DollarSign className="w-4 h-4" />
+                                </div>
+                                <p className="text-2xl font-bold text-foreground">{formatCurrency(summary.totalCost)}</p>
+                                <p className="text-[11px] text-muted-foreground">{formatNumber(summary.totalM3, 0)} m³ consumidos</p>
+                            </div>
+                            <div className="bg-card border border-border rounded-xl p-4 shadow-xs space-y-1">
+                                <div className="flex items-center justify-between text-muted-foreground">
+                                    <span className="text-xs font-semibold uppercase tracking-wider">Conta mais alta</span>
+                                    <Calendar className="w-4 h-4" />
+                                </div>
+                                <p className="text-2xl font-bold text-foreground">{formatCurrency(summary.highest.total_amount)}</p>
+                                <p className="text-[11px] text-muted-foreground">{formatMonth(summary.highest.reference_month)} · {formatNumber(summary.highest.consumption_m3, 0)} m³</p>
+                            </div>
+                        </div>
+                    )}
 
-                {/* Custom date inputs (shown when "Período" is selected) */}
-                {monthsFilter === "custom" && (
-                    <div className="flex flex-col gap-2 bg-background border border-border rounded-lg p-3 animate-in fade-in slide-in-from-top-1 duration-200">
-                        <div className="flex items-center gap-2">
-                            <label className="text-sm text-muted-foreground w-10 shrink-0">De:</label>
-                            <input
-                                type="month"
-                                value={customStart}
-                                max={customEnd}
-                                onChange={(e) => setCustomStart(e.target.value)}
-                                className="flex-1 min-w-0 px-2.5 py-2 text-sm rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                            />
+                    {/* Charts */}
+                    <div className="space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+                                <TrendingUp className="w-5 h-5 text-blue-600" />
+                                Visualizações & Indicadores
+                            </h2>
+                            <div className="inline-flex items-center rounded-xl border border-border bg-card p-1 text-xs font-semibold shadow-xs">
+                                {PERIODS.map(opt => (
+                                    <button
+                                        key={opt.val}
+                                        type="button"
+                                        onClick={() => setFilterMonths(opt.val)}
+                                        className={cn("px-3 py-1.5 rounded-lg transition-colors", filterMonths === opt.val ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground hover:bg-muted")}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <label className="text-sm text-muted-foreground w-10 shrink-0">Até:</label>
-                            <input
-                                type="month"
-                                value={customEnd}
-                                min={customStart}
-                                onChange={(e) => setCustomEnd(e.target.value)}
-                                className="flex-1 min-w-0 px-2.5 py-2 text-sm rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                            />
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div className="bg-card border border-border rounded-xl p-6 shadow-xs">
+                                <h3 className="text-sm font-bold text-foreground">Consumo mensal (m³)</h3>
+                                <p className="text-xs text-muted-foreground mb-4">Consumo medido pela concessionária · {filteredBills.length} {filteredBills.length === 1 ? "mês" : "meses"}</p>
+                                <ConsumptionChart data={chartData} dataKey="consumption" unit="m³" color="#3b82f6" height={280} />
+                            </div>
+                            <div className="bg-card border border-border rounded-xl p-6 shadow-xs">
+                                <h3 className="text-sm font-bold text-foreground">Valor mensal (R$)</h3>
+                                <p className="text-xs text-muted-foreground mb-4">Custo da conta de água mês a mês</p>
+                                <ConsumptionChart data={chartData} dataKey="cost" unit="R$" color="#10b981" height={280} />
+                            </div>
                         </div>
                     </div>
-                )}
-            </div>
 
-            {/* ── Summary Cards ──────────────────────────────── */}
-            {summaryStats && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-                    <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-                        <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                            <DollarSign className="w-4 h-4" />
-                            <span className="text-xs font-medium uppercase tracking-wide">Total ({filteredBills.length} meses)</span>
+                    {/* History table (spreadsheet-style: sort/filter per column, right-click to hide columns, select cells to sum, inline edit) */}
+                    <div className="bg-card border border-border rounded-xl shadow-xs">
+                        <div className="px-6 py-4 border-b border-border bg-muted/20 rounded-t-xl">
+                            <h3 className="text-base font-semibold text-foreground">Histórico de Contas</h3>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                                Contas da concessionária por mês · clique no cabeçalho para ordenar e filtrar (botão direito: colunas); selecione células para somar; duplo clique ou Enter edita na própria célula; o lápis abre a conta completa
+                            </p>
+                            {inlineError && <p className="text-xs text-red-600 mt-1">{inlineError}</p>}
                         </div>
-                        <p className="text-2xl font-bold text-foreground">
-                            {showValues ? formatCurrency(summaryStats.totalCost) : MASK_CURRENCY}
-                        </p>
+
+                        {cf.anyFilter && (
+                            <div className="px-4 pt-3">
+                                <FilterChips columns={columns} ctl={cf} />
+                            </div>
+                        )}
+
+                        {cf.rows.length === 0 ? (
+                            <div className="px-6 py-10 text-center text-sm text-muted-foreground">
+                                {filteredBills.length === 0 ? "Nenhuma conta no período escolhido." : <>Nenhuma conta com os filtros atuais. <button type="button" onClick={cf.clearFilters} className="underline underline-offset-2">Limpar filtros</button></>}
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto px-2 pb-2">
+                                <table className="w-full text-xs">
+                                    <thead>
+                                        <ColumnHeaders columns={columns} ctl={cf} visibility={vis} trailing={<th className="px-2 py-2 font-semibold text-center">Ações</th>} />
+                                    </thead>
+                                    <tbody>
+                                        {cf.rows.map(b => {
+                                            const show = (key: string) => !vis.isHidden(key);
+                                            const ro = "px-2 py-1.5 text-right tabular-nums whitespace-nowrap";
+                                            const edit = "px-1 py-0.5 text-right whitespace-nowrap";
+                                            const cell = (col: string, field: InlineField, decimals: number, opts: { prefix?: string; suffix?: string; dashWhenEmpty?: boolean; className?: string } = {}) => (
+                                                <td {...sel.cellProps(col, b.id, b[field], edit, () => cancelDraft(b.id, field))}>
+                                                    <UnitInput
+                                                        value={b[field]}
+                                                        draft={drafts[draftKey(b.id, field)]}
+                                                        disabled={savingCells.has(draftKey(b.id, field))}
+                                                        onDraft={text => setDraft(b.id, field, text)}
+                                                        onCommit={() => commitDraft(b, field)}
+                                                        decimals={decimals}
+                                                        {...opts}
+                                                    />
+                                                </td>
+                                            );
+                                            return (
+                                                <tr key={b.id} className="border-b border-border/60 hover:bg-muted/30 transition-colors">
+                                                    <td {...sel.cellProps("month", b.id, null, "px-2 py-1.5 font-semibold text-foreground whitespace-nowrap")}>
+                                                        {formatMonth(b.reference_month)}
+                                                    </td>
+                                                    {show("consumption") && cell("consumption", "consumption_m3", 1, { suffix: " m³", className: "font-semibold text-blue-700 dark:text-blue-300" })}
+                                                    {show("billed") && cell("billed", "billed_consumption_m3", 1, { suffix: " m³", dashWhenEmpty: true, className: "text-muted-foreground" })}
+                                                    {show("prevReading") && cell("prevReading", "previous_reading", 0, { dashWhenEmpty: true, className: "font-mono text-muted-foreground" })}
+                                                    {show("currReading") && cell("currReading", "current_reading", 1, { dashWhenEmpty: true, className: "font-mono text-muted-foreground" })}
+                                                    {show("readingDate") && (
+                                                        <td {...sel.cellProps("readingDate", b.id, null, cn(ro, "text-muted-foreground"))}>{formatDate(b.reading_date)}</td>
+                                                    )}
+                                                    {show("dueDate") && (
+                                                        <td {...sel.cellProps("dueDate", b.id, null, cn(ro, "text-muted-foreground"))}>{formatDate(b.due_date)}</td>
+                                                    )}
+                                                    {show("waterTariff") && cell("waterTariff", "water_tariff", 2, { prefix: "R$ ", dashWhenEmpty: true, className: "text-muted-foreground" })}
+                                                    {show("sewageTariff") && cell("sewageTariff", "sewage_tariff", 2, { prefix: "R$ ", dashWhenEmpty: true, className: "text-muted-foreground" })}
+                                                    {show("waterFee") && cell("waterFee", "water_basic_fee", 2, { prefix: "R$ ", dashWhenEmpty: true, className: "text-muted-foreground" })}
+                                                    {show("sewageFee") && cell("sewageFee", "sewage_basic_fee", 2, { prefix: "R$ ", dashWhenEmpty: true, className: "text-muted-foreground" })}
+                                                    {show("total") && cell("total", "total_amount", 2, { prefix: "R$ ", className: "font-bold text-foreground" })}
+                                                    {show("rate") && (
+                                                        <td {...sel.cellProps("rate", b.id, b.effective_rate_per_m3, cn(ro, "font-mono text-muted-foreground"))}>
+                                                            {b.effective_rate_per_m3 !== null ? `R$ ${formatNumber(b.effective_rate_per_m3, 2)}` : "-"}
+                                                        </td>
+                                                    )}
+                                                    {show("occurrence") && (
+                                                        <td {...sel.cellProps("occurrence", b.id, null, "px-2 py-1.5 whitespace-nowrap text-muted-foreground")}>{b.occurrence_code || "-"}</td>
+                                                    )}
+                                                    <td className="px-2 py-1.5 text-center whitespace-nowrap">
+                                                        <div className="flex items-center justify-center gap-1.5">
+                                                            {b.bill_pdf_url && (
+                                                                <a
+                                                                    href={b.bill_pdf_url}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    className="p-1.5 rounded-lg text-blue-600 dark:text-blue-400 hover:text-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/60 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 transition-colors shadow-2xs"
+                                                                    title="Abrir a conta em PDF"
+                                                                    aria-label="Abrir a conta em PDF"
+                                                                >
+                                                                    <FileText className="w-3.5 h-3.5" />
+                                                                </a>
+                                                            )}
+                                                            <Link
+                                                                href={editHref(b.reference_month)}
+                                                                className="p-1.5 rounded-lg text-amber-600 dark:text-amber-400 hover:text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/60 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 transition-colors shadow-2xs"
+                                                                title="Editar a conta completa"
+                                                                aria-label="Editar conta"
+                                                            >
+                                                                <Pencil className="w-3.5 h-3.5" />
+                                                            </Link>
+                                                            <button
+                                                                onClick={() => handleDelete(b)}
+                                                                disabled={deletingId === b.id}
+                                                                className="p-1.5 rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors disabled:opacity-50"
+                                                                title="Excluir conta"
+                                                                aria-label="Excluir conta"
+                                                            >
+                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                     </div>
-                    <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-                        <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                            <TrendingUp className="w-4 h-4" />
-                            <span className="text-xs font-medium uppercase tracking-wide">Média Mensal</span>
-                        </div>
-                        <p className="text-2xl font-bold text-foreground">
-                            {showValues ? formatCurrency(summaryStats.avgMonthlyCost) : MASK_CURRENCY}
-                        </p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                            {Math.round(summaryStats.avgMonthlyConsumption)} m³/mês
-                        </p>
-                    </div>
-                    <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-                        <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                            <Droplets className="w-4 h-4" />
-                            <span className="text-xs font-medium uppercase tracking-wide">Consumo Total</span>
-                        </div>
-                        <p className="text-2xl font-bold text-foreground">
-                            {summaryStats.totalConsumption} <span className="text-base font-normal text-muted-foreground">m³</span>
-                        </p>
-                    </div>
-                    <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-                        <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                            <Calendar className="w-4 h-4" />
-                            <span className="text-xs font-medium uppercase tracking-wide">Conta Mais Alta</span>
-                        </div>
-                        <p className="text-2xl font-bold text-foreground">
-                            {showValues ? formatCurrency(Number(summaryStats.highestBill.total_amount)) : MASK_CURRENCY}
-                        </p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                            {formatMonth(summaryStats.highestBill.reference_month)} — {Number(summaryStats.highestBill.consumption_m3)} m³
-                        </p>
-                    </div>
-                </div>
+                </>
             )}
 
-            {/* ── Consumption Chart ──────────────────────────── */}
-            <div className="bg-card border border-border rounded-xl p-6 shadow-sm mb-10">
-                <h2 className="text-lg font-semibold text-foreground mb-1">Consumo Mensal (m³)</h2>
-                <p className="text-sm text-muted-foreground mb-6">Evolução do consumo da concessionária nos últimos {filteredBills.length} meses</p>
-                <ConsumptionChart
-                    data={chartData}
-                    dataKey="consumption"
-                    unit="m³"
-                    color="#3b82f6"
-                    height={300}
-                />
-            </div>
-
-            {/* ── Cost Chart ─────────────────────────────────── */}
-            <div className="bg-card border border-border rounded-xl p-6 shadow-sm mb-10">
-                <h2 className="text-lg font-semibold text-foreground mb-1">Valor Mensal (R$)</h2>
-                <p className="text-sm text-muted-foreground mb-6">Evolução do custo da conta de água</p>
-                <ConsumptionChart
-                    data={chartData}
-                    dataKey="cost"
-                    unit="R$"
-                    color="#10b981"
-                    height={300}
-                />
-            </div>
-
-            {/* ── Bills Table ────────────────────────────────── */}
-            <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden mb-10">
-                <div className="p-6 border-b border-border">
-                    <h2 className="text-lg font-semibold text-foreground">Detalhamento das Contas</h2>
-                    <p className="text-sm text-muted-foreground">Clique em uma linha para ver detalhes</p>
-                </div>
-
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                        <thead>
-                            <tr className="border-b border-border bg-muted/30">
-                                <th className="text-left px-6 py-3 font-medium text-muted-foreground">Mês/Ano</th>
-                                <th className="text-right px-6 py-3 font-medium text-muted-foreground">Consumo</th>
-                                <th className="text-right px-6 py-3 font-medium text-muted-foreground">Valor</th>
-                                <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Taxa</th>
-                                <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">Leitura</th>
-                                <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">Vencimento</th>
-                                <th className="px-4 py-3 w-20"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredBills.map((bill) => {
-                                const isSelected = selectedBill?.id === bill.id;
-                                return (
-                                    <React.Fragment key={bill.id}>
-                                        <tr
-                                            onClick={() => setSelectedBill(isSelected ? null : bill)}
-                                            className={`border-b border-border cursor-pointer transition-colors hover:bg-muted/20 ${isSelected ? "bg-primary/5" : ""}`}
-                                        >
-                                            <td className="px-6 py-4 font-medium text-foreground">
-                                                <span className="inline-flex items-center gap-2">
-                                                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${isSelected ? "rotate-180" : ""}`} />
-                                                    {formatMonth(bill.reference_month)}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-right text-foreground">
-                                                {formatNumber(Number(bill.consumption_m3))} m³
-                                            </td>
-                                            <td className="px-6 py-4 text-right font-semibold text-foreground">
-                                                {showValues ? formatCurrency(Number(bill.total_amount)) : MASK_CURRENCY}
-                                            </td>
-                                            <td className="px-6 py-4 text-right text-muted-foreground hidden md:table-cell">
-                                                {showValues ? `R$ ${formatNumber(Number(bill.effective_rate_per_m3), 2)}/m³` : MASK_CURRENCY}
-                                            </td>
-                                            <td className="px-6 py-4 text-right text-muted-foreground hidden lg:table-cell font-mono text-xs">
-                                                {formatNumber(Number(bill.previous_reading), 0)} → {formatNumber(Number(bill.current_reading), 1)}
-                                            </td>
-                                            <td className="px-6 py-4 text-right text-muted-foreground hidden lg:table-cell">
-                                                {formatDate(bill.due_date)}
-                                            </td>
-                                            <td className="px-4 py-4 text-right">
-                                                <div className="flex items-center justify-end gap-1">
-                                                    <Link
-                                                        href={`/${lang}/dashboard/billing/${propertyId}/new?gateway=${gatewayId || ""}&edit=${bill.reference_month}`}
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        className="p-1.5 rounded-md hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
-                                                        title="Editar conta"
-                                                    >
-                                                        <Pencil className="w-3.5 h-3.5" />
-                                                    </Link>
-                                                    <button
-                                                        onClick={async (e) => {
-                                                            e.stopPropagation();
-                                                            if (!confirm(`Excluir conta de ${formatMonth(bill.reference_month)}?`)) return;
-                                                            setDeletingId(bill.id);
-                                                            const res = await fetch("/api/delete-bill", {
-                                                                method: "POST",
-                                                                headers: { "Content-Type": "application/json" },
-                                                                body: JSON.stringify({ billId: bill.id }),
-                                                            });
-                                                            const result = await res.json();
-                                                            if (res.ok && result.success) {
-                                                                setBills(prev => prev.filter(b => b.id !== bill.id));
-                                                                if (selectedBill?.id === bill.id) setSelectedBill(null);
-                                                            } else {
-                                                                alert(result.error || "Erro ao excluir conta");
-                                                            }
-                                                            setDeletingId(null);
-                                                        }}
-                                                        disabled={deletingId === bill.id}
-                                                        className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-950/30 text-muted-foreground hover:text-red-600 dark:hover:text-red-400 transition-colors disabled:opacity-50"
-                                                        title="Excluir conta"
-                                                    >
-                                                        {deletingId === bill.id ? (
-                                                            <div className="w-3.5 h-3.5 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin" />
-                                                        ) : (
-                                                            <Trash2 className="w-3.5 h-3.5" />
-                                                        )}
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-
-                                        {/* Inline expanded detail */}
-                                        {isSelected && (
-                                            <tr className="bg-muted/10">
-                                                <td colSpan={7} className="px-6 py-5">
-                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                                        <div>
-                                                            <p className="text-muted-foreground text-xs">Hidrômetro</p>
-                                                            <p className="font-mono font-medium">{showAddress ? bill.meter_number : MASK}</p>
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-muted-foreground text-xs">Data da Leitura</p>
-                                                            <p className="font-medium">{formatDate(bill.reading_date)}</p>
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-muted-foreground text-xs">Leitura Anterior</p>
-                                                            <p className="font-medium">{Number(bill.previous_reading)}</p>
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-muted-foreground text-xs">Leitura Atual</p>
-                                                            <p className="font-medium">{Number(bill.current_reading)}</p>
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-muted-foreground text-xs">Cons. Real</p>
-                                                            <p className="font-medium">{formatNumber(Number(bill.consumption_m3))} m³</p>
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-muted-foreground text-xs">Cons. Faturado</p>
-                                                            <p className="font-medium">{formatNumber(Number(bill.billed_consumption_m3))} m³</p>
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-muted-foreground text-xs">Vencimento</p>
-                                                            <p className="font-medium">{formatDate(bill.due_date)}</p>
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-muted-foreground text-xs">Ocorrência</p>
-                                                            <p className="font-medium">{bill.occurrence_code || "-"}</p>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Tariff breakdown */}
-                                                    {Number(bill.water_tariff) > 0 && (
-                                                        <div className="mt-4 pt-4 border-t border-border">
-                                                            <p className="text-sm font-semibold text-muted-foreground mb-3">Composição da Conta</p>
-                                                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
-                                                                <div className="bg-background rounded-lg p-3 border border-border">
-                                                                    <p className="text-xs text-muted-foreground">Tarifa de Água</p>
-                                                                    <p className="font-semibold">{showValues ? formatCurrency(Number(bill.water_tariff)) : MASK_CURRENCY}</p>
-                                                                </div>
-                                                                <div className="bg-background rounded-lg p-3 border border-border">
-                                                                    <p className="text-xs text-muted-foreground">Tarifa de Esgoto</p>
-                                                                    <p className="font-semibold">{showValues ? formatCurrency(Number(bill.sewage_tariff)) : MASK_CURRENCY}</p>
-                                                                </div>
-                                                                <div className="bg-background rounded-lg p-3 border border-border">
-                                                                    <p className="text-xs text-muted-foreground">TBOA (Água)</p>
-                                                                    <p className="font-semibold">{showValues ? formatCurrency(Number(bill.water_basic_fee)) : MASK_CURRENCY}</p>
-                                                                </div>
-                                                                <div className="bg-background rounded-lg p-3 border border-border">
-                                                                    <p className="text-xs text-muted-foreground">TBOE (Esgoto)</p>
-                                                                    <p className="font-semibold">{showValues ? formatCurrency(Number(bill.sewage_basic_fee)) : MASK_CURRENCY}</p>
-                                                                </div>
-                                                                <div className="bg-primary/10 rounded-lg p-3 border border-primary/20">
-                                                                    <p className="text-xs text-primary font-medium">Total</p>
-                                                                    <p className="font-bold text-primary">{showValues ? formatCurrency(Number(bill.total_amount)) : MASK_CURRENCY}</p>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </React.Fragment>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+            {/* Spreadsheet helpers: selection sum bar, column sort/filter and columns menus */}
+            <CellSumBar ctl={sel} />
+            <ColumnMenu columns={columns} ctl={cf} />
+            <ColumnVisibilityMenu columns={columns} ctl={vis} />
         </div>
     );
 }

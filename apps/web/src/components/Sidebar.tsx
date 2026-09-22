@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@kitnets/ui";
 import { SignOutButton, useAuth } from "@clerk/nextjs";
-import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Rocket, HardHat, Briefcase, Building2, User, Users, UserCheck, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart, ArrowLeftRight, FileText, AlertCircle, Plus, Minus, Gem, X, Zap, Building, ChevronsLeft, ChevronsRight, Landmark } from "lucide-react";
+import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Rocket, HardHat, Briefcase, Building2, User, Users, UserCheck, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart, ArrowLeftRight, FileText, AlertCircle, Plus, Minus, Gem, X, Zap, Building, ChevronsLeft, ChevronsRight, Landmark, Droplets } from "lucide-react";
 import { PropertyFilters } from "./PropertyFilters";
 
 import { useTheme } from "next-themes";
@@ -368,6 +368,17 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                                 >
                                                     <Zap className="h-5 w-5 text-amber-500 transition duration-75 group-hover:text-amber-600" />
                                                     <span className="ms-3 sidebar-label">Energia Solar</span>
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <Link
+                                                    title={navCollapsed ? "Água" : undefined}
+                                                    href={lang === 'pt' ? '/dashboard/water' : `/${lang}/dashboard/water`}
+                                                    aria-current={pathname.includes('/dashboard/water') || pathname.includes('/dashboard/billing') ? "page" : undefined}
+                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${pathname.includes('/dashboard/water') || pathname.includes('/dashboard/billing') ? 'bg-accent font-medium' : ''}`}
+                                                >
+                                                    <Droplets className="h-5 w-5 text-blue-500 transition duration-75 group-hover:text-blue-600" />
+                                                    <span className="ms-3 sidebar-label">Água</span>
                                                 </Link>
                                             </li>
                                             <li>
