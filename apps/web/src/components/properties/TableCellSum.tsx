@@ -14,11 +14,17 @@
  *   • Ctrl/Cmd+click   toggles one cell in and out of the selection
  *   • double-click     starts inline editing (focuses the input / opens the select)
  *   • Esc              while editing: cancels the edit (draft discarded, nothing saved); otherwise clears the selection
- * A floating bar shows count, sum and average of the selected numeric cells.
+ * A floating bar shows count, sum and average of the selected numeric cells. Sums are R$ unless
+ * the column has its own unit: useCellSum({ formatByCol: { cons: v => `${v} kWh` } }).
  */
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Sigma, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+export interface CellSumOptions {
+    /** How to print the sum/average of a column's cells; columns without one are R$ */
+    formatByCol?: Record<string, (v: number) => string>;
+}
 
 export interface CellSumController {
     cellProps: (col: string, rowId: string, value: number | null | undefined, className?: string, onCancel?: () => void) => {
@@ -30,19 +36,23 @@ export interface CellSumController {
         title?: string;
     };
     isSelected: (col: string, rowId: string) => boolean;
-    /** count / sum over the current selection (numeric cells only for the sum) */
-    stats: () => { count: number; numeric: number; total: number };
+    /** count / sum over the current selection (numeric cells only for the sum); `format` prints the sum in the selected column's unit */
+    stats: () => { count: number; numeric: number; total: number; format: (v: number) => string };
     count: number;
     clear: () => void;
 }
 
 const formatBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const formatPlain = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 const key = (col: string, rowId: string) => `${col}::${rowId}`;
+const colOf = (k: string) => k.slice(0, k.indexOf("::"));
 
 interface Grid { cols: string[]; rows: string[]; cells: Map<string, number | null> }
 
-export function useCellSum(): CellSumController {
+export function useCellSum(options: CellSumOptions = {}): CellSumController {
     const [selected, setSelected] = useState<Set<string>>(new Set());
+    const formatByCol = useRef(options.formatByCol);
+    useEffect(() => { formatByCol.current = options.formatByCol; });
     const grid = useRef<Grid>({ cols: [], rows: [], cells: new Map() });
     const inPass = useRef(false);
     const anchor = useRef<{ col: string; rowId: string } | null>(null);
@@ -138,8 +148,16 @@ export function useCellSum(): CellSumController {
     const isSelected = useCallback((col: string, rowId: string) => selected.has(key(col, rowId)), [selected]);
     const stats = useCallback(() => {
         let total = 0, numeric = 0;
-        for (const k of selected) { const v = grid.current.cells.get(k); if (typeof v === "number") { total += v; numeric++; } }
-        return { count: selected.size, numeric, total: Math.round(total * 100) / 100 };
+        const formats = new Set<((v: number) => string) | undefined>();
+        for (const k of selected) {
+            const v = grid.current.cells.get(k);
+            if (typeof v !== "number") continue;
+            total += v; numeric++;
+            formats.add(formatByCol.current?.[colOf(k)]);
+        }
+        // one unit across the selection → print it; mixed units → plain numbers
+        const format = formats.size <= 1 ? ([...formats][0] ?? formatBRL) : formatPlain;
+        return { count: selected.size, numeric, total: Math.round(total * 100) / 100, format };
     }, [selected]);
     return { cellProps, isSelected, stats, count: selected.size, clear };
 }
@@ -147,15 +165,15 @@ export function useCellSum(): CellSumController {
 /** Floating status bar (bottom centre) with count, sum and average of the selected cells. */
 export function CellSumBar({ ctl }: { ctl: CellSumController }) {
     if (ctl.count === 0) return null;
-    const { count, numeric, total } = ctl.stats();
+    const { count, numeric, total, format } = ctl.stats();
     return (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-full border border-emerald-300 bg-background/95 backdrop-blur px-4 py-2 text-xs shadow-lg">
             <Sigma className="w-4 h-4 text-emerald-600" />
             <span><span className="font-semibold text-foreground">{count}</span> {count === 1 ? "célula" : "células"}</span>
             {numeric > 0 && (
                 <>
-                    <span>Soma <span className="font-bold text-foreground tabular-nums">{formatBRL(total)}</span></span>
-                    <span className="text-muted-foreground">Média {formatBRL(total / numeric)}</span>
+                    <span>Soma <span className="font-bold text-foreground tabular-nums">{format(total)}</span></span>
+                    <span className="text-muted-foreground">Média {format(total / numeric)}</span>
                 </>
             )}
             <button type="button" onClick={ctl.clear} className="text-muted-foreground hover:text-foreground" title="Limpar seleção (Esc)"><X className="w-3.5 h-3.5" /></button>
