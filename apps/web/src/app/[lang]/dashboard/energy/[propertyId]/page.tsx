@@ -43,6 +43,11 @@ import { EditEnergyBillModal } from "@/components/energy/EditEnergyBillModal";
 import { PdfViewerModal } from "@/components/ui/PdfViewerModal";
 import { solarSavings } from "@/lib/energy-savings";
 import type { OwnerPropertySummary } from "@/app/api/energy-bills/properties/route";
+import { cn } from "@/lib/utils";
+import { columnTableKey } from "@/lib/ui-preferences";
+import { CellSumBar, useCellSum } from "@/components/properties/TableCellSum";
+import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "@/components/properties/TableColumnFilters";
+import { ColumnVisibilityButton, ColumnVisibilityMenu, useColumnVisibility } from "@/components/properties/TableColumnVisibility";
 
 export interface EnergyBillRecord {
     id: string;
@@ -86,6 +91,12 @@ const formatCurrency = (val: number) =>
 
 const formatNumber = (val: number, decimals = 1) =>
     val.toLocaleString("pt-BR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+
+// Units for the history table (column sums under the header and the cell-selection bar)
+const formatKwh = (decimals: number) => (v: number) => `${formatNumber(v, decimals)} kWh`;
+const formatDays = (v: number) => `${formatNumber(v, 0)} dias`;
+const formatUnitPrice = (v: number) => `R$ ${formatNumber(v, 4)}`;
+const dailyAvg = (b: EnergyBillRecord) => b.daily_avg_kwh || (b.grid_consumption_kwh / (b.billing_days || 30));
 
 const MONTH_NAMES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
@@ -225,6 +236,23 @@ export default function EnergyDashboardPage() {
 
         return bills.filter((b) => b.reference_month >= cutoffStr);
     }, [bills, filterMonths]);
+
+    // Spreadsheet-style history table: sort/filter per column, hide columns, select cells to sum
+    const billColumns = useMemo<ColumnDef<EnergyBillRecord>[]>(() => [
+        { key: "month", label: "Mês/Ano", kind: "month", get: b => b.reference_month.slice(0, 7) },
+        { key: "cons", label: "Cons. kWh", kind: "number", align: "right", formatSum: formatKwh(0), get: b => b.grid_consumption_kwh },
+        { key: "daily", label: "kWh/Dia", kind: "number", align: "right", sum: false, get: b => dailyAvg(b) },
+        { key: "days", label: "Dias", kind: "number", align: "right", sum: false, get: b => b.billing_days || 30 },
+        { key: "balance", label: "Saldo Atual Geração", kind: "number", align: "right", sum: false, className: "text-emerald-600 dark:text-emerald-400", get: b => b.generation_balance_kwh > 0 ? b.generation_balance_kwh : null },
+        { key: "injected", label: "Energia Injetada", kind: "number", align: "right", formatSum: formatKwh(0), className: "text-amber-600 dark:text-amber-400", get: b => b.solar_injected_kwh > 0 ? b.solar_injected_kwh : null },
+        { key: "availability", label: "Custo Disponibilidade", kind: "number", align: "right", get: b => b.availability_cost_amount > 0 ? b.availability_cost_amount : null },
+        { key: "unitPrice", label: "Preço Unit.", kind: "number", align: "right", sum: false, get: b => b.unit_price ?? null },
+        { key: "total", label: "Valor a Pagar", kind: "number", align: "right", get: b => b.total_amount > 0 ? b.total_amount : null },
+        { key: "origin", label: "Origem", kind: "enum", align: "center", options: [{ value: "full", label: "Fatura Completa" }, { value: "hist", label: "Histórico Base" }], get: b => b.is_historical_only ? "hist" : "full" },
+    ], []);
+    const cf = useColumnFilters(filteredBills, billColumns, { key: "month", dir: "desc" });
+    const vis = useColumnVisibility(columnTableKey("energy-bills"), { locked: ["month"] });
+    const sel = useCellSum({ formatByCol: { cons: formatKwh(0), daily: formatKwh(2), days: formatDays, balance: formatKwh(2), injected: formatKwh(0), unitPrice: formatUnitPrice } });
 
     // Latest full bill (for current status cards)
     const latestFullBill = useMemo(() => {
@@ -769,147 +797,148 @@ export default function EnergyDashboardPage() {
                         </div>
                     </div>
 
-                    {/* Histórico de Consumo (Interactive Data Table) */}
-                    <div className="bg-card border border-border rounded-xl shadow-xs overflow-hidden space-y-0">
-                        <div className="px-6 py-4 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-muted/20">
+                    {/* Histórico de Consumo (spreadsheet-style table: sort/filter per column, hide columns, select cells to sum) */}
+                    <div className="bg-card border border-border rounded-xl shadow-xs">
+                        <div className="px-6 py-4 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-muted/20 rounded-t-xl">
                             <div>
                                 <h3 className="text-base font-semibold text-foreground">Histórico de Consumo Detalhado</h3>
                                 <p className="text-xs text-muted-foreground mt-0.5">
-                                    Registros de consumo, injeção solar, saldo de créditos e custos por ciclo de faturamento
+                                    Registros de consumo, injeção solar, saldo de créditos e custos por ciclo de faturamento · clique no cabeçalho para ordenar e filtrar; selecione células para somar; duplo clique edita
                                 </p>
                             </div>
-                            <span className="text-xs font-mono text-muted-foreground bg-muted px-2.5 py-1 rounded-md self-start sm:self-auto">
-                                {filteredBills.length} {filteredBills.length === 1 ? "registro" : "registros"}
-                            </span>
+                            <div className="flex items-center gap-2 self-start sm:self-auto">
+                                <ColumnVisibilityButton ctl={vis} />
+                                <span className="text-xs font-mono text-muted-foreground bg-muted px-2.5 py-1 rounded-md">
+                                    {cf.anyFilter ? `${cf.rows.length} de ${filteredBills.length}` : filteredBills.length} {filteredBills.length === 1 ? "registro" : "registros"}
+                                </span>
+                            </div>
                         </div>
 
-                        <div className="overflow-auto max-h-[600px] relative">
-                            <table className="w-full text-xs text-left border-separate border-spacing-0">
-                                <thead>
-                                    <tr>
-                                        <th className="sticky top-0 left-0 z-30 bg-muted border-b border-r border-border py-3 px-4 font-semibold text-muted-foreground min-w-[110px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.12)]">
-                                            MÊS/ANO
-                                        </th>
-                                        <th className="sticky top-0 z-20 bg-muted border-b border-border py-3 px-4 font-semibold text-muted-foreground text-right whitespace-nowrap">
-                                            Cons. kWh
-                                        </th>
-                                        <th className="sticky top-0 z-20 bg-muted border-b border-border py-3 px-4 font-semibold text-muted-foreground text-right whitespace-nowrap">
-                                            kWh/Dia
-                                        </th>
-                                        <th className="sticky top-0 z-20 bg-muted border-b border-border py-3 px-4 font-semibold text-muted-foreground text-right whitespace-nowrap">
-                                            Dias
-                                        </th>
-                                        <th className="sticky top-0 z-20 bg-muted border-b border-border py-3 px-4 font-semibold text-emerald-600 dark:text-emerald-400 text-right whitespace-nowrap">
-                                            Saldo Atual Geração
-                                        </th>
-                                        <th className="sticky top-0 z-20 bg-muted border-b border-border py-3 px-4 font-semibold text-amber-600 dark:text-amber-400 text-right whitespace-nowrap">
-                                            Energia Injetada
-                                        </th>
-                                        <th className="sticky top-0 z-20 bg-muted border-b border-border py-3 px-4 font-semibold text-muted-foreground text-right whitespace-nowrap">
-                                            Custo Disponibilidade
-                                        </th>
-                                        <th className="sticky top-0 z-20 bg-muted border-b border-border py-3 px-4 font-semibold text-muted-foreground text-right whitespace-nowrap">
-                                            Preço Unit.
-                                        </th>
-                                        <th className="sticky top-0 z-20 bg-muted border-b border-border py-3 px-4 font-semibold text-muted-foreground text-right whitespace-nowrap">
-                                            Valor a Pagar
-                                        </th>
-                                        <th className="sticky top-0 z-20 bg-muted border-b border-border py-3 px-4 font-semibold text-muted-foreground text-center whitespace-nowrap">
-                                            Origem
-                                        </th>
-                                        <th className="sticky top-0 z-20 bg-muted border-b border-border py-3 px-4 font-semibold text-muted-foreground text-center whitespace-nowrap">
-                                            Ações
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredBills.map((b) => {
-                                        const daily = b.daily_avg_kwh || (b.grid_consumption_kwh / (b.billing_days || 30));
-                                        return (
-                                            <tr key={b.id} className="group hover:bg-muted/30 transition-colors">
-                                                <td className="sticky left-0 z-10 bg-card group-hover:bg-muted/40 border-b border-r border-border py-3 px-4 font-bold text-foreground min-w-[110px] whitespace-nowrap shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">
-                                                    {b.reference_month_label || formatMonthLabel(b.reference_month)}
-                                                </td>
-                                                <td className="py-3 px-4 text-right font-medium border-b border-border whitespace-nowrap">
-                                                    {formatNumber(b.grid_consumption_kwh, 0)}
-                                                </td>
-                                                <td className="py-3 px-4 text-right font-mono border-b border-border whitespace-nowrap">
-                                                    {formatNumber(daily, 2)}
-                                                </td>
-                                                <td className="py-3 px-4 text-right text-muted-foreground border-b border-border whitespace-nowrap">
-                                                    {b.billing_days || 30}
-                                                </td>
-                                                <td className="py-3 px-4 text-right font-semibold text-emerald-700 dark:text-emerald-300 border-b border-border whitespace-nowrap">
-                                                    {b.generation_balance_kwh > 0 ? `${formatNumber(b.generation_balance_kwh, 2)} kWh` : "-"}
-                                                </td>
-                                                <td className="py-3 px-4 text-right font-semibold text-amber-600 dark:text-amber-400 border-b border-border whitespace-nowrap">
-                                                    {b.solar_injected_kwh > 0 ? `${formatNumber(b.solar_injected_kwh, 0)} kWh` : "-"}
-                                                </td>
-                                                <td className="py-3 px-4 text-right text-muted-foreground border-b border-border whitespace-nowrap">
-                                                    {b.availability_cost_amount > 0 ? formatCurrency(b.availability_cost_amount) : "-"}
-                                                </td>
-                                                <td className="py-3 px-4 text-right font-mono text-muted-foreground border-b border-border whitespace-nowrap">
-                                                    {b.unit_price ? `R$ ${formatNumber(b.unit_price, 4)}` : "-"}
-                                                </td>
-                                                <td className="py-3 px-4 text-right font-bold text-foreground border-b border-border whitespace-nowrap">
-                                                    {b.total_amount > 0 ? formatCurrency(b.total_amount) : "-"}
-                                                </td>
-                                                <td className="py-3 px-4 text-center border-b border-border whitespace-nowrap">
-                                                    {b.is_historical_only ? (
-                                                        <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-medium bg-muted text-muted-foreground">
-                                                             Histórico Base
-                                                        </span>
-                                                    ) : (
-                                                        <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                                                            Fatura Completa
-                                                        </span>
+                        {cf.anyFilter && (
+                            <div className="px-4 pt-3">
+                                <FilterChips columns={billColumns} ctl={cf} />
+                            </div>
+                        )}
+
+                        {cf.rows.length === 0 ? (
+                            <div className="px-6 py-10 text-center text-sm text-muted-foreground">
+                                Nenhum registro com os filtros atuais. <button type="button" onClick={cf.clearFilters} className="underline underline-offset-2">Limpar filtros</button>
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto px-2 pb-2">
+                                <table className="w-full text-xs">
+                                    <thead>
+                                        <ColumnHeaders columns={billColumns} ctl={cf} visibility={vis} trailing={<th className="px-2 py-2 font-semibold text-center">Ações</th>} />
+                                    </thead>
+                                    <tbody>
+                                        {cf.rows.map((b) => {
+                                            const daily = dailyAvg(b);
+                                            const show = (key: string) => !vis.isHidden(key);
+                                            const num = "px-2 py-1.5 text-right tabular-nums whitespace-nowrap";
+                                            return (
+                                                <tr key={b.id} className="border-b border-border/60 hover:bg-muted/30 transition-colors" onDoubleClick={() => setEditingBill(b)}>
+                                                    <td {...sel.cellProps("month", b.id, null, "px-2 py-1.5 font-semibold text-foreground whitespace-nowrap")}>
+                                                        {b.reference_month_label || formatMonthLabel(b.reference_month)}
+                                                    </td>
+                                                    {show("cons") && (
+                                                        <td {...sel.cellProps("cons", b.id, b.grid_consumption_kwh, cn(num, "font-medium"))}>
+                                                            {formatNumber(b.grid_consumption_kwh, 0)}
+                                                        </td>
                                                     )}
-                                                </td>
-                                                <td className="py-3 px-4 text-center border-b border-border whitespace-nowrap">
-                                                    <div className="flex items-center justify-center gap-1.5">
-                                                        {(b.pdf_url || (b.id === latestFullBill?.id && activePdfUrl)) && (
+                                                    {show("daily") && (
+                                                        <td {...sel.cellProps("daily", b.id, daily, cn(num, "font-mono"))}>
+                                                            {formatNumber(daily, 2)}
+                                                        </td>
+                                                    )}
+                                                    {show("days") && (
+                                                        <td {...sel.cellProps("days", b.id, b.billing_days || 30, cn(num, "text-muted-foreground"))}>
+                                                            {b.billing_days || 30}
+                                                        </td>
+                                                    )}
+                                                    {show("balance") && (
+                                                        <td {...sel.cellProps("balance", b.id, b.generation_balance_kwh > 0 ? b.generation_balance_kwh : null, cn(num, "font-semibold text-emerald-700 dark:text-emerald-300"))}>
+                                                            {b.generation_balance_kwh > 0 ? `${formatNumber(b.generation_balance_kwh, 2)} kWh` : "-"}
+                                                        </td>
+                                                    )}
+                                                    {show("injected") && (
+                                                        <td {...sel.cellProps("injected", b.id, b.solar_injected_kwh > 0 ? b.solar_injected_kwh : null, cn(num, "font-semibold text-amber-600 dark:text-amber-400"))}>
+                                                            {b.solar_injected_kwh > 0 ? `${formatNumber(b.solar_injected_kwh, 0)} kWh` : "-"}
+                                                        </td>
+                                                    )}
+                                                    {show("availability") && (
+                                                        <td {...sel.cellProps("availability", b.id, b.availability_cost_amount > 0 ? b.availability_cost_amount : null, cn(num, "text-muted-foreground"))}>
+                                                            {b.availability_cost_amount > 0 ? formatCurrency(b.availability_cost_amount) : "-"}
+                                                        </td>
+                                                    )}
+                                                    {show("unitPrice") && (
+                                                        <td {...sel.cellProps("unitPrice", b.id, b.unit_price ?? null, cn(num, "font-mono text-muted-foreground"))}>
+                                                            {b.unit_price ? `R$ ${formatNumber(b.unit_price, 4)}` : "-"}
+                                                        </td>
+                                                    )}
+                                                    {show("total") && (
+                                                        <td {...sel.cellProps("total", b.id, b.total_amount > 0 ? b.total_amount : null, cn(num, "font-bold text-foreground"))}>
+                                                            {b.total_amount > 0 ? formatCurrency(b.total_amount) : "-"}
+                                                        </td>
+                                                    )}
+                                                    {show("origin") && (
+                                                        <td {...sel.cellProps("origin", b.id, null, "px-2 py-1.5 text-center whitespace-nowrap")}>
+                                                            {b.is_historical_only ? (
+                                                                <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-medium bg-muted text-muted-foreground">
+                                                                    Histórico Base
+                                                                </span>
+                                                            ) : (
+                                                                <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                                                                    Fatura Completa
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                    )}
+                                                    <td className="px-2 py-1.5 text-center whitespace-nowrap" onDoubleClick={(ev) => ev.stopPropagation()}>
+                                                        <div className="flex items-center justify-center gap-1.5">
+                                                            {(b.pdf_url || (b.id === latestFullBill?.id && activePdfUrl)) && (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        const billPdf = b.pdf_url || activePdfUrl;
+                                                                        if (billPdf) {
+                                                                            setPdfViewerUrl(billPdf);
+                                                                            setPdfViewerTitle(`Fatura de Energia - ${b.reference_month_label || formatMonthLabel(b.reference_month)}`);
+                                                                            setPdfViewerFileName(`fatura-${b.reference_month}.pdf`);
+                                                                            setIsPdfViewerOpen(true);
+                                                                        }
+                                                                    }}
+                                                                    className="p-1.5 rounded-lg text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 transition-colors shadow-2xs"
+                                                                    title="Visualizar fatura em PDF dentro do Kitnets"
+                                                                    aria-label="Visualizar fatura em PDF"
+                                                                >
+                                                                    <FileText className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            )}
                                                             <button
-                                                                onClick={() => {
-                                                                    const billPdf = b.pdf_url || activePdfUrl;
-                                                                    if (billPdf) {
-                                                                        setPdfViewerUrl(billPdf);
-                                                                        setPdfViewerTitle(`Fatura de Energia - ${b.reference_month_label || formatMonthLabel(b.reference_month)}`);
-                                                                        setPdfViewerFileName(`fatura-${b.reference_month}.pdf`);
-                                                                        setIsPdfViewerOpen(true);
-                                                                    }
-                                                                }}
-                                                                className="p-1.5 rounded-lg text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 transition-colors shadow-2xs"
-                                                                title="Visualizar fatura em PDF dentro do Kitnets"
-                                                                aria-label="Visualizar fatura em PDF"
+                                                                onClick={() => setEditingBill(b)}
+                                                                className="p-1.5 rounded-lg text-amber-600 dark:text-amber-400 hover:text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/60 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 transition-colors shadow-2xs"
+                                                                title="Editar valores desta fatura"
+                                                                aria-label="Editar fatura"
                                                             >
-                                                                <FileText className="w-3.5 h-3.5" />
+                                                                <Pencil className="w-3.5 h-3.5" />
                                                             </button>
-                                                        )}
-                                                        <button
-                                                            onClick={() => setEditingBill(b)}
-                                                            className="p-1.5 rounded-lg text-amber-600 dark:text-amber-400 hover:text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/60 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 transition-colors shadow-2xs"
-                                                            title="Editar valores desta fatura"
-                                                            aria-label="Editar fatura"
-                                                        >
-                                                            <Pencil className="w-3.5 h-3.5" />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDelete(b.id)}
-                                                            disabled={deletingId === b.id}
-                                                            className="p-1.5 rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-                                                            title="Excluir registro"
-                                                            aria-label="Excluir registro"
-                                                        >
-                                                            <Trash2 className="w-3.5 h-3.5" />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
+                                                            <button
+                                                                onClick={() => handleDelete(b.id)}
+                                                                disabled={deletingId === b.id}
+                                                                className="p-1.5 rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                                                                title="Excluir registro"
+                                                                aria-label="Excluir registro"
+                                                            >
+                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                     </div>
                 </>
             )}
@@ -957,6 +986,11 @@ export default function EnergyDashboardPage() {
                     }}
                 />
             )}
+            {/* Spreadsheet helpers for the history table: selection sum bar, column sort/filter and columns menus */}
+            <CellSumBar ctl={sel} />
+            <ColumnMenu columns={billColumns} ctl={cf} />
+            <ColumnVisibilityMenu columns={billColumns} ctl={vis} />
+
             {/* In-App PDF Document Viewer */}
             {isPdfViewerOpen && pdfViewerUrl && (
                 <PdfViewerModal
