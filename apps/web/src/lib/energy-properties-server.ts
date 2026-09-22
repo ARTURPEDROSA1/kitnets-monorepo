@@ -32,6 +32,8 @@ export interface OwnerPropertySummary {
     ucCategory: UcCategory | null;
     notes?: string | null;
     latestBillPdfUrl?: string | null;
+    /** "Água" checked under Medidores Principais do Imóvel: the landlord pays the main water meter (feeds /dashboard/water) */
+    hasWaterMeter?: boolean;
 }
 
 /**
@@ -324,6 +326,8 @@ export async function getOwnerPropertiesSummary(userId: string): Promise<OwnerPr
             const ucNum = billStats.consumerUnit || savedUcNumber;
 
             const hasSolar = effectiveStandaloneUc || solarEnergy || billStats.count > 0;
+            const listingDetails = isPrimary && primaryDetails ? primaryDetails : matchingAp?.details ?? null;
+            const hasWaterMeter = Boolean(listingDetails?.mainMeters?.water);
 
             return {
                 id: prop.id,
@@ -347,6 +351,7 @@ export async function getOwnerPropertiesSummary(userId: string): Promise<OwnerPr
                 ucCategory: ucCategory || (isOrphaned ? "outro" : null),
                 notes: savedNotes || (isOrphaned ? "Imóvel desvinculado do portfólio de aluguel" : null),
                 latestBillPdfUrl: billStats.latestBillPdfUrl,
+                hasWaterMeter,
             };
         });
 
