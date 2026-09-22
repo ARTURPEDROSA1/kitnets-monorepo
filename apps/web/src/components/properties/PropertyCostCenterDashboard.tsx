@@ -21,6 +21,7 @@ import {
     ExternalLink,
     PieChart as PieChartIcon,
     BarChart3,
+    Droplets,
 } from 'lucide-react';
 import {
     ResponsiveContainer,
@@ -473,6 +474,19 @@ export default function PropertyCostCenterDashboard({
                             Gestão de Energia
                         </Button>
                     </Link>
+                    {/* Water is a landlord cost only on multi-unit buildings (one main meter for all units) */}
+                    {propertyType === 'multi' && (
+                        <Link href={dbId ? `/${lang}/dashboard/billing/${dbId}` : `/${lang}/dashboard/water`}>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-1.5 text-xs font-medium text-blue-600 border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                            >
+                                <Droplets className="w-3.5 h-3.5" />
+                                Gestão de Água
+                            </Button>
+                        </Link>
+                    )}
                 </div>
             </div>
 
