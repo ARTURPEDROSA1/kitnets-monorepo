@@ -22,6 +22,13 @@ describe("condominium months", () => {
         expect(months[1]).toMatchObject({ revenue: 250, units: 1, totalCost: 0, result: 250, hasCosts: false });
     });
 
+    it("a month with rent but no condominium still gets a row (revenue 0); a vacant month without either does not", () => {
+        const vacant: PropertyIncomeRow = { ...income("2026-06", "u1", 0), received_amount: 0 };
+        const months = buildCondominiumMonths([income("2026-07", "u1", 0), vacant], []);
+        expect(months.map(m => m.month)).toEqual(["2026-07"]);
+        expect(months[0]).toMatchObject({ revenue: 0, units: 0, expected: false });
+    });
+
     it("keeps a month that only has costs, and flags a month whose units are all still expected", () => {
         const months = buildCondominiumMonths([income("2026-10", "u1", 250, "EXPECTED")], [cost("2026-07", { maintenance_cost: 900 })]);
         expect(months.map(m => m.month)).toEqual(["2026-10", "2026-07"]);

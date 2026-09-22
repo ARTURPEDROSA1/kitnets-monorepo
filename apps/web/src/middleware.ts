@@ -48,6 +48,7 @@ export default clerkMiddleware(async (auth, req) => {
     // If no locale, redirect to default locale
     const locale = defaultLocale;
     const newUrl = new URL(`/${locale}${pathname === "/" ? "" : pathname}`, req.url);
+    newUrl.search = req.nextUrl.search;   // deep links (?id=, ?property=) survive the redirect
 
     return NextResponse.redirect(newUrl);
 });

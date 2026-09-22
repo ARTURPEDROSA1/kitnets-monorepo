@@ -7,12 +7,11 @@
  * to add them up. Above it, the period's totals and the DRE chart.
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, Building, Loader2, Percent, Plus, Receipt, Trash2, TrendingUp, Wallet } from "lucide-react";
+import { AlertCircle, Building, Loader2, Percent, Receipt, Trash2, TrendingUp, Wallet } from "lucide-react";
 import { Bar, CartesianGrid, Cell, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from "recharts";
-import { Button } from "@kitnets/ui";
 import { cn } from "@/lib/utils";
 import { CONDO_COST_KEYS, CONDO_COST_LABELS, summarizeCondominium, type CondoCostKey, type CondominiumCostInput, type CondominiumMonth } from "@/lib/condominium";
-import { currentMonthKey, formatMonthKey } from "@/lib/property-income";
+import { formatMonthKey } from "@/lib/property-income";
 import { groupMonthly, periodLabel, periodRange, type ChartGroup, type PeriodFilterValue } from "@/lib/period-filter";
 import { columnTableKey } from "@/lib/ui-preferences";
 import PeriodFilter, { GroupSelect } from "@/components/properties/PeriodFilter";
@@ -36,7 +35,6 @@ export default function CondominiumLedger({ propertyId }: { propertyId: string }
     const [period, setPeriod] = useState<PeriodFilterValue>({ kind: "ytd" });
     const [chartGroup, setChartGroup] = useState<ChartGroup>("month");
     const [showAll, setShowAll] = useState(false);
-    const [newMonth, setNewMonth] = useState(currentMonthKey());
     const sel = useCellSum();
     const vis = useColumnVisibility(columnTableKey("condominium-ledger"), { locked: ["month"] });
 
@@ -78,7 +76,9 @@ export default function CondominiumLedger({ propertyId }: { propertyId: string }
         try {
             const res = await fetch(`${endpoint}?month=${month}`, { method: "DELETE" });
             if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Erro ao remover o mês");
-            setMonths(prev => (prev ?? []).map(m => (m.month === month ? { ...m, energy_cost: 0, internet_cost: 0, water_cost: 0, iptu_amount: 0, maintenance_cost: 0, totalCost: 0, result: m.revenue, hasCosts: false, notes: null } : m)).filter(m => m.units > 0 || m.hasCosts));
+            const fresh = await fetch(endpoint);
+            const data = await fresh.json().catch(() => ({}));
+            if (fresh.ok) setMonths(data.months ?? []);
         } catch (err) {
             setError((err as Error).message);
         } finally {
@@ -100,11 +100,6 @@ export default function CondominiumLedger({ propertyId }: { propertyId: string }
         const value = parseInput(raw);
         if (value === null || value === row[field]) return cancelDraft(row.month, field);
         void putRows([{ month: row.month, [field]: value }]);
-    };
-
-    const addMonth = () => {
-        if (!/^\d{4}-\d{2}$/.test(newMonth)) return;
-        void putRows([{ month: newMonth }]);
     };
 
     // ── Derived ─────────────────────────────────────────────────────────
@@ -208,26 +203,18 @@ export default function CondominiumLedger({ propertyId }: { propertyId: string }
                         </ResponsiveContainer>
                     </div>
                 ) : (
-                    <p className="text-sm text-muted-foreground py-6 text-center">Nenhum mês no período. Informe o condomínio das unidades em Receitas de Aluguel ou adicione um mês de custos abaixo.</p>
+                    <p className="text-sm text-muted-foreground py-6 text-center">Nenhum mês no período. Os meses vêm de Receitas de Aluguel: um mês aparece aqui assim que uma unidade do imóvel tem aluguel ou condomínio registrado.</p>
                 )}
             </div>
 
             {/* Ledger */}
             <div className="bg-card border border-border rounded-2xl p-6 shadow-xs space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="space-y-0.5">
-                        <h3 className="font-bold text-base text-foreground flex items-center gap-2"><Receipt className="w-4 h-4 text-rose-600" /> Custos do condomínio</h3>
-                        <p className="text-xs text-muted-foreground">
-                            Um mês por linha. A receita vem de Receitas de Aluguel; edite os custos nas células (Enter ou Tab para salvar).
-                            Clique com o botão direito no cabeçalho para ocultar colunas; clique nas células para somá-las.
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <input type="month" value={newMonth} onChange={e => setNewMonth(e.target.value)} className="h-9 rounded-md border border-input bg-background px-2 text-sm" aria-label="Mês a adicionar" />
-                        <Button size="sm" onClick={addMonth} disabled={saving.size > 0 || !/^\d{4}-\d{2}$/.test(newMonth)} className="gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white" title="Cria a linha de custos do mês (a receita, se houver, já aparece sozinha)">
-                            <Plus className="w-3.5 h-3.5" /> Adicionar mês
-                        </Button>
-                    </div>
+                <div className="space-y-0.5">
+                    <h3 className="font-bold text-base text-foreground flex items-center gap-2"><Receipt className="w-4 h-4 text-rose-600" /> Custos do condomínio</h3>
+                    <p className="text-xs text-muted-foreground">
+                        Um mês por linha, criado sozinho para cada mês em que alguma unidade do imóvel tem aluguel em Receitas de Aluguel. A receita vem de lá;
+                        edite os custos nas células (Enter ou Tab para salvar). Clique no cabeçalho para ordenar e filtrar, com o botão direito para ocultar colunas; clique nas células para somá-las.
+                    </p>
                 </div>
 
                 <span className="text-xs text-muted-foreground">
