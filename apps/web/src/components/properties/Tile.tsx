@@ -35,7 +35,7 @@ export function CardInfoIcon({ label, icon, info, className }: { label: string; 
         <>
             <button
                 type="button"
-                onClick={e => { e.stopPropagation(); setOpen(true); }}          // some cards are clickable themselves
+                onClick={e => { e.preventDefault(); e.stopPropagation(); setOpen(true); }}   // some cards are links/clickable: no navigation
                 onKeyDown={e => { if (e.key === "Enter" || e.key === " ") e.stopPropagation(); }}
                 title="O que é este indicador e como é calculado"
                 aria-label={`Explicar ${label}`}
@@ -43,6 +43,8 @@ export function CardInfoIcon({ label, icon, info, className }: { label: string; 
             >
                 {icon}
             </button>
+            {/* the dialog is portalled, but React still bubbles its clicks (overlay included) to the card link */}
+            <span className="contents" onClick={e => e.stopPropagation()}>
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogContent className="sm:max-w-md shadow-2xl border-border" onClick={e => e.stopPropagation()}>
                     <DialogHeader>
@@ -67,6 +69,7 @@ export function CardInfoIcon({ label, icon, info, className }: { label: string; 
                     </div>
                 </DialogContent>
             </Dialog>
+            </span>
         </>
     );
 }
