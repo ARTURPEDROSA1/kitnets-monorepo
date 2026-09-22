@@ -137,6 +137,8 @@ export interface Condominium {
     property_id: string;
     name: string;
     notes: string | null;
+    /** the condominium's monthly result counts towards the property's solar energy payback */
+    solar_payback_from_result: boolean;
     property_name: string;
     property_address: string;
     units: number;
@@ -165,6 +167,13 @@ export function condominiumKpis(months: CondominiumMonth[], now = new Date()): C
         year,
         ytd: { revenue: ytd.revenue, totalCost: ytd.totalCost, result: ytd.result, marginPct: ytd.marginPct, months: ytd.months },
     };
+}
+
+/** The condominium's result per month (`YYYY-MM`), months still "previsto" left out: what the solar payback may count. */
+export function condominiumResultByMonth(months: CondominiumMonth[]): Map<string, number> {
+    const out = new Map<string, number>();
+    for (const m of months) if (!m.expected) out.set(m.month, m.result);
+    return out;
 }
 
 export interface CondominiumSummary {

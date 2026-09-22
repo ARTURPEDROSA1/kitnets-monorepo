@@ -315,24 +315,34 @@ export function summarizeInvestment(txs: PropertyTransaction[], inv: PropertyInv
 
 export interface SolarPayback {
     invested: number;
-    /** Σ (energy income − energy cost) over confirmed ledger months */
+    /** Σ (energy income − energy cost) over confirmed ledger months, plus `extraRecovered` */
     recovered: number;
+    /** what came from elsewhere (the condominium's monthly result, when the owner counts it) */
+    extraRecovered: number;
     pct: number;
     remaining: number;
     months: number;
 }
 
 /** The solar system is its own cost centre: paid back by net energy income from the rent ledger. */
-export function solarPayback(solarInvested: number, incomeRows: PropertyIncomeRow[]): SolarPayback {
+/**
+ * How much of the solar investment already came back: the tenants' energy payments minus the energy cost
+ * over the confirmed ledger months, plus `extraByMonth` (the condominium's monthly result, when the owner
+ * chose to count it: the panels feed the condominium's meter).
+ */
+export function solarPayback(solarInvested: number, incomeRows: PropertyIncomeRow[], extraByMonth?: Map<string, number>): SolarPayback {
     const confirmed = incomeRows.filter(r => r.status === "CONFIRMED");
-    const recovered = round2(confirmed.reduce((acc, r) => {
+    const fromEnergy = round2(confirmed.reduce((acc, r) => {
         const b = breakdown(r);
         return acc + b.energy - b.other;
     }, 0));
+    const extraRecovered = round2([...(extraByMonth?.values() ?? [])].reduce((acc, v) => acc + (Number(v) || 0), 0));
+    const recovered = round2(fromEnergy + extraRecovered);
     const invested = round2(solarInvested);
     return {
         invested,
         recovered,
+        extraRecovered,
         pct: invested > 0 ? Math.round((recovered / invested) * 1000) / 10 : 0,
         remaining: round2(Math.max(0, invested - recovered)),
         months: confirmed.length,

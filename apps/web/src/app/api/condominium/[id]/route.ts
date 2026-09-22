@@ -5,7 +5,7 @@ import { CONDO_COSTS_TABLE, CONDOMINIUMS_TABLE } from "@/lib/condominium-server"
 export const dynamic = "force-dynamic";
 
 /**
- *   PATCH  /api/condominium/[id] { name?, notes? } → { condominium }
+ *   PATCH  /api/condominium/[id] { name?, notes?, solar_payback_from_result? } → { condominium }
  *   DELETE /api/condominium/[id]                   → { ok }   also removes the property's condominium cost rows
  *
  * The condominium charged to the units stays in Receitas de Aluguel: deleting a condominium only removes
@@ -28,22 +28,26 @@ async function resolve(context: RouteContext) {
 export async function PATCH(request: Request, context: RouteContext) {
     const r = await resolve(context);
     if ("response" in r) return r.response;
-    let body: { name?: unknown; notes?: unknown };
+    let body: { name?: unknown; notes?: unknown; solar_payback_from_result?: unknown };
     try {
         body = await request.json();
     } catch {
         return NextResponse.json({ error: "Corpo da requisição inválido" }, { status: 400 });
     }
-    const patch: { name?: string; notes?: string | null } = {};
+    const patch: { name?: string; notes?: string | null; solar_payback_from_result?: boolean } = {};
     if (body.name !== undefined) {
         const name = typeof body.name === "string" ? body.name.trim().slice(0, 120) : "";
         if (!name) return NextResponse.json({ error: "Informe o nome do condomínio" }, { status: 400 });
         patch.name = name;
     }
     if (body.notes !== undefined) patch.notes = typeof body.notes === "string" ? body.notes.trim().slice(0, 500) || null : null;
+    if (body.solar_payback_from_result !== undefined) {
+        if (typeof body.solar_payback_from_result !== "boolean") return NextResponse.json({ error: "solar_payback_from_result deve ser verdadeiro ou falso" }, { status: 400 });
+        patch.solar_payback_from_result = body.solar_payback_from_result;
+    }
     if (Object.keys(patch).length === 0) return NextResponse.json({ error: "Nada para alterar" }, { status: 400 });
 
-    const { data, error } = await r.ctx.supabase.from(CONDOMINIUMS_TABLE).update(patch).eq("id", r.ctx.id).select("id, property_id, name, notes, created_at, updated_at").single();
+    const { data, error } = await r.ctx.supabase.from(CONDOMINIUMS_TABLE).update(patch).eq("id", r.ctx.id).select("id, property_id, name, notes, solar_payback_from_result, created_at, updated_at").single();
     if (error) {
         console.error("[Condominium PATCH]", error.message);
         return NextResponse.json({ error: "Erro ao salvar o condomínio" }, { status: 500 });

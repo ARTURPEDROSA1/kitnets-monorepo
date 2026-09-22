@@ -60,6 +60,8 @@ interface Props {
     onDataChange?: (data: { investment: PropertyInvestment | null; transactions: PropertyTransaction[]; loading: boolean }) => void;
     /** Taxes paid by the landlord (Tributos do imóvel), all years — shown with the running costs. */
     landlordTaxes?: { iptu: number; itbi: number; other: number; total: number };
+    /** Extra amounts that count towards the solar payback, per month: the condominium's result when the owner chose so (`label` = its name). */
+    solarExtra?: { byMonth: Map<string, number>; label: string };
     /** Loaded by the parent (overview): undefined = fetch here, null = parent still loading. */
     preloaded?: { investment: PropertyInvestment | null; transactions: PropertyTransaction[] } | null;
 }
@@ -87,7 +89,7 @@ const FIN_KINDS: TransactionKind[] = ["PRESTACAO", "AMORTIZACAO", "QUITACAO"];
 
 type TxDraft = Partial<Record<"date" | "kind" | "amount" | "interest" | "principal" | "insurance" | "comment", string>>;
 
-export default function PropertyInvestmentSection({ propertyId, incomeRows, onDataChange, preloaded, landlordTaxes }: Props) {
+export default function PropertyInvestmentSection({ propertyId, incomeRows, onDataChange, preloaded, landlordTaxes, solarExtra }: Props) {
     const taxes = landlordTaxes ?? { iptu: 0, itbi: 0, other: 0, total: 0 };
     const sel = useCellSum();
     const txEndpoint = propertyId ? `/api/properties/${propertyId}/transactions` : null;
@@ -215,7 +217,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
 
     // ── Derived ─────────────────────────────────────────────────────────
     const summary = useMemo(() => summarizeInvestment(txs, investment), [txs, investment]);
-    const solar = useMemo(() => solarPayback(summary.solarInvested, incomeRows), [summary.solarInvested, incomeRows]);
+    const solar = useMemo(() => solarPayback(summary.solarInvested, incomeRows, solarExtra?.byMonth), [summary.solarInvested, incomeRows, solarExtra]);
     const range = useMemo(() => periodRange(period), [period]);
     /** Rows inside the period (before column filters). */
     const inPeriod = useMemo(
@@ -502,8 +504,12 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
             example: investment && investment.financing_status !== "NONE" ? <>{[investment.lender, investment.financing_system, investment.principal ? formatBRL(investment.principal) : null].filter(Boolean).join(" · ")}{paidOffMonths !== null ? ` · quitado em ${paidOffMonths} meses${investment.term_months ? ` de ${investment.term_months}` : ""}` : ""}</> : undefined,
         },
         solar: {
-            what: "O investimento no sistema solar (lançamentos Energia solar) e quanto dele já voltou: a energia paga pelo inquilino menos o custo de energia, mês a mês.",
-            formula: <>Recuperado = Σ (energia recebida − custo de energia)<br />Falta = investido − recuperado</>,
+            what: solarExtra
+                ? `O investimento no sistema solar (lançamentos Energia solar) e quanto dele já voltou: a energia paga pelo inquilino menos o custo de energia, mês a mês, mais o resultado mensal do ${solarExtra.label}: água, internet e IPTU são repassados a custo, então o que sobra no condomínio é a economia que o sistema solar gera (opção ligada na página Condomínio).`
+                : "O investimento no sistema solar (lançamentos Energia solar) e quanto dele já voltou: a energia paga pelo inquilino menos o custo de energia, mês a mês. Num imóvel com condomínio, a página Condomínio permite contar o resultado mensal do condomínio aqui, já que ele vem da economia de energia do sistema solar.",
+            formula: solarExtra
+                ? <>Recuperado = Σ (energia recebida − custo de energia) + Σ resultado do condomínio<br />Falta = investido − recuperado</>
+                : <>Recuperado = Σ (energia recebida − custo de energia)<br />Falta = investido − recuperado</>,
             example: solar.invested > 0 ? <>{formatBRL(solar.recovered)} de {formatBRL(solar.invested)} = {solar.pct}%{solar.remaining > 0 ? ` · falta ${formatBRL(solar.remaining)}` : " · recuperado"}</> : undefined,
         },
     };
@@ -578,7 +584,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                 <Tile label="Energia solar" value={formatBRL(solar.invested)} tone="amber" icon={<Sun className="w-4 h-4" />} info={investInfo.solar}
                     hint={
                         <>
-                            Recuperado {formatBRL(solar.recovered)} ({solar.pct}%)<br />
+                            Recuperado {formatBRL(solar.recovered)} ({solar.pct}%){solarExtra && <> · condomínio {formatBRL(solar.extraRecovered)}</>}<br />
                             {solar.invested > 0 ? (solar.remaining > 0 ? `Falta ${formatBRL(solar.remaining)}` : "Investimento recuperado") : "Sem investimento registrado"}
                             {solar.invested > 0 && (
                                 <span className="block mt-1 h-1.5 rounded-full bg-amber-100 dark:bg-amber-950/60 overflow-hidden">

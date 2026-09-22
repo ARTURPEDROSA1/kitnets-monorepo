@@ -8,7 +8,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertCircle, ArrowLeft, Building, Check, Home, Loader2, Pencil, Plus, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, Building, Check, Home, Loader2, Pencil, Plus, Settings, Sun, X } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,6 +34,9 @@ export default function CondominioContent({ lang }: { lang: string }) {
     const [creating, setCreating] = useState(false);
     // rename
     const [renaming, setRenaming] = useState(false);
+    // settings dialog
+    const [settingsOpen, setSettingsOpen] = useState(false);
+    const [savingSettings, setSavingSettings] = useState(false);
     const [renameText, setRenameText] = useState("");
 
     const base = `/${lang}`;
@@ -126,6 +129,21 @@ export default function CondominioContent({ lang }: { lang: string }) {
         }
     };
 
+    const saveSetting = async (patch: { solar_payback_from_result: boolean }) => {
+        if (!selected) return;
+        setSavingSettings(true);
+        setError(null);
+        try {
+            const res = await fetch(`/api/condominium/${selected.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) });
+            if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Erro ao salvar a configuração");
+            setCondominiums(prev => (prev ?? []).map(c => (c.id === selected.id ? { ...c, ...patch } : c)));
+        } catch (err) {
+            setError((err as Error).message);
+        } finally {
+            setSavingSettings(false);
+        }
+    };
+
     const saveRename = async () => {
         if (!selected) return;
         const name = renameText.trim();
@@ -159,6 +177,7 @@ export default function CondominioContent({ lang }: { lang: string }) {
                                 <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
                                     <Building className="w-6 h-6 text-emerald-600" /> {selected.name}
                                     <button type="button" onClick={() => { setRenameText(selected.name); setRenaming(true); }} className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted" title="Renomear condomínio"><Pencil className="w-4 h-4" /></button>
+                                    <button type="button" onClick={() => setSettingsOpen(true)} className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted" title="Configurações do condomínio"><Settings className="w-4 h-4" /></button>
                                 </h1>
                             )}
                             <p className="text-xs text-muted-foreground">
@@ -224,6 +243,35 @@ export default function CondominioContent({ lang }: { lang: string }) {
                     )}
                 </>
             )}
+
+            <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2"><Settings className="w-5 h-5 text-emerald-600" /> Configurações{selected ? ` · ${selected.name}` : ""}</DialogTitle>
+                        <DialogDescription>Como este condomínio entra nas contas do imóvel.</DialogDescription>
+                    </DialogHeader>
+                    {selected && (
+                        <label className="flex items-start gap-3 py-2 text-sm cursor-pointer select-none">
+                            <input
+                                type="checkbox" className="mt-1 accent-emerald-600" disabled={savingSettings}
+                                checked={selected.solar_payback_from_result}
+                                onChange={e => void saveSetting({ solar_payback_from_result: e.target.checked })}
+                            />
+                            <span>
+                                <span className="font-semibold text-foreground flex items-center gap-1.5"><Sun className="w-4 h-4 text-amber-500" /> Contar o resultado mensal do condomínio como retorno da energia solar</span>
+                                <span className="block text-xs text-muted-foreground mt-1">
+                                    Água, internet e IPTU são repassados a custo: o que sobra no condomínio a cada mês é a economia que o sistema solar gera na conta de energia.
+                                    Ligado, o resultado de cada mês (receita do condomínio − custos, meses confirmados) é somado ao “Recuperado” do card Energia solar em Investimento no imóvel,
+                                    junto com a energia paga pelos inquilinos menos o custo de energia. Meses com prejuízo reduzem o recuperado.
+                                </span>
+                            </span>
+                        </label>
+                    )}
+                    <DialogFooter>
+                        <Button variant="ghost" onClick={() => setSettingsOpen(false)}>Fechar</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <Dialog open={createOpen} onOpenChange={setCreateOpen}>
                 <DialogContent className="max-w-md">

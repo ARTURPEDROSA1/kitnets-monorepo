@@ -2524,6 +2524,7 @@ export type Database = {
           notes: string | null
           owner_id: string
           property_id: string
+          solar_payback_from_result: boolean
           updated_at: string
         }
         Insert: {
@@ -2533,6 +2534,7 @@ export type Database = {
           notes?: string | null
           owner_id: string
           property_id: string
+          solar_payback_from_result?: boolean
           updated_at?: string
         }
         Update: {
@@ -2542,6 +2544,7 @@ export type Database = {
           notes?: string | null
           owner_id?: string
           property_id?: string
+          solar_payback_from_result?: boolean
           updated_at?: string
         }
         Relationships: [
