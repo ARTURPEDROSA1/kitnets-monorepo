@@ -258,10 +258,11 @@ export default function CondominioContent({ lang }: { lang: string }) {
                                 onChange={e => void saveSetting({ solar_payback_from_result: e.target.checked })}
                             />
                             <span>
-                                <span className="font-semibold text-foreground flex items-center gap-1.5"><Sun className="w-4 h-4 text-amber-500" /> Usar o resultado mensal do condomínio no payback da energia solar</span>
+                                <span className="font-semibold text-foreground flex items-center gap-1.5"><Sun className="w-4 h-4 text-amber-500" /> Contar o resultado mensal do condomínio como retorno da energia solar</span>
                                 <span className="block text-xs text-muted-foreground mt-1">
+                                    Água, internet e IPTU são repassados a custo: o que sobra no condomínio a cada mês é a economia que o sistema solar gera na conta de energia.
                                     Ligado, o resultado de cada mês (receita do condomínio − custos, meses confirmados) é somado ao “Recuperado” do card Energia solar em Investimento no imóvel,
-                                    junto com a energia paga pelos inquilinos menos o custo de energia. Use quando o sistema solar alimenta o medidor do condomínio. Meses com prejuízo reduzem o recuperado.
+                                    junto com a energia paga pelos inquilinos menos o custo de energia. Meses com prejuízo reduzem o recuperado.
                                 </span>
                             </span>
                         </label>

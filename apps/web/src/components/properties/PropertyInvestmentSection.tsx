@@ -505,8 +505,8 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
         },
         solar: {
             what: solarExtra
-                ? `O investimento no sistema solar (lançamentos Energia solar) e quanto dele já voltou: a energia paga pelo inquilino menos o custo de energia, mês a mês, mais o resultado mensal do ${solarExtra.label} (o sistema alimenta o medidor do condomínio; opção ligada na página Condomínio).`
-                : "O investimento no sistema solar (lançamentos Energia solar) e quanto dele já voltou: a energia paga pelo inquilino menos o custo de energia, mês a mês. Num imóvel com condomínio, a página Condomínio permite somar o resultado mensal do condomínio aqui.",
+                ? `O investimento no sistema solar (lançamentos Energia solar) e quanto dele já voltou: a energia paga pelo inquilino menos o custo de energia, mês a mês, mais o resultado mensal do ${solarExtra.label}: água, internet e IPTU são repassados a custo, então o que sobra no condomínio é a economia que o sistema solar gera (opção ligada na página Condomínio).`
+                : "O investimento no sistema solar (lançamentos Energia solar) e quanto dele já voltou: a energia paga pelo inquilino menos o custo de energia, mês a mês. Num imóvel com condomínio, a página Condomínio permite contar o resultado mensal do condomínio aqui, já que ele vem da economia de energia do sistema solar.",
             formula: solarExtra
                 ? <>Recuperado = Σ (energia recebida − custo de energia) + Σ resultado do condomínio<br />Falta = investido − recuperado</>
                 : <>Recuperado = Σ (energia recebida − custo de energia)<br />Falta = investido − recuperado</>,

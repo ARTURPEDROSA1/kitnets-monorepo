@@ -1,7 +1,7 @@
 -- Condomínio setting: whether the condominium's monthly result counts towards the solar energy payback.
 --
--- A multi-unit property's solar system usually feeds the condominium's meter, so the condominium's profit
--- (condominium charged − its costs) is, in part, what the panels earn. The owner decides, per condominium,
+-- Water, internet and IPTU are passed through to the units at cost; the condominium's monthly surplus
+-- (condominium charged − its costs) is the saving the solar system makes on the energy bill. The owner decides, per condominium,
 -- whether that monthly result is added to the "Recuperado" of the Energia solar card in Investimento no
 -- imóvel (alongside the tenants' energy payments minus the energy cost). Off by default.
 
