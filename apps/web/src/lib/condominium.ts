@@ -101,6 +101,42 @@ export function buildCondominiumMonths(incomeRows: PropertyIncomeRow[], costRows
     return [...months.values()].sort((a, b) => (a.month < b.month ? 1 : -1));
 }
 
+/** A condominium as the Condomínio page lists it: the record, its property and the card figures. */
+export interface Condominium {
+    id: string;
+    property_id: string;
+    name: string;
+    notes: string | null;
+    property_name: string;
+    property_address: string;
+    units: number;
+    kpis: CondominiumKpis;
+}
+
+export interface CondominiumKpis {
+    /** the newest month (revenue, costs, result), or null */
+    latest: CondominiumMonth | null;
+    months: number;
+    monthsWithCosts: number;
+    /** the calendar year the `ytd` figures cover */
+    year: number;
+    ytd: Pick<CondominiumSummary, "revenue" | "totalCost" | "result" | "marginPct" | "months">;
+}
+
+/** Figures of a condominium card: latest month and the current year to date. */
+export function condominiumKpis(months: CondominiumMonth[], now = new Date()): CondominiumKpis {
+    const year = now.getFullYear();
+    const ytd = summarizeCondominium(months.filter(m => m.month.startsWith(`${year}-`)));
+    const sorted = [...months].sort((a, b) => (a.month < b.month ? 1 : -1));
+    return {
+        latest: sorted[0] ?? null,
+        months: months.length,
+        monthsWithCosts: months.filter(m => m.hasCosts).length,
+        year,
+        ytd: { revenue: ytd.revenue, totalCost: ytd.totalCost, result: ytd.result, marginPct: ytd.marginPct, months: ytd.months },
+    };
+}
+
 export interface CondominiumSummary {
     months: number;
     revenue: number;
