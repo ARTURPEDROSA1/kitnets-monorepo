@@ -3,12 +3,27 @@
  *
  * A multi-unit property's landlord also runs its condominium. Its revenue is the condominium charged to
  * every unit (`condo_amount` in the income ledger, one row per month and unit; a vacant unit still owes it).
- * Its costs live in `condominium_months`: one row per property and month. Result = revenue − costs.
+ * Its costs: energy and IPTU come from the registers where the bills are uploaded (the property's energy
+ * bills, "Valor a pagar"; the taxes register, IPTU paid by the landlord in the month) so they are entered
+ * once; internet, water and maintenance are typed in `condominium_months`, one row per property and month.
+ * Result = revenue − costs.
  */
 import { monthKey, type PropertyIncomeRow } from "./property-income";
 
 export const CONDO_COST_KEYS = ["energy_cost", "internet_cost", "water_cost", "iptu_amount", "maintenance_cost"] as const;
 export type CondoCostKey = (typeof CONDO_COST_KEYS)[number];
+/** Costs read from another register (never typed in the condominium table). */
+export const CONDO_AUTO_KEYS = ["energy_cost", "iptu_amount"] as const satisfies readonly CondoCostKey[];
+export type CondoAutoKey = (typeof CONDO_AUTO_KEYS)[number];
+export const isAutoCostKey = (k: string): k is CondoAutoKey => (CONDO_AUTO_KEYS as readonly string[]).includes(k);
+
+/** Amounts per month (`YYYY-MM`) read from the energy bills and the taxes register. */
+export interface CondominiumAutoCosts {
+    /** "Valor a pagar" of the property's energy bills, by reference month */
+    energy?: Map<string, number>;
+    /** IPTU paid by the landlord, by the month it was paid (Tributos do imóvel) */
+    iptu?: Map<string, number>;
+}
 
 export const CONDO_COST_LABELS: Record<CondoCostKey, string> = {
     energy_cost: "Energia",
@@ -64,10 +79,11 @@ export function condoTotalCost(row: Partial<Record<CondoCostKey, number>>): numb
 
 /**
  * Months of the condominium, newest first: every month in which at least one unit has rental income or a
- * condominium in the income ledger, plus every month with a cost row. A month's revenue adds the
- * `condo_amount` of all its unit rows (confirmed or expected: the condominium is owed either way).
+ * condominium in the income ledger, every month with a cost row, and every month with an energy bill or
+ * IPTU. A month's revenue adds the `condo_amount` of all its unit rows (confirmed or expected: the
+ * condominium is owed either way). Energy and IPTU always come from `auto`, never from the cost row.
  */
-export function buildCondominiumMonths(incomeRows: PropertyIncomeRow[], costRows: CondominiumCostRow[]): CondominiumMonth[] {
+export function buildCondominiumMonths(incomeRows: PropertyIncomeRow[], costRows: CondominiumCostRow[], auto: CondominiumAutoCosts = {}): CondominiumMonth[] {
     const months = new Map<string, CondominiumMonth>();
     const blank = (m: string): CondominiumMonth => ({
         month: m, revenue: 0, units: 0, expected: false,
@@ -91,10 +107,18 @@ export function buildCondominiumMonths(incomeRows: PropertyIncomeRow[], costRows
     for (const c of costRows) {
         const m = monthKey(c.month);
         const cur = months.get(m) ?? blank(m);
-        for (const k of CONDO_COST_KEYS) cur[k] = num(c[k]);
+        for (const k of CONDO_COST_KEYS) if (!isAutoCostKey(k)) cur[k] = num(c[k]);
         cur.hasCosts = true;
         cur.notes = c.notes ?? null;
         months.set(m, cur);
+    }
+    for (const [key, source] of [["energy_cost", auto.energy], ["iptu_amount", auto.iptu]] as const) {
+        for (const [m, amount] of source ?? []) {
+            if (!(num(amount) > 0)) continue;
+            const cur = months.get(m) ?? blank(m);
+            cur[key] = r2(num(amount));
+            months.set(m, cur);
+        }
     }
     for (const cur of months.values()) {
         cur.expected = withIncome.has(cur.month) && !confirmed.has(cur.month);   // every unit of the month still 'previsto'

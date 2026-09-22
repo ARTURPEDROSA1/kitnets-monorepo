@@ -356,22 +356,51 @@ export function iptuYearsFromTransactions(txs: PropertyTransaction[], paidBy: Ta
  * This is the only tax source of the money model (dashboard, DRE, engine).
  * `kinds` defaults to every kind (IPTU, ITBI, OUTRO).
  */
-export function landlordTaxesByMonth(taxes: PropertyTax[], kinds: TaxKind[] = ["IPTU", "ITBI", "OUTRO"]): Map<string, number> {
+/**
+ * Which landlord taxes a property's own figures count.
+ * A multi-unit property's condominium bears the IPTU from `CONDOMINIUM_IPTU_FROM` on (the condominium cost
+ * centre exists since then), so the property's DRE and investment analysis leave those payments out;
+ * payments before that month stay with the property, as they were booked.
+ */
+export interface TaxScope {
+    /** `YYYY-MM`: landlord IPTU paid from this month on is the condominium's, not the property's */
+    excludeIptuFrom?: string;
+}
+
+/** First month whose IPTU belongs to a multi-unit property's condominium. */
+export const CONDOMINIUM_IPTU_FROM = "2025-01";
+
+/** The scope a property's figures use: a multi-unit property hands its IPTU to the condominium from 2025 on. */
+export function taxScopeForProperty(multiUnit: boolean): TaxScope {
+    return multiUnit ? { excludeIptuFrom: CONDOMINIUM_IPTU_FROM } : {};
+}
+
+export function landlordTaxesByMonth(taxes: PropertyTax[], kinds: TaxKind[] = ["IPTU", "ITBI", "OUTRO"], scope: TaxScope = {}): Map<string, number> {
     const out = new Map<string, number>();
-    const add = (m: string, amt: number) => { if (amt > 0) out.set(m, round2((out.get(m) ?? 0) + amt)); };
+    const add = (kind: TaxKind, m: string, amt: number) => {
+        if (kind === "IPTU" && scope.excludeIptuFrom && m >= scope.excludeIptuFrom) return;   // the condominium's
+        if (amt > 0) out.set(m, round2((out.get(m) ?? 0) + amt));
+    };
     for (const tax of taxes) {
         if (!kinds.includes(tax.kind)) continue;
         const year = String(tax.year);
         const parts = Array.isArray(tax.installments) ? tax.installments : [];
         if (parts.length === 0) {
-            if (tax.paid_by === "LANDLORD") add(tax.paid_on ? tax.paid_on.slice(0, 7) : `${year}-01`, Number(tax.amount) || 0);
+            if (tax.paid_by === "LANDLORD") add(tax.kind, tax.paid_on ? tax.paid_on.slice(0, 7) : `${year}-01`, Number(tax.amount) || 0);
         } else {
             parts.forEach((p, i) => {
                 if (p.paid_by !== "LANDLORD") return;
-                add(p.paid_on ? p.paid_on.slice(0, 7) : `${year}-${String(Math.min(12, i + 1)).padStart(2, "0")}`, Number(p.amount) || 0);
+                add(tax.kind, p.paid_on ? p.paid_on.slice(0, 7) : `${year}-${String(Math.min(12, i + 1)).padStart(2, "0")}`, Number(p.amount) || 0);
             });
         }
     }
+    return out;
+}
+
+/** Landlord IPTU that a multi-unit property's condominium bears: paid from `from` (`YYYY-MM`) on. */
+export function condominiumIptuByMonth(taxes: PropertyTax[], from: string = CONDOMINIUM_IPTU_FROM): Map<string, number> {
+    const out = new Map<string, number>();
+    for (const [m, amt] of landlordIptuByMonth(taxes)) if (m >= from) out.set(m, amt);
     return out;
 }
 
@@ -421,26 +450,27 @@ export function iptuByMonth(rows: PropertyTax[]): IptuMonthPoint[] {
 }
 
 /** IPTU only (kept for callers that split IPTU from the other taxes). */
-export function landlordIptuByMonth(taxes: PropertyTax[]): Map<string, number> {
-    return landlordTaxesByMonth(taxes, ["IPTU"]);
+export function landlordIptuByMonth(taxes: PropertyTax[], scope: TaxScope = {}): Map<string, number> {
+    return landlordTaxesByMonth(taxes, ["IPTU"], scope);
 }
 
 /** Landlord taxes (any kind) that fall in one month (`YYYY-MM`). */
-export function landlordTaxesForMonth(taxes: PropertyTax[], month: string): number {
-    return landlordTaxesByMonth(taxes).get(month) ?? 0;
+export function landlordTaxesForMonth(taxes: PropertyTax[], month: string, scope: TaxScope = {}): number {
+    return landlordTaxesByMonth(taxes, undefined, scope).get(month) ?? 0;
 }
 
 /** Landlord IPTU that falls in one month (`YYYY-MM`). */
-export function landlordIptuForMonth(taxes: PropertyTax[], month: string): number {
-    return landlordIptuByMonth(taxes).get(month) ?? 0;
+export function landlordIptuForMonth(taxes: PropertyTax[], month: string, scope: TaxScope = {}): number {
+    return landlordIptuByMonth(taxes, scope).get(month) ?? 0;
 }
 
-/** Totals paid by the landlord per kind, all years. */
-export function landlordTaxTotals(taxes: PropertyTax[]): { iptu: number; itbi: number; other: number; total: number } {
+/** Totals paid by the landlord per kind, all years (IPTU within the scope: a multi-unit property's condominium keeps its share). */
+export function landlordTaxTotals(taxes: PropertyTax[], scope: TaxScope = {}): { iptu: number; itbi: number; other: number; total: number } {
     let iptu = 0, itbi = 0, other = 0;
     for (const t of taxes) {
         const v = effectiveTax(t).byLandlord;
-        if (t.kind === "IPTU") iptu += v; else if (t.kind === "ITBI") itbi += v; else other += v;
+        if (t.kind === "IPTU") continue; else if (t.kind === "ITBI") itbi += v; else other += v;
     }
+    for (const v of landlordIptuByMonth(taxes, scope).values()) iptu += v;
     return { iptu: round2(iptu), itbi: round2(itbi), other: round2(other), total: round2(iptu + itbi + other) };
 }

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireProfile } from "@/lib/api-auth";
 import { aggregateIncomeByMonth, breakdown, currentMonthKey, monthKey, type PropertyIncomeRow } from "@/lib/property-income";
-import { landlordIptuForMonth, normalizeInstallments, type PropertyTax } from "@/lib/property-taxes";
+import { landlordIptuForMonth, normalizeInstallments, taxScopeForProperty, type PropertyTax } from "@/lib/property-taxes";
+import { loadPropertyUnits } from "@/lib/property-units-server";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +47,10 @@ export async function GET() {
         return NextResponse.json({ error: "Erro ao carregar receitas" }, { status: 500 });
     }
     // landlord-paid IPTU (taxes register) is a cost of the month it was paid
-    const { data: taxData } = await supabase.from("property_taxes").select("property_id, year, kind, amount, paid_by, paid_on, installments").eq("owner_id", profileId);
+    const [{ data: taxData }, units] = await Promise.all([
+        supabase.from("property_taxes").select("property_id, year, kind, amount, paid_by, paid_on, installments").eq("owner_id", profileId),
+        loadPropertyUnits(supabase, profileId),   // a multi-unit property leaves the condominium's IPTU out
+    ]);
     const taxesByProperty = new Map<string, PropertyTax[]>();
     for (const t of (taxData ?? []) as unknown as PropertyTax[]) {
         taxesByProperty.set(t.property_id, [...(taxesByProperty.get(t.property_id) ?? []), { ...t, amount: Number(t.amount) || 0, installments: normalizeInstallments(t.installments) }]);
@@ -61,7 +65,7 @@ export async function GET() {
         const latest = monthly[0];
         if (!latest) continue;
         const b = breakdown(latest);
-        const iptu = landlordIptuForMonth(taxesByProperty.get(propertyId) ?? [], monthKey(latest.month));
+        const iptu = landlordIptuForMonth(taxesByProperty.get(propertyId) ?? [], monthKey(latest.month), taxScopeForProperty((units.get(propertyId)?.length ?? 0) > 0));
         const opex = Math.round((b.opex + iptu) * 100) / 100;
         const noi = Math.round((b.noi - iptu) * 100) / 100;
         summaries[propertyId] = {

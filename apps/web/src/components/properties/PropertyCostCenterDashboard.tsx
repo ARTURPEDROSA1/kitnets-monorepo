@@ -57,7 +57,7 @@ import {
 } from '@/lib/property-income';
 import { groupMonthly, monthsBetween, periodLabel, periodRange, type ChartGroup, type PeriodFilterValue } from '@/lib/period-filter';
 import type { PropertyInvestment, PropertyTransaction } from '@/lib/property-investment';
-import { landlordIptuByMonth, landlordTaxTotals, type PropertyTax } from '@/lib/property-taxes';
+import { landlordIptuByMonth, landlordTaxTotals, taxScopeForProperty, type PropertyTax } from '@/lib/property-taxes';
 import type { PropertyValuation } from '@/lib/property-valuations';
 import type { CondominiumMonth } from '@/lib/condominium';
 
@@ -157,6 +157,8 @@ export default function PropertyCostCenterDashboard({
     const [forecastYear, setForecastYear] = useState(true);
     const [rentHistoryOpen, setRentHistoryOpen] = useState(false);
     /** Units of a multi-unit property: the income ledger then keeps one row per month and unit. */
+    // a multi-unit property's condominium bears the IPTU from 2025 on: the property's own figures leave it out
+    const taxScope = useMemo(() => taxScopeForProperty(propertyType === 'multi'), [propertyType]);
     const ledgerUnits = useMemo(
         () => (propertyType === 'multi' ? subUnits.filter(u => u.id).map((u, i) => ({ id: u.id as string, name: u.name || `Kitnet ${i + 1}` })) : []),
         [propertyType, subUnits]
@@ -257,7 +259,7 @@ export default function PropertyCostCenterDashboard({
         const estimatedExpenses = iptuMonthly + condoMonthly + maintenanceReserve + adminFee + insuranceAndOther;
 
         // With ledger data: OPEX = agency fee + energy cost + other expenses + landlord IPTU paid in the month (taxes register)
-        const iptuByMonth = landlordIptuByMonth(taxRows);   // recurring tax only: ITBI and other one-off taxes are investment, not a monthly cost
+        const iptuByMonth = landlordIptuByMonth(taxRows, taxScope);   // recurring tax only: ITBI and other one-off taxes are investment, not a monthly cost
         const iptuNow = latest ? (iptuByMonth.get(monthKey(latest.month)) ?? 0) : 0;
         const totalExpenses = current ? Math.round(current.opex + iptuNow) : estimatedExpenses;
         const noi = current ? Math.round(current.noi - iptuNow) : Math.max(0, grossMonthlyRevenue - totalExpenses);
@@ -826,12 +828,13 @@ export default function PropertyCostCenterDashboard({
                 transactions={investmentData.transactions}
                 incomeRows={incomeRows}
                 taxes={taxRows}
+                taxScope={taxScope}
                 loading={incomeLoading || investmentData.loading}
                 preloadedValuations={overview === undefined ? undefined : overview?.valuations ?? null}
             />
 
             {/* Investment ledger: acquisition, financing, capex, running costs, solar */}
-            <PropertyInvestmentSection propertyId={dbId} incomeRows={incomeRows} landlordTaxes={landlordTaxTotals(taxRows)} onDataChange={setInvestmentData} preloaded={preloadedInvestment} />
+            <PropertyInvestmentSection propertyId={dbId} incomeRows={incomeRows} landlordTaxes={landlordTaxTotals(taxRows, taxScope)} onDataChange={setInvestmentData} preloaded={preloadedInvestment} />
 
             {/* Property taxes register: the source of IPTU (landlord payments count in the month paid) */}
             <RentHistoryModal isOpen={rentHistoryOpen} onClose={() => setRentHistoryOpen(false)} rows={incomeRows} areaM2={areaM2} />
