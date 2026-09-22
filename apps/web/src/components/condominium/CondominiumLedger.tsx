@@ -11,7 +11,7 @@ import { AlertCircle, Building, ExternalLink, Loader2, Percent, Receipt, Trash2,
 import Link from "next/link";
 import { Bar, CartesianGrid, Cell, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from "recharts";
 import { cn } from "@/lib/utils";
-import { CONDO_COST_KEYS, CONDO_COST_LABELS, isAutoCostKey, summarizeCondominium, type CondoCostKey, type CondominiumCostInput, type CondominiumMonth } from "@/lib/condominium";
+import { CONDO_COST_KEYS, CONDO_COST_LABELS, isAutoCostKey, summarizeCondominium, type CondoAutoKey, type CondoCostKey, type CondominiumCostInput, type CondominiumMonth } from "@/lib/condominium";
 import { formatMonthKey } from "@/lib/property-income";
 import { groupMonthly, periodLabel, periodRange, type ChartGroup, type PeriodFilterValue } from "@/lib/period-filter";
 import { columnTableKey } from "@/lib/ui-preferences";
@@ -28,9 +28,10 @@ const COLLAPSED_ROWS = 24;
 type DraftField = CondoCostKey | "notes";
 
 export default function CondominiumLedger({ propertyId, lang = "pt" }: { propertyId: string; lang?: string }) {
-    /** Where the two derived columns are fed from: the energy bills and the property's taxes register. */
-    const source = useMemo((): Record<"energy_cost" | "iptu_amount", { href: string; label: string; title: string }> => ({
+    /** Where the derived columns are fed from: the energy bills, the water bills and the property's taxes register. */
+    const source = useMemo((): Record<CondoAutoKey, { href: string; label: string; title: string }> => ({
         energy_cost: { href: `/${lang}/dashboard/energy/${propertyId}`, label: "faturas de energia", title: "Vem de Gestão de Energia Solar & Consumo: o “Valor a pagar” da fatura do mês. Envie a fatura lá e o valor entra aqui sozinho." },
+        water_cost: { href: `/${lang}/dashboard/billing/${propertyId}`, label: "contas de água", title: "Vem de Água › Histórico de Contas: o “Valor” da conta do mês. Envie a conta lá e o valor entra aqui sozinho." },
         iptu_amount: { href: `/${lang}/imoveis?id=${propertyId}`, label: "Tributos do imóvel", title: "Vem de Tributos do imóvel: o IPTU pago por você, no mês do pagamento, a partir de jan/2025 (antes disso o IPTU fica com o imóvel). Registre o carnê lá e o valor entra aqui sozinho." },
     }), [lang, propertyId]);
     const endpoint = `/api/properties/${propertyId}/condominium`;
@@ -138,7 +139,7 @@ export default function CondominiumLedger({ propertyId, lang = "pt" }: { propert
             example: summary.months ? <>{formatBRL(summary.revenue)} em {summary.months} {summary.months === 1 ? "mês" : "meses"} · {periodLabel(period)}</> : undefined,
         },
         cost: {
-            what: "O que o condomínio gastou no período. Energia vem das faturas de energia do imóvel (Valor a pagar) e IPTU de Tributos do imóvel, lançados uma vez só; internet, água e manutenção são digitados na tabela abaixo.",
+            what: "O que o condomínio gastou no período. Energia vem das faturas de energia do imóvel (Valor a pagar), água das contas de água (Valor) e IPTU de Tributos do imóvel, lançados uma vez só; internet e manutenção são digitados na tabela abaixo.",
             formula: "Custos = energia + internet + água + IPTU + manutenção",
             example: summary.months ? <>{CONDO_COST_KEYS.map(k => `${CONDO_COST_LABELS[k]} ${formatBRL(summary.byCost[k])}`).join(" · ")}</> : undefined,
         },
@@ -219,8 +220,8 @@ export default function CondominiumLedger({ propertyId, lang = "pt" }: { propert
                     <h3 className="font-bold text-base text-foreground flex items-center gap-2"><Receipt className="w-4 h-4 text-rose-600" /> Custos do condomínio</h3>
                     <p className="text-xs text-muted-foreground">
                         Um mês por linha, criado sozinho para cada mês em que alguma unidade do imóvel tem aluguel em Receitas de Aluguel. A receita vem de lá;
-                        Energia vem das <Link href={source.energy_cost.href} className="text-emerald-700 dark:text-emerald-400 hover:underline">faturas de energia</Link> (Valor a pagar) e IPTU de <Link href={source.iptu_amount.href} className="text-emerald-700 dark:text-emerald-400 hover:underline">Tributos do imóvel</Link>, uma entrada só.
-                        Internet, água e manutenção você digita nas células (Enter ou Tab para salvar). Clique no cabeçalho para ordenar e filtrar, com o botão direito para ocultar colunas; clique nas células para somá-las.
+                        Energia vem das <Link href={source.energy_cost.href} className="text-emerald-700 dark:text-emerald-400 hover:underline">faturas de energia</Link> (Valor a pagar), água das <Link href={source.water_cost.href} className="text-emerald-700 dark:text-emerald-400 hover:underline">contas de água</Link> (Valor) e IPTU de <Link href={source.iptu_amount.href} className="text-emerald-700 dark:text-emerald-400 hover:underline">Tributos do imóvel</Link>, uma entrada só.
+                        Internet e manutenção você digita nas células (Enter ou Tab para salvar). Clique no cabeçalho para ordenar e filtrar, com o botão direito para ocultar colunas; clique nas células para somá-las.
                     </p>
                 </div>
 

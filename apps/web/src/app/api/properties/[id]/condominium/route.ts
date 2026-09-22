@@ -11,8 +11,8 @@ export const dynamic = "force-dynamic";
  *   PUT    /api/properties/[id]/condominium { rows }       → { months, costs }   merge upsert, one row per month
  *   DELETE /api/properties/[id]/condominium?month=YYYY-MM  → { ok }             removes the month's cost row
  *
- * `months` (lib/condominium.ts) joins the condominium charged in the income ledger (revenue), the energy
- * bills and the landlord's IPTU (energy_cost / iptu_amount, read-only here) and the cost rows of
+ * `months` (lib/condominium.ts) joins the condominium charged in the income ledger (revenue), the energy and
+ * water bills and the landlord's IPTU (energy_cost / water_cost / iptu_amount, read-only here) and the cost rows of
  * `condominium_months`, newest first. `costs` are the raw cost rows.
  */
 
@@ -48,7 +48,7 @@ function validate(raw: unknown, index: number): { row: CondominiumCostInput } | 
     const row: CondominiumCostInput = { month: r.month };
     for (const key of CONDO_COST_KEYS) {
         if (r[key] === undefined) continue;
-        if (isAutoCostKey(key)) return { error: `Linha ${index + 1} (${r.month}): ${key === "energy_cost" ? "a energia vem das faturas de energia do imóvel" : "o IPTU vem de Tributos do imóvel"}, não é digitado aqui` };
+        if (isAutoCostKey(key)) return { error: `Linha ${index + 1} (${r.month}): ${key === "energy_cost" ? "a energia vem das faturas de energia do imóvel" : key === "water_cost" ? "a água vem das contas de água do imóvel" : "o IPTU vem de Tributos do imóvel"}, não é digitado aqui` };
         const v = Number(r[key]);
         if (!Number.isFinite(v) || v < 0 || v > 1e9) return { error: `Linha ${index + 1} (${r.month}): ${key} deve ser um número ≥ 0` };
         row[key] = Math.round(v * 100) / 100;
