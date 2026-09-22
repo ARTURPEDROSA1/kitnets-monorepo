@@ -48,6 +48,7 @@ import { columnTableKey } from "@/lib/ui-preferences";
 import { CellSumBar, useCellSum } from "@/components/properties/TableCellSum";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "@/components/properties/TableColumnFilters";
 import { ColumnVisibilityButton, ColumnVisibilityMenu, useColumnVisibility } from "@/components/properties/TableColumnVisibility";
+import { parseMoneyText } from "@/components/properties/MoneyInput";
 
 export interface EnergyBillRecord {
     id: string;
@@ -97,6 +98,49 @@ const formatKwh = (decimals: number) => (v: number) => `${formatNumber(v, decima
 const formatDays = (v: number) => `${formatNumber(v, 0)} dias`;
 const formatUnitPrice = (v: number) => `R$ ${formatNumber(v, 4)}`;
 const dailyAvg = (b: EnergyBillRecord) => b.daily_avg_kwh || (b.grid_consumption_kwh / (b.billing_days || 30));
+
+/** Bill fields that can be edited straight in the history table (double-click / Enter on the cell) */
+type InlineField = "grid_consumption_kwh" | "billing_days" | "generation_balance_kwh" | "solar_injected_kwh" | "availability_cost_amount" | "unit_price" | "total_amount";
+
+const CELL_INPUT = "text-right bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-none w-full min-w-[4rem] px-1.5 py-1 outline-none tabular-nums";
+
+/**
+ * Editable number cell: formatted with its unit at rest ("820,00 kWh", "R$ 58,97"), a plain
+ * number while editing. Same draft/commit pattern as the income ledger's MoneyInput.
+ */
+function UnitInput({ value, draft, onDraft, onCommit, decimals, prefix = "", suffix = "", dashWhenZero, disabled, className }: {
+    value: number | null | undefined;
+    draft?: string;
+    onDraft: (text: string) => void;
+    onCommit: () => void;
+    decimals: number;
+    prefix?: string;
+    suffix?: string;
+    /** show "-" instead of 0 (balance, injected, costs) */
+    dashWhenZero?: boolean;
+    disabled?: boolean;
+    className?: string;
+}) {
+    const [editing, setEditing] = useState(false);
+    const fmt = (n: number) => `${prefix}${formatNumber(n, decimals)}${suffix}`;
+    const empty = value === null || value === undefined || !Number.isFinite(value) || (dashWhenZero && value <= 0);
+    const parsedDraft = draft !== undefined ? parseMoneyText(draft) : null;
+    const rest = draft !== undefined ? (parsedDraft === null ? draft : fmt(parsedDraft)) : empty ? "-" : fmt(value as number);
+    const text = editing ? (draft ?? (value === null || value === undefined ? "" : String(Number((value as number).toFixed(decimals))))) : rest;
+    return (
+        <input
+            type="text"
+            inputMode="decimal"
+            disabled={disabled}
+            value={text}
+            onFocus={ev => { setEditing(true); requestAnimationFrame(() => ev.target.select()); }}
+            onChange={ev => onDraft(ev.target.value)}
+            onBlur={() => { setEditing(false); onCommit(); }}
+            onKeyDown={ev => { if (ev.key === "Enter") (ev.target as HTMLInputElement).blur(); }}
+            className={cn(CELL_INPUT, className)}
+        />
+    );
+}
 
 const MONTH_NAMES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
@@ -253,6 +297,52 @@ export default function EnergyDashboardPage() {
     const cf = useColumnFilters(filteredBills, billColumns, { key: "month", dir: "desc" });
     const vis = useColumnVisibility(columnTableKey("energy-bills"), { locked: ["month"] });
     const sel = useCellSum({ formatByCol: { cons: formatKwh(0), daily: formatKwh(2), days: formatDays, balance: formatKwh(2), injected: formatKwh(0), unitPrice: formatUnitPrice } });
+
+    // Inline edits in the history table: draft while typing, save on blur/Enter (optimistic, reverted on failure)
+    const [drafts, setDrafts] = useState<Record<string, string>>({});
+    const [savingCells, setSavingCells] = useState<Set<string>>(new Set());
+    const [inlineError, setInlineError] = useState<string | null>(null);
+    const draftKey = (id: string, field: InlineField) => `${id}:${field}`;
+    const setDraft = (id: string, field: InlineField, text: string) => setDrafts(d => ({ ...d, [draftKey(id, field)]: text }));
+    const cancelDraft = (id: string, field: InlineField) => setDrafts(d => { const n = { ...d }; delete n[draftKey(id, field)]; return n; });
+    const commitDraft = async (b: EnergyBillRecord, field: InlineField) => {
+        const k = draftKey(b.id, field);
+        const raw = drafts[k];
+        if (raw === undefined) return;
+        cancelDraft(b.id, field);
+        const parsed = parseMoneyText(raw);
+        if (parsed === null || parsed < 0) return;
+        const value = field === "billing_days" ? Math.round(parsed) : parsed;
+        if (value === (Number(b[field]) || 0)) return;
+
+        const patch: Partial<EnergyBillRecord> = { [field]: value };
+        if (field === "grid_consumption_kwh" || field === "billing_days") {
+            // kWh/dia follows consumption ÷ days (the API recomputes it when daily_avg_kwh is sent as 0)
+            const cons = field === "grid_consumption_kwh" ? value : b.grid_consumption_kwh;
+            const days = field === "billing_days" ? value : (b.billing_days || 30);
+            patch.grid_consumption_kwh = cons;
+            patch.billing_days = days;
+            patch.daily_avg_kwh = days > 0 ? Math.round((cons / days) * 100) / 100 : b.daily_avg_kwh;
+        }
+        setBills(prev => prev.map(x => (x.id === b.id ? { ...x, ...patch } : x)));
+        setSavingCells(prev => new Set(prev).add(k));
+        setInlineError(null);
+        try {
+            const res = await fetch("/api/energy-bills", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: b.id, billData: { ...patch, ...(patch.daily_avg_kwh !== undefined ? { daily_avg_kwh: 0 } : {}) } }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) throw new Error(data.error || "Erro ao salvar a fatura");
+        } catch (err) {
+            console.error("[EnergyDashboard] Inline edit failed:", err);
+            setBills(prev => prev.map(x => (x.id === b.id ? b : x)));
+            setInlineError(err instanceof Error ? err.message : "Erro ao salvar a fatura");
+        } finally {
+            setSavingCells(prev => { const n = new Set(prev); n.delete(k); return n; });
+        }
+    };
 
     // Latest full bill (for current status cards)
     const latestFullBill = useMemo(() => {
@@ -803,8 +893,9 @@ export default function EnergyDashboardPage() {
                             <div>
                                 <h3 className="text-base font-semibold text-foreground">Histórico de Consumo Detalhado</h3>
                                 <p className="text-xs text-muted-foreground mt-0.5">
-                                    Registros de consumo, injeção solar, saldo de créditos e custos por ciclo de faturamento · clique no cabeçalho para ordenar e filtrar; selecione células para somar; duplo clique edita
+                                    Registros de consumo, injeção solar, saldo de créditos e custos por ciclo de faturamento · clique no cabeçalho para ordenar e filtrar; selecione células para somar; duplo clique ou Enter edita na própria célula; o lápis abre a fatura completa
                                 </p>
+                                {inlineError && <p className="text-xs text-red-600 mt-1">{inlineError}</p>}
                             </div>
                             <div className="flex items-center gap-2 self-start sm:self-auto">
                                 <ColumnVisibilityButton ctl={vis} />
@@ -835,14 +926,26 @@ export default function EnergyDashboardPage() {
                                             const daily = dailyAvg(b);
                                             const show = (key: string) => !vis.isHidden(key);
                                             const num = "px-2 py-1.5 text-right tabular-nums whitespace-nowrap";
+                                            const edit = "px-1 py-0.5 text-right whitespace-nowrap";
+                                            const input = (field: InlineField, decimals: number, opts: { prefix?: string; suffix?: string; dashWhenZero?: boolean; className?: string } = {}) => (
+                                                <UnitInput
+                                                    value={b[field]}
+                                                    draft={drafts[draftKey(b.id, field)]}
+                                                    disabled={savingCells.has(draftKey(b.id, field))}
+                                                    onDraft={text => setDraft(b.id, field, text)}
+                                                    onCommit={() => commitDraft(b, field)}
+                                                    decimals={decimals}
+                                                    {...opts}
+                                                />
+                                            );
                                             return (
-                                                <tr key={b.id} className="border-b border-border/60 hover:bg-muted/30 transition-colors" onDoubleClick={() => setEditingBill(b)}>
+                                                <tr key={b.id} className="border-b border-border/60 hover:bg-muted/30 transition-colors">
                                                     <td {...sel.cellProps("month", b.id, null, "px-2 py-1.5 font-semibold text-foreground whitespace-nowrap")}>
                                                         {b.reference_month_label || formatMonthLabel(b.reference_month)}
                                                     </td>
                                                     {show("cons") && (
-                                                        <td {...sel.cellProps("cons", b.id, b.grid_consumption_kwh, cn(num, "font-medium"))}>
-                                                            {formatNumber(b.grid_consumption_kwh, 0)}
+                                                        <td {...sel.cellProps("cons", b.id, b.grid_consumption_kwh, edit, () => cancelDraft(b.id, "grid_consumption_kwh"))}>
+                                                            {input("grid_consumption_kwh", 0, { className: "font-medium text-foreground" })}
                                                         </td>
                                                     )}
                                                     {show("daily") && (
@@ -851,33 +954,33 @@ export default function EnergyDashboardPage() {
                                                         </td>
                                                     )}
                                                     {show("days") && (
-                                                        <td {...sel.cellProps("days", b.id, b.billing_days || 30, cn(num, "text-muted-foreground"))}>
-                                                            {b.billing_days || 30}
+                                                        <td {...sel.cellProps("days", b.id, b.billing_days || 30, edit, () => cancelDraft(b.id, "billing_days"))}>
+                                                            {input("billing_days", 0, { className: "text-muted-foreground" })}
                                                         </td>
                                                     )}
                                                     {show("balance") && (
-                                                        <td {...sel.cellProps("balance", b.id, b.generation_balance_kwh > 0 ? b.generation_balance_kwh : null, cn(num, "font-semibold text-emerald-700 dark:text-emerald-300"))}>
-                                                            {b.generation_balance_kwh > 0 ? `${formatNumber(b.generation_balance_kwh, 2)} kWh` : "-"}
+                                                        <td {...sel.cellProps("balance", b.id, b.generation_balance_kwh > 0 ? b.generation_balance_kwh : null, edit, () => cancelDraft(b.id, "generation_balance_kwh"))}>
+                                                            {input("generation_balance_kwh", 2, { suffix: " kWh", dashWhenZero: true, className: "font-semibold text-emerald-700 dark:text-emerald-300" })}
                                                         </td>
                                                     )}
                                                     {show("injected") && (
-                                                        <td {...sel.cellProps("injected", b.id, b.solar_injected_kwh > 0 ? b.solar_injected_kwh : null, cn(num, "font-semibold text-amber-600 dark:text-amber-400"))}>
-                                                            {b.solar_injected_kwh > 0 ? `${formatNumber(b.solar_injected_kwh, 0)} kWh` : "-"}
+                                                        <td {...sel.cellProps("injected", b.id, b.solar_injected_kwh > 0 ? b.solar_injected_kwh : null, edit, () => cancelDraft(b.id, "solar_injected_kwh"))}>
+                                                            {input("solar_injected_kwh", 0, { suffix: " kWh", dashWhenZero: true, className: "font-semibold text-amber-600 dark:text-amber-400" })}
                                                         </td>
                                                     )}
                                                     {show("availability") && (
-                                                        <td {...sel.cellProps("availability", b.id, b.availability_cost_amount > 0 ? b.availability_cost_amount : null, cn(num, "text-muted-foreground"))}>
-                                                            {b.availability_cost_amount > 0 ? formatCurrency(b.availability_cost_amount) : "-"}
+                                                        <td {...sel.cellProps("availability", b.id, b.availability_cost_amount > 0 ? b.availability_cost_amount : null, edit, () => cancelDraft(b.id, "availability_cost_amount"))}>
+                                                            {input("availability_cost_amount", 2, { prefix: "R$ ", dashWhenZero: true, className: "text-muted-foreground" })}
                                                         </td>
                                                     )}
                                                     {show("unitPrice") && (
-                                                        <td {...sel.cellProps("unitPrice", b.id, b.unit_price ?? null, cn(num, "font-mono text-muted-foreground"))}>
-                                                            {b.unit_price ? `R$ ${formatNumber(b.unit_price, 4)}` : "-"}
+                                                        <td {...sel.cellProps("unitPrice", b.id, b.unit_price ?? null, edit, () => cancelDraft(b.id, "unit_price"))}>
+                                                            {input("unit_price", 4, { prefix: "R$ ", dashWhenZero: true, className: "font-mono text-muted-foreground" })}
                                                         </td>
                                                     )}
                                                     {show("total") && (
-                                                        <td {...sel.cellProps("total", b.id, b.total_amount > 0 ? b.total_amount : null, cn(num, "font-bold text-foreground"))}>
-                                                            {b.total_amount > 0 ? formatCurrency(b.total_amount) : "-"}
+                                                        <td {...sel.cellProps("total", b.id, b.total_amount > 0 ? b.total_amount : null, edit, () => cancelDraft(b.id, "total_amount"))}>
+                                                            {input("total_amount", 2, { prefix: "R$ ", dashWhenZero: true, className: "font-bold text-foreground" })}
                                                         </td>
                                                     )}
                                                     {show("origin") && (
@@ -893,7 +996,7 @@ export default function EnergyDashboardPage() {
                                                             )}
                                                         </td>
                                                     )}
-                                                    <td className="px-2 py-1.5 text-center whitespace-nowrap" onDoubleClick={(ev) => ev.stopPropagation()}>
+                                                    <td className="px-2 py-1.5 text-center whitespace-nowrap">
                                                         <div className="flex items-center justify-center gap-1.5">
                                                             {(b.pdf_url || (b.id === latestFullBill?.id && activePdfUrl)) && (
                                                                 <button

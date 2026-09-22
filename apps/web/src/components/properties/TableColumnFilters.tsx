@@ -323,12 +323,18 @@ export function ColumnMenu<T>({ columns, ctl }: { columns: ColumnDef<T>[]; ctl: 
                 {(c.kind === "number" || c.kind === "date" || c.kind === "month") && (
                     <div className="px-2 py-1 space-y-1">
                         <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{c.kind === "number" ? "Faixa de valores" : "Período"}</div>
-                        <div className="flex items-center gap-1.5">
-                            <input type={c.kind === "number" ? "number" : c.kind} step={c.kind === "number" ? "0.01" : undefined} placeholder={c.kind === "number" ? "mín." : ""} value={f.min ?? ""}
-                                onChange={e => ctl.setFilter(c.key, { ...f, min: e.target.value })} className={inputCls} />
-                            <span className="text-muted-foreground">a</span>
-                            <input type={c.kind === "number" ? "number" : c.kind} step={c.kind === "number" ? "0.01" : undefined} placeholder={c.kind === "number" ? "máx." : ""} value={f.max ?? ""}
-                                onChange={e => ctl.setFilter(c.key, { ...f, max: e.target.value })} className={inputCls} />
+                        {/* stacked: two date pickers side by side overflow the 16 rem popup */}
+                        <div className="space-y-1.5">
+                            <label className="flex items-center gap-2">
+                                <span className="w-6 shrink-0 text-muted-foreground">de</span>
+                                <input type={c.kind === "number" ? "number" : c.kind} step={c.kind === "number" ? "0.01" : undefined} placeholder={c.kind === "number" ? "mín." : ""} value={f.min ?? ""}
+                                    onChange={e => ctl.setFilter(c.key, { ...f, min: e.target.value })} className={cn(inputCls, "min-w-0")} />
+                            </label>
+                            <label className="flex items-center gap-2">
+                                <span className="w-6 shrink-0 text-muted-foreground">até</span>
+                                <input type={c.kind === "number" ? "number" : c.kind} step={c.kind === "number" ? "0.01" : undefined} placeholder={c.kind === "number" ? "máx." : ""} value={f.max ?? ""}
+                                    onChange={e => ctl.setFilter(c.key, { ...f, max: e.target.value })} className={cn(inputCls, "min-w-0")} />
+                            </label>
                         </div>
                     </div>
                 )}
