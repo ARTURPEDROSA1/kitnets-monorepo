@@ -392,7 +392,7 @@ export default function PropertyCostCenterDashboard({
             what: 'O condomínio das unidades como centro de custos, no mês mais recente: o que as unidades pagam de condomínio, o que o condomínio gastou (energia das áreas comuns, internet, água, IPTU, manutenção) e o resultado.',
             formula: 'Resultado = condomínio das unidades − custos do condomínio',
             example: condoCard ? <>{brl(condoCard.revenue)} − {brl(condoCard.cost)} = {brl(condoCard.result)}{condoCard.month ? ` em ${formatMonthKey(condoCard.month)}` : ''}</> : undefined,
-            note: 'Os custos são lançados na página Condomínio (menu lateral), mês a mês.',
+            note: 'Clique no card para abrir o condomínio: os custos são lançados lá, mês a mês.',
         },
         revenue: {
             what: 'Tudo o que o inquilino pagou no mês mais recente confirmado: o aluguel bruto (valor de contrato, antes da taxa da administradora) mais a parcela de energia.',
@@ -619,7 +619,11 @@ export default function PropertyCostCenterDashboard({
 
                 {/* 5. Condomínio (multi-unit) or Energia Solar & Utilidades */}
                 {condoCard ? (
-                <div className="p-5 rounded-2xl border border-border bg-card shadow-xs space-y-2">
+                <Link
+                    href={`/${lang}/condominio?property=${dbId ?? ''}`}
+                    title="Abrir o condomínio deste imóvel (receita, custos e resultado)"
+                    className="p-5 rounded-2xl border border-border bg-card shadow-xs space-y-2 block hover:border-amber-500/50 hover:shadow-md transition-all"
+                >
                     <div className="flex items-center justify-between text-muted-foreground">
                         <span className="text-xs font-semibold uppercase tracking-wider">Condomínio</span>
                         <CardInfoIcon label="Condomínio" info={kpiInfo.condo} className="p-2 bg-amber-50 dark:bg-amber-950/40 text-amber-600" icon={<Building className="w-4 h-4" />} />
@@ -630,11 +634,14 @@ export default function PropertyCostCenterDashboard({
                         </span>
                         <span className="text-xs text-muted-foreground block leading-snug">
                             Condomínio {formatBRL(condoCard.revenue)}{condoCard.month ? ` · ${formatMonthKey(condoCard.month)}` : ''}<br />
-                            Custo {condoCard.hasCosts ? formatBRL(condoCard.cost) : <Link href={`${lang === 'pt' ? '' : `/${lang}`}/condominio?property=${dbId ?? ''}`} className="text-emerald-700 dark:text-emerald-400 hover:underline">lançar em Condomínio</Link>}<br />
+                            Custo {formatBRL(condoCard.cost)}{!condoCard.hasCosts && ' (não lançado)'}<br />
                             Resultado <span className={cn('text-sm', condoCard.result < 0 ? 'text-rose-600' : 'text-foreground')}>{formatBRL(condoCard.result)}</span>
                         </span>
+                        <span className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                            <Building className="w-3.5 h-3.5" /> Ver condomínio
+                        </span>
                     </div>
-                </div>
+                </Link>
                 ) : (
                 <div className="p-5 rounded-2xl border border-border bg-card shadow-xs space-y-2">
                     <div className="flex items-center justify-between text-muted-foreground">

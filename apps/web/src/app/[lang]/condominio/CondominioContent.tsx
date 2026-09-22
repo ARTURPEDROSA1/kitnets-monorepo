@@ -36,7 +36,7 @@ export default function CondominioContent({ lang }: { lang: string }) {
     const [renaming, setRenaming] = useState(false);
     const [renameText, setRenameText] = useState("");
 
-    const base = lang === "pt" ? "" : `/${lang}`;
+    const base = `/${lang}`;
 
     const load = useCallback(async () => {
         const [a, b] = await Promise.all([fetch("/api/condominium"), fetch("/api/condominium/properties")]);

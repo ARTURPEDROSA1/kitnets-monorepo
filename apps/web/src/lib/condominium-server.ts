@@ -26,7 +26,7 @@ export async function loadCosts(supabase: AdminSupabase, propertyId: string): Pr
 /** One property's condominium months (revenue from the income ledger + its cost rows), newest first. */
 export async function loadMonths(supabase: AdminSupabase, propertyId: string): Promise<{ months: CondominiumMonth[]; costs: CondominiumCostRow[] }> {
     const [{ data: income, error }, costs] = await Promise.all([
-        supabase.from("property_income_months").select("month, condo_amount, status").eq("property_id", propertyId).gt("condo_amount", 0),
+        supabase.from("property_income_months").select("month, condo_amount, received_amount, status").eq("property_id", propertyId),
         loadCosts(supabase, propertyId),
     ]);
     if (error) throw new Error(error.message);
@@ -38,7 +38,7 @@ export async function loadMonthsByProperty(supabase: AdminSupabase, profileId: s
     const out = new Map<string, CondominiumMonth[]>();
     if (propertyIds.length === 0) return out;
     const [{ data: income, error: e1 }, { data: costs, error: e2 }] = await Promise.all([
-        supabase.from("property_income_months").select("property_id, month, condo_amount, status").in("property_id", propertyIds).gt("condo_amount", 0),
+        supabase.from("property_income_months").select("property_id, month, condo_amount, received_amount, status").in("property_id", propertyIds),
         supabase.from(CONDO_COSTS_TABLE).select(COST_COLUMNS).eq("owner_id", profileId).in("property_id", propertyIds),
     ]);
     if (e1) throw new Error(e1.message);

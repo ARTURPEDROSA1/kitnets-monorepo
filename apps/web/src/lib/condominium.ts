@@ -63,9 +63,9 @@ export function condoTotalCost(row: Partial<Record<CondoCostKey, number>>): numb
 }
 
 /**
- * Months of the condominium, newest first: every month with a condominium in the income ledger and every
- * month with a cost row. A month's revenue adds the `condo_amount` of all its unit rows (confirmed or
- * expected: the condominium is owed either way).
+ * Months of the condominium, newest first: every month in which at least one unit has rental income or a
+ * condominium in the income ledger, plus every month with a cost row. A month's revenue adds the
+ * `condo_amount` of all its unit rows (confirmed or expected: the condominium is owed either way).
  */
 export function buildCondominiumMonths(incomeRows: PropertyIncomeRow[], costRows: CondominiumCostRow[]): CondominiumMonth[] {
     const months = new Map<string, CondominiumMonth>();
@@ -77,11 +77,13 @@ export function buildCondominiumMonths(incomeRows: PropertyIncomeRow[], costRows
     const confirmed = new Set<string>();
     for (const r of incomeRows) {
         const condo = num(r.condo_amount);
-        if (condo <= 0) continue;
+        if (condo <= 0 && num(r.received_amount) <= 0) continue;   // a vacant unit with no condominium adds nothing
         const m = monthKey(r.month);
         const cur = months.get(m) ?? blank(m);
-        cur.revenue = r2(cur.revenue + condo);
-        cur.units++;
+        if (condo > 0) {
+            cur.revenue = r2(cur.revenue + condo);
+            cur.units++;
+        }
         if (r.status === "CONFIRMED") confirmed.add(m);
         months.set(m, cur);
     }
@@ -94,7 +96,7 @@ export function buildCondominiumMonths(incomeRows: PropertyIncomeRow[], costRows
         months.set(m, cur);
     }
     for (const cur of months.values()) {
-        cur.expected = cur.units > 0 && !confirmed.has(cur.month);
+        cur.expected = (cur.units > 0 || cur.revenue === 0 && !cur.hasCosts) && !confirmed.has(cur.month) && incomeRows.some(r => monthKey(r.month) === cur.month);
         cur.totalCost = condoTotalCost(cur);
         cur.result = r2(cur.revenue - cur.totalCost);
     }
