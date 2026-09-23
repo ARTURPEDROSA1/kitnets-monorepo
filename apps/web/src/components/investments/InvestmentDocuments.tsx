@@ -53,11 +53,11 @@ export default function InvestmentDocuments({ investmentId, documents, onChanged
         return map;
     }, [documents]);
 
-    const upload = async (kind: DocumentKind, files: FileList | null) => {
-        if (!files || files.length === 0) return;
+    const upload = async (kind: DocumentKind, files: File[]) => {
+        if (files.length === 0) return;
         setUploading(kind);
         setError(null);
-        for (const file of Array.from(files)) {
+        for (const file of files) {
             const result = await attachInvestmentDocument(investmentId, file, kind);
             if ("error" in result) {
                 setError(result.error);
@@ -105,7 +105,13 @@ export default function InvestmentDocuments({ investmentId, documents, onChanged
                                 multiple={kind === "PHOTO" || kind === "LAYOUT" || kind === "MARKETING"}
                                 accept={INVESTMENT_UPLOAD_ACCEPT}
                                 className="sr-only"
-                                onChange={e => { const files = e.target.files; e.target.value = ""; upload(kind, files); }}
+                                onChange={e => {
+                                    // copy the File objects out BEFORE resetting the input: `files` is the
+                                    // input's live selection, and clearing the value empties it
+                                    const files = Array.from(e.target.files ?? []);
+                                    e.target.value = "";
+                                    upload(kind, files);
+                                }}
                             />
                         </React.Fragment>
                     ))}
