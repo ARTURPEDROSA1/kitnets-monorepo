@@ -36,6 +36,7 @@ import { PdfViewerModal } from "@/components/ui/PdfViewerModal";
 import InvestmentPaymentsTable, { type PaymentDraft } from "./InvestmentPaymentsTable";
 import InvestmentCashFlowSimulator from "./InvestmentCashFlowSimulator";
 import InvestmentDocuments, { type DocumentWithUrl } from "./InvestmentDocuments";
+import type { ProjectDashboardView } from "@/lib/new-investment-views";
 import InvestmentPlanModal from "./InvestmentPlanModal";
 import InvestmentDetailsModal from "./InvestmentDetailsModal";
 import InvestmentSellModal from "./InvestmentSellModal";
@@ -54,14 +55,7 @@ import {
 } from "@/lib/new-investments";
 import type { InvestmentBenchmarks, InvestmentMetrics } from "@/lib/new-investment-metrics";
 
-interface Bundle {
-    investment: NewInvestment;
-    schedules: InvestmentSchedule[];
-    payments: InvestmentPayment[];
-    documents: DocumentWithUrl[];
-    metrics: InvestmentMetrics;
-    benchmarks?: InvestmentBenchmarks;
-}
+type Bundle = ProjectDashboardView;
 
 const NO_BENCHMARKS: InvestmentBenchmarks = { cdi12mPct: null, cdiAsOf: null, fipezapSale12mPct: null, fipezapAsOf: null };
 const pct1 = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
@@ -72,10 +66,15 @@ interface Props {
     lang: string;
     onBack: () => void;
     onChanged: () => void;
+    /** The dashboard the page preloaded on the server, so the first paint has it; refreshes go through the API. */
+    initialBundle?: ProjectDashboardView | null;
 }
 
-export default function InvestmentDashboard({ investmentId, lang, onBack, onChanged }: Props) {
-    const [bundle, setBundle] = useState<Bundle | null>(null);
+export default function InvestmentDashboard({ investmentId, lang, onBack, onChanged, initialBundle = null }: Props) {
+    const preloaded = initialBundle && initialBundle.investment.id === investmentId ? initialBundle : null;
+    const [bundle, setBundle] = useState<Bundle | null>(preloaded);
+    /** Seeded from the server: no first fetch. Read once — a later prop change must not reset what the user did. */
+    const [seeded] = useState(preloaded !== null);
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const [promoteOpen, setPromoteOpen] = useState(false);
@@ -88,22 +87,20 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
     /** The contract, a floor plan or a receipt, opened inside the app like every other document. */
     const [viewing, setViewing] = useState<{ url: string; name: string } | null>(null);
 
+    // One request: the dashboard route carries the documents with their signed URLs.
     const load = useCallback(async () => {
-        const [main, docs] = await Promise.all([
-            fetch(`/api/investments/${investmentId}`),
-            fetch(`/api/investments/${investmentId}/documents`),
-        ]);
-        const data = await main.json().catch(() => ({}));
-        if (!main.ok) throw new Error(data.error || "Erro ao carregar o projeto");
-        const docJson = docs.ok ? await docs.json().catch(() => ({ documents: [] })) : { documents: [] };
-        setBundle({ ...data, documents: docJson.documents ?? [] });
+        const res = await fetch(`/api/investments/${investmentId}`);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Erro ao carregar o projeto");
+        setBundle({ ...data, documents: data.documents ?? [] });
     }, [investmentId]);
 
     useEffect(() => {
+        if (seeded) return;
         let alive = true;
         load().catch(err => { if (alive) setError(err instanceof Error ? err.message : "Erro ao carregar"); });
         return () => { alive = false; };
-    }, [load]);
+    }, [load, seeded]);
 
     /** Each payment's receipts, newest first — a split has one per pocket. */
     const receiptsByPayment = useMemo(() => {
