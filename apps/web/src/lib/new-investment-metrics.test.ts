@@ -31,6 +31,12 @@ const investment = (over: Partial<NewInvestment> = {}): NewInvestment => ({
     rent_vacancy_pct: 0,
     rent_costs_pct: 0,
     sim_horizon_months: 120,
+    sim_delivery_costs: 0,
+    area_m2: null,
+    market_m2_price: null,
+    estimated_value_at_delivery: null,
+    construction_pct: null,
+    construction_updated_on: null,
     status: "ACTIVE",
     promoted_property_id: null,
     promoted_at: null,
@@ -263,6 +269,37 @@ describe("rentStartMonth", () => {
 
     it("is null when no date is known", () => {
         expect(rentStartMonth(investment({ keys_expected_on: null }))).toBeNull();
+    });
+});
+
+describe("valorização, obra and tolerance", () => {
+    it("adds the legal 180 days to the expected keys, and drops it once they are delivered", () => {
+        expect(computeInvestmentMetrics(investment(), schedules, [], asOf).keysToleranceOn).toBe("2030-03-19");
+        expect(computeInvestmentMetrics(investment({ keys_delivered_on: "2029-09-01" }), schedules, [], asOf).keysToleranceOn).toBeNull();
+        expect(computeInvestmentMetrics(investment({ keys_expected_on: null }), schedules, [], asOf).keysToleranceOn).toBeNull();
+    });
+
+    it("values the unit at delivery from area × market R$/m² when the owner typed no figure", () => {
+        const m = computeInvestmentMetrics(investment({ area_m2: 30, market_m2_price: 9000 }), schedules, [payment({})], asOf);
+        expect(m.deliveryValue).toBe(270000);
+        expect(m.deliveryValueSource).toBe("m2");
+        expect(m.appreciationGain).toBeCloseTo(270000 - m.committed, 2);
+        expect(m.appreciationPct).toBeCloseTo(((270000 - m.committed) / m.committed) * 100, 1);
+        expect(m.costPerM2).toBeCloseTo(m.committed / 30, 2);
+    });
+
+    it("prefers the owner's own figure over area × R$/m²", () => {
+        const m = computeInvestmentMetrics(investment({ area_m2: 30, market_m2_price: 9000, estimated_value_at_delivery: 200000 }), schedules, [payment({})], asOf);
+        expect(m.deliveryValue).toBe(200000);
+        expect(m.deliveryValueSource).toBe("typed");
+    });
+
+    it("has no valorização without a value, and carries the works' progress through", () => {
+        const m = computeInvestmentMetrics(investment({ area_m2: 30, construction_pct: 42.5 }), schedules, [payment({})], asOf);
+        expect(m.deliveryValue).toBeNull();
+        expect(m.appreciationGain).toBeNull();
+        expect(m.costPerM2).toBeCloseTo(m.committed / 30, 2);
+        expect(m.constructionPct).toBe(42.5);
     });
 });
 

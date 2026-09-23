@@ -35,6 +35,7 @@ function toPayload(values: InvestmentFormValues) {
         total_price: optional(values.total_price),
         down_payment: optional(values.down_payment),
         financed_amount: optional(values.financed_amount),
+        area_m2: optional(values.area_m2),
         contract_date: optional(values.contract_date),
         keys_expected_on: optional(values.keys_expected_on),
         index_before_keys: values.index_before_keys,

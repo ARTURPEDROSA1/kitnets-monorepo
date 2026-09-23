@@ -4,6 +4,9 @@
  * routes receive its path and never its bytes.
  */
 
+import type { DocumentKind } from "./new-investments";
+import { readByFromJson, type ReadBy } from "./ai-reader-label";
+
 export const INVESTMENT_UPLOAD_MAX_SIZE = 20 * 1024 * 1024;
 export const INVESTMENT_UPLOAD_ACCEPT = ".pdf,.jpg,.jpeg,.png,.webp";
 
@@ -44,12 +47,20 @@ export async function stageInvestmentFile(file: File): Promise<{ path: string } 
 }
 
 /** Stages the file and files it under the investment. → the created document, or the message. */
+/** The AI put the file in another section than the one the owner picked; the UI says so. */
+export interface ClassifiedMove {
+    from: DocumentKind;
+    to: DocumentKind;
+    read_by: ReadBy | null;
+    reason: string | null;
+}
+
 export async function attachInvestmentDocument(
     investmentId: string,
     file: File,
     kind: "CONTRACT" | "MARKETING" | "PHOTO" | "LAYOUT" | "RECEIPT" | "OTHER",
     stagedPath?: string | null
-): Promise<{ document: Record<string, unknown> } | { error: string }> {
+): Promise<{ document: Record<string, unknown>; classified: ClassifiedMove | null } | { error: string }> {
     const staged = stagedPath ? { path: stagedPath } : await stageInvestmentFile(file);
     if ("error" in staged) return staged;
     try {
@@ -69,7 +80,12 @@ export async function attachInvestmentDocument(
             const message = typeof json.error === "string" ? json.error : json.errors?.storage_path;
             return { error: typeof message === "string" ? message : "Não foi possível anexar o arquivo." };
         }
-        return { document: json.document };
+        const move = json.classified;
+        const classified: ClassifiedMove | null =
+            move && typeof move === "object" && typeof move.to === "string" && typeof move.from === "string"
+                ? { from: move.from, to: move.to, read_by: readByFromJson(move.read_by), reason: typeof move.reason === "string" ? move.reason : null }
+                : null;
+        return { document: json.document, classified };
     } catch {
         return { error: "Erro de conexão ao anexar o arquivo. Tente novamente." };
     }

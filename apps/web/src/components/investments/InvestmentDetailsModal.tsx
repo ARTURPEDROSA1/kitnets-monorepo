@@ -11,14 +11,19 @@
  * The address is edited as the one line it is stored as, rather than being split back into street,
  * number and neighbourhood — that split is lossy, and re-splitting it to show it here would quietly
  * drop whatever did not fit.
+ *
+ * The second block is what the contract never says: what the unit should be worth at delivery
+ * (typed, or area × a market R$/m²) and how far the works are. Both feed the "Valorização" and
+ * "Chaves" tiles.
  */
 import React, { useState } from "react";
 import { AlertCircle, Loader2, Save } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DateInput } from "@/components/ui/DateInput";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { INVESTMENT_KIND_LABELS, type InvestmentKind, type NewInvestment } from "@/lib/new-investments";
+import { INVESTMENT_KIND_LABELS, formatBRL, type InvestmentKind, type NewInvestment } from "@/lib/new-investments";
 
 interface Props {
     open: boolean;
@@ -45,6 +50,13 @@ export default function InvestmentDetailsModal({ open, onClose, investment, onSa
     );
 }
 
+const numberOrEmpty = (v: number | null): string => (v === null ? "" : String(v).replace(".", ","));
+/** "27,5" → 27.5; blank → null. The API accepts the string too, but the preview below wants the number. */
+const parseDecimal = (v: string): number | null => {
+    const n = Number(v.replace(/\./g, "").replace(",", "."));
+    return v.trim() && Number.isFinite(n) ? n : null;
+};
+
 function DetailsForm({ investment, onSave, onClose }: Omit<Props, "open">) {
     const [form, setForm] = useState({
         name: investment.name,
@@ -56,12 +68,21 @@ function DetailsForm({ investment, onSave, onClose }: Omit<Props, "open">) {
         state: investment.state ?? "",
         postal_code: investment.zip ?? "",
         description: investment.description ?? "",
+        area_m2: numberOrEmpty(investment.area_m2),
+        market_m2_price: numberOrEmpty(investment.market_m2_price),
+        estimated_value_at_delivery: numberOrEmpty(investment.estimated_value_at_delivery),
+        construction_pct: numberOrEmpty(investment.construction_pct),
+        construction_updated_on: investment.construction_updated_on ?? "",
     });
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
         setForm(prev => ({ ...prev, [key]: value }));
+
+    const area = parseDecimal(form.area_m2);
+    const m2 = parseDecimal(form.market_m2_price);
+    const byArea = area && m2 ? area * m2 : null;
 
     const save = async () => {
         if (!form.name.trim()) {
@@ -81,6 +102,11 @@ function DetailsForm({ investment, onSave, onClose }: Omit<Props, "open">) {
             state: blank(form.state),
             postal_code: blank(form.postal_code),
             description: blank(form.description),
+            area_m2: blank(form.area_m2),
+            market_m2_price: blank(form.market_m2_price),
+            estimated_value_at_delivery: blank(form.estimated_value_at_delivery),
+            construction_pct: blank(form.construction_pct),
+            construction_updated_on: blank(form.construction_updated_on),
         });
         setSaving(false);
         if (ok) onClose();
@@ -89,7 +115,7 @@ function DetailsForm({ investment, onSave, onClose }: Omit<Props, "open">) {
 
     return (
         <>
-            <div className="space-y-3 min-w-0">
+            <div className="space-y-4 min-w-0">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div className="space-y-1 lg:col-span-2">
                         <Label htmlFor="details-name">Empreendimento *</Label>
@@ -137,6 +163,49 @@ function DetailsForm({ investment, onSave, onClose }: Omit<Props, "open">) {
                 <div className="space-y-1">
                     <Label htmlFor="details-description">Descrição</Label>
                     <Input id="details-description" value={form.description} onChange={e => set("description", e.target.value)} placeholder="Studio mobiliado com vaga, frente mar" />
+                </div>
+
+                <div className="space-y-3 rounded-xl border border-border/70 bg-muted/20 p-3">
+                    <div>
+                        <h3 className="text-sm font-semibold text-foreground">Valorização e obra</h3>
+                        <p className="text-xs text-muted-foreground">
+                            O contrato não diz quanto a unidade vai valer. Informe a área e um R$/m² de mercado (anúncios do
+                            prédio ou da rua) ou direto o valor esperado na entrega; e o andamento que a construtora informa.
+                        </p>
+                    </div>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                        <div className="space-y-1">
+                            <Label htmlFor="details-area">Área privativa (m²)</Label>
+                            <Input id="details-area" inputMode="decimal" value={form.area_m2} onChange={e => set("area_m2", e.target.value)} placeholder="27,5" />
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="details-m2">R$/m² de mercado</Label>
+                            <Input id="details-m2" inputMode="decimal" value={form.market_m2_price} onChange={e => set("market_m2_price", e.target.value)} placeholder="11.000" />
+                        </div>
+                        <div className="space-y-1 col-span-2">
+                            <Label htmlFor="details-value">Valor esperado na entrega (R$)</Label>
+                            <Input
+                                id="details-value"
+                                inputMode="decimal"
+                                value={form.estimated_value_at_delivery}
+                                onChange={e => set("estimated_value_at_delivery", e.target.value)}
+                                placeholder={byArea ? formatBRL(byArea, 0) : "320.000"}
+                            />
+                            <p className="text-[11px] text-muted-foreground">
+                                {byArea
+                                    ? `Em branco, vale área × R$/m² = ${formatBRL(byArea, 0)}.`
+                                    : "Em branco, vale área × R$/m² quando os dois estiverem preenchidos."}
+                            </p>
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="details-works">Andamento da obra (%)</Label>
+                            <Input id="details-works" inputMode="decimal" value={form.construction_pct} onChange={e => set("construction_pct", e.target.value)} placeholder="35" />
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="details-works-on">Informado em</Label>
+                            <DateInput id="details-works-on" value={form.construction_updated_on} onChange={iso => set("construction_updated_on", iso)} />
+                        </div>
+                    </div>
                 </div>
 
                 {error && (

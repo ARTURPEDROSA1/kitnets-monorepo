@@ -87,7 +87,8 @@ export async function adoptStagedUpload(
 const INVESTMENT_COLUMNS =
     "id, name, description, developer, unit_label, kind, address, city, state, zip, total_price, down_payment, " +
     "financed_amount, contract_date, keys_expected_on, keys_delivered_on, index_before_keys, index_after_keys, " +
-    "estimated_rent, rent_start_on, rent_adjustment_pct, rent_vacancy_pct, rent_costs_pct, sim_horizon_months, status, " +
+    "estimated_rent, rent_start_on, rent_adjustment_pct, rent_vacancy_pct, rent_costs_pct, sim_horizon_months, sim_delivery_costs, " +
+    "area_m2, market_m2_price, estimated_value_at_delivery, construction_pct, construction_updated_on, status, " +
     "promoted_property_id, promoted_at, cover_path, notes, created_at, updated_at";
 
 const SCHEDULE_COLUMNS = "id, investment_id, label, kind, installments, amount, first_due_on, periodicity, index_code, position";
@@ -115,6 +116,12 @@ function mapInvestment(row: Record<string, unknown>): NewInvestment {
         rent_vacancy_pct: toNumber(row.rent_vacancy_pct),
         rent_costs_pct: toNumber(row.rent_costs_pct),
         sim_horizon_months: toNumber(row.sim_horizon_months, 120),
+        sim_delivery_costs: toNumber(row.sim_delivery_costs),
+        area_m2: row.area_m2 == null ? null : toNumber(row.area_m2),
+        market_m2_price: row.market_m2_price == null ? null : toNumber(row.market_m2_price),
+        estimated_value_at_delivery: row.estimated_value_at_delivery == null ? null : toNumber(row.estimated_value_at_delivery),
+        construction_pct: row.construction_pct == null ? null : toNumber(row.construction_pct),
+        construction_updated_on: (row.construction_updated_on as string | null) ?? null,
     };
 }
 
@@ -247,7 +254,9 @@ export function investmentRow(input: Partial<InvestmentInput>): Record<string, u
         "name", "description", "developer", "unit_label", "kind", "city", "state",
         "total_price", "down_payment", "financed_amount", "contract_date", "keys_expected_on", "keys_delivered_on",
         "index_before_keys", "index_after_keys", "estimated_rent", "rent_start_on", "rent_adjustment_pct",
-        "rent_vacancy_pct", "rent_costs_pct", "sim_horizon_months", "status", "cover_path", "notes",
+        "rent_vacancy_pct", "rent_costs_pct", "sim_horizon_months", "sim_delivery_costs",
+        "area_m2", "market_m2_price", "estimated_value_at_delivery", "construction_pct", "construction_updated_on",
+        "status", "cover_path", "notes",
     ] as const;
     for (const key of copy) {
         if (input[key] !== undefined) row[key] = input[key];

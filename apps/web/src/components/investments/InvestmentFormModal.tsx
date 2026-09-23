@@ -12,6 +12,7 @@ import React, { useRef, useState } from "react";
 import { AlertCircle, FileUp, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/DateInput";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -40,6 +41,7 @@ export interface InvestmentFormValues {
     total_price: string;
     down_payment: string;
     financed_amount: string;
+    area_m2: string;
     contract_date: string;
     keys_expected_on: string;
     index_before_keys: IndexCode;
@@ -51,7 +53,7 @@ export interface InvestmentFormValues {
 const EMPTY: InvestmentFormValues = {
     name: "", unit_label: "", developer: "", kind: "STUDIO", description: "",
     street: "", street_number: "", neighborhood: "", city: "", state: "", postal_code: "",
-    total_price: "", down_payment: "", financed_amount: "", contract_date: "", keys_expected_on: "",
+    total_price: "", down_payment: "", financed_amount: "", area_m2: "", contract_date: "", keys_expected_on: "",
     index_before_keys: "NONE", index_after_keys: "NONE", estimated_rent: "", schedules: [],
 };
 
@@ -75,6 +77,7 @@ function fromExtraction(data: ExtractedInvestment, inferredTotal: number | null)
         total_price: numberOrEmpty(i.total_price ?? inferredTotal),
         down_payment: numberOrEmpty(i.down_payment),
         financed_amount: numberOrEmpty(i.financed_amount),
+        area_m2: numberOrEmpty(i.area_m2),
         contract_date: i.contract_date ?? "",
         keys_expected_on: i.keys_expected_on ?? "",
         index_before_keys: i.index_before_keys,
@@ -287,12 +290,16 @@ export default function InvestmentFormModal({ open, onClose, onSubmit }: Props) 
                             <Input id="inv-rent" inputMode="decimal" value={values.estimated_rent} onChange={e => set("estimated_rent", e.target.value)} placeholder="1800,00" />
                         </div>
                         <div className="space-y-1">
+                            <Label htmlFor="inv-area">Área privativa (m²)</Label>
+                            <Input id="inv-area" inputMode="decimal" value={values.area_m2} onChange={e => set("area_m2", e.target.value)} placeholder="27,5" />
+                        </div>
+                        <div className="space-y-1">
                             <Label htmlFor="inv-contract-date">Data do contrato</Label>
-                            <Input id="inv-contract-date" type="date" value={values.contract_date} onChange={e => set("contract_date", e.target.value)} />
+                            <DateInput id="inv-contract-date" value={values.contract_date} onChange={iso => set("contract_date", iso)} />
                         </div>
                         <div className="space-y-1">
                             <Label htmlFor="inv-keys">Entrega das chaves</Label>
-                            <Input id="inv-keys" type="date" value={values.keys_expected_on} onChange={e => set("keys_expected_on", e.target.value)} />
+                            <DateInput id="inv-keys" value={values.keys_expected_on} onChange={iso => set("keys_expected_on", iso)} />
                         </div>
                         <div className="space-y-1">
                             <Label htmlFor="inv-index-before">Índice até as chaves</Label>

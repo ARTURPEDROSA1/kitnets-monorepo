@@ -75,6 +75,43 @@ export interface InvestmentMetrics {
     netYieldPct: number | null;
     /** Months of net rent needed to give the invested capital back, from the first rent. */
     paybackMonths: number | null;
+
+    /** Progress of the works as the developer last reported it, 0–100. */
+    constructionPct: number | null;
+    constructionUpdatedOn: string | null;
+    /** `keys_expected_on` + 180 days — the tolerance every off-plan contract carries; null once delivered or without a forecast. */
+    keysToleranceOn: string | null;
+
+    areaM2: number | null;
+    /** `committed ÷ area`: what the unit is costing per m². */
+    costPerM2: number | null;
+    /** The reference market R$/m² the owner typed. */
+    marketM2Price: number | null;
+    /** What the unit is expected to be worth at delivery: the owner's figure, else area × market R$/m². */
+    deliveryValue: number | null;
+    deliveryValueSource: "typed" | "m2" | null;
+    /** `deliveryValue − committed`, and the same as % of `committed`. */
+    appreciationGain: number | null;
+    appreciationPct: number | null;
+}
+
+/** The market figures the dashboard reads the KPIs against; loaded server-side, best-effort. */
+export interface InvestmentBenchmarks {
+    /** CDI accumulated over the last twelve months, % a.a. — what the money would have earned sitting still. */
+    cdi12mPct: number | null;
+    cdiAsOf: string | null;
+    /** FipeZap's national sale-price variation over twelve months, % — the trend behind "valorização", not a city price. */
+    fipezapSale12mPct: number | null;
+    fipezapAsOf: string | null;
+}
+
+/** Brazilian off-plan contracts carry a 180-day tolerance on the delivery date (Lei 13.786/2018). */
+export const KEYS_TOLERANCE_DAYS = 180;
+
+function addDays(iso: string, days: number): string {
+    const d = new Date(`${iso.slice(0, 10)}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + days);
+    return d.toISOString().slice(0, 10);
 }
 
 const EMPTY_TOTALS = { paid: 0, corrections: 0, count: 0 };
@@ -159,6 +196,14 @@ export function computeInvestmentMetrics(
             : round2(rent * (1 - investment.rent_vacancy_pct / 100) * (1 - investment.rent_costs_pct / 100));
     const base = committed > 0 ? committed : null;
 
+    // Valorização: the owner's own figure for the unit at delivery wins; otherwise area × market R$/m².
+    const positive = (v: number | null) => (v !== null && v > 0 ? v : null);
+    const area = positive(investment.area_m2);
+    const marketM2 = positive(investment.market_m2_price);
+    const typedValue = positive(investment.estimated_value_at_delivery);
+    const deliveryValue = typedValue ?? (area && marketM2 ? round2(area * marketM2) : null);
+    const appreciationGain = deliveryValue !== null && base ? round2(deliveryValue - committed) : null;
+
     return {
         contractPrice: round2(investment.total_price || 0),
         paidToDate: round2(paid),
@@ -188,6 +233,18 @@ export function computeInvestmentMetrics(
         grossYieldPct: rent !== null && base ? round2(((rent * 12) / base) * 100) : null,
         netYieldPct: netMonthlyRent !== null && base ? round2(((netMonthlyRent * 12) / base) * 100) : null,
         paybackMonths: netMonthlyRent !== null && netMonthlyRent > 0 && base ? Math.ceil(base / netMonthlyRent) : null,
+
+        constructionPct: investment.construction_pct,
+        constructionUpdatedOn: investment.construction_updated_on,
+        keysToleranceOn: !investment.keys_delivered_on && investment.keys_expected_on ? addDays(investment.keys_expected_on, KEYS_TOLERANCE_DAYS) : null,
+
+        areaM2: area,
+        costPerM2: area && base ? round2(committed / area) : null,
+        marketM2Price: marketM2,
+        deliveryValue,
+        deliveryValueSource: typedValue ? "typed" : deliveryValue !== null ? "m2" : null,
+        appreciationGain,
+        appreciationPct: appreciationGain !== null && base ? round2((appreciationGain / committed) * 100) : null,
     };
 }
 

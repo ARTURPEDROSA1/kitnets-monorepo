@@ -67,6 +67,19 @@ const percent = (max = 100) =>
         }, z.number({ invalid_type_error: "Percentual inválido." }).min(0, "O percentual não pode ser negativo.").max(max, `O percentual deve ser menor que ${max}.`))
         .transform((v) => Math.round(v * 100) / 100);
 
+/** A percentage that may be unknown: blank stays null instead of turning into 0. */
+const optionalPercent = (max = 100) =>
+    z
+        .preprocess((v) => {
+            if (v === "" || v === null || v === undefined) return null;
+            if (typeof v === "string") {
+                const n = Number(v.replace("%", "").replace(",", ".").trim());
+                return Number.isFinite(n) ? n : v;
+            }
+            return v;
+        }, z.number({ invalid_type_error: "Percentual inválido." }).min(0, "O percentual não pode ser negativo.").max(max, `O percentual deve ser no máximo ${max}.`).nullable().optional())
+        .transform((v) => (v == null ? null : Math.round(v * 100) / 100));
+
 export const INVESTMENT_KINDS = ["APARTMENT", "STUDIO", "HOUSE", "PARKING", "LOT", "COMMERCIAL", "OTHER"] as const;
 export const INDEX_CODES = ["NONE", "INCC", "IGPM", "IPCA", "CUB", "OTHER"] as const;
 export const PERIODICITIES = ["SINGLE", "MONTHLY", "QUARTERLY", "SEMIANNUAL", "ANNUAL"] as const;
@@ -130,6 +143,14 @@ export const investmentInputSchema = z.object({
     rent_vacancy_pct: percent(99).default(0),
     rent_costs_pct: percent(99).default(0),
     sim_horizon_months: z.coerce.number().int().min(12, "Mínimo de 12 meses.").max(480, "Máximo de 40 anos.").optional(),
+    sim_delivery_costs: money(),
+
+    /** Valorização and works: all optional, all typed by the owner (the contract rarely has more than the area). */
+    area_m2: money("Área inválida."),
+    market_m2_price: money("Preço do m² inválido."),
+    estimated_value_at_delivery: money("Valor estimado inválido."),
+    construction_pct: optionalPercent(100),
+    construction_updated_on: isoDate(),
 
     status: z.enum(INVESTMENT_STATUSES).default("ACTIVE"),
     cover_path: optionalText(400),

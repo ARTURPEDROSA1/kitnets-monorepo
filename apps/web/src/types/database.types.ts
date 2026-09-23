@@ -2034,6 +2034,12 @@ export type Database = {
           rent_start_on: string | null
           rent_vacancy_pct: number
           sim_horizon_months: number
+          sim_delivery_costs: number
+          area_m2: number | null
+          market_m2_price: number | null
+          estimated_value_at_delivery: number | null
+          construction_pct: number | null
+          construction_updated_on: string | null
           state: string | null
           status: string
           total_price: number
@@ -2068,6 +2074,12 @@ export type Database = {
           rent_start_on?: string | null
           rent_vacancy_pct?: number
           sim_horizon_months?: number
+          sim_delivery_costs?: number
+          area_m2?: number | null
+          market_m2_price?: number | null
+          estimated_value_at_delivery?: number | null
+          construction_pct?: number | null
+          construction_updated_on?: string | null
           state?: string | null
           status?: string
           total_price?: number
@@ -2102,6 +2114,12 @@ export type Database = {
           rent_start_on?: string | null
           rent_vacancy_pct?: number
           sim_horizon_months?: number
+          sim_delivery_costs?: number
+          area_m2?: number | null
+          market_m2_price?: number | null
+          estimated_value_at_delivery?: number | null
+          construction_pct?: number | null
+          construction_updated_on?: string | null
           state?: string | null
           status?: string
           total_price?: number

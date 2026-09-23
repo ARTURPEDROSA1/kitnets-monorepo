@@ -12,6 +12,7 @@ import React from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/DateInput";
 import {
     INDEX_LABELS,
     PAYMENT_KINDS,
@@ -145,13 +146,12 @@ export default function InvestmentScheduleEditor({
                                         />
                                     </td>
                                     <td className="px-2 py-1">
-                                        <Input
-                                            type="date"
+                                        <DateInput
                                             value={s.first_due_on}
-                                            onChange={e => patch(index, { first_due_on: e.target.value })}
+                                            onChange={iso => patch(index, { first_due_on: iso })}
                                             disabled={disabled}
                                             aria-label="Primeiro vencimento"
-                                            className="h-8 text-xs tabular-nums"
+                                            className="h-8 text-xs"
                                         />
                                     </td>
                                     <td className="px-2 py-1">

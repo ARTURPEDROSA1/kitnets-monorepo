@@ -16,6 +16,7 @@ import {
     Banknote,
     CalendarClock,
     CheckCircle2,
+    Gem,
     KeyRound,
     Loader2,
     Pencil,
@@ -28,6 +29,7 @@ import {
 import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DateInput } from "@/components/ui/DateInput";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Tile from "@/components/properties/Tile";
 import { PdfViewerModal } from "@/components/ui/PdfViewerModal";
@@ -46,7 +48,7 @@ import {
     type InvestmentSchedule,
     type NewInvestment,
 } from "@/lib/new-investments";
-import type { InvestmentMetrics } from "@/lib/new-investment-metrics";
+import type { InvestmentBenchmarks, InvestmentMetrics } from "@/lib/new-investment-metrics";
 
 interface Bundle {
     investment: NewInvestment;
@@ -54,7 +56,12 @@ interface Bundle {
     payments: InvestmentPayment[];
     documents: DocumentWithUrl[];
     metrics: InvestmentMetrics;
+    benchmarks?: InvestmentBenchmarks;
 }
+
+const NO_BENCHMARKS: InvestmentBenchmarks = { cdi12mPct: null, cdiAsOf: null, fipezapSale12mPct: null, fipezapAsOf: null };
+const pct1 = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+const signed = (v: number, digits = 0) => `${v > 0 ? "+" : ""}${formatBRL(v, digits)}`;
 
 interface Props {
     investmentId: string;
@@ -186,6 +193,7 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
     }
 
     const { investment, metrics, schedules, payments, documents } = bundle;
+    const benchmarks = bundle.benchmarks ?? NO_BENCHMARKS;
     const title = investmentTitle(investment);
     const promoted = Boolean(investment.promoted_property_id);
 
@@ -232,7 +240,7 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7 gap-3">
                 <Tile
                     label="Pago até agora"
                     tone="emerald"
@@ -307,6 +315,42 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                     }}
                 />
                 <Tile
+                    label="Valorização"
+                    tone={metrics.appreciationGain === null ? "slate" : metrics.appreciationGain >= 0 ? "emerald" : "rose"}
+                    icon={<Gem className="w-4 h-4" />}
+                    value={metrics.appreciationGain !== null ? signed(metrics.appreciationGain) : "—"}
+                    hint={
+                        <span className="block space-y-0.5 pt-0.5">
+                            {metrics.deliveryValue !== null && metrics.appreciationPct !== null ? (
+                                <span className="block">
+                                    {metrics.appreciationPct > 0 ? "+" : ""}{pct1(metrics.appreciationPct)}% sobre o custo · vale {formatBRL(metrics.deliveryValue, 0)} na entrega
+                                </span>
+                            ) : (
+                                <span className="block">Informe a área e o R$/m² de mercado, ou o valor na entrega (lápis ao lado do nome)</span>
+                            )}
+                            {metrics.costPerM2 !== null && (
+                                <span className="block tabular-nums">
+                                    {formatBRL(metrics.costPerM2, 0)}/m² pago{metrics.marketM2Price !== null ? ` · ${formatBRL(metrics.marketM2Price, 0)}/m² mercado` : ""}
+                                </span>
+                            )}
+                            {benchmarks.fipezapSale12mPct !== null && (
+                                <span className="block" title={`FipeZap venda, índice nacional, 12 meses até ${benchmarks.fipezapAsOf ? formatDateBR(benchmarks.fipezapAsOf) : "—"}`}>
+                                    FipeZap venda 12 m: {benchmarks.fipezapSale12mPct > 0 ? "+" : ""}{pct1(benchmarks.fipezapSale12mPct)}% (nacional)
+                                </span>
+                            )}
+                        </span>
+                    }
+                    info={{
+                        what: "Quanto a unidade deve valer na entrega além do que ela custou — o ganho de comprar na planta. O valor na entrega é o seu (lápis ao lado do nome) ou, sem ele, a área privativa vezes um R$/m² de mercado que você informa a partir de anúncios do prédio ou da rua.",
+                        formula: <>Valorização = valor na entrega − custo total<br />Valor na entrega = o informado, ou área × R$/m² de mercado</>,
+                        example:
+                            metrics.deliveryValue !== null && metrics.appreciationGain !== null
+                                ? `${formatBRL(metrics.deliveryValue)} − ${formatBRL(metrics.committed)} = ${signed(metrics.appreciationGain, 2)}`
+                                : undefined,
+                        note: "O FipeZap deste painel é o índice nacional de venda — mostra a tendência do mercado, não o preço da sua rua. Estimativa, não avaliação.",
+                    }}
+                />
+                <Tile
                     label="Próxima parcela"
                     tone={metrics.overdueCount > 0 ? "rose" : "violet"}
                     icon={<Receipt className="w-4 h-4" />}
@@ -330,18 +374,31 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                     icon={<KeyRound className="w-4 h-4" />}
                     value={metrics.keysOn ? formatDateBR(metrics.keysOn) : "—"}
                     hint={
-                        metrics.keysDelivered
-                            ? "Chaves entregues"
-                            : metrics.monthsToKeys === null
-                              ? "Informe a previsão de entrega"
-                              : metrics.monthsToKeys >= 0
-                                ? `Faltam ${metrics.monthsToKeys} ${metrics.monthsToKeys === 1 ? "mês" : "meses"}`
-                                : `Atrasada em ${-metrics.monthsToKeys} meses`
+                        <span className="block space-y-0.5 pt-0.5">
+                            <span className="block">
+                                {metrics.keysDelivered
+                                    ? "Chaves entregues"
+                                    : metrics.monthsToKeys === null
+                                      ? "Informe a previsão de entrega"
+                                      : metrics.monthsToKeys >= 0
+                                        ? `Faltam ${metrics.monthsToKeys} ${metrics.monthsToKeys === 1 ? "mês" : "meses"}`
+                                        : `Atrasada em ${-metrics.monthsToKeys} meses`}
+                                {!metrics.keysDelivered && metrics.constructionPct !== null && ` · obra ${pct1(metrics.constructionPct)}%`}
+                            </span>
+                            {!metrics.keysDelivered && metrics.constructionPct !== null && (
+                                <span className="block h-1.5 w-full rounded-full bg-muted overflow-hidden" title={`Obra ${pct1(metrics.constructionPct)}%${metrics.constructionUpdatedOn ? ` em ${formatDateBR(metrics.constructionUpdatedOn)}` : ""}`}>
+                                    <span className="block h-full rounded-full bg-sky-500" style={{ width: `${Math.min(100, Math.max(0, metrics.constructionPct))}%` }} />
+                                </span>
+                            )}
+                            {metrics.keysToleranceOn && (
+                                <span className="block">com tolerância: até {formatDateBR(metrics.keysToleranceOn)}</span>
+                            )}
+                        </span>
                     }
                     info={{
-                        what: "A data em que a construtora entrega a unidade. É quando o aluguel pode começar, e a linha vertical do gráfico.",
-                        formula: "data de entrega do contrato (ou a data real, quando informada)",
-                        note: `Correção até as chaves: ${INDEX_LABELS[investment.index_before_keys]} · após: ${INDEX_LABELS[investment.index_after_keys]}`,
+                        what: "A data em que a construtora entrega a unidade. É quando o aluguel pode começar, e a linha vertical do gráfico. O andamento da obra é o que a construtora informou por último (lápis ao lado do nome).",
+                        formula: "data de entrega do contrato (ou a data real, quando informada) · tolerância = entrega + 180 dias",
+                        note: `A lei permite à construtora atrasar até 180 dias sem multa (Lei 13.786/2018). Correção até as chaves: ${INDEX_LABELS[investment.index_before_keys]} · após: ${INDEX_LABELS[investment.index_after_keys]}`,
                     }}
                 />
                 <Tile
@@ -403,6 +460,7 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                 investment={investment}
                 schedules={schedules}
                 payments={payments}
+                benchmarks={benchmarks}
                 onSave={patchInvestment}
             />
 
@@ -458,7 +516,7 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                         </div>
                         <div className="space-y-1">
                             <Label htmlFor="promote-date">Data de entrega das chaves</Label>
-                            <Input id="promote-date" type="date" value={promoteDate} onChange={e => setPromoteDate(e.target.value)} />
+                            <DateInput id="promote-date" value={promoteDate} onChange={setPromoteDate} />
                         </div>
                     </div>
                     <DialogFooter>

@@ -15,6 +15,7 @@ import React, { useMemo, useState } from "react";
 import { AlertCircle, Loader2, Save } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/DateInput";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import InvestmentScheduleEditor, { INDEX_CODES, type ScheduleDraft, scheduleTotal } from "./InvestmentScheduleEditor";
@@ -165,11 +166,11 @@ function PlanForm({ investment, schedules, paymentCount, onSave, onClose }: Omit
                     </div>
                     <div className="space-y-1">
                         <Label htmlFor="plan-contract-date">Data do contrato</Label>
-                        <Input id="plan-contract-date" type="date" value={header.contract_date} onChange={e => set("contract_date", e.target.value)} />
+                        <DateInput id="plan-contract-date" value={header.contract_date} onChange={iso => set("contract_date", iso)} />
                     </div>
                     <div className="space-y-1">
                         <Label htmlFor="plan-keys">Entrega das chaves</Label>
-                        <Input id="plan-keys" type="date" value={header.keys_expected_on} onChange={e => set("keys_expected_on", e.target.value)} />
+                        <DateInput id="plan-keys" value={header.keys_expected_on} onChange={iso => set("keys_expected_on", iso)} />
                         <p className="text-[11px] text-muted-foreground">Marca a linha vertical do gráfico.</p>
                     </div>
                     <div className="space-y-1">

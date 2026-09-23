@@ -128,6 +128,17 @@ export interface NewInvestment {
     rent_costs_pct: number;
     /** How many months of rent the simulator projects past the first one. */
     sim_horizon_months: number;
+    /** Simulator premise: what the handover itself costs (ITBI, escritura, registro, mobília), in the keys month. */
+    sim_delivery_costs: number;
+    /** Private area of the unit, m². */
+    area_m2: number | null;
+    /** Reference market R$/m² typed by the owner; with the area, an estimate of the unit's worth. */
+    market_m2_price: number | null;
+    /** The owner's own estimate of the unit's worth at delivery; wins over area × R$/m². */
+    estimated_value_at_delivery: number | null;
+    /** Progress of the works as the developer last reported it, 0–100. */
+    construction_pct: number | null;
+    construction_updated_on: string | null;
     status: InvestmentStatus;
     promoted_property_id: string | null;
     promoted_at: string | null;

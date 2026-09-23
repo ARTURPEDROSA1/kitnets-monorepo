@@ -123,6 +123,36 @@ neighbourhood to show it in three fields would drop whatever the original split 
 `investmentRow` accepts a whole `address` (the edit dialog) as well as the parts (the create form),
 and the whole one wins when both arrive.
 
+### Valorização, obra and tolerance (the KPIs the contract cannot give)
+
+The second block of the pencil dialog is what the contract never says:
+
+- **`area_m2`** (the AI also reads it from the quadro resumo), **`market_m2_price`** (a reference
+  R$/m² the owner takes from listings of the building or the street) and
+  **`estimated_value_at_delivery`**. `deliveryValue` in the metrics is the typed figure, else
+  area × R$/m²; `appreciationGain` / `appreciationPct` = that minus `committed`. The "Valorização"
+  tile shows the gain, R$/m² paid vs market, and FipeZap's **national** sale variation over twelve
+  months (`benchmarks.fipezapSale12mPct`) as the trend — the app has no per-city FipeZap series, so
+  it is a reference, never a price for the unit's street.
+- **`construction_pct`** + `construction_updated_on`: the progress the developer last reported.
+  Shown as a bar under the "Chaves" tile and as "obra 35%" on the card.
+- **`keysToleranceOn`** = `keys_expected_on` + 180 days (Lei 13.786/2018), on the "Chaves" tile
+  until the keys are delivered.
+
+`benchmarks` come from `lib/new-investment-benchmarks-server.ts` on `GET /api/investments/[id]`:
+CDI accumulated 12 m (`lib/indexes.ts`) and FipeZap venda var_12m (`fipezap_series`), both null when
+missing — never an error on the dashboard.
+
+### Dates the Brazilian way
+
+Every date field of the module (and of the property tables) is `components/ui/DateInput`, a
+dd/mm/aaaa masked text input whose value stays ISO, with a calendar button that opens the browser's
+own picker. Native `<input type="date">` renders in the browser's locale, so on an English Chrome
+the ledger read 03/17/2026 next to text saying 17/03/2026. `mode="month"` does mm/aaaa for the
+simulator's first rent and the income ledger. Pure helpers in `lib/date-input.ts`. The native
+inputs left elsewhere in the app (calculators, filters, anunciar) are listed by
+`grep -rn 'type="date"' apps/web/src`.
+
 ### The payment table
 
 Built on the shared table machinery, so it behaves like Receitas de Aluguel and the condominium
@@ -240,15 +270,22 @@ alone; it is another module.
 
 One row per month from the first movement to the end of the horizon:
 
-- below the axis, `outflowPaid` (solid) and `outflowForecast` (hollow);
+- below the axis, `outflowPaid` (solid), `outflowForecast` (hollow) and `outflowDelivery` — the
+  handover costs (ITBI, escritura, registro, mobília; premise `sim_delivery_costs`) as one amber
+  bar in the keys month;
 - above it, the net rent from `rentStart` on — gross rent less vacancy and running costs, with one
   adjustment every twelve months, the way a Brazilian lease behaves (not monthly compounding);
 - a line for the running total, and a vertical marker at the key handover;
-- `breakEvenMonth` is where the line crosses zero.
+- `breakEvenMonth` is where the line crosses zero;
+- `irrAnnualPct` is the **TIR** of the whole flow over the horizon (`internalRateOfReturn`, monthly
+  bisection on NPV, annualized). The tile puts it next to the CDI of the last twelve months
+  (`benchmarks.cdi12mPct`): above the CDI, anticipating instalments earns less than leaving the money
+  invested; below it, anticipating is the better use. The bisection's lower bracket starts at −50%
+  a month and backs off while `(1+r)^-t` overflows — at −99% a 30-year horizon is NaN.
 
 The assumptions live on the investment (`estimated_rent`, `rent_start_on`, `rent_adjustment_pct`,
-`rent_vacancy_pct`, `rent_costs_pct`, `sim_horizon_months`), so the chart is the same for everyone
-who opens it. `rent_start_on` defaults to the month after the keys.
+`rent_vacancy_pct`, `rent_costs_pct`, `sim_horizon_months`, `sim_delivery_costs`), so the chart is
+the same for everyone who opens it. `rent_start_on` defaults to the month after the keys.
 
 They are **saved as they are typed**, like a cell of the ledger — there is no button to remember.
 A field changes, the chart moves, and half a second later the row is written; a status line in the
@@ -281,6 +318,14 @@ The fixtures are the real thing: the studio (R$ 141.900 = 2 × 7.095 + 36 × 3.5
 spot (R$ 45.900 = 2 × 2.295 + 36 × 1.147,50).
 
 ## 8. Known gaps
+
+- **Valorização is the owner's number.** FipeZap in this app is the national index; there is no
+  per-city R$/m², so area × R$/m² depends on a figure typed from listings. A city series (or a
+  broker valuation field with a date, like the property module's) would be the next step.
+- The AI sorts pictures on upload (`lib/new-investment-classify.ts`, one Gemini/OpenAI look per
+  image ≤ 8 MB sent to Fotos/Plantas/Divulgação/Outros; moves only when ≥ 0.7 confident, and says
+  so). PDFs are not classified — a contract is always chosen on purpose. "Mover para" on the file
+  (`PATCH …/documents/[docId]`) fixes what the model gets wrong.
 
 - The forecast projects **from the last payment, not from an index series**. Every open instalment
   is priced at the highest value already paid for its kind — the developer's own billing rule (the

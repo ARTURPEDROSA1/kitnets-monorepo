@@ -32,6 +32,7 @@ import { CellSumBar, useCellSum } from "./TableCellSum";
 import MoneyInput, { parseMoneyText } from "./MoneyInput";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "./TableColumnFilters";
 import { columnTableKey, recordTableKey } from "@/lib/ui-preferences";
+import { DateInput } from "@/components/ui/DateInput";
 import { monthsBetween, periodLabel, periodRange, type PeriodFilterValue } from "@/lib/period-filter";
 import { parseSheet, type PropertyIncomeRow } from "@/lib/property-income";
 import {
@@ -649,9 +650,9 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                                 return (
                                     <tr key={tx.id} className="border-b border-border/60 hover:bg-muted/30">
                                         <td {...sel.cellProps("date", tx.id, null, "px-2 py-1 whitespace-nowrap", () => cancelDraft(tx.id, "date"))}>
-                                            <input type="date" disabled={busy} value={d.date ?? tx.occurred_on}
-                                                onChange={e => setDraft(tx.id, "date", e.target.value)} onBlur={() => commit(tx, "date")}
-                                                className="bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-none w-full min-w-[5rem] px-1 py-1 outline-none" />
+                                            <DateInput variant="bare" disabled={busy} value={d.date ?? tx.occurred_on}
+                                                onChange={iso => { if (iso) setDraft(tx.id, "date", iso); }} onBlur={() => commit(tx, "date")}
+                                                className="bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-none w-full min-w-[6.5rem] px-1 py-1 outline-none" />
                                             {busy && <Loader2 className="inline w-3 h-3 ml-1 animate-spin text-muted-foreground" />}
                                         </td>
                                         <td {...sel.cellProps("kind", tx.id, null, "px-2 py-1", () => cancelDraft(tx.id, "kind"))}>
@@ -790,7 +791,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                     <div className="space-y-4 py-2 max-h-[65vh] overflow-y-auto pr-1">
                         <div className="grid grid-cols-2 gap-3">
                             <Field label="Valor de compra (R$)"><Input type="number" step="0.01" min={0} value={cfg.purchase_price ?? ""} onChange={e => setCfg(c => ({ ...c, purchase_price: e.target.value }))} /></Field>
-                            <Field label="Data da compra"><Input type="date" value={cfg.acquired_on ?? ""} onChange={e => setCfg(c => ({ ...c, acquired_on: e.target.value }))} /></Field>
+                            <Field label="Data da compra"><DateInput value={cfg.acquired_on ?? ""} onChange={iso => setCfg(c => ({ ...c, acquired_on: iso }))} /></Field>
                             <Field label="Área construída (m²)"><Input type="number" step="0.01" min={0} value={cfg.built_area_m2 ?? ""} onChange={e => setCfg(c => ({ ...c, built_area_m2: e.target.value }))} /></Field>
                             <Field label="Financiamento">
                                 <select value={cfg.financing_status ?? "NONE"} onChange={e => setCfg(c => ({ ...c, financing_status: e.target.value }))} className="h-12 w-full rounded-xl border border-input bg-background px-3 text-base">
@@ -812,10 +813,10 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                                 <Field label="Valor financiado (R$)"><Input type="number" step="0.01" min={0} value={cfg.principal ?? ""} onChange={e => setCfg(c => ({ ...c, principal: e.target.value }))} /></Field>
                                 <Field label="Juros nominal (% a.a.)"><Input type="number" step="0.01" min={0} value={cfg.annual_rate ?? ""} onChange={e => setCfg(c => ({ ...c, annual_rate: e.target.value }))} /></Field>
                                 <Field label="Prazo (meses)"><Input type="number" step="1" min={1} value={cfg.term_months ?? ""} onChange={e => setCfg(c => ({ ...c, term_months: e.target.value }))} /></Field>
-                                <Field label="Data do contrato"><Input type="date" value={cfg.contract_date ?? ""} onChange={e => setCfg(c => ({ ...c, contract_date: e.target.value }))} /></Field>
-                                <Field label="1ª prestação"><Input type="date" value={cfg.first_due_date ?? ""} onChange={e => setCfg(c => ({ ...c, first_due_date: e.target.value }))} /></Field>
+                                <Field label="Data do contrato"><DateInput value={cfg.contract_date ?? ""} onChange={iso => setCfg(c => ({ ...c, contract_date: iso }))} /></Field>
+                                <Field label="1ª prestação"><DateInput value={cfg.first_due_date ?? ""} onChange={iso => setCfg(c => ({ ...c, first_due_date: iso }))} /></Field>
                                 {cfg.financing_status === "PAID_OFF" && (
-                                    <Field label="Quitado em"><Input type="date" value={cfg.paid_off_on ?? ""} onChange={e => setCfg(c => ({ ...c, paid_off_on: e.target.value }))} /></Field>
+                                    <Field label="Quitado em"><DateInput value={cfg.paid_off_on ?? ""} onChange={iso => setCfg(c => ({ ...c, paid_off_on: iso }))} /></Field>
                                 )}
                             </div>
                         )}
@@ -839,7 +840,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                     </DialogHeader>
                     <div className="space-y-4 py-2">
                         <div className="grid grid-cols-2 gap-3">
-                            <Field label="Data"><Input type="date" value={add.date} onChange={e => setAdd(a => ({ ...a, date: e.target.value }))} /></Field>
+                            <Field label="Data"><DateInput value={add.date} onChange={iso => setAdd(a => ({ ...a, date: iso }))} /></Field>
                             <Field label="Tipo">
                                 <select value={add.kind} onChange={e => setAdd(a => ({ ...a, kind: e.target.value as TransactionKind }))} className="h-12 w-full rounded-xl border border-input bg-background px-3 text-base">
                                     {ACTIVE_TRANSACTION_KINDS.map(k => <option key={k.kind} value={k.kind}>{k.label}</option>)}
