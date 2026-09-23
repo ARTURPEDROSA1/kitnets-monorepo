@@ -57,8 +57,8 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
     const [draft, setDraft] = useState<CashFlowAssumptions>(stored);
     const [saving, setSaving] = useState(false);
     const [dirty, setDirty] = useState(false);
-    /** The running-total line can drown the monthly bars at this scale; its legend entry toggles it. */
-    const [showCumulative, setShowCumulative] = useState(true);
+    /** The running-total line drowns the monthly bars at this scale, so it starts off; its legend entry toggles it. */
+    const [showCumulative, setShowCumulative] = useState(false);
 
     const assumptions = dirty ? draft : stored;
     const result = useMemo(

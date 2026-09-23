@@ -358,6 +358,51 @@ export function pendingByKind(instalments: OpenInstalment[]): PendingKindSummary
     }));
 }
 
+/** The index one payment carries over the previous one of its kind — what the bill's CUB/INCC did in between. */
+export interface PaymentIndex {
+    /** Percentage: `+0.24` means the bill rose 0,24 % over the previous one. */
+    pct: number;
+    /** True for the first payment of a kind, which can only be compared with its contracted amount. */
+    sinceContract: boolean;
+}
+
+/**
+ * The index between consecutive PAID payments of the same kind, keyed by payment id.
+ *
+ * Ordered by the date the money moved, not the due date: the bill grows with time, so two
+ * instalments anticipated a month apart show the month's index between them even when their due
+ * dates are years apart. The first payment of a kind has no predecessor; it is compared with its
+ * contracted amount, which reads as the correction accrued since the contract was signed. Rows
+ * that are only planned, or that have nothing to compare against, map to null.
+ */
+export function indexBetweenPayments(payments: InvestmentPayment[]): Map<string, PaymentIndex | null> {
+    const out = new Map<string, PaymentIndex | null>();
+    const byKind = new Map<PaymentKind, InvestmentPayment[]>();
+    for (const p of payments) {
+        if (p.status !== "PAID") {
+            out.set(p.id, null);
+            continue;
+        }
+        const list = byKind.get(p.kind) ?? [];
+        list.push(p);
+        byKind.set(p.kind, list);
+    }
+    for (const list of byKind.values()) {
+        list.sort((a, b) => {
+            const da = a.paid_on ?? a.due_on, db = b.paid_on ?? b.due_on;
+            return da < db ? -1 : da > db ? 1 : a.due_on < b.due_on ? -1 : 1;
+        });
+        let previous: number | null = null;
+        for (const p of list) {
+            const total = paymentTotal(p);
+            const base = previous ?? p.amount;
+            out.set(p.id, base > 0 ? { pct: round2((total / base - 1) * 100), sinceContract: previous === null } : null);
+            previous = total;
+        }
+    }
+    return out;
+}
+
 // ── Formatting ───────────────────────────────────────────────────────
 
 export const formatBRL = (value: number, fractionDigits = 2): string =>
