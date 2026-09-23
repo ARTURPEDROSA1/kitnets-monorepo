@@ -130,22 +130,6 @@ export function Step5Details() {
                     </div>
                 )}
 
-                {intent === 'sale' && (
-                    <div className="space-y-4 fade-in">
-                        <h3 className="font-semibold text-lg">Valores de Venda</h3>
-                        <div>
-                            <label className="text-sm font-medium mb-1 block">Preço de Venda (R$)</label>
-                            <Input
-                                type="number"
-                                placeholder="0,00"
-                                value={details.salePrice}
-                                onChange={(e) => updateData({ details: { ...details, salePrice: e.target.value } })}
-                            />
-                        </div>
-                        <Toggle label="Aceita Financiamento" value={details.financing || false} onChange={(v) => updateData({ details: { ...details, financing: v } })} />
-                    </div>
-                )}
-
                 {intent === 'launch' && (
                     <div className="space-y-4 fade-in">
                         <h3 className="font-semibold text-lg">Detalhes do Lançamento</h3>
@@ -173,7 +157,7 @@ export function Step5Details() {
             <div className="pt-6">
                 <Button
                     className="w-full h-12 text-lg bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-lg shadow-emerald-900/20"
-                    disabled={!details.area || (intent === 'rent' && !details.rentValue) || (intent === 'sale' && !details.salePrice)}
+                    disabled={!details.area || (intent === 'rent' && !details.rentValue)}
                     // Basic validation check
                     onClick={handleNext}
                 >

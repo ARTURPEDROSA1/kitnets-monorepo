@@ -2151,7 +2151,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
 
     if (!isLoaded || !user) return <div className="p-8 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-emerald-600" /></div>;
 
-    const handleQuickPublish = (intent: 'rent' | 'sale', targetPropIdx: number = 0) => {
+    const handleQuickPublish = (intent: 'rent', targetPropIdx: number = 0) => {
         const targetProp = properties[targetPropIdx] || properties[0];
         const propAddr = targetProp ? targetProp.address : formData.propertyAddress;
         const propDetails = targetProp ? targetProp.details : propertyDetails;
@@ -2195,8 +2195,6 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                 condoFee: "",
                 tax: "",
                 minPeriod: "12",
-                salePrice: "",
-                financing: false,
             },
             media: {
                 photos: propPhotos,
@@ -3325,15 +3323,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                     <Home className="w-3.5 h-3.5" />
                                     Anunciar Aluguel
                                 </Button>
-                                <Button
-                                    size="sm"
-                                    type="button"
-                                    className="h-8 text-xs flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-xs"
-                                    onClick={() => handleQuickPublish('sale', propIdx)}
-                                >
-                                    <Sparkles className="w-3.5 h-3.5" />
-                                    Anunciar Venda
-                                </Button>
+                                {/* No "Anunciar Venda": kitnets.com is about renting for the foreseeable future (owner's call, 2026-09-24) */}
                                 <Button
                                     size="sm"
                                     type="button"

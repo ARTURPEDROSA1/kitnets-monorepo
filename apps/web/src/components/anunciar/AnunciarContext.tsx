@@ -41,8 +41,6 @@ const initialState: AnunciarState = {
             condoFee: "",
             tax: "",
             minPeriod: "",
-            salePrice: "",
-            financing: false,
         },
         media: { photos: [], video: null, pdf: null },
         description: "",
