@@ -3,6 +3,7 @@ import {
     addMonthsToKey,
     expandSchedule,
     expandSchedules,
+    indexBetweenPayments,
     monthsBetween,
     paymentMonth,
     paymentTotal,
@@ -212,6 +213,53 @@ describe("projecting open instalments from what was paid", () => {
         const september = payment({ due_on: "2026-09-15", paid_on: "2026-09-11", amount: 1000, correction_amount: 43.07 });
         const pending = pendingInstalments([monthly, bigger], [september]);
         expect(pending.find(i => i.scheduleId === "b")!.amount).toBe(2000);
+    });
+});
+
+describe("indexBetweenPayments", () => {
+    // the monthly bills of the real contract: 1.000 contracted, CUB creeping up month by month
+    const monthly = [
+        payment({ id: "aug", due_on: "2026-08-15", paid_on: "2026-08-11", amount: 1000, correction_amount: 40.55 }),
+        payment({ id: "sep", due_on: "2026-09-15", paid_on: "2026-09-11", amount: 1000, correction_amount: 43.07 }),
+    ];
+
+    it("reads the month's index off two consecutive bills of a kind", () => {
+        const idx = indexBetweenPayments(monthly);
+        // 1.043,07 ÷ 1.040,55 − 1
+        expect(idx.get("sep")).toEqual({ pct: 0.24, sinceContract: false });
+    });
+
+    it("compares the first bill of a kind with its contracted amount, and says so", () => {
+        const idx = indexBetweenPayments(monthly);
+        // 1.040,55 ÷ 1.000 − 1: the correction accrued since the contract (4,055 % sits on a
+        // rounding boundary, so the check is a tolerance, not a literal)
+        expect(idx.get("aug")!.sinceContract).toBe(true);
+        expect(idx.get("aug")!.pct).toBeCloseTo(4.055, 2);
+    });
+
+    it("orders by the date paid, so anticipated instalments read in the order the money moved", () => {
+        // due 2037 was paid first (May), due 2036 and 2035 in June: the index runs May → June
+        const annual = [
+            payment({ id: "y37", kind: "PARCELA_ANUAL", due_on: "2037-03-15", paid_on: "2026-05-11", amount: 5995.45, correction_amount: 70.54 }),
+            payment({ id: "y36", kind: "PARCELA_ANUAL", due_on: "2036-03-15", paid_on: "2026-06-05", amount: 5995.45, correction_amount: 134.22 }),
+            payment({ id: "y35", kind: "PARCELA_ANUAL", due_on: "2035-03-15", paid_on: "2026-06-09", amount: 5995.45, correction_amount: 134.22 }),
+        ];
+        const idx = indexBetweenPayments(annual);
+        expect(idx.get("y37")!.sinceContract).toBe(true);
+        expect(idx.get("y36")).toEqual({ pct: 1.05, sinceContract: false });
+        expect(idx.get("y35")).toEqual({ pct: 0, sinceContract: false });
+    });
+
+    it("keeps kinds apart", () => {
+        const mixed = [...monthly, payment({ id: "y", kind: "PARCELA_ANUAL", due_on: "2035-03-15", paid_on: "2026-09-01", amount: 5995.45, correction_amount: 134.22 })];
+        const idx = indexBetweenPayments(mixed);
+        expect(idx.get("y")!.sinceContract).toBe(true);
+        expect(idx.get("sep")!.pct).toBe(0.24);
+    });
+
+    it("has nothing to say about a payment that is only planned", () => {
+        const planned = payment({ id: "p", status: "PLANNED", paid_on: null, due_on: "2026-10-15" });
+        expect(indexBetweenPayments([...monthly, planned]).get("p")).toBeNull();
     });
 });
 

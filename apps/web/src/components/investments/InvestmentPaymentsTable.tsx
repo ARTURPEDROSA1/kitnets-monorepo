@@ -32,6 +32,7 @@ import { columnTableKey } from "@/lib/ui-preferences";
 import {
     PAYMENT_KINDS,
     formatBRL,
+    indexBetweenPayments,
     paymentTotal,
     pendingByKind,
     pendingInstalments,
@@ -84,6 +85,9 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 
 const cellInput = "bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-none w-full px-1.5 py-1 outline-none";
 
+/** Every column hugs its content (`w-px` + nowrap); Observação is the one that absorbs the rest. */
+const tight = "w-px whitespace-nowrap";
+
 /** The sum bar prints an instalment number as a count, not as reais. */
 const SUM_FORMATS = { installment_number: (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 0 }) };
 
@@ -128,13 +132,17 @@ export default function InvestmentPaymentsTable({
     );
     const selectedSummary = pendingKinds.find(k => k.kind === selectedKind) ?? null;
 
+    /** The index each bill carries over the previous one of its kind — computed on all payments, not the filtered view. */
+    const indexOf = useMemo(() => indexBetweenPayments(payments), [payments]);
+
     const columns = useMemo<ColumnDef<InvestmentPayment>[]>(() => [
-        { key: "due_on", label: "Vencimento", kind: "date", get: r => r.due_on },
-        { key: "paid_on", label: "Pago em", kind: "date", get: r => r.paid_on ?? "" },
+        { key: "due_on", label: "Vencimento", kind: "date", className: tight, get: r => r.due_on },
+        { key: "paid_on", label: "Pago em", kind: "date", className: tight, get: r => r.paid_on ?? "" },
         {
             key: "kind",
             label: "Tipo",
             kind: "enum",
+            className: tight,
             get: r => r.kind,
             options: PAYMENT_KINDS.map(k => ({ value: k.kind, label: k.label })),
         },
@@ -142,30 +150,43 @@ export default function InvestmentPaymentsTable({
             key: "status",
             label: "Situação",
             kind: "enum",
+            className: tight,
             get: r => r.status,
             options: [{ value: "PAID", label: "Pago" }, { value: "PLANNED", label: "Previsto" }],
         },
-        { key: "installment_number", label: "Parcela nº", kind: "number", align: "right", sum: false, get: r => r.installment_number },
-        { key: "amount", label: "Valor", kind: "number", align: "right", title: "Valor contratado da parcela, como está no quadro resumo", get: r => r.amount },
+        { key: "installment_number", label: "Parcela nº", kind: "number", align: "right", sum: false, className: tight, get: r => r.installment_number },
+        { key: "amount", label: "Valor", kind: "number", align: "right", className: tight, title: "Valor contratado da parcela, como está no quadro resumo", get: r => r.amount },
         {
             key: "correction_amount",
             label: "Correção",
             kind: "number",
             align: "right",
+            className: tight,
             title: "Calculada: valor pago − valor da parcela. Positiva quando houve correção (CUB, INCC); negativa quando houve desconto por antecipação.",
             get: r => r.correction_amount,
         },
-        { key: "total", label: "Valor pago", kind: "number", align: "right", title: "O que saiu da conta — o valor do comprovante", get: r => paymentTotal(r) },
+        { key: "total", label: "Valor pago", kind: "number", align: "right", className: tight, title: "O que saiu da conta — o valor do comprovante", get: r => paymentTotal(r) },
+        {
+            key: "index_pct",
+            label: "Índice",
+            kind: "number",
+            align: "right",
+            sum: false,
+            className: tight,
+            title: "Variação sobre o pagamento anterior do mesmo tipo, na ordem em que foram pagos — o CUB/INCC do período. O primeiro de cada tipo compara com o valor de contrato: a correção acumulada desde a assinatura.",
+            get: r => indexOf.get(r.id)?.pct ?? null,
+        },
         { key: "notes", label: "Observação", kind: "text", get: r => r.notes ?? "" },
         {
             key: "receipt",
             label: "Comprovante",
             kind: "enum",
             align: "center",
+            className: tight,
             get: r => (r.receipt_path ? "YES" : "NO"),
             options: [{ value: "YES", label: "Anexado" }, { value: "NO", label: "Sem comprovante" }],
         },
-    ], []);
+    ], [indexOf]);
 
     const cf = useColumnFilters(payments, columns, { key: "due_on", dir: "asc" });
     const rows = cf.rows;
@@ -369,9 +390,9 @@ export default function InvestmentPaymentsTable({
                 </div>
 
                 <div className="overflow-x-auto -mx-2">
-                    <table className="w-full text-xs" style={{ minWidth: `${Math.max(560, visibleCount * 104)}px` }}>
+                    <table className="w-full text-xs [&_td]:whitespace-nowrap">
                         <thead>
-                            <ColumnHeaders columns={columns} ctl={cf} visibility={vis} trailing={<th className="px-2 py-2" />} />
+                            <ColumnHeaders columns={columns} ctl={cf} visibility={vis} trailing={<th className="px-2 py-2 w-px" />} />
                         </thead>
                         <tbody>
                             {rows.length === 0 && draft === null && (
@@ -484,6 +505,17 @@ export default function InvestmentPaymentsTable({
                                             />
                                         </td>
                                     )}
+                                    {show("index_pct") && (() => {
+                                        const idx = indexOf.get(row.id) ?? null;
+                                        return (
+                                            <td
+                                                {...sel.cellProps("index_pct", row.id, idx?.pct ?? null, cn("px-2 py-1 text-right tabular-nums", idx && idx.pct < 0 ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"))}
+                                                title={idx ? (idx.sinceContract ? "Sobre o valor de contrato: a correção acumulada até este pagamento" : "Sobre o pagamento anterior deste tipo, na ordem em que foram pagos") : undefined}
+                                            >
+                                                {idx ? `${idx.pct > 0 ? "+" : ""}${idx.pct.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%${idx.sinceContract ? " *" : ""}` : "—"}
+                                            </td>
+                                        );
+                                    })()}
                                     {show("notes") && (
                                         <td {...sel.cellProps("notes", row.id, null, "px-2 py-1")}>
                                             <input
@@ -612,6 +644,7 @@ export default function InvestmentPaymentsTable({
                                             />
                                         </td>
                                     )}
+                                    {show("index_pct") && <td className="px-2 py-1 text-right text-muted-foreground">—</td>}
                                     {show("notes") && (
                                         <td className="px-2 py-1">
                                             <input
@@ -665,8 +698,11 @@ export default function InvestmentPaymentsTable({
                                     {show("amount") && <td className="px-2 py-2 text-right tabular-nums">{formatBRL(totals.paid - totals.corrections)}</td>}
                                     {show("correction_amount") && <td className="px-2 py-2 text-right tabular-nums">{formatBRL(totals.corrections)}</td>}
                                     {show("total") && <td className="px-2 py-2 text-right tabular-nums text-emerald-700 dark:text-emerald-400">{formatBRL(totals.paid)}</td>}
-                                    <td colSpan={3} className="px-2 py-2 text-[11px] font-normal text-muted-foreground">
-                                        {totals.planned > 0 ? `${formatBRL(totals.planned)} lançados como previstos` : ""}
+                                    <td colSpan={1 + ["index_pct", "notes", "receipt"].filter(show).length} className="px-2 py-2 text-[11px] font-normal text-muted-foreground whitespace-normal">
+                                        {[
+                                            totals.planned > 0 ? `${formatBRL(totals.planned)} lançados como previstos` : null,
+                                            show("index_pct") && rows.some(r => indexOf.get(r.id)?.sinceContract) ? "* índice acumulado desde o contrato" : null,
+                                        ].filter(Boolean).join(" · ")}
                                     </td>
                                 </tr>
                             </tfoot>
