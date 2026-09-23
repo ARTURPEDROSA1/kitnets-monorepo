@@ -7,27 +7,32 @@
  *
  * Used by the table hooks (`useColumnVisibility`, `useColumnFilters`); pages do not call this directly.
  */
-import { hiddenColumnsPrefKey, sanitizeHiddenColumns, sanitizeSort, sortPrefKey, type TableSort } from "@/lib/ui-preferences";
+import {
+    filtersPrefKey, hiddenColumnsPrefKey, sanitizeFilters, sanitizeHiddenColumns, sanitizeSort, sortPrefKey,
+    type TableFilters, type TableSort,
+} from "@/lib/ui-preferences";
 
 export interface AccountPreferences {
     hiddenColumns: Record<string, string[]>;
     sort: Record<string, TableSort>;
+    filters: Record<string, TableFilters>;
 }
 type Section = keyof AccountPreferences;
 
-const EMPTY: AccountPreferences = { hiddenColumns: {}, sort: {} };
+const EMPTY: AccountPreferences = { hiddenColumns: {}, sort: {}, filters: {} };
 const ACCOUNT_TTL_MS = 60_000;
 const SAVE_DEBOUNCE_MS = 600;
 
 let account: { at: number; load: Promise<AccountPreferences> } | null = null;
 const pendingSaves = new Map<string, ReturnType<typeof setTimeout>>();
 
-const PREF_KEY: Record<Section, (tableKey: string) => string | null> = { hiddenColumns: hiddenColumnsPrefKey, sort: sortPrefKey };
-const SANITIZE: Record<Section, (value: unknown) => unknown> = { hiddenColumns: sanitizeHiddenColumns, sort: sanitizeSort };
+const PREF_KEY: Record<Section, (tableKey: string) => string | null> = { hiddenColumns: hiddenColumnsPrefKey, sort: sortPrefKey, filters: filtersPrefKey };
+const SANITIZE: Record<Section, (value: unknown) => unknown> = { hiddenColumns: sanitizeHiddenColumns, sort: sanitizeSort, filters: sanitizeFilters };
+const LOCAL_NAME: Record<Section, string> = { hiddenColumns: "hidden-columns", sort: "sort", filters: "filters" };
 
 // ── This device's copy ─────────────────────────────────────────────────────
 
-const storageName = (section: Section, tableKey: string) => `kitnets:${section === "hiddenColumns" ? "hidden-columns" : "sort"}:${tableKey}`;
+const storageName = (section: Section, tableKey: string) => `kitnets:${LOCAL_NAME[section]}:${tableKey}`;
 
 /** This device's copy of one preference; null when it has none (or it is junk). */
 export function readLocalPreference<S extends Section>(section: S, tableKey: string): AccountPreferences[S][string] | null {
@@ -50,7 +55,7 @@ export function loadAccountPreferences(): Promise<AccountPreferences> {
     if (!account || Date.now() - account.at > ACCOUNT_TTL_MS) {
         const load = fetch("/api/profiles/preferences")
             .then(res => (res.ok ? res.json() : EMPTY))
-            .then((data: Partial<AccountPreferences>) => ({ hiddenColumns: data.hiddenColumns ?? {}, sort: data.sort ?? {} }))
+            .then((data: Partial<AccountPreferences>) => ({ hiddenColumns: data.hiddenColumns ?? {}, sort: data.sort ?? {}, filters: data.filters ?? {} }))
             .catch(() => EMPTY);   // signed out or offline: this device's copy still works
         account = { at: Date.now(), load };
     }

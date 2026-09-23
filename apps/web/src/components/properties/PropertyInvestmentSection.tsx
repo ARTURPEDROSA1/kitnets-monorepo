@@ -31,6 +31,7 @@ import Tile, { type TileInfo } from "./Tile";
 import { CellSumBar, useCellSum } from "./TableCellSum";
 import MoneyInput, { parseMoneyText } from "./MoneyInput";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "./TableColumnFilters";
+import { columnTableKey } from "@/lib/ui-preferences";
 import { monthsBetween, periodLabel, periodRange, type PeriodFilterValue } from "@/lib/period-filter";
 import { parseSheet, type PropertyIncomeRow } from "@/lib/property-income";
 import {
@@ -245,7 +246,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
             .filter(c => showSplit || !split.has(c.key))
             .map(c => (c.key === "amount" && !showSplit ? { ...c, headerExtra: toggle(false) } : c.key === "insurance" && showSplit ? { ...c, headerExtra: toggle(true) } : c));
     }, [showSplit]);
-    const cf = useColumnFilters(inPeriod, columns, { key: "date", dir: "desc" });
+    const cf = useColumnFilters(inPeriod, columns, { key: "date", dir: "desc" }, { storageKey: columnTableKey("property-investments") });
     const cfRef = useRef(cf);
     cfRef.current = cf;
     useEffect(() => {

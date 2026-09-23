@@ -128,7 +128,7 @@ export default function CondominiumLedger({ propertyId, lang = "pt" }: { propert
         { key: "result", label: "Resultado", kind: "number", align: "right", title: "Receita − custos", get: r => r.result },
         { key: "notes", label: "Descrição", kind: "text", get: r => r.notes ?? "" },
     ], [source]);
-    const cf = useColumnFilters(filtered, columns, { key: "month", dir: "desc" });
+    const cf = useColumnFilters(filtered, columns, { key: "month", dir: "desc" }, { storageKey: columnTableKey("condominium-ledger") });
     const visible = showAll ? cf.rows : cf.rows.slice(0, COLLAPSED_ROWS);
     const show = (key: string) => !vis.isHidden(key);
 

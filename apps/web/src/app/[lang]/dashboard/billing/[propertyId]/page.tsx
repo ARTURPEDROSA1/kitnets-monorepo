@@ -320,7 +320,7 @@ export default function BillingPage() {
         { key: "rate", label: "R$/m³", kind: "number", align: "right", sum: false, title: "Valor ÷ consumo", get: b => b.effective_rate_per_m3 },
         { key: "occurrence", label: "Ocorrência", kind: "text", get: b => b.occurrence_code ?? "" },
     ], []);
-    const cf = useColumnFilters(filteredBills, columns, { key: "month", dir: "desc" });
+    const cf = useColumnFilters(filteredBills, columns, { key: "month", dir: "desc" }, { storageKey: columnTableKey("water-bills") });
     const vis = useColumnVisibility(columnTableKey("water-bills"), {
         locked: ["month"],
         defaultHidden: ["prevReading", "currReading", "readingDate", "waterTariff", "sewageTariff", "waterFee", "sewageFee", "occurrence"],

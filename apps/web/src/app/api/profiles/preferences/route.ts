@@ -1,17 +1,27 @@
 import { NextResponse } from "next/server";
 import { requireProfile } from "@/lib/api-auth";
 import {
-    HIDDEN_COLUMNS_PREFIX, SORT_PREFIX, sanitizeHiddenColumns, sanitizeSort, tableKeyFromPrefKey, tableKeyFromSortPrefKey, type TableSort,
+    FILTERS_PREFIX, HIDDEN_COLUMNS_PREFIX, SORT_PREFIX,
+    sanitizeFilters, sanitizeHiddenColumns, sanitizeSort, tableKeyFromFiltersPrefKey, tableKeyFromPrefKey, tableKeyFromSortPrefKey,
 } from "@/lib/ui-preferences";
 
 export const dynamic = "force-dynamic";
 
 const TABLE = "user_ui_preferences";
-const MAX_TABLES_PER_PUT = 20;
+const MAX_ROWS_PER_PUT = 20;
+
+/** The kinds of preference this route carries: the field in the JSON, the key prefix in the table, the checks. */
+const SECTIONS = {
+    hiddenColumns: { prefix: HIDDEN_COLUMNS_PREFIX, tableKey: tableKeyFromPrefKey, sanitize: sanitizeHiddenColumns },
+    sort: { prefix: SORT_PREFIX, tableKey: tableKeyFromSortPrefKey, sanitize: sanitizeSort },
+    filters: { prefix: FILTERS_PREFIX, tableKey: tableKeyFromFiltersPrefKey, sanitize: sanitizeFilters },
+} as const;
+type Section = keyof typeof SECTIONS;
+const SECTION_NAMES = Object.keys(SECTIONS) as Section[];
 
 /**
  * GET /api/profiles/preferences
- * → { hiddenColumns: { "<table key>": string[] }, sort: { "<table key>": { key, dir } } }
+ * → { hiddenColumns: { "<table key>": string[] }, sort: { "<table key>": { key, dir } }, filters: { "<table key>": {…} } }
  *
  * The signed-in user's interface preferences (lib/ui-preferences.ts). They live in the account, so the
  * choice made on one device is there on the next.
@@ -25,33 +35,28 @@ export async function GET() {
         .from(TABLE)
         .select("key, value")
         .eq("profile_id", profileId)
-        .or(`key.like.${HIDDEN_COLUMNS_PREFIX}%,key.like.${SORT_PREFIX}%`);
+        .or(SECTION_NAMES.map(name => `key.like.${SECTIONS[name].prefix}%`).join(","));
     if (error) {
         console.error("[Preferences GET]", error.message);
         return NextResponse.json({ error: "Erro ao carregar as preferências" }, { status: 500 });
     }
 
-    const hiddenColumns: Record<string, string[]> = {};
-    const sort: Record<string, TableSort> = {};
+    const out: Record<Section, Record<string, unknown>> = { hiddenColumns: {}, sort: {}, filters: {} };
     for (const row of data ?? []) {
-        const columnsTable = tableKeyFromPrefKey(row.key);
-        if (columnsTable) {
-            const columns = sanitizeHiddenColumns(row.value);
-            if (columns) hiddenColumns[columnsTable] = columns;
-            continue;
-        }
-        const sortTable = tableKeyFromSortPrefKey(row.key);
-        if (sortTable) {
-            const order = sanitizeSort(row.value);
-            if (order) sort[sortTable] = order;
+        for (const name of SECTION_NAMES) {
+            const tableKey = SECTIONS[name].tableKey(row.key);
+            if (!tableKey) continue;
+            const clean = SECTIONS[name].sanitize(row.value);
+            if (clean) out[name][tableKey] = clean;
+            break;
         }
     }
-    return NextResponse.json({ hiddenColumns, sort });
+    return NextResponse.json(out);
 }
 
 /**
  * PUT /api/profiles/preferences
- * body { hiddenColumns?: { "<table key>": string[] }, sort?: { "<table key>": { key, dir } } } → { ok: true }
+ * body { hiddenColumns?: {…}, sort?: {…}, filters?: {…} }, each keyed by table → { ok: true }
  *
  * Replaces the preferences of each table sent; tables (and kinds) not sent are left alone.
  */
@@ -60,7 +65,7 @@ export async function PUT(request: Request) {
     if ("response" in authed) return authed.response;
     const { profileId, supabase } = authed.ctx;
 
-    let body: { hiddenColumns?: unknown; sort?: unknown };
+    let body: Partial<Record<Section, unknown>>;
     try {
         body = await request.json();
     } catch {
@@ -68,36 +73,24 @@ export async function PUT(request: Request) {
     }
 
     const now = new Date().toISOString();
-    const rows: Array<{ profile_id: string; key: string; value: string[] | TableSort; updated_at: string }> = [];
-
-    const collect = (
-        sent: unknown,
-        field: string,
-        prefix: string,
-        accept: (key: string) => string | null,
-        sanitize: (value: unknown) => string[] | TableSort | null
-    ): NextResponse | null => {
-        if (sent === undefined) return null;
+    const rows: Array<{ profile_id: string; key: string; value: unknown; updated_at: string }> = [];
+    for (const name of SECTION_NAMES) {
+        const sent = body[name];
+        if (sent === undefined) continue;
         if (!sent || typeof sent !== "object" || Array.isArray(sent)) {
-            return NextResponse.json({ error: `${field} deve ser um objeto por tabela` }, { status: 400 });
+            return NextResponse.json({ error: `${name} deve ser um objeto por tabela` }, { status: 400 });
         }
         for (const [tableKey, value] of Object.entries(sent as Record<string, unknown>)) {
-            const key = `${prefix}${tableKey}`;
-            const clean = sanitize(value);
-            if (!accept(key) || !clean) {
+            const key = `${SECTIONS[name].prefix}${tableKey}`;
+            const clean = SECTIONS[name].sanitize(value);
+            if (!SECTIONS[name].tableKey(key) || !clean) {
                 return NextResponse.json({ error: `Preferência inválida: ${tableKey.slice(0, 80)}` }, { status: 400 });
             }
             rows.push({ profile_id: profileId, key, value: clean, updated_at: now });
         }
-        return null;
-    };
-
-    const bad =
-        collect(body.hiddenColumns, "hiddenColumns", HIDDEN_COLUMNS_PREFIX, tableKeyFromPrefKey, sanitizeHiddenColumns) ??
-        collect(body.sort, "sort", SORT_PREFIX, tableKeyFromSortPrefKey, sanitizeSort);
-    if (bad) return bad;
-    if (rows.length === 0 || rows.length > MAX_TABLES_PER_PUT) {
-        return NextResponse.json({ error: `Envie de 1 a ${MAX_TABLES_PER_PUT} preferências` }, { status: 400 });
+    }
+    if (rows.length === 0 || rows.length > MAX_ROWS_PER_PUT) {
+        return NextResponse.json({ error: `Envie de 1 a ${MAX_ROWS_PER_PUT} preferências` }, { status: 400 });
     }
 
     const { error } = await supabase.from(TABLE).upsert(rows, { onConflict: "profile_id,key" });

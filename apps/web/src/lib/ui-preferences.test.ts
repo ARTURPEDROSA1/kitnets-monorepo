@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-    columnTableKey, hiddenColumnsPrefKey, sanitizeHiddenColumns, sanitizeSort, sortPrefKey, tableKeyFromPrefKey, tableKeyFromSortPrefKey,
+    columnTableKey, filtersPrefKey, hiddenColumnsPrefKey, sanitizeFilters, sanitizeHiddenColumns, sanitizeSort, sortPrefKey,
+    tableKeyFromFiltersPrefKey, tableKeyFromPrefKey, tableKeyFromSortPrefKey,
 } from "./ui-preferences";
 
 describe("hidden-column preferences", () => {
@@ -48,5 +49,43 @@ describe("sort preferences", () => {
         expect(sanitizeSort(["due_on", "asc"])).toBeNull();
         expect(sanitizeSort("due_on")).toBeNull();
         expect(sanitizeSort(null)).toBeNull();
+    });
+});
+
+describe("filter preferences", () => {
+    it("builds and reads back the preference key", () => {
+        expect(filtersPrefKey("income-ledger:multi")).toBe("filters:income-ledger:multi");
+        expect(tableKeyFromFiltersPrefKey("filters:income-ledger:multi")).toBe("income-ledger:multi");
+        expect(tableKeyFromFiltersPrefKey("sort:income-ledger:multi")).toBeNull();
+        expect(filtersPrefKey("a:b:c")).toBeNull();
+    });
+
+    it("keeps each column's filter as typed and drops the ones that say nothing", () => {
+        expect(sanitizeFilters({
+            status: { values: ["PAID", "PAID", "OPEN"] },
+            tenant: { text: "ana" },
+            amount: { min: "100", max: "" },
+            month: { min: " ", max: "" },
+            note: { text: "" },
+            paid_on: {},
+        })).toEqual({
+            status: { values: ["PAID", "OPEN"] },
+            tenant: { text: "ana" },
+            amount: { min: "100" },
+        });
+        expect(sanitizeFilters({})).toEqual({});   // "no filters" is a choice too
+        expect(sanitizeFilters({ status: { values: [] } })).toEqual({ status: { values: [] } });   // "none of them" filters everything out
+    });
+
+    it("refuses junk", () => {
+        expect(sanitizeFilters([])).toBeNull();
+        expect(sanitizeFilters("status")).toBeNull();
+        expect(sanitizeFilters({ "<script>": { text: "x" } })).toBeNull();
+        expect(sanitizeFilters({ status: "PAID" })).toBeNull();
+        expect(sanitizeFilters({ status: { values: "PAID" } })).toBeNull();
+        expect(sanitizeFilters({ status: { values: [1] } })).toBeNull();
+        expect(sanitizeFilters({ tenant: { text: 3 } })).toBeNull();
+        expect(sanitizeFilters({ tenant: { text: "x".repeat(201) } })).toBeNull();
+        expect(sanitizeFilters(Object.fromEntries(Array.from({ length: 61 }, (_, i) => [`c${i}`, { text: "a" }])))).toBeNull();
     });
 });
