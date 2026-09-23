@@ -339,7 +339,7 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                                 ))}
                             </span>
                         ) : (
-                            "Nada em aberto no contrato"
+                            metrics.sold ? "Vendido: as parcelas em aberto passaram ao comprador" : "Nada em aberto no contrato"
                         )
                     }
                     info={{
@@ -374,7 +374,7 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                             ? `${metrics.overdueCount} em atraso (${formatBRL(metrics.overdueAmount, 0)})`
                             : metrics.nextDueOn
                               ? `Vence em ${formatDateBR(metrics.nextDueOn)}`
-                              : "Sem parcelas em aberto"
+                              : metrics.sold ? "Vendido — nada mais a pagar" : "Sem parcelas em aberto"
                     }
                     info={{
                         what: "A próxima parcela do quadro resumo que ainda não tem pagamento lançado, pelo valor que ela deve chegar: o último valor pago do seu tipo.",
@@ -487,6 +487,7 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                 onEditPlan={() => setPlanOpen(true)}
                 onView={(url, name) => setViewing({ url, name })}
                 busy={busy}
+                sold={metrics.sold}
             />
 
             <InvestmentCashFlowSimulator

@@ -193,8 +193,11 @@ export function computeInvestmentMetrics(
     );
 
     // Still owed = forecast instalments nothing covers + payments the owner typed as planned
-    const pending: ScheduledInstalment[] = pendingInstalments(schedules, payments);
-    const plannedPayments = payments.filter(p => p.status === "PLANNED");
+    // Sold: nothing is owed any more — the buyer took over the open instalments — so nothing is
+    // still due, next or overdue, and the unit "cost" exactly what was paid.
+    const soldOut = investment.status === "SOLD" && Boolean(investment.sold_on) && (investment.sale_price ?? 0) > 0;
+    const pending: ScheduledInstalment[] = soldOut ? [] : pendingInstalments(schedules, payments);
+    const plannedPayments = soldOut ? [] : payments.filter(p => p.status === "PLANNED");
     const remaining = round2(
         pending.reduce((s, i) => s + i.amount, 0) + plannedPayments.reduce((s, p) => s + paymentTotal(p), 0)
     );
@@ -241,7 +244,7 @@ export function computeInvestmentMetrics(
 
     // The sale, once registered: net of its own costs, against what was actually paid (a buyer of
     // an off-plan unit takes over the open instalments, so those are not the seller's cost).
-    const sold = investment.status === "SOLD" && Boolean(investment.sold_on) && (investment.sale_price ?? 0) > 0;
+    const sold = soldOut;
     const saleNet = sold ? round2((investment.sale_price ?? 0) * (1 - (investment.sale_costs_pct ?? 0) / 100)) : null;
     const realizedGain = saleNet !== null ? round2(saleNet - paid) : null;
     let realizedIrrAnnualPct: number | null = null;
