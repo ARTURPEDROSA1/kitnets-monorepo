@@ -20,15 +20,14 @@ export const POST = withAuth<typeof paymentInputSchema, Params>(
             throw badRequest({ amount: "Informe o valor pago." });
         }
 
-        let receiptPath: string | null = null;
-        let receiptSize: number | null = null;
-        if (body.receipt_path) {
-            const staged = ownStagedPath(profileId, body.receipt_path);
-            if (!staged) throw badRequest({ receipt_path: "Comprovante não encontrado. Envie o arquivo novamente." });
-            const adopted = await adoptStagedUpload(supabase, params.id, staged);
-            if (!adopted) throw badRequest({ receipt_path: "Comprovante não encontrado. Envie o arquivo novamente." });
-            receiptPath = adopted.path;
-            receiptSize = adopted.size;
+        // Every staged receipt becomes a document of this payment; a split has one per pocket.
+        const stagedPaths = [body.receipt_path, ...(body.receipt_paths ?? [])].filter((p): p is string => Boolean(p));
+        const adopted: { path: string; size: number | null }[] = [];
+        for (const raw of stagedPaths) {
+            const staged = ownStagedPath(profileId, raw);
+            const moved = staged ? await adoptStagedUpload(supabase, params.id, staged) : null;
+            if (!moved) throw badRequest({ receipt_path: "Comprovante não encontrado. Envie o arquivo novamente." });
+            adopted.push(moved);
         }
 
         const { data, error } = await supabase
@@ -43,8 +42,10 @@ export const POST = withAuth<typeof paymentInputSchema, Params>(
                 correction_amount: body.correction_amount,
                 installment_number: body.installment_number,
                 status: body.status,
-                receipt_path: receiptPath,
+                receipt_path: adopted[0]?.path ?? null,
                 receipt_name: body.receipt_name,
+                payer: body.payer ?? null,
+                pj_amount: body.payer === "SPLIT" ? (body.pj_amount ?? 0) : null,
                 notes: body.notes,
                 source: "MANUAL",
             })
@@ -55,16 +56,19 @@ export const POST = withAuth<typeof paymentInputSchema, Params>(
             throw new Error(`payment insert failed: ${error?.message}`);
         }
 
-        if (receiptPath) {
-            await supabase.from("new_investment_documents").insert({
-                investment_id: params.id,
-                owner_id: profileId,
-                kind: "RECEIPT",
-                storage_path: receiptPath,
-                file_name: body.receipt_name,
-                mime_type: mimeTypeOfPath(receiptPath),
-                size_bytes: receiptSize,
-            });
+        if (adopted.length > 0) {
+            await supabase.from("new_investment_documents").insert(
+                adopted.map((file, index) => ({
+                    investment_id: params.id,
+                    owner_id: profileId,
+                    payment_id: data.id,
+                    kind: "RECEIPT",
+                    storage_path: file.path,
+                    file_name: index === 0 ? body.receipt_name : null,
+                    mime_type: mimeTypeOfPath(file.path),
+                    size_bytes: file.size,
+                }))
+            );
         }
 
         return NextResponse.json({ payment: data }, { status: 201 });

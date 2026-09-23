@@ -57,6 +57,8 @@ const payment = (over: Partial<InvestmentPayment>): InvestmentPayment => ({
     status: "PAID",
     receipt_path: null,
     receipt_name: null,
+    payer: null,
+    pj_amount: null,
     notes: null,
     source: "MANUAL",
     created_at: "2026-08-31T00:00:00Z",

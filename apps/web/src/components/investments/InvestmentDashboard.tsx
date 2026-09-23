@@ -93,9 +93,13 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
         return () => { alive = false; };
     }, [load]);
 
-    const receiptUrls = useMemo(() => {
-        const map: Record<string, string | null> = {};
-        for (const doc of bundle?.documents ?? []) map[doc.storage_path] = doc.url;
+    /** Each payment's receipts, newest first — a split has one per pocket. */
+    const receiptsByPayment = useMemo(() => {
+        const map: Record<string, DocumentWithUrl[]> = {};
+        for (const doc of bundle?.documents ?? []) {
+            if (!doc.payment_id) continue;
+            (map[doc.payment_id] ??= []).push(doc);
+        }
         return map;
     }, [bundle?.documents]);
 
@@ -109,7 +113,8 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
         const res = await fetch(`/api/investments/${investmentId}/payments`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(draft),
+            // the first receipt's name labels the row; the rest keep their own on the documents
+            body: JSON.stringify({ ...draft, receipt_name: draft.receipt_names[0] ?? null }),
         });
         setBusy(false);
         if (!res.ok) return false;
@@ -351,7 +356,9 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
             <InvestmentPaymentsTable
                 payments={payments}
                 schedules={schedules}
-                receiptUrls={receiptUrls}
+                investmentId={investmentId}
+                receiptsByPayment={receiptsByPayment}
+                onRefresh={refresh}
                 onCreate={createPayment}
                 onPatch={patchPayment}
                 onDelete={deletePayment}
