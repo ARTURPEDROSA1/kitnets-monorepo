@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeInvestmentMetrics, rentStartMonth, toCardSummary } from "./new-investment-metrics";
+import { CARD_PHOTO_LIMIT, cardPhotoPaths, computeInvestmentMetrics, rentStartMonth, toCardSummary } from "./new-investment-metrics";
 import type { InvestmentPayment, InvestmentSchedule, NewInvestment } from "./new-investments";
 
 /**
@@ -270,6 +270,33 @@ describe("toCardSummary", () => {
     it("carries the card's figures and the document count", () => {
         const m = computeInvestmentMetrics(investment(), schedules, [payment({})], asOf);
         const summary = toCardSummary("i1", m, 3);
-        expect(summary).toMatchObject({ id: "i1", paidToDate: 7095, committed: 141900, documents: 3 });
+        expect(summary).toMatchObject({ id: "i1", paidToDate: 7095, committed: 141900, documents: 3, coverUrl: null, photoUrls: [] });
+    });
+
+    it("the cover is the first picture the card slides through", () => {
+        const m = computeInvestmentMetrics(investment(), schedules, [payment({})], asOf);
+        const summary = toCardSummary("i1", m, 3, ["https://x/cover", "https://x/second"]);
+        expect(summary.coverUrl).toBe("https://x/cover");
+        expect(summary.photoUrls).toEqual(["https://x/cover", "https://x/second"]);
+    });
+});
+
+describe("cardPhotoPaths", () => {
+    it("puts the chosen cover first and keeps the others in upload order", () => {
+        expect(cardPhotoPaths("i1/c.jpg", ["i1/a.jpg", "i1/b.jpg", "i1/c.jpg", "i1/d.jpg"])).toEqual(["i1/c.jpg", "i1/a.jpg", "i1/b.jpg", "i1/d.jpg"]);
+    });
+
+    it("keeps upload order when no cover was chosen", () => {
+        expect(cardPhotoPaths(null, ["i1/a.jpg", "i1/b.jpg"])).toEqual(["i1/a.jpg", "i1/b.jpg"]);
+    });
+
+    it("still shows a cover that is no longer among the photos, and never repeats a path", () => {
+        expect(cardPhotoPaths("i1/old.jpg", ["i1/a.jpg", "i1/a.jpg"])).toEqual(["i1/old.jpg", "i1/a.jpg"]);
+    });
+
+    it("caps how many pictures a card carries", () => {
+        const many = Array.from({ length: 20 }, (_, i) => `i1/${i}.jpg`);
+        expect(cardPhotoPaths(null, many)).toHaveLength(CARD_PHOTO_LIMIT);
+        expect(cardPhotoPaths("i1/19.jpg", many, 3)).toEqual(["i1/19.jpg", "i1/0.jpg", "i1/1.jpg"]);
     });
 });

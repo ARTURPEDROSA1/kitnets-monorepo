@@ -205,11 +205,26 @@ export interface InvestmentCardSummary {
     keysOn: string | null;
     netYieldPct: number | null;
     documents: number;
-    /** Signed URL of the card's cover picture; null when none was chosen. */
+    /** Signed URL of the card's cover picture; null when none was chosen. Always `photoUrls[0]`. */
     coverUrl: string | null;
+    /** Signed URLs the card slides through: the cover first, then the other photos in upload order. */
+    photoUrls: string[];
 }
 
-export function toCardSummary(id: string, metrics: InvestmentMetrics, documents: number, coverUrl: string | null = null): InvestmentCardSummary {
+/** How many pictures a list card is willing to carry; the lightbox shows the rest. */
+export const CARD_PHOTO_LIMIT = 12;
+
+/**
+ * The storage paths a card slides through: the chosen cover first, then the remaining photos in
+ * the order they were uploaded, without repeats and capped so a card with fifty photos does not
+ * sign fifty URLs on every list load.
+ */
+export function cardPhotoPaths(coverPath: string | null, photoPaths: string[], limit = CARD_PHOTO_LIMIT): string[] {
+    const ordered = coverPath ? [coverPath, ...photoPaths.filter(p => p !== coverPath)] : photoPaths;
+    return Array.from(new Set(ordered)).slice(0, Math.max(0, limit));
+}
+
+export function toCardSummary(id: string, metrics: InvestmentMetrics, documents: number, photoUrls: string[] = []): InvestmentCardSummary {
     return {
         id,
         paidToDate: metrics.paidToDate,
@@ -223,6 +238,7 @@ export function toCardSummary(id: string, metrics: InvestmentMetrics, documents:
         keysOn: metrics.keysOn,
         netYieldPct: metrics.netYieldPct,
         documents,
-        coverUrl,
+        coverUrl: photoUrls[0] ?? null,
+        photoUrls,
     };
 }

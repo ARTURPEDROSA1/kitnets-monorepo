@@ -103,6 +103,14 @@ automatically; any photo can replace it from the grid (star on hover) or from th
 como capa"). The list route signs it into `summaries[].coverUrl`, which is what the card renders —
 before this the cover was set but never shown, because the list never passed a URL.
 
+**The card's cover is a carousel** over the investment's photos (`summaries[].photoUrls`, the
+cover first then upload order, capped at `CARD_PHOTO_LIMIT` = 12 by `cardPhotoPaths`; all of a
+list's pictures are signed in one storage call by `signStorageUrls`). Arrows and dots appear on
+hover, swipe works on touch, ← → while the card has focus, and the cover advances by itself every
+5 s while the page is open — paused under the pointer, skipped for `prefers-reduced-motion` and
+while the tab is hidden. Pictures mount the first time they show, so a card never downloads twelve
+photos just to be on the page; once seen they stay mounted for the cross-fade.
+
 ### Editing what the investment is
 
 The gear covers what the unit costs; the pencil next to the title covers what it *is* — name,

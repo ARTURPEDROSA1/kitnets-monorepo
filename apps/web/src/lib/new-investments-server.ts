@@ -196,18 +196,29 @@ export async function loadInvestmentList(supabase: AdminSupabase, profileId: str
         throw new Error(`investment list failed: ${error.message}`);
     }
     const investments = ((data as Record<string, unknown>[] | null) ?? []).map(mapInvestment);
-    if (investments.length === 0) return { investments, schedules: [], payments: [], documentCounts: new Map<string, number>() };
+    if (investments.length === 0) {
+        return { investments, schedules: [], payments: [], documentCounts: new Map<string, number>(), photoPaths: new Map<string, string[]>() };
+    }
 
     const ids = investments.map(i => i.id);
     const [schedules, payments, documents] = await Promise.all([
         supabase.from("new_investment_schedules").select(SCHEDULE_COLUMNS as "*").in("investment_id", ids),
         supabase.from("new_investment_payments").select(PAYMENT_COLUMNS as "*").in("investment_id", ids),
-        supabase.from("new_investment_documents").select("investment_id").in("investment_id", ids),
+        supabase
+            .from("new_investment_documents")
+            .select("investment_id, kind, storage_path")
+            .in("investment_id", ids)
+            .order("created_at", { ascending: true }),
     ]);
 
+    // One count per card, plus the photos each card slides through (upload order).
     const documentCounts = new Map<string, number>();
-    for (const row of (documents.data as { investment_id: string }[] | null) ?? []) {
+    const photoPaths = new Map<string, string[]>();
+    for (const row of (documents.data as { investment_id: string; kind: string; storage_path: string }[] | null) ?? []) {
         documentCounts.set(row.investment_id, (documentCounts.get(row.investment_id) ?? 0) + 1);
+        if (row.kind === "PHOTO" && row.storage_path) {
+            photoPaths.set(row.investment_id, [...(photoPaths.get(row.investment_id) ?? []), row.storage_path]);
+        }
     }
 
     return {
@@ -215,6 +226,7 @@ export async function loadInvestmentList(supabase: AdminSupabase, profileId: str
         schedules: ((schedules.data as Record<string, unknown>[] | null) ?? []).map(mapSchedule),
         payments: ((payments.data as Record<string, unknown>[] | null) ?? []).map(mapPayment),
         documentCounts,
+        photoPaths,
     };
 }
 
