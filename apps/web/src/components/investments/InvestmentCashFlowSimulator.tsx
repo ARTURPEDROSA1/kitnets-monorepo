@@ -169,12 +169,20 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
     // uses it as the inflow when the project is meant to be sold.
     const delivery = deliveryValueOf(investment, metrics.committed, assumptions.expectedAppreciationPct);
     const gain = delivery.value !== null && metrics.committed > 0 ? delivery.value - metrics.committed : null;
-    const sellMode = investment.exit_plan === "VENDER";
+    // Sold: the chart is the realized flow — paid instalments closed by the net sale — and the
+    // premises no longer matter. Meant to be sold: the expected delivery value is the inflow.
+    const sold = metrics.sold && Boolean(investment.sold_on) && metrics.saleNet !== null;
+    const realizedSale = sold ? { month: (investment.sold_on as string).slice(0, 7), net: metrics.saleNet as number } : null;
+    const sellMode = sold || investment.exit_plan === "VENDER";
     const suggested = suggestedAppreciation(benchmarks.fipezapSale12mPct, metrics.monthsToKeys);
 
     const result = useMemo(
-        () => simulateCashFlow(investment, schedules, payments, { ...assumptions, saleAtDelivery: sellMode ? delivery.value : null }),
-        [investment, schedules, payments, assumptions, sellMode, delivery.value]
+        () => simulateCashFlow(investment, schedules, payments, {
+            ...assumptions,
+            sale: realizedSale,
+            saleAtDelivery: !realizedSale && sellMode ? delivery.value : null,
+        }),
+        [investment, schedules, payments, assumptions, sellMode, delivery.value, realizedSale]
     );
 
     const chart = useMemo(
@@ -206,9 +214,11 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
                         <TrendingUp className="w-4 h-4 text-violet-600" /> Simulador de fluxo de caixa
                     </h2>
                     <p className="text-xs text-muted-foreground">
-                        {sellMode
-                            ? `Parcelas abaixo do eixo, a venda estimada acima, no mês da ${completion.toLowerCase()}. As premissas são salvas conforme você digita.`
-                            : `Parcelas abaixo do eixo, aluguel estimado acima. A linha vertical marca a ${completion.toLowerCase()}. As premissas são salvas conforme você digita.`}
+                        {sold
+                            ? "Projeto vendido: o gráfico é o realizado — as parcelas pagas e a venda líquida no mês em que aconteceu. Nada mais é projetado."
+                            : sellMode
+                              ? `Parcelas abaixo do eixo, a venda estimada acima, no mês da ${completion.toLowerCase()}. As premissas são salvas conforme você digita.`
+                              : `Parcelas abaixo do eixo, aluguel estimado acima. A linha vertical marca a ${completion.toLowerCase()}. As premissas são salvas conforme você digita.`}
                     </p>
                 </div>
                 <span
@@ -226,7 +236,8 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
             </header>
 
             <div className="p-4 space-y-4">
-                <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
+                {/* the premises stay editable until the project is sold; after that they have nothing left to drive */}
+                <div className={sold ? "hidden" : "grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3"}>
                     <label className="space-y-1">
                         <span className={labelCls}>Aluguel (R$)</span>
                         <input type="number" step="50" min="0" value={assumptions.monthlyRent || ""} onChange={num("monthlyRent")} className={inputCls} placeholder="0" title="Aluguel mensal bruto estimado para a unidade pronta" />
@@ -353,7 +364,7 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
                                 <Bar dataKey="previsto" name="Previsto" stackId="cash" fill="#fda4af" isAnimationActive={false} />
                                 <Bar dataKey="entrega" name="Custos na entrega" stackId="cash" fill="#f59e0b" isAnimationActive={false} />
                                 {sellMode
-                                    ? <Bar dataKey="venda" name="Venda estimada" stackId="cash" fill="#059669" isAnimationActive={false} />
+                                    ? <Bar dataKey="venda" name={sold ? "Venda líquida" : "Venda estimada"} stackId="cash" fill="#059669" isAnimationActive={false} />
                                     : <Bar dataKey="aluguel" name="Aluguel estimado" stackId="cash" fill="#10b981" isAnimationActive={false} />}
                                 <Line type="monotone" dataKey="acumulado" name="Resultado acumulado" stroke="#8b5cf6" strokeWidth={2} dot={false} isAnimationActive={false} hide={!showCumulative} />
                                 {keysLabel && (
@@ -361,7 +372,8 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
                                         x={keysLabel}
                                         stroke="#0ea5e9"
                                         strokeDasharray="4 3"
-                                        label={{ value: completion, position: "insideTopLeft", fontSize: 11, fill: "#0ea5e9" }}
+                                        // text to the left of its line; the payback label goes to the right of its own, so the two never meet
+                                        label={{ value: completion, position: "insideTopRight", fontSize: 11, fill: "#0ea5e9" }}
                                     />
                                 )}
                                 {result.breakEvenMonth && result.breakEvenMonth !== result.keysMonth && (
@@ -369,7 +381,7 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
                                         x={formatMonthLabel(result.breakEvenMonth)}
                                         stroke="#10b981"
                                         strokeDasharray="4 3"
-                                        label={{ value: "Payback", position: "insideTopRight", fontSize: 11, fill: "#10b981" }}
+                                        label={{ value: "Payback", position: "insideTopLeft", fontSize: 11, fill: "#10b981" }}
                                     />
                                 )}
                             </ComposedChart>
@@ -386,10 +398,16 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
                         <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Total desembolsado</span>
                         <span className="block text-base font-bold tabular-nums text-foreground">{formatBRL(result.totalOutflow, 0)}</span>
                         <span className="text-muted-foreground">
-                            pago + previsto no contrato{result.totalDelivery > 0 ? ` + ${formatBRL(result.totalDelivery, 0)} na entrega` : ""}
+                            {sold ? "pago até a venda" : `pago + previsto no contrato${result.totalDelivery > 0 ? ` + ${formatBRL(result.totalDelivery, 0)} na entrega` : ""}`}
                         </span>
                     </div>
-                    {sellMode ? (
+                    {sold && realizedSale ? (
+                        <div className={tileCls}>
+                            <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Venda líquida</span>
+                            <span className="block text-base font-bold tabular-nums text-emerald-600">{formatBRL(realizedSale.net, 0)}</span>
+                            <span className="text-muted-foreground">em {formatMonthLabel(realizedSale.month)}{investment.sale_costs_pct > 0 ? ` · após ${pct(investment.sale_costs_pct)} de custos` : ""}</span>
+                        </div>
+                    ) : sellMode ? (
                         <div className={tileCls}>
                             <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Venda na {completion.toLowerCase()}</span>
                             <span className="block text-base font-bold tabular-nums text-emerald-600">{result.totalSale > 0 ? formatBRL(result.totalSale, 0) : "—"}</span>
@@ -404,6 +422,22 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
                             </span>
                         </div>
                     )}
+                    {sold && metrics.realizedGain !== null ? (
+                        <div
+                            className={metrics.realizedGain >= 0 ? "rounded-lg border border-emerald-300 dark:border-emerald-800 bg-emerald-50/60 dark:bg-emerald-950/20 px-3 py-2" : "rounded-lg border border-rose-300 dark:border-rose-800 bg-rose-50/60 dark:bg-rose-950/20 px-3 py-2"}
+                            title="Venda líquida menos o que foi de fato pago. As parcelas em aberto passaram ao comprador e não contam."
+                        >
+                            <span className="block text-[10px] uppercase tracking-wider text-muted-foreground inline-flex items-center gap-1">
+                                <Gem className="w-3 h-3" /> Ganho realizado
+                            </span>
+                            <span className={`block text-base font-bold tabular-nums ${metrics.realizedGain >= 0 ? "text-emerald-700 dark:text-emerald-300" : "text-rose-700 dark:text-rose-300"}`}>
+                                {signed(metrics.realizedGain)}
+                            </span>
+                            <span className="text-muted-foreground">
+                                {metrics.realizedGainPct !== null ? `${metrics.realizedGainPct > 0 ? "+" : ""}${pct(metrics.realizedGainPct)} sobre ${formatBRL(metrics.paidToDate, 0)} pagos` : ""}
+                            </span>
+                        </div>
+                    ) : (
                     <div
                         className={gain === null ? tileCls : gain >= 0 ? "rounded-lg border border-emerald-300 dark:border-emerald-800 bg-emerald-50/60 dark:bg-emerald-950/20 px-3 py-2" : "rounded-lg border border-rose-300 dark:border-rose-800 bg-rose-50/60 dark:bg-rose-950/20 px-3 py-2"}
                         title={`Quanto a unidade deve valer na ${completion.toLowerCase()} além do que ela custou. Valor na entrega = o informado no lápis, senão área × R$/m², senão custo × (1 + valorização %). O FipeZap deste painel é o índice nacional de venda — tendência, não o preço da sua rua.`}
@@ -421,6 +455,7 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
                             {benchmarks.fipezapSale12mPct !== null && ` · FipeZap 12 m ${benchmarks.fipezapSale12mPct > 0 ? "+" : ""}${pct(benchmarks.fipezapSale12mPct)}`}
                         </span>
                     </div>
+                    )}
                     <div className={tileCls}>
                         <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Payback</span>
                         <span className="block text-base font-bold tabular-nums text-foreground">
@@ -428,10 +463,12 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
                         </span>
                         <span className="text-muted-foreground">
                             {result.breakEvenMonths !== null
-                                ? sellMode
-                                    ? `na venda, ${completion.toLowerCase()} em ${keysLabel ?? "—"}`
-                                    : `${Math.floor(result.breakEvenMonths / 12)} anos e ${result.breakEvenMonths % 12} meses de aluguel`
-                                : "fora do horizonte escolhido"}
+                                ? sold
+                                    ? "na venda"
+                                    : sellMode
+                                      ? `na venda, ${completion.toLowerCase()} em ${keysLabel ?? "—"}`
+                                      : `${Math.floor(result.breakEvenMonths / 12)} anos e ${result.breakEvenMonths % 12} meses de aluguel`
+                                : sold ? "a venda não cobriu o pago" : "fora do horizonte escolhido"}
                         </span>
                     </div>
                     <div
@@ -445,7 +482,7 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
                         title="Taxa interna de retorno de todo o fluxo: parcelas pagas e previstas, custos na entrega e o que volta — aluguel líquido no horizonte, ou a venda na entrega. É a taxa que se compara com o CDI."
                     >
                         <span className="block text-[10px] uppercase tracking-wider text-muted-foreground inline-flex items-center gap-1">
-                            <Percent className="w-3 h-3" /> TIR {sellMode ? "da venda" : "no horizonte"}
+                            <Percent className="w-3 h-3" /> TIR {sold ? "realizada" : sellMode ? "da venda" : "no horizonte"}
                         </span>
                         <span className={`block text-base font-bold tabular-nums ${beatsCdi === false ? "text-amber-700 dark:text-amber-300" : "text-foreground"}`}>
                             {irr !== null ? `${pct(irr)} a.a.` : "—"}
@@ -468,13 +505,23 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
                 </div>
 
                 <p className="text-[11px] text-muted-foreground">
-                    {sellMode
-                        ? "A venda estimada é o valor na entrega (lápis: valor informado ou área × R$/m²; senão custo × valorização). "
-                        : "O aluguel é líquido de vacância e custos e recebe um reajuste a cada doze meses. "}
-                    As parcelas previstas saem do quadro resumo do contrato, cada uma pelo último valor pago do seu tipo — a
-                    parcela carrega a correção acumulada e não cai, então a previsão sobe a cada pagamento lançado. A TIR
-                    junta tudo isso numa taxa anual: acima do CDI, antecipar parcelas rende menos que deixar o dinheiro
-                    aplicado; abaixo, antecipar é o melhor uso dele. Estimativas, não previsões.
+                    {sold ? (
+                        <>
+                            Fluxo realizado: só o que foi pago, fechado pela venda líquida no mês em que aconteceu. As parcelas em
+                            aberto passaram ao comprador. A TIR anualiza o ganho pelo tempo em que o dinheiro ficou parado — num
+                            projeto vendido cedo ela fica alta porque o prazo foi curto; compare também o ganho em reais.
+                        </>
+                    ) : (
+                        <>
+                            {sellMode
+                                ? "A venda estimada é o valor na entrega (lápis: valor informado ou área × R$/m²; senão custo × valorização). "
+                                : "O aluguel é líquido de vacância e custos e recebe um reajuste a cada doze meses. "}
+                            As parcelas previstas saem do quadro resumo do contrato, cada uma pelo último valor pago do seu tipo — a
+                            parcela carrega a correção acumulada e não cai, então a previsão sobe a cada pagamento lançado. A TIR
+                            junta tudo isso numa taxa anual: acima do CDI, antecipar parcelas rende menos que deixar o dinheiro
+                            aplicado; abaixo, antecipar é o melhor uso dele. Estimativas, não previsões.
+                        </>
+                    )}
                 </p>
             </div>
         </section>

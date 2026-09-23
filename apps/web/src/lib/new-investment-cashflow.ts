@@ -55,6 +55,12 @@ export interface CashFlowAssumptions {
      * month and there is no rent. Null (or 0) = the rent model. Not stored — derived per render.
      */
     saleAtDelivery?: number | null;
+    /**
+     * A sale that already happened ("Registrar venda"): the net amount, in its month. From then
+     * on nothing is projected — the buyer takes over the open instalments, there is no rent and
+     * no handover cost — so the flow is what was paid, closed by the sale. Derived, never stored.
+     */
+    sale?: { month: string; net: number } | null;
 }
 
 export interface CashFlowPoint {
@@ -146,20 +152,26 @@ export function simulateCashFlow(
     // The handover costs are a % of what the unit costs in instalments (paid + still owed); they
     // land in the keys month, or without one, the month before the first rent.
     const instalmentsTotal = [...paidByMonth.values(), ...forecastByMonth.values()].reduce((s, v) => s + v, 0);
-    const deliveryCosts = round2(instalmentsTotal * (assumptions.deliveryCostsPct / 100));
+    // Sold: only what was paid counts, and the sale closes it — no open instalment, no handover cost.
+    const realized = assumptions.sale && assumptions.sale.net > 0 && /^\d{4}-\d{2}$/.test(assumptions.sale.month) ? assumptions.sale : null;
+    if (realized) forecastByMonth.clear();
+    const deliveryCosts = realized ? 0 : round2(instalmentsTotal * (assumptions.deliveryCostsPct / 100));
     const deliveryMonth = deliveryCosts > 0 ? (keysMonth ?? (rentStart ? addMonthsToKey(rentStart, -1) : null)) : null;
 
     // A project meant to be sold: the delivery value comes in once, in the keys month (or when
     // the rent would have started), and no rent is projected.
-    const saleAmount = assumptions.saleAtDelivery && assumptions.saleAtDelivery > 0 ? round2(assumptions.saleAtDelivery) : 0;
-    const saleMonth = saleAmount > 0 ? (keysMonth ?? rentStart) : null;
+    const saleAmount = realized ? round2(realized.net) : assumptions.saleAtDelivery && assumptions.saleAtDelivery > 0 ? round2(assumptions.saleAtDelivery) : 0;
+    const saleMonth = realized ? realized.month : saleAmount > 0 ? (keysMonth ?? rentStart) : null;
     const rentMode = saleMonth === null;
 
     // Range: from the first movement to whichever comes last — the last instalment, the keys, or
     // enough rent months to show the recovery.
     const cashMonths = [...paidByMonth.keys(), ...forecastByMonth.keys()];
     const scheduleMonths = expandSchedules(schedules).map(i => i.dueOn.slice(0, 7));
-    const known = [...cashMonths, ...scheduleMonths, ...(deliveryMonth ? [deliveryMonth] : []), ...(saleMonth ? [saleMonth] : [])].sort();
+    // Sold: the plan's months no longer matter — the range is what was paid, up to the sale.
+    const known = realized
+        ? [...cashMonths, realized.month].sort()
+        : [...cashMonths, ...scheduleMonths, ...(deliveryMonth ? [deliveryMonth] : []), ...(saleMonth ? [saleMonth] : [])].sort();
     const start = known[0] ?? rentStart ?? keysMonth;
     if (!start) {
         return { points: [], totalOutflow: 0, totalDelivery: 0, totalRent: 0, totalSale: 0, breakEvenMonth: null, breakEvenMonths: null, irrAnnualPct: null, keysMonth, rentStart };
@@ -167,7 +179,7 @@ export function simulateCashFlow(
 
     const lastCash = known[known.length - 1] ?? start;
     const rentEnd = rentMode && rentStart && assumptions.monthlyRent > 0 ? addMonthsToKey(rentStart, Math.max(0, assumptions.horizonMonths - 1)) : null;
-    const end = [lastCash, keysMonth, rentEnd].filter(Boolean).sort().pop() as string;
+    const end = realized ? (lastCash > realized.month ? lastCash : realized.month) : ([lastCash, keysMonth, rentEnd].filter(Boolean).sort().pop() as string);
 
     const points: CashFlowPoint[] = [];
     let cumulative = 0;

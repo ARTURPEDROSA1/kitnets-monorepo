@@ -340,6 +340,14 @@ With `exit_plan = VENDER` the simulator switches to the **sale model**: no rent,
 delivery value comes in as one inflow in the keys month (`saleAtDelivery`, derived per render from
 `deliveryValueOf`, never stored), payback is the keys month and the TIR is the flipper's number.
 
+Once **sold**, the simulator stops projecting altogether (`sale: { month, net }`, derived): the
+chart is the realized flow — the instalments paid, closed by the net sale in its month; open
+instalments, handover costs and rent are dropped (the buyer took them), the premises row is
+hidden, and the tiles read "pago até a venda", "Venda líquida", "Ganho realizado", payback "na
+venda", "TIR realizada" — the same numbers as the green banner. A project sold months after the
+first instalment shows a very high TIR: it annualizes a short holding period, which is why the
+note tells the owner to read the gain in reais alongside it.
+
 ## 7. Tests
 
 `npm run test -w web` — 58 tests across four files, all pure:

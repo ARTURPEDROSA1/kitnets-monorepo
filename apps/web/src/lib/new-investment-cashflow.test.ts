@@ -46,6 +46,19 @@ describe("a project meant to be sold", () => {
         expect(result.irrAnnualPct!).toBeGreaterThan(0);
     });
 
+    it("after a registered sale, shows only what was paid and the net sale in its month — nothing projected", () => {
+        const result = simulateCashFlow(investment(), schedules, [paid], base({ sale: { month: "2027-02", net: 19000 } }));
+        expect(result.points[0].month).toBe("2026-08");
+        expect(result.points[result.points.length - 1].month).toBe("2027-02");
+        expect(result.totalOutflow).toBe(2295);                     // the one paid instalment, no forecast, no handover cost
+        expect(result.points.every(p => p.outflowForecast === 0 && p.outflowDelivery === 0 && p.rent === 0)).toBe(true);
+        expect(result.totalSale).toBe(19000);
+        expect(result.points.find(p => p.month === "2027-02")?.sale).toBe(19000);
+        expect(result.breakEvenMonth).toBe("2027-02");
+        expect(result.irrAnnualPct).not.toBeNull();
+        expect(result.irrAnnualPct!).toBeGreaterThan(100);          // 2.295 → 19.000 in six months
+    });
+
     it("keeps the rent model when there is no sale value", () => {
         const result = simulateCashFlow(investment(), schedules, [paid], base({ saleAtDelivery: null }));
         expect(result.totalSale).toBe(0);
