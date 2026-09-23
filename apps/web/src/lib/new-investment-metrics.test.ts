@@ -344,6 +344,13 @@ describe("a registered sale", () => {
         expect(m.paidPct).toBe(100);
     });
 
+    it("has no rent yield once sold — the unit will never be let by this owner", () => {
+        const sold = investment({ status: "SOLD", sold_on: "2026-09-15", sale_price: 20000, estimated_rent: 1200 });
+        const m = computeInvestmentMetrics(sold, schedules, [payment({})], asOf);
+        expect(m.netYieldPct).toBeNull();
+        expect(m.paybackMonths).toBeNull();
+    });
+
     it("is not a sale until the price and the date are there", () => {
         expect(computeInvestmentMetrics(investment({ status: "SOLD" }), schedules, [payment({})], asOf).sold).toBe(false);
         expect(computeInvestmentMetrics(investment({ sold_on: "2028-08-15", sale_price: 20000 }), schedules, [payment({})], asOf).sold).toBe(false);

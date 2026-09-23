@@ -238,7 +238,7 @@ export default function InvestmentDocuments({ investmentId, documents, onChanged
                                     const isCover = coverPath !== null && doc.storage_path === coverPath;
                                     const busy = deleting === doc.id || moving === doc.id;
                                     return (
-                                        <li key={doc.id} className={cn("group relative rounded-lg border bg-muted/20 overflow-hidden", isCover ? "border-amber-400" : "border-border/70")}>
+                                        <li key={doc.id} className={cn("group relative rounded-lg border bg-muted/20 overflow-hidden", isCover ? "border-amber-400" : "border-border/70", pictures && !isImage(doc) && "col-span-2")}>
                                             <button
                                                 type="button"
                                                 onClick={() => openDocument(kind, doc)}
@@ -256,8 +256,8 @@ export default function InvestmentDocuments({ investmentId, documents, onChanged
                                                         <span className="line-clamp-1">{doc.file_name ?? "Arquivo"}</span>
                                                     </span>
                                                 )}
-                                                <span className="block px-2 py-1 pr-16 text-[10px] text-muted-foreground tabular-nums">
-                                                    {formatDateBR(doc.created_at.slice(0, 10))} {humanSize(doc.size_bytes)}
+                                                <span className="block px-2 py-1 pr-16 text-[10px] text-muted-foreground tabular-nums whitespace-nowrap">
+                                                    {formatDateBR(doc.created_at.slice(0, 10))} · {humanSize(doc.size_bytes)}
                                                 </span>
                                             </button>
                                             {isCover && (

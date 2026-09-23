@@ -245,8 +245,13 @@ export default function InvestmentSquareCard({ investment, summary, photoUrls = 
 
                 <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground border-t border-border/60 pt-2">
                     <span className="inline-flex items-center gap-1"><FileText className="w-3 h-3" /> {summary?.documents ?? 0} arquivo{(summary?.documents ?? 0) === 1 ? "" : "s"}</span>
-                    {summary?.netYieldPct != null && (
-                        <span className="inline-flex items-center gap-1 text-emerald-600 font-medium">
+                    {summary?.realizedGain != null ? (
+                        <span className={cn("inline-flex items-center gap-1 font-medium", summary.realizedGain >= 0 ? "text-emerald-600" : "text-rose-600")} title="Ganho realizado na venda, sobre o que foi pago">
+                            <Handshake className="w-3 h-3" /> {summary.realizedGain > 0 ? "+" : ""}{formatBRL(summary.realizedGain, 0)}
+                            {summary.paidToDate > 0 ? ` (${((summary.realizedGain / summary.paidToDate) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}%)` : ""}
+                        </span>
+                    ) : summary?.netYieldPct != null && (
+                        <span className="inline-flex items-center gap-1 text-emerald-600 font-medium" title="Yield do aluguel: 12 × aluguel líquido ÷ custo total">
                             <TrendingUp className="w-3 h-3" /> {summary.netYieldPct.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% a.a.
                         </span>
                     )}
