@@ -20,6 +20,7 @@ import {
     Loader2,
     PiggyBank,
     Receipt,
+    Settings,
     TrendingUp,
     Wallet,
 } from "lucide-react";
@@ -31,6 +32,7 @@ import Tile from "@/components/properties/Tile";
 import InvestmentPaymentsTable, { type PaymentDraft } from "./InvestmentPaymentsTable";
 import InvestmentCashFlowSimulator from "./InvestmentCashFlowSimulator";
 import InvestmentDocuments, { type DocumentWithUrl } from "./InvestmentDocuments";
+import InvestmentPlanModal from "./InvestmentPlanModal";
 import { formatDateBR } from "@/lib/dates";
 import {
     INDEX_LABELS,
@@ -66,6 +68,7 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
     const [promoteName, setPromoteName] = useState("");
     const [promoteDate, setPromoteDate] = useState(new Date().toISOString().slice(0, 10));
     const [promoting, setPromoting] = useState(false);
+    const [planOpen, setPlanOpen] = useState(false);
 
     const load = useCallback(async () => {
         const [main, docs] = await Promise.all([
@@ -187,6 +190,11 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                         {[INVESTMENT_KIND_LABELS[investment.kind], investment.developer, investment.address, investment.city].filter(Boolean).join(" · ")}
                     </p>
                 </div>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" onClick={() => setPlanOpen(true)} title="Plano de pagamento do contrato">
+                        <Settings className="w-4 h-4 sm:mr-1" />
+                        <span className="hidden sm:inline">Plano de pagamento</span>
+                    </Button>
                 {promoted ? (
                     <Link
                         href={lang === "pt" ? "/imoveis" : `/${lang}/imoveis`}
@@ -199,6 +207,7 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                         <ArrowRightLeft className="w-4 h-4 mr-1" /> Mover para Imóveis
                     </Button>
                 )}
+                </div>
             </div>
 
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
@@ -312,6 +321,7 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                 onCreate={createPayment}
                 onPatch={patchPayment}
                 onDelete={deletePayment}
+                onEditPlan={() => setPlanOpen(true)}
                 busy={busy}
             />
 
@@ -325,6 +335,15 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
             <InvestmentDocuments investmentId={investmentId} documents={documents} onChanged={refresh} />
 
             {error && <p className="text-sm text-rose-600">{error}</p>}
+
+            <InvestmentPlanModal
+                open={planOpen}
+                onClose={() => setPlanOpen(false)}
+                investment={investment}
+                schedules={schedules}
+                paymentCount={payments.length}
+                onSave={patchInvestment}
+            />
 
             <Dialog open={promoteOpen} onOpenChange={o => { if (!promoting) setPromoteOpen(o); }}>
                 <DialogContent className="sm:max-w-lg">
