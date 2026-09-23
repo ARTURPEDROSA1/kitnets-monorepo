@@ -30,6 +30,7 @@ const investment = (over: Partial<NewInvestment> = {}): NewInvestment => ({
     rent_adjustment_pct: 0,
     rent_vacancy_pct: 0,
     rent_costs_pct: 0,
+    sim_horizon_months: 120,
     status: "ACTIVE",
     promoted_property_id: null,
     promoted_at: null,

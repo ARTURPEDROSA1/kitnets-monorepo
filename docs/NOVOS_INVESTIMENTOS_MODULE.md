@@ -220,8 +220,16 @@ One row per month from the first movement to the end of the horizon:
 - `breakEvenMonth` is where the line crosses zero.
 
 The assumptions live on the investment (`estimated_rent`, `rent_start_on`, `rent_adjustment_pct`,
-`rent_vacancy_pct`, `rent_costs_pct`), so the chart is the same for everyone who opens it.
-`rent_start_on` defaults to the month after the keys.
+`rent_vacancy_pct`, `rent_costs_pct`, `sim_horizon_months`), so the chart is the same for everyone
+who opens it. `rent_start_on` defaults to the month after the keys.
+
+They are **saved as they are typed**, like a cell of the ledger — there is no button to remember.
+A field changes, the chart moves, and half a second later the row is written; a status line in the
+header says "Salvando…" / "Premissas salvas". Leaving the page flushes whatever is still pending.
+The horizon was the one field without a column and used to snap back to ten years on every reload;
+it has one now. The simulator seeds its inputs once from the server and is keyed by the dashboard on
+the key-handover dates, so a change to those remounts it rather than syncing state back through an
+effect.
 
 ## 6. Promotion to a property
 

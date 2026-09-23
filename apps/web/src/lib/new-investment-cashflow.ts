@@ -74,14 +74,14 @@ export function formatMonthLabel(key: string): string {
 }
 
 /** The assumptions stored on the investment, ready for the simulator's inputs. */
-export function assumptionsOf(investment: NewInvestment, horizonMonths = 120): CashFlowAssumptions {
+export function assumptionsOf(investment: NewInvestment, fallbackHorizonMonths = 120): CashFlowAssumptions {
     return {
         monthlyRent: investment.estimated_rent ?? 0,
         rentStart: rentStartMonth(investment),
         rentAdjustmentPct: investment.rent_adjustment_pct ?? 0,
         vacancyPct: investment.rent_vacancy_pct ?? 0,
         costsPct: investment.rent_costs_pct ?? 0,
-        horizonMonths,
+        horizonMonths: investment.sim_horizon_months || fallbackHorizonMonths,
     };
 }
 

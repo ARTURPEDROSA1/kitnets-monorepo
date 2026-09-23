@@ -8,7 +8,7 @@ const investment = (over: Partial<NewInvestment> = {}): NewInvestment => ({
     total_price: 45900, down_payment: 4590, financed_amount: 41310,
     contract_date: "2026-07-01", keys_expected_on: "2029-09-20", keys_delivered_on: null,
     index_before_keys: "INCC", index_after_keys: "IGPM",
-    estimated_rent: 1200, rent_start_on: null, rent_adjustment_pct: 5, rent_vacancy_pct: 0, rent_costs_pct: 0,
+    estimated_rent: 1200, rent_start_on: null, rent_adjustment_pct: 5, rent_vacancy_pct: 0, rent_costs_pct: 0, sim_horizon_months: 120,
     status: "ACTIVE", promoted_property_id: null, promoted_at: null, cover_path: null, notes: null,
     created_at: "2026-07-01T00:00:00Z", updated_at: "2026-07-01T00:00:00Z",
     ...over,
@@ -105,6 +105,14 @@ describe("assumptionsOf", () => {
             vacancyPct: 8,
             horizonMonths: 120,
         });
+    });
+
+    it("keeps the horizon the owner chose — it used to snap back to ten years on every reload", () => {
+        expect(assumptionsOf(investment({ sim_horizon_months: 240 })).horizonMonths).toBe(240);
+    });
+
+    it("falls back to ten years when the row has no horizon", () => {
+        expect(assumptionsOf(investment({ sim_horizon_months: 0 })).horizonMonths).toBe(120);
     });
 });
 

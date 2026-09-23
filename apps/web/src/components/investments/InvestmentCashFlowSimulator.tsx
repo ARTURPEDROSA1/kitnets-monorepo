@@ -8,9 +8,11 @@
  * arrive, growing by one adjustment a year. The vertical marker is the key handover; the line is
  * the running total, and where it crosses zero is when the investment has paid itself back.
  *
- * The assumptions are stored on the investment, so the chart is the same for everyone who opens it.
+ * The assumptions are stored on the investment and saved as they are typed, like a cell of the
+ * ledger: there is no button to remember. A field changes, the chart moves, and half a second
+ * later the row is written. Leaving the page flushes whatever is still pending.
  */
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     Bar,
     CartesianGrid,
@@ -23,8 +25,7 @@ import {
     XAxis,
     YAxis,
 } from "recharts";
-import { KeyRound, Loader2, RotateCcw, Save, TrendingUp } from "lucide-react";
-import { Button } from "@kitnets/ui";
+import { AlertCircle, Check, KeyRound, Loader2, TrendingUp } from "lucide-react";
 import {
     assumptionsOf,
     formatMonthLabel,
@@ -45,22 +46,73 @@ const HORIZONS = [
     { months: 120, label: "10 anos" },
     { months: 180, label: "15 anos" },
     { months: 240, label: "20 anos" },
+    { months: 360, label: "30 anos" },
 ];
+
+const SAVE_DELAY_MS = 500;
 
 const inputCls = "w-full h-9 rounded-md border border-input bg-background px-2 text-sm tabular-nums";
 
 /** `YYYY-MM` ↔ the month input's value (they are the same string; this only guards nulls). */
 const monthValue = (v: string | null) => v ?? "";
 
+/** The columns a set of assumptions writes. */
+const toPatch = (a: CashFlowAssumptions): Record<string, unknown> => ({
+    estimated_rent: a.monthlyRent,
+    rent_start_on: a.rentStart ? `${a.rentStart}-01` : null,
+    rent_adjustment_pct: a.rentAdjustmentPct,
+    rent_vacancy_pct: a.vacancyPct,
+    rent_costs_pct: a.costsPct,
+    sim_horizon_months: a.horizonMonths,
+});
+
+type SaveStatus = "idle" | "pending" | "saving" | "saved" | "error";
+
 export default function InvestmentCashFlowSimulator({ investment, schedules, payments, onSave }: Props) {
-    const stored = useMemo(() => assumptionsOf(investment), [investment]);
-    const [draft, setDraft] = useState<CashFlowAssumptions>(stored);
-    const [saving, setSaving] = useState(false);
-    const [dirty, setDirty] = useState(false);
+    // Seeded once from the server; the component is keyed by the dashboard on the dates that would
+    // change the defaults, so a stale seed remounts instead of being synced back by an effect.
+    const [assumptions, setAssumptions] = useState<CashFlowAssumptions>(() => assumptionsOf(investment));
+    const [status, setStatus] = useState<SaveStatus>("idle");
     /** The running-total line drowns the monthly bars at this scale, so it starts off; its legend entry toggles it. */
     const [showCumulative, setShowCumulative] = useState(false);
 
-    const assumptions = dirty ? draft : stored;
+    // The latest save callback, read at flush time: the dashboard recreates it on every render and
+    // a stale one would write through a refresh that has already happened.
+    const onSaveRef = useRef(onSave);
+    useEffect(() => { onSaveRef.current = onSave; });
+
+    const pending = useRef<CashFlowAssumptions | null>(null);
+    const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const mounted = useRef(true);
+
+    /** Writes whatever is pending. Safe after unmount: it only touches state while mounted. */
+    const flush = useCallback(async () => {
+        if (timer.current) { clearTimeout(timer.current); timer.current = null; }
+        const next = pending.current;
+        pending.current = null;
+        if (!next) return;
+        if (mounted.current) setStatus("saving");
+        const ok = await onSaveRef.current(toPatch(next));
+        if (mounted.current) setStatus(ok ? "saved" : "error");
+    }, []);
+
+    // Leaving the page must not lose the last edit: flush on unmount.
+    useEffect(() => {
+        mounted.current = true;
+        return () => { mounted.current = false; void flush(); };
+    }, [flush]);
+
+    const update = (patch: Partial<CashFlowAssumptions>) => {
+        const next = { ...assumptions, ...patch };
+        setAssumptions(next);
+        pending.current = next;
+        setStatus("pending");
+        if (timer.current) clearTimeout(timer.current);
+        timer.current = setTimeout(() => { void flush(); }, SAVE_DELAY_MS);
+    };
+    const num = (key: "monthlyRent" | "rentAdjustmentPct" | "vacancyPct" | "costsPct") =>
+        (e: React.ChangeEvent<HTMLInputElement>) => update({ [key]: Number(e.target.value.replace(",", ".")) || 0 });
+
     const result = useMemo(
         () => simulateCashFlow(investment, schedules, payments, assumptions),
         [investment, schedules, payments, assumptions]
@@ -79,26 +131,6 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
         [result]
     );
 
-    const set = <K extends keyof CashFlowAssumptions>(key: K) => (value: CashFlowAssumptions[K]) => {
-        setDraft(prev => ({ ...(dirty ? prev : stored), [key]: value }));
-        setDirty(true);
-    };
-    const num = (key: "monthlyRent" | "rentAdjustmentPct" | "vacancyPct" | "costsPct") =>
-        (e: React.ChangeEvent<HTMLInputElement>) => set(key)(Number(e.target.value.replace(",", ".")) || 0);
-
-    const save = async () => {
-        setSaving(true);
-        const ok = await onSave({
-            estimated_rent: draft.monthlyRent,
-            rent_start_on: draft.rentStart ? `${draft.rentStart}-01` : null,
-            rent_adjustment_pct: draft.rentAdjustmentPct,
-            rent_vacancy_pct: draft.vacancyPct,
-            rent_costs_pct: draft.costsPct,
-        });
-        setSaving(false);
-        if (ok) setDirty(false);
-    };
-
     const keysLabel = result.keysMonth ? formatMonthLabel(result.keysMonth) : null;
 
     return (
@@ -110,18 +142,21 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
                     </h2>
                     <p className="text-xs text-muted-foreground">
                         Parcelas abaixo do eixo, aluguel estimado acima. A linha vertical marca a entrega das chaves.
+                        As premissas são salvas conforme você digita.
                     </p>
                 </div>
-                <div className="flex items-center gap-2">
-                    {dirty && (
-                        <Button size="sm" variant="ghost" onClick={() => { setDraft(stored); setDirty(false); }}>
-                            <RotateCcw className="w-4 h-4 mr-1" /> Desfazer
-                        </Button>
-                    )}
-                    <Button size="sm" onClick={save} disabled={!dirty || saving}>
-                        {saving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Save className="w-4 h-4 mr-1" />} Salvar premissas
-                    </Button>
-                </div>
+                <span
+                    className={
+                        status === "error"
+                            ? "inline-flex items-center gap-1 text-xs text-rose-600"
+                            : "inline-flex items-center gap-1 text-xs text-muted-foreground"
+                    }
+                    aria-live="polite"
+                >
+                    {(status === "pending" || status === "saving") && <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Salvando…</>}
+                    {status === "saved" && <><Check className="w-3.5 h-3.5 text-emerald-600" /> Premissas salvas</>}
+                    {status === "error" && <><AlertCircle className="w-3.5 h-3.5" /> Não foi possível salvar — tente alterar de novo</>}
+                </span>
             </header>
 
             <div className="p-4 space-y-4">
@@ -135,7 +170,7 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
                         <input
                             type="month"
                             value={monthValue(assumptions.rentStart)}
-                            onChange={e => set("rentStart")(e.target.value || null)}
+                            onChange={e => update({ rentStart: e.target.value || null })}
                             className={inputCls}
                         />
                     </label>
@@ -164,7 +199,7 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
                         <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Horizonte</span>
                         <select
                             value={assumptions.horizonMonths}
-                            onChange={e => set("horizonMonths")(Number(e.target.value))}
+                            onChange={e => update({ horizonMonths: Number(e.target.value) })}
                             className={inputCls}
                         >
                             {HORIZONS.map(h => <option key={h.months} value={h.months}>{h.label}</option>)}
