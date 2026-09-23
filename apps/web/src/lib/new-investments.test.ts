@@ -122,6 +122,23 @@ describe("pendingInstalments", () => {
         expect(pending).toHaveLength(36);
     });
 
+    it("clears the instalment that was anticipated, however early it was paid", () => {
+        // the bug this pins: an annual instalment due 15/03/2036, settled in May 2026 to escape the
+        // correction, used to stay open because the match keyed on the month the money moved
+        const annual = schedule({ id: "a", installments: 11, amount: 5995.45, first_due_on: "2027-03-15", periodicity: "ANNUAL", kind: "PARCELA_ANUAL" });
+        const anticipated = payment({ kind: "PARCELA_ANUAL", due_on: "2036-03-15", paid_on: "2026-05-06", amount: 5995.45, correction_amount: 134.22 });
+
+        const pending = pendingInstalments([annual], [anticipated]);
+        expect(pending).toHaveLength(10);
+        expect(pending.some(i => i.dueOn === "2036-03-15")).toBe(false);
+    });
+
+    it("does not let a payment clear an instalment of another year", () => {
+        const annual = schedule({ id: "a", installments: 11, amount: 5995.45, first_due_on: "2027-03-15", periodicity: "ANNUAL", kind: "PARCELA_ANUAL" });
+        const paid = payment({ kind: "PARCELA_ANUAL", due_on: "2036-03-15", paid_on: "2026-05-06" });
+        expect(pendingInstalments([annual], [paid]).some(i => i.dueOn === "2037-03-15")).toBe(true);
+    });
+
     it("uses the due date when the payment is only planned", () => {
         const pending = pendingInstalments([schedule()], [payment({ status: "PLANNED", paid_on: null, due_on: "2026-10-20" })]);
         expect(pending).toHaveLength(35);

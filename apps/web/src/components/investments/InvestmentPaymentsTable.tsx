@@ -78,6 +78,8 @@ const emptyDraft = (): PaymentDraft => ({
     notes: "",
 });
 
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
 const cellInput = "bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-none w-full px-1.5 py-1 outline-none";
 
 /** The sum bar prints an instalment number as a count, not as reais. */
@@ -141,16 +143,16 @@ export default function InvestmentPaymentsTable({
             options: [{ value: "PAID", label: "Pago" }, { value: "PLANNED", label: "Previsto" }],
         },
         { key: "installment_number", label: "Parcela nº", kind: "number", align: "right", sum: false, get: r => r.installment_number },
-        { key: "amount", label: "Valor", kind: "number", align: "right", get: r => r.amount },
+        { key: "amount", label: "Valor", kind: "number", align: "right", title: "Valor contratado da parcela, como está no quadro resumo", get: r => r.amount },
         {
             key: "correction_amount",
             label: "Correção",
             kind: "number",
             align: "right",
-            title: "INCC, IGP-M ou CUB cobrado sobre esta parcela",
+            title: "Calculada: valor pago − valor da parcela. Positiva quando houve correção (CUB, INCC); negativa quando houve desconto por antecipação.",
             get: r => r.correction_amount,
         },
-        { key: "total", label: "Total", kind: "number", align: "right", title: "Valor + correção", get: r => paymentTotal(r) },
+        { key: "total", label: "Valor pago", kind: "number", align: "right", title: "O que saiu da conta — o valor do comprovante", get: r => paymentTotal(r) },
         { key: "notes", label: "Observação", kind: "text", get: r => r.notes ?? "" },
         {
             key: "receipt",
@@ -176,14 +178,29 @@ export default function InvestmentPaymentsTable({
         };
     }, [rows]);
 
-    const commitMoney = async (row: InvestmentPayment, field: "amount" | "correction_amount") => {
-        const key = `${row.id}:${field}`;
+    /**
+     * The two typed facts are the contracted instalment and what was actually paid; the correction
+     * is always the difference. Whichever of the two is edited, the other stays and the correction
+     * is recomputed — so the row never holds three numbers that disagree.
+     */
+    const takeDraft = (rowId: string, field: string): number | null => {
+        const key = `${rowId}:${field}`;
         const text = drafts[key];
-        if (text === undefined) return;
+        if (text === undefined) return null;
         setDrafts(d => { const next = { ...d }; delete next[key]; return next; });
-        const value = parseMoneyText(text) ?? 0;
-        if (value === row[field]) return;
-        await onPatch(row.id, { [field]: value });
+        return parseMoneyText(text) ?? 0;
+    };
+
+    const commitAmount = async (row: InvestmentPayment) => {
+        const amount = takeDraft(row.id, "amount");
+        if (amount === null || amount === row.amount) return;
+        await onPatch(row.id, { amount, correction_amount: round2(paymentTotal(row) - amount) });
+    };
+
+    const commitPaid = async (row: InvestmentPayment) => {
+        const paid = takeDraft(row.id, "paid");
+        if (paid === null || paid === paymentTotal(row)) return;
+        await onPatch(row.id, { correction_amount: round2(paid - row.amount) });
     };
 
     const cancelDraft = (rowId: string, field: string) =>
@@ -438,24 +455,28 @@ export default function InvestmentPaymentsTable({
                                                 value={row.amount}
                                                 draft={drafts[`${row.id}:amount`]}
                                                 onDraft={text => setDrafts(d => ({ ...d, [`${row.id}:amount`]: text }))}
-                                                onCommit={() => commitMoney(row, "amount")}
+                                                onCommit={() => commitAmount(row)}
                                             />
                                         </td>
                                     )}
                                     {show("correction_amount") && (
-                                        <td {...sel.cellProps("correction_amount", row.id, row.correction_amount, "px-2 py-1 text-right", () => cancelDraft(row.id, "correction_amount"))}>
-                                            <MoneyInput
-                                                value={row.correction_amount}
-                                                draft={drafts[`${row.id}:correction_amount`]}
-                                                onDraft={text => setDrafts(d => ({ ...d, [`${row.id}:correction_amount`]: text }))}
-                                                onCommit={() => commitMoney(row, "correction_amount")}
-                                                title="INCC, IGP-M ou CUB cobrado sobre esta parcela"
-                                            />
+                                        <td
+                                            {...sel.cellProps("correction_amount", row.id, row.correction_amount, cn("px-2 py-1 text-right tabular-nums", row.correction_amount < 0 ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"))}
+                                            title={row.correction_amount < 0 ? "Desconto: pagou menos que o valor da parcela" : "Correção: pagou mais que o valor da parcela"}
+                                        >
+                                            {formatBRL(row.correction_amount)}
                                         </td>
                                     )}
                                     {show("total") && (
-                                        <td {...sel.cellProps("total", row.id, paymentTotal(row), "px-2 py-1 text-right font-semibold tabular-nums")}>
-                                            {formatBRL(paymentTotal(row))}
+                                        <td {...sel.cellProps("total", row.id, paymentTotal(row), "px-2 py-1 text-right font-semibold", () => cancelDraft(row.id, "paid"))}>
+                                            <MoneyInput
+                                                value={paymentTotal(row)}
+                                                draft={drafts[`${row.id}:paid`]}
+                                                onDraft={text => setDrafts(d => ({ ...d, [`${row.id}:paid`]: text }))}
+                                                onCommit={() => commitPaid(row)}
+                                                title="O valor do comprovante. A correção ao lado é a diferença para o valor da parcela."
+                                                className="font-semibold"
+                                            />
                                         </td>
                                     )}
                                     {show("notes") && (
@@ -547,26 +568,42 @@ export default function InvestmentPaymentsTable({
                                                 onCommit={() => {
                                                     const text = drafts["new:amount"];
                                                     setDrafts(d => { const next = { ...d }; delete next["new:amount"]; return next; });
-                                                    if (text !== undefined) setDraft(prev => (prev ? { ...prev, amount: parseMoneyText(text) ?? 0 } : prev));
+                                                    if (text === undefined) return;
+                                                    const amount = parseMoneyText(text) ?? 0;
+                                                    setDraft(prev => {
+                                                        if (!prev) return prev;
+                                                        // nothing typed as paid yet: the parcel's value is what will be paid
+                                                        const paid = prev.amount + prev.correction_amount;
+                                                        return { ...prev, amount, correction_amount: paid > 0 ? round2(paid - amount) : 0 };
+                                                    });
                                                 }}
                                             />
                                         </td>
                                     )}
                                     {show("correction_amount") && (
-                                        <td className="px-2 py-1 text-right">
+                                        <td className={cn("px-2 py-1 text-right tabular-nums", draft.correction_amount < 0 ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground")}>
+                                            {formatBRL(draft.correction_amount)}
+                                        </td>
+                                    )}
+                                    {show("total") && (
+                                        <td className="px-2 py-1 text-right font-semibold">
                                             <MoneyInput
-                                                value={draft.correction_amount}
-                                                draft={drafts["new:correction"]}
-                                                onDraft={text => setDrafts(d => ({ ...d, "new:correction": text }))}
+                                                value={draft.amount + draft.correction_amount}
+                                                draft={drafts["new:paid"]}
+                                                onDraft={text => setDrafts(d => ({ ...d, "new:paid": text }))}
                                                 onCommit={() => {
-                                                    const text = drafts["new:correction"];
-                                                    setDrafts(d => { const next = { ...d }; delete next["new:correction"]; return next; });
-                                                    if (text !== undefined) setDraft(prev => (prev ? { ...prev, correction_amount: parseMoneyText(text) ?? 0 } : prev));
+                                                    const text = drafts["new:paid"];
+                                                    setDrafts(d => { const next = { ...d }; delete next["new:paid"]; return next; });
+                                                    if (text !== undefined) {
+                                                        const paid = parseMoneyText(text) ?? 0;
+                                                        setDraft(prev => (prev ? { ...prev, correction_amount: round2(paid - prev.amount) } : prev));
+                                                    }
                                                 }}
+                                                title="O valor do comprovante. A correção ao lado é a diferença para o valor da parcela."
+                                                className="font-semibold"
                                             />
                                         </td>
                                     )}
-                                    {show("total") && <td className="px-2 py-1 text-right font-semibold tabular-nums">{formatBRL(draft.amount + draft.correction_amount)}</td>}
                                     {show("notes") && (
                                         <td className="px-2 py-1">
                                             <input

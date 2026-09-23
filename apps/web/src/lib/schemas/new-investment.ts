@@ -32,6 +32,19 @@ const money = (message = "Valor inválido.") =>
         }, z.number({ invalid_type_error: message }).min(0, "O valor não pode ser negativo.").max(1e12, message).nullable().optional())
         .transform((v) => (v == null ? null : Math.round(v * 100) / 100));
 
+/** Same as `money`, but signed: a correction is negative when an anticipated instalment is discounted. */
+const signedMoney = (message = "Valor inválido.") =>
+    z
+        .preprocess((v) => {
+            if (v === "" || v === null || v === undefined) return null;
+            if (typeof v === "number") return v;
+            if (typeof v !== "string") return v;
+            const cleaned = v.replace(/[^\d,.-]/g, "").replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", ".");
+            const n = Number(cleaned);
+            return Number.isFinite(n) ? n : v;
+        }, z.number({ invalid_type_error: message }).min(-1e12, message).max(1e12, message).nullable().optional())
+        .transform((v) => (v == null ? null : Math.round(v * 100) / 100));
+
 const isoDate = (message = "Data inválida.") =>
     z
         .preprocess((v) => {
@@ -137,7 +150,7 @@ export const paymentInputSchema = z
         paid_on: isoDate(),
         kind: z.enum(PAYMENT_KINDS).default("PARCELA"),
         amount: money().transform((v) => v ?? 0),
-        correction_amount: money().transform((v) => v ?? 0),
+        correction_amount: signedMoney().transform((v) => v ?? 0),
         installment_number: z.coerce.number().int().min(1).max(600).nullable().optional().default(null),
         status: z.enum(PAYMENT_STATUSES).default("PAID"),
         receipt_path: optionalText(400),
