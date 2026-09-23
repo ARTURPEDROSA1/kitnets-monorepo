@@ -84,6 +84,18 @@ Blocks are replaced wholesale (`PATCH` with `schedules`), never patched one by o
 payments are untouched: the instalments they already answer drop out of the forecast by month and
 kind, as always.
 
+### Editing what the investment is
+
+The gear covers what the unit costs; the pencil next to the title covers what it *is* — name,
+unit, **type**, developer, address, city, UF, CEP, description. The type matters more than it
+looks: the AI guesses it from the contract's wording, so a studio sold as "unidade autônoma" lands
+on Apartamento and a garage on Outro, and it is what the card's badge shows.
+
+The address is edited as the single line it is stored as. Splitting it back into street, number and
+neighbourhood to show it in three fields would drop whatever the original split could not place, so
+`investmentRow` accepts a whole `address` (the edit dialog) as well as the parts (the create form),
+and the whole one wins when both arrive.
+
 ### The payment table
 
 Built on the shared table machinery, so it behaves like Receitas de Aluguel and the condominium

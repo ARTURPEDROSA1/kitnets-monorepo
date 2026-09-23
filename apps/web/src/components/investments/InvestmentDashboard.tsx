@@ -18,6 +18,7 @@ import {
     CheckCircle2,
     KeyRound,
     Loader2,
+    Pencil,
     PiggyBank,
     Receipt,
     Settings,
@@ -33,6 +34,7 @@ import InvestmentPaymentsTable, { type PaymentDraft } from "./InvestmentPayments
 import InvestmentCashFlowSimulator from "./InvestmentCashFlowSimulator";
 import InvestmentDocuments, { type DocumentWithUrl } from "./InvestmentDocuments";
 import InvestmentPlanModal from "./InvestmentPlanModal";
+import InvestmentDetailsModal from "./InvestmentDetailsModal";
 import { formatDateBR } from "@/lib/dates";
 import {
     INDEX_LABELS,
@@ -69,6 +71,7 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
     const [promoteDate, setPromoteDate] = useState(new Date().toISOString().slice(0, 10));
     const [promoting, setPromoting] = useState(false);
     const [planOpen, setPlanOpen] = useState(false);
+    const [detailsOpen, setDetailsOpen] = useState(false);
 
     const load = useCallback(async () => {
         const [main, docs] = await Promise.all([
@@ -185,7 +188,18 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                     <Button variant="ghost" size="sm" onClick={onBack} className="-ml-2">
                         <ArrowLeft className="w-4 h-4 mr-1" /> Novos Investimentos
                     </Button>
-                    <h1 className="text-2xl font-bold text-foreground">{title}</h1>
+                    <div className="flex items-center gap-2">
+                        <h1 className="text-2xl font-bold text-foreground">{title}</h1>
+                        <button
+                            type="button"
+                            onClick={() => setDetailsOpen(true)}
+                            title="Editar nome, unidade, tipo e endereço"
+                            aria-label="Editar dados do investimento"
+                            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                        >
+                            <Pencil className="w-4 h-4" />
+                        </button>
+                    </div>
                     <p className="text-sm text-muted-foreground">
                         {[INVESTMENT_KIND_LABELS[investment.kind], investment.developer, investment.address, investment.city].filter(Boolean).join(" · ")}
                     </p>
@@ -363,6 +377,13 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
             <InvestmentDocuments investmentId={investmentId} documents={documents} onChanged={refresh} />
 
             {error && <p className="text-sm text-rose-600">{error}</p>}
+
+            <InvestmentDetailsModal
+                open={detailsOpen}
+                onClose={() => setDetailsOpen(false)}
+                investment={investment}
+                onSave={patchInvestment}
+            />
 
             <InvestmentPlanModal
                 open={planOpen}
