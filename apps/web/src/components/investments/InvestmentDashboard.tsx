@@ -257,12 +257,12 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                         )
                     }
                     info={{
-                        what: "As parcelas do quadro resumo que ainda não foram pagas, sem projeção de correção monetária. A quebra por tipo mostra quanto cada bloco do contrato ainda custa — é por ela que se decide o que vale antecipar.",
-                        formula: "Σ parcelas previstas − parcelas já quitadas",
+                        what: "As parcelas do quadro resumo que ainda não foram pagas, cada uma projetada pelo último valor pago do seu tipo. A quebra por tipo mostra quanto cada bloco do contrato ainda custa — é por ela que se decide o que vale antecipar.",
+                        formula: <>Parcela em aberto = maior valor já pago do tipo (nunca menos que o contrato)<br />Falta pagar = Σ parcelas em aberto</>,
                         example: metrics.remainingByKind.length > 0
-                            ? metrics.remainingByKind.map(k => `${k.label}: ${k.count} × em aberto = ${formatBRL(k.total)}`).join(" · ")
+                            ? metrics.remainingByKind.map(k => `${k.label}: ${k.count} em aberto = ${formatBRL(k.total)}`).join(" · ")
                             : undefined,
-                        note: "A correção do INCC/IGP-M entra quando o pagamento é lançado, não aqui.",
+                        note: "É assim que a construtora cobra: a parcela carrega a correção acumulada e não cai, mesmo num mês de índice negativo. Por isso este número muda a cada pagamento lançado.",
                     }}
                 />
                 <Tile
@@ -275,7 +275,7 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                         what: "O que a unidade terá custado: o já pago mais o que ainda falta. É a base de todos os percentuais desta página.",
                         formula: "pago + a pagar",
                         example: `${formatBRL(metrics.paidToDate)} + ${formatBRL(metrics.remaining)} = ${formatBRL(metrics.committed)}`,
-                        note: "Difere do preço do contrato pela correção monetária já paga.",
+                        note: "Difere do preço do contrato pela correção: a já paga, e a projetada nas parcelas em aberto a partir do último pagamento de cada tipo.",
                     }}
                 />
                 <Tile
@@ -284,27 +284,16 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                     icon={<Receipt className="w-4 h-4" />}
                     value={metrics.nextDueOn ? formatBRL(metrics.nextDueAmount, 0) : "—"}
                     hint={
-                        <span className="block space-y-0.5">
-                            <span className="block">
-                                {metrics.overdueCount > 0
-                                    ? `${metrics.overdueCount} em atraso (${formatBRL(metrics.overdueAmount, 0)})`
-                                    : metrics.nextDueOn
-                                      ? `Vence em ${formatDateBR(metrics.nextDueOn)}`
-                                      : "Sem parcelas em aberto"}
-                            </span>
-                            {metrics.lastDueOn && (
-                                <span className="block">
-                                    Última: {formatBRL(metrics.lastDueAmount, 0)} em {formatDateBR(metrics.lastDueOn)}
-                                </span>
-                            )}
-                        </span>
+                        metrics.overdueCount > 0
+                            ? `${metrics.overdueCount} em atraso (${formatBRL(metrics.overdueAmount, 0)})`
+                            : metrics.nextDueOn
+                              ? `Vence em ${formatDateBR(metrics.nextDueOn)}`
+                              : "Sem parcelas em aberto"
                     }
                     info={{
-                        what: "A próxima parcela do quadro resumo que ainda não tem pagamento lançado, e a última do plano — quando o pagamento termina.",
-                        formula: <>Próxima = primeira parcela prevista com vencimento ≥ hoje<br />Última = a parcela prevista mais distante</>,
-                        example: metrics.lastDueOn
-                            ? `Última parcela em ${formatDateBR(metrics.lastDueOn)}, de ${formatBRL(metrics.lastDueAmount)}`
-                            : undefined,
+                        what: "A próxima parcela do quadro resumo que ainda não tem pagamento lançado, pelo valor que ela deve chegar: o último valor pago do seu tipo.",
+                        formula: <>Próxima = primeira parcela prevista com vencimento ≥ hoje<br />Valor = maior valor já pago do tipo (nunca menos que o contrato)</>,
+                        note: "A parcela nunca cai — num mês de índice negativo ela repete o valor da anterior. Lance o pagamento e este valor acompanha.",
                     }}
                 />
                 <Tile

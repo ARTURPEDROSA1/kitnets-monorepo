@@ -169,6 +169,52 @@ describe("month arithmetic", () => {
     });
 });
 
+describe("projecting open instalments from what was paid", () => {
+    const monthly = schedule({ id: "m", installments: 140, amount: 1000, first_due_on: "2026-04-15" });
+
+    it("keeps the contract figure while nothing of the kind has been paid", () => {
+        const pending = pendingInstalments([monthly], []);
+        expect(pending[0].amount).toBe(1000);
+        expect(pending[0].contractedAmount).toBe(1000);
+    });
+
+    it("raises every open instalment to the last value paid for its kind", () => {
+        const september = payment({ due_on: "2026-09-15", paid_on: "2026-09-11", amount: 1000, correction_amount: 43.07 });
+        const pending = pendingInstalments([monthly], [september]);
+        expect(pending.every(i => i.amount === 1043.07)).toBe(true);
+        expect(pending.every(i => i.contractedAmount === 1000)).toBe(true);
+    });
+
+    it("never lets the projection fall: a cheaper later payment does not lower it", () => {
+        // a negative index month: the developer keeps billing the previous value, so a payment
+        // below the ratchet is a discount, not a new floor
+        const high = payment({ id: "h", due_on: "2026-08-15", paid_on: "2026-08-11", amount: 1000, correction_amount: 40.55 });
+        const lower = payment({ id: "l", due_on: "2026-09-15", paid_on: "2026-09-11", amount: 1000, correction_amount: 10 });
+        const pending = pendingInstalments([monthly], [high, lower]);
+        expect(pending[0].amount).toBe(1040.55);
+    });
+
+    it("keeps kinds apart: paying an annual instalment does not reprice the monthly ones", () => {
+        const annual = schedule({ id: "a", installments: 11, amount: 5995.45, first_due_on: "2027-03-15", periodicity: "ANNUAL", kind: "PARCELA_ANUAL" });
+        const paidAnnual = payment({ kind: "PARCELA_ANUAL", due_on: "2035-03-15", paid_on: "2026-06-09", amount: 5995.45, correction_amount: 134.22 });
+        const pending = pendingInstalments([monthly, annual], [paidAnnual]);
+        expect(pending.find(i => i.kind === "PARCELA")!.amount).toBe(1000);
+        expect(pending.find(i => i.kind === "PARCELA_ANUAL")!.amount).toBe(6129.67);
+    });
+
+    it("ignores a payment that is only planned: a guess is not a bill", () => {
+        const planned = payment({ status: "PLANNED", paid_on: null, due_on: "2026-09-15", amount: 1000, correction_amount: 500 });
+        expect(pendingInstalments([monthly], [planned])[0].amount).toBe(1000);
+    });
+
+    it("does not let the projection drop below a block whose contract figure is higher", () => {
+        const bigger = schedule({ id: "b", installments: 2, amount: 2000, first_due_on: "2030-01-15" });
+        const september = payment({ due_on: "2026-09-15", paid_on: "2026-09-11", amount: 1000, correction_amount: 43.07 });
+        const pending = pendingInstalments([monthly, bigger], [september]);
+        expect(pending.find(i => i.scheduleId === "b")!.amount).toBe(2000);
+    });
+});
+
 describe("pendingByKind", () => {
     // the plan of the real contract: 140 monthly, 11 annual, one at the start of the works
     const plan: InvestmentSchedule[] = [

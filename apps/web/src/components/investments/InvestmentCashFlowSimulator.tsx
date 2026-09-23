@@ -249,8 +249,8 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
 
                 <p className="text-[11px] text-muted-foreground">
                     O aluguel é líquido de vacância e custos e recebe um reajuste a cada doze meses. As parcelas previstas
-                    saem do quadro resumo do contrato, sem projeção de correção monetária — o INCC e o IGP-M realizados
-                    entram como correção em cada pagamento lançado. Estimativas, não previsões.
+                    saem do quadro resumo do contrato, cada uma pelo último valor pago do seu tipo — a parcela carrega a
+                    correção acumulada e não cai, então a previsão sobe a cada pagamento lançado. Estimativas, não previsões.
                 </p>
             </div>
         </section>

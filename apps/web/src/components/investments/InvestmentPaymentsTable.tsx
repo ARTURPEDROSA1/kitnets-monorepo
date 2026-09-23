@@ -206,13 +206,14 @@ export default function InvestmentPaymentsTable({
     const cancelDraft = (rowId: string, field: string) =>
         setDrafts(d => { const next = { ...d }; delete next[`${rowId}:${field}`]; return next; });
 
+    /** The chip already knows what the bill should be: the contracted value, plus the correction the last payment of this kind carried. */
     const startFromInstalment = (inst: ScheduledInstalment) => {
         setDraft({
             due_on: inst.dueOn,
             paid_on: inst.dueOn,
             kind: inst.kind,
-            amount: inst.amount,
-            correction_amount: 0,
+            amount: inst.contractedAmount,
+            correction_amount: round2(inst.amount - inst.contractedAmount),
             status: "PAID",
             notes: inst.label,
         });
@@ -322,8 +323,9 @@ export default function InvestmentPaymentsTable({
                     {showUpcoming && selectedSummary && (
                         <p className="mt-2 text-[11px] text-muted-foreground">
                             {selectedSummary.count} em aberto, somando{" "}
-                            <strong className="text-foreground tabular-nums">{formatBRL(selectedSummary.total)}</strong>.
-                            Antecipar uma parcela a lança pelo valor de hoje, sem a correção que ela acumularia até o vencimento.
+                            <strong className="text-foreground tabular-nums">{formatBRL(selectedSummary.total)}</strong>,
+                            pelo último valor pago deste tipo. Antecipar uma parcela a lança por esse valor, sem a correção
+                            que ela ainda acumularia até o vencimento.
                         </p>
                     )}
                     {showUpcoming && (

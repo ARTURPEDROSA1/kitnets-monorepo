@@ -85,12 +85,14 @@ describe("computeInvestmentMetrics", () => {
         expect(m.paidCount).toBe(1);
     });
 
-    it("counts the index correction as money spent, on top of the contract", () => {
+    it("counts the index correction as money spent, and projects it onto the rest of the kind", () => {
         const m = computeInvestmentMetrics(investment(), schedules, [payment({ correction_amount: 300 })], asOf);
         expect(m.correctionsPaid).toBe(300);
         expect(m.paidToDate).toBe(7395);
-        // the correction is real money, so the unit ends up costing more than the headline price
-        expect(m.committed).toBe(142200);
+        // the correction is real money, and the second entrada instalment is now expected at the
+        // same 7.395 — so the unit ends up costing 600 more than the headline price, not 300
+        expect(m.remaining).toBe(7395 + 127710);
+        expect(m.committed).toBe(142500);
         expect(m.contractPrice).toBe(141900);
     });
 
@@ -172,23 +174,46 @@ describe("what is still owed, per kind", () => {
     });
 });
 
-describe("the last instalment of the plan", () => {
+describe("projection from the last payment", () => {
+    // the real plan: 140 monthly at 1.000, 11 annual at 5.995,45
     const plan: InvestmentSchedule[] = [
         { id: "m", investment_id: "i1", label: "Parcelas mensais", kind: "PARCELA", installments: 140, amount: 1000, first_due_on: "2026-04-15", periodicity: "MONTHLY", index_code: "CUB", position: 0 },
         { id: "a", investment_id: "i1", label: "Parcelas anuais", kind: "PARCELA_ANUAL", installments: 11, amount: 5995.45, first_due_on: "2027-03-15", periodicity: "ANNUAL", index_code: "CUB", position: 1 },
     ];
+    // September's instalment came with 43,07 of CUB on top; two annual ones were anticipated with 134,22 each
+    const paid = [
+        payment({ kind: "PARCELA", due_on: "2026-09-15", paid_on: "2026-09-11", amount: 1000, correction_amount: 43.07 }),
+        payment({ kind: "PARCELA_ANUAL", due_on: "2035-03-15", paid_on: "2026-06-09", amount: 5995.45, correction_amount: 134.22 }),
+        payment({ kind: "PARCELA_ANUAL", due_on: "2036-03-15", paid_on: "2026-06-05", amount: 5995.45, correction_amount: 134.22 }),
+    ];
 
-    it("is the furthest one still owed, whatever kind it is", () => {
-        const m = computeInvestmentMetrics(investment(), plan, [], asOf);
-        // monthly runs to 2037-11, annual to 2037-03: the monthly one is last
-        expect(m.lastDueOn).toBe("2037-11-15");
-        expect(m.lastDueAmount).toBe(1000);
+    it("prices every open instalment at the last value paid for its kind", () => {
+        const m = computeInvestmentMetrics(investment(), plan, paid, asOf);
+        const monthly = m.remainingByKind.find(k => k.kind === "PARCELA")!;
+        const annual = m.remainingByKind.find(k => k.kind === "PARCELA_ANUAL")!;
+        // 139 monthly left (one paid), each now 1.043,07; 9 annual left, each 6.129,67
+        expect(monthly.count).toBe(139);
+        expect(monthly.total).toBe(144986.73);
+        expect(annual.count).toBe(9);
+        expect(annual.total).toBe(55167.03);
     });
 
-    it("is null when nothing is owed", () => {
-        const m = computeInvestmentMetrics(investment(), [], [], asOf);
-        expect(m.lastDueOn).toBeNull();
-        expect(m.lastDueAmount).toBe(0);
+    it("shows the next instalment at what it will actually cost, not the contract figure", () => {
+        const m = computeInvestmentMetrics(investment(), plan, paid, asOf);
+        expect(m.nextDueOn).toBe("2026-10-15");
+        expect(m.nextDueAmount).toBe(1043.07);
+    });
+
+    it("moves the total cost up with the projection", () => {
+        const before = computeInvestmentMetrics(investment(), plan, [], asOf);
+        const after = computeInvestmentMetrics(investment(), plan, paid, asOf);
+        expect(after.committed).toBeGreaterThan(before.committed);
+        expect(after.committed).toBe(after.paidToDate + after.remaining);
+    });
+
+    it("uses the contract figure while nothing of that kind has been paid", () => {
+        const m = computeInvestmentMetrics(investment(), plan, [paid[0]], asOf);
+        expect(m.remainingByKind.find(k => k.kind === "PARCELA_ANUAL")!.total).toBe(11 * 5995.45);
     });
 });
 

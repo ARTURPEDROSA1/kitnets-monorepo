@@ -29,7 +29,11 @@ export interface InvestmentMetrics {
     paidToDate: number;
     /** Index correction inside `paidToDate`. */
     correctionsPaid: number;
-    /** Still owed: forecast instalments no payment covers, plus payments marked PLANNED. */
+    /**
+     * Still owed: forecast instalments no payment covers, plus payments marked PLANNED. Each open
+     * instalment is projected at the last value paid for its kind (see `pendingInstalments`), so
+     * this moves every time a payment is recorded.
+     */
     remaining: number;
     /** `paidToDate + remaining` — what the unit is going to have cost. */
     committed: number;
@@ -48,10 +52,6 @@ export interface InvestmentMetrics {
     /** Open instalments whose due date has already passed. */
     overdueAmount: number;
     overdueCount: number;
-
-    /** The last instalment the plan still owes: when the paying ends, and with how much. */
-    lastDueOn: string | null;
-    lastDueAmount: number;
 
     /** First and last cash movement known (paid or forecast), `YYYY-MM`. */
     firstMonth: string | null;
@@ -119,7 +119,6 @@ export function computeInvestmentMetrics(
     ].sort((a, b) => (a.dueOn < b.dueOn ? -1 : 1));
 
     const next = openItems.find(i => i.dueOn >= today) ?? null;
-    const last = openItems.length > 0 ? openItems[openItems.length - 1] : null;
     const overdue = openItems.filter(i => i.dueOn < today);
 
     // Month range over everything known, realised and forecast
@@ -158,9 +157,6 @@ export function computeInvestmentMetrics(
         nextDueAmount: round2(next?.amount ?? 0),
         overdueAmount: round2(overdue.reduce((s, i) => s + i.amount, 0)),
         overdueCount: overdue.length,
-
-        lastDueOn: last?.dueOn ?? null,
-        lastDueAmount: round2(last?.amount ?? 0),
 
         firstMonth,
         lastMonth,
