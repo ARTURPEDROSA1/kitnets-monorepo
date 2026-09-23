@@ -45,8 +45,14 @@ jobs:
         if: steps.has_migrations.outputs.present == 'true'
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
+      # setup-cli points the CLI at ghcr.io; on 2026-09-23 that registry answered every pull
+      # with toomanyrequests even after a successful login (retry-after in microseconds — an
+      # incident, not a quota). Supabase mirrors the same images on ECR Public, the CLI's own
+      # default, which allows anonymous pulls.
       - name: Start local database and apply every migration
         if: steps.has_migrations.outputs.present == 'true'
+        env:
+          SUPABASE_INTERNAL_IMAGE_REGISTRY: public.ecr.aws
         run: supabase db start
 
       - name: Lint schema
