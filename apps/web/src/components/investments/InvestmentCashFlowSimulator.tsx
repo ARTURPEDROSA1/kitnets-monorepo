@@ -57,6 +57,8 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
     const [draft, setDraft] = useState<CashFlowAssumptions>(stored);
     const [saving, setSaving] = useState(false);
     const [dirty, setDirty] = useState(false);
+    /** The running-total line can drown the monthly bars at this scale; its legend entry toggles it. */
+    const [showCumulative, setShowCumulative] = useState(true);
 
     const assumptions = dirty ? draft : stored;
     const result = useMemo(
@@ -181,12 +183,28 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
                                     formatter={(value, name) => [formatBRL(Math.abs(Number(value ?? 0))), name ?? ""]}
                                     contentStyle={{ backgroundColor: "hsl(var(--background))", borderColor: "hsl(var(--border))", borderRadius: "12px", fontSize: 12 }}
                                 />
-                                <Legend wrapperStyle={{ paddingTop: "6px", fontSize: "12px" }} />
+                                <Legend
+                                    wrapperStyle={{ paddingTop: "6px", fontSize: "12px" }}
+                                    onClick={entry => { if (entry.dataKey === "acumulado") setShowCumulative(v => !v); }}
+                                    formatter={(value, entry) =>
+                                        entry.dataKey === "acumulado" ? (
+                                            <span
+                                                role="button"
+                                                title={showCumulative ? "Ocultar a linha do resultado acumulado" : "Mostrar a linha do resultado acumulado"}
+                                                style={{ cursor: "pointer", textDecoration: showCumulative ? "none" : "line-through", opacity: showCumulative ? 1 : 0.55 }}
+                                            >
+                                                {value}
+                                            </span>
+                                        ) : (
+                                            value
+                                        )
+                                    }
+                                />
                                 <ReferenceLine y={0} stroke="hsl(var(--border))" />
                                 <Bar dataKey="pago" name="Pago" stackId="cash" fill="#f43f5e" isAnimationActive={false} />
                                 <Bar dataKey="previsto" name="Previsto" stackId="cash" fill="#fda4af" isAnimationActive={false} />
                                 <Bar dataKey="aluguel" name="Aluguel estimado" stackId="cash" fill="#10b981" isAnimationActive={false} />
-                                <Line type="monotone" dataKey="acumulado" name="Resultado acumulado" stroke="#8b5cf6" strokeWidth={2} dot={false} isAnimationActive={false} />
+                                <Line type="monotone" dataKey="acumulado" name="Resultado acumulado" stroke="#8b5cf6" strokeWidth={2} dot={false} isAnimationActive={false} hide={!showCumulative} />
                                 {keysLabel && (
                                     <ReferenceLine
                                         x={keysLabel}
@@ -249,8 +267,8 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
 
                 <p className="text-[11px] text-muted-foreground">
                     O aluguel é líquido de vacância e custos e recebe um reajuste a cada doze meses. As parcelas previstas
-                    saem do quadro resumo do contrato, sem projeção de correção monetária — o INCC e o IGP-M realizados
-                    entram como correção em cada pagamento lançado. Estimativas, não previsões.
+                    saem do quadro resumo do contrato, cada uma pelo último valor pago do seu tipo — a parcela carrega a
+                    correção acumulada e não cai, então a previsão sobe a cada pagamento lançado. Estimativas, não previsões.
                 </p>
             </div>
         </section>

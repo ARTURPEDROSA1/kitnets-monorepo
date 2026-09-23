@@ -182,7 +182,13 @@ export interface ScheduledInstalment {
     /** 1-based within its own schedule */
     number: number;
     dueOn: string;
+    /**
+     * What the instalment is expected to cost. Straight from the plan when nothing of its kind has
+     * been paid yet; once something has, the last paid value of that kind (see `pendingInstalments`).
+     */
     amount: number;
+    /** What the quadro resumo says, before any correction. */
+    contractedAmount: number;
     indexCode: IndexCode;
 }
 
@@ -209,6 +215,7 @@ export function expandSchedule(schedule: InvestmentSchedule): ScheduledInstalmen
             number: i + 1,
             dueOn: toISODate(step === 0 ? start : addMonthsClamped(start, i * step, anchorDay)),
             amount: round2(schedule.amount),
+            contractedAmount: round2(schedule.amount),
             indexCode: schedule.index_code,
         });
     }
@@ -256,6 +263,12 @@ export function paymentTotal(payment: Pick<InvestmentPayment, "amount" | "correc
  * It has to be the due date, not the date the money moved: anticipating is the whole point of
  * paying ahead, and a 2036 instalment settled in 2026 would otherwise stay open forever while the
  * payment sat in the ledger.
+ *
+ * What is left is then **projected**: each open instalment is expected to cost the last value paid
+ * for its kind, never less than the plan says. That is how a developer bills — the instalment
+ * carries the correction accrued so far and never goes down, even in a month the index is
+ * negative — so the forecast, the totals and the next-instalment card all move every time a
+ * payment is recorded. `contractedAmount` keeps what the plan said.
  */
 export function pendingInstalments(
     schedules: InvestmentSchedule[],
@@ -266,6 +279,7 @@ export function pendingInstalments(
         const key = `${p.due_on.slice(0, 7)}|${p.kind}`;
         taken.set(key, (taken.get(key) ?? 0) + 1);
     }
+    const ratchet = paidRatchetByKind(payments);
     const pending: ScheduledInstalment[] = [];
     for (const inst of expandSchedules(schedules)) {
         const key = `${inst.dueOn.slice(0, 7)}|${inst.kind}`;
@@ -274,9 +288,27 @@ export function pendingInstalments(
             taken.set(key, left - 1);
             continue;
         }
-        pending.push(inst);
+        pending.push({ ...inst, amount: Math.max(inst.contractedAmount, ratchet.get(inst.kind) ?? 0) });
     }
     return pending;
+}
+
+/**
+ * The highest value actually paid for each kind — the floor every open instalment of that kind
+ * projects from.
+ *
+ * "Highest" and "last" are the same thing under the billing rule (the instalment never decreases),
+ * and highest is what survives payments being recorded out of order, as anticipated ones are.
+ * Only PAID rows count: a planned figure is a guess, not a bill.
+ */
+export function paidRatchetByKind(payments: InvestmentPayment[]): Map<PaymentKind, number> {
+    const ratchet = new Map<PaymentKind, number>();
+    for (const p of payments) {
+        if (p.status !== "PAID") continue;
+        const total = paymentTotal(p);
+        if (total > (ratchet.get(p.kind) ?? 0)) ratchet.set(p.kind, total);
+    }
+    return ratchet;
 }
 
 /** The least a thing needs to be groupable: a forecast instalment or a payment typed as planned. */

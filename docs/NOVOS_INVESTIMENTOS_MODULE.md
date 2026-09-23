@@ -151,9 +151,16 @@ month left it open forever while the payment sat in the ledger. The two dates pa
 when it matters most, which is why the cash-flow chart — where the question is when money moved —
 uses `paymentMonth` instead.
 
+What is left is then **projected**: each open instalment is priced at the highest value already
+paid for its kind, never below what the plan says (`paidRatchetByKind`). That is the developer's
+billing rule taken literally — the instalment carries the correction accrued so far and never goes
+down, even in a month the index is negative. So "falta pagar", its per-kind rows, the next
+instalment, "custo total" and the hollow bars of the chart all move each time a payment is
+recorded; `contractedAmount` keeps what the quadro resumo said.
+
 The consequence worth knowing: **`committed` (paid + remaining) drifts above the contract price**,
-because the INCC-M and IGP-M corrections actually paid are real money and the forecast carries no
-projected correction. Every percentage on the page is against `committed`, not the headline price.
+by the correction already paid plus the correction the ratchet projects onto what is still open.
+Every percentage on the page is against `committed`, not the headline price.
 
 ## 4. AI contract import
 
@@ -213,9 +220,11 @@ spot (R$ 45.900 = 2 × 2.295 + 36 × 1.147,50).
 
 ## 8. Known gaps
 
-- The forecast carries **no projected index correction**. INCC-M and IGP-M enter only as the
-  `correction_amount` of a payment actually made. Projecting them would mean wiring
-  `lib/indexes.ts` into the schedule expansion; the honest version was preferred over a guess.
+- The forecast projects **from the last payment, not from an index series**. Every open instalment
+  is priced at the highest value already paid for its kind — the developer's own billing rule (the
+  instalment never decreases) applied literally. Nothing reads INCC-M/CUB to guess what next month's
+  bill will be; the projection catches up one payment at a time. Wiring `lib/indexes.ts` into it
+  would be the next step if the ratchet proves too flat over a long plan.
 - CUB-denominated instalments are stored in reais. A contract priced purely in CUBs (no reais
   alongside) arrives with `amount` null and its wording in the block's notes.
 - There is no bank-statement import for payments, unlike the property transaction ledger.
