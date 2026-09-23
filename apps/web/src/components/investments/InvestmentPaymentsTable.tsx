@@ -17,7 +17,7 @@
  * company — so an instalment settled from two pockets gets its PF/PJ split filled in from the two
  * receipts, and the row's paid total and date follow them. Everything stays editable after.
  */
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarPlus, Check, Eye, Loader2, Paperclip, Plus, Settings, Sparkles, Trash2, Upload, X } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { cn } from "@/lib/utils";
@@ -49,6 +49,7 @@ import {
     type ScheduledInstalment,
 } from "@/lib/new-investments";
 import { allocateFromReceipts, type ExtractedReceipt } from "@/lib/new-investment-receipt";
+import { readByFromJson, readerLabel, type ReadBy } from "@/lib/ai-reader-label";
 import { stageInvestmentFile } from "@/lib/new-investment-upload-client";
 
 export interface PaymentDraft {
@@ -130,6 +131,8 @@ interface ReadReceipt {
     name: string;
     file: File;
     extracted: ExtractedReceipt | null;
+    /** Which model read it; null when the read failed and the file was only attached. */
+    readBy: ReadBy | null;
 }
 
 /**
@@ -185,6 +188,13 @@ export default function InvestmentPaymentsTable({
     /** Which kind the forecast strip is showing; "ALL" is every kind at once. */
     const [upcomingKind, setUpcomingKind] = useState<PaymentKind | "ALL">("ALL");
     const newFileRef = useRef<HTMLInputElement>(null);
+
+    // The read-out is a toast, not a fixture: it leaves on its own, or on its X.
+    useEffect(() => {
+        if (!notice) return;
+        const timer = setTimeout(() => setNotice(null), 20_000);
+        return () => clearTimeout(timer);
+    }, [notice]);
 
     const sel = useCellSum({ formatByCol: SUM_FORMATS });
     const vis = useColumnVisibility(columnTableKey("investment-payments"), {
@@ -355,6 +365,7 @@ export default function InvestmentPaymentsTable({
         const staged = await stageInvestmentFile(file);
         if ("error" in staged) return staged;
         let extracted: ExtractedReceipt | null = null;
+        let readBy: ReadBy | null = null;
         try {
             const res = await fetch(`/api/investments/${investmentId}/receipts/extract`, {
                 method: "POST",
@@ -362,11 +373,14 @@ export default function InvestmentPaymentsTable({
                 body: JSON.stringify({ storage_path: staged.path }),
             });
             const json = await res.json().catch(() => ({}));
-            if (res.ok && json.success) extracted = json.receipt as ExtractedReceipt;
+            if (res.ok && json.success) {
+                extracted = json.receipt as ExtractedReceipt;
+                readBy = readByFromJson(json.read_by);
+            }
         } catch {
             // the receipt is still attached below; only the allocation is lost
         }
-        return { path: staged.path, name: file.name.slice(0, 200), file, extracted };
+        return { path: staged.path, name: file.name.slice(0, 200), file, extracted, readBy };
     };
 
     const describe = (read: ReadReceipt[]): string => {
@@ -377,7 +391,10 @@ export default function InvestmentPaymentsTable({
             alloc.unattributed > 0 ? `${formatBRL(alloc.unattributed)} sem pagador identificado` : null,
         ].filter(Boolean);
         const unread = read.filter(r => r.extracted === null).length;
-        return `Lido de ${read.length} ${read.length === 1 ? "comprovante" : "comprovantes"}: ${parts.length ? parts.join(" · ") : "nenhum valor identificado"}${unread ? ` · ${unread} não ${unread === 1 ? "lido" : "lidos"}` : ""}. Confira e ajuste se preciso.`;
+        // "pelo Gemini (gemini-3.5-flash)" — or both names when a batch fell back halfway
+        const readers = [...new Set(read.map(r => readerLabel(r.readBy)).filter((l): l is string => l !== null))];
+        const by = readers.length === 0 ? "" : ` pelo ${readers.join(" e pelo ")}`;
+        return `${read.length === 1 ? "Comprovante lido" : `${read.length} comprovantes lidos`}${by}: ${parts.length ? parts.join(" · ") : "nenhum valor identificado"}${unread ? ` · ${unread} não ${unread === 1 ? "lido" : "lidos"}` : ""}. Confira e ajuste se preciso.`;
     };
 
     /** Receipts dropped on an existing row: attach every one, then let what they say update the row. */
@@ -972,8 +989,22 @@ export default function InvestmentPaymentsTable({
                 </div>
 
                 {notice && (
-                    <p className="flex items-start gap-2 text-xs text-emerald-700 dark:text-emerald-400">
-                        <Sparkles className="w-3.5 h-3.5 mt-0.5 shrink-0" /> {notice}
+                    <p
+                        role="status"
+                        aria-live="polite"
+                        className="flex items-start gap-2 rounded-lg border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 px-3 py-2 text-xs text-emerald-800 dark:text-emerald-300"
+                    >
+                        <Sparkles className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                        <span className="flex-1">{notice}</span>
+                        <button
+                            type="button"
+                            onClick={() => setNotice(null)}
+                            title="Fechar"
+                            aria-label="Fechar aviso"
+                            className="shrink-0 p-0.5 rounded hover:bg-emerald-100 dark:hover:bg-emerald-900/40"
+                        >
+                            <X className="w-3.5 h-3.5" />
+                        </button>
                     </p>
                 )}
                 {error && <p className="text-xs text-rose-600">{error}</p>}

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { readJsonBody, withAuth } from "@/lib/api-route";
 import { HOUR } from "@/lib/rate-limit";
 import { validateUpload } from "@/lib/session";
-import { aiConfigured, pdfText, runDocumentExtraction } from "@/lib/document-extract-server";
+import { aiConfigured, pdfText, runDocumentExtraction, type ExtractionResult } from "@/lib/document-extract-server";
 import {
     STAGED_UPLOAD_MAX_SIZE,
     downloadStagedUpload,
@@ -60,21 +60,21 @@ export const POST = withAuth(
         const textContent = mimeType === "application/pdf" ? await pdfText(buffer, TAG) : "";
         if (!aiConfigured()) return NextResponse.json({ error: "Serviço de IA indisponível." }, { status: 503 });
 
-        let raw: unknown | null = null;
+        let result: ExtractionResult | null = null;
         try {
-            raw = await runDocumentExtraction({ prompt: INVESTMENT_EXTRACTION_PROMPT, buffer, mimeType, textContent, tag: TAG });
+            result = await runDocumentExtraction({ prompt: INVESTMENT_EXTRACTION_PROMPT, buffer, mimeType, textContent, tag: TAG });
         } catch (err) {
             console.error(`[${TAG}] AI extraction failed:`, err);
         }
-        if (!raw) {
+        if (!result) {
             return NextResponse.json({ error: "Não foi possível ler o contrato. Tente outro arquivo ou preencha manualmente." }, { status: 422 });
         }
 
-        const data = normalizeInvestmentExtraction(raw);
+        const data = normalizeInvestmentExtraction(result.data);
         if (isEmptyInvestmentExtraction(data)) {
             return NextResponse.json({ error: "Este arquivo não parece ser um contrato de compra de imóvel." }, { status: 422 });
         }
 
-        return NextResponse.json({ success: true, data, inferred_total: inferTotalPrice(data) });
+        return NextResponse.json({ success: true, data, inferred_total: inferTotalPrice(data), read_by: result.readBy });
     }
 );
