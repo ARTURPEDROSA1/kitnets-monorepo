@@ -1,26 +1,29 @@
-import { Button } from "@kitnets/ui";
-import Link from "next/link";
 import { getDictionary } from "../../dictionaries";
 import { FLAGS } from "../../lib/flags";
+import { LeadForm } from "@/components/waitlist/LeadForm";
+import { Building2, Droplets, Sparkles, Sun, TrendingUp } from "lucide-react";
 
 export async function generateMetadata({ params }: { params: Promise<{ lang: "en" | "pt" | "es" }> }) {
     const { lang } = await params;
     const dict = getDictionary(lang);
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://kitnets.com';
 
     return {
-        title: dict.home.welcome + " — " + dict.home.subtitle.split('.')[0], // "Bem-vindo ao Kitnets.com — A plataforma de IA para gestão de kitnets e studios"
+        title: `${dict.home.welcome} — Kitnets.com`,
         description: dict.home.subtitle,
         alternates: {
-            canonical: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://kitnets.com'}/${lang}`,
+            canonical: `${baseUrl}/${lang}`,
             languages: {
-                'pt': `${process.env.NEXT_PUBLIC_BASE_URL || 'https://kitnets.com'}/pt`,
-                'en': `${process.env.NEXT_PUBLIC_BASE_URL || 'https://kitnets.com'}/en`,
-                'es': `${process.env.NEXT_PUBLIC_BASE_URL || 'https://kitnets.com'}/es`,
-                'x-default': `${process.env.NEXT_PUBLIC_BASE_URL || 'https://kitnets.com'}/pt`,
+                'pt': `${baseUrl}/pt`,
+                'en': `${baseUrl}/en`,
+                'es': `${baseUrl}/es`,
+                'x-default': `${baseUrl}/pt`,
             },
         }
     };
 }
+
+const HIGHLIGHT_ICONS = [Building2, Droplets, Sun, TrendingUp];
 
 export default async function Home({ params }: { params: Promise<{ lang: "en" | "pt" | "es" }> }) {
     const { lang } = await params;
@@ -28,46 +31,54 @@ export default async function Home({ params }: { params: Promise<{ lang: "en" | 
 
     return (
         <div className="flex min-h-screen flex-col items-center bg-background selection:bg-primary/20">
-            {/* Hero Section */}
-            <main className="relative flex w-full flex-col items-center justify-center overflow-hidden px-4 py-20 text-center md:py-32 lg:py-40">
-                {/* Background decorative elements */}
+            {/* Hero */}
+            <main className="relative flex w-full flex-col items-center justify-center overflow-hidden px-4 py-20 text-center md:py-28 lg:py-36">
                 <div className="absolute inset-0 -z-10 overflow-hidden">
                     <div className="absolute -top-[20%] left-[20%] h-[400px] w-[400px] rounded-full bg-primary/20 blur-[100px]" />
-                    <div className="absolute right-[20%] top-[10%] h-[300px] w-[300px] rounded-full bg-blue-500/20 blur-[100px]" />
+                    <div className="absolute right-[20%] top-[10%] h-[300px] w-[300px] rounded-full bg-emerald-500/20 blur-[100px]" />
                 </div>
 
-                <div className="animate-in fade-in slide-in-from-bottom-4 duration-1000">
-                    <h1 className="max-w-4xl text-4xl font-extrabold tracking-tight text-foreground md:text-6xl lg:text-7xl">
-                        {dict.home.welcome}{" "}
-                        <span className="block text-transparent bg-clip-text bg-gradient-to-r from-primary via-blue-600 to-purple-600">
-                            {/* Optional: we could highlight part of the welcome text if we split it, but for now we keep it clean */}
-                        </span>
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-1000 space-y-6">
+                    <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                        <Sparkles className="h-3.5 w-3.5" />
+                        {dict.home.eyebrow}
+                    </span>
+                    <h1 className="mx-auto max-w-4xl text-4xl font-extrabold tracking-tight text-foreground md:text-6xl lg:text-7xl text-balance">
+                        {dict.home.welcome}
                     </h1>
                 </div>
 
-                <div className="mt-6 max-w-2xl animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">
-                    <p className="text-xl text-muted-foreground md:text-2xl leading-relaxed">
+                <div className="mt-6 max-w-3xl animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">
+                    <p className="text-lg text-muted-foreground md:text-2xl leading-relaxed text-balance">
                         {dict.home.subtitle}
                     </p>
                 </div>
 
                 {FLAGS.SHOW_HOME_CTA && (
-                    <div className="mt-10 animate-in fade-in zoom-in duration-1000 delay-300">
-                        <Link href={lang === 'pt' ? '/lista-vip' : `/${lang}/lista-vip`}>
-                            <Button size="lg" className="h-14 rounded-full px-10 text-xl font-semibold shadow-xl shadow-emerald-500/20 hover:shadow-emerald-500/40 transition-transform hover:scale-105 bg-emerald-600 hover:bg-emerald-700 text-white border-0">
-                                {dict.homeContent.finalCta.buttonLabel}
-                            </Button>
-                        </Link>
+                    <div className="mt-10 w-full animate-in fade-in zoom-in duration-1000 delay-300">
+                        <LeadForm labels={dict.home.lead} source="home_hero" lang={lang} />
                     </div>
                 )}
+
+                <ul className="mt-10 flex flex-wrap items-center justify-center gap-2.5 animate-in fade-in duration-1000 delay-500">
+                    {dict.home.highlights.map((label, i) => {
+                        const Icon = HIGHLIGHT_ICONS[i % HIGHLIGHT_ICONS.length];
+                        return (
+                            <li key={label} className="inline-flex items-center gap-2 rounded-full border border-border bg-card/70 px-4 py-2 text-sm font-medium text-foreground/90 backdrop-blur-sm">
+                                <Icon className="h-4 w-4 text-emerald-600" />
+                                {label}
+                            </li>
+                        );
+                    })}
+                </ul>
             </main>
 
-            {/* Marketing Content */}
+            {/* Marketing content */}
             {dict.homeContent && (
                 <section className="w-full max-w-7xl mx-auto px-4 py-12 md:py-24 space-y-20 md:space-y-32">
-                    {/* Main Intro */}
+                    {/* Main intro */}
                     <div className="text-center space-y-8 max-w-4xl mx-auto">
-                        <h2 className="text-3xl md:text-5xl font-bold tracking-tight text-foreground leading-tight">
+                        <h2 className="text-3xl md:text-5xl font-bold tracking-tight text-foreground leading-tight text-balance">
                             {dict.homeContent.mainTitle}
                         </h2>
                         <div className="space-y-6 text-lg md:text-xl text-muted-foreground leading-relaxed">
@@ -77,7 +88,7 @@ export default async function Home({ params }: { params: Promise<{ lang: "en" | 
                         </div>
                     </div>
 
-                    {/* Features Grid */}
+                    {/* Feature cards */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 lg:gap-16">
                         {dict.homeContent.sections.map((section, idx) => (
                             <article
@@ -87,7 +98,7 @@ export default async function Home({ params }: { params: Promise<{ lang: "en" | 
                                 <div className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-transparent via-primary/50 to-transparent scale-x-0 opacity-0 transition-all duration-500 group-hover:scale-x-100 group-hover:opacity-100" />
 
                                 <div>
-                                    <h3 className="text-2xl md:text-3xl font-bold text-foreground mb-4 bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text">
+                                    <h3 className="text-2xl md:text-3xl font-bold text-foreground mb-4">
                                         {section.title}
                                     </h3>
                                     {section.description && (
@@ -126,7 +137,7 @@ export default async function Home({ params }: { params: Promise<{ lang: "en" | 
                         <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))]" />
 
                         <div className="relative z-10 space-y-10 max-w-4xl mx-auto">
-                            <h2 className="text-3xl md:text-5xl font-extrabold text-foreground tracking-tight leading-tight">
+                            <h2 className="text-3xl md:text-5xl font-extrabold text-foreground tracking-tight leading-tight text-balance">
                                 {dict.homeContent.finalCta.title}
                             </h2>
 
@@ -134,9 +145,7 @@ export default async function Home({ params }: { params: Promise<{ lang: "en" | 
                                 <p className="font-medium text-primary text-xl md:text-2xl">
                                     {dict.homeContent.finalCta.status}
                                 </p>
-                                <p>
-                                    {dict.homeContent.finalCta.description}
-                                </p>
+                                <p>{dict.homeContent.finalCta.description}</p>
                             </div>
 
                             <div className="bg-card/40 backdrop-blur-sm rounded-2xl p-8 border border-border/50 text-left space-y-6">
@@ -167,20 +176,14 @@ export default async function Home({ params }: { params: Promise<{ lang: "en" | 
                             </div>
 
                             {FLAGS.SHOW_HOME_CTA && (
-                                <div className="pt-4 space-y-6">
-                                    <div className="flex flex-col items-center gap-3">
-                                        <p className="text-base text-muted-foreground font-medium">
-                                            {dict.homeContent.finalCta.subText1}
-                                        </p>
-                                        <Link href={lang === 'pt' ? '/lista-vip' : `/${lang}/lista-vip`}>
-                                            <Button size="lg" className="h-14 px-10 text-lg rounded-full shadow-xl shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:scale-105 transition-all bg-emerald-600 hover:bg-emerald-700 text-white border-0">
-                                                {dict.homeContent.finalCta.buttonLabel}
-                                            </Button>
-                                        </Link>
-                                        <p className="text-sm text-balance text-muted-foreground max-w-lg mx-auto">
-                                            {dict.homeContent.finalCta.subText2}
-                                        </p>
-                                    </div>
+                                <div className="pt-4 space-y-4">
+                                    <p className="text-base text-muted-foreground font-medium">
+                                        {dict.homeContent.finalCta.subText1}
+                                    </p>
+                                    <LeadForm labels={dict.home.lead} source="home_cta" lang={lang} tone="card" />
+                                    <p className="text-sm text-balance text-muted-foreground max-w-lg mx-auto">
+                                        {dict.homeContent.finalCta.subText2}
+                                    </p>
                                 </div>
                             )}
                         </div>
