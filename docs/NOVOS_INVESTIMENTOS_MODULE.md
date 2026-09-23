@@ -50,7 +50,8 @@ apps/web/src/app/api/investments/
   extract/route.ts                 POST → reads the contract with AI
 
 apps/web/src/app/[lang]/novos-investimentos/   page + list content
-apps/web/src/components/investments/           card, dashboard, table, simulator, files, form
+apps/web/src/components/investments/           card, dashboard, table, simulator, files, form,
+                                               schedule editor (shared), plan dialog (the gear)
 ```
 
 ## 3. Data model
@@ -66,6 +67,36 @@ All four carry `owner_id` and have RLS on with no anon/authenticated grants; the
 service role scoped by `requireProfile`, the same as every other owner-scoped table.
 
 The `investment-documents` bucket is private: a read is always a signed URL.
+
+### Editing the plan after the fact
+
+Creation reads the quadro resumo from the contract once, but a plan does not stay still: the
+delivery slips, the developer renegotiates, a block is read wrong, the contract is amended. The
+gear on the dashboard (`InvestmentPlanModal`) is where that is fixed, and it is the only way to
+change the forecast. It edits the contract header (price, entrada, valor a parcelar, dates,
+indexes) and the blocks together, because they are one table in the contract.
+
+`InvestmentScheduleEditor` is the block table itself, shared by the creation form and the gear, so
+the two can never drift apart. The dialog mounts its form only while open and seeds state from
+props once — a cancelled edit dies with the unmount, instead of being synced back by an effect.
+
+Blocks are replaced wholesale (`PATCH` with `schedules`), never patched one by one. Recorded
+payments are untouched: the instalments they already answer drop out of the forecast by month and
+kind, as always.
+
+### The payment table
+
+Built on the shared table machinery, so it behaves like Receitas de Aluguel and the condominium
+ledger rather than being its own thing:
+
+| Piece | What it gives |
+|---|---|
+| `useColumnFilters` + `ColumnHeaders` / `FilterChips` / `ColumnMenu` | sort and filter from each header (dates by range, Tipo and Situação as checkbox lists with counts, values by min–max) |
+| `useColumnVisibility` + `ColumnVisibilityMenu` | right-click a header to hide or show columns; the choice follows the account, not the device (`columnTableKey("investment-payments")`) |
+| `useCellSum` + `CellSumBar` | click a cell and move with the arrows, Shift+arrows for a rectangle, Enter/F2 to edit, Esc to cancel, drag to select, and a floating bar with count, sum and average |
+
+"Parcela nº" is hidden by default — most contracts number their instalments implicitly — and
+"Vencimento" is locked, since a payment with no date belongs to no month.
 
 ### Forecast versus reality
 

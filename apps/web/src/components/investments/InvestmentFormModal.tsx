@@ -9,7 +9,7 @@
  * the investment is created, adopted as its CONTRACT document.
  */
 import React, { useRef, useState } from "react";
-import { AlertCircle, FileUp, Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
+import { AlertCircle, FileUp, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,26 +17,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import {
     INDEX_LABELS,
     INVESTMENT_KIND_LABELS,
-    PAYMENT_KINDS,
-    PERIODICITY_LABELS,
-    formatBRL,
     type IndexCode,
     type InvestmentKind,
-    type PaymentKind,
-    type Periodicity,
 } from "@/lib/new-investments";
+import InvestmentScheduleEditor, { INDEX_CODES, type ScheduleDraft } from "./InvestmentScheduleEditor";
 import type { ExtractedInvestment } from "@/lib/new-investment-extract";
 import { checkInvestmentFile, stageInvestmentFile } from "@/lib/new-investment-upload-client";
-
-export interface ScheduleDraft {
-    label: string;
-    kind: PaymentKind;
-    installments: number;
-    amount: number;
-    first_due_on: string;
-    periodicity: Periodicity;
-    index_code: IndexCode;
-}
 
 export interface InvestmentFormValues {
     name: string;
@@ -67,9 +53,6 @@ const EMPTY: InvestmentFormValues = {
     total_price: "", down_payment: "", financed_amount: "", contract_date: "", keys_expected_on: "",
     index_before_keys: "NONE", index_after_keys: "NONE", estimated_rent: "", schedules: [],
 };
-
-const INDEX_CODES: IndexCode[] = ["NONE", "INCC", "IGPM", "IPCA", "CUB", "OTHER"];
-const PERIODICITIES: Periodicity[] = ["SINGLE", "MONTHLY", "QUARTERLY", "SEMIANNUAL", "ANNUAL"];
 
 const numberOrEmpty = (v: number | null): string => (v === null ? "" : String(v));
 
@@ -178,20 +161,6 @@ export default function InvestmentFormModal({ open, onClose, onSubmit }: Props) 
             setExtracting(false);
         }
     };
-
-    const addSchedule = () =>
-        set("schedules", [
-            ...values.schedules,
-            { label: "Parcelas mensais", kind: "PARCELA", installments: 12, amount: 0, first_due_on: "", periodicity: "MONTHLY", index_code: values.index_before_keys },
-        ]);
-
-    const patchSchedule = (index: number, patch: Partial<ScheduleDraft>) =>
-        set("schedules", values.schedules.map((s, i) => (i === index ? { ...s, ...patch } : s)));
-
-    const scheduleTotal = values.schedules.reduce(
-        (sum, s) => sum + s.amount * (s.periodicity === "SINGLE" ? 1 : Math.max(1, s.installments)),
-        0
-    );
 
     const submit = async () => {
         if (!values.name.trim()) {
@@ -346,121 +315,12 @@ export default function InvestmentFormModal({ open, onClose, onSubmit }: Props) 
                         </div>
                     </div>
 
-                    <div className="space-y-2 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                            <div>
-                                <h3 className="text-sm font-semibold text-foreground">Plano de pagamento</h3>
-                                <p className="text-xs text-muted-foreground">
-                                    Cada linha é um bloco do quadro resumo: quantas parcelas, de quanto, a partir de quando.
-                                </p>
-                            </div>
-                            <Button variant="outline" size="sm" onClick={addSchedule}>
-                                <Plus className="w-4 h-4 mr-1" /> Bloco
-                            </Button>
-                        </div>
-
-                        {values.schedules.length === 0 ? (
-                            <p className="rounded-lg border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-                                Nenhum bloco cadastrado. Sem ele não há previsão de parcelas no gráfico.
-                            </p>
-                        ) : (
-                            <div className="w-full min-w-0 overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                                            <th className="text-left font-semibold px-2 py-1">Descrição</th>
-                                            <th className="text-left font-semibold px-2 py-1">Tipo</th>
-                                            <th className="text-right font-semibold px-2 py-1">Parcelas</th>
-                                            <th className="text-right font-semibold px-2 py-1">Valor</th>
-                                            <th className="text-left font-semibold px-2 py-1">1º vencimento</th>
-                                            <th className="text-left font-semibold px-2 py-1">Periodicidade</th>
-                                            <th className="text-left font-semibold px-2 py-1">Índice</th>
-                                            <th className="px-1" />
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {values.schedules.map((s, index) => (
-                                            <tr key={index} className="border-t border-border/50">
-                                                <td className="px-2 py-1">
-                                                    <Input value={s.label} onChange={e => patchSchedule(index, { label: e.target.value })} className="h-8 text-xs min-w-[8rem]" />
-                                                </td>
-                                                <td className="px-2 py-1">
-                                                    <select
-                                                        value={s.kind}
-                                                        onChange={e => patchSchedule(index, { kind: e.target.value as PaymentKind })}
-                                                        className="h-8 rounded-md border border-input bg-background px-1 text-xs"
-                                                    >
-                                                        {PAYMENT_KINDS.map(k => <option key={k.kind} value={k.kind}>{k.label}</option>)}
-                                                    </select>
-                                                </td>
-                                                <td className="px-2 py-1">
-                                                    <Input
-                                                        type="number"
-                                                        min={1}
-                                                        value={s.installments}
-                                                        disabled={s.periodicity === "SINGLE"}
-                                                        onChange={e => patchSchedule(index, { installments: Number(e.target.value) || 1 })}
-                                                        className="h-8 w-20 text-xs text-right tabular-nums"
-                                                    />
-                                                </td>
-                                                <td className="px-2 py-1">
-                                                    <Input
-                                                        inputMode="decimal"
-                                                        value={s.amount || ""}
-                                                        onChange={e => patchSchedule(index, { amount: Number(e.target.value.replace(/\./g, "").replace(",", ".")) || 0 })}
-                                                        className="h-8 w-28 text-xs text-right tabular-nums"
-                                                    />
-                                                </td>
-                                                <td className="px-2 py-1">
-                                                    <Input
-                                                        type="date"
-                                                        value={s.first_due_on}
-                                                        onChange={e => patchSchedule(index, { first_due_on: e.target.value })}
-                                                        className="h-8 text-xs tabular-nums"
-                                                    />
-                                                </td>
-                                                <td className="px-2 py-1">
-                                                    <select
-                                                        value={s.periodicity}
-                                                        onChange={e => patchSchedule(index, { periodicity: e.target.value as Periodicity })}
-                                                        className="h-8 rounded-md border border-input bg-background px-1 text-xs"
-                                                    >
-                                                        {PERIODICITIES.map(p => <option key={p} value={p}>{PERIODICITY_LABELS[p]}</option>)}
-                                                    </select>
-                                                </td>
-                                                <td className="px-2 py-1">
-                                                    <select
-                                                        value={s.index_code}
-                                                        onChange={e => patchSchedule(index, { index_code: e.target.value as IndexCode })}
-                                                        className="h-8 rounded-md border border-input bg-background px-1 text-xs"
-                                                    >
-                                                        {INDEX_CODES.map(c => <option key={c} value={c}>{INDEX_LABELS[c]}</option>)}
-                                                    </select>
-                                                </td>
-                                                <td className="px-1 py-1">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => set("schedules", values.schedules.filter((_, i) => i !== index))}
-                                                        title="Remover bloco"
-                                                        aria-label="Remover bloco"
-                                                        className="p-1 rounded text-muted-foreground hover:text-rose-600"
-                                                    >
-                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                    <tfoot>
-                                        <tr>
-                                            <td colSpan={3} className="px-2 py-2 text-right text-[10px] uppercase tracking-wider text-muted-foreground">Total do plano</td>
-                                            <td colSpan={5} className="px-2 py-2 text-left text-sm font-semibold tabular-nums">{formatBRL(scheduleTotal)}</td>
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            </div>
-                        )}
-                    </div>
+                    <InvestmentScheduleEditor
+                        schedules={values.schedules}
+                        onChange={next => set("schedules", next)}
+                        defaultIndex={values.index_before_keys}
+                        disabled={saving || extracting}
+                    />
 
                     {error && (
                         <p className="flex items-start gap-2 text-sm text-rose-600">

@@ -1,18 +1,34 @@
 "use client";
 
 /**
- * The payment ledger of a Novo Investimento: one line per month, edited in place like a spreadsheet.
+ * The payment ledger of a Novo Investimento — the same spreadsheet the rest of the app uses.
  *
- * Above it sit the instalments the contract still owes (from the quadro resumo). "Registrar" turns
- * one into a line already filled in, which is the normal way a month is added: the owner pays the
- * developer, drops the receipt in and moves on.
+ * It is built on the shared table machinery, so it behaves exactly like Receitas de Aluguel and the
+ * condominium ledger: sort and filter from each header, right-click a header to hide or show
+ * columns (the choice follows the account), click a cell and move with the arrows, Shift+arrows to
+ * select a rectangle, Enter or F2 to edit, Esc to cancel, and a floating bar with the count, sum
+ * and average of the selected cells.
+ *
+ * Above the table sit the instalments the contract still owes (from the quadro resumo). Clicking one
+ * turns it into a line already filled in, which is the normal way a month is added: the owner pays
+ * the developer, drops the receipt in and moves on.
  */
 import React, { useMemo, useRef, useState } from "react";
-import { CalendarPlus, Check, Download, Loader2, Paperclip, Plus, Trash2, Upload, X } from "lucide-react";
+import { CalendarPlus, Check, Download, Loader2, Paperclip, Plus, Settings, Trash2, Upload, X } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { cn } from "@/lib/utils";
 import { formatDateBR } from "@/lib/dates";
 import MoneyInput, { parseMoneyText } from "@/components/properties/MoneyInput";
+import {
+    ColumnHeaders,
+    ColumnMenu,
+    FilterChips,
+    useColumnFilters,
+    type ColumnDef,
+} from "@/components/properties/TableColumnFilters";
+import { ColumnVisibilityMenu, useColumnVisibility } from "@/components/properties/TableColumnVisibility";
+import { CellSumBar, useCellSum } from "@/components/properties/TableCellSum";
+import { columnTableKey } from "@/lib/ui-preferences";
 import {
     PAYMENT_KINDS,
     formatBRL,
@@ -44,6 +60,8 @@ interface Props {
     onCreate: (draft: PaymentDraft) => Promise<boolean>;
     onPatch: (id: string, patch: Record<string, unknown>) => Promise<boolean>;
     onDelete: (id: string) => Promise<boolean>;
+    /** Opens the quadro resumo editor — the forecast above the table comes from it. */
+    onEditPlan?: () => void;
     busy?: boolean;
 }
 
@@ -59,7 +77,10 @@ const emptyDraft = (): PaymentDraft => ({
     notes: "",
 });
 
-const cellInput = "bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded px-1.5 py-1 outline-none w-full";
+const cellInput = "bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-none w-full px-1.5 py-1 outline-none";
+
+/** The sum bar prints an instalment number as a count, not as reais. */
+const SUM_FORMATS = { installment_number: (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 0 }) };
 
 export default function InvestmentPaymentsTable({
     payments,
@@ -68,6 +89,7 @@ export default function InvestmentPaymentsTable({
     onCreate,
     onPatch,
     onDelete,
+    onEditPlan,
     busy,
 }: Props) {
     const [draft, setDraft] = useState<PaymentDraft | null>(null);
@@ -78,11 +100,57 @@ export default function InvestmentPaymentsTable({
     const [showUpcoming, setShowUpcoming] = useState(true);
     const newFileRef = useRef<HTMLInputElement>(null);
 
-    const rows = useMemo(
-        () => [...payments].sort((a, b) => ((a.paid_on ?? a.due_on) < (b.paid_on ?? b.due_on) ? -1 : 1)),
-        [payments]
-    );
+    const sel = useCellSum({ formatByCol: SUM_FORMATS });
+    const vis = useColumnVisibility(columnTableKey("investment-payments"), {
+        locked: ["due_on"],
+        defaultHidden: ["installment_number"],
+    });
+
     const upcoming = useMemo(() => pendingInstalments(schedules, payments).slice(0, 6), [schedules, payments]);
+
+    const columns = useMemo<ColumnDef<InvestmentPayment>[]>(() => [
+        { key: "due_on", label: "Vencimento", kind: "date", get: r => r.due_on },
+        { key: "paid_on", label: "Pago em", kind: "date", get: r => r.paid_on ?? "" },
+        {
+            key: "kind",
+            label: "Tipo",
+            kind: "enum",
+            get: r => r.kind,
+            options: PAYMENT_KINDS.map(k => ({ value: k.kind, label: k.label })),
+        },
+        {
+            key: "status",
+            label: "Situação",
+            kind: "enum",
+            get: r => r.status,
+            options: [{ value: "PAID", label: "Pago" }, { value: "PLANNED", label: "Previsto" }],
+        },
+        { key: "installment_number", label: "Parcela nº", kind: "number", align: "right", sum: false, get: r => r.installment_number },
+        { key: "amount", label: "Valor", kind: "number", align: "right", get: r => r.amount },
+        {
+            key: "correction_amount",
+            label: "Correção",
+            kind: "number",
+            align: "right",
+            title: "INCC, IGP-M ou CUB cobrado sobre esta parcela",
+            get: r => r.correction_amount,
+        },
+        { key: "total", label: "Total", kind: "number", align: "right", title: "Valor + correção", get: r => paymentTotal(r) },
+        { key: "notes", label: "Observação", kind: "text", get: r => r.notes ?? "" },
+        {
+            key: "receipt",
+            label: "Comprovante",
+            kind: "enum",
+            align: "center",
+            get: r => (r.receipt_path ? "YES" : "NO"),
+            options: [{ value: "YES", label: "Anexado" }, { value: "NO", label: "Sem comprovante" }],
+        },
+    ], []);
+
+    const cf = useColumnFilters(payments, columns, { key: "due_on", dir: "asc" });
+    const rows = cf.rows;
+    const show = (key: string) => !vis.isHidden(key);
+    const visibleCount = columns.filter(c => show(c.key)).length;
 
     const totals = useMemo(() => {
         const paid = rows.filter(r => r.status === "PAID");
@@ -102,6 +170,9 @@ export default function InvestmentPaymentsTable({
         if (value === row[field]) return;
         await onPatch(row.id, { [field]: value });
     };
+
+    const cancelDraft = (rowId: string, field: string) =>
+        setDrafts(d => { const next = { ...d }; delete next[`${rowId}:${field}`]; return next; });
 
     const startFromInstalment = (inst: ScheduledInstalment) => {
         setDraft({
@@ -149,12 +220,18 @@ export default function InvestmentPaymentsTable({
         }
     };
 
+    /** Columns before "Valor", so the footer's label spans exactly the ones on screen. */
+    const labelSpan = Math.max(1, columns.slice(0, columns.findIndex(c => c.key === "amount")).filter(c => show(c.key)).length);
+
     return (
         <section className="rounded-xl border border-border/80 bg-card">
             <header className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-border/60">
                 <div>
                     <h2 className="text-sm font-semibold text-foreground">Pagamentos</h2>
-                    <p className="text-xs text-muted-foreground">Um lançamento por parcela paga, com o comprovante anexado.</p>
+                    <p className="text-xs text-muted-foreground">
+                        Um lançamento por parcela paga, com o comprovante anexado. Clique numa célula e ande com as setas;
+                        botão direito no cabeçalho esconde colunas.
+                    </p>
                 </div>
                 <Button size="sm" variant="outline" onClick={() => { setDraft(emptyDraft()); setError(null); }} disabled={busy || draft !== null}>
                     <Plus className="w-4 h-4 mr-1" /> Novo lançamento
@@ -163,13 +240,25 @@ export default function InvestmentPaymentsTable({
 
             {upcoming.length > 0 && (
                 <div className="px-4 py-3 border-b border-border/60 bg-muted/20">
-                    <button
-                        type="button"
-                        onClick={() => setShowUpcoming(v => !v)}
-                        className="text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground"
-                    >
-                        Próximas parcelas do contrato ({upcoming.length})
-                    </button>
+                    <div className="flex items-center justify-between gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setShowUpcoming(v => !v)}
+                            className="text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground"
+                        >
+                            Próximas parcelas do contrato ({upcoming.length})
+                        </button>
+                        {onEditPlan && (
+                            <button
+                                type="button"
+                                onClick={onEditPlan}
+                                title="Editar o plano de pagamento do contrato"
+                                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                            >
+                                <Settings className="w-3.5 h-3.5" /> Editar plano
+                            </button>
+                        )}
+                    </div>
                     {showUpcoming && (
                         <ul className="mt-2 flex flex-wrap gap-2">
                             {upcoming.map(inst => (
@@ -192,221 +281,305 @@ export default function InvestmentPaymentsTable({
                 </div>
             )}
 
-            <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                    <thead>
-                        <tr className="text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border/60">
-                            <th className="text-left font-semibold px-3 py-2">Vencimento</th>
-                            <th className="text-left font-semibold px-3 py-2">Pago em</th>
-                            <th className="text-left font-semibold px-3 py-2">Tipo</th>
-                            <th className="text-right font-semibold px-3 py-2">Valor</th>
-                            <th className="text-right font-semibold px-3 py-2">Correção</th>
-                            <th className="text-right font-semibold px-3 py-2">Total</th>
-                            <th className="text-left font-semibold px-3 py-2">Observação</th>
-                            <th className="text-center font-semibold px-3 py-2">Comprovante</th>
-                            <th className="px-2 py-2" />
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {rows.length === 0 && draft === null && (
-                            <tr>
-                                <td colSpan={9} className="px-3 py-8 text-center text-sm text-muted-foreground">
-                                    Nenhum pagamento lançado ainda. Comece pela entrada ou pelo sinal.
-                                </td>
-                            </tr>
-                        )}
+            <div className="px-4 py-3 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs text-muted-foreground">
+                        {payments.length} {payments.length === 1 ? "lançamento" : "lançamentos"}
+                        {cf.anyFilter && ` · ${rows.length} de ${payments.length}`}
+                        {vis.hiddenCount > 0 && ` · ${vis.hiddenCount} coluna${vis.hiddenCount === 1 ? "" : "s"} oculta${vis.hiddenCount === 1 ? "" : "s"}`}
+                    </span>
+                    <FilterChips columns={columns} ctl={cf} />
+                </div>
 
-                        {rows.map(row => (
-                            <tr key={row.id} className={cn("border-b border-border/40 hover:bg-muted/30", row.status === "PLANNED" && "text-muted-foreground")}>
-                                <td className="px-3 py-1.5">
-                                    <input
-                                        type="date"
-                                        value={row.due_on}
-                                        onChange={e => onPatch(row.id, { due_on: e.target.value })}
-                                        className={cn(cellInput, "tabular-nums")}
-                                    />
-                                </td>
-                                <td className="px-3 py-1.5">
-                                    <input
-                                        type="date"
-                                        value={row.paid_on ?? ""}
-                                        onChange={e => onPatch(row.id, { paid_on: e.target.value || null, status: e.target.value ? "PAID" : "PLANNED" })}
-                                        className={cn(cellInput, "tabular-nums")}
-                                    />
-                                </td>
-                                <td className="px-3 py-1.5">
-                                    <select
-                                        value={row.kind}
-                                        onChange={e => onPatch(row.id, { kind: e.target.value })}
-                                        className={cn(cellInput, "text-xs")}
-                                    >
-                                        {PAYMENT_KINDS.map(k => <option key={k.kind} value={k.kind}>{k.label}</option>)}
-                                    </select>
-                                </td>
-                                <td className="px-3 py-1.5">
-                                    <MoneyInput
-                                        value={row.amount}
-                                        draft={drafts[`${row.id}:amount`]}
-                                        onDraft={text => setDrafts(d => ({ ...d, [`${row.id}:amount`]: text }))}
-                                        onCommit={() => commitMoney(row, "amount")}
-                                    />
-                                </td>
-                                <td className="px-3 py-1.5">
-                                    <MoneyInput
-                                        value={row.correction_amount}
-                                        draft={drafts[`${row.id}:correction_amount`]}
-                                        onDraft={text => setDrafts(d => ({ ...d, [`${row.id}:correction_amount`]: text }))}
-                                        onCommit={() => commitMoney(row, "correction_amount")}
-                                        title="INCC, IGP-M ou CUB cobrado sobre esta parcela"
-                                    />
-                                </td>
-                                <td className="px-3 py-1.5 text-right font-semibold tabular-nums">{formatBRL(paymentTotal(row))}</td>
-                                <td className="px-3 py-1.5">
-                                    <input
-                                        type="text"
-                                        defaultValue={row.notes ?? ""}
-                                        onBlur={e => { if (e.target.value !== (row.notes ?? "")) onPatch(row.id, { notes: e.target.value || null }); }}
-                                        placeholder="—"
-                                        className={cn(cellInput, "text-xs min-w-[8rem]")}
-                                    />
-                                </td>
-                                <td className="px-3 py-1.5 text-center">
-                                    {row.receipt_path ? (
-                                        <a
-                                            href={receiptUrls[row.receipt_path] ?? "#"}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            title={row.receipt_name ?? "Comprovante"}
-                                            className="inline-flex items-center gap-1 text-xs text-emerald-600 hover:underline"
-                                        >
-                                            <Download className="w-3.5 h-3.5" /> ver
-                                        </a>
-                                    ) : (
-                                        <label className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer">
-                                            {uploading === row.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                <div className="overflow-x-auto -mx-2">
+                    <table className="w-full text-xs" style={{ minWidth: `${Math.max(560, visibleCount * 104)}px` }}>
+                        <thead>
+                            <ColumnHeaders columns={columns} ctl={cf} visibility={vis} trailing={<th className="px-2 py-2" />} />
+                        </thead>
+                        <tbody>
+                            {rows.length === 0 && draft === null && (
+                                <tr>
+                                    <td colSpan={visibleCount + 1} className="px-3 py-8 text-center text-sm text-muted-foreground">
+                                        {payments.length === 0
+                                            ? "Nenhum pagamento lançado ainda. Comece pela entrada ou pelo sinal."
+                                            : "Nenhum lançamento com os filtros atuais."}
+                                        {onEditPlan && payments.length === 0 && upcoming.length === 0 && (
+                                            <>
+                                                {" "}
+                                                <button type="button" onClick={onEditPlan} className="underline hover:text-foreground">
+                                                    Cadastre o plano de pagamento
+                                                </button>{" "}
+                                                para ver a previsão das parcelas.
+                                            </>
+                                        )}
+                                    </td>
+                                </tr>
+                            )}
+
+                            {rows.map(row => (
+                                <tr key={row.id} className={cn("border-b border-border/60 hover:bg-muted/30", row.status === "PLANNED" && "opacity-70")}>
+                                    {show("due_on") && (
+                                        <td {...sel.cellProps("due_on", row.id, null, "px-2 py-1")}>
                                             <input
+                                                type="date"
+                                                value={row.due_on}
+                                                onChange={e => onPatch(row.id, { due_on: e.target.value })}
+                                                aria-label="Vencimento"
+                                                className={cn(cellInput, "tabular-nums")}
+                                            />
+                                        </td>
+                                    )}
+                                    {show("paid_on") && (
+                                        <td {...sel.cellProps("paid_on", row.id, null, "px-2 py-1")}>
+                                            <input
+                                                type="date"
+                                                value={row.paid_on ?? ""}
+                                                onChange={e => onPatch(row.id, { paid_on: e.target.value || null, status: e.target.value ? "PAID" : "PLANNED" })}
+                                                aria-label="Pago em"
+                                                className={cn(cellInput, "tabular-nums")}
+                                            />
+                                        </td>
+                                    )}
+                                    {show("kind") && (
+                                        <td {...sel.cellProps("kind", row.id, null, "px-2 py-1")}>
+                                            <select
+                                                value={row.kind}
+                                                onChange={e => onPatch(row.id, { kind: e.target.value })}
+                                                aria-label="Tipo do pagamento"
+                                                className={cn(cellInput, "cursor-pointer")}
+                                            >
+                                                {PAYMENT_KINDS.map(k => <option key={k.kind} value={k.kind}>{k.label}</option>)}
+                                            </select>
+                                        </td>
+                                    )}
+                                    {show("status") && (
+                                        <td {...sel.cellProps("status", row.id, null, "px-2 py-1")}>
+                                            <select
+                                                value={row.status}
+                                                onChange={e => onPatch(row.id, { status: e.target.value })}
+                                                aria-label="Situação"
+                                                className={cn(cellInput, "cursor-pointer")}
+                                            >
+                                                <option value="PAID">Pago</option>
+                                                <option value="PLANNED">Previsto</option>
+                                            </select>
+                                        </td>
+                                    )}
+                                    {show("installment_number") && (
+                                        <td {...sel.cellProps("installment_number", row.id, row.installment_number, "px-2 py-1 text-right")}>
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                value={row.installment_number ?? ""}
+                                                onChange={e => onPatch(row.id, { installment_number: e.target.value ? Number(e.target.value) : null })}
+                                                aria-label="Número da parcela"
+                                                className={cn(cellInput, "text-right tabular-nums")}
+                                            />
+                                        </td>
+                                    )}
+                                    {show("amount") && (
+                                        <td {...sel.cellProps("amount", row.id, row.amount, "px-2 py-1 text-right", () => cancelDraft(row.id, "amount"))}>
+                                            <MoneyInput
+                                                value={row.amount}
+                                                draft={drafts[`${row.id}:amount`]}
+                                                onDraft={text => setDrafts(d => ({ ...d, [`${row.id}:amount`]: text }))}
+                                                onCommit={() => commitMoney(row, "amount")}
+                                            />
+                                        </td>
+                                    )}
+                                    {show("correction_amount") && (
+                                        <td {...sel.cellProps("correction_amount", row.id, row.correction_amount, "px-2 py-1 text-right", () => cancelDraft(row.id, "correction_amount"))}>
+                                            <MoneyInput
+                                                value={row.correction_amount}
+                                                draft={drafts[`${row.id}:correction_amount`]}
+                                                onDraft={text => setDrafts(d => ({ ...d, [`${row.id}:correction_amount`]: text }))}
+                                                onCommit={() => commitMoney(row, "correction_amount")}
+                                                title="INCC, IGP-M ou CUB cobrado sobre esta parcela"
+                                            />
+                                        </td>
+                                    )}
+                                    {show("total") && (
+                                        <td {...sel.cellProps("total", row.id, paymentTotal(row), "px-2 py-1 text-right font-semibold tabular-nums")}>
+                                            {formatBRL(paymentTotal(row))}
+                                        </td>
+                                    )}
+                                    {show("notes") && (
+                                        <td {...sel.cellProps("notes", row.id, null, "px-2 py-1")}>
+                                            <input
+                                                type="text"
+                                                defaultValue={row.notes ?? ""}
+                                                onBlur={e => { if (e.target.value !== (row.notes ?? "")) onPatch(row.id, { notes: e.target.value || null }); }}
+                                                onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                                                placeholder="—"
+                                                aria-label="Observação"
+                                                className={cn(cellInput, "min-w-[8rem]")}
+                                            />
+                                        </td>
+                                    )}
+                                    {show("receipt") && (
+                                        <td {...sel.cellProps("receipt", row.id, null, "px-2 py-1 text-center")}>
+                                            {row.receipt_path ? (
+                                                <a
+                                                    href={receiptUrls[row.receipt_path] ?? "#"}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    title={row.receipt_name ?? "Comprovante"}
+                                                    className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 hover:underline"
+                                                >
+                                                    <Download className="w-3.5 h-3.5" /> ver
+                                                </a>
+                                            ) : (
+                                                <label className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground cursor-pointer">
+                                                    {uploading === row.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                                                    <input
+                                                        type="file"
+                                                        accept=".pdf,.jpg,.jpeg,.png,.webp"
+                                                        className="sr-only"
+                                                        onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; if (f) uploadReceipt(f, row.id); }}
+                                                    />
+                                                    anexar
+                                                </label>
+                                            )}
+                                        </td>
+                                    )}
+                                    <td className="px-2 py-1 text-center">
+                                        <button
+                                            type="button"
+                                            onClick={() => onDelete(row.id)}
+                                            title="Excluir lançamento"
+                                            aria-label="Excluir lançamento"
+                                            className="text-muted-foreground hover:text-rose-600"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+
+                            {draft && (
+                                <tr className="border-b border-border/60 bg-emerald-50/50 dark:bg-emerald-950/20">
+                                    {show("due_on") && (
+                                        <td className="px-2 py-1">
+                                            <input type="date" value={draft.due_on} onChange={e => setDraft({ ...draft, due_on: e.target.value })} aria-label="Vencimento do novo lançamento" className={cn(cellInput, "tabular-nums")} />
+                                        </td>
+                                    )}
+                                    {show("paid_on") && (
+                                        <td className="px-2 py-1">
+                                            <input
+                                                type="date"
+                                                value={draft.paid_on}
+                                                onChange={e => setDraft({ ...draft, paid_on: e.target.value, status: e.target.value ? "PAID" : "PLANNED" })}
+                                                aria-label="Data do pagamento"
+                                                className={cn(cellInput, "tabular-nums")}
+                                            />
+                                        </td>
+                                    )}
+                                    {show("kind") && (
+                                        <td className="px-2 py-1">
+                                            <select value={draft.kind} onChange={e => setDraft({ ...draft, kind: e.target.value as PaymentKind })} aria-label="Tipo do novo lançamento" className={cn(cellInput, "cursor-pointer")}>
+                                                {PAYMENT_KINDS.map(k => <option key={k.kind} value={k.kind}>{k.label}</option>)}
+                                            </select>
+                                        </td>
+                                    )}
+                                    {show("status") && <td className="px-2 py-1 text-muted-foreground">{draft.status === "PAID" ? "Pago" : "Previsto"}</td>}
+                                    {show("installment_number") && <td className="px-2 py-1" />}
+                                    {show("amount") && (
+                                        <td className="px-2 py-1 text-right">
+                                            <MoneyInput
+                                                value={draft.amount}
+                                                draft={drafts["new:amount"]}
+                                                onDraft={text => setDrafts(d => ({ ...d, "new:amount": text }))}
+                                                onCommit={() => {
+                                                    const text = drafts["new:amount"];
+                                                    setDrafts(d => { const next = { ...d }; delete next["new:amount"]; return next; });
+                                                    if (text !== undefined) setDraft(prev => (prev ? { ...prev, amount: parseMoneyText(text) ?? 0 } : prev));
+                                                }}
+                                            />
+                                        </td>
+                                    )}
+                                    {show("correction_amount") && (
+                                        <td className="px-2 py-1 text-right">
+                                            <MoneyInput
+                                                value={draft.correction_amount}
+                                                draft={drafts["new:correction"]}
+                                                onDraft={text => setDrafts(d => ({ ...d, "new:correction": text }))}
+                                                onCommit={() => {
+                                                    const text = drafts["new:correction"];
+                                                    setDrafts(d => { const next = { ...d }; delete next["new:correction"]; return next; });
+                                                    if (text !== undefined) setDraft(prev => (prev ? { ...prev, correction_amount: parseMoneyText(text) ?? 0 } : prev));
+                                                }}
+                                            />
+                                        </td>
+                                    )}
+                                    {show("total") && <td className="px-2 py-1 text-right font-semibold tabular-nums">{formatBRL(draft.amount + draft.correction_amount)}</td>}
+                                    {show("notes") && (
+                                        <td className="px-2 py-1">
+                                            <input
+                                                type="text"
+                                                value={draft.notes}
+                                                onChange={e => setDraft({ ...draft, notes: e.target.value })}
+                                                placeholder="Observação"
+                                                aria-label="Observação do novo lançamento"
+                                                className={cn(cellInput, "min-w-[8rem]")}
+                                            />
+                                        </td>
+                                    )}
+                                    {show("receipt") && (
+                                        <td className="px-2 py-1 text-center">
+                                            <button
+                                                type="button"
+                                                onClick={() => newFileRef.current?.click()}
+                                                className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                                            >
+                                                {uploading === "new" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Paperclip className="w-3.5 h-3.5" />}
+                                                {draft.receipt_name ? draft.receipt_name.slice(0, 14) : "anexar"}
+                                            </button>
+                                            <input
+                                                ref={newFileRef}
                                                 type="file"
                                                 accept=".pdf,.jpg,.jpeg,.png,.webp"
                                                 className="sr-only"
-                                                onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; if (f) uploadReceipt(f, row.id); }}
+                                                onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; if (f) uploadReceipt(f, null); }}
                                             />
-                                            anexar
-                                        </label>
+                                        </td>
                                     )}
-                                </td>
-                                <td className="px-2 py-1.5 text-right">
-                                    <button
-                                        type="button"
-                                        onClick={() => onDelete(row.id)}
-                                        title="Excluir lançamento"
-                                        aria-label="Excluir lançamento"
-                                        className="p-1 rounded text-muted-foreground hover:text-rose-600"
-                                    >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
-
-                        {draft && (
-                            <tr className="border-b border-border/40 bg-emerald-50/50 dark:bg-emerald-950/20">
-                                <td className="px-3 py-1.5">
-                                    <input type="date" value={draft.due_on} onChange={e => setDraft({ ...draft, due_on: e.target.value })} className={cn(cellInput, "tabular-nums")} />
-                                </td>
-                                <td className="px-3 py-1.5">
-                                    <input
-                                        type="date"
-                                        value={draft.paid_on}
-                                        onChange={e => setDraft({ ...draft, paid_on: e.target.value, status: e.target.value ? "PAID" : "PLANNED" })}
-                                        className={cn(cellInput, "tabular-nums")}
-                                    />
-                                </td>
-                                <td className="px-3 py-1.5">
-                                    <select value={draft.kind} onChange={e => setDraft({ ...draft, kind: e.target.value as PaymentKind })} className={cn(cellInput, "text-xs")}>
-                                        {PAYMENT_KINDS.map(k => <option key={k.kind} value={k.kind}>{k.label}</option>)}
-                                    </select>
-                                </td>
-                                <td className="px-3 py-1.5">
-                                    <MoneyInput
-                                        value={draft.amount}
-                                        draft={drafts["new:amount"]}
-                                        onDraft={text => setDrafts(d => ({ ...d, "new:amount": text }))}
-                                        onCommit={() => {
-                                            const text = drafts["new:amount"];
-                                            setDrafts(d => { const next = { ...d }; delete next["new:amount"]; return next; });
-                                            if (text !== undefined) setDraft(prev => (prev ? { ...prev, amount: parseMoneyText(text) ?? 0 } : prev));
-                                        }}
-                                    />
-                                </td>
-                                <td className="px-3 py-1.5">
-                                    <MoneyInput
-                                        value={draft.correction_amount}
-                                        draft={drafts["new:correction"]}
-                                        onDraft={text => setDrafts(d => ({ ...d, "new:correction": text }))}
-                                        onCommit={() => {
-                                            const text = drafts["new:correction"];
-                                            setDrafts(d => { const next = { ...d }; delete next["new:correction"]; return next; });
-                                            if (text !== undefined) setDraft(prev => (prev ? { ...prev, correction_amount: parseMoneyText(text) ?? 0 } : prev));
-                                        }}
-                                    />
-                                </td>
-                                <td className="px-3 py-1.5 text-right font-semibold tabular-nums">
-                                    {formatBRL(draft.amount + draft.correction_amount)}
-                                </td>
-                                <td className="px-3 py-1.5">
-                                    <input
-                                        type="text"
-                                        value={draft.notes}
-                                        onChange={e => setDraft({ ...draft, notes: e.target.value })}
-                                        placeholder="Observação"
-                                        className={cn(cellInput, "text-xs min-w-[8rem]")}
-                                    />
-                                </td>
-                                <td className="px-3 py-1.5 text-center">
-                                    <button
-                                        type="button"
-                                        onClick={() => newFileRef.current?.click()}
-                                        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                                    >
-                                        {uploading === "new" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Paperclip className="w-3.5 h-3.5" />}
-                                        {draft.receipt_name ? draft.receipt_name.slice(0, 14) : "anexar"}
-                                    </button>
-                                    <input
-                                        ref={newFileRef}
-                                        type="file"
-                                        accept=".pdf,.jpg,.jpeg,.png,.webp"
-                                        className="sr-only"
-                                        onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; if (f) uploadReceipt(f, null); }}
-                                    />
-                                </td>
-                                <td className="px-2 py-1.5">
-                                    <div className="flex items-center gap-1 justify-end">
-                                        <button type="button" onClick={save} disabled={saving} title="Salvar" aria-label="Salvar lançamento" className="p-1 rounded text-emerald-600 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 disabled:opacity-50">
-                                            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                                        </button>
-                                        <button type="button" onClick={() => { setDraft(null); setError(null); }} title="Cancelar" aria-label="Cancelar" className="p-1 rounded text-muted-foreground hover:text-foreground">
-                                            <X className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
+                                    <td className="px-2 py-1">
+                                        <div className="flex items-center gap-1 justify-end">
+                                            <button type="button" onClick={save} disabled={saving} title="Salvar" aria-label="Salvar lançamento" className="p-1 rounded text-emerald-600 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 disabled:opacity-50">
+                                                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                                            </button>
+                                            <button type="button" onClick={() => { setDraft(null); setError(null); }} title="Cancelar" aria-label="Cancelar" className="p-1 rounded text-muted-foreground hover:text-foreground">
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                        {rows.length > 0 && (
+                            <tfoot>
+                                <tr className="font-semibold border-t border-border">
+                                    <td colSpan={labelSpan} className="px-2 py-2 text-right text-[10px] uppercase tracking-wider text-muted-foreground">
+                                        Total pago
+                                    </td>
+                                    {show("amount") && <td className="px-2 py-2 text-right tabular-nums">{formatBRL(totals.paid - totals.corrections)}</td>}
+                                    {show("correction_amount") && <td className="px-2 py-2 text-right tabular-nums">{formatBRL(totals.corrections)}</td>}
+                                    {show("total") && <td className="px-2 py-2 text-right tabular-nums text-emerald-700 dark:text-emerald-400">{formatBRL(totals.paid)}</td>}
+                                    <td colSpan={3} className="px-2 py-2 text-[11px] font-normal text-muted-foreground">
+                                        {totals.planned > 0 ? `${formatBRL(totals.planned)} lançados como previstos` : ""}
+                                    </td>
+                                </tr>
+                            </tfoot>
                         )}
-                    </tbody>
-                    <tfoot>
-                        <tr className="text-sm font-semibold">
-                            <td colSpan={3} className="px-3 py-2 text-right text-muted-foreground uppercase text-[10px] tracking-wider">Total pago</td>
-                            <td className="px-3 py-2 text-right tabular-nums">{formatBRL(totals.paid - totals.corrections)}</td>
-                            <td className="px-3 py-2 text-right tabular-nums">{formatBRL(totals.corrections)}</td>
-                            <td className="px-3 py-2 text-right tabular-nums text-emerald-600">{formatBRL(totals.paid)}</td>
-                            <td colSpan={3} className="px-3 py-2 text-xs font-normal text-muted-foreground">
-                                {totals.planned > 0 ? `${formatBRL(totals.planned)} lançados como previstos` : ""}
-                            </td>
-                        </tr>
-                    </tfoot>
-                </table>
+                    </table>
+                </div>
+
+                {error && <p className="text-xs text-rose-600">{error}</p>}
             </div>
 
-            {error && <p className="px-4 py-2 text-xs text-rose-600">{error}</p>}
+            <ColumnMenu columns={columns} ctl={cf} />
+            <ColumnVisibilityMenu columns={columns} ctl={vis} />
+            <CellSumBar ctl={sel} />
         </section>
     );
 }
