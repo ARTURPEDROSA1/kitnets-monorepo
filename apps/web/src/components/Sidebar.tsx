@@ -339,17 +339,6 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                             </li>
                                             <li>
                                                 <Link
-                                                    title={navCollapsed ? "Proprietário" : undefined}
-                                                    href={lang === 'pt' ? '/proprietario' : `/${lang}/proprietario`}
-                                                    aria-current={isActive(lang === 'pt' ? '/proprietario' : `/${lang}/proprietario`) ? "page" : undefined}
-                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/proprietario' : `/${lang}/proprietario`) ? 'bg-accent' : ''}`}
-                                                >
-                                                    <User className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 sidebar-label">Proprietário</span>
-                                                </Link>
-                                            </li>
-                                            <li>
-                                                <Link
                                                     title={navCollapsed ? "Imóveis" : undefined}
                                                     href={lang === 'pt' ? '/imoveis' : `/${lang}/imoveis`}
                                                     aria-current={isActive(lang === 'pt' ? '/imoveis' : `/${lang}/imoveis`) ? "page" : undefined}
@@ -481,6 +470,17 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                                 </Link>
                                             </li>
                                             <li className="my-2 border-t border-border" />
+                                            <li>
+                                                <Link
+                                                    title={navCollapsed ? "Proprietário" : undefined}
+                                                    href={lang === 'pt' ? '/proprietario' : `/${lang}/proprietario`}
+                                                    aria-current={isActive(lang === 'pt' ? '/proprietario' : `/${lang}/proprietario`) ? "page" : undefined}
+                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/proprietario' : `/${lang}/proprietario`) ? 'bg-accent' : ''}`}
+                                                >
+                                                    <User className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3 sidebar-label">Proprietário</span>
+                                                </Link>
+                                            </li>
                                             <li>
                                                 <SignOutButton>
                                                     <button
