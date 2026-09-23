@@ -32,18 +32,18 @@ export type InvestmentStatus = "ACTIVE" | "COMPLETED" | "ARCHIVED";
 export type InvestmentKind = "APARTMENT" | "STUDIO" | "HOUSE" | "PARKING" | "LOT" | "COMMERCIAL" | "OTHER";
 export type DocumentKind = "CONTRACT" | "MARKETING" | "PHOTO" | "LAYOUT" | "RECEIPT" | "OTHER";
 
-export const PAYMENT_KINDS: ReadonlyArray<{ kind: PaymentKind; label: string; hint: string }> = [
-    { kind: "SINAL", label: "Sinal / reserva", hint: "Valor pago para reservar a unidade, antes do contrato" },
-    { kind: "ENTRADA", label: "Entrada", hint: "Entrada do contrato, à vista ou em poucas parcelas" },
-    { kind: "PARCELA", label: "Parcela mensal", hint: "Parcela do parcelamento direto com a construtora" },
-    { kind: "PARCELA_ANUAL", label: "Parcela anual", hint: "Parcela anual (balão) prevista no contrato" },
-    { kind: "INTERCALADA", label: "Intercalada", hint: "Reforço semestral ou parcela fora do fluxo mensal" },
-    { kind: "INICIO_OBRAS", label: "Início de obras", hint: "Valor devido quando a obra começa, antes das chaves" },
-    { kind: "CHAVES", label: "Parcela das chaves", hint: "Valor pago na entrega das chaves" },
-    { kind: "AMORTIZACAO", label: "Amortização", hint: "Pagamento extra que reduz o saldo devedor" },
-    { kind: "CORRECAO", label: "Correção do índice", hint: "INCC, IGP-M ou CUB cobrado à parte da parcela" },
-    { kind: "TAXAS", label: "Taxas e impostos", hint: "ITBI, registro, escritura, taxa de interveniência" },
-    { kind: "OUTROS", label: "Outros", hint: "Qualquer outro desembolso do investimento" },
+export const PAYMENT_KINDS: ReadonlyArray<{ kind: PaymentKind; label: string; short: string; hint: string }> = [
+    { kind: "SINAL", label: "Sinal / reserva", short: "Sinal", hint: "Valor pago para reservar a unidade, antes do contrato" },
+    { kind: "ENTRADA", label: "Entrada", short: "Entrada", hint: "Entrada do contrato, à vista ou em poucas parcelas" },
+    { kind: "PARCELA", label: "Parcela mensal", short: "Mensais", hint: "Parcela do parcelamento direto com a construtora" },
+    { kind: "PARCELA_ANUAL", label: "Parcela anual", short: "Anuais", hint: "Parcela anual (balão) prevista no contrato" },
+    { kind: "INTERCALADA", label: "Intercalada", short: "Intercaladas", hint: "Reforço semestral ou parcela fora do fluxo mensal" },
+    { kind: "INICIO_OBRAS", label: "Início de obras", short: "Início de obras", hint: "Valor devido quando a obra começa, antes das chaves" },
+    { kind: "CHAVES", label: "Parcela das chaves", short: "Chaves", hint: "Valor pago na entrega das chaves" },
+    { kind: "AMORTIZACAO", label: "Amortização", short: "Amortizações", hint: "Pagamento extra que reduz o saldo devedor" },
+    { kind: "CORRECAO", label: "Correção do índice", short: "Correções", hint: "INCC, IGP-M ou CUB cobrado à parte da parcela" },
+    { kind: "TAXAS", label: "Taxas e impostos", short: "Taxas", hint: "ITBI, registro, escritura, taxa de interveniência" },
+    { kind: "OUTROS", label: "Outros", short: "Outros", hint: "Qualquer outro desembolso do investimento" },
 ];
 
 export const PAYMENT_KIND_VALUES = PAYMENT_KINDS.map(k => k.kind) as PaymentKind[];
@@ -275,10 +275,19 @@ export function pendingInstalments(
     return pending;
 }
 
+/** The least a thing needs to be groupable: a forecast instalment or a payment typed as planned. */
+export interface OpenInstalment {
+    kind: PaymentKind;
+    dueOn: string;
+    amount: number;
+}
+
 /** One line per kind still owed: what an investor picks from when deciding what to anticipate. */
 export interface PendingKindSummary {
     kind: PaymentKind;
     label: string;
+    /** Compact plural for a KPI row or a filter chip ("Mensais"). */
+    short: string;
     count: number;
     /** Contracted total still open for this kind, before any index correction. */
     total: number;
@@ -293,7 +302,7 @@ export interface PendingKindSummary {
  * anticipate, and a plan of 140 monthly instalments plus 11 annual ones is impossible to act on as
  * one flat list — so the dashboard offers the kinds, with what each one still costs.
  */
-export function pendingByKind(instalments: ScheduledInstalment[]): PendingKindSummary[] {
+export function pendingByKind(instalments: OpenInstalment[]): PendingKindSummary[] {
     const byKind = new Map<PaymentKind, { count: number; total: number; nextDueOn: string }>();
     for (const inst of instalments) {
         const current = byKind.get(inst.kind);
@@ -308,6 +317,7 @@ export function pendingByKind(instalments: ScheduledInstalment[]): PendingKindSu
     return PAYMENT_KINDS.filter(k => byKind.has(k.kind)).map(k => ({
         kind: k.kind,
         label: k.label,
+        short: k.short,
         ...byKind.get(k.kind)!,
     }));
 }

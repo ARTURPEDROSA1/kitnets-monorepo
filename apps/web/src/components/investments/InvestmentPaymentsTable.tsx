@@ -297,7 +297,7 @@ export default function InvestmentPaymentsTable({
                                         selectedKind === k.kind ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-semibold" : "border-border text-muted-foreground hover:border-emerald-400"
                                     )}
                                 >
-                                    {k.label} ({k.count})
+                                    {k.short} ({k.count})
                                 </button>
                             ))}
                         </div>
