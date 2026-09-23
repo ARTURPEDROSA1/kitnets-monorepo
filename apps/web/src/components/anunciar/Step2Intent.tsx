@@ -4,7 +4,7 @@ import React from "react";
 import { useAnunciar } from "./AnunciarContext";
 import { StepLayout } from "./StepLayout";
 import { SelectCard } from "./SelectCard";
-import { Rocket, Tag, KeyRound } from "lucide-react";
+import { Rocket, KeyRound } from "lucide-react";
 import { ListingIntent } from "./types";
 import { Button } from "@kitnets/ui";
 
@@ -25,11 +25,6 @@ export function Step2Intent() {
             label: "Lançar (Empreendimento)",
             icon: <Rocket className="w-6 h-6" />,
             recommendedFor: ['builder']
-        },
-        {
-            value: "sale",
-            label: "Vender",
-            icon: <Tag className="w-6 h-6" />
         },
         {
             value: "rent",

@@ -58,7 +58,7 @@ export function Step9Review() {
             }
 
             // 3. Insert Listing
-            const priceStr = data.intent === 'rent' ? data.details.rentValue : data.details.salePrice;
+            const priceStr = data.intent === 'rent' ? data.details.rentValue : '';
             const price = parseFloat(priceStr.replace(/[^0-9,.]/g, '').replace(',', '.'));
 
             const area = parseFloat(data.details.area.replace(/[^0-9,.]/g, '').replace(',', '.'));
@@ -110,7 +110,7 @@ export function Step9Review() {
                         )}
                     </div>
                     <div>
-                        <h3 className="font-semibold text-lg capitalize">{data.propertyType} para {data.intent === 'rent' ? 'Alugar' : data.intent === 'sale' ? 'Venda' : 'Lançamento'}</h3>
+                        <h3 className="font-semibold text-lg capitalize">{data.propertyType} para {data.intent === 'rent' ? 'Alugar' : 'Lançamento'}</h3>
                         <div className="flex items-center text-muted-foreground text-sm mt-1">
                             <MapPin className="w-3 h-3 mr-1" />
                             {data.location.city} - {data.location.neighborhood}
@@ -128,11 +128,11 @@ export function Step9Review() {
                         <span className="font-medium">{data.details.bedrooms}</span>
                     </div>
 
-                    {(data.intent === 'rent' || data.intent === 'sale') && (
+                    {data.intent === 'rent' && (
                         <div className="col-span-2">
                             <span className="text-muted-foreground block">Valor</span>
                             <span className="font-semibold text-lg text-primary dark:text-emerald-500">
-                                R$ {data.intent === 'rent' ? data.details.rentValue : data.details.salePrice}
+                                R$ {data.details.rentValue}
                             </span>
                         </div>
                     )}

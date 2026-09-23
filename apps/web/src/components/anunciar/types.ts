@@ -1,5 +1,6 @@
 export type UserRole = 'builder' | 'broker' | 'agency' | 'owner';
-export type ListingIntent = 'launch' | 'sale' | 'rent';
+/** Renting is what kitnets.com is about; "vender" left the wizard on 2026-09-24 (owner's call). */
+export type ListingIntent = 'launch' | 'rent';
 export type PropertyType = 'kitnet' | 'apartment' | 'house' | 'commercial' | 'land' | 'other';
 import { OwnershipClaim } from '@/types/ownership';
 
@@ -31,8 +32,6 @@ export interface ListingData {
         condoFee: string;
         tax: string;
         minPeriod: string;
-        salePrice: string;
-        financing: boolean;
     };
     media: {
         photos: (File | string)[]; // Can be File objects or URL strings

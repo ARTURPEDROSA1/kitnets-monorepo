@@ -81,7 +81,8 @@ interface PropertyCostCenterDashboardProps {
     };
     lang?: string;
     onBack: () => void;
-    onQuickPublish: (mode: 'rent' | 'sale') => void;
+    /** Renting only: kitnets.com has no sale listings (owner's call, 2026-09-24). */
+    onQuickPublish: (mode: 'rent') => void;
     onUpdateDetails: (updatedDetails: PropertyDetails) => void;
 }
 
@@ -462,14 +463,6 @@ export default function PropertyCostCenterDashboard({
                     >
                         <Home className="w-3.5 h-3.5" />
                         Anunciar Aluguel
-                    </Button>
-                    <Button
-                        size="sm"
-                        onClick={() => onQuickPublish('sale')}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 text-xs font-medium shadow-xs"
-                    >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        Anunciar Venda
                     </Button>
                     <Link href={dbId ? `/${lang}/dashboard/energy/${dbId}` : `/${lang}/dashboard/energy`}>
                         <Button

@@ -2151,7 +2151,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
 
     if (!isLoaded || !user) return <div className="p-8 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-emerald-600" /></div>;
 
-    const handleQuickPublish = (intent: 'rent' | 'sale', targetPropIdx: number = 0) => {
+    const handleQuickPublish = (intent: 'rent', targetPropIdx: number = 0) => {
         const targetProp = properties[targetPropIdx] || properties[0];
         const propAddr = targetProp ? targetProp.address : formData.propertyAddress;
         const propDetails = targetProp ? targetProp.details : propertyDetails;
@@ -2195,8 +2195,6 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                 condoFee: "",
                 tax: "",
                 minPeriod: "12",
-                salePrice: "",
-                financing: false,
             },
             media: {
                 photos: propPhotos,
