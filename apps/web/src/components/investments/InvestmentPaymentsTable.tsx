@@ -478,7 +478,7 @@ export default function InvestmentPaymentsTable({
             value={value ?? ""}
             onChange={e => onChange((e.target.value || null) as Payer | null)}
             aria-label={label}
-            className={cn(cellInput, "cursor-pointer")}
+            className={cn(cellInput, "w-auto cursor-pointer")}
         >
             {PAYER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
@@ -682,7 +682,7 @@ export default function InvestmentPaymentsTable({
                                                     value={row.kind}
                                                     onChange={e => onPatch(row.id, { kind: e.target.value })}
                                                     aria-label="Tipo do pagamento"
-                                                    className={cn(cellInput, "cursor-pointer")}
+                                                    className={cn(cellInput, "w-auto cursor-pointer")}
                                                 >
                                                     {PAYMENT_KINDS.map(k => <option key={k.kind} value={k.kind}>{k.label}</option>)}
                                                 </select>
@@ -694,7 +694,7 @@ export default function InvestmentPaymentsTable({
                                                     value={row.status}
                                                     onChange={e => onPatch(row.id, { status: e.target.value })}
                                                     aria-label="Situação"
-                                                    className={cn(cellInput, "cursor-pointer")}
+                                                    className={cn(cellInput, "w-auto cursor-pointer")}
                                                 >
                                                     <option value="PAID">Pago</option>
                                                     <option value="PLANNED">Previsto</option>
@@ -827,7 +827,7 @@ export default function InvestmentPaymentsTable({
                                     )}
                                     {show("kind") && (
                                         <td className="px-2 py-1">
-                                            <select value={draft.kind} onChange={e => setDraft({ ...draft, kind: e.target.value as PaymentKind })} aria-label="Tipo do novo lançamento" className={cn(cellInput, "cursor-pointer")}>
+                                            <select value={draft.kind} onChange={e => setDraft({ ...draft, kind: e.target.value as PaymentKind })} aria-label="Tipo do novo lançamento" className={cn(cellInput, "w-auto cursor-pointer")}>
                                                 {PAYMENT_KINDS.map(k => <option key={k.kind} value={k.kind}>{k.label}</option>)}
                                             </select>
                                         </td>
