@@ -246,6 +246,8 @@ export function investmentRow(input: Partial<InvestmentInput>): Record<string, u
             neighborhood: input.neighborhood ?? null,
         });
     }
+    // Sent whole by the edit dialog, and then it is the address: the create form sends the parts.
+    if (input.address !== undefined) row.address = input.address;
     return row;
 }
 

@@ -97,6 +97,8 @@ export const investmentInputSchema = z.object({
     street: optionalText(200),
     street_number: optionalText(20),
     neighborhood: optionalText(100),
+    /** The one-line address as stored; the edit dialog sends this instead of the parts. */
+    address: optionalText(300),
     city: optionalText(100),
     state: optionalText(2).transform((v) => (v ? v.toUpperCase() : null)),
 
