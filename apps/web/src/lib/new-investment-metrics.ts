@@ -335,6 +335,9 @@ export interface InvestmentCardSummary {
     coverUrl: string | null;
     /** Signed URLs the card slides through: the cover first, then the other photos in upload order. */
     photoUrls: string[];
+    /** A sold project: what came in net of the sale's costs, and the gain over what was paid. */
+    saleNet: number | null;
+    realizedGain: number | null;
 }
 
 /** How many pictures a list card is willing to carry; the lightbox shows the rest. */
@@ -366,5 +369,7 @@ export function toCardSummary(id: string, metrics: InvestmentMetrics, documents:
         documents,
         coverUrl: photoUrls[0] ?? null,
         photoUrls,
+        saleNet: metrics.saleNet,
+        realizedGain: metrics.realizedGain,
     };
 }
