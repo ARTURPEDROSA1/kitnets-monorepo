@@ -123,13 +123,33 @@ used to land on `OUTROS`, which hid it from every reading of the plan. The extra
 "Parcela nº" is hidden by default — most contracts number their instalments implicitly — and
 "Vencimento" is locked, since a payment with no date belongs to no month.
 
+### What was paid, and what of it was correction
+
+A row holds two typed facts and one derived figure:
+
+| Column | What it is |
+|---|---|
+| **Valor** | the contracted instalment, as the quadro resumo has it |
+| **Valor pago** | what actually left the account — the figure on the receipt |
+| **Correção** | derived: `valor pago − valor`. Positive when CUB/INCC has accrued, **negative when the developer discounted an anticipated instalment** |
+
+Editing either fact keeps the other and recomputes the correction, so a row never holds three
+numbers that disagree. `correction_amount` is stored signed for that reason — the non-negative
+CHECK was dropped, because a discount for paying early is the usual reason to pay early.
+
 ### Forecast versus reality
 
 `expandSchedule` turns a block into dated instalments (the due day is clamped on short months, so a
 31/08 first date lands on 30/09). `pendingInstalments` then removes the instalments a payment
-already answers — same month, same kind — and what is left is what the owner still owes. This is
+already answers — same **due** month, same kind — and what is left is what the owner still owes. This is
 why the chart never double-counts a month, and why `remaining` shrinks as payments are entered
 without anyone having to tick anything off.
+
+The match is on the **due** date, never on the date the money moved. Anticipating is the point of
+paying ahead: an instalment due in 2036 and settled in 2026 has to clear, and keying on the paid
+month left it open forever while the payment sat in the ledger. The two dates part ways exactly
+when it matters most, which is why the cash-flow chart — where the question is when money moved —
+uses `paymentMonth` instead.
 
 The consequence worth knowing: **`committed` (paid + remaining) drifts above the contract price**,
 because the INCC-M and IGP-M corrections actually paid are real money and the forecast carries no

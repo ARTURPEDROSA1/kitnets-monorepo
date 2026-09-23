@@ -249,9 +249,13 @@ export function paymentTotal(payment: Pick<InvestmentPayment, "amount" | "correc
 /**
  * Forecast instalments that no payment covers yet.
  *
- * A payment answers an instalment when both fall in the same month and carry the same kind; a
- * month with more payments than instalments simply consumes them all. Everything left is what
- * the owner still owes, and that is what the chart draws as forecast.
+ * A payment answers an instalment when their **due** months and kinds match; a month with more
+ * payments than instalments simply consumes them all. Everything left is what the owner still
+ * owes, and that is what the chart draws as forecast.
+ *
+ * It has to be the due date, not the date the money moved: anticipating is the whole point of
+ * paying ahead, and a 2036 instalment settled in 2026 would otherwise stay open forever while the
+ * payment sat in the ledger.
  */
 export function pendingInstalments(
     schedules: InvestmentSchedule[],
@@ -259,7 +263,7 @@ export function pendingInstalments(
 ): ScheduledInstalment[] {
     const taken = new Map<string, number>();
     for (const p of payments) {
-        const key = `${paymentMonth(p)}|${p.kind}`;
+        const key = `${p.due_on.slice(0, 7)}|${p.kind}`;
         taken.set(key, (taken.get(key) ?? 0) + 1);
     }
     const pending: ScheduledInstalment[] = [];
