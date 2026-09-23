@@ -61,6 +61,12 @@ interface Bundle {
 
 const NO_BENCHMARKS: InvestmentBenchmarks = { cdi12mPct: null, cdiAsOf: null, fipezapSale12mPct: null, fipezapAsOf: null };
 const pct1 = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+
+/** FipeZap's 12-month sale variation compounded until the keys: a starting point for "valorização esperada", not a forecast. */
+function suggestedAppreciation(fipezap12mPct: number | null, monthsToKeys: number | null): number | null {
+    if (fipezap12mPct === null || monthsToKeys === null || monthsToKeys <= 0) return null;
+    return Math.round((Math.pow(1 + fipezap12mPct / 100, monthsToKeys / 12) - 1) * 1000) / 10;
+}
 const signed = (v: number, digits = 0) => `${v > 0 ? "+" : ""}${formatBRL(v, digits)}`;
 
 interface Props {
@@ -319,14 +325,17 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                     tone={metrics.appreciationGain === null ? "slate" : metrics.appreciationGain >= 0 ? "emerald" : "rose"}
                     icon={<Gem className="w-4 h-4" />}
                     value={metrics.appreciationGain !== null ? signed(metrics.appreciationGain) : "—"}
+                    title="Toque para informar a valorização esperada"
+                    onClick={() => setDetailsOpen(true)}
                     hint={
                         <span className="block space-y-0.5 pt-0.5">
                             {metrics.deliveryValue !== null && metrics.appreciationPct !== null ? (
                                 <span className="block">
                                     {metrics.appreciationPct > 0 ? "+" : ""}{pct1(metrics.appreciationPct)}% sobre o custo · vale {formatBRL(metrics.deliveryValue, 0)} na entrega
+                                    {metrics.deliveryValueSource === "pct" ? " (pela sua estimativa)" : metrics.deliveryValueSource === "m2" ? " (área × R$/m²)" : ""}
                                 </span>
                             ) : (
-                                <span className="block">Informe a área e o R$/m² de mercado, ou o valor na entrega (lápis ao lado do nome)</span>
+                                <span className="block underline underline-offset-2 decoration-dotted">Toque aqui e informe a valorização esperada (%) — ou a área e o R$/m², ou o valor na entrega</span>
                             )}
                             {metrics.costPerM2 !== null && (
                                 <span className="block tabular-nums">
@@ -341,8 +350,8 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                         </span>
                     }
                     info={{
-                        what: "Quanto a unidade deve valer na entrega além do que ela custou — o ganho de comprar na planta. O valor na entrega é o seu (lápis ao lado do nome) ou, sem ele, a área privativa vezes um R$/m² de mercado que você informa a partir de anúncios do prédio ou da rua.",
-                        formula: <>Valorização = valor na entrega − custo total<br />Valor na entrega = o informado, ou área × R$/m² de mercado</>,
+                        what: "Quanto a unidade deve valer na entrega além do que ela custou — o ganho de comprar na planta. Toque no card para informar: a valorização esperada em %, ou a área privativa e um R$/m² de mercado (anúncios do prédio ou da rua), ou direto o valor na entrega.",
+                        formula: <>Valorização = valor na entrega − custo total<br />Valor na entrega = o informado; senão área × R$/m²; senão custo × (1 + % esperado)</>,
                         example:
                             metrics.deliveryValue !== null && metrics.appreciationGain !== null
                                 ? `${formatBRL(metrics.deliveryValue)} − ${formatBRL(metrics.committed)} = ${signed(metrics.appreciationGain, 2)}`
@@ -488,6 +497,7 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                 onClose={() => setDetailsOpen(false)}
                 investment={investment}
                 onSave={patchInvestment}
+                suggestedAppreciationPct={suggestedAppreciation(benchmarks.fipezapSale12mPct, metrics.monthsToKeys)}
             />
 
             <InvestmentPlanModal

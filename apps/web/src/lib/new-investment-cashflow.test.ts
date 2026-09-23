@@ -9,7 +9,7 @@ const investment = (over: Partial<NewInvestment> = {}): NewInvestment => ({
     contract_date: "2026-07-01", keys_expected_on: "2029-09-20", keys_delivered_on: null,
     index_before_keys: "INCC", index_after_keys: "IGPM",
     estimated_rent: 1200, rent_start_on: null, rent_adjustment_pct: 5, rent_vacancy_pct: 0, rent_costs_pct: 0, sim_horizon_months: 120,
-    sim_delivery_costs: 0, area_m2: null, market_m2_price: null, estimated_value_at_delivery: null, construction_pct: null, construction_updated_on: null,
+    sim_delivery_costs_pct: 0, expected_appreciation_pct: null, area_m2: null, market_m2_price: null, estimated_value_at_delivery: null, construction_pct: null, construction_updated_on: null,
     status: "ACTIVE", promoted_property_id: null, promoted_at: null, cover_path: null, notes: null,
     created_at: "2026-07-01T00:00:00Z", updated_at: "2026-07-01T00:00:00Z",
     ...over,
@@ -29,7 +29,7 @@ const paid: InvestmentPayment = {
 };
 
 const base = (over: Partial<CashFlowAssumptions> = {}): CashFlowAssumptions => ({
-    monthlyRent: 1200, rentStart: "2029-10", rentAdjustmentPct: 5, vacancyPct: 0, costsPct: 0, horizonMonths: 120, deliveryCosts: 0, ...over,
+    monthlyRent: 1200, rentStart: "2029-10", rentAdjustmentPct: 5, vacancyPct: 0, costsPct: 0, horizonMonths: 120, deliveryCostsPct: 0, ...over,
 });
 
 describe("internalRateOfReturn", () => {
@@ -49,14 +49,15 @@ describe("internalRateOfReturn", () => {
 });
 
 describe("delivery costs and TIR in the simulation", () => {
-    it("draws the handover costs as one bar in the keys month and counts them in the total", () => {
-        const withCosts = simulateCashFlow(investment(), schedules, [paid], base({ deliveryCosts: 9000 }));
+    it("draws the handover costs — a % of the instalments — as one bar in the keys month and counts them in the total", () => {
+        const withCosts = simulateCashFlow(investment(), schedules, [paid], base({ deliveryCostsPct: 20 }));
         const without = simulateCashFlow(investment(), schedules, [paid], base());
+        // the plan is 2 × 2.295 + 36 × 1.147,50 = 45.900; 20% of it is 9.180
         const keys = withCosts.points.find(p => p.keys);
-        expect(keys?.outflowDelivery).toBe(9000);
+        expect(keys?.outflowDelivery).toBe(9180);
         expect(withCosts.points.filter(p => p.outflowDelivery > 0)).toHaveLength(1);
-        expect(withCosts.totalDelivery).toBe(9000);
-        expect(withCosts.totalOutflow).toBeCloseTo(without.totalOutflow + 9000, 2);
+        expect(withCosts.totalDelivery).toBe(9180);
+        expect(withCosts.totalOutflow).toBeCloseTo(without.totalOutflow + 9180, 2);
         // paying more at the keys pushes the payback later, never earlier
         expect(withCosts.breakEvenMonth! >= without.breakEvenMonth!).toBe(true);
     });

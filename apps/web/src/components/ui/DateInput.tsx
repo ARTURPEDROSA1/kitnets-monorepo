@@ -57,8 +57,12 @@ export function DateInput({ value, onChange, mode = "date", variant = "input", c
         }
     };
 
+    // Auto-fit table cells shrink to the content they see; the text input must claim room for
+    // "dd/mm/aaaa" plus the calendar button or the year is clipped under it (seen on the phone).
+    const minWidth = mode === "month" ? "min-w-[6.25rem]" : "min-w-[8.25rem]";
+
     return (
-        <span className={cn("relative inline-flex w-full items-center", wrapperClassName)}>
+        <span className={cn("relative inline-flex w-full items-center", minWidth, wrapperClassName)}>
             <input
                 {...rest}
                 type="text"
@@ -80,7 +84,7 @@ export function DateInput({ value, onChange, mode = "date", variant = "input", c
                     if (text !== "" && brToISO(text, mode) === null) setText(isoToBR(value, mode));
                     onBlur?.(e);
                 }}
-                className={cn(variant === "input" ? INPUT_LOOK : null, "pr-7 tabular-nums", className)}
+                className={cn(variant === "input" ? INPUT_LOOK : null, "pr-7 tabular-nums", minWidth, className)}
             />
             <button
                 type="button"

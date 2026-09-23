@@ -2034,7 +2034,8 @@ export type Database = {
           rent_start_on: string | null
           rent_vacancy_pct: number
           sim_horizon_months: number
-          sim_delivery_costs: number
+          sim_delivery_costs_pct: number
+          expected_appreciation_pct: number | null
           area_m2: number | null
           market_m2_price: number | null
           estimated_value_at_delivery: number | null
@@ -2074,7 +2075,8 @@ export type Database = {
           rent_start_on?: string | null
           rent_vacancy_pct?: number
           sim_horizon_months?: number
-          sim_delivery_costs?: number
+          sim_delivery_costs_pct?: number
+          expected_appreciation_pct?: number | null
           area_m2?: number | null
           market_m2_price?: number | null
           estimated_value_at_delivery?: number | null
@@ -2114,7 +2116,8 @@ export type Database = {
           rent_start_on?: string | null
           rent_vacancy_pct?: number
           sim_horizon_months?: number
-          sim_delivery_costs?: number
+          sim_delivery_costs_pct?: number
+          expected_appreciation_pct?: number | null
           area_m2?: number | null
           market_m2_price?: number | null
           estimated_value_at_delivery?: number | null

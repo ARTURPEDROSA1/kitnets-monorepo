@@ -143,12 +143,13 @@ export const investmentInputSchema = z.object({
     rent_vacancy_pct: percent(99).default(0),
     rent_costs_pct: percent(99).default(0),
     sim_horizon_months: z.coerce.number().int().min(12, "Mínimo de 12 meses.").max(480, "Máximo de 40 anos.").optional(),
-    sim_delivery_costs: money(),
+    sim_delivery_costs_pct: percent(100).optional(),
 
     /** Valorização and works: all optional, all typed by the owner (the contract rarely has more than the area). */
     area_m2: money("Área inválida."),
     market_m2_price: money("Preço do m² inválido."),
     estimated_value_at_delivery: money("Valor estimado inválido."),
+    expected_appreciation_pct: optionalPercent(1000),
     construction_pct: optionalPercent(100),
     construction_updated_on: isoDate(),
 
