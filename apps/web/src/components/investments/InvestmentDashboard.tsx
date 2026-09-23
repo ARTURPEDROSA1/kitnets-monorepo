@@ -16,7 +16,7 @@ import {
     Banknote,
     CalendarClock,
     CheckCircle2,
-    Gem,
+    Handshake,
     KeyRound,
     Loader2,
     Pencil,
@@ -38,10 +38,14 @@ import InvestmentCashFlowSimulator from "./InvestmentCashFlowSimulator";
 import InvestmentDocuments, { type DocumentWithUrl } from "./InvestmentDocuments";
 import InvestmentPlanModal from "./InvestmentPlanModal";
 import InvestmentDetailsModal from "./InvestmentDetailsModal";
+import InvestmentSellModal from "./InvestmentSellModal";
 import { formatDateBR } from "@/lib/dates";
 import {
+    COMPLETION_LABELS,
+    EXIT_PLAN_LABELS,
     INDEX_LABELS,
     INVESTMENT_KIND_LABELS,
+    STRATEGY_LABELS,
     formatBRL,
     investmentTitle,
     type InvestmentPayment,
@@ -62,12 +66,6 @@ interface Bundle {
 const NO_BENCHMARKS: InvestmentBenchmarks = { cdi12mPct: null, cdiAsOf: null, fipezapSale12mPct: null, fipezapAsOf: null };
 const pct1 = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
 
-/** FipeZap's 12-month sale variation compounded until the keys: a starting point for "valorização esperada", not a forecast. */
-function suggestedAppreciation(fipezap12mPct: number | null, monthsToKeys: number | null): number | null {
-    if (fipezap12mPct === null || monthsToKeys === null || monthsToKeys <= 0) return null;
-    return Math.round((Math.pow(1 + fipezap12mPct / 100, monthsToKeys / 12) - 1) * 1000) / 10;
-}
-const signed = (v: number, digits = 0) => `${v > 0 ? "+" : ""}${formatBRL(v, digits)}`;
 
 interface Props {
     investmentId: string;
@@ -86,6 +84,7 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
     const [promoting, setPromoting] = useState(false);
     const [planOpen, setPlanOpen] = useState(false);
     const [detailsOpen, setDetailsOpen] = useState(false);
+    const [sellOpen, setSellOpen] = useState(false);
     /** The contract, a floor plan or a receipt, opened inside the app like every other document. */
     const [viewing, setViewing] = useState<{ url: string; name: string } | null>(null);
 
@@ -164,6 +163,23 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
         return true;
     };
 
+    /** "Registrar venda": the row is marked SOLD with the sale on it; a problem comes back as the message to show. */
+    const sell = async (input: { sold_on: string; sale_price: string; sale_costs: string }): Promise<string | null> => {
+        const res = await fetch(`/api/investments/${investmentId}/sell`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(input),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            const first = Object.values(json.errors ?? {})[0];
+            return typeof json.error === "string" ? json.error : typeof first === "string" ? first : "Não foi possível registrar a venda.";
+        }
+        await refresh();
+        return null;
+    };
+    const undoSale = () => patchInvestment({ status: "ACTIVE", sold_on: null, sale_price: null, sale_costs: 0 });
+
     const promote = async () => {
         setPromoting(true);
         const res = await fetch(`/api/investments/${investmentId}/promote`, {
@@ -223,7 +239,14 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                         </button>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                        {[INVESTMENT_KIND_LABELS[investment.kind], investment.developer, investment.address, investment.city].filter(Boolean).join(" · ")}
+                        {[
+                            INVESTMENT_KIND_LABELS[investment.kind],
+                            STRATEGY_LABELS[investment.strategy],
+                            `para ${(EXIT_PLAN_LABELS[investment.exit_plan] ?? "alugar").toLowerCase()}`,
+                            investment.developer,
+                            investment.address,
+                            investment.city,
+                        ].filter(Boolean).join(" · ")}
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -231,22 +254,43 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                         <Settings className="w-4 h-4 sm:mr-1" />
                         <span className="hidden sm:inline">Plano de pagamento</span>
                     </Button>
-                {promoted ? (
+                {metrics.sold ? (
+                    <span className="inline-flex items-center gap-2 rounded-lg border border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 px-3 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                        <Handshake className="w-4 h-4" /> Vendido em {formatDateBR(investment.sold_on)}
+                    </span>
+                ) : promoted ? (
                     <Link
                         href={lang === "pt" ? "/imoveis" : `/${lang}/imoveis`}
                         className="inline-flex items-center gap-2 rounded-lg border border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 px-3 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-400"
                     >
                         <CheckCircle2 className="w-4 h-4" /> Já está em Imóveis
                     </Link>
+                ) : investment.exit_plan === "VENDER" ? (
+                    // The finish the project was planned for is the primary button; the other stays one click away.
+                    <>
+                        <Button variant="outline" onClick={() => { setPromoteName(investment.unit_label || investment.name); setPromoteOpen(true); }} title="Ficar com a unidade e alugar, em vez de vender">
+                            <ArrowRightLeft className="w-4 h-4 sm:mr-1" />
+                            <span className="hidden sm:inline">Mover para Imóveis</span>
+                        </Button>
+                        <Button onClick={() => setSellOpen(true)}>
+                            <Handshake className="w-4 h-4 mr-1" /> Registrar venda
+                        </Button>
+                    </>
                 ) : (
-                    <Button onClick={() => { setPromoteName(investment.unit_label || investment.name); setPromoteOpen(true); }}>
-                        <ArrowRightLeft className="w-4 h-4 mr-1" /> Mover para Imóveis
-                    </Button>
+                    <>
+                        <Button variant="outline" onClick={() => setSellOpen(true)} title="Vender a unidade, antes ou depois das chaves">
+                            <Handshake className="w-4 h-4 sm:mr-1" />
+                            <span className="hidden sm:inline">Registrar venda</span>
+                        </Button>
+                        <Button onClick={() => { setPromoteName(investment.unit_label || investment.name); setPromoteOpen(true); }}>
+                            <ArrowRightLeft className="w-4 h-4 mr-1" /> Mover para Imóveis
+                        </Button>
+                    </>
                 )}
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
                 <Tile
                     label="Pago até agora"
                     tone="emerald"
@@ -321,45 +365,6 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                     }}
                 />
                 <Tile
-                    label="Valorização"
-                    tone={metrics.appreciationGain === null ? "slate" : metrics.appreciationGain >= 0 ? "emerald" : "rose"}
-                    icon={<Gem className="w-4 h-4" />}
-                    value={metrics.appreciationGain !== null ? signed(metrics.appreciationGain) : "—"}
-                    title="Toque para informar a valorização esperada"
-                    onClick={() => setDetailsOpen(true)}
-                    hint={
-                        <span className="block space-y-0.5 pt-0.5">
-                            {metrics.deliveryValue !== null && metrics.appreciationPct !== null ? (
-                                <span className="block">
-                                    {metrics.appreciationPct > 0 ? "+" : ""}{pct1(metrics.appreciationPct)}% sobre o custo · vale {formatBRL(metrics.deliveryValue, 0)} na entrega
-                                    {metrics.deliveryValueSource === "pct" ? " (pela sua estimativa)" : metrics.deliveryValueSource === "m2" ? " (área × R$/m²)" : ""}
-                                </span>
-                            ) : (
-                                <span className="block underline underline-offset-2 decoration-dotted">Toque aqui e informe a valorização esperada (%) — ou a área e o R$/m², ou o valor na entrega</span>
-                            )}
-                            {metrics.costPerM2 !== null && (
-                                <span className="block tabular-nums">
-                                    {formatBRL(metrics.costPerM2, 0)}/m² pago{metrics.marketM2Price !== null ? ` · ${formatBRL(metrics.marketM2Price, 0)}/m² mercado` : ""}
-                                </span>
-                            )}
-                            {benchmarks.fipezapSale12mPct !== null && (
-                                <span className="block" title={`FipeZap venda, índice nacional, 12 meses até ${benchmarks.fipezapAsOf ? formatDateBR(benchmarks.fipezapAsOf) : "—"}`}>
-                                    FipeZap venda 12 m: {benchmarks.fipezapSale12mPct > 0 ? "+" : ""}{pct1(benchmarks.fipezapSale12mPct)}% (nacional)
-                                </span>
-                            )}
-                        </span>
-                    }
-                    info={{
-                        what: "Quanto a unidade deve valer na entrega além do que ela custou — o ganho de comprar na planta. Toque no card para informar: a valorização esperada em %, ou a área privativa e um R$/m² de mercado (anúncios do prédio ou da rua), ou direto o valor na entrega.",
-                        formula: <>Valorização = valor na entrega − custo total<br />Valor na entrega = o informado; senão área × R$/m²; senão custo × (1 + % esperado)</>,
-                        example:
-                            metrics.deliveryValue !== null && metrics.appreciationGain !== null
-                                ? `${formatBRL(metrics.deliveryValue)} − ${formatBRL(metrics.committed)} = ${signed(metrics.appreciationGain, 2)}`
-                                : undefined,
-                        note: "O FipeZap deste painel é o índice nacional de venda — mostra a tendência do mercado, não o preço da sua rua. Estimativa, não avaliação.",
-                    }}
-                />
-                <Tile
                     label="Próxima parcela"
                     tone={metrics.overdueCount > 0 ? "rose" : "violet"}
                     icon={<Receipt className="w-4 h-4" />}
@@ -378,7 +383,7 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                     }}
                 />
                 <Tile
-                    label="Chaves"
+                    label={COMPLETION_LABELS[investment.strategy] ?? "Chaves"}
                     tone="slate"
                     icon={<KeyRound className="w-4 h-4" />}
                     value={metrics.keysOn ? formatDateBR(metrics.keysOn) : "—"}
@@ -431,6 +436,27 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                 />
             </div>
 
+            {metrics.sold && metrics.saleNet !== null && metrics.realizedGain !== null && (
+                <div
+                    role="note"
+                    className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/30 px-4 py-3 text-sm text-emerald-900 dark:text-emerald-200"
+                >
+                    <Handshake className="w-5 h-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                    <span>
+                        Vendido em <strong>{formatDateBR(investment.sold_on)}</strong> por <strong className="tabular-nums">{formatBRL(investment.sale_price ?? 0)}</strong>
+                        {investment.sale_costs > 0 ? ` (líquido ${formatBRL(metrics.saleNet)})` : ""} — ganho de{" "}
+                        <strong className={`text-base font-bold tabular-nums ${metrics.realizedGain >= 0 ? "" : "text-rose-700 dark:text-rose-300"}`}>
+                            {metrics.realizedGain > 0 ? "+" : ""}{formatBRL(metrics.realizedGain)}
+                        </strong>
+                        {metrics.realizedGainPct !== null ? ` (${metrics.realizedGainPct > 0 ? "+" : ""}${pct1(metrics.realizedGainPct)}%)` : ""} sobre {formatBRL(metrics.paidToDate)} pagos
+                        {metrics.realizedIrrAnnualPct !== null ? ` · TIR ${pct1(metrics.realizedIrrAnnualPct)}% a.a.` : ""}.
+                    </span>
+                    <button type="button" onClick={() => void undoSale()} className="text-xs underline underline-offset-2 text-emerald-800/80 dark:text-emerald-300/80 hover:text-emerald-900">
+                        desfazer
+                    </button>
+                </div>
+            )}
+
             {metrics.correctionsPaid > 0 && (
                 <div
                     role="note"
@@ -469,6 +495,7 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                 investment={investment}
                 schedules={schedules}
                 payments={payments}
+                metrics={metrics}
                 benchmarks={benchmarks}
                 onSave={patchInvestment}
             />
@@ -497,7 +524,14 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                 onClose={() => setDetailsOpen(false)}
                 investment={investment}
                 onSave={patchInvestment}
-                suggestedAppreciationPct={suggestedAppreciation(benchmarks.fipezapSale12mPct, metrics.monthsToKeys)}
+            />
+
+            <InvestmentSellModal
+                open={sellOpen}
+                onClose={() => setSellOpen(false)}
+                investment={investment}
+                paidToDate={metrics.paidToDate}
+                onSell={sell}
             />
 
             <InvestmentPlanModal

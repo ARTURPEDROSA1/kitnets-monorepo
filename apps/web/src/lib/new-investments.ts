@@ -33,7 +33,11 @@ export type PaymentStatus = "PLANNED" | "PAID";
 export type Payer = "PF" | "PJ" | "SPLIT";
 
 export const PAYER_LABELS: Record<Payer, string> = { PF: "PF", PJ: "PJ", SPLIT: "PF + PJ" };
-export type InvestmentStatus = "ACTIVE" | "COMPLETED" | "ARCHIVED";
+export type InvestmentStatus = "ACTIVE" | "COMPLETED" | "SOLD" | "ARCHIVED";
+/** What kind of project: the modality decides labels and default cost kinds, not the machinery. */
+export type InvestmentStrategy = "NA_PLANTA" | "TERRENO" | "REFORMA" | "LEILAO";
+/** How the project is meant to end: as a property of the portfolio, or as a sale. */
+export type InvestmentExitPlan = "ALUGAR" | "VENDER";
 export type InvestmentKind = "APARTMENT" | "STUDIO" | "HOUSE" | "PARKING" | "LOT" | "COMMERCIAL" | "OTHER";
 export type DocumentKind = "CONTRACT" | "MARKETING" | "PHOTO" | "LAYOUT" | "RECEIPT" | "OTHER";
 
@@ -92,6 +96,26 @@ export const INVESTMENT_KIND_LABELS: Record<InvestmentKind, string> = {
     OTHER: "Outro",
 };
 
+export const STRATEGY_LABELS: Record<InvestmentStrategy, string> = {
+    NA_PLANTA: "Na planta",
+    TERRENO: "Terreno + construção",
+    REFORMA: "Reforma",
+    LEILAO: "Leilão",
+};
+
+export const EXIT_PLAN_LABELS: Record<InvestmentExitPlan, string> = {
+    ALUGAR: "Alugar",
+    VENDER: "Vender",
+};
+
+/** What the finish line is called in each modality: the keys, the habite-se, the end of the works, the possession. */
+export const COMPLETION_LABELS: Record<InvestmentStrategy, string> = {
+    NA_PLANTA: "Chaves",
+    TERRENO: "Habite-se",
+    REFORMA: "Fim da obra",
+    LEILAO: "Posse",
+};
+
 export const DOCUMENT_KIND_LABELS: Record<DocumentKind, string> = {
     CONTRACT: "Contrato",
     MARKETING: "Material de divulgação",
@@ -142,6 +166,13 @@ export interface NewInvestment {
     /** Progress of the works as the developer last reported it, 0–100. */
     construction_pct: number | null;
     construction_updated_on: string | null;
+    strategy: InvestmentStrategy;
+    exit_plan: InvestmentExitPlan;
+    /** The sale, once registered ("Registrar venda"); status becomes SOLD. */
+    sold_on: string | null;
+    sale_price: number | null;
+    /** Corretagem, certidões, imposto sobre o ganho — what the sale itself cost. */
+    sale_costs: number;
     status: InvestmentStatus;
     promoted_property_id: string | null;
     promoted_at: string | null;

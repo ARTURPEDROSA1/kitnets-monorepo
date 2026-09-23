@@ -13,10 +13,10 @@
  */
 import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { Building2, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, FileText, KeyRound, Trash2, TrendingUp } from "lucide-react";
+import { Building2, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, FileText, Handshake, KeyRound, Trash2, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDateBR } from "@/lib/dates";
-import { INVESTMENT_KIND_LABELS, formatBRL, investmentTitle, type NewInvestment } from "@/lib/new-investments";
+import { INVESTMENT_KIND_LABELS, STRATEGY_LABELS, formatBRL, investmentTitle, type NewInvestment } from "@/lib/new-investments";
 import type { InvestmentCardSummary } from "@/lib/new-investment-metrics";
 
 interface Props {
@@ -41,6 +41,7 @@ function keysLabel(summary: InvestmentCardSummary | undefined, investment: NewIn
     const works = investment.construction_pct !== null && !investment.keys_delivered_on
         ? ` · obra ${investment.construction_pct.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}%`
         : "";
+    if (investment.status === "SOLD" && investment.sold_on) return `Vendido em ${formatDateBR(investment.sold_on)}`;
     if (investment.keys_delivered_on) return "Chaves entregues";
     if (!summary || summary.monthsToKeys === null) return `Entrega não informada${works}`;
     if (summary.monthsToKeys < 0) return `Prevista para ${formatDateBR(summary.keysOn)}, vencida${works}`;
@@ -54,6 +55,7 @@ export default function InvestmentSquareCard({ investment, summary, photoUrls = 
     const title = investmentTitle(investment);
     const pct = Math.min(100, Math.max(0, summary?.paidPct ?? 0));
     const completed = investment.status === "COMPLETED";
+    const sold = investment.status === "SOLD";
 
     // ── Cover carousel ──────────────────────────────────────────────
     const count = photoUrls.length;
@@ -137,11 +139,16 @@ export default function InvestmentSquareCard({ investment, summary, photoUrls = 
                     </span>
                 )}
                 <span className="absolute top-2 left-2 rounded-full bg-background/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    {INVESTMENT_KIND_LABELS[investment.kind] ?? "Imóvel"}
+                    {INVESTMENT_KIND_LABELS[investment.kind] ?? "Imóvel"} · {STRATEGY_LABELS[investment.strategy] ?? "Na planta"}
                 </span>
                 {completed && (
                     <span className="absolute top-2 right-10 inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-semibold text-white">
                         <CheckCircle2 className="w-3 h-3" /> Em Imóveis
+                    </span>
+                )}
+                {sold && (
+                    <span className="absolute top-2 right-10 inline-flex items-center gap-1 rounded-full bg-sky-600 px-2 py-0.5 text-[10px] font-semibold text-white">
+                        <Handshake className="w-3 h-3" /> Vendido
                     </span>
                 )}
                 <button

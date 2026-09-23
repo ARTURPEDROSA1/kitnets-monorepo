@@ -1,13 +1,19 @@
 "use client";
 
 /**
- * Cash-flow simulator of a Novo Investimento.
+ * Cash-flow simulator of a project.
  *
  * Below the axis, what leaves the pocket: the instalments already paid (solid), the ones the
  * contract still owes (hollow) and, in the keys month, what the handover itself costs. Above it,
- * the rent the unit is expected to produce once the keys arrive, growing by one adjustment a year.
- * The vertical marker is the key handover; the line is the running total, and where it crosses
- * zero is when the investment has paid itself back.
+ * what comes back: for a project meant to be let, the rent the unit is expected to produce once
+ * the keys arrive, growing by one adjustment a year; for a project meant to be sold, the expected
+ * delivery value as one inflow at the keys. The vertical marker is the completion; the line is
+ * the running total, and where it crosses zero is when the investment has paid itself back.
+ *
+ * The valorização lives here too — it is a premise-driven projection like the rent, not a fact
+ * like the KPIs on top: "worth X% more at delivery" is typed with the other premises and the
+ * result tile shows what that means in reais (the pencil's area × R$/m² or typed value win over
+ * the percentage when they exist).
  *
  * The TIR of the whole flow sits next to the CDI of the last twelve months: that pair is the
  * answer to "should I anticipate instalments or leave the money invested".
@@ -29,21 +35,23 @@ import {
     XAxis,
     YAxis,
 } from "recharts";
-import { AlertCircle, Check, KeyRound, Loader2, Percent, TrendingUp } from "lucide-react";
+import { AlertCircle, Check, Gem, HelpCircle, KeyRound, Loader2, Percent, TrendingUp } from "lucide-react";
 import { DateInput } from "@/components/ui/DateInput";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
     assumptionsOf,
     formatMonthLabel,
     simulateCashFlow,
     type CashFlowAssumptions,
 } from "@/lib/new-investment-cashflow";
-import type { InvestmentBenchmarks } from "@/lib/new-investment-metrics";
-import { formatBRL, formatBRLShort, type InvestmentPayment, type InvestmentSchedule, type NewInvestment } from "@/lib/new-investments";
+import { deliveryValueOf, type InvestmentBenchmarks, type InvestmentMetrics } from "@/lib/new-investment-metrics";
+import { COMPLETION_LABELS, formatBRL, formatBRLShort, type InvestmentPayment, type InvestmentSchedule, type NewInvestment } from "@/lib/new-investments";
 
 interface Props {
     investment: NewInvestment;
     schedules: InvestmentSchedule[];
     payments: InvestmentPayment[];
+    metrics: InvestmentMetrics;
     benchmarks: InvestmentBenchmarks;
     onSave: (patch: Record<string, unknown>) => Promise<boolean>;
 }
@@ -59,7 +67,16 @@ const HORIZONS = [
 const SAVE_DELAY_MS = 500;
 
 const inputCls = "w-full h-9 rounded-md border border-input bg-background px-2 text-sm tabular-nums";
+const labelCls = "text-[10px] uppercase tracking-wider text-muted-foreground whitespace-nowrap";
+const tileCls = "rounded-lg border border-border/70 bg-muted/20 px-3 py-2";
 const pct = (v: number) => `${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
+const signed = (v: number) => `${v > 0 ? "+" : ""}${formatBRL(v, 0)}`;
+
+/** FipeZap's 12-month sale variation compounded until the keys: a starting point for "valorização", not a forecast. */
+function suggestedAppreciation(fipezap12mPct: number | null, monthsToKeys: number | null): number | null {
+    if (fipezap12mPct === null || monthsToKeys === null || monthsToKeys <= 0) return null;
+    return Math.round((Math.pow(1 + fipezap12mPct / 100, monthsToKeys / 12) - 1) * 1000) / 10;
+}
 
 /** The columns a set of assumptions writes. */
 const toPatch = (a: CashFlowAssumptions): Record<string, unknown> => ({
@@ -70,11 +87,40 @@ const toPatch = (a: CashFlowAssumptions): Record<string, unknown> => ({
     rent_costs_pct: a.costsPct,
     sim_horizon_months: a.horizonMonths,
     sim_delivery_costs_pct: a.deliveryCostsPct,
+    expected_appreciation_pct: a.expectedAppreciationPct,
 });
 
 type SaveStatus = "idle" | "pending" | "saving" | "saved" | "error";
 
-export default function InvestmentCashFlowSimulator({ investment, schedules, payments, benchmarks, onSave }: Props) {
+/** The "?" next to a premise: opens a small dialog, so it works on a phone where there is no hover. */
+function PremiseHelp({ label, children }: { label: string; children: React.ReactNode }) {
+    const [open, setOpen] = useState(false);
+    return (
+        <>
+            <button
+                type="button"
+                onClick={e => { e.preventDefault(); setOpen(true); }}
+                aria-label={`O que é ${label}`}
+                title={`O que é ${label}`}
+                className="inline-flex align-middle ml-1 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded"
+            >
+                <HelpCircle className="w-3.5 h-3.5" />
+            </button>
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>{label}</DialogTitle>
+                        <DialogDescription asChild>
+                            <div className="space-y-2 text-sm text-muted-foreground">{children}</div>
+                        </DialogDescription>
+                    </DialogHeader>
+                </DialogContent>
+            </Dialog>
+        </>
+    );
+}
+
+export default function InvestmentCashFlowSimulator({ investment, schedules, payments, metrics, benchmarks, onSave }: Props) {
     // Seeded once from the server; the component is keyed by the dashboard on the dates that would
     // change the defaults, so a stale seed remounts instead of being synced back by an effect.
     const [assumptions, setAssumptions] = useState<CashFlowAssumptions>(() => assumptionsOf(investment));
@@ -119,9 +165,16 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
     const num = (key: "monthlyRent" | "rentAdjustmentPct" | "vacancyPct" | "costsPct" | "deliveryCostsPct") =>
         (e: React.ChangeEvent<HTMLInputElement>) => update({ [key]: Number(e.target.value.replace(",", ".")) || 0 });
 
+    // What the unit should be worth at delivery, live as the percentage is typed; the sale model
+    // uses it as the inflow when the project is meant to be sold.
+    const delivery = deliveryValueOf(investment, metrics.committed, assumptions.expectedAppreciationPct);
+    const gain = delivery.value !== null && metrics.committed > 0 ? delivery.value - metrics.committed : null;
+    const sellMode = investment.exit_plan === "VENDER";
+    const suggested = suggestedAppreciation(benchmarks.fipezapSale12mPct, metrics.monthsToKeys);
+
     const result = useMemo(
-        () => simulateCashFlow(investment, schedules, payments, assumptions),
-        [investment, schedules, payments, assumptions]
+        () => simulateCashFlow(investment, schedules, payments, { ...assumptions, saleAtDelivery: sellMode ? delivery.value : null }),
+        [investment, schedules, payments, assumptions, sellMode, delivery.value]
     );
 
     const chart = useMemo(
@@ -133,11 +186,13 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
                 previsto: p.outflowForecast > 0 ? -p.outflowForecast : null,
                 entrega: p.outflowDelivery > 0 ? -p.outflowDelivery : null,
                 aluguel: p.rent > 0 ? p.rent : null,
+                venda: p.sale > 0 ? p.sale : null,
                 acumulado: p.cumulative,
             })),
         [result]
     );
 
+    const completion = COMPLETION_LABELS[investment.strategy] ?? "Chaves";
     const keysLabel = result.keysMonth ? formatMonthLabel(result.keysMonth) : null;
     const irr = result.irrAnnualPct;
     const cdi = benchmarks.cdi12mPct;
@@ -151,8 +206,9 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
                         <TrendingUp className="w-4 h-4 text-violet-600" /> Simulador de fluxo de caixa
                     </h2>
                     <p className="text-xs text-muted-foreground">
-                        Parcelas abaixo do eixo, aluguel estimado acima. A linha vertical marca a entrega das chaves.
-                        As premissas são salvas conforme você digita.
+                        {sellMode
+                            ? `Parcelas abaixo do eixo, a venda estimada acima, no mês da ${completion.toLowerCase()}. As premissas são salvas conforme você digita.`
+                            : `Parcelas abaixo do eixo, aluguel estimado acima. A linha vertical marca a ${completion.toLowerCase()}. As premissas são salvas conforme você digita.`}
                     </p>
                 </div>
                 <span
@@ -170,13 +226,13 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
             </header>
 
             <div className="p-4 space-y-4">
-                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
                     <label className="space-y-1">
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Aluguel estimado (R$)</span>
-                        <input type="number" step="50" min="0" value={assumptions.monthlyRent || ""} onChange={num("monthlyRent")} className={inputCls} placeholder="0" />
+                        <span className={labelCls}>Aluguel (R$)</span>
+                        <input type="number" step="50" min="0" value={assumptions.monthlyRent || ""} onChange={num("monthlyRent")} className={inputCls} placeholder="0" title="Aluguel mensal bruto estimado para a unidade pronta" />
                     </label>
                     <label className="space-y-1">
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Primeiro aluguel</span>
+                        <span className={labelCls}>1º aluguel</span>
                         <DateInput
                             mode="month"
                             variant="bare"
@@ -186,15 +242,21 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
                         />
                     </label>
                     <label className="space-y-1">
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Reajuste anual (%)</span>
-                        <input type="number" step="0.5" min="0" value={assumptions.rentAdjustmentPct} onChange={num("rentAdjustmentPct")} className={inputCls} />
+                        <span className={labelCls}>Reajuste (% a.a.)</span>
+                        <input type="number" step="0.5" min="0" value={assumptions.rentAdjustmentPct} onChange={num("rentAdjustmentPct")} className={inputCls} title="Reajuste do aluguel a cada doze meses" />
                     </label>
                     <label className="space-y-1">
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Vacância (%)</span>
-                        <input type="number" step="1" min="0" max="90" value={assumptions.vacancyPct} onChange={num("vacancyPct")} className={inputCls} />
+                        <span className={labelCls}>Vacância (%)</span>
+                        <input type="number" step="1" min="0" max="90" value={assumptions.vacancyPct} onChange={num("vacancyPct")} className={inputCls} title="Parte do ano em que a unidade fica vazia" />
                     </label>
                     <label className="space-y-1">
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Custos sobre o aluguel (%)</span>
+                        <span className={labelCls}>
+                            Custos (% do aluguel)
+                            <PremiseHelp label="Custos sobre o aluguel">
+                                <p>A parte do aluguel que não chega ao seu bolso, como percentual do aluguel bruto: condomínio e IPTU quando ficam por sua conta (vazio ou por contrato), taxa de administração da imobiliária (em geral 8–10%), pequenas manutenções.</p>
+                                <p>Exemplo: aluguel de R$ 2.000 com 12% de custos → R$ 1.760 líquidos antes da vacância. É o que o simulador usa como renda mensal.</p>
+                            </PremiseHelp>
+                        </span>
                         <input
                             type="number"
                             step="1"
@@ -207,7 +269,13 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
                         />
                     </label>
                     <label className="space-y-1">
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Custos na entrega (%)</span>
+                        <span className={labelCls}>
+                            Entrega (% do custo)
+                            <PremiseHelp label="Custos na entrega">
+                                <p>O que a escritura da unidade custa quando as chaves chegam, como percentual do custo total (parcelas pagas + previstas): ITBI de 2% a 3% conforme o município, mais escritura e registro em cartório, em torno de 1%. Mobília, se quiser, entra aqui também.</p>
+                                <p>Exemplo: custo total de R$ 250.000 com 4% → R$ 10.000 lançados de uma vez no mês das chaves, contados no total desembolsado, no payback e na TIR.</p>
+                            </PremiseHelp>
+                        </span>
                         <input
                             type="number"
                             step="0.5"
@@ -221,7 +289,27 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
                         />
                     </label>
                     <label className="space-y-1">
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Horizonte</span>
+                        <span className={labelCls}>
+                            Valorização (%)
+                            <PremiseHelp label="Valorização esperada">
+                                <p>Quanto a unidade deve valer a mais na entrega, como percentual do custo total. Quem compra na planta costuma esperar de 20% a 40% até as chaves; a tendência do FipeZap (índice nacional de venda) capitalizada até a sua entrega aparece como sugestão no campo.</p>
+                                <p>Se no lápis você informou área e R$/m² de mercado, ou um valor na entrega, eles valem no lugar deste percentual. Num projeto para vender, esse valor é a venda estimada do gráfico.</p>
+                            </PremiseHelp>
+                        </span>
+                        <input
+                            type="number"
+                            step="1"
+                            min="0"
+                            max="1000"
+                            value={assumptions.expectedAppreciationPct ?? ""}
+                            onChange={e => update({ expectedAppreciationPct: e.target.value === "" ? null : Math.max(0, Number(e.target.value.replace(",", ".")) || 0) })}
+                            className={inputCls}
+                            placeholder={suggested !== null ? String(suggested).replace(".", ",") : "30"}
+                            title={`Quanto a unidade deve valer a mais na entrega, sobre o custo total.${suggested !== null ? ` Pela tendência FipeZap (índice nacional de venda) até a entrega seriam +${pct(suggested)}.` : ""} Área × R$/m² ou um valor na entrega informados no lápis prevalecem.`}
+                        />
+                    </label>
+                    <label className="space-y-1">
+                        <span className={labelCls}>Horizonte</span>
                         <select
                             value={assumptions.horizonMonths}
                             onChange={e => update({ horizonMonths: Number(e.target.value) })}
@@ -264,17 +352,19 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
                                 <Bar dataKey="pago" name="Pago" stackId="cash" fill="#f43f5e" isAnimationActive={false} />
                                 <Bar dataKey="previsto" name="Previsto" stackId="cash" fill="#fda4af" isAnimationActive={false} />
                                 <Bar dataKey="entrega" name="Custos na entrega" stackId="cash" fill="#f59e0b" isAnimationActive={false} />
-                                <Bar dataKey="aluguel" name="Aluguel estimado" stackId="cash" fill="#10b981" isAnimationActive={false} />
+                                {sellMode
+                                    ? <Bar dataKey="venda" name="Venda estimada" stackId="cash" fill="#059669" isAnimationActive={false} />
+                                    : <Bar dataKey="aluguel" name="Aluguel estimado" stackId="cash" fill="#10b981" isAnimationActive={false} />}
                                 <Line type="monotone" dataKey="acumulado" name="Resultado acumulado" stroke="#8b5cf6" strokeWidth={2} dot={false} isAnimationActive={false} hide={!showCumulative} />
                                 {keysLabel && (
                                     <ReferenceLine
                                         x={keysLabel}
                                         stroke="#0ea5e9"
                                         strokeDasharray="4 3"
-                                        label={{ value: "Chaves", position: "insideTopLeft", fontSize: 11, fill: "#0ea5e9" }}
+                                        label={{ value: completion, position: "insideTopLeft", fontSize: 11, fill: "#0ea5e9" }}
                                     />
                                 )}
-                                {result.breakEvenMonth && (
+                                {result.breakEvenMonth && result.breakEvenMonth !== result.keysMonth && (
                                     <ReferenceLine
                                         x={formatMonthLabel(result.breakEvenMonth)}
                                         stroke="#10b981"
@@ -291,44 +381,71 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
                     </p>
                 )}
 
-                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
-                    <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2">
+                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 text-xs">
+                    <div className={tileCls}>
                         <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Total desembolsado</span>
                         <span className="block text-base font-bold tabular-nums text-foreground">{formatBRL(result.totalOutflow, 0)}</span>
                         <span className="text-muted-foreground">
                             pago + previsto no contrato{result.totalDelivery > 0 ? ` + ${formatBRL(result.totalDelivery, 0)} na entrega` : ""}
                         </span>
                     </div>
-                    <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2">
-                        <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Aluguel no horizonte</span>
-                        <span className="block text-base font-bold tabular-nums text-emerald-600">{formatBRL(result.totalRent, 0)}</span>
+                    {sellMode ? (
+                        <div className={tileCls}>
+                            <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Venda na {completion.toLowerCase()}</span>
+                            <span className="block text-base font-bold tabular-nums text-emerald-600">{result.totalSale > 0 ? formatBRL(result.totalSale, 0) : "—"}</span>
+                            <span className="text-muted-foreground">{result.totalSale > 0 && keysLabel ? `em ${keysLabel}` : "informe a valorização"}</span>
+                        </div>
+                    ) : (
+                        <div className={tileCls}>
+                            <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Aluguel no horizonte</span>
+                            <span className="block text-base font-bold tabular-nums text-emerald-600">{formatBRL(result.totalRent, 0)}</span>
+                            <span className="text-muted-foreground">
+                                {result.rentStart ? `a partir de ${formatMonthLabel(result.rentStart)}` : "informe o primeiro aluguel"}
+                            </span>
+                        </div>
+                    )}
+                    <div
+                        className={gain === null ? tileCls : gain >= 0 ? "rounded-lg border border-emerald-300 dark:border-emerald-800 bg-emerald-50/60 dark:bg-emerald-950/20 px-3 py-2" : "rounded-lg border border-rose-300 dark:border-rose-800 bg-rose-50/60 dark:bg-rose-950/20 px-3 py-2"}
+                        title={`Quanto a unidade deve valer na ${completion.toLowerCase()} além do que ela custou. Valor na entrega = o informado no lápis, senão área × R$/m², senão custo × (1 + valorização %). O FipeZap deste painel é o índice nacional de venda — tendência, não o preço da sua rua.`}
+                    >
+                        <span className="block text-[10px] uppercase tracking-wider text-muted-foreground inline-flex items-center gap-1">
+                            <Gem className="w-3 h-3" /> Valorização
+                        </span>
+                        <span className={`block text-base font-bold tabular-nums ${gain === null ? "text-foreground" : gain >= 0 ? "text-emerald-700 dark:text-emerald-300" : "text-rose-700 dark:text-rose-300"}`}>
+                            {gain !== null ? signed(gain) : "—"}
+                        </span>
                         <span className="text-muted-foreground">
-                            {result.rentStart ? `a partir de ${formatMonthLabel(result.rentStart)}` : "informe o primeiro aluguel"}
+                            {delivery.value !== null && gain !== null
+                                ? `${gain > 0 ? "+" : ""}${pct((gain / metrics.committed) * 100)} · vale ${formatBRL(delivery.value, 0)}${delivery.source === "m2" ? " (área × R$/m²)" : delivery.source === "typed" ? " (valor informado)" : ""}`
+                                : "digite a valorização esperada (%)"}
+                            {benchmarks.fipezapSale12mPct !== null && ` · FipeZap 12 m ${benchmarks.fipezapSale12mPct > 0 ? "+" : ""}${pct(benchmarks.fipezapSale12mPct)}`}
                         </span>
                     </div>
-                    <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2">
+                    <div className={tileCls}>
                         <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Payback</span>
                         <span className="block text-base font-bold tabular-nums text-foreground">
                             {result.breakEvenMonth ? formatMonthLabel(result.breakEvenMonth) : "—"}
                         </span>
                         <span className="text-muted-foreground">
                             {result.breakEvenMonths !== null
-                                ? `${Math.floor(result.breakEvenMonths / 12)} anos e ${result.breakEvenMonths % 12} meses de aluguel`
+                                ? sellMode
+                                    ? `na venda, ${completion.toLowerCase()} em ${keysLabel ?? "—"}`
+                                    : `${Math.floor(result.breakEvenMonths / 12)} anos e ${result.breakEvenMonths % 12} meses de aluguel`
                                 : "fora do horizonte escolhido"}
                         </span>
                     </div>
                     <div
                         className={
                             beatsCdi === null
-                                ? "rounded-lg border border-border/70 bg-muted/20 px-3 py-2"
+                                ? tileCls
                                 : beatsCdi
                                   ? "rounded-lg border border-emerald-300 dark:border-emerald-800 bg-emerald-50/60 dark:bg-emerald-950/20 px-3 py-2"
                                   : "rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-950/20 px-3 py-2"
                         }
-                        title="Taxa interna de retorno de todo o fluxo no horizonte: parcelas pagas e previstas, custos na entrega e o aluguel líquido. É a taxa que se compara com o CDI."
+                        title="Taxa interna de retorno de todo o fluxo: parcelas pagas e previstas, custos na entrega e o que volta — aluguel líquido no horizonte, ou a venda na entrega. É a taxa que se compara com o CDI."
                     >
                         <span className="block text-[10px] uppercase tracking-wider text-muted-foreground inline-flex items-center gap-1">
-                            <Percent className="w-3 h-3" /> TIR no horizonte
+                            <Percent className="w-3 h-3" /> TIR {sellMode ? "da venda" : "no horizonte"}
                         </span>
                         <span className={`block text-base font-bold tabular-nums ${beatsCdi === false ? "text-amber-700 dark:text-amber-300" : "text-foreground"}`}>
                             {irr !== null ? `${pct(irr)} a.a.` : "—"}
@@ -336,26 +453,28 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
                         <span className="text-muted-foreground">
                             {cdi !== null
                                 ? `CDI 12 meses: ${pct(cdi)} a.a.${beatsCdi === null ? "" : beatsCdi ? " · acima do CDI" : " · abaixo do CDI"}`
-                                : irr !== null ? "CDI ainda não sincronizado" : "informe o aluguel estimado"}
+                                : irr !== null ? "CDI ainda não sincronizado" : sellMode ? "informe a valorização" : "informe o aluguel estimado"}
                         </span>
                     </div>
-                    <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2">
+                    <div className={tileCls}>
                         <span className="block text-[10px] uppercase tracking-wider text-muted-foreground inline-flex items-center gap-1">
-                            <KeyRound className="w-3 h-3" /> Entrega
+                            <KeyRound className="w-3 h-3" /> {completion}
                         </span>
                         <span className="block text-base font-bold text-foreground">{keysLabel ?? "—"}</span>
                         <span className="text-muted-foreground">
-                            {investment.keys_delivered_on ? "chaves entregues" : "previsão do contrato"}
+                            {investment.keys_delivered_on ? "entregue" : "previsão do contrato"}
                         </span>
                     </div>
                 </div>
 
                 <p className="text-[11px] text-muted-foreground">
-                    O aluguel é líquido de vacância e custos e recebe um reajuste a cada doze meses. As parcelas previstas
-                    saem do quadro resumo do contrato, cada uma pelo último valor pago do seu tipo — a parcela carrega a
-                    correção acumulada e não cai, então a previsão sobe a cada pagamento lançado. A TIR junta tudo isso
-                    numa taxa anual: acima do CDI, antecipar parcelas rende menos que deixar o dinheiro aplicado; abaixo,
-                    antecipar é o melhor uso dele. Estimativas, não previsões.
+                    {sellMode
+                        ? "A venda estimada é o valor na entrega (lápis: valor informado ou área × R$/m²; senão custo × valorização). "
+                        : "O aluguel é líquido de vacância e custos e recebe um reajuste a cada doze meses. "}
+                    As parcelas previstas saem do quadro resumo do contrato, cada uma pelo último valor pago do seu tipo — a
+                    parcela carrega a correção acumulada e não cai, então a previsão sobe a cada pagamento lançado. A TIR
+                    junta tudo isso numa taxa anual: acima do CDI, antecipar parcelas rende menos que deixar o dinheiro
+                    aplicado; abaixo, antecipar é o melhor uso dele. Estimativas, não previsões.
                 </p>
             </div>
         </section>

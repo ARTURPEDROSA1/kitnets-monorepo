@@ -16,10 +16,14 @@ import { DateInput } from "@/components/ui/DateInput";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
+    EXIT_PLAN_LABELS,
     INDEX_LABELS,
     INVESTMENT_KIND_LABELS,
+    STRATEGY_LABELS,
     type IndexCode,
+    type InvestmentExitPlan,
     type InvestmentKind,
+    type InvestmentStrategy,
 } from "@/lib/new-investments";
 import InvestmentScheduleEditor, { INDEX_CODES, type ScheduleDraft } from "./InvestmentScheduleEditor";
 import type { ExtractedInvestment } from "@/lib/new-investment-extract";
@@ -31,6 +35,8 @@ export interface InvestmentFormValues {
     unit_label: string;
     developer: string;
     kind: InvestmentKind;
+    strategy: InvestmentStrategy;
+    exit_plan: InvestmentExitPlan;
     description: string;
     street: string;
     street_number: string;
@@ -51,7 +57,7 @@ export interface InvestmentFormValues {
 }
 
 const EMPTY: InvestmentFormValues = {
-    name: "", unit_label: "", developer: "", kind: "STUDIO", description: "",
+    name: "", unit_label: "", developer: "", kind: "STUDIO", strategy: "NA_PLANTA", exit_plan: "ALUGAR", description: "",
     street: "", street_number: "", neighborhood: "", city: "", state: "", postal_code: "",
     total_price: "", down_payment: "", financed_amount: "", area_m2: "", contract_date: "", keys_expected_on: "",
     index_before_keys: "NONE", index_after_keys: "NONE", estimated_rent: "", schedules: [],
@@ -67,6 +73,8 @@ function fromExtraction(data: ExtractedInvestment, inferredTotal: number | null)
         unit_label: i.unit_label ?? "",
         developer: i.developer ?? "",
         kind: i.kind,
+        strategy: "NA_PLANTA",
+        exit_plan: "ALUGAR",
         description: i.description ?? "",
         street: i.street ?? "",
         street_number: i.street_number ?? "",
@@ -243,6 +251,32 @@ export default function InvestmentFormModal({ open, onClose, onSubmit }: Props) 
                             >
                                 {(Object.keys(INVESTMENT_KIND_LABELS) as InvestmentKind[]).map(k => (
                                     <option key={k} value={k}>{INVESTMENT_KIND_LABELS[k]}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="inv-strategy">Modalidade</Label>
+                            <select
+                                id="inv-strategy"
+                                value={values.strategy}
+                                onChange={e => set("strategy", e.target.value as InvestmentStrategy)}
+                                className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+                            >
+                                {(Object.keys(STRATEGY_LABELS) as InvestmentStrategy[]).map(k => (
+                                    <option key={k} value={k}>{STRATEGY_LABELS[k]}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="inv-exit">Plano de saída</Label>
+                            <select
+                                id="inv-exit"
+                                value={values.exit_plan}
+                                onChange={e => set("exit_plan", e.target.value as InvestmentExitPlan)}
+                                className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+                            >
+                                {(Object.keys(EXIT_PLAN_LABELS) as InvestmentExitPlan[]).map(k => (
+                                    <option key={k} value={k}>{EXIT_PLAN_LABELS[k]}</option>
                                 ))}
                             </select>
                         </div>

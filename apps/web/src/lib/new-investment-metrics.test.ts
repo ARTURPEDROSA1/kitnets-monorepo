@@ -33,6 +33,11 @@ const investment = (over: Partial<NewInvestment> = {}): NewInvestment => ({
     sim_horizon_months: 120,
     sim_delivery_costs_pct: 0,
     expected_appreciation_pct: null,
+    strategy: "NA_PLANTA",
+    exit_plan: "ALUGAR",
+    sold_on: null,
+    sale_price: null,
+    sale_costs: 0,
     area_m2: null,
     market_m2_price: null,
     estimated_value_at_delivery: null,
@@ -311,6 +316,25 @@ describe("valorização, obra and tolerance", () => {
         expect(m.appreciationGain).toBeNull();
         expect(m.costPerM2).toBeCloseTo(m.committed / 30, 2);
         expect(m.constructionPct).toBe(42.5);
+    });
+});
+
+describe("a registered sale", () => {
+    it("measures the gain against what was actually paid, net of the sale's costs, with a TIR", () => {
+        // paid 7.095 in 2026-08; sold two years later for 20.000 less 1.000 of costs
+        const sold = investment({ status: "SOLD", sold_on: "2028-08-15", sale_price: 20000, sale_costs: 1000 });
+        const m = computeInvestmentMetrics(sold, schedules, [payment({})], asOf);
+        expect(m.sold).toBe(true);
+        expect(m.saleNet).toBe(19000);
+        expect(m.realizedGain).toBeCloseTo(19000 - 7095, 2);
+        expect(m.realizedGainPct).toBeCloseTo(((19000 - 7095) / 7095) * 100, 1);
+        // 7.095 → 19.000 in 24 months ≈ 63.6% a.a.
+        expect(m.realizedIrrAnnualPct).toBeCloseTo(63.6, 0);
+    });
+
+    it("is not a sale until the price and the date are there", () => {
+        expect(computeInvestmentMetrics(investment({ status: "SOLD" }), schedules, [payment({})], asOf).sold).toBe(false);
+        expect(computeInvestmentMetrics(investment({ sold_on: "2028-08-15", sale_price: 20000 }), schedules, [payment({})], asOf).sold).toBe(false);
     });
 });
 

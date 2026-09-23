@@ -11,8 +11,10 @@
 > renaming them buys nothing. "Projetos" was chosen because the module is a *project* phase —
 > money out on a plan before the asset produces anything — and that skeleton (cost plan →
 > disbursement ledger → completion → rent or sale) fits land + build, refurbishment and auction
-> purchases as well as off-plan units. Those modalities are the next steps (a `strategy` and an
-> `exit_plan` field, a "Registrar venda" finish next to "Mover para Imóveis").
+> purchases as well as off-plan units. Every project carries a `strategy` (NA_PLANTA · TERRENO ·
+> REFORMA · LEILAO — labels and the name of the finish line, `COMPLETION_LABELS`) and an
+> `exit_plan` (ALUGAR → "Mover para Imóveis" · VENDER → "Registrar venda", see §6). The AI import
+> still understands only the off-plan contract; the other modalities' imports come one at a time.
 
 ---
 
@@ -137,13 +139,16 @@ and the whole one wins when both arrive.
 
 The second block of the pencil dialog is what the contract never says:
 
-- **`expected_appreciation_pct`** ("worth X% more at delivery" — the one the owner reached for
-  first; the pencil suggests FipeZap's 12-month trend compounded to the keys as a starting
-  point), **`area_m2`** (the AI also reads it from the quadro resumo) with **`market_m2_price`** (a
-  reference R$/m² from listings of the building or the street), and
-  **`estimated_value_at_delivery`**. `deliveryValue` in the metrics is the typed figure, else
-  area × R$/m², else cost × (1 + %); `appreciationGain` / `appreciationPct` = that minus
-  `committed`. The "Valorização" tile is itself the way in: tapping it opens the pencil dialog. The "Valorização"
+- **Valorização lives in the simulator, not on the KPI row** (the owner's call: it is a
+  premise-driven projection like the rent, not a fact like the six tiles on top).
+  **`expected_appreciation_pct`** ("worth X% more at delivery") is typed with the other premises
+  and autosaved; the placeholder is FipeZap's 12-month trend compounded to the keys. The pencil
+  keeps the two ways that win over the percentage: **`area_m2`** (the AI also reads it from the
+  quadro resumo) with **`market_m2_price`**, and **`estimated_value_at_delivery`**.
+  `deliveryValueOf()` (typed → area × R$/m² → cost × (1 + %)) is shared by the metrics and the
+  simulator, which recomputes it live as the % is typed; the simulator's "Valorização" tile shows
+  the gain over `committed`. Three premises carry a "?" (`PremiseHelp`, a small dialog so it works
+  on a phone): custos sobre o aluguel, custos na entrega, valorização. The "Valorização"
   tile shows the gain, R$/m² paid vs market, and FipeZap's **national** sale variation over twelve
   months (`benchmarks.fipezapSale12mPct`) as the trend — the app has no per-city FipeZap series, so
   it is a reference, never a price for the unit's street.
@@ -318,6 +323,21 @@ set; it is never deleted, and the dashboard turns the button into a link to Imó
 
 The property name must be unique among the account's properties (the Imóveis page pairs rows and
 JSON entries by name), so the dialog asks for it and surfaces the 409 as a field error.
+
+### Or a sale ("Registrar venda")
+
+The other finish. `POST /api/investments/[id]/sell { sold_on, sale_price, sale_costs }` marks the
+row SOLD with the sale on it (undo: a PATCH back to ACTIVE with the fields cleared, the
+"desfazer" link on the banner). The metrics then give `saleNet`, `realizedGain` (net sale minus
+**what was actually paid** — a buyer of an off-plan unit takes over the open instalments, so those
+were never the seller's cost), `realizedGainPct` and `realizedIrrAnnualPct` (the paid flows by
+month closed by the net sale, `lib/irr.ts`, shared with the simulator). The card shows "Vendido";
+the dashboard shows a green banner and hides the finish buttons. Which button is primary follows
+`exit_plan`; the other stays one click away.
+
+With `exit_plan = VENDER` the simulator switches to the **sale model**: no rent, the expected
+delivery value comes in as one inflow in the keys month (`saleAtDelivery`, derived per render from
+`deliveryValueOf`, never stored), payback is the keys month and the TIR is the flipper's number.
 
 ## 7. Tests
 

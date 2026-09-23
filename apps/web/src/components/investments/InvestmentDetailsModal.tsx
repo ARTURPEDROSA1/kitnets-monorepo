@@ -23,19 +23,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DateInput } from "@/components/ui/DateInput";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { INVESTMENT_KIND_LABELS, formatBRL, type InvestmentKind, type NewInvestment } from "@/lib/new-investments";
+import {
+    EXIT_PLAN_LABELS, INVESTMENT_KIND_LABELS, STRATEGY_LABELS, formatBRL,
+    type InvestmentExitPlan, type InvestmentKind, type InvestmentStrategy, type NewInvestment,
+} from "@/lib/new-investments";
 
 interface Props {
     open: boolean;
     onClose: () => void;
     investment: NewInvestment;
     onSave: (patch: Record<string, unknown>) => Promise<boolean>;
-    /** FipeZap's trend compounded to the keys, offered under the "valorização esperada" field. */
-    suggestedAppreciationPct?: number | null;
 }
 
 /** Mounted only while open, so a cancelled edit dies with the unmount. */
-export default function InvestmentDetailsModal({ open, onClose, investment, onSave, suggestedAppreciationPct = null }: Props) {
+export default function InvestmentDetailsModal({ open, onClose, investment, onSave }: Props) {
     return (
         <Dialog open={open} onOpenChange={o => { if (!o) onClose(); }}>
             <DialogContent className="sm:max-w-2xl max-h-[92vh] overflow-y-auto">
@@ -46,7 +47,7 @@ export default function InvestmentDetailsModal({ open, onClose, investment, onSa
                         parcelas ficam em &ldquo;Plano de pagamento&rdquo;.
                     </DialogDescription>
                 </DialogHeader>
-                {open && <DetailsForm investment={investment} onSave={onSave} onClose={onClose} suggestedAppreciationPct={suggestedAppreciationPct} />}
+                {open && <DetailsForm investment={investment} onSave={onSave} onClose={onClose} />}
             </DialogContent>
         </Dialog>
     );
@@ -59,11 +60,13 @@ const parseDecimal = (v: string): number | null => {
     return v.trim() && Number.isFinite(n) ? n : null;
 };
 
-function DetailsForm({ investment, onSave, onClose, suggestedAppreciationPct = null }: Omit<Props, "open">) {
+function DetailsForm({ investment, onSave, onClose }: Omit<Props, "open">) {
     const [form, setForm] = useState({
         name: investment.name,
         unit_label: investment.unit_label ?? "",
         kind: investment.kind,
+        strategy: investment.strategy,
+        exit_plan: investment.exit_plan,
         developer: investment.developer ?? "",
         address: investment.address ?? "",
         city: investment.city ?? "",
@@ -73,7 +76,6 @@ function DetailsForm({ investment, onSave, onClose, suggestedAppreciationPct = n
         area_m2: numberOrEmpty(investment.area_m2),
         market_m2_price: numberOrEmpty(investment.market_m2_price),
         estimated_value_at_delivery: numberOrEmpty(investment.estimated_value_at_delivery),
-        expected_appreciation_pct: numberOrEmpty(investment.expected_appreciation_pct),
         construction_pct: numberOrEmpty(investment.construction_pct),
         construction_updated_on: investment.construction_updated_on ?? "",
     });
@@ -99,6 +101,8 @@ function DetailsForm({ investment, onSave, onClose, suggestedAppreciationPct = n
             name: form.name.trim(),
             unit_label: blank(form.unit_label),
             kind: form.kind,
+            strategy: form.strategy,
+            exit_plan: form.exit_plan,
             developer: blank(form.developer),
             address: blank(form.address),
             city: blank(form.city),
@@ -108,7 +112,6 @@ function DetailsForm({ investment, onSave, onClose, suggestedAppreciationPct = n
             area_m2: blank(form.area_m2),
             market_m2_price: blank(form.market_m2_price),
             estimated_value_at_delivery: blank(form.estimated_value_at_delivery),
-            expected_appreciation_pct: blank(form.expected_appreciation_pct),
             construction_pct: blank(form.construction_pct),
             construction_updated_on: blank(form.construction_updated_on),
         });
@@ -142,6 +145,34 @@ function DetailsForm({ investment, onSave, onClose, suggestedAppreciationPct = n
                             ))}
                         </select>
                     </div>
+                    <div className="space-y-1">
+                        <Label htmlFor="details-strategy">Modalidade</Label>
+                        <select
+                            id="details-strategy"
+                            value={form.strategy}
+                            onChange={e => set("strategy", e.target.value as InvestmentStrategy)}
+                            className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+                            title="Na planta, terreno + construção, reforma ou leilão — muda os nomes das etapas, não a mecânica"
+                        >
+                            {(Object.keys(STRATEGY_LABELS) as InvestmentStrategy[]).map(k => (
+                                <option key={k} value={k}>{STRATEGY_LABELS[k]}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="space-y-1">
+                        <Label htmlFor="details-exit">Plano de saída</Label>
+                        <select
+                            id="details-exit"
+                            value={form.exit_plan}
+                            onChange={e => set("exit_plan", e.target.value as InvestmentExitPlan)}
+                            className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+                            title="Alugar: termina com 'Mover para Imóveis'. Vender: termina com 'Registrar venda' e o simulador projeta a venda na entrega"
+                        >
+                            {(Object.keys(EXIT_PLAN_LABELS) as InvestmentExitPlan[]).map(k => (
+                                <option key={k} value={k}>{EXIT_PLAN_LABELS[k]}</option>
+                            ))}
+                        </select>
+                    </div>
                     <div className="space-y-1 lg:col-span-2">
                         <Label htmlFor="details-developer">Construtora</Label>
                         <Input id="details-developer" value={form.developer} onChange={e => set("developer", e.target.value)} placeholder="Rofran Construtora" />
@@ -171,31 +202,14 @@ function DetailsForm({ investment, onSave, onClose, suggestedAppreciationPct = n
 
                 <div className="space-y-3 rounded-xl border border-border/70 bg-muted/20 p-3">
                     <div>
-                        <h3 className="text-sm font-semibold text-foreground">Valorização e obra</h3>
+                        <h3 className="text-sm font-semibold text-foreground">Valor na entrega e obra</h3>
                         <p className="text-xs text-muted-foreground">
-                            O contrato não diz quanto a unidade vai valer. Diga de um jeito: a valorização esperada em %,
-                            a área com um R$/m² de mercado (anúncios do prédio ou da rua), ou direto o valor na entrega.
-                            E o andamento que a construtora informa.
+                            A valorização em % fica no simulador. Aqui, se preferir, a área com um R$/m² de mercado (anúncios
+                            do prédio ou da rua) ou direto o valor na entrega — eles valem no lugar do percentual. E o
+                            andamento que a construtora informa.
                         </p>
                     </div>
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                        <div className="space-y-1 col-span-2">
-                            <Label htmlFor="details-appreciation">Valorização esperada até a entrega (%)</Label>
-                            <Input
-                                id="details-appreciation"
-                                inputMode="decimal"
-                                value={form.expected_appreciation_pct}
-                                onChange={e => set("expected_appreciation_pct", e.target.value)}
-                                placeholder={suggestedAppreciationPct !== null ? String(suggestedAppreciationPct).replace(".", ",") : "30"}
-                            />
-                            <p className="text-[11px] text-muted-foreground">
-                                {suggestedAppreciationPct !== null
-                                    ? `Pela tendência FipeZap (índice nacional de venda) até as chaves seriam +${suggestedAppreciationPct.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%. `
-                                    : ""}
-                                Vale quando os campos abaixo estão em branco.
-                            </p>
-                        </div>
-                        <div className="space-y-1 col-span-2" />
                         <div className="space-y-1">
                             <Label htmlFor="details-area">Área privativa (m²)</Label>
                             <Input id="details-area" inputMode="decimal" value={form.area_m2} onChange={e => set("area_m2", e.target.value)} placeholder="27,5" />

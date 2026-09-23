@@ -22,6 +22,7 @@ import {
     type ScheduledInstalment,
 } from "./new-investments";
 import { round2 } from "./property-income";
+import { annualizePct, internalRateOfReturn } from "./irr";
 
 export interface InvestmentMetrics {
     /** Contract headline price (quadro resumo "preço total do imóvel"). */
@@ -95,6 +96,36 @@ export interface InvestmentMetrics {
     /** `deliveryValue − committed`, and the same as % of `committed`. */
     appreciationGain: number | null;
     appreciationPct: number | null;
+
+    /** The sale, once registered: what came in net of the sale's own costs, against what was actually paid. */
+    sold: boolean;
+    saleNet: number | null;
+    realizedGain: number | null;
+    realizedGainPct: number | null;
+    /** TIR of the paid flows (by month) closed by the net sale in the month it happened. */
+    realizedIrrAnnualPct: number | null;
+}
+
+/**
+ * What the unit is expected to be worth at delivery: the owner's figure, else area × market R$/m²,
+ * else the cost grown by the expected %. Shared with the simulator, which recomputes it live as
+ * the percentage is typed.
+ */
+export function deliveryValueOf(
+    investment: Pick<NewInvestment, "area_m2" | "market_m2_price" | "estimated_value_at_delivery">,
+    committed: number,
+    expectedAppreciationPct: number | null
+): { value: number | null; source: "typed" | "m2" | "pct" | null } {
+    const positive = (v: number | null) => (v !== null && v > 0 ? v : null);
+    const typed = positive(investment.estimated_value_at_delivery);
+    if (typed) return { value: typed, source: "typed" };
+    const area = positive(investment.area_m2);
+    const m2 = positive(investment.market_m2_price);
+    if (area && m2) return { value: round2(area * m2), source: "m2" };
+    if (expectedAppreciationPct !== null && expectedAppreciationPct >= 0 && committed > 0) {
+        return { value: round2(committed * (1 + expectedAppreciationPct / 100)), source: "pct" };
+    }
+    return { value: null, source: null };
 }
 
 /** The market figures the dashboard reads the KPIs against; loaded server-side, best-effort. */
@@ -198,16 +229,39 @@ export function computeInvestmentMetrics(
             : round2(rent * (1 - investment.rent_vacancy_pct / 100) * (1 - investment.rent_costs_pct / 100));
     const base = committed > 0 ? committed : null;
 
-    // Valorização: the owner's own figure for the unit at delivery wins; otherwise area × market R$/m².
+    // Valorização: the owner's own figure for the unit at delivery wins; otherwise area × market
+    // R$/m²; otherwise the cost grown by the expected percentage.
     const positive = (v: number | null) => (v !== null && v > 0 ? v : null);
     const area = positive(investment.area_m2);
     const marketM2 = positive(investment.market_m2_price);
-    const typedValue = positive(investment.estimated_value_at_delivery);
-    const byArea = area && marketM2 ? round2(area * marketM2) : null;
     const expectedPct = investment.expected_appreciation_pct !== null && investment.expected_appreciation_pct >= 0 ? investment.expected_appreciation_pct : null;
-    const byPct = expectedPct !== null && base ? round2(committed * (1 + expectedPct / 100)) : null;
-    const deliveryValue = typedValue ?? byArea ?? byPct;
+    const delivery = deliveryValueOf(investment, committed, expectedPct);
+    const deliveryValue = delivery.value;
     const appreciationGain = deliveryValue !== null && base ? round2(deliveryValue - committed) : null;
+
+    // The sale, once registered: net of its own costs, against what was actually paid (a buyer of
+    // an off-plan unit takes over the open instalments, so those are not the seller's cost).
+    const sold = investment.status === "SOLD" && Boolean(investment.sold_on) && (investment.sale_price ?? 0) > 0;
+    const saleNet = sold ? round2((investment.sale_price ?? 0) - (investment.sale_costs ?? 0)) : null;
+    const realizedGain = saleNet !== null ? round2(saleNet - paid) : null;
+    let realizedIrrAnnualPct: number | null = null;
+    if (sold && saleNet !== null && investment.sold_on) {
+        const soldMonth = investment.sold_on.slice(0, 7);
+        const paidRows = payments.filter(p => p.status === "PAID");
+        const months = [...paidRows.map(paymentMonth), soldMonth].sort();
+        const first = months[0];
+        const span = monthsBetween(first, soldMonth);
+        if (span >= 0) {
+            const flows = Array.from({ length: span + 1 }, () => 0);
+            for (const p of paidRows) {
+                const i = monthsBetween(first, paymentMonth(p));
+                if (i >= 0 && i <= span) flows[i] -= paymentTotal(p);
+            }
+            flows[span] += saleNet;
+            const monthly = internalRateOfReturn(flows);
+            realizedIrrAnnualPct = monthly === null ? null : annualizePct(monthly);
+        }
+    }
 
     return {
         contractPrice: round2(investment.total_price || 0),
@@ -248,9 +302,15 @@ export function computeInvestmentMetrics(
         marketM2Price: marketM2,
         expectedAppreciationPct: expectedPct,
         deliveryValue,
-        deliveryValueSource: typedValue ? "typed" : byArea !== null ? "m2" : byPct !== null ? "pct" : null,
+        deliveryValueSource: delivery.source,
         appreciationGain,
         appreciationPct: appreciationGain !== null && base ? round2((appreciationGain / committed) * 100) : null,
+
+        sold,
+        saleNet,
+        realizedGain,
+        realizedGainPct: realizedGain !== null && paid > 0 ? round2((realizedGain / paid) * 100) : null,
+        realizedIrrAnnualPct,
     };
 }
 

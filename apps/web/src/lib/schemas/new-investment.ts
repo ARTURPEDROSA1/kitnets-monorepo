@@ -89,7 +89,9 @@ export const PAYMENT_KINDS = [
 ] as const;
 export const PAYMENT_STATUSES = ["PLANNED", "PAID"] as const;
 export const DOCUMENT_KINDS = ["CONTRACT", "MARKETING", "PHOTO", "LAYOUT", "RECEIPT", "OTHER"] as const;
-export const INVESTMENT_STATUSES = ["ACTIVE", "COMPLETED", "ARCHIVED"] as const;
+export const INVESTMENT_STATUSES = ["ACTIVE", "COMPLETED", "SOLD", "ARCHIVED"] as const;
+export const INVESTMENT_STRATEGIES = ["NA_PLANTA", "TERRENO", "REFORMA", "LEILAO"] as const;
+export const INVESTMENT_EXIT_PLANS = ["ALUGAR", "VENDER"] as const;
 
 export const scheduleInputSchema = z.object({
     label: z.string().trim().min(1, "Descreva o bloco de parcelas.").max(80),
@@ -153,6 +155,13 @@ export const investmentInputSchema = z.object({
     construction_pct: optionalPercent(100),
     construction_updated_on: isoDate(),
 
+    strategy: z.enum(INVESTMENT_STRATEGIES).default("NA_PLANTA"),
+    exit_plan: z.enum(INVESTMENT_EXIT_PLANS).default("ALUGAR"),
+    /** The sale is registered through POST …/sell; PATCH may only clear it (undo). */
+    sold_on: isoDate(),
+    sale_price: money("Preço de venda inválido."),
+    sale_costs: money("Custos da venda inválidos."),
+
     status: z.enum(INVESTMENT_STATUSES).default("ACTIVE"),
     cover_path: optionalText(400),
     notes: optionalText(4000),
@@ -205,6 +214,15 @@ export const documentInputSchema = z.object({
 });
 
 export type DocumentInput = z.output<typeof documentInputSchema>;
+
+/** POST /api/investments/[id]/sell — the sale that ends a project meant to be sold. */
+export const sellInputSchema = z.object({
+    sold_on: isoDate("Informe a data da venda.").refine((v) => v !== null, "Informe a data da venda."),
+    sale_price: money("Preço de venda inválido.").refine((v) => v !== null && v > 0, "Informe o preço de venda."),
+    sale_costs: money("Custos da venda inválidos.").transform((v) => v ?? 0),
+});
+
+export type SellInput = z.output<typeof sellInputSchema>;
 
 /** POST /api/investments/[id]/promote — the name the property gets in Imóveis. */
 export const promoteInputSchema = z.object({
