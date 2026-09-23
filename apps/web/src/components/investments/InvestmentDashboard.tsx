@@ -366,11 +366,21 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
             </div>
 
             {metrics.correctionsPaid > 0 && (
-                <p className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
-                    <PiggyBank className="w-3.5 h-3.5" />
-                    {formatBRL(metrics.correctionsPaid)} do que já foi pago é correção monetária
-                    ({INDEX_LABELS[investment.index_before_keys]}), {((metrics.correctionsPaid / Math.max(1, metrics.paidToDate)) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% do desembolso.
-                </p>
+                <div
+                    role="note"
+                    className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-sm text-amber-900 dark:text-amber-200"
+                    title="Correção monetária paga sobre as parcelas até agora — a diferença entre o que a construtora cobrou e o valor de contrato"
+                >
+                    <PiggyBank className="w-5 h-5 shrink-0 text-amber-600 dark:text-amber-400" />
+                    <span>
+                        <strong className="text-base font-bold tabular-nums">{formatBRL(metrics.correctionsPaid)}</strong> do que já foi pago é
+                        correção monetária <span className="font-semibold">({INDEX_LABELS[investment.index_before_keys]})</span> —{" "}
+                        <strong className="tabular-nums">{((metrics.correctionsPaid / Math.max(1, metrics.paidToDate)) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%</strong> do desembolso.
+                    </span>
+                    <span className="text-xs text-amber-800/80 dark:text-amber-300/80">
+                        Antecipar parcelas é o que evita que esse número cresça.
+                    </span>
+                </div>
             )}
 
             <InvestmentPaymentsTable
