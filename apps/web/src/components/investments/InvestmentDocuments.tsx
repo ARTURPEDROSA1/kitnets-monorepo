@@ -23,6 +23,8 @@ interface Props {
     investmentId: string;
     documents: DocumentWithUrl[];
     onChanged: () => Promise<void> | void;
+    /** Opens the file in the app's own viewer — never a new tab. */
+    onView: (url: string, name: string) => void;
 }
 
 const UPLOADABLE: DocumentKind[] = ["CONTRACT", "MARKETING", "PHOTO", "LAYOUT", "OTHER"];
@@ -35,7 +37,7 @@ function humanSize(bytes: number | null): string {
     return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.round(bytes / 1024)} KB`;
 }
 
-export default function InvestmentDocuments({ investmentId, documents, onChanged }: Props) {
+export default function InvestmentDocuments({ investmentId, documents, onChanged, onView }: Props) {
     const [uploading, setUploading] = useState<DocumentKind | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [deleting, setDeleting] = useState<string | null>(null);
@@ -128,12 +130,12 @@ export default function InvestmentDocuments({ investmentId, documents, onChanged
                             <ul className={cn("grid gap-2", kind === "PHOTO" || kind === "LAYOUT" ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5" : "grid-cols-1 sm:grid-cols-2")}>
                                 {list.map(doc => (
                                     <li key={doc.id} className="group relative rounded-lg border border-border/70 bg-muted/20 overflow-hidden">
-                                        <a
-                                            href={doc.url ?? "#"}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-                                            title={doc.file_name ?? "Arquivo"}
+                                        <button
+                                            type="button"
+                                            onClick={() => { if (doc.url) onView(doc.url, doc.file_name ?? "Arquivo"); }}
+                                            disabled={!doc.url}
+                                            className="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:cursor-not-allowed"
+                                            title={doc.url ? `Abrir ${doc.file_name ?? "arquivo"}` : "Arquivo indisponível"}
                                         >
                                             {isImage(doc) && doc.url ? (
                                                 <span className="relative block h-28 w-full bg-muted">
@@ -148,7 +150,7 @@ export default function InvestmentDocuments({ investmentId, documents, onChanged
                                             <span className="block px-2 py-1 text-[10px] text-muted-foreground tabular-nums">
                                                 {formatDateBR(doc.created_at.slice(0, 10))} {humanSize(doc.size_bytes)}
                                             </span>
-                                        </a>
+                                        </button>
                                         <button
                                             type="button"
                                             onClick={() => remove(doc)}

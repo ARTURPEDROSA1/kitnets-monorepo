@@ -14,7 +14,7 @@
  * the developer, drops the receipt in and moves on.
  */
 import React, { useMemo, useRef, useState } from "react";
-import { CalendarPlus, Check, Download, Loader2, Paperclip, Plus, Settings, Trash2, Upload, X } from "lucide-react";
+import { CalendarPlus, Check, Eye, Loader2, Paperclip, Plus, Settings, Trash2, Upload, X } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { cn } from "@/lib/utils";
 import { formatDateBR } from "@/lib/dates";
@@ -63,6 +63,8 @@ interface Props {
     onDelete: (id: string) => Promise<boolean>;
     /** Opens the quadro resumo editor — the forecast above the table comes from it. */
     onEditPlan?: () => void;
+    /** Opens a receipt in the app's own viewer — never a new tab. */
+    onView?: (url: string, name: string) => void;
     busy?: boolean;
 }
 
@@ -93,6 +95,7 @@ export default function InvestmentPaymentsTable({
     onPatch,
     onDelete,
     onEditPlan,
+    onView,
     busy,
 }: Props) {
     const [draft, setDraft] = useState<PaymentDraft | null>(null);
@@ -497,15 +500,18 @@ export default function InvestmentPaymentsTable({
                                     {show("receipt") && (
                                         <td {...sel.cellProps("receipt", row.id, null, "px-2 py-1 text-center")}>
                                             {row.receipt_path ? (
-                                                <a
-                                                    href={receiptUrls[row.receipt_path] ?? "#"}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const url = receiptUrls[row.receipt_path!];
+                                                        if (url && onView) onView(url, row.receipt_name ?? "Comprovante");
+                                                    }}
+                                                    disabled={!receiptUrls[row.receipt_path] || !onView}
                                                     title={row.receipt_name ?? "Comprovante"}
-                                                    className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 hover:underline"
+                                                    className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 hover:underline disabled:opacity-50 disabled:no-underline"
                                                 >
-                                                    <Download className="w-3.5 h-3.5" /> ver
-                                                </a>
+                                                    <Eye className="w-3.5 h-3.5" /> ver
+                                                </button>
                                             ) : (
                                                 <label className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground cursor-pointer">
                                                     {uploading === row.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}

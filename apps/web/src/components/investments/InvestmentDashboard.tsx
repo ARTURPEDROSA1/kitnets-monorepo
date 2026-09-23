@@ -30,6 +30,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Tile from "@/components/properties/Tile";
+import { PdfViewerModal } from "@/components/ui/PdfViewerModal";
 import InvestmentPaymentsTable, { type PaymentDraft } from "./InvestmentPaymentsTable";
 import InvestmentCashFlowSimulator from "./InvestmentCashFlowSimulator";
 import InvestmentDocuments, { type DocumentWithUrl } from "./InvestmentDocuments";
@@ -72,6 +73,8 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
     const [promoting, setPromoting] = useState(false);
     const [planOpen, setPlanOpen] = useState(false);
     const [detailsOpen, setDetailsOpen] = useState(false);
+    /** The contract, a floor plan or a receipt, opened inside the app like every other document. */
+    const [viewing, setViewing] = useState<{ url: string; name: string } | null>(null);
 
     const load = useCallback(async () => {
         const [main, docs] = await Promise.all([
@@ -353,6 +356,7 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                 onPatch={patchPayment}
                 onDelete={deletePayment}
                 onEditPlan={() => setPlanOpen(true)}
+                onView={(url, name) => setViewing({ url, name })}
                 busy={busy}
             />
 
@@ -363,9 +367,22 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                 onSave={patchInvestment}
             />
 
-            <InvestmentDocuments investmentId={investmentId} documents={documents} onChanged={refresh} />
+            <InvestmentDocuments
+                investmentId={investmentId}
+                documents={documents}
+                onChanged={refresh}
+                onView={(url, name) => setViewing({ url, name })}
+            />
 
             {error && <p className="text-sm text-rose-600">{error}</p>}
+
+            <PdfViewerModal
+                isOpen={viewing !== null}
+                onClose={() => setViewing(null)}
+                url={viewing?.url ?? null}
+                title={viewing?.name ?? "Documento"}
+                fileName={viewing?.name ?? "documento.pdf"}
+            />
 
             <InvestmentDetailsModal
                 open={detailsOpen}
