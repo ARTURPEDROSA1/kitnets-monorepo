@@ -2036,6 +2036,11 @@ export type Database = {
           sim_horizon_months: number
           sim_delivery_costs_pct: number
           expected_appreciation_pct: number | null
+          strategy: string
+          exit_plan: string
+          sold_on: string | null
+          sale_price: number | null
+          sale_costs: number
           area_m2: number | null
           market_m2_price: number | null
           estimated_value_at_delivery: number | null
@@ -2077,6 +2082,11 @@ export type Database = {
           sim_horizon_months?: number
           sim_delivery_costs_pct?: number
           expected_appreciation_pct?: number | null
+          strategy?: string
+          exit_plan?: string
+          sold_on?: string | null
+          sale_price?: number | null
+          sale_costs?: number
           area_m2?: number | null
           market_m2_price?: number | null
           estimated_value_at_delivery?: number | null
@@ -2118,6 +2128,11 @@ export type Database = {
           sim_horizon_months?: number
           sim_delivery_costs_pct?: number
           expected_appreciation_pct?: number | null
+          strategy?: string
+          exit_plan?: string
+          sold_on?: string | null
+          sale_price?: number | null
+          sale_costs?: number
           area_m2?: number | null
           market_m2_price?: number | null
           estimated_value_at_delivery?: number | null

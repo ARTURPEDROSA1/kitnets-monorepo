@@ -30,6 +30,7 @@ import {
     type NewInvestment,
 } from "./new-investments";
 import { rentStartMonth } from "./new-investment-metrics";
+import { annualizePct, internalRateOfReturn } from "./irr";
 import { round2 } from "./property-income";
 
 export interface CashFlowAssumptions {
@@ -47,6 +48,13 @@ export interface CashFlowAssumptions {
     horizonMonths: number;
     /** What the handover costs (ITBI 2–3%, escritura + registro ~1%) as % of the instalments, paid in the keys month. */
     deliveryCostsPct: number;
+    /** "Worth X% more at delivery" — stored with the other premises; feeds the delivery value. */
+    expectedAppreciationPct: number | null;
+    /**
+     * A project meant to be sold: the expected delivery value comes in as one inflow in the keys
+     * month and there is no rent. Null (or 0) = the rent model. Not stored — derived per render.
+     */
+    saleAtDelivery?: number | null;
 }
 
 export interface CashFlowPoint {
@@ -57,7 +65,9 @@ export interface CashFlowPoint {
     outflowForecast: number;
     outflowDelivery: number;
     rent: number;
-    /** Σ (rent − outflows) up to and including this month. */
+    /** The sale at delivery, in a project meant to be sold (drawn above the axis). */
+    sale: number;
+    /** Σ (rent + sale − outflows) up to and including this month. */
     cumulative: number;
     /** True for the month the keys are handed over. */
     keys: boolean;
@@ -69,6 +79,7 @@ export interface CashFlowResult {
     totalOutflow: number;
     totalDelivery: number;
     totalRent: number;
+    totalSale: number;
     /** `YYYY-MM` where `cumulative` first reaches zero, null when the horizon is too short. */
     breakEvenMonth: string | null;
     /** Months from the first rent to break-even. */
@@ -96,6 +107,7 @@ export function assumptionsOf(investment: NewInvestment, fallbackHorizonMonths =
         costsPct: investment.rent_costs_pct ?? 0,
         horizonMonths: investment.sim_horizon_months || fallbackHorizonMonths,
         deliveryCostsPct: investment.sim_delivery_costs_pct ?? 0,
+        expectedAppreciationPct: investment.expected_appreciation_pct,
     };
 }
 
@@ -107,36 +119,7 @@ export function rentAtMonth(a: CashFlowAssumptions, monthsSinceStart: number): n
     return round2(gross * (1 - a.vacancyPct / 100) * (1 - a.costsPct / 100));
 }
 
-/**
- * Monthly internal rate of return of a series of flows (index = month, negative = out, positive
- * = in), by bisection on the net present value. Null when the flows never change sign, or when
- * no rate between −99% and +100% a month answers — a flow that only ever loses has no TIR.
- */
-export function internalRateOfReturn(flows: number[]): number | null {
-    if (!flows.some(f => f < 0) || !flows.some(f => f > 0)) return null;
-    const npv = (rate: number) => flows.reduce((sum, f, t) => sum + f / Math.pow(1 + rate, t), 0);
-    // The lower bracket: (1 + r)^-t explodes past double precision at −99% a month over a
-    // 30-year horizon, so start at −50% (already absurd) and back off while it overflows.
-    let lo = -0.5, hi = 1;
-    let fLo = npv(lo);
-    for (const candidate of [-0.3, -0.1, -0.02]) {
-        if (Number.isFinite(fLo)) break;
-        lo = candidate;
-        fLo = npv(lo);
-    }
-    let fHi = npv(hi);
-    if (!Number.isFinite(fLo) || !Number.isFinite(fHi) || fLo * fHi > 0) return null;
-    for (let i = 0; i < 200; i++) {
-        const mid = (lo + hi) / 2;
-        const fMid = npv(mid);
-        if (Math.abs(fMid) < 1e-7 || hi - lo < 1e-10) return mid;
-        if (fLo * fMid < 0) { hi = mid; fHi = fMid; } else { lo = mid; fLo = fMid; }
-    }
-    return (lo + hi) / 2;
-}
-
-/** A monthly rate as the yearly figure people quote (% a.a.). */
-export const annualizePct = (monthlyRate: number): number => round2((Math.pow(1 + monthlyRate, 12) - 1) * 100);
+export { internalRateOfReturn, annualizePct } from "./irr";
 
 export function simulateCashFlow(
     investment: NewInvestment,
@@ -166,18 +149,24 @@ export function simulateCashFlow(
     const deliveryCosts = round2(instalmentsTotal * (assumptions.deliveryCostsPct / 100));
     const deliveryMonth = deliveryCosts > 0 ? (keysMonth ?? (rentStart ? addMonthsToKey(rentStart, -1) : null)) : null;
 
+    // A project meant to be sold: the delivery value comes in once, in the keys month (or when
+    // the rent would have started), and no rent is projected.
+    const saleAmount = assumptions.saleAtDelivery && assumptions.saleAtDelivery > 0 ? round2(assumptions.saleAtDelivery) : 0;
+    const saleMonth = saleAmount > 0 ? (keysMonth ?? rentStart) : null;
+    const rentMode = saleMonth === null;
+
     // Range: from the first movement to whichever comes last — the last instalment, the keys, or
     // enough rent months to show the recovery.
     const cashMonths = [...paidByMonth.keys(), ...forecastByMonth.keys()];
     const scheduleMonths = expandSchedules(schedules).map(i => i.dueOn.slice(0, 7));
-    const known = [...cashMonths, ...scheduleMonths, ...(deliveryMonth ? [deliveryMonth] : [])].sort();
+    const known = [...cashMonths, ...scheduleMonths, ...(deliveryMonth ? [deliveryMonth] : []), ...(saleMonth ? [saleMonth] : [])].sort();
     const start = known[0] ?? rentStart ?? keysMonth;
     if (!start) {
-        return { points: [], totalOutflow: 0, totalDelivery: 0, totalRent: 0, breakEvenMonth: null, breakEvenMonths: null, irrAnnualPct: null, keysMonth, rentStart };
+        return { points: [], totalOutflow: 0, totalDelivery: 0, totalRent: 0, totalSale: 0, breakEvenMonth: null, breakEvenMonths: null, irrAnnualPct: null, keysMonth, rentStart };
     }
 
     const lastCash = known[known.length - 1] ?? start;
-    const rentEnd = rentStart && assumptions.monthlyRent > 0 ? addMonthsToKey(rentStart, Math.max(0, assumptions.horizonMonths - 1)) : null;
+    const rentEnd = rentMode && rentStart && assumptions.monthlyRent > 0 ? addMonthsToKey(rentStart, Math.max(0, assumptions.horizonMonths - 1)) : null;
     const end = [lastCash, keysMonth, rentEnd].filter(Boolean).sort().pop() as string;
 
     const points: CashFlowPoint[] = [];
@@ -185,6 +174,7 @@ export function simulateCashFlow(
     let totalOutflow = 0;
     let totalDelivery = 0;
     let totalRent = 0;
+    let totalSale = 0;
     let breakEvenMonth: string | null = null;
 
     const count = monthsBetween(start, end);
@@ -193,13 +183,15 @@ export function simulateCashFlow(
         const outflowPaid = paidByMonth.get(month) ?? 0;
         const outflowForecast = forecastByMonth.get(month) ?? 0;
         const outflowDelivery = month === deliveryMonth ? deliveryCosts : 0;
-        const rent = rentStart && month >= rentStart ? rentAtMonth(assumptions, monthsBetween(rentStart, month)) : 0;
+        const rent = rentMode && rentStart && month >= rentStart ? rentAtMonth(assumptions, monthsBetween(rentStart, month)) : 0;
+        const sale = month === saleMonth ? saleAmount : 0;
 
-        cumulative = round2(cumulative + rent - outflowPaid - outflowForecast - outflowDelivery);
+        cumulative = round2(cumulative + rent + sale - outflowPaid - outflowForecast - outflowDelivery);
         totalOutflow = round2(totalOutflow + outflowPaid + outflowForecast + outflowDelivery);
         totalDelivery = round2(totalDelivery + outflowDelivery);
         totalRent = round2(totalRent + rent);
-        if (breakEvenMonth === null && cumulative >= 0 && totalOutflow > 0 && rent > 0) breakEvenMonth = month;
+        totalSale = round2(totalSale + sale);
+        if (breakEvenMonth === null && cumulative >= 0 && totalOutflow > 0 && (rent > 0 || sale > 0)) breakEvenMonth = month;
 
         points.push({
             month,
@@ -208,20 +200,23 @@ export function simulateCashFlow(
             outflowForecast: round2(outflowForecast),
             outflowDelivery,
             rent,
+            sale,
             cumulative,
             keys: month === keysMonth,
         });
     }
 
-    const monthlyIrr = internalRateOfReturn(points.map(p => p.rent - p.outflowPaid - p.outflowForecast - p.outflowDelivery));
+    const monthlyIrr = internalRateOfReturn(points.map(p => p.rent + p.sale - p.outflowPaid - p.outflowForecast - p.outflowDelivery));
+    const recoveryStart = rentMode ? rentStart : saleMonth;
 
     return {
         points,
         totalOutflow,
         totalDelivery,
         totalRent,
+        totalSale,
         breakEvenMonth,
-        breakEvenMonths: breakEvenMonth && rentStart ? monthsBetween(rentStart, breakEvenMonth) : null,
+        breakEvenMonths: breakEvenMonth && recoveryStart ? monthsBetween(recoveryStart, breakEvenMonth) : null,
         irrAnnualPct: monthlyIrr === null ? null : annualizePct(monthlyIrr),
         keysMonth,
         rentStart,

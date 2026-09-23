@@ -28,6 +28,8 @@ function toPayload(values: InvestmentFormValues) {
         unit_label: optional(values.unit_label),
         developer: optional(values.developer),
         kind: values.kind,
+        strategy: values.strategy,
+        exit_plan: values.exit_plan,
         description: optional(values.description),
         street: optional(values.street),
         street_number: optional(values.street_number),

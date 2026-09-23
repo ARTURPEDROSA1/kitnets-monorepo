@@ -9,7 +9,7 @@ const investment = (over: Partial<NewInvestment> = {}): NewInvestment => ({
     contract_date: "2026-07-01", keys_expected_on: "2029-09-20", keys_delivered_on: null,
     index_before_keys: "INCC", index_after_keys: "IGPM",
     estimated_rent: 1200, rent_start_on: null, rent_adjustment_pct: 5, rent_vacancy_pct: 0, rent_costs_pct: 0, sim_horizon_months: 120,
-    sim_delivery_costs_pct: 0, expected_appreciation_pct: null, area_m2: null, market_m2_price: null, estimated_value_at_delivery: null, construction_pct: null, construction_updated_on: null,
+    sim_delivery_costs_pct: 0, expected_appreciation_pct: null, strategy: "NA_PLANTA", exit_plan: "ALUGAR", sold_on: null, sale_price: null, sale_costs: 0, area_m2: null, market_m2_price: null, estimated_value_at_delivery: null, construction_pct: null, construction_updated_on: null,
     status: "ACTIVE", promoted_property_id: null, promoted_at: null, cover_path: null, notes: null,
     created_at: "2026-07-01T00:00:00Z", updated_at: "2026-07-01T00:00:00Z",
     ...over,
@@ -29,7 +29,28 @@ const paid: InvestmentPayment = {
 };
 
 const base = (over: Partial<CashFlowAssumptions> = {}): CashFlowAssumptions => ({
-    monthlyRent: 1200, rentStart: "2029-10", rentAdjustmentPct: 5, vacancyPct: 0, costsPct: 0, horizonMonths: 120, deliveryCostsPct: 0, ...over,
+    monthlyRent: 1200, rentStart: "2029-10", rentAdjustmentPct: 5, vacancyPct: 0, costsPct: 0, horizonMonths: 120, deliveryCostsPct: 0, expectedAppreciationPct: null, ...over,
+});
+
+describe("a project meant to be sold", () => {
+    it("brings the delivery value in once, in the keys month, with no rent, and pays back right there", () => {
+        const result = simulateCashFlow(investment(), schedules, [paid], base({ saleAtDelivery: 70000 }));
+        const keys = result.points.find(p => p.keys);
+        expect(keys?.sale).toBe(70000);
+        expect(result.points.filter(p => p.sale > 0)).toHaveLength(1);
+        expect(result.totalSale).toBe(70000);
+        expect(result.totalRent).toBe(0);
+        expect(result.breakEvenMonth).toBe("2029-09");
+        expect(result.breakEvenMonths).toBe(0);
+        expect(result.irrAnnualPct).not.toBeNull();
+        expect(result.irrAnnualPct!).toBeGreaterThan(0);
+    });
+
+    it("keeps the rent model when there is no sale value", () => {
+        const result = simulateCashFlow(investment(), schedules, [paid], base({ saleAtDelivery: null }));
+        expect(result.totalSale).toBe(0);
+        expect(result.totalRent).toBeGreaterThan(0);
+    });
 });
 
 describe("internalRateOfReturn", () => {
