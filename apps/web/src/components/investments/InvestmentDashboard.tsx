@@ -238,11 +238,31 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                     tone="emerald"
                     icon={<Wallet className="w-4 h-4" />}
                     value={formatBRL(metrics.paidToDate, 0)}
-                    hint={`${metrics.paidCount} lançamento${metrics.paidCount === 1 ? "" : "s"} · ${metrics.paidPct.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% do total`}
+                    hint={
+                        <span className="block space-y-0.5 pt-0.5">
+                            <span className="flex items-baseline justify-between gap-2">
+                                <span>PF</span>
+                                <span className="tabular-nums whitespace-nowrap">{formatBRL(metrics.paidByPayer.pf, 0)}</span>
+                            </span>
+                            <span className="flex items-baseline justify-between gap-2">
+                                <span>PJ</span>
+                                <span className="tabular-nums whitespace-nowrap">{formatBRL(metrics.paidByPayer.pj, 0)}</span>
+                            </span>
+                            {metrics.paidByPayer.unassigned > 0 && (
+                                <span className="flex items-baseline justify-between gap-2" title="Lançamentos sem pagador informado">
+                                    <span>Sem pagador</span>
+                                    <span className="tabular-nums whitespace-nowrap">{formatBRL(metrics.paidByPayer.unassigned, 0)}</span>
+                                </span>
+                            )}
+                            <span className="block pt-0.5">
+                                {metrics.paidCount} lançamento{metrics.paidCount === 1 ? "" : "s"} · {metrics.paidPct.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% do total
+                            </span>
+                        </span>
+                    }
                     info={{
-                        what: "Tudo que já saiu do bolso por esta unidade: sinal, entrada, parcelas, correções, taxas.",
-                        formula: "Σ (valor + correção) dos lançamentos pagos",
-                        example: `${metrics.paidCount} lançamentos = ${formatBRL(metrics.paidToDate)}`,
+                        what: "Tudo que já saiu do bolso por esta unidade: sinal, entrada, parcelas, correções, taxas — e de qual bolso saiu, pela coluna Pagador de cada lançamento.",
+                        formula: <>Σ (valor + correção) dos lançamentos pagos<br />PF = Σ parte PF · PJ = Σ parte PJ · sem pagador = lançamentos sem essa informação</>,
+                        example: `PF ${formatBRL(metrics.paidByPayer.pf)} + PJ ${formatBRL(metrics.paidByPayer.pj)}${metrics.paidByPayer.unassigned > 0 ? ` + sem pagador ${formatBRL(metrics.paidByPayer.unassigned)}` : ""} = ${formatBRL(metrics.paidToDate)}`,
                     }}
                 />
                 <Tile

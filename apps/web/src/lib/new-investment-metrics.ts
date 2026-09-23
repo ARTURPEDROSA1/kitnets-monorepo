@@ -10,6 +10,7 @@ import {
     expandSchedules,
     monthsBetween,
     paymentMonth,
+    payerSplit,
     paymentTotal,
     pendingByKind,
     pendingInstalments,
@@ -29,6 +30,8 @@ export interface InvestmentMetrics {
     paidToDate: number;
     /** Index correction inside `paidToDate`. */
     correctionsPaid: number;
+    /** How `paidToDate` divides between the pockets; `unassigned` is the rows with no payer recorded. */
+    paidByPayer: { pf: number; pj: number; unassigned: number };
     /**
      * Still owed: forecast instalments no payment covers, plus payments marked PLANNED. Each open
      * instalment is projected at the last value paid for its kind (see `pendingInstalments`), so
@@ -104,6 +107,20 @@ export function computeInvestmentMetrics(
 ): InvestmentMetrics {
     const today = asOf.toISOString().slice(0, 10);
     const { paid, corrections, count } = sumPaid(payments);
+    // Who paid it: a row with no payer recorded is neither pocket's, and is shown as such.
+    const paidByPayer = payments.reduce(
+        (acc, p) => {
+            if (p.status !== "PAID") return acc;
+            const split = payerSplit(p);
+            if (!split) acc.unassigned = round2(acc.unassigned + paymentTotal(p));
+            else {
+                acc.pf = round2(acc.pf + split.pf);
+                acc.pj = round2(acc.pj + split.pj);
+            }
+            return acc;
+        },
+        { pf: 0, pj: 0, unassigned: 0 }
+    );
 
     // Still owed = forecast instalments nothing covers + payments the owner typed as planned
     const pending: ScheduledInstalment[] = pendingInstalments(schedules, payments);
@@ -146,6 +163,7 @@ export function computeInvestmentMetrics(
         contractPrice: round2(investment.total_price || 0),
         paidToDate: round2(paid),
         correctionsPaid: round2(corrections),
+        paidByPayer,
         remaining,
         committed,
         paidPct: committed > 0 ? round2((paid / committed) * 100) : 0,
