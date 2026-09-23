@@ -361,6 +361,17 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                             </li>
                                             <li>
                                                 <Link
+                                                    title={navCollapsed ? "Novos Investimentos" : undefined}
+                                                    href={lang === 'pt' ? '/novos-investimentos' : `/${lang}/novos-investimentos`}
+                                                    aria-current={isActive(lang === 'pt' ? '/novos-investimentos' : `/${lang}/novos-investimentos`) ? "page" : undefined}
+                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/novos-investimentos' : `/${lang}/novos-investimentos`) ? 'bg-accent' : ''}`}
+                                                >
+                                                    <HardHat className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3 sidebar-label">Novos Investimentos</span>
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <Link
                                                     title={navCollapsed ? "Energia Solar" : undefined}
                                                     href={lang === 'pt' ? '/dashboard/energy' : `/${lang}/dashboard/energy`}
                                                     aria-current={pathname.includes('/dashboard/energy') ? "page" : undefined}

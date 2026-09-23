@@ -2653,6 +2653,309 @@ export type Database = {
           },
         ]
       }
+      new_investments: {
+        Row: {
+          address: string | null
+          city: string | null
+          contract_date: string | null
+          cover_path: string | null
+          created_at: string
+          description: string | null
+          developer: string | null
+          down_payment: number
+          estimated_rent: number | null
+          financed_amount: number
+          id: string
+          index_after_keys: string
+          index_before_keys: string
+          keys_delivered_on: string | null
+          keys_expected_on: string | null
+          kind: string
+          name: string
+          notes: string | null
+          owner_id: string
+          promoted_at: string | null
+          promoted_property_id: string | null
+          rent_adjustment_pct: number
+          rent_costs_pct: number
+          rent_start_on: string | null
+          rent_vacancy_pct: number
+          state: string | null
+          status: string
+          total_price: number
+          unit_label: string | null
+          updated_at: string
+          zip: string | null
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          contract_date?: string | null
+          cover_path?: string | null
+          created_at?: string
+          description?: string | null
+          developer?: string | null
+          down_payment?: number
+          estimated_rent?: number | null
+          financed_amount?: number
+          id?: string
+          index_after_keys?: string
+          index_before_keys?: string
+          keys_delivered_on?: string | null
+          keys_expected_on?: string | null
+          kind?: string
+          name: string
+          notes?: string | null
+          owner_id: string
+          promoted_at?: string | null
+          promoted_property_id?: string | null
+          rent_adjustment_pct?: number
+          rent_costs_pct?: number
+          rent_start_on?: string | null
+          rent_vacancy_pct?: number
+          state?: string | null
+          status?: string
+          total_price?: number
+          unit_label?: string | null
+          updated_at?: string
+          zip?: string | null
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          contract_date?: string | null
+          cover_path?: string | null
+          created_at?: string
+          description?: string | null
+          developer?: string | null
+          down_payment?: number
+          estimated_rent?: number | null
+          financed_amount?: number
+          id?: string
+          index_after_keys?: string
+          index_before_keys?: string
+          keys_delivered_on?: string | null
+          keys_expected_on?: string | null
+          kind?: string
+          name?: string
+          notes?: string | null
+          owner_id?: string
+          promoted_at?: string | null
+          promoted_property_id?: string | null
+          rent_adjustment_pct?: number
+          rent_costs_pct?: number
+          rent_start_on?: string | null
+          rent_vacancy_pct?: number
+          state?: string | null
+          status?: string
+          total_price?: number
+          unit_label?: string | null
+          updated_at?: string
+          zip?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "new_investments_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "new_investments_promoted_property_id_fkey"
+            columns: ["promoted_property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      new_investment_schedules: {
+        Row: {
+          amount: number
+          created_at: string
+          first_due_on: string
+          id: string
+          index_code: string
+          installments: number
+          investment_id: string
+          kind: string
+          label: string
+          owner_id: string
+          periodicity: string
+          position: number
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          first_due_on: string
+          id?: string
+          index_code?: string
+          installments?: number
+          investment_id: string
+          kind?: string
+          label: string
+          owner_id: string
+          periodicity?: string
+          position?: number
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          first_due_on?: string
+          id?: string
+          index_code?: string
+          installments?: number
+          investment_id?: string
+          kind?: string
+          label?: string
+          owner_id?: string
+          periodicity?: string
+          position?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "new_investment_schedules_investment_id_fkey"
+            columns: ["investment_id"]
+            isOneToOne: false
+            referencedRelation: "new_investments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "new_investment_schedules_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      new_investment_payments: {
+        Row: {
+          amount: number
+          correction_amount: number
+          created_at: string
+          due_on: string
+          id: string
+          installment_number: number | null
+          investment_id: string
+          kind: string
+          notes: string | null
+          owner_id: string
+          paid_on: string | null
+          receipt_name: string | null
+          receipt_path: string | null
+          source: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          correction_amount?: number
+          created_at?: string
+          due_on: string
+          id?: string
+          installment_number?: number | null
+          investment_id: string
+          kind?: string
+          notes?: string | null
+          owner_id: string
+          paid_on?: string | null
+          receipt_name?: string | null
+          receipt_path?: string | null
+          source?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          correction_amount?: number
+          created_at?: string
+          due_on?: string
+          id?: string
+          installment_number?: number | null
+          investment_id?: string
+          kind?: string
+          notes?: string | null
+          owner_id?: string
+          paid_on?: string | null
+          receipt_name?: string | null
+          receipt_path?: string | null
+          source?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "new_investment_payments_investment_id_fkey"
+            columns: ["investment_id"]
+            isOneToOne: false
+            referencedRelation: "new_investments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "new_investment_payments_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      new_investment_documents: {
+        Row: {
+          created_at: string
+          file_name: string | null
+          id: string
+          investment_id: string
+          kind: string
+          mime_type: string | null
+          owner_id: string
+          size_bytes: number | null
+          storage_path: string
+        }
+        Insert: {
+          created_at?: string
+          file_name?: string | null
+          id?: string
+          investment_id: string
+          kind?: string
+          mime_type?: string | null
+          owner_id: string
+          size_bytes?: number | null
+          storage_path: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string | null
+          id?: string
+          investment_id?: string
+          kind?: string
+          mime_type?: string | null
+          owner_id?: string
+          size_bytes?: number | null
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "new_investment_documents_investment_id_fkey"
+            columns: ["investment_id"]
+            isOneToOne: false
+            referencedRelation: "new_investments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "new_investment_documents_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       water_bills: {
         Row: {
           average_consumption_m3: number | null
