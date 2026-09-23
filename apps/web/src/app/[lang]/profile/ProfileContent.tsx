@@ -13,8 +13,9 @@ import { createLeaseFromImport } from '@/lib/lease-import-client';
 import type { LeaseAgencyOption, LeasePropertyOption } from '@/types/lease';
 import PropertyDocumentsCard, { DocCategory } from '@/components/profile/PropertyDocumentsCard';
 import { DeletePropertyModal } from '@/components/profile/DeletePropertyModal';
-import PropertySquareCard, { type PropertyRealIncome, type PropertyCardInvestment } from '@/components/properties/PropertySquareCard';
-import type { PortfolioTotalsData } from '@/components/properties/PortfolioStrip';
+import PropertySquareCard, { cardFinancials, type PropertyRealIncome, type PropertyCardInvestment } from '@/components/properties/PropertySquareCard';
+import PortfolioStrip, { type PortfolioIncomeData, type PortfolioTotalsData } from '@/components/properties/PortfolioStrip';
+import PhotoLightbox from '@/components/investments/PhotoLightbox';
 import PropertyCostCenterDashboard from '@/components/properties/PropertyCostCenterDashboard';
 import { cn } from '@/lib/utils';
 import { useUser, useAuth } from '@clerk/nextjs';
@@ -379,6 +380,8 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
     const [realIncomeByProperty, setRealIncomeByProperty] = useState<Record<string, PropertyRealIncome>>({});
     // False until the first successful summary; cached figures are shown until then
     const [realIncomeLoaded, setRealIncomeLoaded] = useState(false);
+    // The property's photo gallery (zoom, arrows, "usar como capa"): which saved photo is open
+    const [propLightbox, setPropLightbox] = useState<number | null>(null);
     // Investment engine per property + portfolio totals (payback, yield, market value) for the strip and the cards
     const [portfolio, setPortfolio] = useState<{ properties: Record<string, PropertyCardInvestment>; totals: PortfolioTotalsData } | null>(null);
     useEffect(() => {
@@ -2130,6 +2133,22 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
             });
     }, [properties, propertiesLoaded, cachedCards, imoveisFilterTab, imoveisSearch]);
 
+    // The hub's dashboard adds up exactly what the cards on screen show: the ledger's latest month
+    // where there is one, the card's own estimate otherwise.
+    const hubIncome = useMemo<PortfolioIncomeData>(() => {
+        let revenue = 0, noi = 0, realCount = 0;
+        for (const { prop } of filteredProperties) {
+            const realIncome = prop.id
+                ? (realIncomeLoaded ? realIncomeByProperty[prop.id] ?? null : cachedRealIncomeById.get(prop.id) ?? null)
+                : null;
+            const f = cardFinancials({ propertyType: prop.propertyType, details: prop.details, subUnits: prop.subUnits, realIncome });
+            revenue += f.monthlyRevenue;
+            noi += f.noi;
+            if (f.realMonth) realCount += 1;
+        }
+        return { count: filteredProperties.length, realCount, revenue, noi };
+    }, [filteredProperties, realIncomeLoaded, realIncomeByProperty, cachedRealIncomeById]);
+
     if (!isLoaded || !user) return <div className="p-8 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-emerald-600" /></div>;
 
     const handleQuickPublish = (intent: 'rent' | 'sale', targetPropIdx: number = 0) => {
@@ -2260,6 +2279,26 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
         const setPOwnershipOpen = (v: boolean | ((p: boolean) => boolean)) => setPropField('ownershipSectionOpen', v);
         const setPAddressOpen = (v: boolean | ((p: boolean) => boolean)) => setPropField('addressSectionOpen', v);
         const setPPhotosOpen = (v: boolean | ((p: boolean) => boolean)) => setPropField('photosSectionOpen', v);
+        /** The picture on the card and the cover of the gallery — written straight to the profile row. */
+        const setPropCover = (url: string) => {
+            updateProperty(propIdx, prev => ({ ...prev, profilePhotoUrl: url }));
+            if (!profileId) return;
+            getSupabase().then(sb => {
+                if (propIdx === 0) {
+                    sb.from('profiles').update({ profile_photo_url: url }).eq('id', profileId);
+                } else {
+                    sb.from('profiles').select('additional_properties').eq('id', profileId).single().then(({ data: prof }) => {
+                        if (prof?.additional_properties) {
+                            const addProps = [...(prof.additional_properties as Record<string, unknown>[])];
+                            if (addProps[propIdx - 1]) {
+                                addProps[propIdx - 1] = { ...addProps[propIdx - 1], profilePhotoUrl: url };
+                                sb.from('profiles').update({ additional_properties: addProps }).eq('id', profileId);
+                            }
+                        }
+                    });
+                }
+            }).catch(console.error);
+        };
         const setPDescOpen = (v: boolean | ((p: boolean) => boolean)) => setPropField('descriptionSectionOpen', v);
         const setPDetailsOpen = (v: boolean | ((p: boolean) => boolean)) => setPropField('detailsInitialOpen', v);
         const setPDetails = (v: PropertyDetails | ((p: PropertyDetails) => PropertyDetails)) => setPropField('details', v);
@@ -2883,34 +2922,20 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                             return (
                                                 <div
                                                     key={`saved-p-${idx}`}
+                                                    role="button"
+                                                    tabIndex={0}
+                                                    title="Abrir a galeria"
                                                     className={cn(
-                                                        "aspect-square rounded-lg border relative group overflow-hidden cursor-pointer transition-all",
+                                                        "aspect-square rounded-lg border relative group overflow-hidden cursor-zoom-in transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500",
                                                         isProfilePhoto
                                                             ? "border-emerald-500 border-2 ring-2 ring-emerald-200 dark:ring-emerald-800 shadow-sm"
                                                             : "border-border hover:border-emerald-300"
                                                     )}
-                                                    onClick={() => {
-                                                        updateProperty(propIdx, prev => ({ ...prev, profilePhotoUrl: url }));
-                                                        if (profileId) {
-                                                            getSupabase().then(sb => {
-                                                                if (propIdx === 0) {
-                                                                    sb.from('profiles').update({ profile_photo_url: url }).eq('id', profileId);
-                                                                } else {
-                                                                    sb.from('profiles').select('additional_properties').eq('id', profileId).single().then(({ data: prof }) => {
-                                                                        if (prof?.additional_properties) {
-                                                                            const addProps = [...(prof.additional_properties as Record<string, unknown>[])];
-                                                                            if (addProps[propIdx - 1]) {
-                                                                                addProps[propIdx - 1] = { ...addProps[propIdx - 1], profilePhotoUrl: url };
-                                                                                sb.from('profiles').update({ additional_properties: addProps }).eq('id', profileId);
-                                                                            }
-                                                                        }
-                                                                    });
-                                                                }
-                                                            }).catch(console.error);
-                                                        }
-                                                    }}
+                                                    // the picture opens the gallery; the bar at the bottom is what sets the cover
+                                                    onClick={() => setPropLightbox(idx)}
+                                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setPropLightbox(idx); } }}
                                                 >
-                                                    <Image src={url} alt="Property" width={200} height={200} className="w-full h-full object-cover" />
+                                                    <Image src={url} alt={`Foto ${idx + 1}`} width={200} height={200} className="w-full h-full object-cover" />
                                                     <div className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
                                                         <Button
                                                             size="icon"
@@ -2925,8 +2950,11 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                         </Button>
                                                     </div>
                                                     <div
+                                                        role="button"
+                                                        title={isProfilePhoto ? "Esta é a foto do card" : "Usar como foto do card"}
+                                                        onClick={(e) => { e.stopPropagation(); if (!isProfilePhoto) setPropCover(url); }}
                                                         className={cn(
-                                                            "absolute bottom-0 inset-x-0 flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-medium transition-colors select-none",
+                                                            "absolute bottom-0 inset-x-0 flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-medium transition-colors select-none cursor-pointer",
                                                             isProfilePhoto
                                                                 ? "bg-emerald-600 text-white font-semibold"
                                                                 : "bg-black/60 text-white opacity-0 group-hover:opacity-100"
@@ -2962,6 +2990,15 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                             </div>
                                         )}
                                     </div>
+                                    {/* The same gallery the projects have: arrows, zoom, thumbnails, "usar como capa" */}
+                                    <PhotoLightbox
+                                        photos={pSavedPhotos.map((url, i) => ({ id: url, url, name: `Foto ${i + 1}` }))}
+                                        index={propLightbox}
+                                        onClose={() => setPropLightbox(null)}
+                                        onNavigate={setPropLightbox}
+                                        coverId={prop.profilePhotoUrl || pSavedPhotos[0] || null}
+                                        onSetCover={(photo) => { setPropCover(photo.url); }}
+                                    />
                                 </div>
 
                                 <div className="space-y-2 pt-3 border-t border-border">
@@ -3510,24 +3547,26 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                 </div>
                             )}
 
+                            {/* The hub's dashboard: what the properties on screen bring in, and the investment roll-up */}
+                            {(propertiesLoaded ? properties : cachedCards).length > 0 && filteredProperties.length > 0 && (
+                                <PortfolioStrip totals={portfolio?.totals ?? null} income={hubIncome} />
+                            )}
+
                             {/* Loading skeleton: first visit, nothing cached yet */}
                             {!propertiesLoaded && cachedCards.length === 0 && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" aria-busy="true" aria-label="Carregando imóveis">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" aria-busy="true" aria-label="Carregando imóveis">
                                     {[0, 1, 2].map(i => (
-                                        <div key={`prop-skeleton-${i}`} className="rounded-2xl border border-border bg-card p-6 shadow-xs space-y-5 animate-pulse">
-                                            <div className="flex items-start gap-4">
-                                                <div className="w-24 h-24 rounded-2xl bg-muted/60 flex-shrink-0" />
-                                                <div className="flex-1 space-y-2.5 pt-1">
-                                                    <div className="h-5 w-3/4 rounded bg-muted" />
-                                                    <div className="h-3 w-full rounded bg-muted/70" />
-                                                    <div className="h-3 w-2/3 rounded bg-muted/70" />
+                                        <div key={`prop-skeleton-${i}`} className="rounded-2xl border border-border/80 bg-card overflow-hidden animate-pulse">
+                                            <div className="h-32 w-full bg-muted/60" />
+                                            <div className="p-4 space-y-3">
+                                                <div className="h-4 w-3/4 rounded bg-muted" />
+                                                <div className="h-3 w-full rounded bg-muted/70" />
+                                                <div className="h-2 w-full rounded-full bg-muted/60" />
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div className="h-12 rounded-lg bg-muted/50" />
+                                                    <div className="h-12 rounded-lg bg-muted/50" />
                                                 </div>
                                             </div>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <div className="h-12 rounded-xl bg-muted/50" />
-                                                <div className="h-12 rounded-xl bg-muted/50" />
-                                            </div>
-                                            <div className="h-9 rounded-xl bg-muted/40" />
                                         </div>
                                     ))}
                                 </div>
@@ -3571,7 +3610,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
 
                             {/* Responsive Square Cards Grid */}
                             {filteredProperties.length > 0 && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                                     {filteredProperties.map(({ prop, originalIdx }) => (
                                         <PropertySquareCard
                                             key={`prop-sq-${originalIdx}`}
