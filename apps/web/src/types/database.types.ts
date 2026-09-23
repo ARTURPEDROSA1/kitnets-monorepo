@@ -1856,6 +1856,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "new_investment_documents_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "new_investment_payments"
+            referencedColumns: ["id"]
+          },
         ]
       }
       new_investment_payments: {
