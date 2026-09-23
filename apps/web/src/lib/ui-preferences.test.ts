@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { columnTableKey, hiddenColumnsPrefKey, sanitizeHiddenColumns, tableKeyFromPrefKey } from "./ui-preferences";
+import {
+    columnTableKey, hiddenColumnsPrefKey, sanitizeHiddenColumns, sanitizeSort, sortPrefKey, tableKeyFromPrefKey, tableKeyFromSortPrefKey,
+} from "./ui-preferences";
 
 describe("hidden-column preferences", () => {
     it("names a table per kind of property", () => {
@@ -24,5 +26,27 @@ describe("hidden-column preferences", () => {
         expect(sanitizeHiddenColumns(["energy", 3])).toBeNull();
         expect(sanitizeHiddenColumns(["<script>"])).toBeNull();
         expect(sanitizeHiddenColumns(Array.from({ length: 61 }, (_, i) => `c${i}`))).toBeNull();
+    });
+});
+
+describe("sort preferences", () => {
+    it("builds and reads back the preference key, refusing anything else", () => {
+        expect(sortPrefKey("investment-payments")).toBe("sort:investment-payments");
+        expect(sortPrefKey("income-ledger:multi")).toBe("sort:income-ledger:multi");
+        expect(tableKeyFromSortPrefKey("sort:investment-payments")).toBe("investment-payments");
+        for (const bad of ["", "Payments", "a:b:c", "../x"]) expect(sortPrefKey(bad)).toBeNull();
+        expect(tableKeyFromSortPrefKey("hidden-columns:investment-payments")).toBeNull();
+        expect(tableKeyFromSortPrefKey("sort:")).toBeNull();
+    });
+
+    it("accepts only a column key and a direction", () => {
+        expect(sanitizeSort({ key: "due_on", dir: "asc" })).toEqual({ key: "due_on", dir: "asc" });
+        expect(sanitizeSort({ key: "paid_on", dir: "desc", extra: 1 })).toEqual({ key: "paid_on", dir: "desc" });
+        expect(sanitizeSort({ key: "due_on", dir: "up" })).toBeNull();
+        expect(sanitizeSort({ key: "<script>", dir: "asc" })).toBeNull();
+        expect(sanitizeSort({ dir: "asc" })).toBeNull();
+        expect(sanitizeSort(["due_on", "asc"])).toBeNull();
+        expect(sanitizeSort("due_on")).toBeNull();
+        expect(sanitizeSort(null)).toBeNull();
     });
 });

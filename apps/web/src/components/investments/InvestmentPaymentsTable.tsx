@@ -297,7 +297,8 @@ export default function InvestmentPaymentsTable({
         },
     ], [indexOf, receiptsByPayment]);
 
-    const cf = useColumnFilters(payments, columns, { key: "due_on", dir: "asc" });
+    // The order chosen here follows the user to any device, like the hidden columns.
+    const cf = useColumnFilters(payments, columns, { key: "due_on", dir: "asc" }, { storageKey: columnTableKey("investment-payments") });
     const rows = cf.rows;
     const show = (key: string) => !vis.isHidden(key);
     const visibleCount = columns.filter(c => show(c.key)).length;
