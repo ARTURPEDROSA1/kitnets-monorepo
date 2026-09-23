@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import OpenAI from "openai";
 import { extractText, getDocumentProxy } from "unpdf";
 import { AI_MODELS, reportAiFallback } from "@/lib/ai-models";
+import type { ReadBy } from "@/lib/ai-reader-label";
 import { scannedPdfPageImages } from "@/lib/pdf-page-images";
 
 /**
@@ -53,7 +54,13 @@ export interface ExtractionInput {
     tag: string;
 }
 
-export async function runDocumentExtraction({ prompt, buffer, mimeType, textContent, tag }: ExtractionInput): Promise<unknown | null> {
+/** The parsed answer, and who gave it — the owner sees the reader's name after every receipt. */
+export interface ExtractionResult {
+    data: unknown;
+    readBy: ReadBy;
+}
+
+export async function runDocumentExtraction({ prompt, buffer, mimeType, textContent, tag }: ExtractionInput): Promise<ExtractionResult | null> {
     const base64 = buffer.toString("base64");
     const hasText = textContent.trim().length >= 100;
 
@@ -68,7 +75,7 @@ export async function runDocumentExtraction({ prompt, buffer, mimeType, textCont
                     ? [{ text: `${prompt}\n\nConteúdo do documento:\n\n${textContent.substring(0, MAX_TEXT_CHARS)}` }]
                     : [{ text: prompt }, { inlineData: { mimeType, data: base64 } }]
             );
-            return parseJsonResponse(result.response.text());
+            return { data: parseJsonResponse(result.response.text()), readBy: { provider: "gemini", model: AI_MODELS.gemini } };
         } catch (err) {
             console.warn(`[${tag}] Gemini failed:`, err);
             reportAiFallback(tag, err);
@@ -84,8 +91,9 @@ export async function runDocumentExtraction({ prompt, buffer, mimeType, textCont
     }
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const openaiModel = hasText ? AI_MODELS.openaiMini : AI_MODELS.openai;
     const completion = await openai.chat.completions.create({
-        model: hasText ? AI_MODELS.openaiMini : AI_MODELS.openai,
+        model: openaiModel,
         response_format: { type: "json_object" },
         temperature: 0,
         max_tokens: 4000,
@@ -105,5 +113,5 @@ export async function runDocumentExtraction({ prompt, buffer, mimeType, textCont
               ],
     });
     const content = completion.choices[0]?.message?.content;
-    return content ? parseJsonResponse(content) : null;
+    return content ? { data: parseJsonResponse(content), readBy: { provider: "openai", model: openaiModel } } : null;
 }

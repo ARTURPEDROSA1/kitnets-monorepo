@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { readJsonBody, withAuth } from "@/lib/api-route";
 import { HOUR } from "@/lib/rate-limit";
-import { aiConfigured, pdfText, runDocumentExtraction } from "@/lib/document-extract-server";
+import { aiConfigured, pdfText, runDocumentExtraction, type ExtractionResult } from "@/lib/document-extract-server";
 import { downloadStagedUpload, loadOwnedInvestment, mimeTypeOfPath, ownStagedPath } from "@/lib/new-investments-server";
 import { RECEIPT_EXTRACTION_PROMPT, isEmptyReceipt, normalizeReceiptExtraction } from "@/lib/new-investment-receipt";
 
@@ -34,18 +34,19 @@ export const POST = withAuth<undefined, Params>(
         const mimeType = mimeTypeOfPath(path);
         const textContent = mimeType === "application/pdf" ? await pdfText(buffer, TAG) : "";
 
-        let raw: unknown | null = null;
+        let result: ExtractionResult | null = null;
         try {
-            raw = await runDocumentExtraction({ prompt: RECEIPT_EXTRACTION_PROMPT, buffer, mimeType, textContent, tag: TAG });
+            result = await runDocumentExtraction({ prompt: RECEIPT_EXTRACTION_PROMPT, buffer, mimeType, textContent, tag: TAG });
         } catch (err) {
             console.error(`[${TAG}] AI extraction failed:`, err);
         }
-        if (!raw) return NextResponse.json({ error: "Não foi possível ler o comprovante." }, { status: 422 });
+        if (!result) return NextResponse.json({ error: "Não foi possível ler o comprovante." }, { status: 422 });
 
-        const receipt = normalizeReceiptExtraction(raw);
+        const receipt = normalizeReceiptExtraction(result.data);
         if (isEmptyReceipt(receipt)) {
             return NextResponse.json({ error: "Este arquivo não parece ser um comprovante de pagamento." }, { status: 422 });
         }
-        return NextResponse.json({ success: true, receipt });
+        // `read_by` is what the owner sees next to the result: which model answered, by name and id.
+        return NextResponse.json({ success: true, receipt, read_by: result.readBy });
     }
 );

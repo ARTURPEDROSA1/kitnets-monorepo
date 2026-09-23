@@ -23,6 +23,7 @@ import {
 import InvestmentScheduleEditor, { INDEX_CODES, type ScheduleDraft } from "./InvestmentScheduleEditor";
 import type { ExtractedInvestment } from "@/lib/new-investment-extract";
 import { checkInvestmentFile, stageInvestmentFile } from "@/lib/new-investment-upload-client";
+import { readByFromJson, readerLabel } from "@/lib/ai-reader-label";
 
 export interface InvestmentFormValues {
     name: string;
@@ -150,10 +151,12 @@ export default function InvestmentFormModal({ open, onClose, onSubmit }: Props) 
             }
             const next = fromExtraction(json.data as ExtractedInvestment, json.inferred_total ?? null);
             setValues(prev => ({ ...next, estimated_rent: prev.estimated_rent }));
+            const reader = readerLabel(readByFromJson(json.read_by));
+            const by = reader ? ` pelo ${reader}` : "";
             setNotice(
                 next.schedules.length > 0
-                    ? `Quadro resumo lido: ${next.schedules.length} bloco${next.schedules.length === 1 ? "" : "s"} de parcelas. Confira antes de salvar.`
-                    : "Contrato lido. Nenhum bloco de parcelas foi identificado — cadastre-os abaixo."
+                    ? `Quadro resumo lido${by}: ${next.schedules.length} bloco${next.schedules.length === 1 ? "" : "s"} de parcelas. Confira antes de salvar.`
+                    : `Contrato lido${by}. Nenhum bloco de parcelas foi identificado — cadastre-os abaixo.`
             );
         } catch {
             setError("Erro de conexão ao ler o contrato.");
