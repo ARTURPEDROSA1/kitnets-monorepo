@@ -381,6 +381,8 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                 documents={documents}
                 onChanged={refresh}
                 onView={(url, name) => setViewing({ url, name })}
+                coverPath={investment.cover_path}
+                onSetCover={path => patchInvestment({ cover_path: path })}
             />
 
             {error && <p className="text-sm text-rose-600">{error}</p>}

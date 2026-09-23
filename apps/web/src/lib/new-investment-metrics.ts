@@ -187,9 +187,11 @@ export interface InvestmentCardSummary {
     keysOn: string | null;
     netYieldPct: number | null;
     documents: number;
+    /** Signed URL of the card's cover picture; null when none was chosen. */
+    coverUrl: string | null;
 }
 
-export function toCardSummary(id: string, metrics: InvestmentMetrics, documents: number): InvestmentCardSummary {
+export function toCardSummary(id: string, metrics: InvestmentMetrics, documents: number, coverUrl: string | null = null): InvestmentCardSummary {
     return {
         id,
         paidToDate: metrics.paidToDate,
@@ -203,5 +205,6 @@ export function toCardSummary(id: string, metrics: InvestmentMetrics, documents:
         keysOn: metrics.keysOn,
         netYieldPct: metrics.netYieldPct,
         documents,
+        coverUrl,
     };
 }
