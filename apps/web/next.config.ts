@@ -31,6 +31,9 @@ const nextConfig: NextConfig = {
   async redirects() {
     const sections = "conteudos|contents|autor|tag";
     return [
+      // "Novos Investimentos" became "Projetos" in 2026-09; the old address keeps working (query string included).
+      { source: "/:lang(pt|en|es)/novos-investimentos", destination: "/:lang/projetos", permanent: true },
+      { source: "/novos-investimentos", destination: "/projetos", permanent: true },
       { source: `/:lang(pt|en|es)/:section(${sections})/:path*`, destination: "/:lang", permanent: true },
       { source: `/:lang(pt|en|es)/:section(${sections})`, destination: "/:lang", permanent: true },
       { source: `/:section(${sections})/:path*`, destination: "/", permanent: true },

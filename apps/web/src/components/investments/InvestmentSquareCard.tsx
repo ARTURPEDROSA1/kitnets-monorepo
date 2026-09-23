@@ -148,7 +148,7 @@ export default function InvestmentSquareCard({ investment, summary, photoUrls = 
                     type="button"
                     onClick={onDelete}
                     disabled={isDeleting}
-                    title="Excluir investimento"
+                    title="Excluir projeto"
                     aria-label={`Excluir ${title}`}
                     className="absolute top-2 right-2 p-1.5 rounded-lg bg-background/90 text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-rose-600 transition-opacity disabled:opacity-50"
                 >

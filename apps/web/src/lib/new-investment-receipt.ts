@@ -1,5 +1,5 @@
 /**
- * Reading a payment receipt (Novos Investimentos → the "anexar" on a payment row).
+ * Reading a payment receipt (Projetos → the "anexar" on a payment row).
  *
  * Pure pieces shared by POST /api/investments/[id]/receipts/extract and its tests: the prompt, the
  * lenient normaliser, and the allocation of a payment between the person and the company from the

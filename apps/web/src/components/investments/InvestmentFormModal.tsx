@@ -184,7 +184,7 @@ export default function InvestmentFormModal({ open, onClose, onSubmit }: Props) 
         if (id) {
             reset();
         } else {
-            setError("Não foi possível salvar o investimento.");
+            setError("Não foi possível salvar o projeto.");
         }
     };
 
@@ -192,7 +192,7 @@ export default function InvestmentFormModal({ open, onClose, onSubmit }: Props) 
         <Dialog open={open} onOpenChange={o => { if (!o && !saving && !extracting) { reset(); onClose(); } }}>
             <DialogContent className="sm:max-w-4xl max-h-[92vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>Novo investimento</DialogTitle>
+                    <DialogTitle>Novo projeto</DialogTitle>
                     <DialogDescription>
                         Imóvel comprado na planta. Envie o contrato e a IA preenche o quadro resumo para você conferir.
                     </DialogDescription>
@@ -342,7 +342,7 @@ export default function InvestmentFormModal({ open, onClose, onSubmit }: Props) 
                 <DialogFooter>
                     <Button variant="outline" onClick={() => { reset(); onClose(); }} disabled={saving || extracting}>Cancelar</Button>
                     <Button onClick={submit} disabled={saving || extracting}>
-                        {saving && <Loader2 className="w-4 h-4 mr-1 animate-spin" />} Criar investimento
+                        {saving && <Loader2 className="w-4 h-4 mr-1 animate-spin" />} Criar projeto
                     </Button>
                 </DialogFooter>
             </DialogContent>

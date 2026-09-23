@@ -38,7 +38,7 @@ export default function InvestmentDetailsModal({ open, onClose, investment, onSa
         <Dialog open={open} onOpenChange={o => { if (!o) onClose(); }}>
             <DialogContent className="sm:max-w-2xl max-h-[92vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>Dados do investimento</DialogTitle>
+                    <DialogTitle>Dados do projeto</DialogTitle>
                     <DialogDescription>
                         Nome, unidade, tipo e endereço — o que aparece no card e no cabeçalho do painel. Os valores e as
                         parcelas ficam em &ldquo;Plano de pagamento&rdquo;.
@@ -110,7 +110,7 @@ function DetailsForm({ investment, onSave, onClose }: Omit<Props, "open">) {
         });
         setSaving(false);
         if (ok) onClose();
-        else setError("Não foi possível salvar os dados do investimento.");
+        else setError("Não foi possível salvar os dados do projeto.");
     };
 
     return (

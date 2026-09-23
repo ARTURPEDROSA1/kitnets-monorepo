@@ -6,7 +6,7 @@ import type { ReadBy } from "@/lib/ai-reader-label";
 import { scannedPdfPageImages } from "@/lib/pdf-page-images";
 
 /**
- * One document, one prompt, one JSON answer — the runner behind the Novos Investimentos readers
+ * One document, one prompt, one JSON answer — the runner behind the Projetos readers
  * (the purchase contract, the payment receipts).
  *
  * Gemini on the PDF's text, or on the file itself when it is a scan or an image; OpenAI as the

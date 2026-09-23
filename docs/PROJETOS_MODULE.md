@@ -1,8 +1,18 @@
-# Novos Investimentos (Off-Plan Investments) Module
+# Projetos (Off-Plan Investments) Module
 
-**Version:** 1.0
-**Last updated:** 2026-09-22
+**Version:** 1.1
+**Last updated:** 2026-09-23
 **Author:** Kitnets Engineering
+
+> Renamed from **"Novos Investimentos"** on 2026-09-23. The sidebar entry, the page and the route
+> (`/projetos`, with a permanent redirect from `/novos-investimentos`) carry the new name; the
+> database tables (`new_investments…`), the TypeScript types (`NewInvestment`), the API
+> (`/api/investments`) and the component files (`components/investments/`) keep the old one —
+> renaming them buys nothing. "Projetos" was chosen because the module is a *project* phase —
+> money out on a plan before the asset produces anything — and that skeleton (cost plan →
+> disbursement ledger → completion → rent or sale) fits land + build, refurbishment and auction
+> purchases as well as off-plan units. Those modalities are the next steps (a `strategy` and an
+> `exit_plan` field, a "Registrar venda" finish next to "Mover para Imóveis").
 
 ---
 
@@ -13,7 +23,7 @@ payment plan: a *quadro resumo* in a contract, a stack of monthly receipts, an I
 nobody tracks, and a delivery date that keeps moving. Nothing in Imóveis fits it — there is no
 rent, no tenant and no IPTU, so an income ledger has nothing to show.
 
-**Novos Investimentos** is the incubator for those units. It answers four questions:
+**Projetos** is the incubator for those units. It answers four questions:
 
 1. How much of this unit have I already paid, and how much of it is index correction?
 2. What is due next, and is anything overdue?
@@ -49,7 +59,7 @@ apps/web/src/app/api/investments/
   upload-url/route.ts              POST → signed upload URL
   extract/route.ts                 POST → reads the contract with AI
 
-apps/web/src/app/[lang]/novos-investimentos/   page + list content
+apps/web/src/app/[lang]/projetos/              page + list content (ProjetosContent)
 apps/web/src/components/investments/           card, dashboard, table, simulator, files, form,
                                                schedule editor (shared), plan dialog (the gear)
 ```

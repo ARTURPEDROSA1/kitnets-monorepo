@@ -156,7 +156,7 @@ export default function InvestmentDocuments({ investmentId, documents, onChanged
         <section className="rounded-xl border border-border/80 bg-card">
             <header className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-border/60">
                 <div>
-                    <h2 className="text-sm font-semibold text-foreground">Arquivos do investimento</h2>
+                    <h2 className="text-sm font-semibold text-foreground">Arquivos do projeto</h2>
                     <p className="text-xs text-muted-foreground">
                         Contrato, material de divulgação, fotos e plantas. A IA confere a seção de cada imagem enviada. Os comprovantes ficam em cada pagamento.
                     </p>

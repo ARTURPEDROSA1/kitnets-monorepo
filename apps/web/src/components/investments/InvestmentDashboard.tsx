@@ -89,7 +89,7 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
             fetch(`/api/investments/${investmentId}/documents`),
         ]);
         const data = await main.json().catch(() => ({}));
-        if (!main.ok) throw new Error(data.error || "Erro ao carregar o investimento");
+        if (!main.ok) throw new Error(data.error || "Erro ao carregar o projeto");
         const docJson = docs.ok ? await docs.json().catch(() => ({ documents: [] })) : { documents: [] };
         setBundle({ ...data, documents: docJson.documents ?? [] });
     }, [investmentId]);
@@ -187,7 +187,7 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
     if (!bundle) {
         return (
             <div className="flex items-center gap-2 text-sm text-muted-foreground py-12 justify-center">
-                <Loader2 className="w-4 h-4 animate-spin" /> Carregando investimento…
+                <Loader2 className="w-4 h-4 animate-spin" /> Carregando projeto…
             </div>
         );
     }
@@ -202,7 +202,7 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="space-y-1">
                     <Button variant="ghost" size="sm" onClick={onBack} className="-ml-2">
-                        <ArrowLeft className="w-4 h-4 mr-1" /> Novos Investimentos
+                        <ArrowLeft className="w-4 h-4 mr-1" /> Projetos
                     </Button>
                     <div className="flex items-center gap-2">
                         <h1 className="text-2xl font-bold text-foreground">{title}</h1>
@@ -210,7 +210,7 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                             type="button"
                             onClick={() => setDetailsOpen(true)}
                             title="Editar nome, unidade, tipo e endereço"
-                            aria-label="Editar dados do investimento"
+                            aria-label="Editar dados do projeto"
                             className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
                         >
                             <Pencil className="w-4 h-4" />

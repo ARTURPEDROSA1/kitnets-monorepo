@@ -12,7 +12,7 @@ import type {
 import type { InvestmentInput, PromoteInput, ScheduleInput } from "@/lib/schemas/new-investment";
 
 /**
- * Server side of Novos Investimentos: ownership, the bundle every dashboard call needs, the
+ * Server side of Projetos (né Novos Investimentos): ownership, the bundle every dashboard call needs, the
  * uploads (contract, receipts, photos, floor plans) and the promotion to a real property.
  *
  * Files never travel through a route body — a request body on Vercel stops at 4.5 MB and a floor

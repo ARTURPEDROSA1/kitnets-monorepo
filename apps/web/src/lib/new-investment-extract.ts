@@ -1,5 +1,5 @@
 /**
- * Off-plan purchase contract import (Novos Investimentos → "Importar contrato com IA").
+ * Off-plan purchase contract import (Projetos → "Importar contrato com IA").
  *
  * Pure pieces shared by POST /api/investments/extract and its tests: the prompt and a lenient
  * normaliser for whatever JSON the model returns. Nothing here touches the database — the route

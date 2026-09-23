@@ -1,5 +1,5 @@
 /**
- * Browser side of the Novos Investimentos uploads (server side and the reason:
+ * Browser side of the Projetos uploads (server side and the reason:
  * lib/new-investments-server.ts). The file goes straight to storage through a signed URL, so
  * routes receive its path and never its bytes.
  */

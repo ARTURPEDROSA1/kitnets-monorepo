@@ -1,8 +1,11 @@
 "use client";
 
 /**
- * Novos Investimentos — the units bought off-plan, one square card each, with the totals of the
- * whole incubator on top. A card opens the investment's dashboard (`?id=<investimento>`), where the
+ * Projetos (until 2026-09 "Novos Investimentos"; the tables, types and routes keep the old name) —
+ * what is being bought or built, one square card each, with the totals of the whole pipeline on
+ * top. Off-plan units today; land + build, refurbishment and auction purchases share the same
+ * skeleton (a cost plan → a disbursement ledger → a completion → rent or sale) and come next.
+ * A card opens the project's dashboard (`?id=<investimento>`), where the
  * payments, the cash-flow simulator and the files live.
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -53,7 +56,7 @@ function toPayload(values: InvestmentFormValues) {
     };
 }
 
-export default function NovosInvestimentosContent({ lang }: { lang: string }) {
+export default function ProjetosContent({ lang }: { lang: string }) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const selectedId = searchParams.get("id");
@@ -67,7 +70,7 @@ export default function NovosInvestimentosContent({ lang }: { lang: string }) {
     const load = useCallback(async () => {
         const res = await fetch("/api/investments");
         const json = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(json.error || "Erro ao carregar os investimentos");
+        if (!res.ok) throw new Error(json.error || "Erro ao carregar os projetos");
         setInvestments(json.investments ?? []);
         setSummaries(Object.fromEntries(((json.summaries ?? []) as InvestmentCardSummary[]).map(s => [s.id, s])));
     }, []);
@@ -79,7 +82,7 @@ export default function NovosInvestimentosContent({ lang }: { lang: string }) {
         return () => { alive = false; };
     }, [load]);
 
-    const base = lang === "pt" ? "/novos-investimentos" : `/${lang}/novos-investimentos`;
+    const base = lang === "pt" ? "/projetos" : `/${lang}/projetos`;
     const select = (id: string | null) => router.push(id ? `${base}?id=${id}` : base, { scroll: true });
 
     const totals = useMemo(() => {
@@ -100,7 +103,7 @@ export default function NovosInvestimentosContent({ lang }: { lang: string }) {
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok) {
-            setError(typeof json.error === "string" ? json.error : Object.values(json.errors ?? {})[0] as string ?? "Erro ao criar o investimento");
+            setError(typeof json.error === "string" ? json.error : Object.values(json.errors ?? {})[0] as string ?? "Erro ao criar o projeto");
             return null;
         }
         const id = json.investment?.id as string | undefined;
@@ -119,12 +122,12 @@ export default function NovosInvestimentosContent({ lang }: { lang: string }) {
     };
 
     const remove = async (id: string, name: string) => {
-        if (!window.confirm(`Excluir "${name}"? Os pagamentos e arquivos deste investimento serão apagados.`)) return;
+        if (!window.confirm(`Excluir "${name}"? Os pagamentos e arquivos deste projeto serão apagados.`)) return;
         setDeletingId(id);
         const res = await fetch(`/api/investments/${id}`, { method: "DELETE" });
         setDeletingId(null);
         if (!res.ok) {
-            setError("Não foi possível excluir o investimento.");
+            setError("Não foi possível excluir o projeto.");
             return;
         }
         await load();
@@ -148,14 +151,14 @@ export default function NovosInvestimentosContent({ lang }: { lang: string }) {
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="space-y-1">
                     <h1 className="text-2xl font-bold text-foreground inline-flex items-center gap-2">
-                        <HardHat className="w-6 h-6 text-emerald-600" /> Novos Investimentos
+                        <HardHat className="w-6 h-6 text-emerald-600" /> Projetos
                     </h1>
                     <p className="text-sm text-muted-foreground">
-                        Imóveis comprados na planta: o que já foi pago, o que falta e quando eles começam a render.
+                        O que está sendo comprado ou construído: o que já foi pago, o que falta, quanto vai valer e quando começa a render.
                     </p>
                 </div>
                 <Button onClick={() => { setFormOpen(true); setError(null); }}>
-                    <Plus className="w-4 h-4 mr-1" /> Novo investimento
+                    <Plus className="w-4 h-4 mr-1" /> Novo projeto
                 </Button>
             </div>
 
@@ -199,7 +202,7 @@ export default function NovosInvestimentosContent({ lang }: { lang: string }) {
             ) : investments.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-border px-6 py-12 text-center space-y-3">
                     <Building2 className="w-10 h-10 mx-auto text-muted-foreground/60" />
-                    <h2 className="text-lg font-semibold text-foreground">Nenhum investimento na planta ainda</h2>
+                    <h2 className="text-lg font-semibold text-foreground">Nenhum projeto ainda</h2>
                     <p className="text-sm text-muted-foreground max-w-md mx-auto">
                         Envie o contrato de compra e venda: a IA lê o quadro resumo, monta o plano de parcelas e a partir
                         daí basta lançar cada pagamento com o comprovante.

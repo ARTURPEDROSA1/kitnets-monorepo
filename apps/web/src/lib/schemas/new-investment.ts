@@ -2,7 +2,7 @@ import { z } from "zod";
 import { parseCEP, validateCEP } from "@/lib/validators";
 
 /**
- * Input schemas for /api/investments — the Novos Investimentos module.
+ * Input schemas for /api/investments — the Projetos module (né Novos Investimentos).
  *
  * Every money field accepts the number the form sends and the "1.234,56" a paste can leave
  * behind. Dates are ISO (`YYYY-MM-DD`): the UI masks DD/MM/AAAA and converts before sending.

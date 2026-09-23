@@ -1,5 +1,6 @@
 /**
- * Novos Investimentos — an off-plan property ("na planta") from the contract to the keys.
+ * Projetos (until 2026-09 "Novos Investimentos" — the tables, types and routes keep that name) —
+ * an off-plan property ("na planta") from the contract to the keys.
  *
  * Three pieces, all pure here so the API, the dashboard and the tests share one definition:
  *
