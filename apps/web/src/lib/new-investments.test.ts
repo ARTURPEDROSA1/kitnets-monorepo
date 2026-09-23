@@ -6,6 +6,7 @@ import {
     monthsBetween,
     paymentMonth,
     paymentTotal,
+    pendingByKind,
     pendingInstalments,
     scheduleHorizon,
     scheduledTotal,
@@ -148,5 +149,46 @@ describe("month arithmetic", () => {
         expect(addMonthsToKey("2026-12", 1)).toBe("2027-01");
         expect(addMonthsToKey("2026-01", -1)).toBe("2025-12");
         expect(addMonthsToKey("2026-10", 36)).toBe("2029-10");
+    });
+});
+
+describe("pendingByKind", () => {
+    // the plan of the real contract: 140 monthly, 11 annual, one at the start of the works
+    const plan: InvestmentSchedule[] = [
+        schedule({ id: "m", installments: 140, amount: 1000, first_due_on: "2026-04-15", label: "Parcelas mensais" }),
+        schedule({ id: "a", installments: 11, amount: 5995.45, first_due_on: "2027-03-15", periodicity: "ANNUAL", kind: "PARCELA_ANUAL", label: "Parcelas anuais" }),
+        schedule({ id: "o", installments: 1, amount: 19000, first_due_on: "2026-03-17", periodicity: "SINGLE", kind: "INICIO_OBRAS", label: "Início de obras" }),
+    ];
+
+    it("counts and totals what is still owed, per kind", () => {
+        const groups = pendingByKind(pendingInstalments(plan, []));
+        expect(groups.map(g => [g.kind, g.count, g.total])).toEqual([
+            ["PARCELA", 140, 140000],
+            ["PARCELA_ANUAL", 11, 65949.95],
+            ["INICIO_OBRAS", 1, 19000],
+        ]);
+    });
+
+    it("keeps the order the kinds are listed in, not the order they fall due", () => {
+        const groups = pendingByKind(pendingInstalments(plan, []));
+        // início de obras is the earliest date but the last kind of the three
+        expect(groups[2].kind).toBe("INICIO_OBRAS");
+        expect(groups[2].nextDueOn).toBe("2026-03-17");
+    });
+
+    it("points at the earliest date still open in each kind", () => {
+        const groups = pendingByKind(pendingInstalments(plan, []));
+        expect(groups[0].nextDueOn).toBe("2026-04-15");
+        expect(groups[1].nextDueOn).toBe("2027-03-15");
+    });
+
+    it("shrinks as payments are recorded, and drops a kind once it is settled", () => {
+        const paidWorks = payment({ kind: "INICIO_OBRAS", amount: 19000, due_on: "2026-03-17", paid_on: "2026-03-17" });
+        const groups = pendingByKind(pendingInstalments(plan, [paidWorks]));
+        expect(groups.map(g => g.kind)).toEqual(["PARCELA", "PARCELA_ANUAL"]);
+    });
+
+    it("has nothing to group without a plan", () => {
+        expect(pendingByKind([])).toEqual([]);
     });
 });

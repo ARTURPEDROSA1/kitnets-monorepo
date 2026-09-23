@@ -18,6 +18,7 @@ export type PaymentKind =
     | "PARCELA"
     | "PARCELA_ANUAL"
     | "INTERCALADA"
+    | "INICIO_OBRAS"
     | "CHAVES"
     | "AMORTIZACAO"
     | "CORRECAO"
@@ -37,7 +38,8 @@ export const PAYMENT_KINDS: ReadonlyArray<{ kind: PaymentKind; label: string; hi
     { kind: "PARCELA", label: "Parcela mensal", hint: "Parcela do parcelamento direto com a construtora" },
     { kind: "PARCELA_ANUAL", label: "Parcela anual", hint: "Parcela anual (balão) prevista no contrato" },
     { kind: "INTERCALADA", label: "Intercalada", hint: "Reforço semestral ou parcela fora do fluxo mensal" },
-    { kind: "CHAVES", label: "Parcela das chaves", hint: "Valor pago na entrega das chaves ou no início de obras" },
+    { kind: "INICIO_OBRAS", label: "Início de obras", hint: "Valor devido quando a obra começa, antes das chaves" },
+    { kind: "CHAVES", label: "Parcela das chaves", hint: "Valor pago na entrega das chaves" },
     { kind: "AMORTIZACAO", label: "Amortização", hint: "Pagamento extra que reduz o saldo devedor" },
     { kind: "CORRECAO", label: "Correção do índice", hint: "INCC, IGP-M ou CUB cobrado à parte da parcela" },
     { kind: "TAXAS", label: "Taxas e impostos", hint: "ITBI, registro, escritura, taxa de interveniência" },
@@ -271,6 +273,43 @@ export function pendingInstalments(
         pending.push(inst);
     }
     return pending;
+}
+
+/** One line per kind still owed: what an investor picks from when deciding what to anticipate. */
+export interface PendingKindSummary {
+    kind: PaymentKind;
+    label: string;
+    count: number;
+    /** Contracted total still open for this kind, before any index correction. */
+    total: number;
+    /** Earliest due date still open. */
+    nextDueOn: string;
+}
+
+/**
+ * Groups open instalments by kind, in the order the kinds are listed.
+ *
+ * Paying ahead is how an off-plan buyer avoids the INCC/CUB correction on the instalments they
+ * anticipate, and a plan of 140 monthly instalments plus 11 annual ones is impossible to act on as
+ * one flat list — so the dashboard offers the kinds, with what each one still costs.
+ */
+export function pendingByKind(instalments: ScheduledInstalment[]): PendingKindSummary[] {
+    const byKind = new Map<PaymentKind, { count: number; total: number; nextDueOn: string }>();
+    for (const inst of instalments) {
+        const current = byKind.get(inst.kind);
+        if (current) {
+            current.count += 1;
+            current.total = round2(current.total + inst.amount);
+            if (inst.dueOn < current.nextDueOn) current.nextDueOn = inst.dueOn;
+        } else {
+            byKind.set(inst.kind, { count: 1, total: round2(inst.amount), nextDueOn: inst.dueOn });
+        }
+    }
+    return PAYMENT_KINDS.filter(k => byKind.has(k.kind)).map(k => ({
+        kind: k.kind,
+        label: k.label,
+        ...byKind.get(k.kind)!,
+    }));
 }
 
 // ── Formatting ───────────────────────────────────────────────────────

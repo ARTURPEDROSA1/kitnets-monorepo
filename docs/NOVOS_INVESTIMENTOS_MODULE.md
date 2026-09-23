@@ -95,6 +95,19 @@ ledger rather than being its own thing:
 | `useColumnVisibility` + `ColumnVisibilityMenu` | right-click a header to hide or show columns; the choice follows the account, not the device (`columnTableKey("investment-payments")`) |
 | `useCellSum` + `CellSumBar` | click a cell and move with the arrows, Shift+arrows for a rectangle, Enter/F2 to edit, Esc to cancel, drag to select, and a floating bar with count, sum and average |
 
+Above the table, the instalments the contract still owes are grouped into filter chips by kind —
+"Parcelas mensais (140)", "Parcelas anuais (11)", "Início de obras (1)" — with the open total of the
+chosen kind. That is there for one reason: an off-plan buyer who pays ahead escapes the INCC/CUB
+correction those instalments would accumulate, and a plan of 140 monthly instalments plus 11 annual
+ones cannot be acted on as one flat list. Picking a kind shows twelve of them instead of six,
+because that is the moment the owner is lining payments up to anticipate. `pendingByKind` does the
+grouping and is tested.
+
+`INICIO_OBRAS` ("Início de obras") is a kind of its own: contracts routinely carry a payment tied to
+the start of construction, months or years before the keys, and both can exist in one contract. It
+used to land on `OUTROS`, which hid it from every reading of the plan. The extractor tests for
+"obra" before "chave" for that reason.
+
 "Parcela nº" is hidden by default — most contracts number their instalments implicitly — and
 "Vencimento" is locked, since a payment with no date belongs to no month.
 
