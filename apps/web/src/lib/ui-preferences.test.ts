@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-    columnTableKey, filtersPrefKey, hiddenColumnsPrefKey, sanitizeFilters, sanitizeHiddenColumns, sanitizeSort, sortPrefKey,
+    columnTableKey, filtersPrefKey, hiddenColumnsPrefKey, recordTableKey, sanitizeFilters, sanitizeHiddenColumns, sanitizeSort, sortPrefKey,
     tableKeyFromFiltersPrefKey, tableKeyFromPrefKey, tableKeyFromSortPrefKey,
 } from "./ui-preferences";
 
@@ -53,6 +53,13 @@ describe("sort preferences", () => {
 });
 
 describe("filter preferences", () => {
+    it("is kept per record: the table plus the property's id", () => {
+        const id = "3F2504E0-4F89-11D3-9A0C-0305E82C3301";
+        expect(recordTableKey("income-ledger", id)).toBe("income-ledger:3f2504e0-4f89-11d3-9a0c-0305e82c3301");
+        expect(filtersPrefKey(recordTableKey("income-ledger", id))).toBe("filters:income-ledger:3f2504e0-4f89-11d3-9a0c-0305e82c3301");
+        expect(tableKeyFromFiltersPrefKey("filters:income-ledger:3f2504e0-4f89-11d3-9a0c-0305e82c3301")).toBe("income-ledger:3f2504e0-4f89-11d3-9a0c-0305e82c3301");
+    });
+
     it("builds and reads back the preference key", () => {
         expect(filtersPrefKey("income-ledger:multi")).toBe("filters:income-ledger:multi");
         expect(tableKeyFromFiltersPrefKey("filters:income-ledger:multi")).toBe("income-ledger:multi");

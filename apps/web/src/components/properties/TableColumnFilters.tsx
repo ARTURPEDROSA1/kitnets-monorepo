@@ -12,10 +12,13 @@
  * Column kinds: text (contains), number (min–max), date (ISO min–max), month (YYYY-MM min–max),
  * enum (checkbox list with counts from the unfiltered rows).
  *
- * With `{ storageKey }` (the same key the table gives `useColumnVisibility`) the chosen sort and the active
- * filters belong to the user's account, like the hidden columns: they are there on any device the user
- * signs in on, with a localStorage copy so the table opens the same way right away. The chips above the
- * table always say which filters are on, with one click to clear them.
+ * With `{ storageKey, filtersKey }` the chosen sort and the active filters belong to the user's account, like
+ * the hidden columns: they are there on any device the user signs in on, with a localStorage copy so the
+ * table opens the same way right away. `storageKey` is the table's key (the one it gives
+ * `useColumnVisibility`) and holds the sort; `filtersKey` is that table for one record
+ * (`recordTableKey("income-ledger", propertyId)`) and holds the filters, so a filter on one property's rows
+ * never reaches another property's. The chips above the table always say which filters are on, with one
+ * click to clear them.
  */
 import type { ColumnVisibility } from "./TableColumnVisibility";
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -80,8 +83,10 @@ const isActiveFilter = (f: ColumnFilter | undefined) =>
     Boolean(f && ((f.values !== null && f.values !== undefined) || (f.text ?? "").trim() !== "" || (f.min ?? "").trim() !== "" || (f.max ?? "").trim() !== ""));
 
 export interface ColumnFilterOptions {
-    /** Table key the sort and filters are remembered under in the user's account; omit to keep them for this visit only. */
+    /** Table key the sort is remembered under in the user's account; omit to keep it for this visit only. */
     storageKey?: string;
+    /** Key the filters are remembered under — the table for one record; omit to keep them for this visit only. */
+    filtersKey?: string;
 }
 
 type Filters = Record<string, ColumnFilter>;
@@ -106,15 +111,16 @@ const filtersToStored = (filters: Filters): TableFilters => {
 };
 
 export function useColumnFilters<T>(rows: T[], columns: ColumnDef<T>[], defaultSort: SortState, opts: ColumnFilterOptions = {}): ColumnFilterController<T> {
-    const { storageKey } = opts;
-    const initial = (key: string | undefined) => {
-        const localSort = key ? readLocalPreference("sort", key) : null;
-        const localFilters = key ? readLocalPreference("filters", key) : null;
-        return { key, sort: localSort ?? defaultSort, filters: localFilters ? filtersFromStored(localFilters) : {} };
+    const { storageKey, filtersKey } = opts;
+    const stateKey = `${storageKey ?? ""}|${filtersKey ?? ""}`;
+    const initial = () => {
+        const localSort = storageKey ? readLocalPreference("sort", storageKey) : null;
+        const localFilters = filtersKey ? readLocalPreference("filters", filtersKey) : null;
+        return { key: stateKey, sort: localSort ?? defaultSort, filters: localFilters ? filtersFromStored(localFilters) : {} };
     };
-    const [state, setState] = useState(() => initial(storageKey));
-    // the key changes when the table turns out to be of another kind: start from that key's copy
-    if (state.key !== storageKey) setState(initial(storageKey));
+    const [state, setState] = useState(initial);
+    // a key changes when the table turns out to be of another kind, or shows another record: start from that key's copy
+    if (state.key !== stateKey) setState(initial());
     const { filters } = state;
     // a remembered column the table no longer has (renamed, removed) must not leave the rows unordered
     const sort = columns.some(c => c.key === state.sort.key) ? state.sort : defaultSort;
@@ -122,28 +128,28 @@ export function useColumnFilters<T>(rows: T[], columns: ColumnDef<T>[], defaultS
     const touched = useRef({ sort: false, filters: false });
 
     useEffect(() => {
-        if (!storageKey) return;
+        if (!storageKey && !filtersKey) return;
         touched.current = { sort: false, filters: false };
         let alive = true;
         void loadAccountPreferences().then(all => {
             if (!alive) return;
-            const remoteSort = all.sort[storageKey];
-            const remoteFilters = all.filters[storageKey];
+            const remoteSort = storageKey ? all.sort[storageKey] : undefined;
+            const remoteFilters = filtersKey ? all.filters[filtersKey] : undefined;
             const applySort = Boolean(remoteSort) && !touched.current.sort;
             const applyFilters = Boolean(remoteFilters) && !touched.current.filters;
-            if (applySort) writeLocalPreference("sort", storageKey, remoteSort);
-            if (applyFilters) writeLocalPreference("filters", storageKey, remoteFilters);
+            if (applySort && storageKey) writeLocalPreference("sort", storageKey, remoteSort!);
+            if (applyFilters && filtersKey) writeLocalPreference("filters", filtersKey, remoteFilters!);
             if (applySort || applyFilters) {
-                setState(prev => (prev.key === storageKey
-                    ? { key: storageKey, sort: applySort ? remoteSort : prev.sort, filters: applyFilters ? filtersFromStored(remoteFilters) : prev.filters }
+                setState(prev => (prev.key === stateKey
+                    ? { key: stateKey, sort: applySort ? remoteSort! : prev.sort, filters: applyFilters ? filtersFromStored(remoteFilters!) : prev.filters }
                     : prev));
             }
-            // first time this table is seen in the account: the choice made on this device becomes the account's
-            if (!remoteSort) { const local = readLocalPreference("sort", storageKey); if (local) saveAccountPreference("sort", storageKey, local); }
-            if (!remoteFilters) { const local = readLocalPreference("filters", storageKey); if (local && Object.keys(local).length > 0) saveAccountPreference("filters", storageKey, local); }
+            // first time this table (or record) is seen in the account: the choice made on this device becomes the account's
+            if (storageKey && !remoteSort) { const local = readLocalPreference("sort", storageKey); if (local) saveAccountPreference("sort", storageKey, local); }
+            if (filtersKey && !remoteFilters) { const local = readLocalPreference("filters", filtersKey); if (local && Object.keys(local).length > 0) saveAccountPreference("filters", filtersKey, local); }
         });
         return () => { alive = false; };
-    }, [storageKey]);
+    }, [storageKey, filtersKey, stateKey]);
 
     const setSort = useCallback((next: SortState) => {
         touched.current.sort = true;
@@ -151,23 +157,23 @@ export function useColumnFilters<T>(rows: T[], columns: ColumnDef<T>[], defaultS
             writeLocalPreference("sort", storageKey, next);
             saveAccountPreference("sort", storageKey, next);
         }
-        setState(prev => ({ ...prev, key: storageKey, sort: next }));
-    }, [storageKey]);
+        setState(prev => ({ ...prev, key: stateKey, sort: next }));
+    }, [storageKey, stateKey]);
 
-    // Every filter change goes through here so the account copy keeps up (writes are debounced per table,
+    // Every filter change goes through here so the account copy keeps up (writes are debounced per key,
     // so persisting from inside the updater is harmless if React runs it twice).
     const setFilters = useCallback((fn: (prev: Filters) => Filters) => {
         touched.current.filters = true;
         setState(prev => {
             const next = fn(prev.filters);
-            if (storageKey) {
+            if (filtersKey) {
                 const stored = filtersToStored(next);
-                writeLocalPreference("filters", storageKey, stored);
-                saveAccountPreference("filters", storageKey, stored);
+                writeLocalPreference("filters", filtersKey, stored);
+                saveAccountPreference("filters", filtersKey, stored);
             }
-            return { ...prev, key: storageKey, filters: next };
+            return { ...prev, key: stateKey, filters: next };
         });
-    }, [storageKey]);
+    }, [filtersKey, stateKey]);
     const [menu, setMenu] = useState<{ key: string; x: number; y: number } | null>(null);
 
     const counts = useMemo(() => {

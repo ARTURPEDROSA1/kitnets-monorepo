@@ -44,7 +44,7 @@ import { PdfViewerModal } from "@/components/ui/PdfViewerModal";
 import { solarSavings } from "@/lib/energy-savings";
 import type { OwnerPropertySummary } from "@/app/api/energy-bills/properties/route";
 import { cn } from "@/lib/utils";
-import { columnTableKey } from "@/lib/ui-preferences";
+import { columnTableKey, recordTableKey } from "@/lib/ui-preferences";
 import { CellSumBar, useCellSum } from "@/components/properties/TableCellSum";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "@/components/properties/TableColumnFilters";
 import { ColumnVisibilityMenu, useColumnVisibility } from "@/components/properties/TableColumnVisibility";
@@ -294,7 +294,10 @@ export default function EnergyDashboardPage() {
         { key: "total", label: "Valor a Pagar", kind: "number", align: "right", get: b => b.total_amount > 0 ? b.total_amount : null },
         { key: "origin", label: "Origem", kind: "enum", align: "center", options: [{ value: "full", label: "Fatura Completa" }, { value: "hist", label: "Histórico Base" }], get: b => b.is_historical_only ? "hist" : "full" },
     ], []);
-    const cf = useColumnFilters(filteredBills, billColumns, { key: "month", dir: "desc" }, { storageKey: columnTableKey("energy-bills") });
+    const cf = useColumnFilters(filteredBills, billColumns, { key: "month", dir: "desc" }, {
+        storageKey: columnTableKey("energy-bills"),
+        filtersKey: recordTableKey("energy-bills", resolvedPropertyId || propertyId),
+    });
     const vis = useColumnVisibility(columnTableKey("energy-bills"), { locked: ["month"] });
     const sel = useCellSum({ formatByCol: { cons: formatKwh(0), daily: formatKwh(2), days: formatDays, balance: formatKwh(2), injected: formatKwh(0), unitPrice: formatUnitPrice } });
 

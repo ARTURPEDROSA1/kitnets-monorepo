@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { CONDO_COST_KEYS, CONDO_COST_LABELS, isAutoCostKey, summarizeCondominium, type CondoAutoKey, type CondoCostKey, type CondominiumCostInput, type CondominiumMonth } from "@/lib/condominium";
 import { formatMonthKey } from "@/lib/property-income";
 import { groupMonthly, periodLabel, periodRange, type ChartGroup, type PeriodFilterValue } from "@/lib/period-filter";
-import { columnTableKey } from "@/lib/ui-preferences";
+import { columnTableKey, recordTableKey } from "@/lib/ui-preferences";
 import PeriodFilter, { GroupSelect } from "@/components/properties/PeriodFilter";
 import Tile, { type TileInfo } from "@/components/properties/Tile";
 import MoneyInput from "@/components/properties/MoneyInput";
@@ -128,7 +128,10 @@ export default function CondominiumLedger({ propertyId, lang = "pt" }: { propert
         { key: "result", label: "Resultado", kind: "number", align: "right", title: "Receita − custos", get: r => r.result },
         { key: "notes", label: "Descrição", kind: "text", get: r => r.notes ?? "" },
     ], [source]);
-    const cf = useColumnFilters(filtered, columns, { key: "month", dir: "desc" }, { storageKey: columnTableKey("condominium-ledger") });
+    const cf = useColumnFilters(filtered, columns, { key: "month", dir: "desc" }, {
+        storageKey: columnTableKey("condominium-ledger"),
+        filtersKey: recordTableKey("condominium-ledger", propertyId),
+    });
     const visible = showAll ? cf.rows : cf.rows.slice(0, COLLAPSED_ROWS);
     const show = (key: string) => !vis.isHidden(key);
 

@@ -5,7 +5,11 @@
  * Three kinds today, all per table (and per kind of property where the table differs by it):
  *   hidden-columns:<table>[:<variant>]   string[] of column keys           e.g. ["energy", "received"]
  *   sort:<table>[:<variant>]             { key, dir }                      e.g. { key: "due_on", dir: "asc" }
- *   filters:<table>[:<variant>]          { <column>: { text | min/max | values[] } }
+ *   filters:<table>:<record id>          { <column>: { text | min/max | values[] } }
+ *
+ * Hidden columns and sort are how the user wants a kind of table to look, so they are per table. Filters
+ * are a question asked of one property's (or one investment's) rows, so they are per record: a filter on
+ * one property's ledger never reaches another property's.
  */
 
 export const HIDDEN_COLUMNS_PREFIX = "hidden-columns:";
@@ -31,6 +35,11 @@ export type TableFilters = Record<string, StoredFilter>;
 /** `income-ledger` + `multi` → `income-ledger:multi`: the name a table's choice is stored under. */
 export function columnTableKey(table: string, kind?: PropertyKind): string {
     return kind ? `${table}:${kind}` : table;
+}
+
+/** `income-ledger` + a property id → `income-ledger:<uuid>`: the name one record's table filters are stored under. */
+export function recordTableKey(table: string, recordId: string): string {
+    return `${table}:${recordId.trim().toLowerCase()}`;
 }
 
 const prefKeyOf = (prefix: string, tableKey: string) => (TABLE_KEY.test(tableKey) ? `${prefix}${tableKey}` : null);
