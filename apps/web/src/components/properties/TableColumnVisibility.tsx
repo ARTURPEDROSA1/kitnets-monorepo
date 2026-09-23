@@ -17,7 +17,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Check, Columns3, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { hiddenColumnsPrefKey, sanitizeHiddenColumns } from "@/lib/ui-preferences";
+import { loadAccountPreferences, readLocalPreference, saveAccountPreference, writeLocalPreference } from "@/lib/ui-preferences-client";
 
 export interface ColumnVisibility {
     isHidden: (key: string) => boolean;
@@ -32,53 +32,10 @@ export interface ColumnVisibility {
     menu: { x: number; y: number; key?: string } | null;
 }
 
-const storageName = (key: string) => `kitnets:hidden-columns:${key}`;
-
-/** This device's copy of a table's hidden columns; null when it has none. */
-function readLocal(key: string): string[] | null {
-    if (typeof window === "undefined") return null;
-    try {
-        const raw = window.localStorage.getItem(storageName(key));
-        return raw === null ? null : sanitizeHiddenColumns(JSON.parse(raw));
-    } catch {
-        return null;
-    }
-}
-
-function writeLocal(key: string, hidden: string[]) {
-    try { window.localStorage.setItem(storageName(key), JSON.stringify(hidden)); } catch { /* private mode: keep it for this visit */ }
-}
-
-// ── The account's copy ──────────────────────────────────────────────────────
-// One GET per page load serves every table; writes are debounced per table key.
-const ACCOUNT_TTL_MS = 60_000;
-let account: { at: number; load: Promise<Record<string, string[]>> } | null = null;
-const pendingSaves = new Map<string, ReturnType<typeof setTimeout>>();
-
-function loadAccountColumns(): Promise<Record<string, string[]>> {
-    if (!account || Date.now() - account.at > ACCOUNT_TTL_MS) {
-        const load = fetch("/api/profiles/preferences")
-            .then(res => (res.ok ? res.json() : {}))
-            .then((data: { hiddenColumns?: Record<string, string[]> }) => data.hiddenColumns ?? {})
-            .catch(() => ({}));   // signed out or offline: this device's copy still works
-        account = { at: Date.now(), load };
-    }
-    return account.load;
-}
-
-function saveAccountColumns(key: string, hidden: string[]) {
-    if (!hiddenColumnsPrefKey(key)) return;
-    // later reads in this page load see the new choice without another request
-    if (account) account = { at: account.at, load: account.load.then(all => ({ ...all, [key]: hidden })) };
-    clearTimeout(pendingSaves.get(key));
-    pendingSaves.set(key, setTimeout(() => {
-        pendingSaves.delete(key);
-        void fetch("/api/profiles/preferences", {
-            method: "PUT", headers: { "Content-Type": "application/json" }, keepalive: true,
-            body: JSON.stringify({ hiddenColumns: { [key]: hidden } }),
-        }).catch(() => { /* the device's copy keeps the choice; the next change tries again */ });
-    }, 600));
-}
+// This device's copy and the account's copy both live in lib/ui-preferences-client (shared with the sort).
+const readLocal = (key: string) => readLocalPreference("hiddenColumns", key);
+const writeLocal = (key: string, hidden: string[]) => writeLocalPreference("hiddenColumns", key, hidden);
+const saveAccountColumns = (key: string, hidden: string[]) => saveAccountPreference("hiddenColumns", key, hidden);
 
 export interface ColumnVisibilityOptions {
     locked?: string[];
@@ -101,9 +58,9 @@ export function useColumnVisibility(storageKey: string, opts: ColumnVisibilityOp
 
     useEffect(() => {
         let alive = true;
-        void loadAccountColumns().then(all => {
+        void loadAccountPreferences().then(all => {
             if (!alive || touched.current.has(storageKey)) return;
-            const remote = all[storageKey];
+            const remote = all.hiddenColumns[storageKey];
             if (remote) {
                 writeLocal(storageKey, remote);
                 setState(prev => (prev.key === storageKey ? { key: storageKey, hidden: new Set(remote) } : prev));

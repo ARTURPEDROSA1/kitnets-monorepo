@@ -33,6 +33,7 @@ import PeriodFilter from "./PeriodFilter";
 import Tile, { type TileInfo } from "./Tile";
 import { periodLabel, periodRange, type PeriodFilterValue } from "@/lib/period-filter";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "./TableColumnFilters";
+import { columnTableKey, recordTableKey } from "@/lib/ui-preferences";
 import { CellSumBar, useCellSum } from "./TableCellSum";
 import MoneyInput, { parseMoneyText } from "./MoneyInput";
 
@@ -360,7 +361,10 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
         },
     };
     const reviewTotals = useMemo(() => (extracted ? checkIptuTotals(extracted) : null), [extracted]);
-    const cf = useColumnFilters(inPeriodRows, TAX_COLUMNS, { key: "year", dir: "desc" });
+    const cf = useColumnFilters(inPeriodRows, TAX_COLUMNS, { key: "year", dir: "desc" }, {
+        storageKey: columnTableKey("property-taxes"),
+        filtersKey: propertyId ? recordTableKey("property-taxes", propertyId) : undefined,
+    });
 
     if (!propertyId) return null;
 

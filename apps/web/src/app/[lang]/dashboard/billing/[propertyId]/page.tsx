@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { ConsumptionChart } from "@/components/dashboard/ConsumptionChart";
 import { cn } from "@/lib/utils";
-import { columnTableKey } from "@/lib/ui-preferences";
+import { columnTableKey, recordTableKey } from "@/lib/ui-preferences";
 import { CellSumBar, useCellSum } from "@/components/properties/TableCellSum";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "@/components/properties/TableColumnFilters";
 import { ColumnVisibilityMenu, useColumnVisibility } from "@/components/properties/TableColumnVisibility";
@@ -320,7 +320,10 @@ export default function BillingPage() {
         { key: "rate", label: "R$/m³", kind: "number", align: "right", sum: false, title: "Valor ÷ consumo", get: b => b.effective_rate_per_m3 },
         { key: "occurrence", label: "Ocorrência", kind: "text", get: b => b.occurrence_code ?? "" },
     ], []);
-    const cf = useColumnFilters(filteredBills, columns, { key: "month", dir: "desc" });
+    const cf = useColumnFilters(filteredBills, columns, { key: "month", dir: "desc" }, {
+        storageKey: columnTableKey("water-bills"),
+        filtersKey: recordTableKey("water-bills", propertyId),
+    });
     const vis = useColumnVisibility(columnTableKey("water-bills"), {
         locked: ["month"],
         defaultHidden: ["prevReading", "currReading", "readingDate", "waterTariff", "sewageTariff", "waterFee", "sewageFee", "occurrence"],

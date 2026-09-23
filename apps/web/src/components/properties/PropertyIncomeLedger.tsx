@@ -48,7 +48,7 @@ import { CellSumBar, useCellSum } from "./TableCellSum";
 import MoneyInput, { parseMoneyText } from "./MoneyInput";
 import Tile, { type TileInfo } from "./Tile";
 import { ColumnVisibilityMenu, useColumnVisibility } from "./TableColumnVisibility";
-import { columnTableKey } from "@/lib/ui-preferences";
+import { columnTableKey, recordTableKey } from "@/lib/ui-preferences";
 import { groupMonthly, periodLabel, periodRange, type ChartGroup, type PeriodFilterValue } from "@/lib/period-filter";
 import {
     breakdown,
@@ -393,7 +393,10 @@ export default function PropertyIncomeLedger({
         { key: "status", label: "Status", kind: "enum", align: "center", get: r => r.status, options: [{ value: "CONFIRMED", label: "Confirmado" }, { value: "EXPECTED", label: "Previsto" }] },
         { key: "notes", label: "Comentários", kind: "text", get: r => r.notes ?? "" },
     ], [multiUnit, units, hasCondo]);
-    const cf = useColumnFilters(filtered, columns, { key: "month", dir: "desc" });
+    const cf = useColumnFilters(filtered, columns, { key: "month", dir: "desc" }, {
+        storageKey: columnTableKey("income-ledger", multiUnit ? "multi" : "single"),
+        filtersKey: propertyId ? recordTableKey("income-ledger", propertyId) : undefined,
+    });
     /** Months in the period (a multi-unit property has several rows per month). */
     const monthCount = useMemo(() => new Set(filtered.map(r => monthKey(r.month))).size, [filtered]);
     const visible = showAll ? cf.rows : cf.rows.slice(0, COLLAPSED_ROWS);
