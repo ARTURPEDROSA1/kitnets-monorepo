@@ -1,24 +1,18 @@
 "use client";
 
+/**
+ * One square card per property on /imoveis — the same shape as the project cards on /projetos:
+ * a cover carousel over the property's photos, the name and address, the money line, two small
+ * tiles and a footer. The whole card opens the property; nothing on it needs a button.
+ *
+ * What it answers at a glance: what the property brings in per month (the income ledger's latest
+ * month when there is one, an estimate otherwise), what is left after costs, and how far the
+ * investment has paid itself back.
+ */
 import React, { useMemo } from 'react';
-import Image from 'next/image';
-import {
-    Building2,
-    Home,
-    MapPin,
-    Sun,
-    Trash2,
-    ArrowRight,
-    Zap,
-    Droplets,
-    Flame,
-    FileText,
-    DollarSign,
-    Percent,
-    PiggyBank,
-} from 'lucide-react';
-import { Button } from '@kitnets/ui';
+import { Building2, Droplets, Flame, Home, PiggyBank, Sun, Trash2, TrendingUp, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { CoverCarousel, useCoverCarousel } from '@/components/ui/CoverCarousel';
 import type { PropertyDetails, SubUnit } from '@/components/profile/PropertyDetailsCard';
 
 export interface PropertyCardData {
@@ -77,13 +71,6 @@ function formatMonthShort(key: string): string {
     return `${MONTH_SHORT[Number(m) - 1] ?? m}/${y}`;
 }
 
-interface PropertySquareCardProps {
-    property: PropertyCardData;
-    onSelect: () => void;
-    onDelete: (e: React.MouseEvent) => void;
-    isDeleting?: boolean;
-}
-
 export function formatCurrencyBRL(value: number): string {
     return value.toLocaleString('pt-BR', {
         style: 'currency',
@@ -92,19 +79,101 @@ export function formatCurrencyBRL(value: number): string {
     });
 }
 
-export default function PropertySquareCard({
-    property,
-    onSelect,
-    onDelete,
-    isDeleting = false,
-}: PropertySquareCardProps) {
-    const { propertyType, details, subUnits, address, savedPhotos, profilePhotoUrl, realIncome, investment } = property;
+const parseMoney = (v: string | undefined | null): number => {
+    if (!v) return 0;
+    const n = parseFloat(v.replace(/[^\d.,]/g, '').replace(',', '.'));
+    return Number.isNaN(n) ? 0 : n;
+};
 
-    // Title calculation
+export interface CardFinancials {
+    monthlyRevenue: number;
+    totalExpenses: number;
+    noi: number;
+    /** % */
+    margin: number;
+    /** No rent typed anywhere: a baseline guess, not the owner's figure. */
+    isEstimate: boolean;
+    /** `mmm/aaaa` of the ledger month the figures come from; null when they are estimates. */
+    realMonth: string | null;
+}
+
+/** Units of a multi property: what was typed, never less than the units actually listed. */
+export function cardUnitCount(property: Pick<PropertyCardData, 'propertyType' | 'details' | 'subUnits'>): number {
+    return property.propertyType === 'multi' ? Math.max(property.details.numberOfUnits || 0, property.subUnits.length || 1) : 1;
+}
+
+/**
+ * The card's monthly figures. The income ledger's latest month wins; without it, the rents typed
+ * on the units (or the property's estimate), less IPTU, condomínio, a maintenance reserve and the
+ * management fee. Shared with the hub's totals so the strip adds up exactly what the cards show.
+ */
+export function cardFinancials(property: Pick<PropertyCardData, 'propertyType' | 'details' | 'subUnits' | 'realIncome'>): CardFinancials {
+    const { propertyType, details, subUnits, realIncome } = property;
+    if (realIncome && realIncome.revenue > 0) {
+        return {
+            monthlyRevenue: realIncome.revenue,
+            totalExpenses: realIncome.opex,
+            noi: realIncome.noi,
+            margin: realIncome.margin,
+            isEstimate: false,
+            realMonth: formatMonthShort(realIncome.month),
+        };
+    }
+
+    const totalUnits = cardUnitCount(property);
+    let monthlyRevenue = 0;
+    let isEstimate = false;
+    if (propertyType === 'multi') {
+        const unitRentsSum = subUnits.reduce((acc, u) => acc + parseMoney(u.rentValue), 0);
+        if (unitRentsSum > 0) monthlyRevenue = unitRentsSum;
+        else if (details.monthlyRentEstimate) monthlyRevenue = parseMoney(details.monthlyRentEstimate);
+        else { monthlyRevenue = totalUnits * 1100; isEstimate = true; }   // baseline: R$ 1.100 per kitnet
+    } else if (details.monthlyRentEstimate) {
+        monthlyRevenue = parseMoney(details.monthlyRentEstimate);
+    } else {
+        const beds = parseInt(details.bedrooms || '2', 10);
+        monthlyRevenue = (Number.isNaN(beds) ? 2 : beds) * 750 + 600;
+        isEstimate = true;
+    }
+
+    // Operating expenses: IPTU, condomínio, a 5% maintenance reserve and the management fee
+    const iptuMonthly = details.iptuMonthly ? (parseMoney(details.iptuMonthly) || 120) : 120;
+    const condoDefault = propertyType === 'multi' ? totalUnits * 60 : 0;
+    const condoMonthly = details.condoMonthly ? (parseMoney(details.condoMonthly) || condoDefault) : condoDefault;
+    const maintenanceReserve = details.maintenanceMonthly ? (parseMoney(details.maintenanceMonthly) || Math.round(monthlyRevenue * 0.05)) : Math.round(monthlyRevenue * 0.05);
+    const adminFee = Math.round(monthlyRevenue * (parseFloat(details.managementFeePercent || '8') / 100));
+    const totalExpenses = iptuMonthly + condoMonthly + maintenanceReserve + adminFee;
+    const noi = Math.max(0, monthlyRevenue - totalExpenses);
+    return {
+        monthlyRevenue,
+        totalExpenses,
+        noi,
+        margin: monthlyRevenue > 0 ? (noi / monthlyRevenue) * 100 : 0,
+        isEstimate,
+        realMonth: null,
+    };
+}
+
+/** The pictures the cover slides through: the chosen one first, then the rest in upload order. */
+export function cardPhotos(property: Pick<PropertyCardData, 'savedPhotos' | 'profilePhotoUrl'>, limit = 12): string[] {
+    const cover = property.profilePhotoUrl ?? null;
+    const ordered = cover ? [cover, ...property.savedPhotos.filter(u => u !== cover)] : property.savedPhotos;
+    return Array.from(new Set(ordered.filter(Boolean))).slice(0, limit);
+}
+
+interface PropertySquareCardProps {
+    property: PropertyCardData;
+    onSelect: () => void;
+    onDelete: (e: React.MouseEvent) => void;
+    isDeleting?: boolean;
+}
+
+export default function PropertySquareCard({ property, onSelect, onDelete, isDeleting = false }: PropertySquareCardProps) {
+    const { propertyType, details, address, investment } = property;
+
     const title = details.propertyName?.trim()
         || (address.street ? `${address.street}${address.number ? `, ${address.number}` : ''}` : `Propriedade ${property.index + 1}`);
 
-    // Formatted full address
     const fullAddress = useMemo(() => {
         const parts = [
             address.street ? `${address.street}${address.number ? `, ${address.number}` : ''}` : null,
@@ -114,294 +183,120 @@ export default function PropertySquareCard({
         return parts.length > 0 ? parts.join(' - ') : 'Endereço em preenchimento';
     }, [address]);
 
-    // Units count
-    const totalUnits = propertyType === 'multi'
-        ? Math.max(details.numberOfUnits || 0, subUnits.length || 1)
-        : 1;
+    const totalUnits = cardUnitCount(property);
+    const financials = useMemo(() => cardFinancials(property), [property]);
+    const photos = useMemo(() => cardPhotos(property), [property]);
+    const carousel = useCoverCarousel(photos.length);
 
-    // Financial calculations: Revenue, OPEX and NOI
-    const financials = useMemo(() => {
-        // Real data from the income ledger wins over every estimate below
-        if (realIncome && realIncome.revenue > 0) {
-            return {
-                monthlyRevenue: realIncome.revenue,
-                totalExpenses: realIncome.opex,
-                noi: realIncome.noi,
-                margin: realIncome.margin,
-                isEstimate: false,
-                realMonth: formatMonthShort(realIncome.month),
-            };
-        }
-
-        let monthlyRevenue = 0;
-        let isEstimate = false;
-
-        if (propertyType === 'multi') {
-            const unitRentsSum = subUnits.reduce((acc, u) => {
-                if (u.rentValue) {
-                    const parsed = parseFloat(u.rentValue.replace(/[^\d.,]/g, '').replace(',', '.'));
-                    return acc + (isNaN(parsed) ? 0 : parsed);
-                }
-                return acc;
-            }, 0);
-
-            if (unitRentsSum > 0) {
-                monthlyRevenue = unitRentsSum;
-            } else if (details.monthlyRentEstimate) {
-                const parsed = parseFloat(details.monthlyRentEstimate.replace(/[^\d.,]/g, '').replace(',', '.'));
-                monthlyRevenue = isNaN(parsed) ? 0 : parsed;
-            } else {
-                // Baseline realistic estimate: R$ 1.100 per kitnet
-                monthlyRevenue = totalUnits * 1100;
-                isEstimate = true;
-            }
-        } else {
-            if (details.monthlyRentEstimate) {
-                const parsed = parseFloat(details.monthlyRentEstimate.replace(/[^\d.,]/g, '').replace(',', '.'));
-                monthlyRevenue = isNaN(parsed) ? 0 : parsed;
-            } else {
-                const beds = parseInt(details.bedrooms || '2', 10);
-                monthlyRevenue = (isNaN(beds) ? 2 : beds) * 750 + 600;
-                isEstimate = true;
-            }
-        }
-
-        // Operating Expenses (OPEX): IPTU, maintenance reserve (5%), admin (8%), common utilities
-        const iptuMonthly = details.iptuMonthly
-            ? (parseFloat(details.iptuMonthly.replace(/[^\d.,]/g, '').replace(',', '.')) || 120)
-            : 120;
-        const condoMonthly = details.condoMonthly
-            ? (parseFloat(details.condoMonthly.replace(/[^\d.,]/g, '').replace(',', '.')) || (propertyType === 'multi' ? totalUnits * 60 : 0))
-            : (propertyType === 'multi' ? totalUnits * 60 : 0);
-        const maintenanceReserve = details.maintenanceMonthly
-            ? (parseFloat(details.maintenanceMonthly.replace(/[^\d.,]/g, '').replace(',', '.')) || Math.round(monthlyRevenue * 0.05))
-            : Math.round(monthlyRevenue * 0.05);
-        const adminFee = Math.round(monthlyRevenue * (parseFloat(details.managementFeePercent || '8') / 100));
-
-        const totalExpenses = iptuMonthly + condoMonthly + maintenanceReserve + adminFee;
-        const noi = Math.max(0, monthlyRevenue - totalExpenses);
-        const margin = monthlyRevenue > 0 ? (noi / monthlyRevenue) * 100 : 0;
-
-        return {
-            monthlyRevenue,
-            totalExpenses,
-            noi,
-            margin,
-            isEstimate,
-            realMonth: null as string | null,
-        };
-    }, [propertyType, details, subUnits, totalUnits, realIncome]);
-
-    // Thumbnail photo
-    const photoUrl = profilePhotoUrl || (savedPhotos.length > 0 ? savedPhotos[0] : null);
+    const payback = investment && investment.invested > 0 ? Math.min(100, Math.max(0, investment.paybackPct)) : null;
+    const yieldPct = investment?.netYieldOnCost ?? investment?.grossYieldOnPrice ?? null;
+    const loadingIncome = Boolean(property.incomeLoading && !property.realIncome);
 
     return (
         <div
-            onClick={onSelect}
             role="button"
             tabIndex={0}
-            onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    onSelect();
-                }
+            onClick={onSelect}
+            onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(); return; }
+                carousel.onKeyDown(e);
             }}
-            className="group relative flex flex-col justify-between rounded-2xl border border-border bg-card p-6 shadow-xs transition-all duration-200 hover:shadow-md hover:border-amber-500/50 cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+            onMouseEnter={carousel.pause}
+            onMouseLeave={carousel.resume}
+            className="group relative flex flex-col rounded-2xl border border-border/80 bg-card overflow-hidden text-left transition-all hover:border-emerald-400 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
         >
-            <div className="space-y-4">
-                {/* Header: Title + Delete button */}
-                <div className="flex items-start justify-between gap-3">
-                    <div className="space-y-1 flex-1 min-w-0">
-                        <h3 className="font-bold text-lg text-foreground group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors line-clamp-1">
-                            {title}
-                        </h3>
-                        <p className="text-xs text-muted-foreground flex items-center gap-1 line-clamp-1">
-                            <MapPin className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-                            <span>{fullAddress}</span>
-                        </p>
-                    </div>
-
-                    {/* Delete action button */}
-                    <button
-                        type="button"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onDelete(e);
-                        }}
-                        disabled={isDeleting}
-                        className="p-1.5 rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors opacity-70 group-hover:opacity-100 flex-shrink-0"
-                        title="Excluir imóvel"
-                        aria-label="Excluir imóvel"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                    </button>
-                </div>
-
-                {/* Badges row: property type and solar side by side (never wraps; the solar label truncates on narrow cards) */}
-                <div className="flex flex-nowrap items-center gap-2 min-w-0">
-                    {/* Typology Badge */}
-                    {propertyType === 'multi' ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 bg-violet-50 text-violet-700 border border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-800">
-                            <Building2 className="w-3.5 h-3.5 text-violet-500" />
-                            Multifamiliar ({totalUnits} {totalUnits === 1 ? 'unidade' : 'unidades'})
-                        </span>
-                    ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800">
-                            <Home className="w-3.5 h-3.5 text-blue-500" />
-                            Unifamiliar
-                        </span>
-                    )}
-
-
-                    {/* Solar Energy Badge */}
-                    {details.solarEnergy ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium min-w-0 bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60">
-                            <Sun className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                            <span className="truncate">{details.solarKwp ? `Solar GD • ${details.solarKwp} kWp` : 'Solar GD Ativa'}</span>
-                        </span>
-                    ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-normal whitespace-nowrap bg-muted text-muted-foreground">
-                            Sem energia solar
-                        </span>
-                    )}
-                </div>
-
-                {/* Photo, Info & Meters Row */}
-                <div className="pt-3 border-t border-border/60 flex items-center gap-4">
-                    {photoUrl ? (
-                        <div className="w-24 h-24 rounded-2xl overflow-hidden border border-border flex-shrink-0 bg-muted">
-                            <Image
-                                src={photoUrl}
-                                alt={title}
-                                width={96}
-                                height={96}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                            />
-                        </div>
-                    ) : (
-                        <div className="w-24 h-24 rounded-2xl border border-border bg-muted/40 flex items-center justify-center flex-shrink-0 text-muted-foreground">
-                            {propertyType === 'multi' ? <Building2 className="w-10 h-10" /> : <Home className="w-10 h-10" />}
-                        </div>
-                    )}
-
-                    {/* Utility meter icons */}
-                    {(details.mainMeters?.energy || details.mainMeters?.water || details.mainMeters?.gas) && (
-                        <div className="order-last flex items-center gap-1.5 flex-shrink-0 self-start text-muted-foreground">
-                            {details.mainMeters?.energy && (
-                                <span title="Medidor de Energia"><Zap className="w-3.5 h-3.5 text-amber-500" /></span>
-                            )}
-                            {details.mainMeters?.water && (
-                                <span title="Medidor de Água"><Droplets className="w-3.5 h-3.5 text-blue-500" /></span>
-                            )}
-                            {details.mainMeters?.gas && (
-                                <span title="Medidor de Gás"><Flame className="w-3.5 h-3.5 text-orange-500" /></span>
-                            )}
-                        </div>
-                    )}
-
-                    <div className="min-w-0 flex-1">
-                        <p className="text-xs font-medium text-foreground truncate">
-                            {propertyType === 'multi'
-                                ? `${totalUnits} Kitnets / Unidades cadastradas`
-                                : `${details.areaEdificada || details.totalSqMeters || 'Área'} m² · ${details.bedrooms || '2'} quartos`}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
-                            <FileText className="w-3 h-3 text-emerald-600" />
-                            Centro de custos ativo
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            {/* Financial / Cost Center Preview Block */}
-            <div className="pt-4 mt-4 border-t border-border/60 space-y-3">
-                {property.incomeLoading && !realIncome ? (
-                <div className="p-3 bg-muted/40 dark:bg-muted/20 border border-border/80 rounded-xl grid grid-cols-2 gap-2 text-xs animate-pulse" aria-busy="true" aria-label="Carregando receitas">
-                    <div className="space-y-1.5">
-                        <div className="h-2.5 w-20 rounded bg-muted" />
-                        <div className="h-4 w-24 rounded bg-muted" />
-                        <div className="h-2 w-16 rounded bg-muted/70" />
-                    </div>
-                    <div className="space-y-1.5 flex flex-col items-end">
-                        <div className="h-2.5 w-24 rounded bg-muted" />
-                        <div className="h-4 w-20 rounded bg-muted" />
-                        <div className="h-2 w-14 rounded bg-muted/70" />
-                    </div>
-                </div>
-                ) : (
-                <div className="p-3 bg-muted/40 dark:bg-muted/20 border border-border/80 rounded-xl grid grid-cols-2 gap-2 text-xs">
-                    <div className="space-y-0.5">
-                        <span className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground flex items-center gap-1">
-                            <DollarSign className="w-3 h-3 text-emerald-500" />
-                            Receita Mensal
-                        </span>
-                        <span className="text-sm font-bold text-foreground block truncate">
-                            {formatCurrencyBRL(financials.monthlyRevenue)}
-                            <span className="text-[10px] font-normal text-muted-foreground">/mês</span>
-                        </span>
-                        {financials.realMonth ? (
-                            <span className="text-[9px] text-emerald-700 dark:text-emerald-400 font-medium">Real · {financials.realMonth}</span>
-                        ) : financials.isEstimate ? (
-                            <span className="text-[9px] text-muted-foreground italic">(Estimativa base)</span>
-                        ) : (
-                            <span className="text-[9px] text-muted-foreground italic">(Cadastro)</span>
-                        )}
-                    </div>
-
-                    <div className="text-right space-y-0.5">
-                        <span className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground flex items-center justify-end gap-1">
-                            <Percent className="w-3 h-3 text-blue-500" />
-                            Resultado Líquido (NOI)
-                        </span>
-                        <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 block truncate">
-                            {formatCurrencyBRL(financials.noi)}
-                            <span className="text-[10px] font-normal text-muted-foreground">/mês</span>
-                        </span>
-                        <span className="text-[10px] font-medium text-blue-600 dark:text-blue-400">
-                            Margem {financials.margin.toFixed(0)}%
-                        </span>
-                    </div>
-                </div>
+            <CoverCarousel
+                photos={photos}
+                alt={title}
+                state={carousel}
+                fallback={propertyType === 'multi' ? <Building2 className="w-10 h-10" /> : <Home className="w-10 h-10" />}
+            >
+                <span className="absolute top-2 left-2 inline-flex items-center gap-1 rounded-full bg-background/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    {propertyType === 'multi'
+                        ? <><Building2 className="w-3 h-3 text-violet-500" /> Multifamiliar · {totalUnits} {totalUnits === 1 ? 'unidade' : 'unidades'}</>
+                        : <><Home className="w-3 h-3 text-blue-500" /> Unifamiliar</>}
+                </span>
+                {details.solarEnergy && (
+                    <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-amber-400/95 px-2 py-0.5 text-[10px] font-semibold text-amber-950" title="Energia solar (geração distribuída)">
+                        <Sun className="w-3 h-3" /> Solar{details.solarKwp ? ` ${details.solarKwp} kWp` : ''}
+                    </span>
                 )}
-
-                {/* Investment: payback and yield from the engine (only when the ledger exists) */}
-                {investment && investment.invested > 0 && (
-                    <div className="px-3 py-2 rounded-xl border border-border/80 bg-muted/20 text-xs space-y-1.5">
-                        <div className="flex items-center justify-between gap-2">
-                            <span className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground flex items-center gap-1">
-                                <PiggyBank className="w-3 h-3 text-emerald-500" />
-                                Payback
-                            </span>
-                            <span className="font-bold text-foreground tabular-nums">
-                                {investment.paybackPct.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%
-                                <span className="text-[10px] font-normal text-muted-foreground">
-                                    {investment.paybackReachedOn
-                                        ? ` · desde ${formatMonthShort(investment.paybackReachedOn)}`
-                                        : investment.paybackForecastMonth ? ` · previsto ${formatMonthShort(investment.paybackForecastMonth)}` : ''}
-                                </span>
-                            </span>
-                        </div>
-                        <span className="block h-1.5 rounded-full bg-muted overflow-hidden">
-                            <span className={cn('block h-full', investment.paybackPct >= 100 ? 'bg-emerald-500' : 'bg-amber-500')} style={{ width: `${Math.min(100, Math.max(0, investment.paybackPct))}%` }} />
-                        </span>
-                        <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-                            <span>Investido {formatCurrencyBRL(investment.invested)}</span>
-                            <span>
-                                {investment.grossYieldOnPrice !== null && <>Yield {investment.grossYieldOnPrice.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%</>}
-                                {investment.netYieldOnCost !== null && <> · líq. {investment.netYieldOnCost.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%</>}
-                                {investment.appreciationPct !== null && <> · valor {investment.appreciationPct >= 0 ? '+' : ''}{investment.appreciationPct.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%</>}
-                            </span>
-                        </div>
-                    </div>
-                )}
-
-                {/* Bottom CTA Action Button */}
-                <Button
-                    className="w-full justify-between bg-amber-600 hover:bg-amber-700 text-white font-medium rounded-xl shadow-xs transition-all group-hover:shadow-md"
+                <button
+                    type="button"
+                    onClick={e => { e.stopPropagation(); onDelete(e); }}
+                    disabled={isDeleting}
+                    title="Excluir imóvel"
+                    aria-label={`Excluir ${title}`}
+                    className="absolute top-2 right-2 p-1.5 rounded-lg bg-background/90 text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-rose-600 transition-opacity disabled:opacity-50"
                 >
-                    <span>Gerenciar Imóvel & Métricas</span>
-                    <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
-                </Button>
+                    <Trash2 className="w-3.5 h-3.5" />
+                </button>
+            </CoverCarousel>
+
+            <div className="flex flex-col gap-3 p-4 flex-1">
+                <div className="space-y-0.5">
+                    <h3 className="font-semibold text-foreground leading-tight line-clamp-1" title={title}>{title}</h3>
+                    <p className="text-xs text-muted-foreground line-clamp-1" title={fullAddress}>{fullAddress}</p>
+                </div>
+
+                {payback !== null && investment ? (
+                    <div className="space-y-1.5">
+                        <div className="flex items-baseline justify-between gap-2 text-xs">
+                            <span className="font-semibold tabular-nums text-foreground inline-flex items-center gap-1"><PiggyBank className="w-3 h-3 text-emerald-500" /> Payback {payback.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%</span>
+                            <span className="text-muted-foreground tabular-nums">investido {formatCurrencyBRL(investment.invested)}</span>
+                        </div>
+                        <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                            <div className={cn('h-full rounded-full transition-all', payback >= 100 ? 'bg-emerald-500' : 'bg-emerald-500/80')} style={{ width: `${payback}%` }} />
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                            <span>
+                                {investment.paybackReachedOn
+                                    ? `recuperado desde ${formatMonthShort(investment.paybackReachedOn)}`
+                                    : investment.paybackForecastMonth ? `previsto para ${formatMonthShort(investment.paybackForecastMonth)}` : 'renda líquida ÷ investido'}
+                            </span>
+                            {investment.appreciationPct !== null && (
+                                <span className={investment.appreciationPct >= 0 ? 'text-emerald-600 font-medium' : 'text-rose-600 font-medium'}>
+                                    valor {investment.appreciationPct >= 0 ? '+' : ''}{investment.appreciationPct.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                ) : (
+                    <p className="text-[11px] text-muted-foreground">Sem registro de investimento — o payback aparece aqui quando a compra for lançada na análise do imóvel.</p>
+                )}
+
+                <dl className="grid grid-cols-2 gap-2 text-[11px] mt-auto">
+                    <div className={cn('rounded-lg bg-muted/40 px-2 py-1.5', loadingIncome && 'animate-pulse')} aria-busy={loadingIncome}>
+                        <dt className="text-muted-foreground">Receita mensal</dt>
+                        <dd className="font-semibold text-foreground tabular-nums">{loadingIncome ? '…' : formatCurrencyBRL(financials.monthlyRevenue)}</dd>
+                        <dd className={cn('line-clamp-1', financials.realMonth ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground')}>
+                            {loadingIncome ? 'carregando' : financials.realMonth ? `real · ${financials.realMonth}` : financials.isEstimate ? 'estimativa base' : 'do cadastro'}
+                        </dd>
+                    </div>
+                    <div className={cn('rounded-lg bg-muted/40 px-2 py-1.5', loadingIncome && 'animate-pulse')}>
+                        <dt className="text-muted-foreground">Resultado líquido (NOI)</dt>
+                        <dd className="font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">{loadingIncome ? '…' : formatCurrencyBRL(financials.noi)}</dd>
+                        <dd className="text-muted-foreground tabular-nums">{loadingIncome ? '' : `margem ${financials.margin.toFixed(0)}%`}</dd>
+                    </div>
+                </dl>
+
+                <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground border-t border-border/60 pt-2">
+                    <span className="inline-flex items-center gap-1.5 min-w-0">
+                        <span className="truncate">
+                            {propertyType === 'multi'
+                                ? `${totalUnits} ${totalUnits === 1 ? 'unidade' : 'unidades'}`
+                                : `${details.areaEdificada || details.totalSqMeters || '—'} m² · ${details.bedrooms || '2'} quartos`}
+                        </span>
+                        {details.mainMeters?.energy && <Zap className="w-3 h-3 text-amber-500 shrink-0" aria-label="Medidor de energia" />}
+                        {details.mainMeters?.water && <Droplets className="w-3 h-3 text-blue-500 shrink-0" aria-label="Medidor de água" />}
+                        {details.mainMeters?.gas && <Flame className="w-3 h-3 text-orange-500 shrink-0" aria-label="Medidor de gás" />}
+                    </span>
+                    {yieldPct !== null && (
+                        <span className="inline-flex items-center gap-1 text-emerald-600 font-medium shrink-0" title={investment?.netYieldOnCost !== null ? 'Yield líquido sobre o custo' : 'Yield bruto sobre o preço'}>
+                            <TrendingUp className="w-3 h-3" /> {yieldPct.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% a.a.
+                        </span>
+                    )}
+                </div>
             </div>
         </div>
     );
