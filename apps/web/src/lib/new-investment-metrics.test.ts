@@ -220,6 +220,30 @@ describe("projection from the last payment", () => {
     });
 });
 
+describe("who paid what", () => {
+    it("splits the paid total between the pockets and keeps unassigned rows apart", () => {
+        const rows = [
+            payment({ id: "a", amount: 1000, correction_amount: 0, payer: "PF" }),
+            payment({ id: "b", amount: 1000, correction_amount: 43.07, payer: "SPLIT", pj_amount: 600 }),
+            payment({ id: "c", amount: 2000, correction_amount: 0 }), // payer never recorded
+        ];
+        const m = computeInvestmentMetrics(investment(), [], rows, asOf);
+        // the split row: 1.043,07 paid, 600 of it PJ, the rest PF
+        expect(m.paidByPayer).toEqual({ pf: 1443.07, pj: 600, unassigned: 2000 });
+        // the three parts add back up to the total (a tolerance: this sum is the test's, not the code's, and it is not rounded)
+        expect(m.paidByPayer.pf + m.paidByPayer.pj + m.paidByPayer.unassigned).toBeCloseTo(m.paidToDate, 2);
+    });
+
+    it("books a PJ row whole to the company and ignores planned rows", () => {
+        const rows = [
+            payment({ id: "a", amount: 5995.45, correction_amount: 134.22, payer: "PJ" }),
+            payment({ id: "p", status: "PLANNED", paid_on: null, amount: 1000, payer: "PF" }),
+        ];
+        const m = computeInvestmentMetrics(investment(), [], rows, asOf);
+        expect(m.paidByPayer).toEqual({ pf: 0, pj: 6129.67, unassigned: 0 });
+    });
+});
+
 describe("rentStartMonth", () => {
     it("defaults to the month after the keys", () => {
         expect(rentStartMonth(investment())).toBe("2029-10");
