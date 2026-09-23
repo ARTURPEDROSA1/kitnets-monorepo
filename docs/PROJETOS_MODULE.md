@@ -161,6 +161,14 @@ The second block of the pencil dialog is what the contract never says:
 CDI accumulated 12 m (`lib/indexes.ts`) and FipeZap venda var_12m (`fipezap_series`), both null when
 missing — never an error on the dashboard.
 
+### The hub's views
+
+The list shows one slice of the pipeline at a time — **Em andamento** (ACTIVE, the default) ·
+**Vendidos** (SOLD) · **Em Imóveis** (COMPLETED) · **Todos** — as chips above the totals, kept in
+the URL (`?view=vendidos`) so the choice survives opening a project and coming back and renders
+the same on the server. The totals follow the slice; the sold slice swaps them for "pago até a
+venda · vendas líquidas · ganho realizado" (`saleNet` / `realizedGain` ride on the card summary).
+
 ### Loading: the page preloads its own data
 
 `page.tsx` is a server component that builds the same views the API serves

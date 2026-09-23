@@ -15,8 +15,31 @@ import { Button } from "@kitnets/ui";
 import InvestmentSquareCard from "@/components/investments/InvestmentSquareCard";
 import InvestmentDashboard from "@/components/investments/InvestmentDashboard";
 import InvestmentFormModal, { type InvestmentFormValues } from "@/components/investments/InvestmentFormModal";
-import { formatBRL, type NewInvestment } from "@/lib/new-investments";
+import { cn } from "@/lib/utils";
+import { formatBRL, type InvestmentStatus, type NewInvestment } from "@/lib/new-investments";
 import type { InvestmentCardSummary } from "@/lib/new-investment-metrics";
+
+/** The hub shows one slice of the pipeline at a time: what is still running, what was sold, what became a property. */
+type ProjectView = "andamento" | "vendidos" | "imoveis" | "todos";
+const DEFAULT_VIEW: ProjectView = "andamento";
+const VIEWS: Array<{ key: ProjectView; label: string }> = [
+    { key: "andamento", label: "Em andamento" },
+    { key: "vendidos", label: "Vendidos" },
+    { key: "imoveis", label: "Em Imóveis" },
+    { key: "todos", label: "Todos" },
+];
+const VIEW_STATUSES: Record<Exclude<ProjectView, "todos">, InvestmentStatus[]> = {
+    andamento: ["ACTIVE", "ARCHIVED"],
+    vendidos: ["SOLD"],
+    imoveis: ["COMPLETED"],
+};
+const EMPTY_VIEW: Record<ProjectView, string> = {
+    andamento: "Nenhum projeto em andamento.",
+    vendidos: "Nenhum projeto vendido ainda.",
+    imoveis: "Nenhum projeto virou imóvel da carteira ainda.",
+    todos: "Nenhum projeto.",
+};
+const viewFromParam = (v: string | null): ProjectView => (VIEWS.some(x => x.key === v) ? (v as ProjectView) : DEFAULT_VIEW);
 import type { ProjectDashboardView, ProjectListView } from "@/lib/new-investment-views";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -99,17 +122,42 @@ export default function ProjetosContent({ lang, initial = null, initialDashboard
     }, [load, seeded]);
 
     const base = lang === "pt" ? "/projetos" : `/${lang}/projetos`;
-    const select = (id: string | null) => router.push(id ? `${base}?id=${id}` : base, { scroll: true });
+    // The view lives in the URL (`?view=vendidos`): it survives opening a project and coming back,
+    // and the server renders the same thing the client does — no flash from a stored preference.
+    const view = viewFromParam(searchParams.get("view"));
+    const viewQuery = view === DEFAULT_VIEW ? "" : `view=${view}`;
+    const select = (id: string | null) => {
+        const query = [id ? `id=${id}` : "", viewQuery].filter(Boolean).join("&");
+        router.push(query ? `${base}?${query}` : base, { scroll: true });
+    };
+    const setView = (next: ProjectView) => router.replace(next === DEFAULT_VIEW ? base : `${base}?view=${next}`, { scroll: false });
+
+    const counts = useMemo(() => {
+        const all = investments ?? [];
+        return {
+            andamento: all.filter(i => VIEW_STATUSES.andamento.includes(i.status)).length,
+            vendidos: all.filter(i => VIEW_STATUSES.vendidos.includes(i.status)).length,
+            imoveis: all.filter(i => VIEW_STATUSES.imoveis.includes(i.status)).length,
+            todos: all.length,
+        };
+    }, [investments]);
+    const visible = useMemo(
+        () => (investments ?? []).filter(i => view === "todos" || VIEW_STATUSES[view].includes(i.status)),
+        [investments, view]
+    );
 
     const totals = useMemo(() => {
-        const list = Object.values(summaries);
+        const list = visible.map(i => summaries[i.id]).filter((s): s is InvestmentCardSummary => Boolean(s));
         return {
+            count: visible.length,
             paid: list.reduce((s, x) => s + x.paidToDate, 0),
             committed: list.reduce((s, x) => s + x.committed, 0),
             remaining: list.reduce((s, x) => s + x.remaining, 0),
             overdue: list.reduce((s, x) => s + x.overdueCount, 0),
+            saleNet: list.reduce((s, x) => s + (x.saleNet ?? 0), 0),
+            realizedGain: list.reduce((s, x) => s + (x.realizedGain ?? 0), 0),
         };
-    }, [summaries]);
+    }, [visible, summaries]);
 
     const create = async (values: InvestmentFormValues, contractPath: string | null, contractName: string | null): Promise<string | null> => {
         const res = await fetch("/api/investments", {
@@ -180,11 +228,60 @@ export default function ProjetosContent({ lang, initial = null, initialDashboard
             </div>
 
             {investments && investments.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Quais projetos mostrar">
+                    {VIEWS.map(v => (
+                        <button
+                            key={v.key}
+                            type="button"
+                            role="tab"
+                            aria-selected={view === v.key}
+                            onClick={() => setView(v.key)}
+                            className={cn(
+                                "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                                view === v.key
+                                    ? "border-emerald-500 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                    : "border-border bg-background text-muted-foreground hover:text-foreground hover:border-emerald-300"
+                            )}
+                        >
+                            {v.label} ({counts[v.key]})
+                        </button>
+                    ))}
+                </div>
+            )}
+
+            {investments && visible.length > 0 && view === "vendidos" ? (
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div className="rounded-xl border border-border/80 bg-card px-4 py-3">
+                        <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Pago até a venda</span>
+                        <span className="block text-xl font-bold tabular-nums text-foreground">{formatBRL(totals.paid, 0)}</span>
+                        <span className="text-xs text-muted-foreground">em {totals.count} projeto{totals.count === 1 ? "" : "s"} vendido{totals.count === 1 ? "" : "s"}</span>
+                    </div>
+                    <div className="rounded-xl border border-border/80 bg-card px-4 py-3">
+                        <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Vendas líquidas</span>
+                        <span className="block text-xl font-bold tabular-nums text-emerald-600">{formatBRL(totals.saleNet, 0)}</span>
+                        <span className="text-xs text-muted-foreground">após os custos de venda</span>
+                    </div>
+                    <div className="rounded-xl border border-border/80 bg-card px-4 py-3">
+                        <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Ganho realizado</span>
+                        <span className={`block text-xl font-bold tabular-nums ${totals.realizedGain >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                            {totals.realizedGain > 0 ? "+" : ""}{formatBRL(totals.realizedGain, 0)}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                            {totals.paid > 0 ? `${((totals.realizedGain / totals.paid) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% sobre o pago` : "—"}
+                        </span>
+                    </div>
+                    <div className="rounded-xl border border-border/80 bg-card px-4 py-3">
+                        <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Custo total</span>
+                        <span className="block text-xl font-bold tabular-nums text-foreground">{formatBRL(totals.committed, 0)}</span>
+                        <span className="text-xs text-muted-foreground">o que foi pago; o resto passou ao comprador</span>
+                    </div>
+                </div>
+            ) : investments && visible.length > 0 && (
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                     <div className="rounded-xl border border-border/80 bg-card px-4 py-3">
                         <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Investido até agora</span>
                         <span className="block text-xl font-bold tabular-nums text-foreground">{formatBRL(totals.paid, 0)}</span>
-                        <span className="text-xs text-muted-foreground">em {investments.length} unidade{investments.length === 1 ? "" : "s"}</span>
+                        <span className="text-xs text-muted-foreground">em {totals.count} unidade{totals.count === 1 ? "" : "s"}</span>
                     </div>
                     <div className="rounded-xl border border-border/80 bg-card px-4 py-3">
                         <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Falta pagar</span>
@@ -228,9 +325,16 @@ export default function ProjetosContent({ lang, initial = null, initialDashboard
                         <Plus className="w-4 h-4 mr-1" /> Cadastrar o primeiro
                     </Button>
                 </div>
+            ) : visible.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-border px-6 py-10 text-center space-y-2">
+                    <p className="text-sm text-muted-foreground">{EMPTY_VIEW[view]}</p>
+                    <button type="button" onClick={() => setView("todos")} className="text-sm text-emerald-700 dark:text-emerald-400 underline underline-offset-2">
+                        Ver todos os {counts.todos} projetos
+                    </button>
+                </div>
             ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {investments.map(investment => (
+                    {visible.map(investment => (
                         <InvestmentSquareCard
                             key={investment.id}
                             investment={investment}
