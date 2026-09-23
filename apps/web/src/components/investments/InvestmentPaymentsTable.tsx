@@ -33,6 +33,7 @@ import {
     PAYMENT_KINDS,
     formatBRL,
     paymentTotal,
+    pendingByKind,
     pendingInstalments,
     type InvestmentPayment,
     type InvestmentSchedule,
@@ -98,6 +99,8 @@ export default function InvestmentPaymentsTable({
     const [uploading, setUploading] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [showUpcoming, setShowUpcoming] = useState(true);
+    /** Which kind the forecast strip is showing; "ALL" is every kind at once. */
+    const [upcomingKind, setUpcomingKind] = useState<PaymentKind | "ALL">("ALL");
     const newFileRef = useRef<HTMLInputElement>(null);
 
     const sel = useCellSum({ formatByCol: SUM_FORMATS });
@@ -106,7 +109,19 @@ export default function InvestmentPaymentsTable({
         defaultHidden: ["installment_number"],
     });
 
-    const upcoming = useMemo(() => pendingInstalments(schedules, payments).slice(0, 6), [schedules, payments]);
+    const pending = useMemo(() => pendingInstalments(schedules, payments), [schedules, payments]);
+    const pendingKinds = useMemo(() => pendingByKind(pending), [pending]);
+    const selectedKind = upcomingKind !== "ALL" && pendingKinds.some(k => k.kind === upcomingKind) ? upcomingKind : "ALL";
+    const filteredPending = useMemo(
+        () => (selectedKind === "ALL" ? pending : pending.filter(i => i.kind === selectedKind)),
+        [pending, selectedKind]
+    );
+    // One kind chosen means the owner is lining payments up to anticipate: show more of them.
+    const upcoming = useMemo(
+        () => filteredPending.slice(0, selectedKind === "ALL" ? 6 : 12),
+        [filteredPending, selectedKind]
+    );
+    const selectedSummary = pendingKinds.find(k => k.kind === selectedKind) ?? null;
 
     const columns = useMemo<ColumnDef<InvestmentPayment>[]>(() => [
         { key: "due_on", label: "Vencimento", kind: "date", get: r => r.due_on },
@@ -246,7 +261,7 @@ export default function InvestmentPaymentsTable({
                             onClick={() => setShowUpcoming(v => !v)}
                             className="text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground"
                         >
-                            Próximas parcelas do contrato ({upcoming.length})
+                            Próximas parcelas do contrato ({filteredPending.length})
                         </button>
                         {onEditPlan && (
                             <button
@@ -259,6 +274,41 @@ export default function InvestmentPaymentsTable({
                             </button>
                         )}
                     </div>
+                    {showUpcoming && pendingKinds.length > 1 && (
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                            <button
+                                type="button"
+                                onClick={() => setUpcomingKind("ALL")}
+                                className={cn(
+                                    "rounded-full border px-2.5 py-0.5 text-[11px] transition-colors",
+                                    selectedKind === "ALL" ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-semibold" : "border-border text-muted-foreground hover:border-emerald-400"
+                                )}
+                            >
+                                Todas ({pending.length})
+                            </button>
+                            {pendingKinds.map(k => (
+                                <button
+                                    key={k.kind}
+                                    type="button"
+                                    onClick={() => setUpcomingKind(k.kind)}
+                                    title={`${k.count} em aberto · ${formatBRL(k.total)} · próxima em ${formatDateBR(k.nextDueOn)}`}
+                                    className={cn(
+                                        "rounded-full border px-2.5 py-0.5 text-[11px] transition-colors",
+                                        selectedKind === k.kind ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-semibold" : "border-border text-muted-foreground hover:border-emerald-400"
+                                    )}
+                                >
+                                    {k.short} ({k.count})
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                    {showUpcoming && selectedSummary && (
+                        <p className="mt-2 text-[11px] text-muted-foreground">
+                            {selectedSummary.count} em aberto, somando{" "}
+                            <strong className="text-foreground tabular-nums">{formatBRL(selectedSummary.total)}</strong>.
+                            Antecipar uma parcela a lança pelo valor de hoje, sem a correção que ela acumularia até o vencimento.
+                        </p>
+                    )}
                     {showUpcoming && (
                         <ul className="mt-2 flex flex-wrap gap-2">
                             {upcoming.map(inst => (
@@ -276,6 +326,11 @@ export default function InvestmentPaymentsTable({
                                     </button>
                                 </li>
                             ))}
+                            {filteredPending.length > upcoming.length && (
+                                <li className="self-center text-[11px] text-muted-foreground">
+                                    + {filteredPending.length - upcoming.length} depois
+                                </li>
+                            )}
                         </ul>
                     )}
                 </div>

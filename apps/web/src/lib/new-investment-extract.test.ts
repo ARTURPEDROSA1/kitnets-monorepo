@@ -97,6 +97,30 @@ describe("normalizeInvestmentExtraction", () => {
     });
 });
 
+describe("payment kinds", () => {
+    it("reads the start of the works as its own kind, not as the keys", () => {
+        // clause (e): "R$ 19.000,00 … no início de obras"
+        const data = normalizeInvestmentExtraction({
+            schedules: [{ label: "Pagamento no início de obras", installments: 1, amount: 19000, first_due_on: "17/03/2026", periodicity: "SINGLE" }],
+        });
+        expect(data.schedules[0].kind).toBe("INICIO_OBRAS");
+    });
+
+    it("still reads the handover instalment as CHAVES", () => {
+        const data = normalizeInvestmentExtraction({
+            schedules: [{ label: "Parcela na entrega das chaves", installments: 1, amount: 50000, first_due_on: "20/09/2029", periodicity: "SINGLE" }],
+        });
+        expect(data.schedules[0].kind).toBe("CHAVES");
+    });
+
+    it("accepts the kind when the model names it outright", () => {
+        const data = normalizeInvestmentExtraction({
+            schedules: [{ label: "Bloco E", kind: "INICIO_OBRAS", installments: 1, amount: 19000, first_due_on: "17/03/2026" }],
+        });
+        expect(data.schedules[0].kind).toBe("INICIO_OBRAS");
+    });
+});
+
 describe("periodicityFromSpan", () => {
     it("reads the step between the first and the last due date", () => {
         expect(periodicityFromSpan(36, "2026-10-20", "2029-09-20")).toBe("MONTHLY");

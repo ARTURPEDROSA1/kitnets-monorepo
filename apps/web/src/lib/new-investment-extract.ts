@@ -49,7 +49,7 @@ Retorne SOMENTE um JSON válido (sem markdown, sem explicações) com esta estru
     "schedules": [
         {
             "label": "descrição curta do bloco (ex: Entrada, Parcelas mensais, Parcelas anuais, Sinal, Início de obras)",
-            "kind": "SINAL | ENTRADA | PARCELA | PARCELA_ANUAL | INTERCALADA | CHAVES | TAXAS | OUTROS",
+            "kind": "SINAL | ENTRADA | PARCELA | PARCELA_ANUAL | INTERCALADA | INICIO_OBRAS (pago no início das obras) | CHAVES (pago na entrega das chaves) | TAXAS | OUTROS",
             "installments": "quantidade de parcelas (número inteiro, use 1 quando for pagamento único)",
             "amount": "valor de CADA parcela, ex: 3547.50, ou null",
             "first_due_on": "primeiro vencimento (YYYY-MM-DD)",
@@ -163,7 +163,8 @@ export function investmentKind(v: unknown): InvestmentKind {
 }
 
 const PAYMENT_KIND_VALUES: PaymentKind[] = [
-    "SINAL", "ENTRADA", "PARCELA", "PARCELA_ANUAL", "INTERCALADA", "CHAVES", "AMORTIZACAO", "CORRECAO", "TAXAS", "OUTROS",
+    "SINAL", "ENTRADA", "PARCELA", "PARCELA_ANUAL", "INTERCALADA", "INICIO_OBRAS",
+    "CHAVES", "AMORTIZACAO", "CORRECAO", "TAXAS", "OUTROS",
 ];
 
 function paymentKind(v: unknown, periodicity: Periodicity): PaymentKind {
@@ -172,7 +173,9 @@ function paymentKind(v: unknown, periodicity: Periodicity): PaymentKind {
     const raw = text(v, 60)?.toLowerCase() ?? "";
     if (/sinal|reserva/.test(raw)) return "SINAL";
     if (/entrada/.test(raw)) return "ENTRADA";
-    if (/chave|obras|habite/.test(raw)) return "CHAVES";
+    // before "chave": a contract can carry both, and only this one says "obra"
+    if (/obra/.test(raw)) return "INICIO_OBRAS";
+    if (/chave|habite/.test(raw)) return "CHAVES";
     if (/itbi|registro|escritura|taxa/.test(raw)) return "TAXAS";
     if (/intercalad|refor[çc]o|bal[ãa]o/.test(raw)) return "INTERCALADA";
     return periodicity === "ANNUAL" ? "PARCELA_ANUAL" : "PARCELA";

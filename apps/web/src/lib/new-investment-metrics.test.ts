@@ -137,6 +137,61 @@ describe("computeInvestmentMetrics", () => {
     });
 });
 
+describe("what is still owed, per kind", () => {
+    // the real plan: 140 monthly + 11 annual + one at the start of the works
+    const plan: InvestmentSchedule[] = [
+        { id: "m", investment_id: "i1", label: "Parcelas mensais", kind: "PARCELA", installments: 140, amount: 1000, first_due_on: "2026-04-15", periodicity: "MONTHLY", index_code: "CUB", position: 0 },
+        { id: "a", investment_id: "i1", label: "Parcelas anuais", kind: "PARCELA_ANUAL", installments: 11, amount: 5995.45, first_due_on: "2027-03-15", periodicity: "ANNUAL", index_code: "CUB", position: 1 },
+        { id: "o", investment_id: "i1", label: "Início de obras", kind: "INICIO_OBRAS", installments: 1, amount: 19000, first_due_on: "2026-03-17", periodicity: "SINGLE", index_code: "CUB", position: 2 },
+    ];
+
+    it("breaks the remaining total into one line per kind", () => {
+        const m = computeInvestmentMetrics(investment(), plan, [], asOf);
+        expect(m.remainingByKind.map(k => [k.short, k.count, k.total])).toEqual([
+            ["Mensais", 140, 140000],
+            ["Anuais", 11, 65949.95],
+            ["Início de obras", 1, 19000],
+        ]);
+    });
+
+    it("keeps the lines adding up to the remaining total", () => {
+        const m = computeInvestmentMetrics(investment(), plan, [], asOf);
+        const sum = m.remainingByKind.reduce((s, k) => s + k.total, 0);
+        expect(Math.round(sum * 100) / 100).toBe(m.remaining);
+    });
+
+    it("counts a payment typed as planned in its own kind", () => {
+        const planned = payment({ status: "PLANNED", paid_on: null, kind: "TAXAS", amount: 2000, due_on: "2033-10-01" });
+        const m = computeInvestmentMetrics(investment(), plan, [planned], asOf);
+        expect(m.remainingByKind.find(k => k.kind === "TAXAS")).toMatchObject({ count: 1, total: 2000 });
+    });
+
+    it("has nothing to break down once the plan is settled", () => {
+        const m = computeInvestmentMetrics(investment(), [], [], asOf);
+        expect(m.remainingByKind).toEqual([]);
+    });
+});
+
+describe("the last instalment of the plan", () => {
+    const plan: InvestmentSchedule[] = [
+        { id: "m", investment_id: "i1", label: "Parcelas mensais", kind: "PARCELA", installments: 140, amount: 1000, first_due_on: "2026-04-15", periodicity: "MONTHLY", index_code: "CUB", position: 0 },
+        { id: "a", investment_id: "i1", label: "Parcelas anuais", kind: "PARCELA_ANUAL", installments: 11, amount: 5995.45, first_due_on: "2027-03-15", periodicity: "ANNUAL", index_code: "CUB", position: 1 },
+    ];
+
+    it("is the furthest one still owed, whatever kind it is", () => {
+        const m = computeInvestmentMetrics(investment(), plan, [], asOf);
+        // monthly runs to 2037-11, annual to 2037-03: the monthly one is last
+        expect(m.lastDueOn).toBe("2037-11-15");
+        expect(m.lastDueAmount).toBe(1000);
+    });
+
+    it("is null when nothing is owed", () => {
+        const m = computeInvestmentMetrics(investment(), [], [], asOf);
+        expect(m.lastDueOn).toBeNull();
+        expect(m.lastDueAmount).toBe(0);
+    });
+});
+
 describe("rentStartMonth", () => {
     it("defaults to the month after the keys", () => {
         expect(rentStartMonth(investment())).toBe("2029-10");

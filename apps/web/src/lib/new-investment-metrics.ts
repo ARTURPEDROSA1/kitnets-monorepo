@@ -11,10 +11,13 @@ import {
     monthsBetween,
     paymentMonth,
     paymentTotal,
+    pendingByKind,
     pendingInstalments,
     type InvestmentPayment,
     type InvestmentSchedule,
     type NewInvestment,
+    type OpenInstalment,
+    type PendingKindSummary,
     type ScheduledInstalment,
 } from "./new-investments";
 import { round2 } from "./property-income";
@@ -36,6 +39,8 @@ export interface InvestmentMetrics {
     paidCount: number;
     /** Forecast instalments still open. */
     remainingCount: number;
+    /** What is still owed, one line per kind, in the order the kinds are listed. */
+    remainingByKind: PendingKindSummary[];
 
     /** Due date and amount of the next thing to pay, from `asOf`. */
     nextDueOn: string | null;
@@ -43,6 +48,10 @@ export interface InvestmentMetrics {
     /** Open instalments whose due date has already passed. */
     overdueAmount: number;
     overdueCount: number;
+
+    /** The last instalment the plan still owes: when the paying ends, and with how much. */
+    lastDueOn: string | null;
+    lastDueAmount: number;
 
     /** First and last cash movement known (paid or forecast), `YYYY-MM`. */
     firstMonth: string | null;
@@ -104,12 +113,13 @@ export function computeInvestmentMetrics(
     );
 
     const committed = round2(paid + remaining);
-    const openItems: { dueOn: string; amount: number }[] = [
-        ...pending.map(i => ({ dueOn: i.dueOn, amount: i.amount })),
-        ...plannedPayments.map(p => ({ dueOn: p.due_on, amount: paymentTotal(p) })),
+    const openItems: OpenInstalment[] = [
+        ...pending.map(i => ({ kind: i.kind, dueOn: i.dueOn, amount: i.amount })),
+        ...plannedPayments.map(p => ({ kind: p.kind, dueOn: p.due_on, amount: paymentTotal(p) })),
     ].sort((a, b) => (a.dueOn < b.dueOn ? -1 : 1));
 
     const next = openItems.find(i => i.dueOn >= today) ?? null;
+    const last = openItems.length > 0 ? openItems[openItems.length - 1] : null;
     const overdue = openItems.filter(i => i.dueOn < today);
 
     // Month range over everything known, realised and forecast
@@ -142,11 +152,15 @@ export function computeInvestmentMetrics(
         paidPct: committed > 0 ? round2((paid / committed) * 100) : 0,
         paidCount: count,
         remainingCount: openItems.length,
+        remainingByKind: pendingByKind(openItems),
 
         nextDueOn: next?.dueOn ?? null,
         nextDueAmount: round2(next?.amount ?? 0),
         overdueAmount: round2(overdue.reduce((s, i) => s + i.amount, 0)),
         overdueCount: overdue.length,
+
+        lastDueOn: last?.dueOn ?? null,
+        lastDueAmount: round2(last?.amount ?? 0),
 
         firstMonth,
         lastMonth,
