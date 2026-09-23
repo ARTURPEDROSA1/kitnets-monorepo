@@ -187,6 +187,12 @@ export default function InvestmentPaymentsTable({
     const [showUpcoming, setShowUpcoming] = useState(true);
     /** Which kind the forecast strip is showing; "ALL" is every kind at once. */
     const [upcomingKind, setUpcomingKind] = useState<PaymentKind | "ALL">("ALL");
+    /**
+     * Which end of the plan the strip shows. "first" is what is due next; "last" is what an owner
+     * paying ahead reaches for — settling the final instalments is how a plan gets shorter.
+     */
+    const [upcomingOrder, setUpcomingOrder] = useState<"first" | "last">("first");
+    const [showAllUpcoming, setShowAllUpcoming] = useState(false);
     const newFileRef = useRef<HTMLInputElement>(null);
 
     // The read-out is a toast, not a fixture: it leaves on its own, or on its X.
@@ -209,11 +215,12 @@ export default function InvestmentPaymentsTable({
         () => (selectedKind === "ALL" ? pending : pending.filter(i => i.kind === selectedKind)),
         [pending, selectedKind]
     );
-    // One kind chosen means the owner is lining payments up to anticipate: show more of them.
-    const upcoming = useMemo(
-        () => filteredPending.slice(0, selectedKind === "ALL" ? 6 : 12),
-        [filteredPending, selectedKind]
-    );
+    // From the chosen end of the plan; one kind chosen means the owner is lining payments up to
+    // anticipate, so more of them show, and "ver todas" shows every one.
+    const upcoming = useMemo(() => {
+        const ordered = upcomingOrder === "last" ? [...filteredPending].reverse() : filteredPending;
+        return showAllUpcoming ? ordered : ordered.slice(0, selectedKind === "ALL" ? 6 : 12);
+    }, [filteredPending, selectedKind, upcomingOrder, showAllUpcoming]);
     const selectedSummary = pendingKinds.find(k => k.kind === selectedKind) ?? null;
 
     /** The index each bill carries over the previous one of its kind — computed on all payments, not the filtered view. */
@@ -558,6 +565,23 @@ export default function InvestmentPaymentsTable({
                         >
                             Próximas parcelas do contrato ({filteredPending.length})
                         </button>
+                        <span className="ml-auto inline-flex rounded-full border border-border p-0.5 text-[11px]" role="group" aria-label="Qual ponta do plano mostrar">
+                            {(["first", "last"] as const).map(order => (
+                                <button
+                                    key={order}
+                                    type="button"
+                                    onClick={() => setUpcomingOrder(order)}
+                                    aria-pressed={upcomingOrder === order}
+                                    title={order === "first" ? "As próximas a vencer" : "As últimas do plano — para antecipar do fim"}
+                                    className={cn(
+                                        "rounded-full px-2.5 py-0.5 transition-colors",
+                                        upcomingOrder === order ? "bg-emerald-600 text-white" : "text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    {order === "first" ? "Próximas" : "Últimas"}
+                                </button>
+                            ))}
+                        </span>
                         {onEditPlan && (
                             <button
                                 type="button"
@@ -606,7 +630,7 @@ export default function InvestmentPaymentsTable({
                         </p>
                     )}
                     {showUpcoming && (
-                        <ul className="mt-2 flex flex-wrap gap-2">
+                        <ul className={cn("mt-2 flex flex-wrap gap-2", showAllUpcoming && "max-h-56 overflow-y-auto pr-1")}>
                             {upcoming.map(inst => (
                                 <li key={`${inst.scheduleId}-${inst.number}`}>
                                     <button
@@ -622,9 +646,17 @@ export default function InvestmentPaymentsTable({
                                     </button>
                                 </li>
                             ))}
-                            {filteredPending.length > upcoming.length && (
-                                <li className="self-center text-[11px] text-muted-foreground">
-                                    + {filteredPending.length - upcoming.length} depois
+                            {(filteredPending.length > upcoming.length || showAllUpcoming) && (
+                                <li className="self-center">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAllUpcoming(v => !v)}
+                                        className="text-[11px] text-emerald-700 dark:text-emerald-400 hover:underline"
+                                    >
+                                        {showAllUpcoming
+                                            ? "mostrar menos"
+                                            : `ver todas as ${filteredPending.length} (+${filteredPending.length - upcoming.length} ${upcomingOrder === "last" ? "antes" : "depois"})`}
+                                    </button>
                                 </li>
                             )}
                         </ul>
