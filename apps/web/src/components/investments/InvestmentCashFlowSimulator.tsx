@@ -381,7 +381,8 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
                                         x={formatMonthLabel(result.breakEvenMonth)}
                                         stroke="#10b981"
                                         strokeDasharray="4 3"
-                                        label={{ value: "Payback", position: "insideTopLeft", fontSize: 11, fill: "#10b981" }}
+                                        // to the right of its line, unless the line is the chart's last month (a sale) and the text would be clipped
+                                        label={{ value: "Payback", position: result.breakEvenMonth === result.points[result.points.length - 1]?.month ? "insideTopRight" : "insideTopLeft", fontSize: 11, fill: "#10b981" }}
                                     />
                                 )}
                             </ComposedChart>

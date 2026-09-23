@@ -225,7 +225,8 @@ export function computeInvestmentMetrics(
     const keysOn = investment.keys_delivered_on ?? investment.keys_expected_on;
     const monthsToKeys = keysOn ? monthsBetween(today.slice(0, 7), keysOn.slice(0, 7)) : null;
 
-    const rent = investment.estimated_rent && investment.estimated_rent > 0 ? investment.estimated_rent : null;
+    // A sold unit never produces rent: no yield, no rent payback.
+    const rent = !soldOut && investment.estimated_rent && investment.estimated_rent > 0 ? investment.estimated_rent : null;
     const netMonthlyRent =
         rent === null
             ? null

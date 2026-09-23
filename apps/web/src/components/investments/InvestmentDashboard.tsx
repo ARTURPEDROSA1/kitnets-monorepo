@@ -387,21 +387,23 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                     hint={
                         <span className="block space-y-0.5 pt-0.5">
                             <span className="block">
-                                {metrics.keysDelivered
+                                {metrics.sold
+                                    ? `Vendido em ${formatDateBR(investment.sold_on)}${metrics.keysDelivered ? "" : ", antes da entrega"}`
+                                    : metrics.keysDelivered
                                     ? "Chaves entregues"
                                     : metrics.monthsToKeys === null
                                       ? "Informe a previsão de entrega"
                                       : metrics.monthsToKeys >= 0
                                         ? `Faltam ${metrics.monthsToKeys} ${metrics.monthsToKeys === 1 ? "mês" : "meses"}`
                                         : `Atrasada em ${-metrics.monthsToKeys} meses`}
-                                {!metrics.keysDelivered && metrics.constructionPct !== null && ` · obra ${pct1(metrics.constructionPct)}%`}
+                                {!metrics.sold && !metrics.keysDelivered && metrics.constructionPct !== null && ` · obra ${pct1(metrics.constructionPct)}%`}
                             </span>
-                            {!metrics.keysDelivered && metrics.constructionPct !== null && (
+                            {!metrics.sold && !metrics.keysDelivered && metrics.constructionPct !== null && (
                                 <span className="block h-1.5 w-full rounded-full bg-muted overflow-hidden" title={`Obra ${pct1(metrics.constructionPct)}%${metrics.constructionUpdatedOn ? ` em ${formatDateBR(metrics.constructionUpdatedOn)}` : ""}`}>
                                     <span className="block h-full rounded-full bg-sky-500" style={{ width: `${Math.min(100, Math.max(0, metrics.constructionPct))}%` }} />
                                 </span>
                             )}
-                            {metrics.keysToleranceOn && (
+                            {!metrics.sold && metrics.keysToleranceOn && (
                                 <span className="block">com tolerância: até {formatDateBR(metrics.keysToleranceOn)}</span>
                             )}
                         </span>
@@ -413,17 +415,19 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                     }}
                 />
                 <Tile
-                    label="Rentabilidade estimada"
+                    label="Yield do aluguel"
                     tone="emerald"
                     icon={<TrendingUp className="w-4 h-4" />}
                     value={metrics.netYieldPct !== null ? `${metrics.netYieldPct.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% a.a.` : "—"}
                     hint={
-                        metrics.netMonthlyRent !== null
-                            ? `Aluguel líquido ${formatBRL(metrics.netMonthlyRent, 0)}/mês${metrics.paybackMonths ? ` · payback ${Math.round(metrics.paybackMonths / 12)} anos` : ""}`
-                            : "Informe o aluguel estimado no simulador"
+                        metrics.sold
+                            ? "Vendido — a unidade não vai render aluguel"
+                            : metrics.netMonthlyRent !== null
+                              ? `Aluguel líquido ${formatBRL(metrics.netMonthlyRent, 0)}/mês${metrics.paybackMonths ? ` · payback ${Math.round(metrics.paybackMonths / 12)} anos` : ""}`
+                              : "Informe o aluguel estimado no simulador"
                     }
                     info={{
-                        what: "Quanto a unidade rende por ano sobre o que ela custou, com o aluguel líquido de vacância e custos.",
+                        what: "O yield do aluguel: quanto a unidade pronta rende por ano sobre o que ela custou, com o aluguel líquido de vacância e custos. É a medida rápida de mercado; a TIR do simulador é outra coisa — junta as parcelas, o prazo até as chaves e o horizonte numa taxa só, e por isso fica menor.",
                         formula: "12 × aluguel líquido ÷ custo total",
                         example:
                             metrics.netMonthlyRent !== null
@@ -446,7 +450,7 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                             {metrics.realizedGain > 0 ? "+" : ""}{formatBRL(metrics.realizedGain)}
                         </strong>
                         {metrics.realizedGainPct !== null ? ` (${metrics.realizedGainPct > 0 ? "+" : ""}${pct1(metrics.realizedGainPct)}%)` : ""} sobre {formatBRL(metrics.paidToDate)} pagos
-                        {metrics.realizedIrrAnnualPct !== null ? ` · TIR ${pct1(metrics.realizedIrrAnnualPct)}% a.a.` : ""}.
+                        {metrics.realizedIrrAnnualPct !== null ? ` · TIR ${pct1(metrics.realizedIrrAnnualPct)}% a.a.` : "."}
                     </span>
                     <button type="button" onClick={() => void undoSale()} className="text-xs underline underline-offset-2 text-emerald-800/80 dark:text-emerald-300/80 hover:text-emerald-900">
                         desfazer
