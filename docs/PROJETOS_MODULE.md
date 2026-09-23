@@ -137,10 +137,13 @@ and the whole one wins when both arrive.
 
 The second block of the pencil dialog is what the contract never says:
 
-- **`area_m2`** (the AI also reads it from the quadro resumo), **`market_m2_price`** (a reference
-  R$/m² the owner takes from listings of the building or the street) and
+- **`expected_appreciation_pct`** ("worth X% more at delivery" — the one the owner reached for
+  first; the pencil suggests FipeZap's 12-month trend compounded to the keys as a starting
+  point), **`area_m2`** (the AI also reads it from the quadro resumo) with **`market_m2_price`** (a
+  reference R$/m² from listings of the building or the street), and
   **`estimated_value_at_delivery`**. `deliveryValue` in the metrics is the typed figure, else
-  area × R$/m²; `appreciationGain` / `appreciationPct` = that minus `committed`. The "Valorização"
+  area × R$/m², else cost × (1 + %); `appreciationGain` / `appreciationPct` = that minus
+  `committed`. The "Valorização" tile is itself the way in: tapping it opens the pencil dialog. The "Valorização"
   tile shows the gain, R$/m² paid vs market, and FipeZap's **national** sale variation over twelve
   months (`benchmarks.fipezapSale12mPct`) as the trend — the app has no per-city FipeZap series, so
   it is a reference, never a price for the unit's street.
@@ -281,7 +284,8 @@ alone; it is another module.
 One row per month from the first movement to the end of the horizon:
 
 - below the axis, `outflowPaid` (solid), `outflowForecast` (hollow) and `outflowDelivery` — the
-  handover costs (ITBI, escritura, registro, mobília; premise `sim_delivery_costs`) as one amber
+  handover costs (ITBI 2–3% + escritura e registro ~1%; premise `sim_delivery_costs_pct`, a % of the
+  instalments paid + owed — the owner asked for a percentage, not a R$ figure) as one amber
   bar in the keys month;
 - above it, the net rent from `rentStart` on — gross rent less vacancy and running costs, with one
   adjustment every twelve months, the way a Brazilian lease behaves (not monthly compounding);
@@ -294,7 +298,7 @@ One row per month from the first movement to the end of the horizon:
   a month and backs off while `(1+r)^-t` overflows — at −99% a 30-year horizon is NaN.
 
 The assumptions live on the investment (`estimated_rent`, `rent_start_on`, `rent_adjustment_pct`,
-`rent_vacancy_pct`, `rent_costs_pct`, `sim_horizon_months`, `sim_delivery_costs`), so the chart is
+`rent_vacancy_pct`, `rent_costs_pct`, `sim_horizon_months`, `sim_delivery_costs_pct`), so the chart is
 the same for everyone who opens it. `rent_start_on` defaults to the month after the keys.
 
 They are **saved as they are typed**, like a cell of the ledger — there is no button to remember.

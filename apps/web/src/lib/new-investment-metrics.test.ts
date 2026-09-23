@@ -31,7 +31,8 @@ const investment = (over: Partial<NewInvestment> = {}): NewInvestment => ({
     rent_vacancy_pct: 0,
     rent_costs_pct: 0,
     sim_horizon_months: 120,
-    sim_delivery_costs: 0,
+    sim_delivery_costs_pct: 0,
+    expected_appreciation_pct: null,
     area_m2: null,
     market_m2_price: null,
     estimated_value_at_delivery: null,
@@ -292,6 +293,16 @@ describe("valorização, obra and tolerance", () => {
         const m = computeInvestmentMetrics(investment({ area_m2: 30, market_m2_price: 9000, estimated_value_at_delivery: 200000 }), schedules, [payment({})], asOf);
         expect(m.deliveryValue).toBe(200000);
         expect(m.deliveryValueSource).toBe("typed");
+    });
+
+    it("falls back to 'worth X% more' over the total cost when nothing else was typed", () => {
+        const m = computeInvestmentMetrics(investment({ expected_appreciation_pct: 30 }), schedules, [payment({})], asOf);
+        expect(m.deliveryValueSource).toBe("pct");
+        expect(m.deliveryValue).toBeCloseTo(m.committed * 1.3, 2);
+        expect(m.appreciationPct).toBeCloseTo(30, 1);
+        // area × R$/m² still wins over the percentage
+        const byArea = computeInvestmentMetrics(investment({ expected_appreciation_pct: 30, area_m2: 30, market_m2_price: 9000 }), schedules, [payment({})], asOf);
+        expect(byArea.deliveryValueSource).toBe("m2");
     });
 
     it("has no valorização without a value, and carries the works' progress through", () => {

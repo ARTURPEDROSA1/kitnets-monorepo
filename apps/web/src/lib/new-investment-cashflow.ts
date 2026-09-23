@@ -45,8 +45,8 @@ export interface CashFlowAssumptions {
     costsPct: number;
     /** How many months of rent to project past the last one. */
     horizonMonths: number;
-    /** R$ spent at the handover (ITBI, escritura, registro, mobília), in the keys month. */
-    deliveryCosts: number;
+    /** What the handover costs (ITBI 2–3%, escritura + registro ~1%) as % of the instalments, paid in the keys month. */
+    deliveryCostsPct: number;
 }
 
 export interface CashFlowPoint {
@@ -95,7 +95,7 @@ export function assumptionsOf(investment: NewInvestment, fallbackHorizonMonths =
         vacancyPct: investment.rent_vacancy_pct ?? 0,
         costsPct: investment.rent_costs_pct ?? 0,
         horizonMonths: investment.sim_horizon_months || fallbackHorizonMonths,
-        deliveryCosts: investment.sim_delivery_costs ?? 0,
+        deliveryCostsPct: investment.sim_delivery_costs_pct ?? 0,
     };
 }
 
@@ -160,8 +160,11 @@ export function simulateCashFlow(
     const keysOn = investment.keys_delivered_on ?? investment.keys_expected_on;
     const keysMonth = keysOn ? keysOn.slice(0, 7) : null;
     const rentStart = assumptions.rentStart;
-    // The handover costs land in the keys month; without one, the month before the first rent.
-    const deliveryMonth = assumptions.deliveryCosts > 0 ? (keysMonth ?? (rentStart ? addMonthsToKey(rentStart, -1) : null)) : null;
+    // The handover costs are a % of what the unit costs in instalments (paid + still owed); they
+    // land in the keys month, or without one, the month before the first rent.
+    const instalmentsTotal = [...paidByMonth.values(), ...forecastByMonth.values()].reduce((s, v) => s + v, 0);
+    const deliveryCosts = round2(instalmentsTotal * (assumptions.deliveryCostsPct / 100));
+    const deliveryMonth = deliveryCosts > 0 ? (keysMonth ?? (rentStart ? addMonthsToKey(rentStart, -1) : null)) : null;
 
     // Range: from the first movement to whichever comes last — the last instalment, the keys, or
     // enough rent months to show the recovery.
@@ -189,7 +192,7 @@ export function simulateCashFlow(
         const month = addMonthsToKey(start, i);
         const outflowPaid = paidByMonth.get(month) ?? 0;
         const outflowForecast = forecastByMonth.get(month) ?? 0;
-        const outflowDelivery = month === deliveryMonth ? round2(assumptions.deliveryCosts) : 0;
+        const outflowDelivery = month === deliveryMonth ? deliveryCosts : 0;
         const rent = rentStart && month >= rentStart ? rentAtMonth(assumptions, monthsBetween(rentStart, month)) : 0;
 
         cumulative = round2(cumulative + rent - outflowPaid - outflowForecast - outflowDelivery);

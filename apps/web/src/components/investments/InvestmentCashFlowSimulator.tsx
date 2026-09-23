@@ -69,7 +69,7 @@ const toPatch = (a: CashFlowAssumptions): Record<string, unknown> => ({
     rent_vacancy_pct: a.vacancyPct,
     rent_costs_pct: a.costsPct,
     sim_horizon_months: a.horizonMonths,
-    sim_delivery_costs: a.deliveryCosts,
+    sim_delivery_costs_pct: a.deliveryCostsPct,
 });
 
 type SaveStatus = "idle" | "pending" | "saving" | "saved" | "error";
@@ -116,7 +116,7 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
         if (timer.current) clearTimeout(timer.current);
         timer.current = setTimeout(() => { void flush(); }, SAVE_DELAY_MS);
     };
-    const num = (key: "monthlyRent" | "rentAdjustmentPct" | "vacancyPct" | "costsPct" | "deliveryCosts") =>
+    const num = (key: "monthlyRent" | "rentAdjustmentPct" | "vacancyPct" | "costsPct" | "deliveryCostsPct") =>
         (e: React.ChangeEvent<HTMLInputElement>) => update({ [key]: Number(e.target.value.replace(",", ".")) || 0 });
 
     const result = useMemo(
@@ -207,16 +207,17 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
                         />
                     </label>
                     <label className="space-y-1">
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Custos na entrega (R$)</span>
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Custos na entrega (%)</span>
                         <input
                             type="number"
-                            step="500"
+                            step="0.5"
                             min="0"
-                            value={assumptions.deliveryCosts || ""}
-                            onChange={num("deliveryCosts")}
+                            max="100"
+                            value={assumptions.deliveryCostsPct}
+                            onChange={num("deliveryCostsPct")}
                             className={inputCls}
-                            placeholder="0"
-                            title="ITBI, escritura, registro e mobília — pagos de uma vez no mês das chaves"
+                            placeholder="4"
+                            title="ITBI (2–3%) mais escritura e registro (~1%), como % do custo total — pagos de uma vez no mês das chaves"
                         />
                     </label>
                     <label className="space-y-1">

@@ -87,9 +87,11 @@ export interface InvestmentMetrics {
     costPerM2: number | null;
     /** The reference market R$/m² the owner typed. */
     marketM2Price: number | null;
-    /** What the unit is expected to be worth at delivery: the owner's figure, else area × market R$/m². */
+    /** "Worth X% more at delivery", as typed. */
+    expectedAppreciationPct: number | null;
+    /** What the unit is expected to be worth at delivery: the owner's figure, else area × market R$/m², else cost × (1 + expected %). */
     deliveryValue: number | null;
-    deliveryValueSource: "typed" | "m2" | null;
+    deliveryValueSource: "typed" | "m2" | "pct" | null;
     /** `deliveryValue − committed`, and the same as % of `committed`. */
     appreciationGain: number | null;
     appreciationPct: number | null;
@@ -201,7 +203,10 @@ export function computeInvestmentMetrics(
     const area = positive(investment.area_m2);
     const marketM2 = positive(investment.market_m2_price);
     const typedValue = positive(investment.estimated_value_at_delivery);
-    const deliveryValue = typedValue ?? (area && marketM2 ? round2(area * marketM2) : null);
+    const byArea = area && marketM2 ? round2(area * marketM2) : null;
+    const expectedPct = investment.expected_appreciation_pct !== null && investment.expected_appreciation_pct >= 0 ? investment.expected_appreciation_pct : null;
+    const byPct = expectedPct !== null && base ? round2(committed * (1 + expectedPct / 100)) : null;
+    const deliveryValue = typedValue ?? byArea ?? byPct;
     const appreciationGain = deliveryValue !== null && base ? round2(deliveryValue - committed) : null;
 
     return {
@@ -241,8 +246,9 @@ export function computeInvestmentMetrics(
         areaM2: area,
         costPerM2: area && base ? round2(committed / area) : null,
         marketM2Price: marketM2,
+        expectedAppreciationPct: expectedPct,
         deliveryValue,
-        deliveryValueSource: typedValue ? "typed" : deliveryValue !== null ? "m2" : null,
+        deliveryValueSource: typedValue ? "typed" : byArea !== null ? "m2" : byPct !== null ? "pct" : null,
         appreciationGain,
         appreciationPct: appreciationGain !== null && base ? round2((appreciationGain / committed) * 100) : null,
     };

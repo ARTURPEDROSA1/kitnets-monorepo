@@ -30,10 +30,12 @@ interface Props {
     onClose: () => void;
     investment: NewInvestment;
     onSave: (patch: Record<string, unknown>) => Promise<boolean>;
+    /** FipeZap's trend compounded to the keys, offered under the "valorização esperada" field. */
+    suggestedAppreciationPct?: number | null;
 }
 
 /** Mounted only while open, so a cancelled edit dies with the unmount. */
-export default function InvestmentDetailsModal({ open, onClose, investment, onSave }: Props) {
+export default function InvestmentDetailsModal({ open, onClose, investment, onSave, suggestedAppreciationPct = null }: Props) {
     return (
         <Dialog open={open} onOpenChange={o => { if (!o) onClose(); }}>
             <DialogContent className="sm:max-w-2xl max-h-[92vh] overflow-y-auto">
@@ -44,7 +46,7 @@ export default function InvestmentDetailsModal({ open, onClose, investment, onSa
                         parcelas ficam em &ldquo;Plano de pagamento&rdquo;.
                     </DialogDescription>
                 </DialogHeader>
-                {open && <DetailsForm investment={investment} onSave={onSave} onClose={onClose} />}
+                {open && <DetailsForm investment={investment} onSave={onSave} onClose={onClose} suggestedAppreciationPct={suggestedAppreciationPct} />}
             </DialogContent>
         </Dialog>
     );
@@ -57,7 +59,7 @@ const parseDecimal = (v: string): number | null => {
     return v.trim() && Number.isFinite(n) ? n : null;
 };
 
-function DetailsForm({ investment, onSave, onClose }: Omit<Props, "open">) {
+function DetailsForm({ investment, onSave, onClose, suggestedAppreciationPct = null }: Omit<Props, "open">) {
     const [form, setForm] = useState({
         name: investment.name,
         unit_label: investment.unit_label ?? "",
@@ -71,6 +73,7 @@ function DetailsForm({ investment, onSave, onClose }: Omit<Props, "open">) {
         area_m2: numberOrEmpty(investment.area_m2),
         market_m2_price: numberOrEmpty(investment.market_m2_price),
         estimated_value_at_delivery: numberOrEmpty(investment.estimated_value_at_delivery),
+        expected_appreciation_pct: numberOrEmpty(investment.expected_appreciation_pct),
         construction_pct: numberOrEmpty(investment.construction_pct),
         construction_updated_on: investment.construction_updated_on ?? "",
     });
@@ -105,6 +108,7 @@ function DetailsForm({ investment, onSave, onClose }: Omit<Props, "open">) {
             area_m2: blank(form.area_m2),
             market_m2_price: blank(form.market_m2_price),
             estimated_value_at_delivery: blank(form.estimated_value_at_delivery),
+            expected_appreciation_pct: blank(form.expected_appreciation_pct),
             construction_pct: blank(form.construction_pct),
             construction_updated_on: blank(form.construction_updated_on),
         });
@@ -169,11 +173,29 @@ function DetailsForm({ investment, onSave, onClose }: Omit<Props, "open">) {
                     <div>
                         <h3 className="text-sm font-semibold text-foreground">Valorização e obra</h3>
                         <p className="text-xs text-muted-foreground">
-                            O contrato não diz quanto a unidade vai valer. Informe a área e um R$/m² de mercado (anúncios do
-                            prédio ou da rua) ou direto o valor esperado na entrega; e o andamento que a construtora informa.
+                            O contrato não diz quanto a unidade vai valer. Diga de um jeito: a valorização esperada em %,
+                            a área com um R$/m² de mercado (anúncios do prédio ou da rua), ou direto o valor na entrega.
+                            E o andamento que a construtora informa.
                         </p>
                     </div>
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                        <div className="space-y-1 col-span-2">
+                            <Label htmlFor="details-appreciation">Valorização esperada até a entrega (%)</Label>
+                            <Input
+                                id="details-appreciation"
+                                inputMode="decimal"
+                                value={form.expected_appreciation_pct}
+                                onChange={e => set("expected_appreciation_pct", e.target.value)}
+                                placeholder={suggestedAppreciationPct !== null ? String(suggestedAppreciationPct).replace(".", ",") : "30"}
+                            />
+                            <p className="text-[11px] text-muted-foreground">
+                                {suggestedAppreciationPct !== null
+                                    ? `Pela tendência FipeZap (índice nacional de venda) até as chaves seriam +${suggestedAppreciationPct.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%. `
+                                    : ""}
+                                Vale quando os campos abaixo estão em branco.
+                            </p>
+                        </div>
+                        <div className="space-y-1 col-span-2" />
                         <div className="space-y-1">
                             <Label htmlFor="details-area">Área privativa (m²)</Label>
                             <Input id="details-area" inputMode="decimal" value={form.area_m2} onChange={e => set("area_m2", e.target.value)} placeholder="27,5" />
