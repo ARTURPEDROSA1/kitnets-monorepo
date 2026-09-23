@@ -52,7 +52,7 @@ apps/web/src/lib/
 
 apps/web/src/app/api/investments/
   route.ts                         GET list (+ card summaries) · POST create
-  [id]/route.ts                    GET bundle + metrics · PATCH · DELETE
+  [id]/route.ts                    GET bundle + metrics + benchmarks + signed document URLs · PATCH · DELETE
   [id]/payments/route.ts           POST a ledger line
   [id]/payments/[paymentId]/route.ts   PATCH a cell · DELETE the line
   [id]/documents/route.ts          GET signed URLs · POST adopt a staged upload
@@ -160,6 +160,20 @@ The second block of the pencil dialog is what the contract never says:
 `benchmarks` come from `lib/new-investment-benchmarks-server.ts` on `GET /api/investments/[id]`:
 CDI accumulated 12 m (`lib/indexes.ts`) and FipeZap venda var_12m (`fipezap_series`), both null when
 missing — never an error on the dashboard.
+
+### Loading: the page preloads its own data
+
+`page.tsx` is a server component that builds the same views the API serves
+(`lib/new-investment-views-server.ts`: `loadProjectList`, `loadProjectDashboard`) and hands them to
+`ProjetosContent` / `InvestmentDashboard` as `initial` / `initialBundle`; the client components seed
+their state from that and skip the first fetch (a `seeded` flag read once, so later prop changes
+never reset what the user did). Before this the browser got an empty shell and then made a second,
+authenticated, often cold round trip per view — "Carregando…" for seconds on the phone. The
+dashboard is now **one** request (documents come with their signed URLs, batch-signed) instead of
+two, and the documents route no longer imports the AI runner at module scope: the Gemini/OpenAI
+SDKs, unpdf and sharp are `await import`ed only when a picture is classified, so the route's cold
+start is light again. `loadInvestmentBundle` runs its four queries in parallel (child rows carry
+`owner_id`, so the ownership check does not have to come first).
 
 ### Dates the Brazilian way
 

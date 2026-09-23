@@ -8,8 +8,7 @@ import {
     mimeTypeOfPath,
     ownStagedPath,
 } from "@/lib/new-investments-server";
-import { signStorageUrl } from "@/lib/storage";
-import { aiConfigured, runDocumentExtraction } from "@/lib/document-extract-server";
+import { signStorageUrl, signStorageUrls } from "@/lib/storage";
 import {
     CLASSIFIABLE_KINDS,
     CLASSIFY_MAX_BYTES,
@@ -50,24 +49,29 @@ export const GET = withAuth<undefined, Params>({ tag: "Investment Docs GET" }, a
         throw new Error(`documents load failed: ${error.message}`);
     }
 
-    const documents = await Promise.all(
-        (data ?? []).map(async doc => ({
-            ...doc,
-            url: await signStorageUrl(supabase, INVESTMENT_DOCUMENTS_BUCKET, doc.storage_path as string),
-        }))
-    );
+    // one storage call for every file, not one per file
+    const signed = await signStorageUrls(supabase, INVESTMENT_DOCUMENTS_BUCKET, (data ?? []).map(doc => doc.storage_path as string));
+    const documents = (data ?? []).map(doc => ({ ...doc, url: signed.get(doc.storage_path as string) ?? null }));
     return NextResponse.json({ documents });
 });
 
-/** What the model thinks a picture is. Null whenever it cannot say — never a failed upload. */
+/**
+ * What the model thinks a picture is. Null whenever it cannot say — never a failed upload.
+ *
+ * The AI runner (Gemini and OpenAI SDKs, unpdf, sharp) is imported here, on demand, and not at
+ * the top of the file: this route also serves the dashboard's GET, and loading those packages
+ * on every cold start was most of the "Carregando projeto…" wait.
+ */
 async function classifyPicture(
     supabase: AdminSupabase,
     path: string,
     mimeType: string,
     size: number
 ): Promise<{ guess: ImageClassification; readBy: ReadBy } | null> {
-    if (!aiConfigured() || !mimeType.startsWith("image/") || size <= 0 || size > CLASSIFY_MAX_BYTES) return null;
+    if (!mimeType.startsWith("image/") || size <= 0 || size > CLASSIFY_MAX_BYTES) return null;
     try {
+        const { aiConfigured, runDocumentExtraction } = await import("@/lib/document-extract-server");
+        if (!aiConfigured()) return null;
         const { data } = await supabase.storage.from(INVESTMENT_DOCUMENTS_BUCKET).download(path);
         if (!data) return null;
         const buffer = Buffer.from(await data.arrayBuffer());

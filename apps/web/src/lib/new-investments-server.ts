@@ -184,11 +184,13 @@ export async function loadInvestmentBundle(
     investmentId: string,
     profileId: string
 ): Promise<InvestmentBundle> {
-    const investment = await loadOwnedInvestment(supabase, investmentId, profileId);
-    const [schedules, payments, documents] = await Promise.all([
-        supabase.from("new_investment_schedules").select(SCHEDULE_COLUMNS as "*").eq("investment_id", investmentId).order("position"),
-        supabase.from("new_investment_payments").select(PAYMENT_COLUMNS as "*").eq("investment_id", investmentId).order("due_on"),
-        supabase.from("new_investment_documents").select(DOCUMENT_COLUMNS as "*").eq("investment_id", investmentId).order("created_at", { ascending: false }),
+    // All four in one round trip: the child rows are filtered by owner as well, so a foreign id
+    // gets empty lists while the ownership check on the investment itself decides the 404.
+    const [investment, schedules, payments, documents] = await Promise.all([
+        loadOwnedInvestment(supabase, investmentId, profileId),
+        supabase.from("new_investment_schedules").select(SCHEDULE_COLUMNS as "*").eq("investment_id", investmentId).eq("owner_id", profileId).order("position"),
+        supabase.from("new_investment_payments").select(PAYMENT_COLUMNS as "*").eq("investment_id", investmentId).eq("owner_id", profileId).order("due_on"),
+        supabase.from("new_investment_documents").select(DOCUMENT_COLUMNS as "*").eq("investment_id", investmentId).eq("owner_id", profileId).order("created_at", { ascending: false }),
     ]);
     return {
         investment,

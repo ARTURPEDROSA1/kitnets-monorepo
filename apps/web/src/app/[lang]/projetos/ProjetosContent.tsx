@@ -17,6 +17,7 @@ import InvestmentDashboard from "@/components/investments/InvestmentDashboard";
 import InvestmentFormModal, { type InvestmentFormValues } from "@/components/investments/InvestmentFormModal";
 import { formatBRL, type NewInvestment } from "@/lib/new-investments";
 import type { InvestmentCardSummary } from "@/lib/new-investment-metrics";
+import type { ProjectDashboardView, ProjectListView } from "@/lib/new-investment-views";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -58,13 +59,25 @@ function toPayload(values: InvestmentFormValues) {
     };
 }
 
-export default function ProjetosContent({ lang }: { lang: string }) {
+interface Props {
+    lang: string;
+    /** The list as the page preloaded it on the server — the first paint has the cards; refreshes go through the API. */
+    initial?: ProjectListView | null;
+    /** The dashboard of `?id=`, preloaded the same way. */
+    initialDashboard?: ProjectDashboardView | null;
+}
+
+export default function ProjetosContent({ lang, initial = null, initialDashboard = null }: Props) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const selectedId = searchParams.get("id");
 
-    const [investments, setInvestments] = useState<NewInvestment[] | null>(null);
-    const [summaries, setSummaries] = useState<Record<string, InvestmentCardSummary>>({});
+    const [investments, setInvestments] = useState<NewInvestment[] | null>(initial?.investments ?? null);
+    const [summaries, setSummaries] = useState<Record<string, InvestmentCardSummary>>(
+        () => Object.fromEntries((initial?.summaries ?? []).map(s => [s.id, s]))
+    );
+    /** Seeded from the server: no first fetch. Read once — later prop changes must not reset the list. */
+    const [seeded] = useState(initial !== null);
     const [error, setError] = useState<string | null>(null);
     const [formOpen, setFormOpen] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -78,11 +91,12 @@ export default function ProjetosContent({ lang }: { lang: string }) {
     }, []);
 
     useEffect(() => {
+        if (seeded) return;
         let alive = true;
         load()
             .catch(err => { if (alive) { setError(err instanceof Error ? err.message : "Erro ao carregar"); setInvestments([]); } });
         return () => { alive = false; };
-    }, [load]);
+    }, [load, seeded]);
 
     const base = lang === "pt" ? "/projetos" : `/${lang}/projetos`;
     const select = (id: string | null) => router.push(id ? `${base}?id=${id}` : base, { scroll: true });
@@ -143,6 +157,7 @@ export default function ProjetosContent({ lang }: { lang: string }) {
                     lang={lang}
                     onBack={() => select(null)}
                     onChanged={() => { load().catch(() => {}); }}
+                    initialBundle={initialDashboard}
                 />
             </div>
         );
