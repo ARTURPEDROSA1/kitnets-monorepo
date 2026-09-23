@@ -9,22 +9,31 @@ import {
     replaceSchedules,
 } from "@/lib/new-investments-server";
 import { computeInvestmentMetrics } from "@/lib/new-investment-metrics";
+import { loadInvestmentBenchmarks } from "@/lib/new-investment-benchmarks-server";
+import type { AdminSupabase } from "@/lib/api-auth";
 
 type Params = { id: string };
 
+/** The whole dashboard: the bundle, the KPIs computed from it, and the market figures they are read against. */
+async function dashboardPayload(supabase: AdminSupabase, id: string, profileId: string) {
+    const [bundle, benchmarks] = await Promise.all([loadInvestmentBundle(supabase, id, profileId), loadInvestmentBenchmarks(supabase)]);
+    return {
+        ...bundle,
+        metrics: computeInvestmentMetrics(bundle.investment, bundle.schedules, bundle.payments),
+        benchmarks,
+    };
+}
+
 /**
  * GET    /api/investments/[id]  → the whole dashboard: investment, quadro resumo, payments,
- *                                 documents and the KPIs computed from them.
+ *                                 documents, the KPIs computed from them and the benchmarks
+ *                                 (CDI 12 m, FipeZap venda 12 m) they are compared with.
  * PATCH  /api/investments/[id]  → any subset of the fields; `schedules`, when present, replaces
  *                                 the quadro resumo as a block.
  * DELETE /api/investments/[id]  → the investment, its payments, its documents and their files.
  */
 export const GET = withAuth<undefined, Params>({ tag: "Investment GET" }, async ({ params, profileId, supabase }) => {
-    const bundle = await loadInvestmentBundle(supabase, params.id, profileId);
-    return NextResponse.json({
-        ...bundle,
-        metrics: computeInvestmentMetrics(bundle.investment, bundle.schedules, bundle.payments),
-    });
+    return NextResponse.json(await dashboardPayload(supabase, params.id, profileId));
 });
 
 export const PATCH = withAuth<typeof investmentPatchSchema, Params>(
@@ -48,11 +57,7 @@ export const PATCH = withAuth<typeof investmentPatchSchema, Params>(
             await replaceSchedules(supabase, params.id, profileId, body.schedules);
         }
 
-        const bundle = await loadInvestmentBundle(supabase, params.id, profileId);
-        return NextResponse.json({
-            ...bundle,
-            metrics: computeInvestmentMetrics(bundle.investment, bundle.schedules, bundle.payments),
-        });
+        return NextResponse.json(await dashboardPayload(supabase, params.id, profileId));
     }
 );
 

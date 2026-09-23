@@ -6,11 +6,17 @@
  *
  *   outflowPaid      instalments already paid            (drawn below the axis)
  *   outflowForecast  instalments the contract still owes (drawn below the axis)
+ *   outflowDelivery  what the handover itself costs — ITBI, escritura, registro, mobília —
+ *                    one bar in the keys month                (drawn below the axis)
  *   rent             net rent expected from the keys on  (drawn above the axis)
- *   cumulative       running sum of the three — crosses zero at the break-even month
+ *   cumulative       running sum of the four — crosses zero at the break-even month
  *
  * The rent grows by `rentAdjustmentPct` every twelve months from the first rent month, which is
  * how a Brazilian lease behaves (one adjustment per year, not a monthly compounding).
+ *
+ * The TIR (IRR) is the annual rate that makes all these flows worth zero today: the number that
+ * compares with the CDI, and the one that says whether anticipating an instalment beats leaving
+ * the money invested.
  */
 import {
     addMonthsToKey,
@@ -39,6 +45,8 @@ export interface CashFlowAssumptions {
     costsPct: number;
     /** How many months of rent to project past the last one. */
     horizonMonths: number;
+    /** R$ spent at the handover (ITBI, escritura, registro, mobília), in the keys month. */
+    deliveryCosts: number;
 }
 
 export interface CashFlowPoint {
@@ -47,8 +55,9 @@ export interface CashFlowPoint {
     label: string;
     outflowPaid: number;
     outflowForecast: number;
+    outflowDelivery: number;
     rent: number;
-    /** Σ (rent − outflow) up to and including this month. */
+    /** Σ (rent − outflows) up to and including this month. */
     cumulative: number;
     /** True for the month the keys are handed over. */
     keys: boolean;
@@ -56,12 +65,16 @@ export interface CashFlowPoint {
 
 export interface CashFlowResult {
     points: CashFlowPoint[];
+    /** Instalments paid + forecast + the delivery costs. */
     totalOutflow: number;
+    totalDelivery: number;
     totalRent: number;
     /** `YYYY-MM` where `cumulative` first reaches zero, null when the horizon is too short. */
     breakEvenMonth: string | null;
     /** Months from the first rent to break-even. */
     breakEvenMonths: number | null;
+    /** Annual internal rate of return of the whole flow over the horizon; null when it has no answer. */
+    irrAnnualPct: number | null;
     keysMonth: string | null;
     rentStart: string | null;
 }
@@ -82,6 +95,7 @@ export function assumptionsOf(investment: NewInvestment, fallbackHorizonMonths =
         vacancyPct: investment.rent_vacancy_pct ?? 0,
         costsPct: investment.rent_costs_pct ?? 0,
         horizonMonths: investment.sim_horizon_months || fallbackHorizonMonths,
+        deliveryCosts: investment.sim_delivery_costs ?? 0,
     };
 }
 
@@ -92,6 +106,37 @@ export function rentAtMonth(a: CashFlowAssumptions, monthsSinceStart: number): n
     const gross = a.monthlyRent * Math.pow(1 + a.rentAdjustmentPct / 100, years);
     return round2(gross * (1 - a.vacancyPct / 100) * (1 - a.costsPct / 100));
 }
+
+/**
+ * Monthly internal rate of return of a series of flows (index = month, negative = out, positive
+ * = in), by bisection on the net present value. Null when the flows never change sign, or when
+ * no rate between −99% and +100% a month answers — a flow that only ever loses has no TIR.
+ */
+export function internalRateOfReturn(flows: number[]): number | null {
+    if (!flows.some(f => f < 0) || !flows.some(f => f > 0)) return null;
+    const npv = (rate: number) => flows.reduce((sum, f, t) => sum + f / Math.pow(1 + rate, t), 0);
+    // The lower bracket: (1 + r)^-t explodes past double precision at −99% a month over a
+    // 30-year horizon, so start at −50% (already absurd) and back off while it overflows.
+    let lo = -0.5, hi = 1;
+    let fLo = npv(lo);
+    for (const candidate of [-0.3, -0.1, -0.02]) {
+        if (Number.isFinite(fLo)) break;
+        lo = candidate;
+        fLo = npv(lo);
+    }
+    let fHi = npv(hi);
+    if (!Number.isFinite(fLo) || !Number.isFinite(fHi) || fLo * fHi > 0) return null;
+    for (let i = 0; i < 200; i++) {
+        const mid = (lo + hi) / 2;
+        const fMid = npv(mid);
+        if (Math.abs(fMid) < 1e-7 || hi - lo < 1e-10) return mid;
+        if (fLo * fMid < 0) { hi = mid; fHi = fMid; } else { lo = mid; fLo = fMid; }
+    }
+    return (lo + hi) / 2;
+}
+
+/** A monthly rate as the yearly figure people quote (% a.a.). */
+export const annualizePct = (monthlyRate: number): number => round2((Math.pow(1 + monthlyRate, 12) - 1) * 100);
 
 export function simulateCashFlow(
     investment: NewInvestment,
@@ -115,15 +160,17 @@ export function simulateCashFlow(
     const keysOn = investment.keys_delivered_on ?? investment.keys_expected_on;
     const keysMonth = keysOn ? keysOn.slice(0, 7) : null;
     const rentStart = assumptions.rentStart;
+    // The handover costs land in the keys month; without one, the month before the first rent.
+    const deliveryMonth = assumptions.deliveryCosts > 0 ? (keysMonth ?? (rentStart ? addMonthsToKey(rentStart, -1) : null)) : null;
 
     // Range: from the first movement to whichever comes last — the last instalment, the keys, or
     // enough rent months to show the recovery.
     const cashMonths = [...paidByMonth.keys(), ...forecastByMonth.keys()];
     const scheduleMonths = expandSchedules(schedules).map(i => i.dueOn.slice(0, 7));
-    const known = [...cashMonths, ...scheduleMonths].sort();
+    const known = [...cashMonths, ...scheduleMonths, ...(deliveryMonth ? [deliveryMonth] : [])].sort();
     const start = known[0] ?? rentStart ?? keysMonth;
     if (!start) {
-        return { points: [], totalOutflow: 0, totalRent: 0, breakEvenMonth: null, breakEvenMonths: null, keysMonth, rentStart };
+        return { points: [], totalOutflow: 0, totalDelivery: 0, totalRent: 0, breakEvenMonth: null, breakEvenMonths: null, irrAnnualPct: null, keysMonth, rentStart };
     }
 
     const lastCash = known[known.length - 1] ?? start;
@@ -133,6 +180,7 @@ export function simulateCashFlow(
     const points: CashFlowPoint[] = [];
     let cumulative = 0;
     let totalOutflow = 0;
+    let totalDelivery = 0;
     let totalRent = 0;
     let breakEvenMonth: string | null = null;
 
@@ -141,10 +189,12 @@ export function simulateCashFlow(
         const month = addMonthsToKey(start, i);
         const outflowPaid = paidByMonth.get(month) ?? 0;
         const outflowForecast = forecastByMonth.get(month) ?? 0;
+        const outflowDelivery = month === deliveryMonth ? round2(assumptions.deliveryCosts) : 0;
         const rent = rentStart && month >= rentStart ? rentAtMonth(assumptions, monthsBetween(rentStart, month)) : 0;
 
-        cumulative = round2(cumulative + rent - outflowPaid - outflowForecast);
-        totalOutflow = round2(totalOutflow + outflowPaid + outflowForecast);
+        cumulative = round2(cumulative + rent - outflowPaid - outflowForecast - outflowDelivery);
+        totalOutflow = round2(totalOutflow + outflowPaid + outflowForecast + outflowDelivery);
+        totalDelivery = round2(totalDelivery + outflowDelivery);
         totalRent = round2(totalRent + rent);
         if (breakEvenMonth === null && cumulative >= 0 && totalOutflow > 0 && rent > 0) breakEvenMonth = month;
 
@@ -153,18 +203,23 @@ export function simulateCashFlow(
             label: formatMonthLabel(month),
             outflowPaid: round2(outflowPaid),
             outflowForecast: round2(outflowForecast),
+            outflowDelivery,
             rent,
             cumulative,
             keys: month === keysMonth,
         });
     }
 
+    const monthlyIrr = internalRateOfReturn(points.map(p => p.rent - p.outflowPaid - p.outflowForecast - p.outflowDelivery));
+
     return {
         points,
         totalOutflow,
+        totalDelivery,
         totalRent,
         breakEvenMonth,
         breakEvenMonths: breakEvenMonth && rentStart ? monthsBetween(rentStart, breakEvenMonth) : null,
+        irrAnnualPct: monthlyIrr === null ? null : annualizePct(monthlyIrr),
         keysMonth,
         rentStart,
     };

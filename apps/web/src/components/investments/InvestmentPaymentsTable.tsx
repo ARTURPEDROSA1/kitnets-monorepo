@@ -33,6 +33,7 @@ import {
 import { ColumnVisibilityMenu, useColumnVisibility } from "@/components/properties/TableColumnVisibility";
 import { CellSumBar, useCellSum } from "@/components/properties/TableCellSum";
 import { columnTableKey, recordTableKey } from "@/lib/ui-preferences";
+import { DateInput } from "@/components/ui/DateInput";
 import {
     PAYER_LABELS,
     PAYMENT_KINDS,
@@ -709,23 +710,23 @@ export default function InvestmentPaymentsTable({
                                     <tr key={row.id} className={cn("border-b border-border/60 hover:bg-muted/30", row.status === "PLANNED" && "opacity-70")}>
                                         {show("due_on") && (
                                             <td {...sel.cellProps("due_on", row.id, null, "px-2 py-1")}>
-                                                <input
-                                                    type="date"
+                                                <DateInput
+                                                    variant="bare"
                                                     value={row.due_on}
-                                                    onChange={e => onPatch(row.id, { due_on: e.target.value })}
+                                                    onChange={iso => { if (iso) onPatch(row.id, { due_on: iso }); }}
                                                     aria-label="Vencimento"
-                                                    className={cn(cellInput, "tabular-nums")}
+                                                    className={cellInput}
                                                 />
                                             </td>
                                         )}
                                         {show("paid_on") && (
                                             <td {...sel.cellProps("paid_on", row.id, null, "px-2 py-1")}>
-                                                <input
-                                                    type="date"
+                                                <DateInput
+                                                    variant="bare"
                                                     value={row.paid_on ?? ""}
-                                                    onChange={e => onPatch(row.id, { paid_on: e.target.value || null, status: e.target.value ? "PAID" : "PLANNED" })}
+                                                    onChange={iso => onPatch(row.id, { paid_on: iso || null, status: iso ? "PAID" : "PLANNED" })}
                                                     aria-label="Pago em"
-                                                    className={cn(cellInput, "tabular-nums")}
+                                                    className={cellInput}
                                                 />
                                             </td>
                                         )}
@@ -864,17 +865,17 @@ export default function InvestmentPaymentsTable({
                                 <tr className="border-b border-border/60 bg-emerald-50/50 dark:bg-emerald-950/20">
                                     {show("due_on") && (
                                         <td className="px-2 py-1">
-                                            <input type="date" value={draft.due_on} onChange={e => setDraft({ ...draft, due_on: e.target.value })} aria-label="Vencimento do novo lançamento" className={cn(cellInput, "tabular-nums")} />
+                                            <DateInput variant="bare" value={draft.due_on} onChange={iso => setDraft({ ...draft, due_on: iso })} aria-label="Vencimento do novo lançamento" className={cellInput} />
                                         </td>
                                     )}
                                     {show("paid_on") && (
                                         <td className="px-2 py-1">
-                                            <input
-                                                type="date"
+                                            <DateInput
+                                                variant="bare"
                                                 value={draft.paid_on}
-                                                onChange={e => setDraft({ ...draft, paid_on: e.target.value, status: e.target.value ? "PAID" : "PLANNED" })}
+                                                onChange={iso => setDraft({ ...draft, paid_on: iso, status: iso ? "PAID" : "PLANNED" })}
                                                 aria-label="Data do pagamento"
-                                                className={cn(cellInput, "tabular-nums")}
+                                                className={cellInput}
                                             />
                                         </td>
                                     )}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assumptionsOf, formatMonthLabel, rentAtMonth, simulateCashFlow, type CashFlowAssumptions } from "./new-investment-cashflow";
+import { annualizePct, assumptionsOf, formatMonthLabel, internalRateOfReturn, rentAtMonth, simulateCashFlow, type CashFlowAssumptions } from "./new-investment-cashflow";
 import type { InvestmentPayment, InvestmentSchedule, NewInvestment } from "./new-investments";
 
 const investment = (over: Partial<NewInvestment> = {}): NewInvestment => ({
@@ -9,6 +9,7 @@ const investment = (over: Partial<NewInvestment> = {}): NewInvestment => ({
     contract_date: "2026-07-01", keys_expected_on: "2029-09-20", keys_delivered_on: null,
     index_before_keys: "INCC", index_after_keys: "IGPM",
     estimated_rent: 1200, rent_start_on: null, rent_adjustment_pct: 5, rent_vacancy_pct: 0, rent_costs_pct: 0, sim_horizon_months: 120,
+    sim_delivery_costs: 0, area_m2: null, market_m2_price: null, estimated_value_at_delivery: null, construction_pct: null, construction_updated_on: null,
     status: "ACTIVE", promoted_property_id: null, promoted_at: null, cover_path: null, notes: null,
     created_at: "2026-07-01T00:00:00Z", updated_at: "2026-07-01T00:00:00Z",
     ...over,
@@ -28,7 +29,45 @@ const paid: InvestmentPayment = {
 };
 
 const base = (over: Partial<CashFlowAssumptions> = {}): CashFlowAssumptions => ({
-    monthlyRent: 1200, rentStart: "2029-10", rentAdjustmentPct: 5, vacancyPct: 0, costsPct: 0, horizonMonths: 120, ...over,
+    monthlyRent: 1200, rentStart: "2029-10", rentAdjustmentPct: 5, vacancyPct: 0, costsPct: 0, horizonMonths: 120, deliveryCosts: 0, ...over,
+});
+
+describe("internalRateOfReturn", () => {
+    it("finds the monthly rate that makes the flows worth zero, and annualizes it", () => {
+        // 100 out today, 110 back after twelve months: 10% a year
+        const flows = [-100, ...Array(11).fill(0), 110];
+        const monthly = internalRateOfReturn(flows);
+        expect(monthly).not.toBeNull();
+        expect(annualizePct(monthly!)).toBeCloseTo(10, 1);
+    });
+
+    it("has no answer for a flow that only goes one way", () => {
+        expect(internalRateOfReturn([-100, -50, -10])).toBeNull();
+        expect(internalRateOfReturn([100, 50])).toBeNull();
+        expect(internalRateOfReturn([])).toBeNull();
+    });
+});
+
+describe("delivery costs and TIR in the simulation", () => {
+    it("draws the handover costs as one bar in the keys month and counts them in the total", () => {
+        const withCosts = simulateCashFlow(investment(), schedules, [paid], base({ deliveryCosts: 9000 }));
+        const without = simulateCashFlow(investment(), schedules, [paid], base());
+        const keys = withCosts.points.find(p => p.keys);
+        expect(keys?.outflowDelivery).toBe(9000);
+        expect(withCosts.points.filter(p => p.outflowDelivery > 0)).toHaveLength(1);
+        expect(withCosts.totalDelivery).toBe(9000);
+        expect(withCosts.totalOutflow).toBeCloseTo(without.totalOutflow + 9000, 2);
+        // paying more at the keys pushes the payback later, never earlier
+        expect(withCosts.breakEvenMonth! >= without.breakEvenMonth!).toBe(true);
+    });
+
+    it("gives a TIR when the rent pays the unit back inside the horizon, and none without rent", () => {
+        const result = simulateCashFlow(investment(), schedules, [paid], base({ horizonMonths: 240 }));
+        expect(result.irrAnnualPct).not.toBeNull();
+        expect(result.irrAnnualPct!).toBeGreaterThan(0);
+        expect(result.irrAnnualPct!).toBeLessThan(40);
+        expect(simulateCashFlow(investment(), schedules, [paid], base({ monthlyRent: 0 })).irrAnnualPct).toBeNull();
+    });
 });
 
 describe("rentAtMonth", () => {

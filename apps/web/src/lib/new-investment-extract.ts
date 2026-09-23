@@ -1,5 +1,5 @@
 /**
- * Off-plan purchase contract import (Novos Investimentos → "Importar contrato com IA").
+ * Off-plan purchase contract import (Projetos → "Importar contrato com IA").
  *
  * Pure pieces shared by POST /api/investments/extract and its tests: the prompt and a lenient
  * normaliser for whatever JSON the model returns. Nothing here touches the database — the route
@@ -29,6 +29,7 @@ Retorne SOMENTE um JSON válido (sem markdown, sem explicações) com esta estru
     "investment": {
         "name": "nome do empreendimento (ex: Sun Place, Infinity Paradise Residencial) ou null",
         "unit_label": "identificação da unidade (ex: Studio 204, Vaga 12, Apartamento 1203) ou null",
+        "area_m2": "área privativa da unidade em m² (número decimal, ex: 27.5) ou null",
         "kind": "APARTMENT | STUDIO | HOUSE | PARKING | LOT | COMMERCIAL | OTHER",
         "developer": "construtora/incorporadora/vendedora ou null",
         "description": "resumo curto do que está sendo comprado (até 300 caracteres) ou null",
@@ -76,6 +77,7 @@ export interface ExtractedInvestment {
     investment: {
         name: string | null;
         unit_label: string | null;
+        area_m2: number | null;
         kind: InvestmentKind;
         developer: string | null;
         description: string | null;
@@ -254,6 +256,7 @@ export function normalizeInvestmentExtraction(raw: unknown): ExtractedInvestment
         investment: {
             name: text(inv.name, 120),
             unit_label: text(inv.unit_label, 80),
+            area_m2: money(inv.area_m2),
             kind: investmentKind(inv.kind),
             developer: text(inv.developer, 120),
             description: text(inv.description, 300),

@@ -9,13 +9,33 @@ import {
     ownStagedPath,
 } from "@/lib/new-investments-server";
 import { signStorageUrl } from "@/lib/storage";
+import { aiConfigured, runDocumentExtraction } from "@/lib/document-extract-server";
+import {
+    CLASSIFIABLE_KINDS,
+    CLASSIFY_MAX_BYTES,
+    IMAGE_CLASSIFY_PROMPT,
+    normalizeClassification,
+    resolveKind,
+    type ImageClassification,
+} from "@/lib/new-investment-classify";
+import type { ReadBy } from "@/lib/ai-reader-label";
+import type { DocumentKind } from "@/lib/new-investments";
+import type { AdminSupabase } from "@/lib/api-auth";
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 type Params = { id: string };
+const TAG = "Investment Docs POST";
 
 /**
  * GET  /api/investments/[id]/documents → the contract, marketing material, photos, floor plans and
  *                                        receipts, each with a signed URL (the bucket is private).
  * POST /api/investments/[id]/documents → adopts a staged upload (POST /api/investments/upload-url).
+ *                                        A picture sent to Fotos, Plantas, Divulgação or Outros is
+ *                                        looked at by the AI once; when it is sure the owner picked
+ *                                        the wrong section, the file goes to the right one and the
+ *                                        response says so (`classified`).
  */
 export const GET = withAuth<undefined, Params>({ tag: "Investment Docs GET" }, async ({ params, profileId, supabase }) => {
     await loadOwnedInvestment(supabase, params.id, profileId);
@@ -39,8 +59,30 @@ export const GET = withAuth<undefined, Params>({ tag: "Investment Docs GET" }, a
     return NextResponse.json({ documents });
 });
 
+/** What the model thinks a picture is. Null whenever it cannot say — never a failed upload. */
+async function classifyPicture(
+    supabase: AdminSupabase,
+    path: string,
+    mimeType: string,
+    size: number
+): Promise<{ guess: ImageClassification; readBy: ReadBy } | null> {
+    if (!aiConfigured() || !mimeType.startsWith("image/") || size <= 0 || size > CLASSIFY_MAX_BYTES) return null;
+    try {
+        const { data } = await supabase.storage.from(INVESTMENT_DOCUMENTS_BUCKET).download(path);
+        if (!data) return null;
+        const buffer = Buffer.from(await data.arrayBuffer());
+        const result = await runDocumentExtraction({ prompt: IMAGE_CLASSIFY_PROMPT, buffer, mimeType, textContent: "", tag: TAG });
+        if (!result) return null;
+        const guess = normalizeClassification(result.data);
+        return guess ? { guess, readBy: result.readBy } : null;
+    } catch (err) {
+        console.error(`[${TAG}] classification failed:`, err);
+        return null;
+    }
+}
+
 export const POST = withAuth<typeof documentInputSchema, Params>(
-    { body: documentInputSchema, tag: "Investment Docs POST" },
+    { body: documentInputSchema, tag: TAG },
     async ({ body, params, profileId, supabase }) => {
         await loadOwnedInvestment(supabase, params.id, profileId);
 
@@ -61,22 +103,37 @@ export const POST = withAuth<typeof documentInputSchema, Params>(
         const adopted = await adoptStagedUpload(supabase, params.id, staged);
         if (!adopted) throw badRequest({ storage_path: "Arquivo não encontrado. Envie o documento novamente." });
 
+        const mimeType = body.mime_type ?? mimeTypeOfPath(adopted.path);
+        const size = body.size_bytes ?? adopted.size ?? 0;
+
+        // Where the file goes: the owner's section, unless the model is sure it belongs elsewhere.
+        let kind: DocumentKind = body.payment_id ? "RECEIPT" : body.kind;
+        let classified: { from: DocumentKind; to: DocumentKind; read_by: ReadBy; reason: string | null } | null = null;
+        if (!body.payment_id && (CLASSIFIABLE_KINDS as readonly string[]).includes(kind)) {
+            const seen = await classifyPicture(supabase, adopted.path, mimeType, size);
+            const resolved = resolveKind(kind, seen?.guess ?? null);
+            if (seen && resolved !== kind) {
+                classified = { from: kind, to: resolved, read_by: seen.readBy, reason: seen.guess.reason };
+                kind = resolved;
+            }
+        }
+
         const { data, error } = await supabase
             .from("new_investment_documents")
             .insert({
                 investment_id: params.id,
                 owner_id: profileId,
                 payment_id: body.payment_id ?? null,
-                kind: body.payment_id ? "RECEIPT" : body.kind,
+                kind,
                 storage_path: adopted.path,
                 file_name: body.file_name,
-                mime_type: body.mime_type ?? mimeTypeOfPath(adopted.path),
-                size_bytes: body.size_bytes ?? adopted.size,
+                mime_type: mimeType,
+                size_bytes: size,
             })
             .select()
             .single();
         if (error || !data) {
-            console.error("[Investment Docs POST] insert failed:", error?.message);
+            console.error(`[${TAG}] insert failed:`, error?.message);
             await supabase.storage.from(INVESTMENT_DOCUMENTS_BUCKET).remove([adopted.path]);
             throw new Error(`document insert failed: ${error?.message}`);
         }
@@ -92,7 +149,7 @@ export const POST = withAuth<typeof documentInputSchema, Params>(
         }
 
         // The first photo becomes the card's cover unless one was chosen already.
-        if (body.kind === "PHOTO") {
+        if (kind === "PHOTO") {
             await supabase
                 .from("new_investments")
                 .update({ cover_path: adopted.path })
@@ -102,6 +159,6 @@ export const POST = withAuth<typeof documentInputSchema, Params>(
         }
 
         const url = await signStorageUrl(supabase, INVESTMENT_DOCUMENTS_BUCKET, adopted.path);
-        return NextResponse.json({ document: { ...data, url } }, { status: 201 });
+        return NextResponse.json({ document: { ...data, url }, classified }, { status: 201 });
     }
 );

@@ -427,13 +427,13 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                             </li>
                                             <li>
                                                 <Link
-                                                    title={navCollapsed ? "Novos Investimentos" : undefined}
-                                                    href={lang === 'pt' ? '/novos-investimentos' : `/${lang}/novos-investimentos`}
-                                                    aria-current={isActive(lang === 'pt' ? '/novos-investimentos' : `/${lang}/novos-investimentos`) ? "page" : undefined}
-                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/novos-investimentos' : `/${lang}/novos-investimentos`) ? 'bg-accent' : ''}`}
+                                                    title={navCollapsed ? "Projetos" : undefined}
+                                                    href={lang === 'pt' ? '/projetos' : `/${lang}/projetos`}
+                                                    aria-current={isActive(lang === 'pt' ? '/projetos' : `/${lang}/projetos`) ? "page" : undefined}
+                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/projetos' : `/${lang}/projetos`) ? 'bg-accent' : ''}`}
                                                 >
                                                     <HardHat className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 sidebar-label">Novos Investimentos</span>
+                                                    <span className="ms-3 sidebar-label">Projetos</span>
                                                 </Link>
                                             </li>
                                             {/* Contábil & Fiscal: holding-level accounting fed by the bank account */}

@@ -34,6 +34,7 @@ import Tile, { type TileInfo } from "./Tile";
 import { periodLabel, periodRange, type PeriodFilterValue } from "@/lib/period-filter";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "./TableColumnFilters";
 import { columnTableKey, recordTableKey } from "@/lib/ui-preferences";
+import { DateInput } from "@/components/ui/DateInput";
 import { CellSumBar, useCellSum } from "./TableCellSum";
 import MoneyInput, { parseMoneyText } from "./MoneyInput";
 
@@ -507,7 +508,7 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
                                                 )}
                                             </td>
                                             <td {...sel.cellProps("date", row.id, null, "px-2 py-1 whitespace-nowrap", () => cancelDraft(row.id, "date"))}>
-                                                <input type="date" disabled={busy} value={d.date ?? (row.paid_on ?? "")} onChange={ev => setDraft(row.id, "date", ev.target.value)} onBlur={() => commit(row, "date")} className={BOX} />
+                                                <DateInput variant="bare" disabled={busy} value={d.date ?? (row.paid_on ?? "")} onChange={iso => setDraft(row.id, "date", iso)} onBlur={() => commit(row, "date")} className={BOX} />
                                             </td>
                                             <td {...sel.cellProps("comment", row.id, null, "px-2 py-1", () => cancelDraft(row.id, "comment"))}>
                                                 <input type="text" disabled={busy} value={d.comment ?? (row.comment ?? "")} placeholder="—"
@@ -561,7 +562,7 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
                                                         </select>
                                                     </td>
                                                     <td className="px-2 py-0.5 whitespace-nowrap">
-                                                        <input type="date" disabled={busy} value={pd.date ?? (part.paid_on ?? "")} onChange={ev => setPartDraft(row.id, part.seq, "date", ev.target.value)} onBlur={() => commitPart(row, part, "date")} className={BOX} />
+                                                        <DateInput variant="bare" disabled={busy} value={pd.date ?? (part.paid_on ?? "")} onChange={iso => setPartDraft(row.id, part.seq, "date", iso)} onBlur={() => commitPart(row, part, "date")} className={BOX} />
                                                     </td>
                                                     <td className="px-2 py-0.5 text-muted-foreground" colSpan={3} />
                                                 </tr>
@@ -608,7 +609,7 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
                                     {TAX_PAYERS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                                 </select>
                             </div>
-                            <div className="space-y-1.5"><Label>Data do pagamento</Label><Input type="date" value={add.date} onChange={ev => setAdd(a => ({ ...a, date: ev.target.value }))} /></div>
+                            <div className="space-y-1.5"><Label>Data do pagamento</Label><DateInput value={add.date} onChange={iso => setAdd(a => ({ ...a, date: iso }))} /></div>
                         </div>
                         <div className="space-y-1.5"><Label>Comentários</Label><Input value={add.comment} placeholder="Opcional" onChange={ev => setAdd(a => ({ ...a, comment: ev.target.value }))} /></div>
                     </div>
@@ -666,7 +667,7 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
                                             {TAX_PAYERS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                                         </select>
                                     </Field>
-                                    <Field label="Vencimento"><Input type="date" value={review.vencimento} onChange={ev => setReview(f => f && ({ ...f, vencimento: ev.target.value }))} /></Field>
+                                    <Field label="Vencimento"><DateInput value={review.vencimento} onChange={iso => setReview(f => f && ({ ...f, vencimento: iso }))} /></Field>
                                     <Field label="Referência"><Input value={review.referencia} placeholder="Única / 1/6" onChange={ev => setReview(f => f && ({ ...f, referencia: ev.target.value }))} /></Field>
                                     <Field label="Valor do imposto (R$)"><Input type="number" step="0.01" min={0} value={review.valorImposto} onChange={ev => setReview(f => f && ({ ...f, valorImposto: ev.target.value }))} /></Field>
                                     <Field label="Coleta de lixo (R$)"><Input type="number" step="0.01" min={0} value={review.coletaLixo} onChange={ev => setReview(f => f && ({ ...f, coletaLixo: ev.target.value }))} /></Field>

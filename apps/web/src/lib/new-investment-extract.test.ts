@@ -13,6 +13,7 @@ const quadroResumo = {
     investment: {
         name: "Sun Place",
         unit_label: "Studio 204",
+        area_m2: "27,5",
         kind: "studio",
         developer: "Acácio SPE",
         total_price: "R$ 141.900,00",

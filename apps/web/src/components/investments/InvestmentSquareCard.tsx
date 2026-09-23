@@ -36,13 +36,16 @@ const SWIPE_MIN_PX = 40;
 
 const compactBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
-/** "faltam 14 meses", "chaves entregues", "entrega este mês". */
-function keysLabel(summary: InvestmentCardSummary | undefined, delivered: boolean): string {
-    if (delivered) return "Chaves entregues";
-    if (!summary || summary.monthsToKeys === null) return "Entrega não informada";
-    if (summary.monthsToKeys < 0) return `Entrega prevista vencida (${formatDateBR(summary.keysOn)})`;
-    if (summary.monthsToKeys === 0) return "Entrega neste mês";
-    return `Faltam ${summary.monthsToKeys} ${summary.monthsToKeys === 1 ? "mês" : "meses"} para as chaves`;
+/** "faltam 14 meses · obra 35%", "chaves entregues", "entrega este mês". Short: the label above already says "Chaves". */
+function keysLabel(summary: InvestmentCardSummary | undefined, investment: NewInvestment): string {
+    const works = investment.construction_pct !== null && !investment.keys_delivered_on
+        ? ` · obra ${investment.construction_pct.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}%`
+        : "";
+    if (investment.keys_delivered_on) return "Chaves entregues";
+    if (!summary || summary.monthsToKeys === null) return `Entrega não informada${works}`;
+    if (summary.monthsToKeys < 0) return `Prevista para ${formatDateBR(summary.keysOn)}, vencida${works}`;
+    if (summary.monthsToKeys === 0) return `Entrega neste mês${works}`;
+    return `Faltam ${summary.monthsToKeys} ${summary.monthsToKeys === 1 ? "mês" : "meses"}${works}`;
 }
 
 const EMPTY: string[] = [];
@@ -145,7 +148,7 @@ export default function InvestmentSquareCard({ investment, summary, photoUrls = 
                     type="button"
                     onClick={onDelete}
                     disabled={isDeleting}
-                    title="Excluir investimento"
+                    title="Excluir projeto"
                     aria-label={`Excluir ${title}`}
                     className="absolute top-2 right-2 p-1.5 rounded-lg bg-background/90 text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-rose-600 transition-opacity disabled:opacity-50"
                 >
@@ -229,7 +232,7 @@ export default function InvestmentSquareCard({ investment, summary, photoUrls = 
                     <div className="rounded-lg bg-muted/40 px-2 py-1.5">
                         <dt className="flex items-center gap-1 text-muted-foreground"><KeyRound className="w-3 h-3" /> Chaves</dt>
                         <dd className="font-semibold text-foreground">{summary?.keysOn ? formatDateBR(summary.keysOn) : "—"}</dd>
-                        <dd className="text-muted-foreground line-clamp-1">{keysLabel(summary, Boolean(investment.keys_delivered_on))}</dd>
+                        <dd className="text-muted-foreground line-clamp-1" title={keysLabel(summary, investment)}>{keysLabel(summary, investment)}</dd>
                     </div>
                 </dl>
 

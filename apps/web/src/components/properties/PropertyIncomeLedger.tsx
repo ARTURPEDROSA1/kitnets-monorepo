@@ -49,6 +49,7 @@ import MoneyInput, { parseMoneyText } from "./MoneyInput";
 import Tile, { type TileInfo } from "./Tile";
 import { ColumnVisibilityMenu, useColumnVisibility } from "./TableColumnVisibility";
 import { columnTableKey, recordTableKey } from "@/lib/ui-preferences";
+import { DateInput } from "@/components/ui/DateInput";
 import { groupMonthly, periodLabel, periodRange, type ChartGroup, type PeriodFilterValue } from "@/lib/period-filter";
 import {
     breakdown,
@@ -1092,7 +1093,7 @@ export default function PropertyIncomeLedger({
                         <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-1.5">
                                 <Label>Mês</Label>
-                                <Input type="month" value={addForm.month} onChange={e => setAddForm(f => ({ ...f, month: e.target.value }))} />
+                                <DateInput mode="month" value={addForm.month} onChange={ym => setAddForm(f => ({ ...f, month: ym }))} />
                             </div>
                             <div className="space-y-1.5">
                                 <Label>Taxa da imobiliária (%)</Label>
