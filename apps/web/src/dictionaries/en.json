@@ -113,9 +113,31 @@
         "clear": "Clear"
     },
     "home": {
-        "welcome": "Welcome to Kitnets.com",
-        "subtitle": "The AI platform for kitnet and studio management. Automation, data, and intelligence for those who live, invest, rent, and build.",
-        "cta": "Get Started"
+        "eyebrow": "AI-powered property management platform",
+        "welcome": "Your rental properties, run like a business",
+        "subtitle": "Kitnets.com is the AI platform for landlords, individuals or real estate holdings, who want to manage their properties on their own or together with an agency: rents, condominiums, solar energy and new investments, all in one place.",
+        "highlights": [
+            "With or without an agency",
+            "Kitnet and studio condominiums",
+            "Solar energy and utility bills",
+            "New investments"
+        ],
+        "cta": "Notify me",
+        "lead": {
+            "nameLabel": "Name",
+            "namePlaceholder": "Your name",
+            "emailLabel": "Email",
+            "emailPlaceholder": "you@email.com",
+            "button": "Notify me",
+            "sending": "Sending...",
+            "successTitle": "Done, you are on the list.",
+            "successText": "We will email you as soon as the platform opens to everyone.",
+            "alreadyText": "This email is already on the list. We will notify you at launch.",
+            "privacy": "No spam. We only use your data to announce the launch.",
+            "errorName": "Please enter your name.",
+            "errorEmail": "Please enter a valid email.",
+            "errorGeneric": "Could not save. Please try again in a moment."
+        }
     },
     "onboarding": {
         "intent": {
@@ -174,93 +196,95 @@
         }
     },
     "homeContent": {
-        "mainTitle": "Kitnets.com is the first platform in Brazil created to transform how kitnets, studios, and compact properties are managed, analyzed, and traded.",
+        "mainTitle": "Everything a landlord needs to decide with numbers, not guesswork.",
         "mainIntro": [
-            "More than a listing portal, we are a digital infrastructure based on data and artificial intelligence for the entire compact real estate ecosystem.",
-            "Here, residents, owners, brokers, agencies, and developers operate in the same environment, with automated processes, structured information, and data-driven decisions."
+            "Scattered spreadsheets, agency statements, energy bills and condominium slips: today the information about your assets lives everywhere. Kitnets.com brings it into one results centre per property, updated month by month.",
+            "AI reads leases and bills, fills in the entries and computes the indicators. You follow revenue, costs, occupancy and return for each property, and for the whole portfolio, in minutes."
         ],
         "sections": [
             {
-                "title": "Find your kitnet with intelligence",
-                "description": "For those looking to live or invest, Kitnets.com offers an objective and precise experience:",
+                "title": "Rent management, with or without an agency",
+                "description": "Self-manage or keep your agency. Either way, you see the real result of each property:",
                 "items": [
-                    "Exclusive listings of kitnets, studios, and compact properties",
-                    "Smart filters by city, neighborhood, price, and profile",
-                    "Automatic alerts based on your interest",
-                    "Less noise. More relevance. More efficiency."
+                    "Gross rent, agency fee and net rent month by month",
+                    "Leases imported by AI: tenant, term, adjustment and guarantees",
+                    "Tenants, adjustments and due dates organised in one place",
+                    "How much you would save by self-managing, computed automatically"
                 ],
-                "footer": "You don’t browse thousands of generic listings. You find the right property, at the right time."
+                "footer": "You choose how to operate. The platform shows what each choice costs."
             },
             {
-                "title": "Advertising is not just publishing. It's operating.",
-                "description": "At Kitnets.com, advertising is just the beginning. The platform was created to operate properties professionally, with automation and control. For owners, brokers, and agencies:",
+                "title": "A results centre per property",
+                "description": "Each property has its own statement: revenue, operating expenses, property tax, energy and net operating income (NOI).",
                 "items": [
-                    "Unprecedented KPIs for compact properties",
-                    "Complete history of properties, contracts, and adjustments"
+                    "A smart ledger with real entries, not estimates",
+                    "Occupancy and rent history since the first lease",
+                    "Filters, sums and editing right in the table, like Excel",
+                    "Explained indicators: you understand how each number is computed"
                 ],
-                "footer": "Here, properties stop being a “black box” and become monitored, analyzed, and comparable assets."
+                "footer": "No more black box: your assets become monitored, comparable investments."
             },
             {
-                "title": "Market intelligence to decide better",
-                "description": "The platform transforms real data into actionable insights:",
+                "title": "Kitnet and studio condominiums",
+                "description": "In buildings with several units, the condominium gets its own cost centre:",
                 "items": [
-                    "Price ranges by neighborhood and city",
-                    "Rent and demand trends",
-                    "Regional comparisons",
-                    "Decision support for new investments"
+                    "Condominium revenue per unit, vacant units included",
+                    "Building costs: water, cleaning, maintenance and land tax",
+                    "Condominium result kept apart from the rent result",
+                    "Clear split between landlord, tenants and agency"
                 ],
-                "footer": "Ideal for those investing, expanding portfolios, or moving cities with more security."
+                "footer": "You know whether the condominium pays for itself, and by how much."
             },
             {
-                "title": "A connected ecosystem",
-                "description": "Kitnets.com connects everyone involved:",
+                "title": "Solar energy and utility bills",
+                "description": "If the property generates solar power, the platform tracks the real savings:",
                 "items": [
-                    "Residents receive alerts, follow the market, and open requests",
-                    "Owners monitor contracts, profitability, and performance",
-                    "Brokers and agencies scale operations with less cost and more control",
-                    "Developers validate demand and find investors"
+                    "Utility bills imported by AI, no typing",
+                    "Credits, injected energy and compensation per consumer unit",
+                    "Solar savings in currency and payback of the investment",
+                    "Water and energy bills integrated into the property result"
                 ],
-                "footer": "Everyone operating on the same database, with clear and traceable processes."
+                "footer": "From the panel on the roof to the result in the bank."
             },
             {
-                "title": "Created for the Artificial Intelligence era",
-                "description": "Kitnets.com was architected from the start for the AI era:",
+                "title": "New investments with market data",
+                "description": "Before buying the next property, simulate and compare:",
                 "items": [
-                    "Structured and standardized data",
-                    "Automation of operational processes",
-                    "Foundation for intelligent agents, advanced reports, and predictive analytics",
-                    "Infrastructure ready for the future of the real estate market"
+                    "Acquisition, financing, renovation and carrying costs in an investment ledger",
+                    "Return, cap rate and payback projected from your real history",
+                    "FipeZap, IPCA, IGP-M and CDI indices updated automatically",
+                    "Calculators for adjustments, termination, pro-rata rent and financial independence"
                 ],
-                "footer": "It's not just a property site. It's the intelligence platform for the compact real estate market."
+                "footer": "Invest with the same clarity you have over what you already own."
             },
             {
-                "title": "Kitnets.com is for you if:",
+                "title": "Artificial intelligence in the daily routine",
+                "description": "AI sits inside the workflow, not in a separate chat:",
                 "items": [
-                    "You are looking for a kitnet or studio efficiently",
-                    "You want to list and operate properties professionally",
-                    "You want to get off spreadsheets and manual control",
-                    "You seek real data to invest better",
-                    "You want management, automation, and intelligence in one place"
-                ]
+                    "Reads leases, bills and slips from PDF or photo",
+                    "Fills in the entries automatically and checks the amounts",
+                    "Alerts for due dates, adjustments and consumption deviations",
+                    "Reports ready for the accountant and the family"
+                ],
+                "footer": "Less typing, more decisions."
             }
         ],
         "finalCta": {
-            "title": "Take your property management to the next level",
-            "status": "Kitnets.com intelligent management SaaS is launching soon.",
-            "description": "We are opening an exclusive waitlist for owners, real estate holdings, investors, and agencies who want to operate kitnets and studios with automation, data, and artificial intelligence from day one.",
-            "listTitle": "By joining the waitlist, you get:",
+            "title": "We are opening the platform in waves",
+            "status": "Join the list now and get early access.",
+            "description": "Leave your name and email. We will let you know as soon as the platform opens to everyone, no spam, no commitment.",
+            "listTitle": "On the list you get:",
             "benefits": [
-                "Early access to the management platform",
-                "Participation in the founding users group",
-                "Priority in activating AI features",
-                "Special commercial conditions at launch",
-                "Direct influence on the product roadmap"
+                "Early access, before the public launch",
+                "A seat among the founding users, with a say in the roadmap",
+                "Launch conditions",
+                "Assisted onboarding: we import your leases and bills with you"
             ],
-            "closing": "Whether you manage one or dozens of properties, this platform was created to replace spreadsheets, reduce operational friction, and elevate your management level.",
-            "callToAction": "Start now. Be one of the first.",
-            "subText1": "Join the Kitnets.com SaaS waitlist",
-            "subText2": "And participate in building the new digital infrastructure for kitnets and studios in Brazil.",
-            "buttonLabel": "Join the waitlist"
+            "closing": "Whether you manage one property or dozens, as an individual or a holding, the platform was built to get you out of spreadsheets and put your assets under control.",
+            "callToAction": "Be among the first.",
+            "subText1": "Name and email are enough.",
+            "subText2": "We use your data only to announce the launch. No spam, no sharing.",
+            "buttonLabel": "Notify me"
         }
     },
     "rentPage": {

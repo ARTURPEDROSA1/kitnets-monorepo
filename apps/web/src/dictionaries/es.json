@@ -76,9 +76,31 @@
         "nearMetro": "Cerca del Metro"
     },
     "home": {
-        "welcome": "Bienvenido a Kitnets.com",
-        "subtitle": "La plataforma de IA para la gestión de kitnets y studios. Automatización, datos e inteligencia para quienes viven, invierten, alquilan y construyen.",
-        "cta": "Comenzar"
+        "eyebrow": "Plataforma de gestión inmobiliaria con inteligencia artificial",
+        "welcome": "Tus inmuebles de alquiler, gestionados como un negocio",
+        "subtitle": "Kitnets.com es la plataforma con IA para propietarios, personas físicas o holdings inmobiliarios, que quieren administrar sus inmuebles por su cuenta o junto con la inmobiliaria: alquileres, condominios, energía solar y nuevas inversiones, todo en un solo lugar.",
+        "highlights": [
+            "Con o sin inmobiliaria",
+            "Condominios de kitnets y studios",
+            "Energía solar y facturas",
+            "Nuevas inversiones"
+        ],
+        "cta": "Quiero que me avisen",
+        "lead": {
+            "nameLabel": "Nombre",
+            "namePlaceholder": "Tu nombre",
+            "emailLabel": "Correo",
+            "emailPlaceholder": "tu@correo.com",
+            "button": "Quiero que me avisen",
+            "sending": "Enviando...",
+            "successTitle": "Listo, estás en la lista.",
+            "successText": "Te avisaremos por correo en cuanto la plataforma esté abierta para todos.",
+            "alreadyText": "Este correo ya está en la lista. Te avisaremos en el lanzamiento.",
+            "privacy": "Sin spam. Usamos tus datos solo para avisar del lanzamiento.",
+            "errorName": "Indica tu nombre.",
+            "errorEmail": "Indica un correo válido.",
+            "errorGeneric": "No se pudo guardar. Inténtalo de nuevo en unos instantes."
+        }
     },
     "onboarding": {
         "intent": {
@@ -137,108 +159,95 @@
         }
     },
     "homeContent": {
-        "mainTitle": "Kitnets.com es la primera plataforma en Brasil creada para transformar la forma en que se gestionan, analizan y negocian kitnets, studios e inmuebles compactos.",
+        "mainTitle": "Todo lo que un propietario necesita para decidir con números, no con intuición.",
         "mainIntro": [
-            "Más que un portal de anuncios, somos una infraestructura digital basada en datos e inteligencia artificial para todo el ecosistema inmobiliario compacto.",
-            "Aquí, residentes, propietarios, corredores, inmobiliarias y constructoras operan en el mismo entorno, con procesos automatizados, información estructurada y decisiones orientadas por datos."
+            "Planillas dispersas, extractos de la inmobiliaria, facturas de energía y recibos de condominio: hoy la información de tu patrimonio está repartida. Kitnets.com la reúne en un centro de resultados por inmueble, actualizado mes a mes.",
+            "La inteligencia artificial lee contratos y facturas, completa los asientos y calcula los indicadores. Sigues ingresos, costos, ocupación y retorno de cada inmueble, y de toda la cartera, en minutos."
         ],
         "sections": [
             {
-                "title": "Encuentra tu kitnet con inteligencia",
-                "description": "Para quienes buscan vivir o invertir, Kitnets.com ofrece una experiencia objetiva y precisa:",
+                "title": "Gestión de alquileres, con o sin inmobiliaria",
+                "description": "Administra por tu cuenta o mantén la alianza con tu inmobiliaria. En cualquier modelo, ves el resultado real de cada inmueble:",
                 "items": [
-                    "Anuncios exclusivos de kitnets, studios e inmuebles compactos",
-                    "Filtros inteligentes por ciudad, barrio, precio y perfil",
-                    "Alertas automáticas basadas en tu interés",
-                    "Menos ruido. Más relevancia. Más eficiencia."
+                    "Renta bruta, comisión de la inmobiliaria y renta neta mes a mes",
+                    "Contratos importados por IA: inquilino, vigencia, reajuste y garantías",
+                    "Inquilinos, reajustes y vencimientos organizados en un solo lugar",
+                    "Cuánto ahorrarías con la autogestión, calculado automáticamente"
                 ],
-                "footer": "No navegas en miles de anuncios genéricos. Encuentras el inmueble correcto, en el momento correcto."
+                "footer": "Tú decides cómo operar. La plataforma muestra lo que cuesta cada opción."
             },
             {
-                "title": "Anunciar no es publicar. Es operar.",
-                "description": "En Kitnets.com, anunciar es solo el comienzo. La plataforma fue creada para operar inmuebles de forma profesional, con automatización y control. Para propietarios, corredores e inmobiliarias:",
+                "title": "Un centro de resultados por inmueble",
+                "description": "Cada inmueble tiene su propio estado de resultados: ingresos, gastos operativos, impuesto predial, energía y resultado neto (NOI).",
                 "items": [
-                    "Anuncios con público altamente cualificado",
-                    "Gestión centralizada de contratos, alquileres y reajustes",
-                    "Comunicación organizada con residentes",
-                    "Historial completo de valores, documentos y eventos",
-                    "Fin de las hojas de cálculo, controles paralelos e improvisación"
+                    "Planilla inteligente con asientos reales, no estimaciones",
+                    "Ocupación e historial de alquiler desde el primer contrato",
+                    "Filtros, sumas y edición directo en la tabla, como en Excel",
+                    "Indicadores explicados: entiendes cómo se calcula cada número"
                 ],
-                "footer": "Todo en un único sistema, orientado a datos."
+                "footer": "Se acabó la caja negra: tu patrimonio pasa a ser un activo monitoreado y comparable."
             },
             {
-                "title": "Gestión inmobiliaria orientada por datos",
-                "description": "Kitnets.com funciona como un SaaS inmobiliario con inteligencia integrada, ofreciendo:",
+                "title": "Condominios de kitnets y studios",
+                "description": "En edificios con varias unidades, el condominio tiene su propio centro de costos:",
                 "items": [
-                    "Dashboards claros y actualizados en tiempo real",
-                    "Informes automáticos",
-                    "Métricas de rendimiento y rentabilidad",
-                    "KPIs inéditos para inmuebles compactos",
-                    "Historial completo de inmuebles, contratos y reajustes"
+                    "Ingreso de condominio por unidad, incluidas las unidades vacías",
+                    "Costos del edificio: agua, limpieza, mantenimiento e impuesto del terreno",
+                    "Resultado del condominio separado del resultado del alquiler",
+                    "Reparto claro entre propietario, inquilinos e inmobiliaria"
                 ],
-                "footer": "Aquí, los inmuebles dejan de ser una “caja negra” y pasan a ser activos monitoreados, analizados y comparables."
+                "footer": "Sabes si el condominio se paga solo, y cuánto sobra o falta."
             },
             {
-                "title": "Inteligencia de mercado para decidir mejor",
-                "description": "La plataforma transforma datos reales en insights accionables:",
+                "title": "Energía solar y facturas de consumo",
+                "description": "Si el inmueble tiene generación solar, la plataforma sigue el ahorro real:",
                 "items": [
-                    "Rangos de precios por barrio y ciudad",
-                    "Tendencias de alquiler y demanda",
-                    "Comparativas regionales",
-                    "Apoyo en la decisión para nuevas inversiones"
+                    "Facturas de la distribuidora importadas por IA, sin tipear",
+                    "Créditos, energía inyectada y compensación por unidad consumidora",
+                    "Ahorro solar en dinero y payback de la inversión",
+                    "Facturas de agua y energía integradas al resultado del inmueble"
                 ],
-                "footer": "Ideal para quienes invierten, expanden portafolio o cambian de ciudad con más seguridad."
+                "footer": "Del panel en el techo al resultado en la caja."
             },
             {
-                "title": "Un ecosistema conectado",
-                "description": "Kitnets.com conecta a todos los involucrados:",
+                "title": "Nuevas inversiones con datos de mercado",
+                "description": "Antes de comprar el próximo inmueble, simula y compara:",
                 "items": [
-                    "Residentes reciben alertas, siguen el mercado y abren solicitudes",
-                    "Propietarios monitorean contratos, rentabilidad y rendimiento",
-                    "Corredores e inmobiliarias escalan operaciones con menos costo y más control",
-                    "Constructoras validan demanda y encuentran inversores"
+                    "Adquisición, financiación, reforma y costos de mantenimiento en un libro de inversión",
+                    "Retorno, cap rate y payback proyectados a partir de tu historial real",
+                    "Índices FipeZap, IPCA, IGP-M y CDI actualizados automáticamente",
+                    "Calculadoras de reajuste, rescisión, alquiler proporcional e independencia financiera"
                 ],
-                "footer": "Todos operando sobre la misma base de datos, con procesos claros y rastreables."
+                "footer": "Invierte con la misma claridad con la que sigues lo que ya tienes."
             },
             {
-                "title": "Creado para la era de la Inteligencia Artificial",
-                "description": "Kitnets.com fue arquitectado desde el inicio para la era de la IA:",
+                "title": "Inteligencia artificial en el día a día",
+                "description": "La IA está dentro del flujo de trabajo, no en un chat aparte:",
                 "items": [
-                    "Datos estructurados y estandarizados",
-                    "Automatización de procesos operativos",
-                    "Base para agentes inteligentes, informes avanzados y análisis predictivos",
-                    "Infraestructura lista para el futuro del mercado inmobiliario"
+                    "Lectura de contratos, facturas y recibos en PDF o foto",
+                    "Carga automática de los asientos y verificación de los valores",
+                    "Alertas de vencimiento, reajuste y desvío de consumo",
+                    "Informes listos para el contador y para la familia"
                 ],
-                "footer": "No es solo un sitio de inmuebles. Es la plataforma de inteligencia para el mercado de inmuebles compactos."
-            },
-            {
-                "title": "Kitnets.com es para ti si:",
-                "items": [
-                    "Buscas una kitnet o studio con eficiencia",
-                    "Quieres anunciar y operar inmuebles de forma profesional",
-                    "Deseas salir de las hojas de cálculo y del control manual",
-                    "Buscas datos reales para invertir mejor",
-                    "Quieres gestión, automatización e inteligencia en un solo lugar"
-                ]
+                "footer": "Menos tipeo, más decisión."
             }
         ],
         "finalCta": {
-            "title": "Lleve la gestión de sus inmuebles al siguiente nivel",
-            "status": "El SaaS de gestión inteligente de Kitnets.com está en fase de lanzamiento.",
-            "description": "Estamos abriendo una lista de espera exclusiva para propietarios, holdings inmobiliarios, inversores e inmobiliarias que desean operar kitnets y studios con automatización, datos e inteligencia artificial desde el primer día.",
-            "listTitle": "Al unirse a la lista de espera, obtendrá:",
+            "title": "Estamos abriendo la plataforma por etapas",
+            "status": "Quien entre en la lista ahora recibe acceso anticipado.",
+            "description": "Deja tu nombre y correo. Te avisaremos en cuanto la plataforma esté abierta para todos, sin spam y sin compromiso.",
+            "listTitle": "Quien entra en la lista tiene:",
             "benefits": [
-                "Acceso anticipado a la plataforma de gestión",
-                "Participación en el grupo de usuarios fundadores",
-                "Prioridad en la activación de funciones de IA",
-                "Condiciones comerciales diferenciadas en el lanzamiento",
-                "Influencia directa en el roadmap del producto"
+                "Acceso anticipado, antes de la apertura al público",
+                "Lugar en el grupo de usuarios fundadores, con voz en el roadmap",
+                "Condiciones de lanzamiento diferenciadas",
+                "Onboarding asistido: importamos tus contratos y facturas contigo"
             ],
-            "closing": "Si administra uno o decenas de inmuebles, esta plataforma fue creada para reemplazar hojas de cálculo, reducir la fricción operativa y elevar el nivel de su gestión.",
-            "callToAction": "Empiece ahora. Sea uno de los primeros.",
-            "subText1": "Únase a la lista de espera del SaaS de Kitnets.com",
-            "subText2": "Y participe en la construcción de la nueva infraestructura digital para kitnets y studios en Brasil.",
-            "buttonLabel": "Unirse a la lista de espera"
+            "closing": "Si administras un inmueble o decenas, como persona física o holding, la plataforma fue hecha para sacarte de las planillas y poner tu patrimonio bajo control.",
+            "callToAction": "Sé uno de los primeros.",
+            "subText1": "Con nombre y correo alcanza.",
+            "subText2": "Usamos tus datos solo para avisar de la apertura de la plataforma. Sin spam, sin compartir.",
+            "buttonLabel": "Quiero que me avisen"
         }
     },
     "rentPage": {
