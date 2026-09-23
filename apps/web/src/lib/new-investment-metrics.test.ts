@@ -37,7 +37,7 @@ const investment = (over: Partial<NewInvestment> = {}): NewInvestment => ({
     exit_plan: "ALUGAR",
     sold_on: null,
     sale_price: null,
-    sale_costs: 0,
+    sale_costs_pct: 0,
     area_m2: null,
     market_m2_price: null,
     estimated_value_at_delivery: null,
@@ -321,8 +321,8 @@ describe("valorização, obra and tolerance", () => {
 
 describe("a registered sale", () => {
     it("measures the gain against what was actually paid, net of the sale's costs, with a TIR", () => {
-        // paid 7.095 in 2026-08; sold two years later for 20.000 less 1.000 of costs
-        const sold = investment({ status: "SOLD", sold_on: "2028-08-15", sale_price: 20000, sale_costs: 1000 });
+        // paid 7.095 in 2026-08; sold two years later for 20.000 less 5% of costs (1.000)
+        const sold = investment({ status: "SOLD", sold_on: "2028-08-15", sale_price: 20000, sale_costs_pct: 5 });
         const m = computeInvestmentMetrics(sold, schedules, [payment({})], asOf);
         expect(m.sold).toBe(true);
         expect(m.saleNet).toBe(19000);

@@ -171,8 +171,8 @@ export interface NewInvestment {
     /** The sale, once registered ("Registrar venda"); status becomes SOLD. */
     sold_on: string | null;
     sale_price: number | null;
-    /** Corretagem, certidões, imposto sobre o ganho — what the sale itself cost. */
-    sale_costs: number;
+    /** Corretagem, certidões, imposto sobre o ganho — what the sale itself costs, as % of the price. */
+    sale_costs_pct: number;
     status: InvestmentStatus;
     promoted_property_id: string | null;
     promoted_at: string | null;

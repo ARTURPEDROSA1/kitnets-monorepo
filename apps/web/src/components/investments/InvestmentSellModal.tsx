@@ -23,12 +23,16 @@ interface Props {
     investment: NewInvestment;
     /** What was actually paid so far — the base the gain is measured against. */
     paidToDate: number;
-    onSell: (input: { sold_on: string; sale_price: string; sale_costs: string }) => Promise<string | null>;
+    onSell: (input: { sold_on: string; sale_price: string; sale_costs_pct: string }) => Promise<string | null>;
 }
 
 const parseMoney = (v: string): number | null => {
     const n = Number(v.replace(/[^\d,.-]/g, "").replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", "."));
     return v.trim() && Number.isFinite(n) ? n : null;
+};
+const parsePct = (v: string): number => {
+    const n = Number(v.replace("%", "").replace(",", ".").trim());
+    return v.trim() && Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 0;
 };
 
 export default function InvestmentSellModal({ open, onClose, investment, paidToDate, onSell }: Props) {
@@ -52,14 +56,14 @@ function SellForm({ investment, paidToDate, onSell, onClose }: Omit<Props, "open
     const [form, setForm] = useState({
         sold_on: investment.sold_on ?? new Date().toISOString().slice(0, 10),
         sale_price: investment.sale_price !== null ? String(investment.sale_price).replace(".", ",") : "",
-        sale_costs: investment.sale_costs ? String(investment.sale_costs).replace(".", ",") : "",
+        sale_costs_pct: investment.sale_costs_pct ? String(investment.sale_costs_pct).replace(".", ",") : "",
     });
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const price = parseMoney(form.sale_price);
-    const costs = parseMoney(form.sale_costs) ?? 0;
-    const net = price !== null ? price - costs : null;
+    const costsPct = parsePct(form.sale_costs_pct);
+    const net = price !== null ? Math.round(price * (1 - costsPct / 100) * 100) / 100 : null;
     const gain = net !== null ? net - paidToDate : null;
 
     const submit = async () => {
@@ -86,8 +90,8 @@ function SellForm({ investment, paidToDate, onSell, onClose }: Omit<Props, "open
                         <Input id="sell-price" inputMode="decimal" value={form.sale_price} onChange={e => setForm(f => ({ ...f, sale_price: e.target.value }))} placeholder="320.000" autoFocus />
                     </div>
                     <div className="space-y-1">
-                        <Label htmlFor="sell-costs">Custos da venda (R$)</Label>
-                        <Input id="sell-costs" inputMode="decimal" value={form.sale_costs} onChange={e => setForm(f => ({ ...f, sale_costs: e.target.value }))} placeholder="0" title="Corretagem, certidões, imposto de renda sobre o ganho" />
+                        <Label htmlFor="sell-costs">Custos da venda (%)</Label>
+                        <Input id="sell-costs" inputMode="decimal" value={form.sale_costs_pct} onChange={e => setForm(f => ({ ...f, sale_costs_pct: e.target.value }))} placeholder="6" title="Corretagem (em geral 5–6%), certidões e imposto de renda sobre o ganho, como % do preço" />
                     </div>
                 </div>
 
@@ -95,6 +99,7 @@ function SellForm({ investment, paidToDate, onSell, onClose }: Omit<Props, "open
                     <div>
                         <dt className="text-[10px] uppercase tracking-wider text-muted-foreground">Venda líquida</dt>
                         <dd className="font-semibold tabular-nums">{net !== null ? formatBRL(net, 0) : "—"}</dd>
+                        {price !== null && costsPct > 0 && <dd className="text-[10px] text-muted-foreground tabular-nums">− {formatBRL(price - net!, 0)} de custos</dd>}
                     </div>
                     <div>
                         <dt className="text-[10px] uppercase tracking-wider text-muted-foreground">Pago até agora</dt>

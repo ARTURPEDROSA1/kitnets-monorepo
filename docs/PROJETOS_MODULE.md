@@ -326,7 +326,8 @@ JSON entries by name), so the dialog asks for it and surfaces the 409 as a field
 
 ### Or a sale ("Registrar venda")
 
-The other finish. `POST /api/investments/[id]/sell { sold_on, sale_price, sale_costs }` marks the
+The other finish. `POST /api/investments/[id]/sell { sold_on, sale_price, sale_costs_pct }` (costs
+as % of the price — corretagem is 5–6%, the figure the owner knows) marks the
 row SOLD with the sale on it (undo: a PATCH back to ACTIVE with the fields cleared, the
 "desfazer" link on the banner). The metrics then give `saleNet`, `realizedGain` (net sale minus
 **what was actually paid** — a buyer of an off-plan unit takes over the open instalments, so those

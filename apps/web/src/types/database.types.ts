@@ -2040,7 +2040,7 @@ export type Database = {
           exit_plan: string
           sold_on: string | null
           sale_price: number | null
-          sale_costs: number
+          sale_costs_pct: number
           area_m2: number | null
           market_m2_price: number | null
           estimated_value_at_delivery: number | null
@@ -2086,7 +2086,7 @@ export type Database = {
           exit_plan?: string
           sold_on?: string | null
           sale_price?: number | null
-          sale_costs?: number
+          sale_costs_pct?: number
           area_m2?: number | null
           market_m2_price?: number | null
           estimated_value_at_delivery?: number | null
@@ -2132,7 +2132,7 @@ export type Database = {
           exit_plan?: string
           sold_on?: string | null
           sale_price?: number | null
-          sale_costs?: number
+          sale_costs_pct?: number
           area_m2?: number | null
           market_m2_price?: number | null
           estimated_value_at_delivery?: number | null
