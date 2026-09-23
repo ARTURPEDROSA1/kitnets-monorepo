@@ -332,6 +332,18 @@ describe("a registered sale", () => {
         expect(m.realizedIrrAnnualPct).toBeCloseTo(63.6, 0);
     });
 
+    it("leaves nothing owed, next or overdue — the buyer took the open instalments", () => {
+        const sold = investment({ status: "SOLD", sold_on: "2026-09-15", sale_price: 20000 });
+        const m = computeInvestmentMetrics(sold, schedules, [payment({})], asOf);
+        expect(m.remaining).toBe(0);
+        expect(m.remainingCount).toBe(0);
+        expect(m.remainingByKind).toEqual([]);
+        expect(m.nextDueOn).toBeNull();
+        expect(m.overdueCount).toBe(0);
+        expect(m.committed).toBe(m.paidToDate);
+        expect(m.paidPct).toBe(100);
+    });
+
     it("is not a sale until the price and the date are there", () => {
         expect(computeInvestmentMetrics(investment({ status: "SOLD" }), schedules, [payment({})], asOf).sold).toBe(false);
         expect(computeInvestmentMetrics(investment({ sold_on: "2028-08-15", sale_price: 20000 }), schedules, [payment({})], asOf).sold).toBe(false);

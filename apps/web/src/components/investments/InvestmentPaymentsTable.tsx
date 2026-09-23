@@ -91,6 +91,8 @@ interface Props {
     /** Opens a receipt in the app's own viewer — never a new tab. */
     onView?: (url: string, name: string) => void;
     busy?: boolean;
+    /** The project was sold: the open instalments belong to the buyer, so there is no "next" to show. */
+    sold?: boolean;
 }
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -176,6 +178,7 @@ export default function InvestmentPaymentsTable({
     onEditPlan,
     onView,
     busy,
+    sold = false,
 }: Props) {
     const [draft, setDraft] = useState<PaymentDraft | null>(null);
     const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -209,7 +212,7 @@ export default function InvestmentPaymentsTable({
         defaultHidden: ["installment_number"],
     });
 
-    const pending = useMemo(() => pendingInstalments(schedules, payments), [schedules, payments]);
+    const pending = useMemo(() => (sold ? [] : pendingInstalments(schedules, payments)), [schedules, payments, sold]);
     const pendingKinds = useMemo(() => pendingByKind(pending), [pending]);
     const selectedKind = upcomingKind !== "ALL" && pendingKinds.some(k => k.kind === upcomingKind) ? upcomingKind : "ALL";
     const filteredPending = useMemo(
