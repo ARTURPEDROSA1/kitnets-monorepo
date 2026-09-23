@@ -214,7 +214,7 @@ export default function NovosInvestimentosContent({ lang }: { lang: string }) {
                             key={investment.id}
                             investment={investment}
                             summary={summaries[investment.id]}
-                            coverUrl={summaries[investment.id]?.coverUrl ?? null}
+                            photoUrls={summaries[investment.id]?.photoUrls}
                             onSelect={() => select(investment.id)}
                             onDelete={e => { e.stopPropagation(); remove(investment.id, investment.name); }}
                             isDeleting={deletingId === investment.id}

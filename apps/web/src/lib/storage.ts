@@ -50,3 +50,24 @@ export async function signStorageUrl(
     }
     return data.signedUrl;
 }
+
+/**
+ * Signs many objects of one private bucket in a single storage call and returns them keyed by
+ * path. Paths that could not be signed are simply absent, so callers fall back per item.
+ */
+export async function signStorageUrls(
+    supabase: SupabaseClient,
+    bucket: string,
+    paths: string[],
+    expiresIn: number = SIGNED_URL_TTL
+): Promise<Map<string, string>> {
+    const signed = new Map<string, string>();
+    const unique = Array.from(new Set(paths.map(p => extractStoragePath(bucket, p)).filter((p): p is string => Boolean(p))));
+    if (unique.length === 0) return signed;
+    const { data, error } = await supabase.storage.from(bucket).createSignedUrls(unique, expiresIn);
+    if (error || !data) return signed;
+    for (const item of data) {
+        if (item.path && item.signedUrl && !item.error) signed.set(item.path, item.signedUrl);
+    }
+    return signed;
+}
