@@ -84,6 +84,25 @@ Blocks are replaced wholesale (`PATCH` with `schedules`), never patched one by o
 payments are untouched: the instalments they already answer drop out of the forecast by month and
 kind, as always.
 
+### Files, pictures and the card's cover
+
+"Arquivos do investimento" holds the contract, marketing material, photos and floor plans.
+**Receipts are not listed there**: they belong to their payment and are reached from its row in the
+ledger — a gallery of PIX screenshots served no one. The section filters out `kind = RECEIPT` and
+anything with a `payment_id`.
+
+Pictures open in `PhotoLightbox`: one at a time on black, arrows and ← → to move, Esc to leave, a
+counter, a thumbnail strip, zoom in steps (scroll to pan, double-click to toggle), swipe on a
+phone, and the neighbours preloading while one is looked at. It is built on the app's Dialog so
+focus and the backdrop behave like every other popup, and the viewer inside is keyed by the
+picture so zoom and loading reset by remounting rather than through an effect. PDFs go to the
+app's document viewer instead.
+
+**The card's cover** is `new_investments.cover_path`. The first photo uploaded becomes it
+automatically; any photo can replace it from the grid (star on hover) or from the lightbox ("Usar
+como capa"). The list route signs it into `summaries[].coverUrl`, which is what the card renders —
+before this the cover was set but never shown, because the list never passed a URL.
+
 ### Editing what the investment is
 
 The gear covers what the unit costs; the pencil next to the title covers what it *is* — name,
