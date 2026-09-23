@@ -89,7 +89,7 @@ const INVESTMENT_COLUMNS =
     "financed_amount, contract_date, keys_expected_on, keys_delivered_on, index_before_keys, index_after_keys, " +
     "estimated_rent, rent_start_on, rent_adjustment_pct, rent_vacancy_pct, rent_costs_pct, sim_horizon_months, sim_delivery_costs_pct, " +
     "area_m2, market_m2_price, estimated_value_at_delivery, expected_appreciation_pct, construction_pct, construction_updated_on, " +
-    "strategy, exit_plan, sold_on, sale_price, sale_costs, status, " +
+    "strategy, exit_plan, sold_on, sale_price, sale_costs_pct, status, " +
     "promoted_property_id, promoted_at, cover_path, notes, created_at, updated_at";
 
 const SCHEDULE_COLUMNS = "id, investment_id, label, kind, installments, amount, first_due_on, periodicity, index_code, position";
@@ -128,7 +128,7 @@ function mapInvestment(row: Record<string, unknown>): NewInvestment {
         exit_plan: ((row.exit_plan as string | null) ?? "ALUGAR") as NewInvestment["exit_plan"],
         sold_on: (row.sold_on as string | null) ?? null,
         sale_price: row.sale_price == null ? null : toNumber(row.sale_price),
-        sale_costs: toNumber(row.sale_costs),
+        sale_costs_pct: toNumber(row.sale_costs_pct),
     };
 }
 
@@ -263,7 +263,7 @@ export function investmentRow(input: Partial<InvestmentInput>): Record<string, u
         "index_before_keys", "index_after_keys", "estimated_rent", "rent_start_on", "rent_adjustment_pct",
         "rent_vacancy_pct", "rent_costs_pct", "sim_horizon_months", "sim_delivery_costs_pct",
         "area_m2", "market_m2_price", "estimated_value_at_delivery", "expected_appreciation_pct", "construction_pct", "construction_updated_on",
-        "strategy", "exit_plan", "sold_on", "sale_price", "sale_costs",
+        "strategy", "exit_plan", "sold_on", "sale_price", "sale_costs_pct",
         "status", "cover_path", "notes",
     ] as const;
     for (const key of copy) {

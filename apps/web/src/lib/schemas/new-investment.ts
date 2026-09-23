@@ -160,7 +160,7 @@ export const investmentInputSchema = z.object({
     /** The sale is registered through POST …/sell; PATCH may only clear it (undo). */
     sold_on: isoDate(),
     sale_price: money("Preço de venda inválido."),
-    sale_costs: money("Custos da venda inválidos."),
+    sale_costs_pct: percent(100).optional(),
 
     status: z.enum(INVESTMENT_STATUSES).default("ACTIVE"),
     cover_path: optionalText(400),
@@ -219,7 +219,8 @@ export type DocumentInput = z.output<typeof documentInputSchema>;
 export const sellInputSchema = z.object({
     sold_on: isoDate("Informe a data da venda.").refine((v) => v !== null, "Informe a data da venda."),
     sale_price: money("Preço de venda inválido.").refine((v) => v !== null && v > 0, "Informe o preço de venda."),
-    sale_costs: money("Custos da venda inválidos.").transform((v) => v ?? 0),
+    /** Corretagem and the rest, as % of the price (blank = 0). */
+    sale_costs_pct: percent(100).default(0),
 });
 
 export type SellInput = z.output<typeof sellInputSchema>;

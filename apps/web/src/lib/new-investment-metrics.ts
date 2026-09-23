@@ -242,7 +242,7 @@ export function computeInvestmentMetrics(
     // The sale, once registered: net of its own costs, against what was actually paid (a buyer of
     // an off-plan unit takes over the open instalments, so those are not the seller's cost).
     const sold = investment.status === "SOLD" && Boolean(investment.sold_on) && (investment.sale_price ?? 0) > 0;
-    const saleNet = sold ? round2((investment.sale_price ?? 0) - (investment.sale_costs ?? 0)) : null;
+    const saleNet = sold ? round2((investment.sale_price ?? 0) * (1 - (investment.sale_costs_pct ?? 0) / 100)) : null;
     const realizedGain = saleNet !== null ? round2(saleNet - paid) : null;
     let realizedIrrAnnualPct: number | null = null;
     if (sold && saleNet !== null && investment.sold_on) {

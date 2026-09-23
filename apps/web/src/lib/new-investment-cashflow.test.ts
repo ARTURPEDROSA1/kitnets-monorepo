@@ -9,7 +9,7 @@ const investment = (over: Partial<NewInvestment> = {}): NewInvestment => ({
     contract_date: "2026-07-01", keys_expected_on: "2029-09-20", keys_delivered_on: null,
     index_before_keys: "INCC", index_after_keys: "IGPM",
     estimated_rent: 1200, rent_start_on: null, rent_adjustment_pct: 5, rent_vacancy_pct: 0, rent_costs_pct: 0, sim_horizon_months: 120,
-    sim_delivery_costs_pct: 0, expected_appreciation_pct: null, strategy: "NA_PLANTA", exit_plan: "ALUGAR", sold_on: null, sale_price: null, sale_costs: 0, area_m2: null, market_m2_price: null, estimated_value_at_delivery: null, construction_pct: null, construction_updated_on: null,
+    sim_delivery_costs_pct: 0, expected_appreciation_pct: null, strategy: "NA_PLANTA", exit_plan: "ALUGAR", sold_on: null, sale_price: null, sale_costs_pct: 0, area_m2: null, market_m2_price: null, estimated_value_at_delivery: null, construction_pct: null, construction_updated_on: null,
     status: "ACTIVE", promoted_property_id: null, promoted_at: null, cover_path: null, notes: null,
     created_at: "2026-07-01T00:00:00Z", updated_at: "2026-07-01T00:00:00Z",
     ...over,

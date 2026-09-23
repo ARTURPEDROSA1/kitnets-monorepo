@@ -164,7 +164,7 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
     };
 
     /** "Registrar venda": the row is marked SOLD with the sale on it; a problem comes back as the message to show. */
-    const sell = async (input: { sold_on: string; sale_price: string; sale_costs: string }): Promise<string | null> => {
+    const sell = async (input: { sold_on: string; sale_price: string; sale_costs_pct: string }): Promise<string | null> => {
         const res = await fetch(`/api/investments/${investmentId}/sell`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -178,7 +178,7 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
         await refresh();
         return null;
     };
-    const undoSale = () => patchInvestment({ status: "ACTIVE", sold_on: null, sale_price: null, sale_costs: 0 });
+    const undoSale = () => patchInvestment({ status: "ACTIVE", sold_on: null, sale_price: null, sale_costs_pct: 0 });
 
     const promote = async () => {
         setPromoting(true);
@@ -444,7 +444,7 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                     <Handshake className="w-5 h-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
                     <span>
                         Vendido em <strong>{formatDateBR(investment.sold_on)}</strong> por <strong className="tabular-nums">{formatBRL(investment.sale_price ?? 0)}</strong>
-                        {investment.sale_costs > 0 ? ` (líquido ${formatBRL(metrics.saleNet)})` : ""} — ganho de{" "}
+                        {investment.sale_costs_pct > 0 ? ` (líquido ${formatBRL(metrics.saleNet)} após ${pct1(investment.sale_costs_pct)}% de custos)` : ""} — ganho de{" "}
                         <strong className={`text-base font-bold tabular-nums ${metrics.realizedGain >= 0 ? "" : "text-rose-700 dark:text-rose-300"}`}>
                             {metrics.realizedGain > 0 ? "+" : ""}{formatBRL(metrics.realizedGain)}
                         </strong>
