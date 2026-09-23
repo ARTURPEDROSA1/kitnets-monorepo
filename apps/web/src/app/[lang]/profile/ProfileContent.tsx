@@ -3325,15 +3325,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                     <Home className="w-3.5 h-3.5" />
                                     Anunciar Aluguel
                                 </Button>
-                                <Button
-                                    size="sm"
-                                    type="button"
-                                    className="h-8 text-xs flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-xs"
-                                    onClick={() => handleQuickPublish('sale', propIdx)}
-                                >
-                                    <Sparkles className="w-3.5 h-3.5" />
-                                    Anunciar Venda
-                                </Button>
+                                {/* No "Anunciar Venda": kitnets.com is about renting for the foreseeable future (owner's call, 2026-09-24) */}
                                 <Button
                                     size="sm"
                                     type="button"
