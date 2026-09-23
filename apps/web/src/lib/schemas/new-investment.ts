@@ -155,6 +155,12 @@ export const paymentInputSchema = z
         status: z.enum(PAYMENT_STATUSES).default("PAID"),
         receipt_path: optionalText(400),
         receipt_name: optionalText(200),
+        /** Several staged receipts at once (a split has one per pocket). Each is adopted as a document of this payment. */
+        receipt_paths: z.array(z.string().trim().min(1).max(400)).max(10, "Máximo de 10 comprovantes por lançamento.").optional(),
+        /** Who paid: the person, the company, or both. Absent = not recorded. */
+        payer: z.enum(["PF", "PJ", "SPLIT"]).nullable().optional(),
+        /** The company's share when payer is SPLIT; ignored otherwise. */
+        pj_amount: money(),
         notes: optionalText(1000),
     })
     // The table's default is PAID, and a paid row without a date breaks every month bucket.
@@ -171,6 +177,8 @@ export const documentInputSchema = z.object({
     file_name: optionalText(200),
     mime_type: optionalText(120),
     size_bytes: z.coerce.number().int().min(0).max(100 * 1024 * 1024).nullable().optional().default(null),
+    /** The payment this file is a receipt of; must belong to the same investment. */
+    payment_id: z.string().uuid("Pagamento inválido.").nullable().optional().default(null),
 });
 
 export type DocumentInput = z.output<typeof documentInputSchema>;

@@ -28,6 +28,10 @@ export type PaymentKind =
 export type Periodicity = "SINGLE" | "MONTHLY" | "QUARTERLY" | "SEMIANNUAL" | "ANNUAL";
 export type IndexCode = "NONE" | "INCC" | "IGPM" | "IPCA" | "CUB" | "OTHER";
 export type PaymentStatus = "PLANNED" | "PAID";
+/** Who settled an instalment: the person, the company, or both. */
+export type Payer = "PF" | "PJ" | "SPLIT";
+
+export const PAYER_LABELS: Record<Payer, string> = { PF: "PF", PJ: "PJ", SPLIT: "PF + PJ" };
 export type InvestmentStatus = "ACTIVE" | "COMPLETED" | "ARCHIVED";
 export type InvestmentKind = "APARTMENT" | "STUDIO" | "HOUSE" | "PARKING" | "LOT" | "COMMERCIAL" | "OTHER";
 export type DocumentKind = "CONTRACT" | "MARKETING" | "PHOTO" | "LAYOUT" | "RECEIPT" | "OTHER";
@@ -156,6 +160,10 @@ export interface InvestmentPayment {
     status: PaymentStatus;
     receipt_path: string | null;
     receipt_name: string | null;
+    /** Who paid; null when never recorded (every row from before the split existed). */
+    payer: Payer | null;
+    /** The company's share when `payer` is SPLIT; the person's share is the rest of the paid total. */
+    pj_amount: number | null;
     notes: string | null;
     source: "MANUAL" | "SCHEDULE" | "IMPORT";
     created_at: string;
@@ -165,6 +173,8 @@ export interface InvestmentPayment {
 export interface InvestmentDocument {
     id: string;
     investment_id: string;
+    /** The payment this is a receipt of; null for the contract, plans, photos. */
+    payment_id: string | null;
     kind: DocumentKind;
     storage_path: string;
     file_name: string | null;
@@ -401,6 +411,20 @@ export function indexBetweenPayments(payments: InvestmentPayment[]): Map<string,
         }
     }
     return out;
+}
+
+/**
+ * How a paid total divides between the person and the company, or null when never recorded.
+ * The PJ share is clamped to the total, so a stale `pj_amount` after the total shrank cannot
+ * produce a negative PF share.
+ */
+export function payerSplit(payment: Pick<InvestmentPayment, "amount" | "correction_amount" | "payer" | "pj_amount">): { pf: number; pj: number } | null {
+    if (!payment.payer) return null;
+    const total = paymentTotal(payment);
+    if (payment.payer === "PF") return { pf: total, pj: 0 };
+    if (payment.payer === "PJ") return { pf: 0, pj: total };
+    const pj = round2(Math.min(Math.max(payment.pj_amount ?? 0, 0), total));
+    return { pf: round2(total - pj), pj };
 }
 
 // ── Formatting ───────────────────────────────────────────────────────

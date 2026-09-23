@@ -23,7 +23,7 @@ const schedules: InvestmentSchedule[] = [
 const paid: InvestmentPayment = {
     id: "p1", investment_id: "i1", due_on: "2026-08-31", paid_on: "2026-08-31", kind: "ENTRADA",
     amount: 2295, correction_amount: 0, installment_number: null, status: "PAID",
-    receipt_path: null, receipt_name: null, notes: null, source: "MANUAL",
+    receipt_path: null, receipt_name: null, payer: null, pj_amount: null, notes: null, source: "MANUAL",
     created_at: "2026-08-31T00:00:00Z", updated_at: "2026-08-31T00:00:00Z",
 };
 

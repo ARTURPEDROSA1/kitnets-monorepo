@@ -1813,6 +1813,7 @@ export type Database = {
           kind: string
           mime_type: string | null
           owner_id: string
+          payment_id: string | null
           size_bytes: number | null
           storage_path: string
         }
@@ -1824,6 +1825,7 @@ export type Database = {
           kind?: string
           mime_type?: string | null
           owner_id: string
+          payment_id?: string | null
           size_bytes?: number | null
           storage_path: string
         }
@@ -1835,6 +1837,7 @@ export type Database = {
           kind?: string
           mime_type?: string | null
           owner_id?: string
+          payment_id?: string | null
           size_bytes?: number | null
           storage_path?: string
         }
@@ -1868,6 +1871,8 @@ export type Database = {
           notes: string | null
           owner_id: string
           paid_on: string | null
+          payer: string | null
+          pj_amount: number | null
           receipt_name: string | null
           receipt_path: string | null
           source: string
@@ -1886,6 +1891,8 @@ export type Database = {
           notes?: string | null
           owner_id: string
           paid_on?: string | null
+          payer?: string | null
+          pj_amount?: number | null
           receipt_name?: string | null
           receipt_path?: string | null
           source?: string
@@ -1904,6 +1911,8 @@ export type Database = {
           notes?: string | null
           owner_id?: string
           paid_on?: string | null
+          payer?: string | null
+          pj_amount?: number | null
           receipt_name?: string | null
           receipt_path?: string | null
           source?: string

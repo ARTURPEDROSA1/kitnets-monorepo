@@ -94,9 +94,9 @@ const SCHEDULE_COLUMNS = "id, investment_id, label, kind, installments, amount, 
 
 const PAYMENT_COLUMNS =
     "id, investment_id, due_on, paid_on, kind, amount, correction_amount, installment_number, status, " +
-    "receipt_path, receipt_name, notes, source, created_at, updated_at";
+    "receipt_path, receipt_name, payer, pj_amount, notes, source, created_at, updated_at";
 
-const DOCUMENT_COLUMNS = "id, investment_id, kind, storage_path, file_name, mime_type, size_bytes, created_at";
+const DOCUMENT_COLUMNS = "id, investment_id, payment_id, kind, storage_path, file_name, mime_type, size_bytes, created_at";
 
 /** Numeric columns come back as strings from PostgREST; the UI wants numbers. */
 function toNumber(value: unknown, fallback = 0): number {
@@ -132,6 +132,7 @@ function mapPayment(row: Record<string, unknown>): InvestmentPayment {
         amount: toNumber(row.amount),
         correction_amount: toNumber(row.correction_amount),
         installment_number: row.installment_number == null ? null : toNumber(row.installment_number),
+        pj_amount: row.pj_amount == null ? null : toNumber(row.pj_amount),
     };
 }
 

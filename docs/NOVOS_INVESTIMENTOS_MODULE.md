@@ -137,6 +137,28 @@ Editing either fact keeps the other and recomputes the correction, so a row neve
 numbers that disagree. `correction_amount` is stored signed for that reason — the non-negative
 CHECK was dropped, because a discount for paying early is the usual reason to pay early.
 
+### Who paid: PF, PJ, or both
+
+An instalment is routinely settled from more than one pocket — the owner's own account and the
+holding's — and the split matters for tax. A payment carries a **payer** (`PF`, `PJ`, `SPLIT`, or
+null for "never recorded") and, for a split, the **PJ share**; the PF share is whatever is left of
+the paid total (`payerSplit`), so the two can never disagree. The table shows "Pagador" and
+"PJ (R$)", and the footer sums PF, PJ and the unassigned remainder.
+
+Receipts are **documents linked to their payment** (`new_investment_documents.payment_id`), so a
+split can hold one receipt per pocket. `receipt_path` on the payment survives as a mirror of the
+first receipt, backfilled into the link by the migration; the row's receipts are read from the
+link, never from the mirror.
+
+**The reader.** Every receipt dropped on a row goes through `POST /api/investments/[id]/receipts/extract`
+before it is attached: amount, date, and — the one fact that decides the allocation — the payer's
+CPF or CNPJ. `payerTypeFromDocument` tells them apart by digits when unmasked and by punctuation
+when the bank masks the number (a slash only ever appears in a CNPJ; a masked CPF is 14 characters,
+a masked CNPJ 18). `allocateFromReceipts` sums each side; `mergeAllocation` in the table folds that
+into what the row already records. A receipt the reader cannot attribute keeps the total honest but
+leaves the payer undecided — better "não informado" than the company's money quietly booked to the
+person. A read that fails still leaves the file attached. Everything it fills in stays editable.
+
 ### Forecast versus reality
 
 `expandSchedule` turns a block into dated instalments (the due day is clamped on short months, so a
@@ -181,6 +203,11 @@ is annual whatever the model wrote, because the dates come straight off the tabl
 
 Nothing is created by the route. The form shows what was read, the user corrects it, and only the
 save creates anything — same contract as the Contratos import.
+
+The contract reader and the receipt reader share one runner, `lib/document-extract-server.ts`:
+one document, one prompt, one JSON answer, Gemini first and OpenAI as the fallback, a scanned PDF
+reaching OpenAI as page images. The lease import has its own copy of the same logic and was left
+alone; it is another module.
 
 ## 5. The cash-flow simulator
 
