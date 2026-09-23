@@ -126,6 +126,8 @@ export interface NewInvestment {
     rent_adjustment_pct: number;
     rent_vacancy_pct: number;
     rent_costs_pct: number;
+    /** How many months of rent the simulator projects past the first one. */
+    sim_horizon_months: number;
     status: InvestmentStatus;
     promoted_property_id: string | null;
     promoted_at: string | null;

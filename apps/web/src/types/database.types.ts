@@ -2026,6 +2026,7 @@ export type Database = {
           rent_costs_pct: number
           rent_start_on: string | null
           rent_vacancy_pct: number
+          sim_horizon_months: number
           state: string | null
           status: string
           total_price: number
@@ -2059,6 +2060,7 @@ export type Database = {
           rent_costs_pct?: number
           rent_start_on?: string | null
           rent_vacancy_pct?: number
+          sim_horizon_months?: number
           state?: string | null
           status?: string
           total_price?: number
@@ -2092,6 +2094,7 @@ export type Database = {
           rent_costs_pct?: number
           rent_start_on?: string | null
           rent_vacancy_pct?: number
+          sim_horizon_months?: number
           state?: string | null
           status?: string
           total_price?: number

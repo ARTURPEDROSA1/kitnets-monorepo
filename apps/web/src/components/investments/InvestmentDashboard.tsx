@@ -368,6 +368,8 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
             />
 
             <InvestmentCashFlowSimulator
+                // the simulator seeds its inputs once; remount when the dates behind the defaults change
+                key={`${investment.id}:${investment.keys_expected_on ?? ""}:${investment.keys_delivered_on ?? ""}`}
                 investment={investment}
                 schedules={schedules}
                 payments={payments}

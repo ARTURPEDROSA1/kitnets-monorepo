@@ -87,7 +87,7 @@ export async function adoptStagedUpload(
 const INVESTMENT_COLUMNS =
     "id, name, description, developer, unit_label, kind, address, city, state, zip, total_price, down_payment, " +
     "financed_amount, contract_date, keys_expected_on, keys_delivered_on, index_before_keys, index_after_keys, " +
-    "estimated_rent, rent_start_on, rent_adjustment_pct, rent_vacancy_pct, rent_costs_pct, status, " +
+    "estimated_rent, rent_start_on, rent_adjustment_pct, rent_vacancy_pct, rent_costs_pct, sim_horizon_months, status, " +
     "promoted_property_id, promoted_at, cover_path, notes, created_at, updated_at";
 
 const SCHEDULE_COLUMNS = "id, investment_id, label, kind, installments, amount, first_due_on, periodicity, index_code, position";
@@ -114,6 +114,7 @@ function mapInvestment(row: Record<string, unknown>): NewInvestment {
         rent_adjustment_pct: toNumber(row.rent_adjustment_pct),
         rent_vacancy_pct: toNumber(row.rent_vacancy_pct),
         rent_costs_pct: toNumber(row.rent_costs_pct),
+        sim_horizon_months: toNumber(row.sim_horizon_months, 120),
     };
 }
 
@@ -234,7 +235,7 @@ export function investmentRow(input: Partial<InvestmentInput>): Record<string, u
         "name", "description", "developer", "unit_label", "kind", "city", "state",
         "total_price", "down_payment", "financed_amount", "contract_date", "keys_expected_on", "keys_delivered_on",
         "index_before_keys", "index_after_keys", "estimated_rent", "rent_start_on", "rent_adjustment_pct",
-        "rent_vacancy_pct", "rent_costs_pct", "status", "cover_path", "notes",
+        "rent_vacancy_pct", "rent_costs_pct", "sim_horizon_months", "status", "cover_path", "notes",
     ] as const;
     for (const key of copy) {
         if (input[key] !== undefined) row[key] = input[key];

@@ -129,6 +129,7 @@ export const investmentInputSchema = z.object({
     rent_adjustment_pct: percent(100).default(0),
     rent_vacancy_pct: percent(99).default(0),
     rent_costs_pct: percent(99).default(0),
+    sim_horizon_months: z.coerce.number().int().min(12, "Mínimo de 12 meses.").max(480, "Máximo de 40 anos.").optional(),
 
     status: z.enum(INVESTMENT_STATUSES).default("ACTIVE"),
     cover_path: optionalText(400),
