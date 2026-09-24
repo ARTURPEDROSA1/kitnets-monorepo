@@ -41,10 +41,15 @@ const tipoName = (tipo: FipezapTipo, t: InsightTemplates) => (tipo === "venda" ?
  */
 export function placeWords(lang: string, name: string, isNational: boolean): { place: string; Place: string; subject: string } {
     const nat = lang === "en" ? "Brazil" : "Brasil";
-    const prep = lang === "pt" ? (isNational ? "no" : "em") : lang === "es" ? "en" : "in";
-    const place = `${prep} ${isNational ? nat : name}`;
-    return { place, Place: place.charAt(0).toUpperCase() + place.slice(1), subject: isNational ? (lang === "pt" ? "o Brasil" : nat) : name };
+    // Portuguese: "no Brasil", "no Rio de Janeiro", "no Recife", but "em São Paulo"
+    const article = lang === "pt" && (isNational || PT_CITIES_WITH_ARTICLE.has(name));
+    const prep = lang === "pt" ? (article ? "no" : "em") : lang === "es" ? "en" : "in";
+    const bare = isNational ? nat : name;
+    const place = `${prep} ${bare}`;
+    return { place, Place: place.charAt(0).toUpperCase() + place.slice(1), subject: article ? `o ${bare}` : bare };
 }
+
+const PT_CITIES_WITH_ARTICLE = new Set(["Rio de Janeiro", "Recife"]);
 
 /** The metric each ranking reads for a tipo: monthly variation for prices, annual yield for rentabilidade. */
 export const monthlyMetric = (s: CitySnapshot, tipo: FipezapTipo) => (tipo === "yield" ? s.yieldAnual : s.varMensal);

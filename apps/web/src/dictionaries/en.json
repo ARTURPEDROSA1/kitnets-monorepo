@@ -1502,6 +1502,7 @@
             "yield": "Rental yield",
             "yieldRanking": "Rental yield by city",
             "cityProfile": "City summary",
+            "map": "City map",
             "methodology": "About the data"
         },
         "columns": {
@@ -1551,6 +1552,7 @@
             "definitionIndice": "FIPE's index number rescaled to 100 at the start of the period",
             "definitionYearly": "December-over-December change; the current year shows the 12-month change",
             "neighborhoodNote": "FIPE does not publish prices by neighbourhood or district.",
+            "mapHint": "Bigger circle = higher value. Hover to see the value; click to open the city.", "mapNoValue": "no data",
             "cityPage": "Open city page",
             "comparingWith": "Comparing with"
         },
@@ -1597,6 +1599,7 @@
             "historyTitleYield": "{Place}, rent yields {yield} a year, {vs} the CDI ({cdi})",
             "yearlyTitle": "{Place}, {above} of the last {n} years closed above IPCA; {year} stands at {ytd}",
             "capitalsTitle": "{k} of {total} state capitals rose more than the national index over 12 months ({tipo})",
+            "mapTitle": "On the map, {maxCity} leads in {metric} ({max}) and {minCity} closes the list ({min})",
             "yieldTitle": "{Place}, rent yields {yield} a year, {vs} the CDI ({cdi})",
             "sectionYearly": "Yearly change",
             "sectionCapitals": "Change in the state capitals"
