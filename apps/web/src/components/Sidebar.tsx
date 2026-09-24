@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@kitnets/ui";
 import { SignOutButton, useAuth } from "@clerk/nextjs";
-import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Rocket, HardHat, Briefcase, Building2, User, Users, UserCheck, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart, ArrowLeftRight, FileText, AlertCircle, Plus, Minus, Gem, X, Zap, Building, ChevronsLeft, ChevronsRight, Landmark, Droplets } from "lucide-react";
+import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Rocket, HardHat, Briefcase, Building2, User, Users, UserCheck, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart, ArrowLeftRight, FileText, AlertCircle, Plus, Minus, Gem, X, Zap, Building, ChevronsLeft, ChevronsRight, Landmark, Droplets, MapPinned } from "lucide-react";
 import { PropertyFilters } from "./PropertyFilters";
 
 import { useTheme } from "next-themes";
@@ -844,6 +844,16 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                         </Link>
                                     </li>
                                 ))}
+                                <li>
+                                    <Link
+                                        href={lang === 'pt' ? '/indices/fipezap/cidades' : `/${lang}/indices/fipezap/cidades`}
+                                        className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
+                                        title="FipeZAP por cidade"
+                                    >
+                                        <MapPinned className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                        <span className="ms-3 text-sm">FipeZAP por cidade</span>
+                                    </Link>
+                                </li>
                             </ul>
                         </div>
                     ) : null}

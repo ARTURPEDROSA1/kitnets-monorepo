@@ -4,6 +4,7 @@ import { FipeZapChart } from "@/components/indices/FipeZap/FipeZapChart";
 import { FipeZapHeatmap } from "@/components/indices/FipeZap/FipeZapHeatmap";
 import { FipeZapTable } from "@/components/indices/FipeZap/FipeZapTable";
 import { FipeZapContext } from "@/lib/fipezap";
+import { FipezapCitiesCta } from "@/components/indices/FipeZap/cities/FipezapCitiesCta";
 import type { ReactNode } from "react";
 
 interface Props {
@@ -14,9 +15,11 @@ interface Props {
     data: FipeZapContext;
     /** correction calculator, rendered between the cards and the filter */
     calculator?: ReactNode;
+    /** locale, for the link to the city dashboard */
+    lang?: string;
 }
 
-export function FipeZapDashboardWrapper({ startDate, endDate, type, bedrooms, data, calculator }: Props) {
+export function FipeZapDashboardWrapper({ startDate, endDate, type, bedrooms, data, calculator, lang = "pt" }: Props) {
     if (!data) {
         return <div className="p-10 text-center text-muted-foreground">Dados indísponíveis no momento.</div>;
     }
@@ -33,6 +36,9 @@ export function FipeZapDashboardWrapper({ startDate, endDate, type, bedrooms, da
         <div className="space-y-6">
             {/* Same order as every index page: cards, calculator, filter, chart, heatmap, table */}
             <FipeZapKPIs data={data} currentYear={currentYear} />
+
+            {/* the same series for 36 cities, on the city dashboard */}
+            <FipezapCitiesCta lang={lang} tipo={type} dorm={bedrooms === 'todos' ? 'total' : bedrooms} />
 
             {calculator}
 

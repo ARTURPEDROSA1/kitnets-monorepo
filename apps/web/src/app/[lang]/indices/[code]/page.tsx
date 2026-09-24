@@ -437,6 +437,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
             {code === 'FIPEZAP' && (
                 <div className="md:col-span-3 min-w-0">
                     <FipeZapDashboardWrapper
+                        lang={lang}
                         startDate={startDateStr}
                         endDate={endDateStr}
                         type={(type as string) || 'locacao'}

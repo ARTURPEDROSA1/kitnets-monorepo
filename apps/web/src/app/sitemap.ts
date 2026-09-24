@@ -1,5 +1,6 @@
 import { MetadataRoute } from 'next';
 import { getAllIndexes } from '@/lib/indexes';
+import { FIPEZAP_CITY_LIST } from '@/lib/fipezap-cities';
 
 const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://kitnets.com';
 const languages = ['pt', 'en', 'es'];
@@ -50,6 +51,9 @@ const staticRoutes = [
     'calculadoras/imposto-minimo-altas-rendas',
     'calculadoras/imposto-minimo-pf',
     'calculadoras/irpf-2026',
+    // FipeZAP por cidade: the overview and one page per catalogued city
+    'indices/fipezap/cidades',
+    ...FIPEZAP_CITY_LIST.map(c => `indices/fipezap/cidades/${c.slug}`),
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
