@@ -1911,9 +1911,9 @@
             "cta": "Acompanhe a variação do IVAR e tome melhores decisões no mercado imobiliário."
         },
         "fipezap": {
-            "title": "Índice FipeZAP: Histórico Completo de Preços de Imóveis no Brasil desde 2008",
+            "title": "Índice FipeZAP: Histórico de Preços de Imóveis no Brasil nos Últimos 15 Anos",
             "description": "O Índice FipeZAP é o principal indicador de preços de imóveis residenciais e comerciais do Brasil, sendo também o primeiro índice imobiliário de abrangência nacional. Criado em 2008, ele acompanha de forma contínua e padronizada a evolução dos preços de venda, locação e rentabilidade (yield imobiliário).",
-            "pageDescription": "Nesta página do Kitnets.com, você encontra o histórico completo do FipeZAP desde o início do índice, com filtros avançados, gráficos interativos, mapa de calor de sazonalidade e tabela detalhada mês a mês — tudo em um único lugar.",
+            "pageDescription": "Nesta página do Kitnets.com, você encontra o histórico do FipeZAP dos últimos 15 anos, com filtros avançados, gráficos interativos, mapa de calor de sazonalidade e tabela detalhada mês a mês — tudo em um único lugar.",
             "keywords": [
                 "Índice FipeZAP",
                 "FipeZAP histórico",
@@ -1945,10 +1945,10 @@
                     ]
                 },
                 {
-                    "title": "Série Histórica Completa desde 2008",
+                    "title": "Série Histórica dos Últimos 15 Anos",
                     "text": "Diferente de muitos sites que mostram apenas dados recentes, aqui você pode:",
                     "list": [
-                        "Analisar o FipeZAP desde o início do índice (2008)",
+                        "Analisar o FipeZAP em uma janela móvel de 15 anos",
                         "Comparar ciclos imobiliários completos",
                         "Avaliar períodos de alta, queda e estabilidade",
                         "Entender o impacto de crises econômicas, juros e inflação no mercado imobiliário"
@@ -2003,7 +2003,7 @@
                 {
                     "title": "Por que acompanhar o FipeZAP no Kitnets.com?",
                     "list": [
-                        "✅ Série histórica completa desde 2008",
+                        "✅ Série histórica dos últimos 15 anos, Brasil e 36 cidades",
                         "✅ Interface clara e moderna",
                         "✅ Filtros avançados e gráficos interativos",
                         "✅ Exportação de dados",

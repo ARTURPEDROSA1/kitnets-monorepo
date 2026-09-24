@@ -1,13 +1,13 @@
 /**
- * FipeZap import — server side: fetches FIPE's workbook and reads only its national sheet.
+ * FipeZap import — server side: fetches FIPE's workbook and reads the sheets the app stores.
  *
  * The workbook has ~60 sheets (one per city) and weighs ~5 MB; loading it whole costs ~450 MB of memory.
- * The streaming reader hands over one sheet at a time, so the function keeps only the national sheet's
- * ~230 rows and stops as soon as it has them.
+ * The streaming reader hands over one sheet at a time; a sheet is recognised by its title cell (B1) as
+ * soon as its first row arrives, and the ones the caller does not want are drained without being kept.
  */
 import { Readable } from "node:stream";
 import ExcelJS from "exceljs";
-import { cellText, FIPEZAP_NATIONAL_TITLE, type SheetCell } from "./fipezap-import";
+import { cellText, type SheetCell } from "./fipezap-import";
 
 export const FIPEZAP_WORKBOOK_URL = "https://downloads.fipe.org.br/indices/fipezap/fipezap-serieshistoricas.xlsx";
 const HEADERS = { "User-Agent": "Mozilla/5.0 (compatible; Kitnets/1.0; +https://kitnets.com)" };
@@ -29,23 +29,42 @@ export async function downloadFipezapWorkbook(): Promise<{ buffer: Buffer; stamp
     return { buffer, stamp: { etag: res.headers.get("etag"), lastModified: res.headers.get("last-modified") } };
 }
 
-/** The national sheet as a 0-based grid. The sheet is recognised by its name or by its title cell (B1). */
-export async function readFipezapNationalGrid(buffer: Buffer): Promise<SheetCell[][]> {
+export interface FipezapSheetGrid {
+    /** text of the title cell (B1): "Índice FipeZAP" or the city name */
+    title: string;
+    /** the sheet's name when exceljs exposes it */
+    sheetName: string | null;
+    /** 0-based grid, holes filled with empty rows */
+    grid: SheetCell[][];
+}
+
+/**
+ * The sheets `keep` accepts, in file order, as 0-based grids. `keep` is asked once per sheet with the
+ * title cell and the sheet name; sheets without a title (Resumo, Aux) or with fewer than ten rows are dropped.
+ */
+export async function readFipezapGrids(buffer: Buffer, keep: (title: string, sheetName: string | null) => boolean): Promise<FipezapSheetGrid[]> {
     const reader = new ExcelJS.stream.xlsx.WorkbookReader(Readable.from(buffer), { worksheets: "emit", sharedStrings: "cache", hyperlinks: "ignore", styles: "ignore", entries: "ignore" });
+    const out: FipezapSheetGrid[] = [];
     for await (const sheet of reader) {
-        const name = String((sheet as unknown as { name?: string }).name ?? "");
+        const sheetName = String((sheet as unknown as { name?: string }).name ?? "") || null;
         const grid: SheetCell[][] = [];
-        let national: boolean | null = name ? name.trim() === FIPEZAP_NATIONAL_TITLE : null;
+        let title = "";
+        let wanted: boolean | null = null;
         for await (const row of sheet) {
-            if (national === false) continue;   // drain the sheet without keeping it
+            if (wanted === false) continue;   // drain the sheet without keeping it
             const values = (row.values as SheetCell[]) ?? [];
-            grid[row.number - 1] = values.slice(1);   // exceljs rows are 1-based with an empty slot 0
-            if (national === null && row.number >= 1) national = values.some(v => cellText(v) === FIPEZAP_NATIONAL_TITLE);
+            const cells = values.slice(1);   // exceljs rows are 1-based with an empty slot 0
+            if (wanted === null) {
+                title = cellText(cells[1]) || cellText(cells[0]);
+                wanted = Boolean(title) && keep(title, sheetName);
+                if (!wanted) continue;
+            }
+            grid[row.number - 1] = cells;
         }
-        if (national && grid.length > 10) {
+        if (wanted && grid.length > 10) {
             for (let r = 0; r < grid.length; r++) if (!grid[r]) grid[r] = [];
-            return grid;
+            out.push({ title, sheetName, grid });
         }
     }
-    throw new Error(`Planilha “${FIPEZAP_NATIONAL_TITLE}” não encontrada no arquivo da FIPE`);
+    return out;
 }

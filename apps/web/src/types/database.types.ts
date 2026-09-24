@@ -1068,6 +1068,7 @@ export type Database = {
       fipezap_series: {
         Row: {
           created_at: string | null
+          city_slug: string
           dormitorios: string
           id: number
           index_type: string
@@ -1078,6 +1079,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          city_slug: string
           dormitorios: string
           id?: number
           index_type: string
@@ -1088,6 +1090,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          city_slug?: string
           dormitorios?: string
           id?: number
           index_type?: string
@@ -1108,6 +1111,8 @@ export type Database = {
           last_modified: string | null
           last_status: string | null
           latest_reference_date: string | null
+          retention_cutoff: string | null
+          rows_deleted: number | null
           rows_upserted: number | null
         }
         Insert: {
@@ -1119,6 +1124,8 @@ export type Database = {
           last_modified?: string | null
           last_status?: string | null
           latest_reference_date?: string | null
+          retention_cutoff?: string | null
+          rows_deleted?: number | null
           rows_upserted?: number | null
         }
         Update: {
@@ -1130,6 +1137,8 @@ export type Database = {
           last_modified?: string | null
           last_status?: string | null
           latest_reference_date?: string | null
+          retention_cutoff?: string | null
+          rows_deleted?: number | null
           rows_upserted?: number | null
         }
         Relationships: []
@@ -3162,6 +3171,17 @@ export type Database = {
       }
     }
     Views: {
+      vw_fipezap_latest: {
+        Row: {
+          city_slug: string | null
+          dormitorios: string | null
+          index_type: string | null
+          metric: string | null
+          reference_date: string | null
+          value: number | null
+        }
+        Relationships: []
+      }
       vw_latest_indices: {
         Row: {
           accumulated_12m: number | null

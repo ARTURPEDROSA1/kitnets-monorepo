@@ -209,7 +209,8 @@ export default function PropertyInvestmentAnalysis({ propertyId, bedrooms, inves
             const e = d.estimate as { amount: number; factor: number; from: string; to: string; months: number };
             const pct = ((e.factor - 1) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
             const bucket = d.bucket === "total" ? "todos os dormitórios" : `${d.bucket} dorm.`;
-            const note = `FipeZap venda (${bucket}): ${pct}% de ${formatMonthKey(e.from)} a ${formatMonthKey(e.to)} sobre ${d.basis === "APPRAISAL" ? "a avaliação na compra de " : ""}${formatBRL(d.purchasePrice)}`;
+            const place = (d.series as { cityName?: string } | undefined)?.cityName ?? "Brasil";
+            const note = `FipeZap venda ${place} (${bucket}): ${pct}% de ${formatMonthKey(e.from)} a ${formatMonthKey(e.to)} sobre ${d.basis === "APPRAISAL" ? "a avaliação na compra de " : ""}${formatBRL(d.purchasePrice)}`;
             setDraft({ valued_on: endOfMonth(e.to), amount: e.amount.toFixed(2).replace(".", ","), source: "FIPEZAP", note });
             setFipezapNote(`Estimativa preenchida: ${formatBRL(e.amount)} (${e.months} meses de índice). Confira e clique em Salvar.`);
         } catch (err) { setError((err as Error).message); } finally { setBusy(null); }
@@ -302,7 +303,7 @@ export default function PropertyInvestmentAnalysis({ propertyId, bedrooms, inves
         },
         marketValue: {
             what: "Estimativa de quanto o imóvel vale hoje: a avaliação mais recente que você cadastrou (manual, laudo, anúncios) ou a estimativa pelo índice FipeZap.",
-            formula: <>Avaliação mais recente<br />FipeZap = valor de compra × variação do índice da cidade desde a compra</>,
+            formula: <>Avaliação mais recente<br />FipeZap = valor de compra × variação do índice de venda desde a compra (da cidade do imóvel quando ela está entre as 36 cidades do FipeZap, senão do Brasil)</>,
             example: metrics.marketValue !== null ? <>{brl(metrics.marketValue)} · {valueSourceLabel} · {formatDateBR(metrics.marketValueOn)}</> : undefined,
         },
         appreciation: {

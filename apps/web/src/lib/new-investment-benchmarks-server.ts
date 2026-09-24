@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getIndexMetadata, getIndexValues } from "@/lib/indexes";
+import { FIPEZAP_NATIONAL_SLUG } from "@/lib/fipezap-cities";
 
 /**
  * The market figures a Novo Investimento is read against, from the series the app already syncs:
@@ -39,6 +40,7 @@ async function fipezapSale12m(supabase: SupabaseClient): Promise<Pick<Investment
         const { data } = await supabase
             .from("fipezap_series")
             .select("reference_date, value")
+            .eq("city_slug", FIPEZAP_NATIONAL_SLUG)
             .eq("index_type", "venda")
             .eq("metric", "var_12m")
             .eq("dormitorios", "total")
