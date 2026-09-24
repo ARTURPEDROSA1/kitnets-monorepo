@@ -29,7 +29,7 @@ export type IndexValue = {
  * A failed read throws inside the cached function, so the failure is never stored: before this,
  * one transient Supabase error was cached for an hour and showed as a 404 or an empty page.
  */
-async function cachedRead<T>(read: () => Promise<T>, keys: string[], fallback: T): Promise<T> {
+export async function cachedRead<T>(read: () => Promise<T>, keys: string[], fallback: T): Promise<T> {
     try {
         return await unstable_cache(read, keys, { revalidate: 3600, tags: ['indices'] })();
     } catch (err) {

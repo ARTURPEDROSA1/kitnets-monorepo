@@ -3,6 +3,7 @@ import { getAllIndexes, getIndexValues, IndexMetadata, IndexValue } from '@/lib/
 import { getFipeZapData, FipeZapDataPoint } from '@/lib/fipezap';
 import { getMinimumWageData, MinimumWageData } from '@/lib/minimum-wage';
 import { LazyMiniIndexChart as MiniIndexChart } from '@/components/indices/LazyMiniIndexChart';
+import { FipezapCitiesCta } from '@/components/indices/FipeZap/cities/FipezapCitiesCta';
 
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
@@ -220,6 +221,7 @@ export default async function PanoramaPage({ params }: { params: Promise<{ lang:
                                 {title}
                                 <span className="h-px bg-border flex-1 ml-4 block opacity-60"></span>
                             </h2>
+                            {key === 'rent' && <div className="mb-6"><FipezapCitiesCta lang={lang} /></div>}
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {items.map(({ meta, history, latest }) => {
                                     // const previous = history[1]?.value_percent || 0;

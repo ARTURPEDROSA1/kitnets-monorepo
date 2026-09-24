@@ -10,6 +10,8 @@ export function refreshIndexPages(): void {
         revalidateTag("indices", { expire: 0 });
         revalidatePath("/[lang]/indices/[code]", "page");
         revalidatePath("/[lang]/indices/panorama", "page");
+        revalidatePath("/[lang]/indices/fipezap/cidades", "page");
+        revalidatePath("/[lang]/indices/fipezap/cidades/[cidade]", "page");
         revalidatePath("/api/indices/[code]/calculator-data", "page");   // the correction calculators' series
     } catch (err) {
         console.error("[index-cache] revalidation failed:", (err as Error).message);
