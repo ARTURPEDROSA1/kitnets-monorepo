@@ -2391,6 +2391,24 @@
             "sectionYearly": "Variação anual",
             "sectionCapitals": "Variação nas capitais"
         },
+        "facts": {
+            "title": "Dados socioeconômicos (IBGE)",
+            "population": "População residente",
+            "area": "Área territorial",
+            "gdp": "PIB per capita",
+            "households": "Domicílios",
+            "apartments": "Apartamentos",
+            "income": "Renda média domiciliar",
+            "unitThousandPeople": "mil pessoas · {year}",
+            "unitKm2": "km² · {year}",
+            "unitPerResident": "por habitante/ano · {year}",
+            "unitThousandHouseholds": "mil domicílios · {year}",
+            "unitThousandApartments": "mil apartamentos · {year}",
+            "unitPerHousehold": "por domicílio/mês · {year}",
+            "affordabilitySale": "Um apartamento de {m2} m² ao preço médio ({price}) equivale a {years} anos da renda média domiciliar.",
+            "affordabilityRent": "Alugar {m2} m² ao preço médio ({rent}/mês) consome {share} da renda média domiciliar.",
+            "source": "Fonte: IBGE (Censo 2022, PIB dos municípios); renda média domiciliar estimada pela FIPE com base em dados do IBGE, como publicada no informe FipeZAP. Disponível para as capitais."
+        },
         "methodology": [
             "O Índice FipeZAP acompanha os preços anunciados de apartamentos prontos em anúncios online, calculado pela FIPE em parceria com o ZAP. Esta página mostra as 22 capitais e as 14 outras cidades que publicam as três séries (venda, locação e rentabilidade).",
             "A Kitnets guarda os últimos 15 anos de cada série; a janela avança a cada mês publicado. O índice rebaseado usa o número-índice da FIPE; as variações anuais são de dezembro a dezembro. A FIPE não divulga dados por bairro."

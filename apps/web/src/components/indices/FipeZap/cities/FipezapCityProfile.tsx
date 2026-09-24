@@ -2,6 +2,7 @@ import Link from "next/link";
 import { MapPin } from "lucide-react";
 import { Delta } from "./Delta";
 import { CitySparklineLazy } from "./ChartsLazy";
+import { FipezapCityFacts } from "./FipezapCityFacts";
 import type { CitySnapshot, HistoryPoint } from "@/lib/fipezap-cities-server";
 import { fmtBRL, fmtPct, monthShort } from "@/lib/fipezap-compare";
 import { buildFipezapCitiesHref, type FipezapCitiesState } from "@/lib/fipezap-cities-params";
@@ -35,7 +36,8 @@ export function FipezapCityProfile({ snapshot, national, history, nationalHistor
     const neighbours = FIPEZAP_CITY_LIST.filter(x => x.uf === c.uf && x.slug !== c.slug && !state.comparar.includes(x.slug)).slice(0, 4);
 
     return (
-        <div className="grid gap-4 md:grid-cols-[1fr_1.2fr] px-2 md:px-0">
+        <div className="space-y-4 px-2 md:px-0">
+        <div className="grid gap-4 md:grid-cols-[1fr_1.2fr]">
             <div className="space-y-3">
                 <div className="flex items-start gap-2">
                     <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
@@ -62,6 +64,9 @@ export function FipezapCityProfile({ snapshot, national, history, nationalHistor
                     </div>
                 )}
             </div>
+        </div>
+        {/* IBGE block of FIPE's slide: capitals only */}
+        <FipezapCityFacts slug={c.slug} tipo={state.tipo} priceM2={snapshot.precoM2} lang={lang} t={t.facts} />
         </div>
     );
 }
