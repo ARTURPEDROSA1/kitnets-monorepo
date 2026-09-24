@@ -1604,6 +1604,24 @@
             "sectionYearly": "Yearly change",
             "sectionCapitals": "Change in the state capitals"
         },
+        "facts": {
+            "title": "Socioeconomic data (IBGE)",
+            "population": "Population",
+            "area": "Area",
+            "gdp": "GDP per capita",
+            "households": "Households",
+            "apartments": "Apartments",
+            "income": "Average household income",
+            "unitThousandPeople": "thousand people · {year}",
+            "unitKm2": "km² · {year}",
+            "unitPerResident": "per resident/year · {year}",
+            "unitThousandHouseholds": "thousand households · {year}",
+            "unitThousandApartments": "thousand apartments · {year}",
+            "unitPerHousehold": "per household/month · {year}",
+            "affordabilitySale": "A {m2} m² apartment at the average price ({price}) equals {years} years of average household income.",
+            "affordabilityRent": "Renting {m2} m² at the average price ({rent}/month) takes {share} of the average household income.",
+            "source": "Source: IBGE (2022 Census, municipal GDP); average household income estimated by FIPE from IBGE data, as published in the FipeZAP report. Available for the state capitals."
+        },
         "methodology": [
             "The FipeZAP Index tracks listed prices of ready apartments in online listings, computed by FIPE with ZAP. This page shows the 22 state capitals and the 14 other cities that publish all three series (sale, rent and rental yield).",
             "Kitnets stores the last 15 years of each series; the window moves forward with every published month. The rebased index uses FIPE's index number; yearly changes are December over December. FIPE does not publish neighbourhood data."
