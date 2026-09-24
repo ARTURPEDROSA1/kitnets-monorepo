@@ -1,5 +1,6 @@
 
 import { createStaticClient } from "@/utils/supabase/static";
+import { FIPEZAP_NATIONAL_SLUG } from "@/lib/fipezap-cities";
 
 export type FipeZapDataPoint = {
     date: string; // YYYY-MM-DD
@@ -15,9 +16,11 @@ export type FipeZapDataPoint = {
 // Database Schema Type
 export type FipeZapDatabaseRow = {
     id: number;
+    /** 'brasil' or a city slug (lib/fipezap-cities.ts) */
+    city_slug: string;
     reference_date: string;
     index_type: 'venda' | 'locacao' | 'yield';
-    metric: 'var_mensal' | 'var_12m' | 'preco_m2' | 'yield_mensal';
+    metric: 'var_mensal' | 'var_12m' | 'preco_m2' | 'yield_mensal' | 'indice';
     dormitorios: 'total' | '1' | '2' | '3' | '4';
     value: number;
     source: string;
@@ -25,14 +28,45 @@ export type FipeZapDatabaseRow = {
 };
 
 export type FipeZapContext = {
+    /** the series' place: 'brasil' or a city slug */
+    city: string;
     locacao: FipeZapDataPoint[];
     venda: FipeZapDataPoint[];
     yield: FipeZapDataPoint[];
 };
 
-export async function getFipeZapData(startDate: string, endDate: string, bedrooms: string): Promise<FipeZapContext> {
-    const supabase = createStaticClient();
+type SeriesRow = Pick<FipeZapDatabaseRow, 'reference_date' | 'index_type' | 'metric' | 'value'>;
 
+/** PostgREST answers at most 1000 rows per request: page through the whole range. */
+async function fetchSeriesRows(citySlug: string, dbBedrooms: string, fetchStartDate: string, endDate: string): Promise<SeriesRow[] | null> {
+    const supabase = createStaticClient();
+    const PAGE = 1000;
+    const out: SeriesRow[] = [];
+    for (let offset = 0; ; offset += PAGE) {
+        const { data, error } = await supabase
+            .from('fipezap_series')
+            .select('reference_date, index_type, metric, value')
+            .eq('city_slug', citySlug)
+            .eq('dormitorios', dbBedrooms)
+            .in('metric', ['var_mensal', 'var_12m', 'yield_mensal'])
+            .gte('reference_date', fetchStartDate)
+            .lte('reference_date', endDate)
+            .order('reference_date', { ascending: true })
+            .order('index_type', { ascending: true })
+            .order('metric', { ascending: true })
+            .range(offset, offset + PAGE - 1);
+        if (error) { console.error("Error fetching FipeZap data:", error); return null; }
+        out.push(...((data ?? []) as SeriesRow[]));
+        if (!data || data.length < PAGE) break;
+    }
+    return out;
+}
+
+/**
+ * The FipeZap series of one place (national by default) between two dates, with 12-month and
+ * year-to-date figures per month. `bedrooms` is 'todos' or '1'..'4'.
+ */
+export async function getFipeZapData(startDate: string, endDate: string, bedrooms: string, citySlug: string = FIPEZAP_NATIONAL_SLUG): Promise<FipeZapContext> {
     // 1. Determine Fetch Date Range (Need context for YTD)
     // We need data starting from Jan 1st of the startDate's year to calculate YTD correctly.
     const [sYear] = startDate.split('-').map(Number);
@@ -43,18 +77,8 @@ export async function getFipeZapData(startDate: string, endDate: string, bedroom
     const dbBedrooms = bedrooms === 'todos' ? 'total' : bedrooms;
 
     // 3. Fetch Data
-    const { data: rows, error } = await supabase
-        .from('fipezap_series')
-        .select('*')
-        .eq('dormitorios', dbBedrooms)
-        .gte('reference_date', fetchStartDate)
-        .lte('reference_date', endDate)
-        .order('reference_date', { ascending: true }); // Ascending for easier calc
-
-    if (error || !rows) {
-        console.error("Error fetching FipeZap data:", error);
-        return { locacao: [], venda: [], yield: [] };
-    }
+    const rows = await fetchSeriesRows(citySlug, dbBedrooms, fetchStartDate, endDate);
+    if (!rows) return { city: citySlug, locacao: [], venda: [], yield: [] };
 
     // 4. Group by Date & Type
     // Structure: map[date][type] -> { [metric]: value }
@@ -74,7 +98,7 @@ export async function getFipeZapData(startDate: string, endDate: string, bedroom
     });
 
     // 5. Build Series
-    const result: FipeZapContext = { locacao: [], venda: [], yield: [] };
+    const result: FipeZapContext = { city: citySlug, locacao: [], venda: [], yield: [] };
 
     // Helpers
     const getYTD = (series: FipeZapDataPoint[], currentYear: number, newVal: number) => {
@@ -108,7 +132,7 @@ export async function getFipeZapData(startDate: string, endDate: string, bedroom
     const sortedDates = Array.from(grouped.keys()).sort();
 
     sortedDates.forEach(dateStr => {
-        const [year, month, day] = dateStr.split('-').map(Number);
+        const [year, month] = dateStr.split('-').map(Number);
         const dateMap = grouped.get(dateStr)!;
 
         // --- LOCACAO ---
@@ -184,6 +208,7 @@ export async function getFipeZapData(startDate: string, endDate: string, bedroom
         list.filter(d => d.date >= startDate); // Keep Oldest -> Newest for Chart
 
     return {
+        city: citySlug,
         locacao: filterAndReverse(result.locacao),
         venda: filterAndReverse(result.venda),
         yield: filterAndReverse(result.yield)

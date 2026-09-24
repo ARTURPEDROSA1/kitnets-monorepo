@@ -3,16 +3,18 @@ import { unstable_cache } from 'next/cache';
 import { getIndexMetadata, getAllIndexValuesForCalculator, type IndexValueForCalc } from '@/lib/indexes';
 import { resolveCalculatorIndex, minimumWageMonthlySeries, type FipezapBucket } from '@/lib/index-calculator';
 import { getMinimumWageData } from '@/lib/minimum-wage';
+import { FIPEZAP_NATIONAL_SLUG } from '@/lib/fipezap-cities';
 import { createStaticClient } from '@/utils/supabase/static';
 
 export const dynamic = 'force-static';
 export const revalidate = 3600; // 1 hour; the index cron jobs also revalidate it after writing
 
-/** FipeZap monthly variation (national, one bedroom bucket) as a calculator series. Throws on a failed read, so it is never cached. */
+/** FipeZap monthly variation (national, one bedroom bucket, last 15 years) as a calculator series. Throws on a failed read, so it is never cached. */
 async function fipezapSeries(indexType: string, dormitorios: FipezapBucket): Promise<IndexValueForCalc[]> {
     const { data, error } = await createStaticClient()
         .from('fipezap_series')
         .select('reference_date, value')
+        .eq('city_slug', FIPEZAP_NATIONAL_SLUG)
         .eq('index_type', indexType).eq('metric', 'var_mensal').eq('dormitorios', dormitorios)
         .order('reference_date', { ascending: true })
         .limit(1000);
