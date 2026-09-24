@@ -3,7 +3,8 @@ import { FipezapCitiesPage } from "@/components/indices/FipeZap/cities/FipezapCi
 import { parseFipezapCitiesParams } from "@/lib/fipezap-cities-params";
 import { fipezapCitiesMetadata } from "./shared";
 
-export { revalidate } from "./shared";
+// route segment config must be a literal here (Next parses it statically)
+export const revalidate = 3600;
 
 type Props = { params: Promise<{ lang: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
 

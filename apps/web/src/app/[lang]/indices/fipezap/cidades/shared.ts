@@ -3,8 +3,6 @@ import { getDictionary } from "@/dictionaries";
 import { buildFipezapCitiesHref, type FipezapCitiesState } from "@/lib/fipezap-cities-params";
 import { fipezapCityBySlug } from "@/lib/fipezap-cities";
 
-export const revalidate = 3600;
-
 /** SEO metadata of the city dashboard: title and canonical depend on the city and the series only. */
 export function fipezapCitiesMetadata(lang: string, state: FipezapCitiesState): Metadata {
     const t = getDictionary(lang).fipezapCitiesPage;

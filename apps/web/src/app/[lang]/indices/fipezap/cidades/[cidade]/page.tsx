@@ -5,7 +5,8 @@ import { parseFipezapCitiesParams } from "@/lib/fipezap-cities-params";
 import { FIPEZAP_CITY_LIST, fipezapCityBySlug } from "@/lib/fipezap-cities";
 import { fipezapCitiesMetadata } from "../shared";
 
-export { revalidate } from "../shared";
+// route segment config must be a literal here (Next parses it statically)
+export const revalidate = 3600;
 
 type Props = { params: Promise<{ lang: string; cidade: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
 
