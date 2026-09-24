@@ -8,11 +8,12 @@ import { FipezapResultsTable } from "./FipezapResultsTable";
 import { FipezapYearlyTable } from "./FipezapYearlyTable";
 import { FipezapCityProfile } from "./FipezapCityProfile";
 import { ReportCard } from "./ReportCard";
-import { BedroomBarsLazy, HistoryChartLazy, RankingBarsLazy } from "./ChartsLazy";
+import { BedroomBarsLazy, BrazilMapLazy, HistoryChartLazy, RankingBarsLazy } from "./ChartsLazy";
+import type { MapMetric } from "./FipezapBrazilMap";
 import { seriesColor } from "./palette";
 import { getBenchmarkSeries, getFipezapBuckets, getFipezapHistory, getFipezapSnapshot, getFipezapYearly, type BenchmarkPoint, type CitySnapshot } from "@/lib/fipezap-cities-server";
 import { buildCardTitles, buildHighlights, twelveMonthMetric, type Benchmark } from "@/lib/fipezap-insights";
-import { fill, monthLong, monthShort, yearOf } from "@/lib/fipezap-compare";
+import { fill, fmtBRL, fmtPct, monthLong, monthShort, yearOf } from "@/lib/fipezap-compare";
 import { buildFipezapCitiesHref, periodStart, type FipezapCitiesState } from "@/lib/fipezap-cities-params";
 import { FIPEZAP_CITIES, FIPEZAP_NATIONAL_SLUG, fipezapCityBySlug } from "@/lib/fipezap-cities";
 import type { FipezapDorm } from "@/lib/fipezap-import";
@@ -105,6 +106,21 @@ export async function FipezapCitiesPage({ lang, state }: { lang: string; state: 
     const historyLabels = { mensal: t.sections.historyMensal, m12: t.sections.history12m, indice: t.sections.historyIndice, yield: t.sections.yield, ipca: t.labels.ipca, igpm: t.labels.igpm, cdi: t.labels.cdi, national: t.labels.national, rebasedNote: t.labels.rebasedNote, viewData: t.labels.viewData, hideData: t.labels.hideData, month: t.columns.month };
     const sparkFrom = periodStart({ periodo: "5y", de: null }, latest) as string;
 
+    // map: one circle per city, sized by price per m², 12-month change or annual yield
+    const values = (pick: (c: CitySnapshot) => number | null) => Object.fromEntries(snapshot.cities.map(c => [c.city.slug, pick(c)]));
+    const mapMetrics: MapMetric[] = [
+        ...(isYield ? [] : [{ key: "preco", label: t.columns.priceM2, unit: "brl" as const, signed: false, values: values(c => c.precoM2) }]),
+        { key: "yield", label: t.columns.yieldAnnual, unit: "pct" as const, signed: false, values: values(c => c.yieldAnual) },
+        ...(isYield ? [] : [{ key: "var12m", label: t.columns.m12, unit: "pct" as const, signed: true, values: values(c => c.var12m) }]),
+    ];
+    const mapCities = snapshot.cities.filter(c => c.city.lat !== null && c.city.lng !== null).map(c => ({ slug: c.city.slug, name: c.city.name, uf: c.city.uf, lat: c.city.lat as number, lng: c.city.lng as number, isCapital: c.city.isCapital }));
+    const mapMain = mapMetrics[0];
+    const mapRanked = snapshot.cities.filter(c => mapMain.values[c.city.slug] !== null).sort((a, b) => (mapMain.values[b.city.slug] as number) - (mapMain.values[a.city.slug] as number));
+    const mapFmt = (v: number | null | undefined) => (mapMain.unit === "brl" ? fmtBRL(v, { lang }) : fmtPct(v, { lang, sign: false }));
+    const mapTitle = mapRanked.length >= 2
+        ? fill(t.insights.mapTitle, { metric: (isYield ? t.kpi.yield : t.kpi.price).replace(/^./, ch => ch.toLowerCase()), maxCity: mapRanked[0].city.name, max: mapFmt(mapMain.values[mapRanked[0].city.slug]), minCity: mapRanked[mapRanked.length - 1].city.name, min: mapFmt(mapMain.values[mapRanked[mapRanked.length - 1].city.slug]) })
+        : t.sections.map;
+
     const base = `https://kitnets.com${buildFipezapCitiesHref(lang, { ...state, comparar: [], periodo: "5y", de: null, ate: null, tipo: "venda", dorm: "total" })}`;
     const jsonLd = [
         { "@context": "https://schema.org", "@type": "Dataset", name: `${t.h1} — ${focus.city.name}`, description: t.description, url: base, temporalCoverage: `${(history[state.cidade]?.[0]?.month ?? latest).slice(0, 7)}/${latest.slice(0, 7)}`, creator: { "@type": "Organization", name: "FIPE" }, provider: { "@type": "Organization", name: "Kitnets.com", url: "https://kitnets.com" }, variableMeasured: ["Preço médio R$/m²", "Variação mensal", "Variação em 12 meses", "Rentabilidade do aluguel"] },
@@ -137,6 +153,10 @@ export async function FipezapCitiesPage({ lang, state }: { lang: string; state: 
 
                 <ReportCard id="preco" eyebrow={isYield ? t.sections.yieldRanking : t.sections.price} title={isYield ? titles.yield : titles.price} definition={isYield ? t.labels.definitionYield : t.labels.definitionPrice} source={sourceLine}>
                     <RankingBarsLazy rows={rankingRows(c => (isYield ? c.yieldAnual : c.precoM2))} selected={state.cidade} compare={state.comparar} nationalValue={isYield ? national.yieldAnual : national.precoM2} unit={isYield ? "pct" : "brl"} lang={lang} labels={rankingLabels} />
+                </ReportCard>
+
+                <ReportCard id="mapa" eyebrow={t.sections.map} title={mapTitle} definition={isYield ? t.labels.definitionYield : t.labels.definitionPrice} source={sourceLine}>
+                    <BrazilMapLazy cities={mapCities} metrics={mapMetrics} state={state} lang={lang} labels={{ hint: t.labels.mapHint, noValue: t.labels.mapNoValue, legendSelected: t.labels.legendSelected, legendCompare: t.labels.legendCompare, legendOthers: t.labels.legendOthers }} />
                 </ReportCard>
 
                 {buckets.length > 1 ? (

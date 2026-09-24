@@ -6,6 +6,7 @@ import type { RankingBars } from "./RankingBars";
 import type { FipezapBedroomBars } from "./FipezapBedroomBars";
 import type { FipezapHistoryChart } from "./FipezapHistoryChart";
 import type { CitySparkline } from "./CitySparkline";
+import type { FipezapBrazilMap } from "./FipezapBrazilMap";
 
 const skeleton = (h: number) => {
     const ChartSkeleton = () => <div className="w-full rounded-lg bg-muted/30 animate-pulse" style={{ height: h }} aria-busy="true" />;
@@ -18,5 +19,6 @@ export const RankingBarsLazy = dynamic(() => import("./RankingBars").then(m => m
 export const BedroomBarsLazy = dynamic(() => import("./FipezapBedroomBars").then(m => m.FipezapBedroomBars), { ssr: false, loading: skeleton(200) }) as typeof FipezapBedroomBars;
 export const HistoryChartLazy = dynamic(() => import("./FipezapHistoryChart").then(m => m.FipezapHistoryChart), { ssr: false, loading: skeleton(360) }) as typeof FipezapHistoryChart;
 export const CitySparklineLazy = dynamic(() => import("./CitySparkline").then(m => m.CitySparkline), { ssr: false, loading: skeleton(120) }) as typeof CitySparkline;
+export const BrazilMapLazy = dynamic(() => import("./FipezapBrazilMap").then(m => m.FipezapBrazilMap), { ssr: false, loading: skeleton(520) }) as typeof FipezapBrazilMap;
 
 export type RankingBarsProps = ComponentProps<typeof RankingBars>;

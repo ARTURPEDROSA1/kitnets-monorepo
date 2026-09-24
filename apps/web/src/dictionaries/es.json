@@ -1497,6 +1497,7 @@
             "yield": "Rentabilidad del alquiler",
             "yieldRanking": "Rentabilidad por ciudad",
             "cityProfile": "Resumen de la ciudad",
+            "map": "Mapa de las ciudades",
             "methodology": "Sobre los datos"
         },
         "columns": {
@@ -1546,6 +1547,7 @@
             "definitionIndice": "Número índice de la FIPE reescalado a 100 al inicio del período",
             "definitionYearly": "Variación de diciembre a diciembre; el año en curso muestra el acumulado de 12 meses",
             "neighborhoodNote": "La FIPE no publica precios por barrio o zona.",
+            "mapHint": "Círculo mayor = valor mayor. Pase el ratón para ver el valor; haga clic para abrir la ciudad.", "mapNoValue": "sin dato",
             "cityPage": "Ver página de la ciudad",
             "comparingWith": "Comparando con"
         },
@@ -1592,6 +1594,7 @@
             "historyTitleYield": "{Place}, el alquiler rinde {yield} al año, {vs} CDI ({cdi})",
             "yearlyTitle": "{Place}, {above} de los últimos {n} años cerraron por encima del IPCA; {year} acumula {ytd}",
             "capitalsTitle": "{k} de las {total} capitales subieron más que el índice nacional en 12 meses ({tipo})",
+            "mapTitle": "En el mapa, {maxCity} lidera en {metric} ({max}) y {minCity} cierra la lista ({min})",
             "yieldTitle": "{Place}, el alquiler rinde {yield} al año, {vs} CDI ({cdi})",
             "sectionYearly": "Variación anual",
             "sectionCapitals": "Variación en las capitales"
