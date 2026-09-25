@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
 import { Button } from '@kitnets/ui';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -61,6 +62,8 @@ interface Props {
     initialFile?: File;
     /** The caller creates the lease on completion instead of opening the form */
     createsLease?: boolean;
+    /** Import started from an agency's dashboard (Imobiliárias): the agency is settled, nothing to match or create */
+    fixedAgency?: { id: string; label: string };
 }
 
 type FieldErrors = Record<string, string>;
@@ -132,7 +135,7 @@ function errorsFrom(json: Record<string, unknown>, fallback: string): FieldError
     return { _form: typeof json.error === 'string' ? json.error : fallback };
 }
 
-export default function LeaseImportModal({ properties, agencies, onClose, onManual, onComplete, fixedProperty, initialFile, createsLease }: Props) {
+export default function LeaseImportModal({ properties, agencies, onClose, onManual, onComplete, fixedProperty, initialFile, createsLease, fixedAgency }: Props) {
     const [step, setStep] = useState<'upload' | 'review'>('upload');
     const [isExtracting, setIsExtracting] = useState(false);
     const [extractError, setExtractError] = useState<string | null>(null);
@@ -160,6 +163,8 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
     const [agencyErrors, setAgencyErrors] = useState<FieldErrors>({});
     const [createdAgency, setCreatedAgency] = useState<LeaseAgencyOption | null>(null);
     const [agencyEditing, setAgencyEditing] = useState(false);
+    /** the logo read from the contract's header (a data URL): it becomes the logo of the agency created here */
+    const [agencyLogo, setAgencyLogo] = useState<string | null>(null);
 
     const [tenantDrafts, setTenantDrafts] = useState<TenantDraft[]>([]);
     const [agentDrafts, setAgentDrafts] = useState<AgentDraft[]>([]);
@@ -180,8 +185,8 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
     const agencyOptions = createdAgency ? [...agencies, createdAgency] : agencies;
     const propertySettled = propertyMode === 'existing' && !propertyEditing && !!propertyId &&
         (propertyMatch?.id === propertyId || createdProperty?.id === propertyId);
-    const agencySettled = agencyMode === 'existing' && !agencyEditing && !!agencyId &&
-        (agencyMatch?.id === agencyId || createdAgency?.id === agencyId);
+    const agencySettled = !!fixedAgency || (agencyMode === 'existing' && !agencyEditing && !!agencyId &&
+        (agencyMatch?.id === agencyId || createdAgency?.id === agencyId));
 
     // ── Step 1: upload + extraction ───────────────────────────────
 
@@ -228,6 +233,7 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
 
             setFile(picked);
             setData(extracted);
+            setAgencyLogo(typeof json.agency_logo === 'string' ? json.agency_logo : null);
 
             const p = extracted.property;
             const streetAndNumber = [p?.street, p?.street_number].filter(Boolean).join(', ');
@@ -251,8 +257,8 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
 
             const a = extracted.agency;
             setAgencyMatch(matches.agency ?? null);
-            setAgencyId(matches.agency?.id ?? '');
-            setAgencyMode(matches.agency ? 'existing' : a ? 'create' : 'skip');
+            setAgencyId(fixedAgency?.id ?? matches.agency?.id ?? '');
+            setAgencyMode(fixedAgency || matches.agency ? 'existing' : a ? 'create' : 'skip');
             setAgencyDraft(a ? {
                 name: a.name,
                 cnpj: a.cnpj ? formatCNPJ(a.cnpj) : '',
@@ -372,6 +378,17 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                 setAgencyId(created.id);
                 setAgencyMode('existing');
                 setAgencyEditing(false);
+                if (agencyLogo) {
+                    // The logo read from the contract's header becomes the agency's logo (the cover of its card); a failure here is no reason to stop
+                    try {
+                        const blob = await fetch(agencyLogo).then(r => r.blob());
+                        const body = new FormData();
+                        body.append('file', new File([blob], 'logo-contrato.png', { type: 'image/png' }));
+                        await fetch(`/api/agencies/${created.id}/logo`, { method: 'POST', body });
+                    } catch {
+                        // the logo can be sent later in Imobiliárias
+                    }
+                }
             }
 
             // 2b. Corretores: the agency's representative (or the autonomous broker), with their own CRECI.
@@ -738,7 +755,11 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                             <section className="space-y-3 rounded-xl border border-border p-4">
                                 <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground"><Building2 className="h-4 w-4" /> Imobiliária</h3>
 
-                                {agencySettled ? (
+                                {fixedAgency ? (
+                                    <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-2.5 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">
+                                        <CheckCircle2 className="h-4 w-4 shrink-0" /> <span>Contrato da imobiliária: <strong>{fixedAgency.label}</strong></span>
+                                    </div>
+                                ) : agencySettled ? (
                                     matchedBanner(
                                         createdAgency?.id === agencyId
                                             ? <>Imobiliária criada: <strong>{createdAgency?.name}</strong></>
@@ -769,7 +790,7 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                                     </>
                                 )}
 
-                                {agencyMode === 'existing' && !agencySettled && (
+                                {!fixedAgency && agencyMode === 'existing' && !agencySettled && (
                                     <select className={selectClass} value={agencyId} onChange={e => setAgencyId(e.target.value)} disabled={applying}>
                                         <option value="">Selecione uma imobiliária...</option>
                                         {agencyOptions.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
@@ -832,7 +853,17 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                                             <Input className="h-9" maxLength={2} value={agencyDraft.state} onChange={e => setAgencyDraft({ ...agencyDraft, state: e.target.value.toUpperCase() })} />
                                             {fieldError(agencyErrors, 'state')}
                                         </div>
-                                        <p className="text-xs text-muted-foreground sm:col-span-6">CRECI, responsável e taxa de administração lidos do contrato também serão salvos. Complete o restante em Imobiliária.</p>
+                                        <p className="text-xs text-muted-foreground sm:col-span-6">CRECI, responsável e taxa de administração lidos do contrato também serão salvos. Complete o restante em Imobiliárias.</p>
+                                        {agencyLogo && (
+                                            <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/30 p-2 sm:col-span-6">
+                                                <Image src={agencyLogo} alt="Logo lido do contrato" width={160} height={48} className="h-12 w-auto max-w-[160px] rounded bg-white object-contain p-1" unoptimized />
+                                                <div className="min-w-0 flex-1 text-xs text-muted-foreground">
+                                                    <p className="font-medium text-foreground">Logo lido do cabeçalho do contrato</p>
+                                                    <p>Vira o logo da imobiliária, a capa do card em Imobiliárias. Troque depois se não for ele.</p>
+                                                </div>
+                                                <button type="button" className="text-xs text-muted-foreground hover:underline" onClick={() => setAgencyLogo(null)} disabled={applying}>Não usar</button>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                                 {otherErrors(agencyErrors, agencyMode === 'create' ? ['name', 'cnpj', 'main_phone', 'email', 'postal_code', 'street', 'street_number', 'neighborhood', 'city', 'state'] : [])}

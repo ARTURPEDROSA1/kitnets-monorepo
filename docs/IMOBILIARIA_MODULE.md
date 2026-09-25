@@ -1,7 +1,7 @@
 # Imobiliária (Agency) Module
 
-**Version:** 1.0  
-**Last updated:** 2026-09-02  
+**Version:** 2.0  
+**Last updated:** 2026-09-25  
 **Author:** Kitnets Engineering
 
 ---
@@ -26,16 +26,17 @@
    - 5.3 [PUT /api/agencies/[id]](#53-put-apiagenciesid)
    - 5.4 [DELETE /api/agencies/[id]](#54-delete-apiagenciesid)
    - 5.5 [GET /api/cep](#55-get-apicep)
+   - 5.6 [GET /api/agencies/[id]/dashboard](#56-get-apiagenciesiddashboard)
 6. [Components](#6-components)
    - 6.1 [Page Component (`page.tsx`)](#61-page-component-pagetsx)
    - 6.2 [ImobiliariaContent (Page Orchestrator)](#62-imobiliariacontent-page-orchestrator)
-   - 6.3 [AgencyProfileCard](#63-agencyprofilecard)
+   - 6.3 [The hub and dashboard components](#63-the-hub-and-dashboard-components)
 7. [UI Flow & States](#7-ui-flow--states)
    - 7.1 [State Machine](#71-state-machine)
-   - 7.2 [List View](#72-list-view)
-   - 7.3 [Registration Form](#73-registration-form)
-   - 7.4 [Edit Flow](#74-edit-flow)
-   - 7.5 [Delete Flow](#75-delete-flow)
+   - 7.2 [Hub](#72-hub)
+   - 7.3 [Agency Dashboard](#73-agency-dashboard)
+   - 7.4 [Registration / Edit Form](#74-registration--edit-form)
+   - 7.5 [Lease Import](#75-lease-import)
 8. [Validation & Normalization](#8-validation--normalization)
    - 8.1 [Client-side Validation](#81-client-side-validation)
    - 8.2 [Server-side Validation](#82-server-side-validation)
@@ -76,21 +77,41 @@ The **Imobiliária Module** (`/[lang]/imobiliaria`) allows authenticated users t
 ```
 apps/web/src/
 ├── app/[lang]/imobiliaria/
-│   ├── page.tsx                    # Server component (metadata + lang)
-│   └── ImobiliariaContent.tsx      # Client component (1096 lines — list/form/accordion)
+│   ├── page.tsx                    # Server component: preloads the list (and the dashboard of ?id=) before the first paint
+│   └── ImobiliariaContent.tsx      # Client orchestrator: hub ↔ agency dashboard (?id=) ↔ form; add modal, lease import, delete modal
 ├── app/api/
 │   ├── agencies/
-│   │   ├── route.ts                # GET (list all) + POST (create agency)
+│   │   ├── route.ts                # GET (list + the leases/tenants/corretores per agency) + POST (create)
+│   │   ├── extract/route.ts        # POST: AI reads an agency out of a document (+ logo)
 │   │   └── [id]/
-│   │       └── route.ts            # PUT (update) + DELETE (soft-delete)
-│   └── cep/
-│       └── route.ts                # CEP lookup proxy (ViaCEP)
+│   │       ├── route.ts            # PUT (update) + DELETE (soft-delete)
+│   │       ├── dashboard/route.ts  # GET: one agency's bundle (agency, leases, tenants, agents)
+│   │       ├── logo/route.ts       # POST / DELETE the logo (public agency-logos bucket)
+│   │       └── agreement/route.ts  # POST / DELETE the service agreement (private documents bucket)
+│   ├── leases/extract/route.ts     # the lease import: also returns the agency's header logo (agency_logo)
+│   └── cep/route.ts                # CEP lookup proxy (ViaCEP)
 ├── components/
-│   ├── Sidebar.tsx                 # "Imobiliária" nav link (lines 286-295)
+│   ├── Sidebar.tsx                 # "Imobiliária" nav link
+│   ├── contratos/
+│   │   ├── LeaseImportModal.tsx    # the AI review of one lease (fixedAgency, the header logo)
+│   │   └── LeaseBatchImportModal.tsx  # several leases in a row (mode="current" from Imobiliárias)
+│   ├── ui/CoverCarousel.tsx        # the card cover; fit="contain" keeps a logo whole
 │   └── imobiliaria/
-│       └── AgencyProfileCard.tsx   # Agency detail card (expanded view)
+│       ├── ImobiliariasHub.tsx     # KPI strip, "Atenção" list, view pills, filters, the cards
+│       ├── AgencySquareCard.tsx    # one card per agency, the logo as the cover
+│       ├── AgencyDashboard.tsx     # one agency: logo, contact chips, tiles, contracts, tenants, corretores, agreement, ficha
+│       ├── AgencyForm.tsx          # create / edit form (5 sections, CEP auto-fill, logo, agreement)
+│       ├── AgencyAddModal.tsx      # "Adicionar imobiliária": document → AI → form prefilled, or manual
+│       └── AgencyLogo.tsx          # the logo widget with upload / remove (dashboard)
 ├── lib/
-│   └── validators.ts              # CNPJ, phone, CEP, email, URL validators
+│   ├── agency-dashboard.ts (+ test) # pure maths: status meta, views, rows (rent, fee, agreement), totals, attention
+│   ├── agency-views.ts             # the list / dashboard view types (client-safe)
+│   ├── agency-views-server.ts      # builds those views (memberships → agencies; the account's leases/tenants/agents that name them)
+│   ├── agencies-server.ts          # roles, CNPJ uniqueness, writeAgency, logo/agreement removal
+│   ├── agency-agreement.ts         # private bucket path ↔ signed URL
+│   ├── agency-logo.ts              # the logo out of a PDF header / a vision box
+│   ├── schemas/agency.ts           # zod input schema
+│   └── validators.ts               # CNPJ, phone, CEP, email, URL validators
 ├── types/
 │   └── agency.ts                   # Agency, AgencyMember, AgencyFormData, AgencyWithRole
 └── middleware.ts                   # /imobiliaria(.*)  protected route
@@ -289,7 +310,7 @@ All agency API routes use the **service role key** to bypass RLS, with authentic
 
 ### 5.1 GET /api/agencies
 
-**Purpose:** Returns all agencies associated with the current user.
+**Purpose:** Returns all agencies associated with the current user, plus the account's leases, tenants and corretores that name one of them (`{ agencies, leases, tenants, agents }`, built by `loadAgencyList` in `lib/agency-views-server.ts`) — what the Imobiliárias hub renders.
 
 **Response:**
 ```json
@@ -374,138 +395,63 @@ All agency API routes use the **service role key** to bypass RLS, with authentic
 
 ---
 
+### 5.6 GET /api/agencies/[id]/dashboard
+
+One agency with the caller's role and a signed agreement URL, the leases it administers (newest first, with property, unit, tenant, corretor, dates, status and rent), the tenants it looks after and the corretores who work for it. 404 when unknown, 403 when the account is not a member. The page preloads the same bundle (`loadAgencyDashboard`).
+
+---
+
 ## 6. Components
 
 ### 6.1 Page Component (`page.tsx`)
 
-Server component at `app/[lang]/imobiliaria/page.tsx`:
-- Force-dynamic rendering (`export const dynamic = 'force-dynamic'`)
-- Generates metadata: `title: 'Imobiliária'`
-- Passes `lang` prop to `ImobiliariaContent`
+Server component at `app/[lang]/imobiliaria/page.tsx`: force-dynamic, metadata `title: 'Imobiliárias'`. Resolves the account with `requireProfile()` and preloads `loadAgencyList` (and `loadAgencyDashboard` when `?id=` or the old `?agency=` is present) inside a `Suspense` boundary, so the first paint already has the cards; the client only fetches again after a change.
 
 ### 6.2 ImobiliariaContent (Page Orchestrator)
 
-Client component (~1096 lines). Manages the entire agency flow:
+Client component at `app/[lang]/imobiliaria/ImobiliariaContent.tsx` — three screens: the **hub** (`/imobiliaria`), one agency's **dashboard** (`?id=<agency>`; the property page's `?agency=` deep link still opens it) and the **form** (create / edit, component state). The view (`?view=ativas|inativas|todas`) lives in the URL. Owns the "Adicionar imobiliária" modal (document → AI → form prefilled, or manual), the lease import (`LeaseBatchImportModal`, `mode="current"`, `fixedAgency` from a dashboard) and the delete modal (OWNER only). Refreshes through `GET /api/agencies` and `GET /api/agencies/[id]/dashboard`.
 
-**State variables:**
-| State | Type | Purpose |
-|-------|------|---------|
-| `pageState` | `'loading' \| 'list' \| 'form' \| 'editing'` | Current page view |
-| `agencies` | `AgencyWithRole[]` | All user's agencies |
-| `editingAgency` | `AgencyWithRole \| null` | Agency being edited |
-| `expandedId` | `string \| null` | Currently expanded accordion row |
-| `deletingAgency` | `AgencyWithRole \| null` | Agency pending delete confirmation |
-| `form` | `AgencyFormData` | Current form state |
-| `errors` | `FieldErrors` | Validation errors per field |
+### 6.3 The hub and dashboard components
 
-**Key functions:**
-- `fetchAgencies()` — Loads all user's agencies from API
-- `toggleExpand(id)` — Accordion expand/collapse (one at a time)
-- `startAdding()` — Reset form and switch to `form` state
-- `startEditing(agency)` — Pre-fill form and switch to `editing` state
-- `cancelForm()` — Return to `list` state
-- `confirmDelete(agency)` / `executeDelete()` — Delete flow with confirmation
-- `handleSubmit()` — Validate, submit to API, refetch list
-- `lookupCEP()` — CEP auto-fill via `/api/cep`
-- `validate()` — Client-side validation returning field errors
-
-### 6.3 AgencyProfileCard
-
-Presentational component at `components/imobiliaria/AgencyProfileCard.tsx`:
-
-**Props:**
-```typescript
-interface AgencyProfileCardProps {
-    agency: AgencyWithRole;
-    onEdit: () => void;
-    onDelete?: () => void;
-}
-```
-
-**Sections:**
-1. **Header** — Logo placeholder + name + trade name + status badge + role badge
-2. **Business Info** — CNPJ (formatted), CRECI (number + UF + type), legal representative
-3. **Contact** — Main phone (with WhatsApp indicator), additional phone, email, website
-4. **Address** — Full formatted address + CEP
-5. **Description** — "Sobre" section (if provided)
-6. **Actions** — "Editar dados" button (OWNER/ADMIN) + "Excluir" button (OWNER only)
+- **ImobiliariasHub**: KPI strip (`agencyHubTotals` in `lib/agency-dashboard.ts`): active agencies, contracts in force with an agency, the rent they add up to, **what the administration fees cost per month** (rent in force × each agency's fee — the "economia potencial com autogestão"; contracts whose agency has no fee are counted apart), tenants served (and corretores linked), service agreements attached / expiring within 90 days / expired. **Atenção** (`agencyAttention`, worst first): suspended but still administering, agreement expired, agreement expiring, fee not entered, no agreement attached, no contact, nothing to do. View pills with counts, search (name, CNPJ, CRECI, responsável, city, property, tenant), a city filter, the cards.
+- **AgencySquareCard**: the logo as the cover (`CoverCarousel` with `fit="contain"`: whole, on a light background), status pill, delete (OWNER), name (trade name first), CNPJ · CRECI, neighbourhood · city/UF, two tiles (contracts in force with the rent under management; the fee and what it costs per month), contact icons (WhatsApp, phone, e-mail, website), the agreement's end date (rose when expired, amber when expiring).
+- **AgencyDashboard**: the logo (`AgencyLogo`, editable for OWNER/ADMIN), name, status, CNPJ, CRECI, responsável, address, contact chips; "Importar contrato", Editar, Excluir; six tiles with "?" (contracts in force, rent under management, the fee and its monthly / yearly cost, tenants served, corretores, the service agreement and its term); the contracts it administers (each with its fee share, link to the contract's dashboard), the tenants it looks after, the corretores who work for it, the service agreement card (document, fee, term; "Ver" opens the signed URL) and the ficha.
+- **AgencyForm**: the five sections of the previous form (dados, contato, endereço, prestação de serviços, observações) with CEP auto-fill, the logo picker and the agreement picker; uploads both after the save. `prefillFor(agency)` builds the initial state; `AgencyPrefill` carries what the AI read.
+- **AgencyAddModal**: drop a lease or service agreement → `POST /api/agencies/extract` → the form opens filled in, the document attached as the agreement and the logo (from the PDF header, or the vision box cropped in the browser) as the logo.
+- **AgencyLogo**: the rectangle logo widget with upload / remove against `POST|DELETE /api/agencies/[id]/logo`.
 
 ---
-
 ## 7. UI Flow & States
 
 ### 7.1 State Machine
 
 ```
-               ┌──── startAdding() ────┐
-               │                       ▼
-loading ──→ list ◄──── cancelForm() ── form
-               │                       ▲
-               │                       │
-               └── startEditing() ──→ editing
-               │                       │
-               │    handleSubmit() ─────┘
-               │        │
-               │        └──→ fetchAgencies() ──→ list
-               │
-               └── confirmDelete() ──→ [modal] ──→ executeDelete() ──→ list
+hub (/imobiliaria) ──click card / Atenção──▶ dashboard (?id=) ──Editar──▶ form ──save──▶ dashboard
+   │                                            │
+   ├── Adicionar imobiliária ──▶ add modal ──AI──▶ form (prefilled) ──save──▶ dashboard
+   │                                 └──manual──▶ form (empty)
+   ├── Importar contrato ──▶ LeaseBatchImportModal (mode="current") ──▶ contracts created ──▶ hub refreshed
+   │                                            └── from the dashboard: fixedAgency, the agency section settled
+   └── Excluir (OWNER) ──▶ confirm ──▶ hub
 ```
 
-### 7.2 List View
+### 7.2 Hub
 
-The default view after loading. Modeled after the Energy Dashboard (`/dashboard/energy`):
-- **Top Navigation & Header:**
-  - Back link: "← Dashboard" (`/[lang]/dashboard`)
-  - Amber icon box: `Building2` inside rounded amber badge
-  - Title: "Gestão de Imobiliárias" + subtitle
-  - Action buttons: "+ Adicionar Imobiliária" (amber button) and "Meus Imóveis" (outline button)
-- **Filter Tabs:**
-  - "Todas as Imobiliárias (N)", "Ativas (X)", "Verificadas (Y)"
-- **Square Cards Grid (`grid-cols-1 md:grid-cols-2 lg:grid-cols-3`):**
-  - Rounded `rounded-2xl` cards with status-colored borders (`border-amber-500/40` for Active, `border-emerald-500/40` for Verified)
-  - Card Header: Name (bold uppercase, line-clamp-1), MapPin + full formatted address, quick edit & delete action icons
-  - Badges row: Status pill badge, CRECI pill badge, font-mono CNPJ badge
-  - Notes: `Razão Social` or `Obs` note in italic text
-  - Middle row: Agency logo (or custom initial box) on left, WhatsApp / phone link on right
-  - Bottom summary card: Responsável Legal (`agency.owner_name`) and user's role badge
-  - Bottom CTA: Full-width button with `ArrowRight` ("Gerenciar Imobiliária")
-- **Detail Modal:**
-  - Clicking "Gerenciar Imobiliária" opens a full dialog modal featuring `AgencyProfileCard` with complete business data, contact, address, edit button, and delete button
-- **Empty state:** Dashed rounded container with amber icon, descriptive copy, and CTA buttons
-- **Delete modal:** Overlay with confirmation + cancel/confirm buttons
+KPI strip, "Atenção", pills `Ativas / Inativas / Todas` (ACTIVE and VERIFIED count as active), search + city filter, one card per agency, an empty state that offers both the registration and the lease import.
 
-### 7.3 Registration Form
+### 7.3 Agency Dashboard
 
-Four form sections matching the spec:
+Everything one agency is to the account: what it administers and what that costs, who it serves, who signs for it, the service agreement and its term, the ficha. Actions depend on the role: OWNER/ADMIN edit (and change the logo), OWNER deletes; anyone can import a contract.
 
-1. **Informações da imobiliária** — Name*, trade name, CNPJ (masked `00.000.000/0000-00`), CRECI + UF + type
-2. **Responsável** — Owner/legal representative name
-3. **Contato** — Main phone* (masked `(XX) XXXXX-XXXX`) + WhatsApp checkbox, additional phone + WhatsApp checkbox, email, website
-4. **Endereço** — CEP* + "Buscar CEP" button, street*, number*, complement, neighborhood*, city*, state* (dropdown), country (read-only "Brasil")
+### 7.4 Registration / Edit Form
 
-**Footer:** "Voltar à lista" + "Cadastrar imobiliária" (disabled until valid)
+`AgencyForm` — the required fields are the name, the main phone and the address; CNPJ, CRECI, e-mail, website and the fee are validated when given. The service agreement is uploaded with the fee and the term after the save; the logo likewise.
 
-### 7.4 Edit Flow
+### 7.5 Lease Import
 
-Pre-fills the form with `agencyToFormData(agency)`:
-- Phones formatted from E.164 to `(XX) XXXXX-XXXX`
-- CNPJ formatted from digits to `XX.XXX.XXX/XXXX-XX`
-- CEP formatted from digits to `XXXXX-XXX`
-- Website stripped of `https://` prefix
-
-On submit, sends `PUT /api/agencies/[id]` then refetches list.
-
-### 7.5 Delete Flow
-
-1. User clicks "Excluir" on expanded card
-2. Confirmation modal appears with agency name
-3. "Cancelar" dismisses modal
-4. "Excluir imobiliária" calls `DELETE /api/agencies/[id]`
-5. On success, agency is removed from local state immediately
-6. If the deleted agency was expanded, accordion closes
+See CONTRATOS_MODULE §7.7: the batch modal reads each contract with the AI, settles the parties (the agency fixed when opened from a dashboard), the unit, the status and the reference, and creates the lease with the file attached; what already exists is linked, not duplicated.
 
 ---
-
 ## 8. Validation & Normalization
 
 ### 8.1 Client-side Validation
@@ -664,7 +610,7 @@ Two SQL files must be run **in order** in the Supabase SQL Editor:
 
 | Item | Status | Description |
 |------|--------|-------------|
-| **Logo upload** | Planned | Upload agency logo to Supabase Storage and save URL in `logo_url` |
+| **Logo for a matched agency from a contract** | Planned | The lease import uploads the header logo only for the agency it creates; an agency that matched and has no logo keeps none until it is sent by hand |
 | **Description field in form** | Planned | Add "Sobre a imobiliária" textarea to registration/edit form (DB + API already support it) |
 | **Multi-user membership** | Planned | Invite other users as ADMIN/MANAGER/AGENT to an agency |
 | **Sidebar badge count** | Planned | Show count of active agencies next to sidebar link |
@@ -681,3 +627,4 @@ Two SQL files must be run **in order** in the Supabase SQL Editor:
 | 2026-09-08 | 1.1 | Redesigned list interface to match Energy Dashboard (`/dashboard/energy`) square cards grid with status-colored borders, badges, WhatsApp link, summary cards, and detail view modal |
 | 2026-09-08 | 1.2 | Replaced global CNPJ uniqueness check with per-account duplicate prevention, allowing multiple independent accounts to register the same management company |
 | 2026-09-08 | 1.3 | Integrated AI contract extraction for lease and service agreements (`/api/agencies/extract`), added popup on "+ Adicionar Imobiliária" with drag & drop document upload, manual typing fallback, auto-cropping logo, and consolidated the "Responsável" card into Section 1 ("Informações da imobiliária") |
+| 2026-09-25 | 2.0 | Redesign in the shape of Inquilinos / Corretores: hub with KPI strip (contracts in force, rent under management, what the fees cost per month, agreements expiring), "Atenção" list, views in the URL and one card per agency with the **logo as the cover**; agency dashboard (`?id=`, `?agency=` kept) with tiles, contracts, tenants, corretores, the service agreement and the ficha; `GET /api/agencies/[id]/dashboard`; `GET /api/agencies` returns the leases/tenants/corretores per agency; the form moved to `AgencyForm.tsx`, the add flow to `AgencyAddModal.tsx`, `AgencyProfileCard` retired. **A lease agreement can be imported from Imobiliárias** (hub or dashboard, the agency fixed): the AI creates the contract, the tenants and the corretor that do not exist yet; the Contratos import now carries the agency's header logo to the agency it creates |

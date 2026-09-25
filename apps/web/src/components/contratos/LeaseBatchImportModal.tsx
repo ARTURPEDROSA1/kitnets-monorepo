@@ -28,6 +28,10 @@ interface Props {
     /** Closes the modal; the ids of the contracts created, so the caller refreshes the list. */
     onClose: (createdIds: string[]) => void;
     onOpenLease: (id: string) => void;
+    /** "history" (default): old contracts, registered as closed unless unticked; "current": contracts that may well be in force */
+    mode?: "history" | "current";
+    /** Import started from an agency's dashboard (Imobiliárias): every contract is that agency's */
+    fixedAgency?: { id: string; label: string };
 }
 
 type Step = "pick" | "review" | "settle" | "done";
@@ -40,11 +44,11 @@ interface Outcome {
     errors?: string[];
 }
 
-export default function LeaseBatchImportModal({ dropdowns, refreshDropdowns, onClose, onOpenLease }: Props) {
+export default function LeaseBatchImportModal({ dropdowns, refreshDropdowns, onClose, onOpenLease, mode = "history", fixedAgency }: Props) {
     const [step, setStep] = useState<Step>("pick");
     const [files, setFiles] = useState<File[]>([]);
     const [fileErrors, setFileErrors] = useState<string[]>([]);
-    const [asHistory, setAsHistory] = useState(true);
+    const [asHistory, setAsHistory] = useState(mode === "history");
     const [dragging, setDragging] = useState(false);
     const [index, setIndex] = useState(0);
     const [outcomes, setOutcomes] = useState<Outcome[]>([]);
@@ -139,6 +143,7 @@ export default function LeaseBatchImportModal({ dropdowns, refreshDropdowns, onC
                 agencies={lists.agencies}
                 initialFile={current}
                 createsLease
+                fixedAgency={fixedAgency}
                 onClose={skip}
                 onComplete={result => { void settle(result); }}
             />
@@ -165,14 +170,16 @@ export default function LeaseBatchImportModal({ dropdowns, refreshDropdowns, onC
                     </div>
                     <div className="space-y-1 pr-6">
                         <h2 className="text-xl font-bold tracking-tight text-foreground">
-                            {step === "pick" ? "Importar contratos antigos" : step === "settle" ? `Contrato ${index + 1} de ${files.length}` : "Importação concluída"}
+                            {step === "pick" ? (mode === "current" ? "Importar contratos de locação" : "Importar contratos antigos") : step === "settle" ? `Contrato ${index + 1} de ${files.length}` : "Importação concluída"}
                         </h2>
                         <p className="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                             {step === "pick"
-                                ? <>Envie os PDFs de contratos que já rodaram (o inquilino anterior, o contrato antes da renovação). A IA lê cada um, você confirma as partes e o contrato entra no histórico com o arquivo guardado.</>
+                                ? (mode === "current"
+                                    ? <>Envie os contratos de locação{fixedAgency ? <> da <strong className="text-foreground">{fixedAgency.label}</strong></> : null}. A IA lê cada um, você confirma imóvel, inquilinos e corretor, e o contrato é criado com o arquivo guardado — o que já estiver cadastrado não é criado de novo.</>
+                                    : <>Envie os PDFs de contratos que já rodaram (o inquilino anterior, o contrato antes da renovação). A IA lê cada um, você confirma as partes e o contrato entra no histórico com o arquivo guardado.</>)
                                 : step === "settle"
                                     ? <>Confira a unidade e o status e crie o contrato. O arquivo <strong className="text-foreground">{current?.name}</strong> fica anexado a ele.</>
-                                    : <>O que foi criado aparece em Contratos → Encerrados (ou Vigentes, quando ainda em vigor).</>}
+                                    : <>O que foi criado aparece em Contratos{mode === "current" ? " → Vigentes (ou Encerrados, quando já terminou)" : " → Encerrados (ou Vigentes, quando ainda em vigor)"}.</>}
                         </p>
                     </div>
                 </div>

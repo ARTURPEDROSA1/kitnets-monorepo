@@ -504,6 +504,11 @@ Several PDFs of contracts that already ran, in one go. Each file goes through th
 ### 7.6 The corretor read from the contract
 The extraction prompt asks for `agents`: the natural person who signs or answers for the agency (sócio, representante legal, corretor responsável — with their own CRECI-F, never the agency's CRECI-J) or the autonomous broker intermediating. `normalizeLeaseExtraction` keeps only the person's own CRECI, dedupes by CRECI, CPF and name, and — when nobody was listed but the agency names its representative — offers that person with the CRECI left to be typed. `matchAgent` (route `POST /api/leases/extract`, `matches.agents`) matches by CRECI (number + UF), then CPF, then an exact name. The review step of `LeaseImportModal` shows a **Corretor** section: matched → linked; not matched → "Cadastrar em Corretores" with name, CPF, CRECI + UF (required), phone and e-mail, created through `POST /api/agents` as IMOBILIARIA (linked to the contract's agency) or AUTONOMO. The lease gets `agent_id`; `management_type` is AGENCY when there is an agency, AGENT when only a corretor, SELF_MANAGED otherwise (`leasePayloadFromImport`, the form prefill). Tenants created in the same review carry the corretor too.
 
+### 7.7 The agency's logo, and the import from Imobiliárias
+The Contratos import already creates the agency the contract names (§7 — "Sim, criar imobiliária"). Since 2026-09-25 the extract route also pulls the agency's logo out of the header of a digital PDF (`extractLogoFromPdf` in `lib/agency-logo.ts`, the same code the Imobiliárias extraction uses) when the agency did not match, and returns it as `agency_logo`; `LeaseImportModal` shows it in the "criar imobiliária" block ("Não usar" drops it) and uploads it to `POST /api/agencies/[id]/logo` right after creating the agency — the logo is the cover of the agency's card. Scanned PDFs and image uploads carry no logo through this path.
+
+The same import runs from **Imobiliárias**: the hub's "Importar contrato" and the dashboard's "Importar contrato" open `LeaseBatchImportModal` in `mode="current"` (contracts that may be in force, the "Registrar como encerrados" box unticked), with `fixedAgency` from the dashboard so the agency section is settled. Each contract goes through the same reading and matching, the unit / status / reference settle step, and `createLeaseFromImport`, whose duplicate guard (same property, unit, tenant and start date) means an agreement imported twice yields no second lease; tenants and corretores that matched are linked, the missing ones created.
+
 ### 8.1 State Machine
 
 ```mermaid
@@ -620,6 +625,7 @@ If a property already has a contract with `status = 'ACTIVE'` and the user attem
 
 ## 12. Changelog
 
+- **2026-09-25** — The agency's header logo travels with the import (`agency_logo`) and becomes the logo of the agency created from the contract; the lease import also runs from Imobiliárias, with the agency fixed from its dashboard (§7.7).
 - **2026-09-25** — The AI import reads the corretor: `agents` in the extraction, `matchAgent`, the Corretor section of the review, `agent_id` on the lease and the tenants created from it (§7.6).
 
 - **2026-09-25 (v1.1)** — Contratos redesigned:
