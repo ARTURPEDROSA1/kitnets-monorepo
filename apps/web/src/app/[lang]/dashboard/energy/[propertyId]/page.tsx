@@ -445,7 +445,7 @@ export default function EnergyDashboardPage() {
                             className="inline-flex items-center font-medium hover:text-foreground transition-colors"
                         >
                             <ArrowLeft className="w-4 h-4 mr-1" />
-                            Painel Solar
+                            Energia
                         </Link>
                         <span className="text-border">•</span>
                         <Link

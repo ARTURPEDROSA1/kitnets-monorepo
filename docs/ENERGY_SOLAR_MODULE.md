@@ -1,7 +1,7 @@
 # Solar Energy & Consumption Management Module
 
-**Version:** 1.0  
-**Last updated:** 2026-09-07  
+**Version:** 1.1  
+**Last updated:** 2026-09-25  
 **Author:** Kitnets Engineering  
 
 ---
@@ -49,11 +49,16 @@ apps/web/src/
 │   └── [lang]/
 │       └── dashboard/
 │           └── energy/
+│               ├── page.tsx         # The hub (server: preloads getOwnerPropertiesSummary)
+│               ├── EnergyHubContent.tsx  # Hub orchestrator: view in the URL, add UC, delete, PDF viewer
 │               └── [propertyId]/
-│                   └── page.tsx     # Solar energy & consumption dashboard
+│                   └── page.tsx     # One unit's solar energy & consumption dashboard
 │
 ├── components/
 │   ├── energy/
+│   │   ├── EnergyHub.tsx            # KPI strip, "Atenção" list, view pills, filters, the cards
+│   │   ├── EnergyUnitCard.tsx       # One card per unit, the distributor's logo as the cover
+│   │   ├── EnergyDistributorLogo.tsx# Inline SVG logos per distributor (CEMIG, CPFL, Enel, Light…)
 │   │   ├── EnergyCharts.tsx         # Recharts visualizations (balance, credits, savings)
 │   │   └── EnergyBillUploadModal.tsx# Zero-storage upload & AI review drawer
 │   └── profile/
@@ -117,3 +122,15 @@ The `energy_bills` table records monthly cycle information linked to `properties
    - The user inspects the extracted values in a review modal, adjusts fields if needed, and clicks "Confirmar e Gravar".
 5. **Database Storage**:
    - The server creates/updates the primary bill and batch-inserts historical baseline records (`is_historical_only: true`) for missing past months.
+
+---
+
+## 5. The Energia hub (`/dashboard/energy`)
+
+Redesigned on 2026-09-25 in the shape of the other hubs (Projetos, Imóveis, Contratos, Inquilinos, Corretores, Imobiliárias). The sidebar entry is now **Energia** (it was "Energia Solar": the hub follows every unit's bills, generation or not).
+
+- **Data**: `getOwnerPropertiesSummary` (`lib/energy-properties-server.ts`) now also returns, per unit, `latest` (the newest full bill: month, due date, amount, consumption, kWh/day, injected, compensated, credit balance, tariff, availability cost, the solar saving via `solarSavings`) and `last12` (the twelve months up to that bill: consumption, paid, savings, injected, average consumption). Both come from `summarizeUnitBills` in `lib/energy-hub.ts`, which also holds the views, `energyRows`, `energyHubTotals` and `energyAttention` (pure, tested).
+- **KPI strip**: units (rental / standalone / orphaned), consumption on the newest bills (and over 12 months), the newest bills' amounts (with how many are overdue or due within 7 days), solar savings (month and 12 months), the credit balance, injected energy.
+- **Atenção**, worst first: a bill overdue (up to 45 days past its due date), a bill due within 7 days, a unit whose newest bill is two or more months old, a consumption spike (30% and 30 kWh above the 12-month average), a rental registered with a solar system whose bill shows no generation, a unit without bills.
+- **Views** `?view=todas|aluguel|avulsas`, search (name, UC, address, distributor) and a distributor filter.
+- **Cards** (`EnergyUnitCard`): the distributor's logo as the cover (`CoverCarousel fit="contain"` with `EnergyDistributorLogo` as the fallback), the category pill (aluguel, casa própria, parente, beneficiária, avulsa, desvinculada), a "Solar · X kWp" badge, the UC number and distributor, the address, two tiles (consumption with kWh/day; the bill amount with its due state), quick actions (view the latest PDF, import a bill) and the credit balance or the saving. A card opens `/dashboard/energy/[propertyId]`, unchanged.

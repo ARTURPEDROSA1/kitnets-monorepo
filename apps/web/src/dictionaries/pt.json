@@ -993,7 +993,7 @@
             "deleteAllTitle": "Excluir imóvel e apagar dados de energia",
             "deleteAllDesc": "O imóvel e todos os dados associados (geração solar, faturas e histórico de consumo) serão removidos permanentemente.",
             "keepEnergyTitle": "Excluir imóvel mas MANTER dados de energia",
-            "keepEnergyDesc": "Remove o imóvel dos anúncios de locação, mas mantém o cadastro e as faturas como uma UC Avulsa na aba Energia Solar.",
+            "keepEnergyDesc": "Remove o imóvel dos anúncios de locação, mas mantém o cadastro e as faturas como uma UC Avulsa na aba Energia.",
             "cancel": "Cancelar",
             "confirmDeleteAll": "Excluir Imóvel e Dados de Energia",
             "confirmKeepEnergy": "Excluir Imóvel e Manter Energia",

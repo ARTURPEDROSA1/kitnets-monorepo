@@ -361,13 +361,13 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                             </li>
                                             <li>
                                                 <Link
-                                                    title={navCollapsed ? "Energia Solar" : undefined}
+                                                    title={navCollapsed ? "Energia" : undefined}
                                                     href={lang === 'pt' ? '/dashboard/energy' : `/${lang}/dashboard/energy`}
                                                     aria-current={pathname.includes('/dashboard/energy') ? "page" : undefined}
                                                     className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${pathname.includes('/dashboard/energy') ? 'bg-accent font-medium' : ''}`}
                                                 >
                                                     <Zap className="h-5 w-5 text-amber-500 transition duration-75 group-hover:text-amber-600" />
-                                                    <span className="ms-3 sidebar-label">Energia Solar</span>
+                                                    <span className="ms-3 sidebar-label">Energia</span>
                                                 </Link>
                                             </li>
                                             <li>

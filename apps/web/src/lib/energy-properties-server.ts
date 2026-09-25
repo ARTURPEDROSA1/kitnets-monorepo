@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { signStorageUrl } from "@/lib/storage";
+import { EMPTY_PERIOD, summarizeUnitBills, type EnergyBillLike, type EnergyLatestSnapshot, type EnergyPeriodTotals } from "@/lib/energy-hub";
 
 function getServiceSupabase() {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -34,6 +35,10 @@ export interface OwnerPropertySummary {
     latestBillPdfUrl?: string | null;
     /** "Água" checked under Medidores Principais do Imóvel: the landlord pays the main water meter (feeds /dashboard/water) */
     hasWaterMeter?: boolean;
+    /** the newest full bill's figures (the hub's tiles and KPIs); null without bills */
+    latest?: EnergyLatestSnapshot | null;
+    /** the twelve months up to the newest bill */
+    last12?: EnergyPeriodTotals;
 }
 
 /**
@@ -167,11 +172,12 @@ export async function getOwnerPropertiesSummary(userId: string): Promise<OwnerPr
             utilityCompany: string | null;
             latestBillPdfUrl: string | null;
         }> = {};
+        const statsByPropId: Record<string, ReturnType<typeof summarizeUnitBills>> = {};
 
         if (propIds.length > 0) {
             const { data: allBills } = await supabase
                 .from("energy_bills")
-                .select("property_id, reference_month, reference_month_label, due_date, total_amount, consumer_unit, utility_company, is_historical_only")
+                .select("property_id, reference_month, reference_month_label, due_date, total_amount, consumer_unit, utility_company, is_historical_only, grid_consumption_kwh, daily_avg_kwh, billing_days, solar_injected_kwh, solar_compensated_kwh, generation_balance_kwh, unit_price, availability_cost_amount, energy_compensated_amount, energy_scee_exempt_amount")
                 .in("property_id", propIds)
                 .order("reference_month", { ascending: false });
 
@@ -211,6 +217,15 @@ export async function getOwnerPropertiesSummary(userId: string): Promise<OwnerPr
                     }
                 }
             }
+
+            // The hub's tiles and KPIs: the newest full bill and the twelve months up to it, per property
+            const billsByProperty = new Map<string, EnergyBillLike[]>();
+            for (const bill of allBills ?? []) {
+                const list = billsByProperty.get(bill.property_id) ?? [];
+                list.push(bill as EnergyBillLike);
+                billsByProperty.set(bill.property_id, list);
+            }
+            for (const [pid, list] of billsByProperty) statsByPropId[pid] = summarizeUnitBills(list);
 
             // Resolve PDF URLs from Supabase Storage for properties that have bills
             // pdf_url is NOT a DB column — PDFs are stored as {propertyId}/current_bill.pdf in storage
@@ -352,6 +367,8 @@ export async function getOwnerPropertiesSummary(userId: string): Promise<OwnerPr
                 notes: savedNotes || (isOrphaned ? "Imóvel desvinculado do portfólio de aluguel" : null),
                 latestBillPdfUrl: billStats.latestBillPdfUrl,
                 hasWaterMeter,
+                latest: statsByPropId[prop.id]?.latest ?? null,
+                last12: statsByPropId[prop.id]?.last12 ?? EMPTY_PERIOD,
             };
         });
 
