@@ -1,7 +1,7 @@
 # Inquilinos (Tenants) Module
 
-**Version:** 1.0  
-**Last updated:** 2026-09-02  
+**Version:** 1.2  
+**Last updated:** 2026-09-25  
 **Author:** Kitnets Engineering  
 
 ---
@@ -80,20 +80,32 @@ The **Inquilinos Module** (`/[lang]/inquilinos`) allows authenticated Kitnets.co
 apps/web/src/
 ├── app/
 │   ├── [lang]/inquilinos/
-│   │   ├── page.tsx                     # Server component wrapper
-│   │   └── InquilinosContent.tsx        # Client component (full CRUD UI)
+│   │   ├── page.tsx                     # Server component: preloads the list (and the dashboard of ?id=) before the first paint
+│   │   └── InquilinosContent.tsx        # Client orchestrator: hub ↔ tenant dashboard (?id=) ↔ form; owns the delete modal
 │   └── api/tenants/
-│       ├── route.ts                     # GET (list) + POST (create)
+│       ├── route.ts                     # GET (list + leases per tenant, via lib/tenant-views-server) + POST (create)
 │       ├── [id]/route.ts               # PUT (update) + DELETE (soft delete)
+│       ├── [id]/photo/route.ts          # POST (multipart ≤ 2 MB → private tenant-photos bucket) + DELETE
+│       ├── [id]/dashboard/route.ts      # GET: the tenant's dashboard bundle (tenant, contracts, ledger months)
 │       └── properties/route.ts          # GET (property dropdown data)
-├── components/
-│   └── inquilinos/
-│       └── TenantProfileCard.tsx        # Expanded detail card
+├── components/inquilinos/
+│   ├── InquilinosHub.tsx                # The hub: KPI strip, "Atenção" list, view pills, filters, the cards
+│   ├── TenantSquareCard.tsx             # One card per tenant (photo cover, occupation, place, rent, contact icons)
+│   ├── TenantDashboard.tsx              # One tenant: photo, contact chips, tiles, rent chart, contracts, ficha
+│   ├── TenantPhoto.tsx                  # Round avatar with upload / remove
+│   └── TenantForm.tsx                   # Create / edit form (occupation and social links included)
+├── lib/
+│   ├── tenant-dashboard.ts (+ test)     # Pure maths: status meta, views, rows (place, rent, time living, birthday), totals, attention
+│   ├── tenant-views.ts                  # The list / dashboard view types (client-safe)
+│   ├── tenant-views-server.ts           # Builds those views (tenants + leases per tenant + signed photos + ledger months)
+│   ├── social-links.ts (+ test)         # Instagram / LinkedIn normalisation, WhatsApp and tel links
+│   ├── tenants-server.ts                # Ownership, relations, CPF uniqueness, photo bucket helpers
+│   └── schemas/tenant.ts (+ test)       # zod input schema (occupation, instagram, linkedin included)
 └── types/
     └── tenant.ts                        # TypeScript interfaces
 
-supabase/legacy/core/
-└── tenant_setup.sql                     # Database migration
+supabase/migrations/
+└── 20260925160000_tenant_profile_fields.sql   # occupation, instagram, linkedin, photo_path + the tenant-photos bucket
 ```
 
 ### Architecture Pattern
@@ -128,6 +140,10 @@ export interface Tenant {
     date_of_birth: string | null;         // ISO date: "1990-01-15"
     rg: string | null;
     additional_phone: string | null;      // E.164
+    occupation: string | null;            // what the tenant does for a living
+    instagram: string | null;             // handle without the @
+    linkedin: string | null;              // profile URL
+    photo_path: string | null;            // object path in the private tenant-photos bucket
 
     // Address (optional)
     postal_code: string | null;           // Digits only: "30000000"
@@ -261,6 +277,10 @@ These are fetched at form mount for populating `<select>` dropdowns.
 | `date_of_birth` | `DATE` | YES | — | ISO date |
 | `rg` | `TEXT` | YES | — | RG / ID number |
 | `additional_phone` | `TEXT` | YES | — | E.164 format |
+| `occupation` | `TEXT` | YES | — | What the tenant does for a living (v1.2) |
+| `instagram` | `TEXT` | YES | — | Instagram handle without the @ (v1.2) |
+| `linkedin` | `TEXT` | YES | — | LinkedIn profile URL (v1.2) |
+| `photo_path` | `TEXT` | YES | — | Object path in the private `tenant-photos` bucket; served through signed URLs (v1.2) |
 | `postal_code` | `TEXT` | YES | — | 8 digits only |
 | `street` | `TEXT` | YES | — | Street name |
 | `street_number` | `TEXT` | YES | — | Building/house number |
@@ -402,6 +422,14 @@ Soft-deletes a tenant by setting `deleted_at` and `deleted_by`.
 
 **Success:** `200 OK` with `{ message: "Inquilino excluído com sucesso." }`
 
+### 5.6 POST / DELETE /api/tenants/[id]/photo
+
+`POST` takes `multipart/form-data` with a `file` (JPG, PNG or WebP up to 2 MB), stores it in the **private** `tenant-photos` bucket under `<tenant id>/<timestamp>.<ext>`, keeps the object path in `photo_path`, removes the previous photo and answers `{ photo_url }` with a short-lived signed URL. `DELETE` removes the file and clears the path. A tenant is a third party: the photo is never a public URL.
+
+### 5.7 GET /api/tenants/[id]/dashboard
+
+Everything one tenant's dashboard shows in one request: the tenant with names and a signed photo URL, their contracts newest first (one entry per role: primary, co-tenant, occupant — `TenantLeaseSummary`) and the property's income ledger rows over the months of the contract in force (else the latest one). The page preloads the same bundle (`loadTenantDashboard` in `lib/tenant-views-server.ts`).
+
 ### 5.5 GET /api/tenants/properties
 
 **File:** [`properties/route.ts`](file:///c:/Users/Administrator/Documents/Kitnets/apps/web/src/app/api/tenants/properties/route.ts)
@@ -431,35 +459,28 @@ Minimal server component that extracts the `lang` route parameter and renders `I
 
 **File:** [`InquilinosContent.tsx`](file:///c:/Users/Administrator/Documents/Kitnets/apps/web/src/app/%5Blang%5D/inquilinos/InquilinosContent.tsx)
 
-The main client component (~1430 lines) managing all CRUD operations. Contains:
+Three screens: the **hub** (`/inquilinos`), one tenant's **dashboard** (`?id=<tenant>`; the old `?tenant=` deep link from the property card and from Contratos still works) and the **form** (create / edit, component state). Seeds the list and the dashboard from what `page.tsx` preloaded on the server; refreshes go through `GET /api/tenants` and `GET /api/tenants/[id]/dashboard`. The view (`?view=atuais|futuros|antigos|todos`) lives in the URL. Owns the delete modal, which reminds that someone who merely moved out should be marked "Antigo", not deleted.
 
-- **State management:** `pageState` machine (`listing`, `adding`, `editing`), form data, dropdown options, filters
-- **List view:** Accordion rows with search/filter bar
-- **Form view:** 6-section form with validation and CEP auto-fill
-- **Delete modal:** Confirmation dialog with tenant name and soft delete
+### 6.3 InquilinosHub (the dashboard on the hub)
 
-**Form sections:**
-1. **Informações Pessoais** — Name, CPF, phone, email (optional), date of birth, RG, additional phone
-2. **Endereço Atual** — "Use property address" checkbox, CEP with auto-fill, street, number, complement, neighborhood, city, state
-3. **Imóvel Associado** — Property dropdown (required)
-4. **Administração** — Management type radio (Self/Agency), agency dropdown (conditional), agent dropdown (conditional, filtered by agency)
-5. **Informações de Ocupação** — Move-in date, move-out date, status
-6. **Informações Adicionais** — Emergency contact, notes
+`components/inquilinos/InquilinosHub.tsx` — the tenants at a glance:
+- **KPI strip** (`tenantHubTotals` in `lib/tenant-dashboard.ts`): current tenants (with how many future and former), the rent of the current tenants (Σ of their contracts in force), the average time living there (and the longest), birthdays within 30 days, current tenants without a contract in force, current or future tenants without a phone.
+- **Atenção** (`tenantAttention`): contract term over, arrivals within 30 days, contracts ending within 60 days, birthdays within 7 days, tenants living without a contract, tenants without a phone. Most pressing first.
+- **View pills** with counts (Atuais · Futuros · Antigos · Todos), search (name, CPF, occupation, property, agency), property and management filters.
+- **TenantSquareCard**: the photo as the cover (`CoverCarousel`, the same as Projetos and Imóveis), the status pill, the name and occupation, the place (from the contract in force, else the registered property), the rent and due day, two tiles (time living there, when the contract ends) and a row of contact icons that work without opening the card: WhatsApp (`wa.me`), phone, e-mail, Instagram, LinkedIn.
 
-### 6.3 TenantProfileCard (Detailed Profile View)
+### 6.4 TenantDashboard (one tenant)
 
-**File:** [`TenantProfileCard.tsx`](file:///c:/Users/Administrator/Documents/Kitnets/apps/web/src/components/inquilinos/TenantProfileCard.tsx)
+`components/inquilinos/TenantDashboard.tsx`:
+- Header: the photo (`TenantPhoto`: click to upload, button to remove), the name, occupation, status pill, place and time living there; contact chips (WhatsApp with a greeting, call, e-mail, Instagram, LinkedIn); Editar / Excluir.
+- **Six tiles** (`components/properties/Tile`): rent (due day, contract), time living there, contract end (with "prazo vencido" when the term is over), received (Σ of the property's ledger over the months of the contract in force, else the latest — `leaseIncome` from `lib/lease-dashboard.ts`), deposit, birthday (age, next one).
+- **Aluguel mês a mês**: `LeaseRentChart` (shared with Contratos) over the ledger months of that contract, with a link to the property's ledger.
+- **Contratos**: every contract the tenant has had, the old ones included, with status, role, dates, rent and a link to the contract's dashboard.
+- **Ficha**: CPF, RG, birth date and age, occupation, address (or "mora no imóvel alugado"), registered property, management (agency link), emergency contact (WhatsApp link), notes, registration dates.
 
-Renders a fully detailed tenant profile when a row is expanded. Organized into sections:
+### 6.5 TenantForm
 
-- Personal information (name, CPF, email, phones, DOB, RG)
-- Current address (or "Utiliza o endereço do imóvel alugado" badge)
-- Property association
-- Management info (self-managed label or agency + agent names)
-- Rental dates + status
-- Linked lease placeholder (for future Lease module)
-- Emergency contact
-- Notes
+`components/inquilinos/TenantForm.tsx` — the seven sections: Informações Pessoais (with **Profissão / ocupação**), **Redes sociais** (Instagram as @handle or URL, LinkedIn URL — normalised by `lib/social-links.ts`), Endereço Atual (CEP auto-fill), Imóvel Associado, Gestão, Ocupação do imóvel (entry, exit, status Atual / Futuro / Antigo) and Informações Adicionais. The photo is not in the form: it is uploaded on the dashboard, where a saved tenant lands.
 
 ---
 
@@ -467,41 +488,23 @@ Renders a fully detailed tenant profile when a row is expanded. Organized into s
 
 ### 7.1 State Machine
 
-```
-  ┌─────────┐
-  │ listing │ ← Default state on mount
-  └────┬────┘
-       │ "+ Adicionar"          "Editar" (pencil icon)
-       ▼                       │
-  ┌─────────┐            ┌─────────┐
-  │ adding  │            │ editing │
-  └────┬────┘            └────┬────┘
-       │ "Salvar" / "Voltar"  │ "Salvar" / "Voltar"
-       ▼                      ▼
-  ┌─────────┐
-  │ listing │  (refetch tenants)
-  └─────────┘
+```mermaid
+stateDiagram-v2
+    [*] --> hub : preloaded list
+    hub --> dashboard : card / KPI / Atenção click (?id=)
+    dashboard --> hub : "Inquilinos"
+    hub --> form : "Adicionar inquilino"
+    dashboard --> form : "Editar"
+    form --> dashboard : Save (the saved tenant)
+    form --> hub : Cancel (from the hub)
+    form --> dashboard : Cancel (from the dashboard)
 ```
 
-### 7.2 List & Accordion View
+### 7.2 Hub, Views & Cards
 
-Each tenant row displays:
-- **Full name** (bold)
-- **CPF** (partially masked: `***.XXX.XXX-**`)
-- **Phone** (formatted)
-- **Property name**
-- **Management** — "Gestão própria" or agency name
-- **Status badge** (color-coded)
-- **Action buttons:** Expand/Collapse, Edit, Delete
-
-**Toolbar features:**
-- Search input (name, CPF, phone, property)
-- Status filter dropdown (Ativo / Futuro / Ex-Inquilino)
-- Property filter dropdown
-- Management type filter dropdown
-- "Limpar filtros" clear button
-
-**Expanded row:** Renders `TenantProfileCard` with full details.
+- Views: **Atuais** (ACTIVE, default) · **Futuros** (FUTURE) · **Antigos** (FORMER) · **Todos**, kept in `?view=`. A former tenant is never removed by the app: marking someone "Antigo" (form) moves them to that view with their contracts, contacts and photo, as the history of the unit; the delete modal says so.
+- Search matches name, CPF, occupation, property, agency, e-mail and phone; filters by property (the contract's, else the registered one) and management.
+- Cards open the dashboard; the trash icon on the cover (hover) opens the delete confirmation.
 
 ### 7.3 Registration & Edit Form
 
@@ -642,15 +645,9 @@ ALTER TABLE public.tenants ALTER COLUMN email DROP NOT NULL;
 
 ---
 
-## 13. Future Integration: Lease Module
+## 13. Integration with Contratos
 
-The tenant module contains **placeholders** for integration with a future Lease (Contrato/Locação) module:
-
-1. **Delete guard:** In `DELETE /api/tenants/[id]`, there is a commented-out section that will check for active leases before allowing deletion. When the Lease module is implemented, uncomment and update the query.
-
-2. **Profile card:** The `TenantProfileCard` displays a "Nenhum contrato vinculado" placeholder in the "Contrato de Locação" section. This should be replaced with actual lease data when available.
-
-3. **Form note:** The "Informações de Ocupação" section header explicitly states: "Informações contratuais detalhadas pertencem ao registro de Contrato/Locação."
+Since v1.2 the tenant screens read the leases: `loadTenantLeases` (`lib/tenant-views-server.ts`) lists every lease of the account once per tenant on it (the primary tenant and the additional ones with their role). `tenantRows` (`lib/tenant-dashboard.ts`) derives from them the contract in force (stored ACTIVE / EXPIRING_SOON, the latest start), the place (property · unit), the rent, the time living there (move-in date, else the contract's start), when the contract ends and, on the dashboard, the rent month by month from the property's ledger. Occupancy dates and status stay on the tenant; money and terms stay on the lease.
 
 ---
 
@@ -660,3 +657,4 @@ The tenant module contains **placeholders** for integration with a future Lease 
 |------|---------|-------------|
 | 2026-09-02 | 1.0 | Initial implementation: full CRUD, search/filter, form with 6 sections, soft delete |
 | 2026-09-02 | 1.1 | Date fields changed from `type="date"` to DD/MM/YYYY masked text inputs; email made optional |
+| 2026-09-25 | 1.2 | Redesign: hub with KPI strip, "Atenção" list, views in the URL and one card per tenant with the photo as the cover and contact icons (WhatsApp, phone, e-mail, Instagram, LinkedIn); tenant dashboard (`?id=`) with tiles, the rent month by month, every contract (old ones included) and the ficha; profile fields `occupation`, `instagram`, `linkedin`, `photo_path` (migration `20260925160000_tenant_profile_fields`, private `tenant-photos` bucket); `GET /api/tenants/[id]/dashboard`, `POST/DELETE /api/tenants/[id]/photo`; the form moved to `TenantForm.tsx`; `TenantProfileCard` retired; former tenants kept as a view |

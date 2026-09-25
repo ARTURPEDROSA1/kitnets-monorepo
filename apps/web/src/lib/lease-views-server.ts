@@ -71,7 +71,7 @@ const INCOME_COLUMNS =
     "id, property_id, month, unit_id, unit_name, received_on, received_amount, energy_portion, other_income, other_expenses, condo_amount, fee_on_condo, iptu_amount, agency_fee_pct, status, source, bank_reference, notes";
 
 /** The property's ledger rows between two months (inclusive), numbers normalised like the income route does. */
-async function loadIncomeRows(supabase: AdminSupabase, propertyId: string, fromMonth: string, toMonth: string): Promise<PropertyIncomeRow[]> {
+export async function loadIncomeRows(supabase: AdminSupabase, propertyId: string, fromMonth: string, toMonth: string): Promise<PropertyIncomeRow[]> {
     const { data, error } = await supabase
         .from("property_income_months")
         .select(INCOME_COLUMNS)

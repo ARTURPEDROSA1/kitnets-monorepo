@@ -17,6 +17,14 @@ export interface Tenant {
     date_of_birth: string | null;         // ISO date
     rg: string | null;
     additional_phone: string | null;      // E.164
+    /** what the tenant does for a living */
+    occupation: string | null;
+    /** Instagram handle, without the @ */
+    instagram: string | null;
+    /** LinkedIn profile URL */
+    linkedin: string | null;
+    /** object path of the photo in the private tenant-photos bucket */
+    photo_path: string | null;
 
     // Address (optional)
     postal_code: string | null;
@@ -57,6 +65,8 @@ export interface TenantWithDetails extends Tenant {
     property_name: string | null;
     agency_name: string | null;
     agent_name: string | null;
+    /** short-lived signed URL of the photo; null without one */
+    photo_url: string | null;
 }
 
 /** Form data for creating/editing a tenant (excludes server-managed fields) */
@@ -71,6 +81,9 @@ export interface TenantFormData {
     date_of_birth: string;
     rg: string;
     additional_phone: string;
+    occupation: string;
+    instagram: string;
+    linkedin: string;
 
     // Address (optional)
     postal_code: string;

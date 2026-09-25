@@ -468,7 +468,7 @@ export function leaseIncome(lease: Pick<LeaseWithDetails, "start_date" | "end_da
 
 // ── Import helpers (old contracts) ───────────────────────────────────
 
-const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const fold = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
 /**
  * Which unit of a multi-unit property a contract is about, from what the AI read ("Kitnet 35B",
