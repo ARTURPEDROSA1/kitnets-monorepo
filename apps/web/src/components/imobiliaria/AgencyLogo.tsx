@@ -20,10 +20,14 @@ interface Props {
     editable?: boolean;
     onChanged?: () => Promise<void> | void;
     className?: string;
+    /** the logo route (POST multipart / DELETE); the agencies' one by default — the water utilities share this widget */
+    endpoint?: string;
+    /** what the confirmation names ("desta imobiliária") */
+    subject?: string;
 }
 
-export default function AgencyLogo({ agencyId, url, name, width = 160, height = 96, editable = false, onChanged, className }: Props) {
-    const endpoint = `/api/agencies/${agencyId}/logo`;
+export default function AgencyLogo({ agencyId, url, name, width = 160, height = 96, editable = false, onChanged, className, endpoint: endpointProp, subject = "desta imobiliária" }: Props) {
+    const endpoint = endpointProp ?? `/api/agencies/${agencyId}/logo`;
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const input = useRef<HTMLInputElement>(null);
@@ -46,7 +50,7 @@ export default function AgencyLogo({ agencyId, url, name, width = 160, height = 
     };
 
     const remove = async () => {
-        if (!window.confirm("Remover o logo desta imobiliária?")) return;
+        if (!window.confirm(`Remover o logo ${subject}?`)) return;
         setBusy(true);
         setError(null);
         const res = await fetch(endpoint, { method: "DELETE" });

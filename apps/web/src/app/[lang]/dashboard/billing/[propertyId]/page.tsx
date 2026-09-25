@@ -19,7 +19,10 @@ import {
     Plus,
     Trash2,
     TrendingUp,
+    Upload,
 } from "lucide-react";
+import { PdfViewerModal } from "@/components/ui/PdfViewerModal";
+import AgencyLogo from "@/components/imobiliaria/AgencyLogo";
 import { ConsumptionChart } from "@/components/dashboard/ConsumptionChart";
 import { cn } from "@/lib/utils";
 import { columnTableKey, recordTableKey } from "@/lib/ui-preferences";
@@ -200,6 +203,15 @@ export default function BillingPage() {
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [filterMonths, setFilterMonths] = useState<number>(12);
 
+    // The current bill's PDF and the utility's logo, kept in the water-bills bucket (signed URLs from the API)
+    const [currentPdfUrl, setCurrentPdfUrl] = useState<string | null>(null);
+    const [logoUrl, setLogoUrl] = useState<string | null>(null);
+    const [pdfOpen, setPdfOpen] = useState(false);
+    const [docBusy, setDocBusy] = useState(false);
+    const [docError, setDocError] = useState<string | null>(null);
+    const [docNotice, setDocNotice] = useState<string | null>(null);
+    const docInput = React.useRef<HTMLInputElement>(null);
+
     // Orphaned bills (property_id IS NULL — from deleted properties)
     const [orphanedBills, setOrphanedBills] = useState<{ id: string; reference_month: string }[]>([]);
     const [claimingOrphans, setClaimingOrphans] = useState(false);
@@ -207,7 +219,10 @@ export default function BillingPage() {
     const fetchBills = async () => {
         const res = await fetch(`/api/water-bills?propertyId=${encodeURIComponent(propertyId)}`);
         if (!res.ok) return;
-        const { property: propData, bills: billsData } = await res.json();
+        const data = await res.json();
+        const { property: propData, bills: billsData } = data;
+        setCurrentPdfUrl(typeof data.currentPdfUrl === "string" ? data.currentPdfUrl : null);
+        setLogoUrl(typeof data.logoUrl === "string" ? data.logoUrl : null);
         if (propData) setProperty(propData);
         if (Array.isArray(billsData)) setBills(billsData.map(normaliseBill));
     };
@@ -268,6 +283,38 @@ export default function BillingPage() {
         } finally {
             setDeletingId(null);
         }
+    };
+
+    // ── The current bill's PDF (one per property, like the energy bills) ──
+    const uploadDocument = async (file: File) => {
+        setDocBusy(true);
+        setDocError(null);
+        setDocNotice(null);
+        try {
+            const body = new FormData();
+            body.append("file", file);
+            if (bills[0]) body.append("referenceMonth", bills[0].reference_month);
+            const res = await fetch(`/api/water-bills/document/${propertyId}`, { method: "POST", body });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) { setDocError(typeof json.error === "string" ? json.error : "Não foi possível guardar o PDF."); return; }
+            setCurrentPdfUrl(typeof json.currentPdfUrl === "string" ? json.currentPdfUrl : null);
+            setLogoUrl(typeof json.logoUrl === "string" ? json.logoUrl : null);
+            setDocNotice(json.logoExtracted ? "PDF guardado. O logo da concessionária foi lido do cabeçalho e virou a capa do imóvel em Água." : json.pdfStored ? "PDF da conta vigente guardado." : "Há uma conta mais recente lançada: o PDF não substituiu o vigente.");
+        } catch {
+            setDocError("Erro de conexão ao enviar o PDF.");
+        } finally {
+            setDocBusy(false);
+        }
+    };
+    const removeDocument = async () => {
+        if (!confirm("Remover o PDF da conta vigente?")) return;
+        setDocBusy(true);
+        setDocError(null);
+        const res = await fetch(`/api/water-bills/document/${propertyId}`, { method: "DELETE" });
+        setDocBusy(false);
+        if (!res.ok) { setDocError("Não foi possível remover o PDF."); return; }
+        setCurrentPdfUrl(null);
+        setDocNotice(null);
     };
 
     // ── Period (charts + table) ─────────────────────────────────────────
@@ -498,6 +545,39 @@ export default function BillingPage() {
                     </button>
                 </div>
             )}
+
+            {/* The current bill: the utility's logo (the card's cover in Água) and the PDF kept for the newest bill */}
+            <div className="bg-card border border-border/80 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col gap-4 sm:flex-row sm:items-center">
+                <AgencyLogo agencyId={propertyId} url={logoUrl} name={property?.name ?? "Imóvel"} width={144} height={80} editable endpoint={`/api/water-bills/logo/${propertyId}`} subject="desta concessionária" onChanged={() => fetchBills()} />
+                <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <span className="font-semibold uppercase tracking-wider text-muted-foreground">Conta vigente:</span>
+                        <span className="font-bold text-foreground bg-muted px-2 py-0.5 rounded-md">{latest ? formatMonth(latest.reference_month) : "—"}</span>
+                        {latest?.due_date && (
+                            <>
+                                <span className="text-muted-foreground">•</span>
+                                <span className="font-semibold uppercase tracking-wider text-muted-foreground">Vencimento:</span>
+                                <span className="font-bold text-foreground bg-muted px-2 py-0.5 rounded-md">{formatDate(latest.due_date)}</span>
+                            </>
+                        )}
+                    </div>
+                    <p className="text-xs sm:text-sm text-muted-foreground">
+                        {currentPdfUrl ? "O PDF da conta vigente está guardado; a conta seguinte o substitui." : "Guarde o PDF da conta vigente. Sem logo, a IA lê o da concessionária no cabeçalho do PDF e ele vira a capa do imóvel em Água."}
+                    </p>
+                    {docError && <p className="text-xs text-red-600">{docError}</p>}
+                    {docNotice && <p className="text-xs text-emerald-700 dark:text-emerald-400">{docNotice}</p>}
+                </div>
+                <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
+                    {currentPdfUrl && (
+                        <Button variant="outline" size="sm" onClick={() => setPdfOpen(true)} className="gap-1.5"><FileText className="w-4 h-4 text-blue-600" /> Ver PDF</Button>
+                    )}
+                    <Button variant="outline" size="sm" onClick={() => docInput.current?.click()} disabled={docBusy} className="gap-1.5"><Upload className="w-4 h-4" /> {docBusy ? "Enviando..." : currentPdfUrl ? "Substituir PDF" : "Enviar PDF"}</Button>
+                    {currentPdfUrl && (
+                        <Button variant="ghost" size="sm" onClick={removeDocument} disabled={docBusy} className="gap-1.5 text-muted-foreground hover:text-red-600"><Trash2 className="w-4 h-4" /> Remover</Button>
+                    )}
+                    <input ref={docInput} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void uploadDocument(f); }} />
+                </div>
+            </div>
 
             {bills.length === 0 ? (
                 /* Empty state */
@@ -737,6 +817,10 @@ export default function BillingPage() {
                         )}
                     </div>
                 </>
+            )}
+
+            {pdfOpen && currentPdfUrl && (
+                <PdfViewerModal isOpen onClose={() => setPdfOpen(false)} url={currentPdfUrl} title={`Conta de Água - ${property?.name ?? ""} - ${latest ? formatMonth(latest.reference_month) : ""}`} fileName={`conta-agua-${latest?.reference_month ?? "atual"}.pdf`} />
             )}
 
             {/* Spreadsheet helpers: selection sum bar, column sort/filter and columns menus */}

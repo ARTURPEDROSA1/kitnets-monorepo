@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireProfile, getOwnedProperty } from "@/lib/api-auth";
+import { signWaterFiles } from "@/lib/water-bills-server";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ const PROPERTY_COLUMNS = "id, name, address, city, state, zip, connection_code";
 
 /**
  * GET /api/water-bills?propertyId=<uuid>
- * → { property, bills }   (bills sorted newest reference_month first)
+ * → { property, bills, currentPdfUrl, logoUrl }   (bills sorted newest reference_month first; the newest one carries the signed URL of the current PDF)
  */
 export async function GET(request: Request) {
     const authed = await requireProfile();
@@ -44,7 +45,10 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: "Erro ao carregar contas" }, { status: 500 });
     }
 
-    return NextResponse.json({ property, bills: bills ?? [] });
+    // The current bill's PDF and the utility's logo live in the private water-bills bucket
+    const files = await signWaterFiles(supabase, propertyId);
+    const rows = (bills ?? []).map((b, idx) => (idx === 0 && files.currentPdfUrl ? { ...b, bill_pdf_url: files.currentPdfUrl } : b));
+    return NextResponse.json({ property, bills: rows, currentPdfUrl: files.currentPdfUrl, logoUrl: files.logoUrl });
 }
 
 interface WaterBillInput {
