@@ -1,5 +1,5 @@
 import type { LeaseImportResult } from "@/components/contratos/LeaseImportModal";
-import type { LeaseWithDetails } from "@/types/lease";
+import type { LeaseStatus, LeaseWithDetails } from "@/types/lease";
 import { attachLeaseContract } from "@/lib/lease-upload-client";
 
 /**
@@ -22,7 +22,7 @@ export interface ImportedLeaseOutcome {
 /** The lease payload POST /api/leases expects, from what the import read and settled. */
 export function leasePayloadFromImport(
     result: LeaseImportResult,
-    opts: { unitId: string | null; referenceName: string; today: string }
+    opts: { unitId: string | null; referenceName: string; today: string; /** forces the status (an old contract imported as history is EXPIRED whatever its dates say) */ status?: LeaseStatus }
 ): Record<string, unknown> {
     const { lease, charges } = result.data;
     return {
@@ -42,7 +42,7 @@ export function leasePayloadFromImport(
         adjustment_index: lease.adjustment_index,
         adjustment_frequency: lease.adjustment_frequency ?? 12,
         next_adjustment_date: null,
-        status: lease.end_date && lease.end_date < opts.today ? "EXPIRED" : "ACTIVE",
+        status: opts.status ?? (lease.end_date && lease.end_date < opts.today ? "EXPIRED" : "ACTIVE"),
         notes: lease.notes,
         additional_tenants: result.additionalTenants,
         charges: charges.map((c) => ({
@@ -58,7 +58,7 @@ export function leasePayloadFromImport(
 
 export async function createLeaseFromImport(
     result: LeaseImportResult,
-    opts: { unitId: string | null; referenceName: string }
+    opts: { unitId: string | null; referenceName: string; status?: LeaseStatus }
 ): Promise<ImportedLeaseOutcome> {
     if (!result.propertyId) return { ok: false, errors: ["Selecione o imóvel do contrato."] };
     if (!result.primaryTenantId) return { ok: false, errors: ["O contrato precisa de um inquilino: cadastre ou selecione o inquilino principal."] };

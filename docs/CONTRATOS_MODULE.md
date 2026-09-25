@@ -1,7 +1,7 @@
 # Contratos (Leases / Rental Contracts) Module
 
-**Version:** 1.0  
-**Last updated:** 2026-09-02  
+**Version:** 1.1  
+**Last updated:** 2026-09-25  
 **Author:** Kitnets Engineering  
 
 ---
@@ -81,21 +81,36 @@ The **Contratos (Leases) Module** (`/[lang]/contratos`) is the central operation
 apps/web/src/
 ├── app/
 │   ├── [lang]/contratos/
-│   │   ├── page.tsx                     # Server component with dynamic metadata
-│   │   └── ContratosContent.tsx        # Client component orchestrator (listing, form, modals)
+│   │   ├── page.tsx                     # Server component: preloads the list (and the dashboard of ?id=) before the first paint
+│   │   └── ContratosContent.tsx        # Client orchestrator: hub ↔ contract dashboard (?id=) ↔ form; owns the shared modals
 │   └── api/leases/
-│       ├── route.ts                     # GET (list) + POST (create lease + charges + co-tenants)
+│       ├── route.ts                     # GET (list, via lib/lease-views-server) + POST (create lease + charges + co-tenants)
 │       ├── dropdowns/
-│       │   └── route.ts                 # GET properties, tenants, agencies, agents
+│       │   └── route.ts                 # GET properties (with units), tenants, agencies, agents
+│       ├── extract/route.ts             # POST: AI reading of a lease agreement (lib/lease-extract.ts)
+│       ├── upload-url/route.ts          # POST: signed URL for a direct-to-storage upload (past Vercel's 4.5 MB body limit)
 │       └── [id]/
 │           ├── route.ts                 # GET (details), PUT (update), DELETE (soft delete)
-│           ├── terminate/
-│           │   └── route.ts             # POST (terminate lease with date & reason)
-│           └── documents/
-│               └── route.ts             # POST (upload file to bucket) + DELETE (delete doc)
-├── components/
-│   └── contratos/
-│       └── LeaseProfileCard.tsx        # Expanded detail view card
+│           ├── dashboard/route.ts       # GET: the contract's dashboard bundle (lease, tenant contact, ledger months, index series)
+│           ├── terminate/route.ts       # POST (terminate lease with date & reason)
+│           └── documents/route.ts       # POST (multipart ≤ 5 MB, or adopt a staged upload) + DELETE
+├── components/contratos/
+│   ├── ContratosHub.tsx                 # The hub: KPI strip, "Atenção" list, view pills, filters, table or timeline
+│   ├── LeaseTable.tsx                   # Sortable table of contracts (row → dashboard; edit / terminate / delete)
+│   ├── LeaseTimeline.tsx                # Gantt-style calendar of the contracts (bars by status, today, adjustments)
+│   ├── LeaseDashboard.tsx               # One contract: KPI tiles, rent chart, ficha, milestones, files
+│   ├── LeaseRentChart.tsx               # recharts: received per month (bars) vs gross rent (line), from the income ledger
+│   ├── LeaseDocuments.tsx               # Files of a contract: typed uploads (drag & drop, 10 MB), viewer, delete
+│   ├── LeaseForm.tsx                    # Create / edit form (collapsible sections; files live on the dashboard)
+│   ├── LeaseImportModal.tsx             # AI import of one agreement: reading + party matching + what to create
+│   └── LeaseBatchImportModal.tsx        # "Importar contratos antigos": several PDFs in a row, each settled and created
+├── lib/
+│   ├── lease-dashboard.ts (+ test)      # Pure maths: display status, views, hub totals, attention list, timeline, income of a lease, unit guess
+│   ├── lease-views.ts                   # The list / dashboard view types (client-safe)
+│   ├── lease-views-server.ts            # Builds those views for the page preload and the API routes
+│   ├── lease-summary.ts (+ test)        # Term, due dates, adjustment cycle and index accumulation (shared with the property page)
+│   ├── lease-import-client.ts (+ test)  # Turns a reviewed import into a lease (unit cards, batch import)
+│   └── lease-upload-client.ts           # Direct-to-storage staging and `attachLeaseDocument`
 └── types/
     └── lease.ts                         # Complete TypeScript type definitions
 
@@ -438,6 +453,9 @@ Uploads a document via `multipart/form-data`:
 ### 6.8 `DELETE /api/leases/[id]/documents?doc_id=xxx`
 Deletes the file from Supabase Storage and deletes the row from `public.lease_documents`.
 
+### 6.10 `GET /api/leases/[id]/dashboard`
+Everything one contract's dashboard shows, in one request: the lease with names, additional tenants, charges and documents (signed URLs), the primary tenant's contact (phone, e-mail), the property's income ledger rows over the lease's months (every unit — `lib/lease-dashboard.ts` cuts them to the lease's unit) and the lease's index series. The page preloads the same bundle on the server (`loadLeaseDashboard` in `lib/lease-views-server.ts`); the client calls this route to refresh after an edit.
+
 ### 6.9 `GET /api/leases/dropdowns`
 Fetches all necessary dropdown options in a single parallel request:
 - Properties owned by user (`public.properties`)
@@ -453,24 +471,31 @@ Fetches all necessary dropdown options in a single parallel request:
 Server component setting dynamic rendering (`force-dynamic`, `revalidate = 0`) and page metadata before rendering `ContratosContent`.
 
 ### 7.2 ContratosContent (Page Orchestrator)
-Located in `apps/web/src/app/[lang]/contratos/ContratosContent.tsx` (~1,500 lines):
-- Manages view transitions between List and Create/Edit form.
-- Controls search and filtering (by search term, property, and status).
-- Manages inline accordions for contract inspection.
-- Hosts modals for Termination, Document Upload/Inspection, and Soft Deletion.
+Located in `apps/web/src/app/[lang]/contratos/ContratosContent.tsx`:
+- Three screens: the **hub** (`/contratos`), one contract's **dashboard** (`?id=<lease>`; the old `?lease=` deep link from the property card still works) and the **form** (create / edit, component state).
+- Seeds the list and the dashboard from what `page.tsx` preloaded on the server (no first fetch); refreshes go through `GET /api/leases` and `GET /api/leases/[id]/dashboard`. The index series of the leases' indexes come with the preload, else from `/api/indices/{code}/calculator-data`.
+- Keeps the view (`?view=vigentes|vencendo|encerrados|rascunhos|todos`) in the URL, like Projetos.
+- Owns the shared modals: terminate, delete, the AI import of a new contract (`LeaseImportModal`), the batch import of old contracts (`LeaseBatchImportModal`) and the PDF viewer.
 
-### 7.3 LeaseProfileCard (Detail Profile Card)
-Located in `apps/web/src/components/contratos/LeaseProfileCard.tsx`:
-- Rendered when an accordion row is expanded.
-- Displays organized sections:
-  - **Identificação & Imóvel**: Property, tenant, reference, management type.
-  - **Valores e Prazos**: Monthly rent, due day, start and end dates, security deposit amount/months.
-  - **Reajuste**: Selected index, adjustment frequency, next scheduled adjustment date.
-  - **Despesas Adicionais (Taxas)**: Badge-coded table of responsibilities (Tenant, Landlord, Included) and values.
-  - **Inquilinos Adicionais**: Badged co-tenants and occupants.
-  - **Documentos**: Document list with download links, file sizes, and quick upload launcher.
-  - **Rescisão**: Termination date and reason (if status is `TERMINATED`).
-  - **Observações**: Free-form notes.
+### 7.3 ContratosHub (the dashboard on the hub)
+`components/contratos/ContratosHub.tsx` — what the portfolio of leases looks like at a glance:
+- **KPI strip** (`hubTotals` in `lib/lease-dashboard.ts`): contracts in force (with how many end within 90 days or have the term over), contracted rent per month (Σ of the contracts in force, gross), next term end, next rent adjustment (with the index accumulated so far), deposits held, contracts with their PDF attached.
+- **Atenção** (`attentionItems`): terms already over (the lease keeps running month to month — renew, extend or terminate), terms ending within 90 days, adjustments within 30 days, unfinished drafts, contracts without their file. Most pressing first.
+- **View pills** with counts, search, property and management filters, and a **Lista / Linha do tempo** toggle.
+- **LeaseTable**: sortable columns (contract, rent, start, end, adjustment), the term's progress, the next adjustment with the accumulated index, who manages it, the file. A row opens the dashboard; the icons edit, terminate or delete.
+- **LeaseTimeline**: one bar per contract on a calendar (colour by status, a hatched tail for a term over while still in force, diamonds for past adjustments, a filled one for the next, today as a line). Pure CSS percentages, so it needs no measuring.
+
+### 7.4 LeaseDashboard (one contract)
+`components/contratos/LeaseDashboard.tsx` — opened from any row or KPI:
+- Header: reference, status pill, place · tenant · management; actions Ver PDF, Editar, Rescindir (in force only), Excluir. A term already over shows the "prazo indeterminado" notice (Lei 8.245/91, art. 46 §1º).
+- **Six tiles** (`components/properties/Tile` with the "?" explanation): rent (due day, next due date, tenant's charges), term (months, progress), next adjustment (index, frequency), the adjusted rent preview (`lib/lease-summary.ts`, the months of the cycle already published), received (Σ of the property's income ledger over the lease's months and unit — `leaseIncome`), deposit.
+- **Aluguel mês a mês** (`LeaseRentChart`): received per month (bars; the months still "previsto" hollow) and the gross rent the ledger implies (line, one axis), with a link to the property's ledger.
+- **Ficha do contrato**: property, tenant (WhatsApp link from the E.164 phone, e-mail), additional tenants, management, dates, due day, index, deposit, termination, charges table, notes.
+- **Linha do tempo do contrato** (`milestones`): start, each adjustment, the next one, the end or the termination.
+- **Arquivos do contrato** (`LeaseDocuments`): typed uploads (Contrato, Aditivo, Laudo de vistoria, Documento do inquilino, Recibo de caução, Outro) by button or drag & drop, several at once, up to 10 MB each through the staged direct upload (`attachLeaseDocument`); PDFs open in the app's viewer, pictures in the lightbox. The oldest CONTRACT file is flagged "Contrato assinado"; the previous contracts of the same tenant are filed here too.
+
+### 7.5 LeaseBatchImportModal ("Importar contratos antigos")
+Several PDFs of contracts that already ran, in one go. Each file goes through the same `LeaseImportModal` reading and party matching as a new contract (`initialFile` + `createsLease`), then a **settle** step: the unit of a multi-unit property (preselected by `guessUnit` from what the AI read — "Kitnet 35B", "35 D" —, confirmed by the user), the status (EXPIRED by default with "Registrar como encerrados"; ACTIVE when the contract is still running) and the reference name. `createLeaseFromImport` creates the lease (skipping one that already exists for the same unit, tenant and start) and attaches the PDF as its CONTRACT document. A file can be skipped; the closing summary links each created contract.
 
 ---
 
@@ -480,19 +505,20 @@ Located in `apps/web/src/components/contratos/LeaseProfileCard.tsx`:
 
 ```mermaid
 stateDiagram-v2
-    [*] --> loading
-    loading --> list : Data Loaded
-    list --> form : "Novo Contrato" Clicked
-    list --> editing : "Editar" Clicked
-    form --> list : Cancel or Save
-    editing --> list : Cancel or Save
+    [*] --> hub : preloaded list
+    hub --> dashboard : row / KPI click (?id=)
+    dashboard --> hub : "Contratos"
+    hub --> form : "Novo Contrato" (AI import or manual)
+    dashboard --> form : "Editar"
+    form --> dashboard : Save (the saved contract)
+    form --> hub : Cancel (from the hub)
+    form --> dashboard : Cancel (from the dashboard)
 ```
 
-### 8.2 Contract Listing & Dynamic Status Badges
-The listing view includes:
-- Metric summary cards (Total Leases, Active Leases, Expiring Soon, Total Monthly Rent Volume).
-- Search input and dropdown filters for **Imóvel** and **Status**.
-- Expandable accordion rows showing reference name, tenant name, monthly rent, and computed badge.
+### 8.2 Hub, Views & Dynamic Status
+- **In force** = stored status ACTIVE / EXPIRING_SOON, whatever the calendar says: a Brazilian lease whose term ended keeps running month to month and the rent keeps coming, so it stays in "Vigentes" flagged **Vencido** (prazo vencido) and in "Vencendo". Stored EXPIRED / TERMINATED / CANCELLED are "Encerrados".
+- **Display status** (`displayStatus`): ACTIVE within 30 days of the end → Vencendo; past the end → Vencido; DRAFT / TERMINATED / CANCELLED as stored.
+- Views: Vigentes (default) · Vencendo · Encerrados · Rascunhos · Todos, kept in `?view=`; search and filters by property and management apply on top; Lista or Linha do tempo.
 
 ### 8.3 Contract Form Sections
 The form is divided into clean collapsible cards:
@@ -510,11 +536,8 @@ Clicking "Rescindir" opens a confirmation dialog requiring:
 - **Motivo da Rescisão** (e.g. "Acordo mútuo", "Inadimplência", "Solicitação do inquilino")
 Upon submission, calls `POST /api/leases/[id]/terminate` and updates UI state immediately.
 
-### 8.5 Document Upload & Management Modal
-Allows users to upload documents directly to a lease:
-- Dropzone / file selector accepting PDF, PNG, and JPEG up to 5 MB.
-- Document type selector (`Contrato`, `Aditivo`, `Laudo de Vistoria`, `Documento do Inquilino`, `Recibo de Caução`, `Outro`).
-- Displays existing files with direct view/download links and deletion confirmation.
+### 8.5 Files (on the contract's dashboard)
+Files are no longer inside the form. `LeaseDocuments` on the dashboard takes PDF, JPG, PNG or WebP up to 10 MB (staged direct upload, then `POST /api/leases/[id]/documents { storage_path, file_name, document_type }`; a file that still fits a route body falls back to multipart), several at once, by button or drag & drop, under a chosen type (`Contrato`, `Aditivo`, `Laudo de Vistoria`, `Documento do Inquilino`, `Recibo de Caução`, `Outro`). PDFs open in the in-app viewer, pictures in the lightbox; deletion asks for confirmation.
 
 ### 8.6 Soft Delete Modal
 Clicking "Excluir" prompts for confirmation before calling `DELETE /api/leases/[id]`, marking the record soft-deleted without purging data from database history.
@@ -593,6 +616,12 @@ If a property already has a contract with `status = 'ACTIVE'` and the user attem
 ---
 
 ## 12. Changelog
+
+- **2026-09-25 (v1.1)** — Contratos redesigned:
+  - The card list became a **hub** with a KPI strip, an "Atenção" list, view pills in the URL, filters, a sortable table and a Gantt-style timeline (`ContratosHub`, `LeaseTable`, `LeaseTimeline`).
+  - Each contract opens a **dashboard** (`?id=`): tiles, the rent month by month from the income ledger, the ficha, the contract's milestones and its files (`LeaseDashboard`, `LeaseRentChart`, `LeaseDocuments`). New `GET /api/leases/[id]/dashboard`; the page preloads list and dashboard on the server (`lib/lease-views-server.ts`).
+  - **Importar contratos antigos**: several PDFs read by the AI in a row, each settled (unit, status) and created with the file attached (`LeaseBatchImportModal`, `guessUnit`, `createLeaseFromImport` with a status override).
+  - The form moved to `LeaseForm.tsx` (files removed from it; they live on the dashboard); `LeaseProfileCard` was retired. Pure maths in `lib/lease-dashboard.ts` (tested).
 
 - **2026-09-02 (v1.0)**:
   - Initial release of Contratos Module with full CRUD, child charge tables, co-tenant management, document uploads via Supabase Storage, and contract rescission flow.

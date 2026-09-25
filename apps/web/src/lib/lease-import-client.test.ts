@@ -38,6 +38,11 @@ describe("leasePayloadFromImport", () => {
         expect(payload).toMatchObject({ management_type: "SELF_MANAGED", agency_id: null, unit_id: null, status: "EXPIRED" });
     });
 
+    it("takes a forced status for a contract imported as history", () => {
+        const payload = leasePayloadFromImport(result, { unitId: null, referenceName: "x", today: "2026-09-18", status: "EXPIRED" });
+        expect(payload).toMatchObject({ status: "EXPIRED" });
+    });
+
     it("leaves what the agreement does not say for the schema to refuse", () => {
         const incomplete = { ...result, data: { ...result.data, lease: { ...result.data.lease, monthly_rent: null, rent_due_day: null } } } as unknown as LeaseImportResult;
         const parsed = leaseInputSchema.safeParse(leasePayloadFromImport(incomplete, { unitId: "u", referenceName: "x", today: "2026-09-18" }));
