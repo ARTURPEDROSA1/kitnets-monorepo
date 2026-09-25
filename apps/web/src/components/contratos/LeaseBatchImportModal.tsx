@@ -30,6 +30,8 @@ interface Props {
     onOpenLease: (id: string) => void;
     /** "history" (default): old contracts, registered as closed unless unticked; "current": contracts that may well be in force */
     mode?: "history" | "current";
+    /** Import started from a property's page (Imóveis): every contract is that property's (the unit is settled per contract) */
+    fixedProperty?: { id: string; label: string };
     /** Import started from an agency's dashboard (Imobiliárias): every contract is that agency's */
     fixedAgency?: { id: string; label: string };
 }
@@ -44,7 +46,7 @@ interface Outcome {
     errors?: string[];
 }
 
-export default function LeaseBatchImportModal({ dropdowns, refreshDropdowns, onClose, onOpenLease, mode = "history", fixedAgency }: Props) {
+export default function LeaseBatchImportModal({ dropdowns, refreshDropdowns, onClose, onOpenLease, mode = "history", fixedAgency, fixedProperty }: Props) {
     const [step, setStep] = useState<Step>("pick");
     const [files, setFiles] = useState<File[]>([]);
     const [fileErrors, setFileErrors] = useState<string[]>([]);
@@ -144,6 +146,7 @@ export default function LeaseBatchImportModal({ dropdowns, refreshDropdowns, onC
                 initialFile={current}
                 createsLease
                 fixedAgency={fixedAgency}
+                fixedProperty={fixedProperty}
                 onClose={skip}
                 onComplete={result => { void settle(result); }}
             />
@@ -175,7 +178,7 @@ export default function LeaseBatchImportModal({ dropdowns, refreshDropdowns, onC
                         <p className="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                             {step === "pick"
                                 ? (mode === "current"
-                                    ? <>Envie os contratos de locação{fixedAgency ? <> da <strong className="text-foreground">{fixedAgency.label}</strong></> : null}. A IA lê cada um, você confirma imóvel, inquilinos e corretor, e o contrato é criado com o arquivo guardado — o que já estiver cadastrado não é criado de novo.</>
+                                    ? <>Envie os contratos de locação{fixedProperty ? <> de <strong className="text-foreground">{fixedProperty.label}</strong></> : fixedAgency ? <> da <strong className="text-foreground">{fixedAgency.label}</strong></> : null}. A IA lê cada um, você confirma imóvel, inquilinos e corretor, e o contrato é criado com o arquivo guardado — o que já estiver cadastrado não é criado de novo.</>
                                     : <>Envie os PDFs de contratos que já rodaram (o inquilino anterior, o contrato antes da renovação). A IA lê cada um, você confirma as partes e o contrato entra no histórico com o arquivo guardado.</>)
                                 : step === "settle"
                                     ? <>Confira a unidade e o status e crie o contrato. O arquivo <strong className="text-foreground">{current?.name}</strong> fica anexado a ele.</>

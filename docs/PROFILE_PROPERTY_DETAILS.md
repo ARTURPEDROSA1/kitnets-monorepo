@@ -1,7 +1,7 @@
 # Profile Page — Property Details & Configuration
 
-**Version:** 2.2  
-**Last updated:** 2026-09-07  
+**Version:** 2.3  
+**Last updated:** 2026-09-25  
 **Author:** Kitnets Engineering
 
 ---
@@ -27,9 +27,11 @@
    - 5.3 [PropertyDetailsCard (Property Details & Amenities)](#53-propertydetailscard-property-details--amenities)
    - 5.4 [SubUnitsSection (Multi-family Sub-Units)](#54-subunitssection-multi-family-sub-units)
    - 5.5 [Helper Components](#55-helper-components)
+   - 5.6 [PropertyRegisterSection & PropertyFilesSection (the saved property's page)](#56-propertyregistersection--propertyfilessection-the-saved-propertys-page)
 6. [Ownership Tab — Section Layout](#6-ownership-tab--section-layout)
    - 6.1 [Section Order & Wizard Progression](#61-section-order--wizard-progression)
    - 6.2 [Collapsible Sections](#62-collapsible-sections)
+   - 6.3 [The saved property's page (manage layout)](#63-the-saved-propertys-page-manage-layout)
 7. [Media Management](#7-media-management)
    - 7.1 [Main Property Media](#71-main-property-media)
    - 7.2 [Sub-Unit Media](#72-sub-unit-media)
@@ -492,13 +494,22 @@ Styled `<select>` dropdown with label and icon support.
 #### `FilePreview`
 Renders a preview thumbnail for a `File` object (photo or video) with a delete button overlay.
 
+### 5.6 PropertyRegisterSection & PropertyFilesSection (the saved property's page)
+
+Since v2.3 (2026-09-25) a **saved** property (`renderPropertyDetailCards(idx, 'manage')`) no longer shows the six accordion cards: it shows two flat sections, in the style of the projects' "Arquivos do projeto".
+
+- **`PropertyRegisterSection`** (`components/profile/PropertyRegisterSection.tsx`) — "Ficha do imóvel": three blocks, **Endereço**, **Dados do imóvel** and **Descrição do imóvel**, each read as a summary (the address in one line; the data as a definition list — name, type and units, areas, cadastro / inscrição / matrícula, cômodos, main meters, internet, solar; the description as text) with a *preenchido / a preencher* badge and an **Editar** button that opens the editor in place. The editors are the page's own (`addressEditor`, `detailsEditor` = `PropertyDetailsCard` with `initialOpen`, `descriptionEditor` with the "Gerar com IA" button), passed as nodes; **Concluir** closes the editor and calls `onSave` (`handleSave(true)`). The open/closed flags are the same `addressSectionOpen` / `detailsInitialOpen` / `descriptionSectionOpen` of `PropertyState`.
+- **`PropertyFilesSection`** (`components/profile/PropertyFilesSection.tsx`) — "Arquivos do imóvel": one upload button per document category (`DOCUMENT_CATEGORIES` of `PropertyDocumentsCard`: IPTU, Contratos, Vistoria, Compra e Venda, Matrícula, Escritura, Certidões, Outros) plus **Fotos n/10** and **Vídeos n/2**; below, the documents grouped by category as cards (name, date · size, the IPTU year; click opens a signed URL of the private `documents` bucket in `PdfViewerModal`, images in the lightbox), the photos as a thumbnail grid (click → `PhotoLightbox`; the **Capa** star marks `profilePhotoUrl`, hover star → `setPropCover`), the videos as tiles with a player, and pending files (picked before the property had a row) marked *pendente*. Delete on hover, with a confirm. The callbacks are the page's existing handlers (`handlePropDocUpload(files, category)`, `removePropSavedProof`, `uploadPropPhotos`, `removePropSavedPhoto`, `uploadPropVideos`, `removePropSavedVideo` — which now also writes the profile row —, `setPropCover`).
+
+The wizard of a new property (`mode === 'wizard'`) keeps the accordion cards of §6.1; `PropertyDocumentsCard` remains its creation dropzone.
+
 ---
 
 ## 6. Ownership Tab — Section Layout
 
 ### 6.1 Section Order & Wizard Progression
 
-Within each property accordion, sections appear in this logical order:
+In the **wizard** of a new property (`mode === 'wizard'`, until the description is confirmed) the sections appear as accordion cards in this order — a saved property uses the flat layout of §6.3 instead:
 
 | # | Section | Component | Scope / Purpose |
 |---|---------|-----------|-----------------|
@@ -532,6 +543,19 @@ All sections are collapsible. Each uses:
 | Dados da Propriedade | Violet | `Home` / `Building2` |
 | Fotos/Vídeos | Amber | `Camera` |
 | Descrição | Indigo | `FileText` |
+
+### 6.3 The saved property's page (manage layout)
+
+A property opened from the `/imoveis` hub shows, under its cost-centre dashboard, the block **Dados Cadastrais & Documentação**:
+
+1. **Ficha do imóvel** (`PropertyRegisterSection`, §5.6) — Endereço, Dados do imóvel, Descrição, read flat, edited in place.
+2. The GPT Vision address banner, when a document was just read.
+3. **Arquivos do imóvel** (`PropertyFilesSection`, §5.6) — documents by category, photos (cover star), videos, one upload button per kind.
+4. **Unidades Locáveis** (`SubUnitsSection`) for multi-unit properties, unchanged.
+
+The block's header has **Importar contrato** (only when the property has a `properties.id`): it opens `LeaseBatchImportModal` in `mode="current"` with `fixedProperty` = this property, so the AI reads one or more lease agreements of this property and creates the contract, the agency, the corretor and the tenants that do not exist yet (the unit is settled per contract; duplicates are skipped — see `docs/CONTRATOS_MODULE.md` §7.8). Closing it reloads the property's unit contracts.
+
+**Adicionar Propriedade** offers a third way in besides Unifamiliar / Multifamiliar: **Importar contrato de locação**, the same modal without a fixed property — the review step's "criar imóvel" creates the property (`POST /api/properties`) from the address the AI read, then the contract and its parties. Closing it bumps `profileReloadTick`, which re-runs the profile loading effect so the new property appears in the hub.
 
 ---
 
@@ -638,6 +662,8 @@ When a property is being created (`isPropertySaved: false`), the user is in the 
 - Includes a conditional **"Digitar manualmente"** button (hidden if address is already filled) and a **"Confirmar →"** button (visible once documents exist) to advance to the Address step.
 
 ### 8.2 8-Folder Categorized Document System (`isPropertySaved`)
+
+> **v2.3:** on the saved property's page the folders were replaced by the flat list of `PropertyFilesSection` (§5.6) — one upload button per category, every document visible, grouped by category. The categories, the `[IPTU y]` / `[category]` name tags and the persistence below are unchanged; `PropertyDocumentsCard` still renders the creation dropzone of the wizard.
 
 Once a property is saved (`isPropertySaved: true`), the document card switches to the full **8-Folder System**:
 
@@ -947,6 +973,14 @@ Property details and sub-units are stored as JSONB in the `profiles` table becau
 ---
 
 ## 14. Changelog
+
+### v2.3 — 2026-09-25
+
+#### The saved property's page flattened; lease agreements create the records
+
+1. **Flat layout** for a saved property (`mode === 'manage'`): `PropertyRegisterSection` (Endereço / Dados do imóvel / Descrição as summaries with edit-in-place) and `PropertyFilesSection` (documents by category, photos with the cover star, videos, one upload button per kind, in the style of the projects' "Arquivos do projeto") replace the six accordion cards; the wizard of a new property keeps them. §5.6, §6.3.
+2. **Importar contrato** on the property's page (`LeaseBatchImportModal`, `mode="current"`, `fixedProperty`) and **Importar contrato de locação** in "Adicionar Propriedade" (no fixed property: the AI creates the property too). Both create the contract, the agency, the corretor and the tenants that are missing. `LeaseBatchImportModal` gained `fixedProperty`.
+3. `handlePropPhotoSelect` / `handlePropVideoSelect` became wrappers of `uploadPropPhotos(files)` / `uploadPropVideos(files)`; `removePropSavedVideo` now persists the removal to the profile row; the energy-dashboard handoff moved to `openEnergyDashboard` (shared by both layouts); `profileReloadTick` re-runs the profile load after an import.
 
 ### v2.2 — 2026-09-07
 

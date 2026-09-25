@@ -9,6 +9,10 @@ import Image from 'next/image';
 import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera, Video, Sparkles, Save, UploadCloud, Home, Building2, User, ShieldCheck, Fingerprint, ChevronDown, ChevronUp, Wand2, Plus, ArrowRight, Minus, Edit3, X, Search, Sun, ArrowLeft } from 'lucide-react';
 import PropertyDetailsCard, { PropertyDetails, SubUnit, SubUnitsSection, Checkbox as DetailCheckbox, defaultSubUnit, type UnitContractFile } from '@/components/profile/PropertyDetailsCard';
 import LeaseImportModal, { type LeaseImportResult } from '@/components/contratos/LeaseImportModal';
+import LeaseBatchImportModal from '@/components/contratos/LeaseBatchImportModal';
+import type { LeaseFormDropdowns } from '@/components/contratos/LeaseForm';
+import PropertyFilesSection from '@/components/profile/PropertyFilesSection';
+import PropertyRegisterSection from '@/components/profile/PropertyRegisterSection';
 import { createLeaseFromImport } from '@/lib/lease-import-client';
 import type { LeaseAgencyOption, LeasePropertyOption } from '@/types/lease';
 import PropertyDocumentsCard, { DocCategory } from '@/components/profile/PropertyDocumentsCard';
@@ -489,6 +493,23 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
     const [importingContractIdx, setImportingContractIdx] = useState<number | null>(null);
     // "Enviar Contrato" on a unit card: the Contratos import (tenant, agency, lease) bound to that unit
     const [unitLeaseImport, setUnitLeaseImport] = useState<{ propIdx: number; unitIdx: number; file: File } | null>(null);
+    /** "Importar contrato" on a property's page (the property fixed) or from "Adicionar Propriedade" (the AI creates the property too) */
+    const [leaseImport, setLeaseImport] = useState<{ propIdx: number | null } | null>(null);
+    const [leaseDropdowns, setLeaseDropdowns] = useState<LeaseFormDropdowns | null>(null);
+    const fetchLeaseDropdowns = useCallback(async (): Promise<LeaseFormDropdowns | null> => {
+        try {
+            const res = await fetch('/api/leases/dropdowns');
+            const d = await res.json();
+            const next: LeaseFormDropdowns = { properties: d.properties || [], tenants: d.tenants || [], agencies: d.agencies || [], agents: d.agents || [] };
+            setLeaseDropdowns(next);
+            return next;
+        } catch {
+            return null;
+        }
+    }, []);
+    useEffect(() => { if (leaseImport && !leaseDropdowns) void fetchLeaseDropdowns(); }, [leaseImport, leaseDropdowns, fetchLeaseDropdowns]);
+    /** bumped after an import created a property: the profile is read again */
+    const [profileReloadTick, setProfileReloadTick] = useState(0);
     const [leaseImportOptions, setLeaseImportOptions] = useState<{ properties: LeasePropertyOption[]; agencies: LeaseAgencyOption[] }>({ properties: [], agencies: [] });
     // Lease agreement file of each unit, by properties.id then unit id (the icon on the unit cards)
     const [unitContracts, setUnitContracts] = useState<Record<string, Record<string, UnitContractFile>>>({});
@@ -945,7 +966,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
         };
 
         if (user) loadProfile();
-    }, [user, getSupabase]);
+    }, [user, getSupabase, profileReloadTick]);
 
 
     // Masks
@@ -2436,12 +2457,12 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
             }
         };
 
-        const handlePropPhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-            if (e.target.files && e.target.files.length > 0) {
+        const uploadPropPhotos = async (picked: File[]) => {
+            if (picked.length > 0) {
                 const total = pSavedPhotos.length + pPhotos.length;
                 const remaining = 10 - total;
                 if (remaining <= 0) { alert('Máximo de 10 fotos por propriedade.'); return; }
-                const newPhotos = Array.from(e.target.files).slice(0, remaining);
+                const newPhotos = picked.slice(0, remaining);
 
                 if (profileId) {
                     try {
@@ -2500,13 +2521,14 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
             }
         };
 
+        const handlePropPhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => { const picked = Array.from(e.target.files ?? []); e.target.value = ''; return uploadPropPhotos(picked); };
         const removePropPhoto = (idx: number) => setPPhotos(prev => prev.filter((_, i) => i !== idx));
 
-        const handlePropVideoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-            if (e.target.files && e.target.files.length > 0) {
+        const uploadPropVideos = async (picked: File[]) => {
+            if (picked.length > 0) {
                 const total = pSavedVideos.length + pVideos.length;
                 if (total >= 2) { alert('Máximo de 2 vídeos por propriedade.'); return; }
-                const videoFile = Array.from(e.target.files)[0];
+                const videoFile = picked[0];
 
                 if (profileId) {
                     try {
@@ -2541,6 +2563,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
             }
         };
 
+        const handlePropVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => { const picked = Array.from(e.target.files ?? []); e.target.value = ''; return uploadPropVideos(picked); };
         const removePropVideo = (idx: number) => setPVideos(prev => prev.filter((_, i) => i !== idx));
 
         const removePropSavedPhoto = async (url: string) => {
@@ -2585,8 +2608,27 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
             }
         };
 
-        const removePropSavedVideo = (url: string) => {
-            setPSavedVideos(prev => prev.filter(u => u !== url));
+        const removePropSavedVideo = async (url: string) => {
+            const remaining = pSavedVideos.filter(u => u !== url);
+            setPSavedVideos(remaining);
+            if (!profileId) return;
+            try {
+                const sb = await getSupabase();
+                if (propIdx === 0) {
+                    await sb.from('profiles').update({ property_videos: remaining }).eq('id', profileId);
+                } else {
+                    const { data: profile } = await sb.from('profiles').select('additional_properties').eq('id', profileId).single();
+                    if (profile?.additional_properties) {
+                        const addProps = [...(profile.additional_properties as Record<string, unknown>[])];
+                        if (addProps[propIdx - 1]) {
+                            addProps[propIdx - 1] = { ...addProps[propIdx - 1], savedVideos: remaining };
+                            await sb.from('profiles').update({ additional_properties: addProps }).eq('id', profileId);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to update videos after deletion:', err);
+            }
         };
 
         const removePropSavedProof = async (proofId: string) => {
@@ -2635,7 +2677,190 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
             });
         };
 
-        // 5 cards content
+        /** Saves what is on screen and opens the property's energy dashboard, with the bill upload ready. */
+        const openEnergyDashboard = async () => {
+            const updatedProps = properties.map((pItem, i) => {
+                if (i !== propIdx) return pItem;
+                return { ...pItem, details: pDetails, subUnits: pSubUnits };
+            });
+            setProperties(updatedProps);
+            await handleSave(true, updatedProps);
+
+            try {
+                const res = await fetch('/api/energy-bills/properties');
+                const data = await res.json();
+                if (data.success && Array.isArray(data.properties)) {
+                    const rentalProps = data.properties.filter((p: any) => !p.isStandaloneUc && !p.isOrphaned);
+                    const currentName = pDetails.propertyName?.trim() || (pAddr.street ? `${pAddr.street}, ${pAddr.number || ''}`.trim() : null);
+                    let matched = rentalProps.find((p: any) => currentName && p.name.trim().toLowerCase() === currentName.toLowerCase());
+                    if (!matched && rentalProps[propIdx]) matched = rentalProps[propIdx];
+                    else if (!matched && propIdx === 0 && rentalProps.length > 0) matched = rentalProps[0];
+                    if (matched?.id) {
+                        router.push(`/${lang}/dashboard/energy/${matched.id}?upload=true`);
+                        return;
+                    }
+                }
+            } catch (err) {
+                console.error('[ProfileContent] Error resolving property for energy dashboard:', err);
+            }
+            const targetParam = propIdx === 0 ? 'primary' : `prop-${propIdx}`;
+            router.push(`/${lang}/dashboard/energy/${targetParam}?upload=true`);
+        };
+
+        // The manage layout: the ficha (address, data, description — edited in place) and the files, flat, no accordions.
+        const manageContent = (
+            <div className="space-y-6">
+                <PropertyRegisterSection
+                    propertyType={pType}
+                    details={pDetails}
+                    address={pAddr}
+                    unitsCount={pSubUnits.length}
+                    saving={isSaving}
+                    editingAddress={pAddressOpen}
+                    onEditAddress={open => setPAddressOpen(open)}
+                    addressEditor={(
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div className="space-y-2">
+                                <Label>{p.basics.cep}</Label>
+                                <div className="relative">
+                                    <Input value={pAddr.cep || ''} onChange={(e) => handlePropAddrChange('cep', e.target.value)} placeholder="00000-000" maxLength={9} />
+                                    {isLoadingAddress && <Loader2 className="absolute right-3 top-2.5 w-4 h-4 animate-spin text-muted-foreground" />}
+                                </div>
+                                {cepError && <p className="text-xs text-red-500">{cepError}</p>}
+                            </div>
+                            <div className="md:col-span-3 space-y-2">
+                                <Label>Cidade / UF</Label>
+                                <div className="flex gap-2">
+                                    <Input value={pAddr.city || ''} onChange={(e) => handlePropAddrChange('city', e.target.value)} placeholder="Cidade" />
+                                    <Input value={pAddr.state || ''} onChange={(e) => handlePropAddrChange('state', e.target.value)} placeholder="UF" className="w-20" maxLength={2} />
+                                </div>
+                            </div>
+                            <div className="md:col-span-3 space-y-2">
+                                <Label>{p.basics.street}</Label>
+                                <Input value={pAddr.street || ''} onChange={(e) => handlePropAddrChange('street', e.target.value)} placeholder="Rua / Avenida" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>{p.basics.number}</Label>
+                                <Input value={pAddr.number || ''} onChange={(e) => handlePropAddrChange('number', e.target.value)} placeholder="123" />
+                            </div>
+                            <div className="md:col-span-2 space-y-2">
+                                <Label>{p.basics.neighborhood}</Label>
+                                <Input value={pAddr.neighborhood || ''} onChange={(e) => handlePropAddrChange('neighborhood', e.target.value)} placeholder="Bairro" />
+                            </div>
+                            <div className="md:col-span-2 space-y-2">
+                                <Label>{p.basics.complement}</Label>
+                                <Input value={pAddr.complement || ''} onChange={(e) => handlePropAddrChange('complement', e.target.value)} placeholder={p.basics.complement} />
+                            </div>
+                        </div>
+                    )}
+                    editingDetails={pDetailsOpen}
+                    onEditDetails={open => setPDetailsOpen(open)}
+                    detailsEditor={(
+                        <PropertyDetailsCard
+                            key={`details-manage-${propIdx}`}
+                            details={pDetails}
+                            units={pSubUnits}
+                            onDetailsChange={setPDetails}
+                            onUnitsChange={setPSubUnits}
+                            propertyType={pType}
+                            propertyId={prop.id}
+                            lang={lang}
+                            initialOpen={true}
+                            onOpenChange={(open) => { if (!open) { setPDetailsOpen(false); handleSave(true); } }}
+                            onContinue={() => { setPDetailsOpen(false); handleSave(true); }}
+                            onViewEnergyDashboard={openEnergyDashboard}
+                        />
+                    )}
+                    editingDescription={pDescOpen}
+                    onEditDescription={open => setPDescOpen(open)}
+                    descriptionEditor={(
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-4 flex-wrap">
+                                <span className="text-sm font-medium text-foreground">Finalidade da descrição:</span>
+                                <DetailCheckbox checked={descriptionPurpose.aluguel} onChange={(val) => setDescriptionPurpose(prev => ({ ...prev, aluguel: val }))} label="Aluguel" />
+                                <DetailCheckbox checked={descriptionPurpose.venda} onChange={(val) => setDescriptionPurpose(prev => ({ ...prev, venda: val }))} label="Venda" />
+                                <Button
+                                    variant="outline" size="sm"
+                                    className="h-7 text-xs gap-1 text-violet-600 border-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/20 ml-auto"
+                                    onClick={() => generateMainDescription(propIdx)}
+                                    disabled={generatingMainDescription || (!descriptionPurpose.venda && !descriptionPurpose.aluguel)}
+                                >
+                                    {generatingMainDescription ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
+                                    {generatingMainDescription ? 'Gerando...' : 'Gerar com IA'}
+                                </Button>
+                            </div>
+                            <textarea
+                                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[120px]"
+                                placeholder="Ex: Excelente apartamento com varanda gourmet, vista livre, armários planejados na cozinha e banheiros..."
+                                value={pAddr.description || ''}
+                                onChange={(e) => handlePropAddrChange('description', e.target.value)}
+                            />
+                            <span className="text-xs text-muted-foreground">Esta descrição será exibida no anúncio do imóvel.</span>
+                        </div>
+                    )}
+                    onSave={() => handleSave(true)}
+                />
+
+                {extractedAddressInfo && (
+                    <div className={`flex items-center justify-between gap-3 p-4 rounded-xl border text-sm font-medium ${extractedAddressInfo.startsWith('✅') ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300' : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300'}`}>
+                        <span className="min-w-0">{extractedAddressInfo}</span>
+                        <button type="button" onClick={() => setTemporaryExtractedInfo(null)} className="text-current opacity-60 hover:opacity-100 p-1 rounded-md flex-shrink-0" aria-label="Fechar mensagem"><X className="w-4 h-4" /></button>
+                    </div>
+                )}
+
+                <PropertyFilesSection
+                    proofs={pSavedProofs}
+                    pendingFiles={pOwnershipFiles}
+                    fileAnalysisStatus={fileAnalysisStatus}
+                    photos={pSavedPhotos}
+                    pendingPhotos={pPhotos}
+                    videos={pSavedVideos}
+                    pendingVideos={pVideos}
+                    coverUrl={prop.profilePhotoUrl}
+                    onUploadDocuments={(files, category) => handlePropDocUpload(files, category)}
+                    onRemoveProof={removePropSavedProof}
+                    onRemovePendingFile={removePropFile}
+                    onUploadPhotos={uploadPropPhotos}
+                    onRemovePhoto={removePropSavedPhoto}
+                    onRemovePendingPhoto={removePropPhoto}
+                    onSetCover={setPropCover}
+                    onUploadVideos={uploadPropVideos}
+                    onRemoveVideo={removePropSavedVideo}
+                    onRemovePendingVideo={removePropVideo}
+                    getSupabase={getSupabase}
+                />
+
+                {pType === 'multi' && (
+                    <div className="pt-4 border-t border-border space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h4 className="text-base font-semibold text-foreground flex items-center gap-2">
+                                <Building2 className="w-4 h-4 text-violet-600" />
+                                Unidades Locáveis ({pSubUnits.length})
+                            </h4>
+                        </div>
+                        <SubUnitsSection
+                            key={`subunits-manage-${propIdx}-${prop.subUnitOpenIdx}`}
+                            details={pDetails}
+                            units={pSubUnits}
+                            onDetailsChange={setPDetails}
+                            onUnitsChange={setPSubUnitsInline}
+                            onCommit={requestUnitsSave}
+                            saveState={unitsSaveState}
+                            unitContracts={prop.id ? unitContracts[prop.id] : undefined}
+                            leasedUnitIds={prop.id ? leasedUnits[prop.id] : undefined}
+                            onGenerateDescription={(unitIdx) => generateUnitDescription(propIdx, unitIdx)}
+                            generatingDescriptionIdx={generatingUnitDescriptionIdx}
+                            onImportContract={(unitIdx, file) => importContract(propIdx, unitIdx, file)}
+                            importingContractIdx={importingContractIdx}
+                            initialOpenIdx={prop.subUnitOpenIdx}
+                            propertyIndex={propIdx}
+                        />
+                    </div>
+                )}
+            </div>
+        );
+
+        // 5 cards content (the wizard of a new property)
         const cardsContent = (
             <div className="space-y-6">
                 {/* 1. Documentation Section */}
@@ -2828,47 +3053,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                 handleSave(true);
                                 setTimeout(() => document.getElementById(`prop-${propIdx}-photos`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
                             }}
-                            onViewEnergyDashboard={async () => {
-                                const updatedProps = properties.map((pItem, i) => {
-                                    if (i !== propIdx) return pItem;
-                                    return {
-                                        ...pItem,
-                                        details: pDetails,
-                                        subUnits: pSubUnits,
-                                    };
-                                });
-                                setProperties(updatedProps);
-                                await handleSave(true, updatedProps);
-
-                                try {
-                                    const res = await fetch('/api/energy-bills/properties');
-                                    const data = await res.json();
-                                    if (data.success && Array.isArray(data.properties)) {
-                                        const rentalProps = data.properties.filter((p: any) => !p.isStandaloneUc && !p.isOrphaned);
-                                        const currentName = pDetails.propertyName?.trim() || (pAddr.street ? `${pAddr.street}, ${pAddr.number || ''}`.trim() : null);
-
-                                        let matched = rentalProps.find((p: any) =>
-                                            currentName && p.name.trim().toLowerCase() === currentName.toLowerCase()
-                                        );
-
-                                        if (!matched && rentalProps[propIdx]) {
-                                            matched = rentalProps[propIdx];
-                                        } else if (!matched && propIdx === 0 && rentalProps.length > 0) {
-                                            matched = rentalProps[0];
-                                        }
-
-                                        if (matched?.id) {
-                                            router.push(`/${lang}/dashboard/energy/${matched.id}?upload=true`);
-                                            return;
-                                        }
-                                    }
-                                } catch (err) {
-                                    console.error('[ProfileContent] Error resolving property for energy dashboard:', err);
-                                }
-
-                                const targetParam = propIdx === 0 ? 'primary' : `prop-${propIdx}`;
-                                router.push(`/${lang}/dashboard/energy/${targetParam}?upload=true`);
-                            }}
+                            onViewEnergyDashboard={openEnergyDashboard}
                         />
                     </>
                 )}
@@ -3216,7 +3401,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
         if (mode === 'manage' || mode === 'wizard') {
             return (
                 <div key={`prop-detail-${propIdx}-${mode}`} className="space-y-6">
-                    {cardsContent}
+                    {mode === 'manage' ? manageContent : cardsContent}
                 </div>
             );
         }
@@ -3414,6 +3599,36 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                     onClose={() => setUnitLeaseImport(null)}
                     onComplete={completeUnitLeaseImport}
                 />
+            )}
+
+            {/* "Importar contrato": from a property's page (the property fixed) or from "Adicionar Propriedade" (the AI creates the property) */}
+            {leaseImport && (
+                leaseDropdowns ? (
+                    <LeaseBatchImportModal
+                        dropdowns={leaseDropdowns}
+                        refreshDropdowns={fetchLeaseDropdowns}
+                        mode="current"
+                        fixedProperty={leaseImport.propIdx !== null && properties[leaseImport.propIdx]?.id
+                            ? { id: properties[leaseImport.propIdx].id as string, label: properties[leaseImport.propIdx].details?.propertyName || `Propriedade ${leaseImport.propIdx + 1}` }
+                            : undefined}
+                        onClose={createdIds => {
+                            const fromHub = leaseImport.propIdx === null;
+                            const propertyId = leaseImport.propIdx !== null ? properties[leaseImport.propIdx]?.id : undefined;
+                            setLeaseImport(null);
+                            setLeaseDropdowns(null);
+                            // the import may have created a property, an agency, tenants and contracts: read everything again
+                            if (fromHub) setProfileReloadTick(t => t + 1);
+                            else if (propertyId && createdIds.length > 0) void loadUnitContracts(propertyId);
+                        }}
+                        onOpenLease={id => router.push(`/${lang}/contratos?id=${id}`)}
+                    />
+                ) : (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+                        <div className="flex items-center gap-2 rounded-2xl border border-border bg-card px-6 py-4 text-sm text-muted-foreground shadow-2xl">
+                            <Loader2 className="h-4 w-4 animate-spin" /> Preparando a importação…
+                        </div>
+                    </div>
+                )
             )}
 
             {showSuccess && (
@@ -3680,9 +3895,19 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                             Dados Cadastrais & Documentação
                                         </h3>
                                         <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-                                            Documentos comprobatórios (IPTU, matrícula, escritura), endereço, fotos, medidores e unidades.
+                                            A ficha do imóvel (endereço, dados, descrição), os arquivos (documentos, fotos, vídeos) e as unidades.
                                         </p>
                                     </div>
+                                    {properties[selectedPropertyIdx].id && (
+                                        <Button
+                                            variant="outline"
+                                            onClick={() => setLeaseImport({ propIdx: selectedPropertyIdx })}
+                                            className="gap-1.5 shrink-0"
+                                            title="A IA lê o contrato de locação deste imóvel e cria o contrato, a imobiliária, o corretor e os inquilinos que ainda não estiverem cadastrados"
+                                        >
+                                            <Sparkles className="w-4 h-4 text-amber-500" /> Importar contrato
+                                        </Button>
+                                    )}
                                 </div>
 
                                 {renderPropertyDetailCards(selectedPropertyIdx, 'manage')}
@@ -4496,6 +4721,19 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                     </div>
                                 </button>
                             </div>
+                            <button
+                                type="button"
+                                onClick={() => { setShowAddPropertyModal(false); setLeaseImport({ propIdx: null }); }}
+                                className="group flex w-full items-center gap-4 p-4 rounded-xl border-2 border-dashed border-amber-300 hover:border-amber-400 hover:bg-amber-50/50 dark:hover:bg-amber-900/20 transition-all duration-200 text-left"
+                            >
+                                <div className="p-3 bg-amber-100 dark:bg-amber-900/50 rounded-xl text-amber-600 group-hover:scale-110 transition-transform shrink-0">
+                                    <Sparkles className="w-7 h-7" />
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="font-semibold text-foreground">Importar contrato de locação</p>
+                                    <p className="text-xs text-muted-foreground mt-1">Envie o contrato: a IA cria o imóvel, o contrato, a imobiliária, o corretor e os inquilinos que ainda não estiverem cadastrados.</p>
+                                </div>
+                            </button>
                             <div className="flex justify-center">
                                 <Button variant="ghost" size="sm" onClick={() => setShowAddPropertyModal(false)}>
                                     Cancelar
