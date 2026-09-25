@@ -207,7 +207,7 @@ export default function LeaseBatchImportModal({ dropdowns, refreshDropdowns, onC
                                     {files.map((f, i) => (
                                         <li key={`${f.name}-${f.size}`} className="flex items-center gap-2 px-3 py-2 text-sm">
                                             <FileText className="h-4 w-4 shrink-0 text-rose-600" />
-                                            <span className="min-w-0 flex-1 truncate text-foreground">{f.name}</span>
+                                            <span className="min-w-0 flex-1 break-words text-foreground">{f.name}</span>
                                             <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{(f.size / 1024 / 1024).toFixed(1)} MB</span>
                                             <button type="button" onClick={() => setFiles(prev => prev.filter((_, j) => j !== i))} className="rounded p-1 text-muted-foreground hover:text-rose-600" aria-label={`Remover ${f.name}`}>
                                                 <Trash2 className="h-3.5 w-3.5" />
@@ -233,7 +233,7 @@ export default function LeaseBatchImportModal({ dropdowns, refreshDropdowns, onC
                                 <div><p className="text-muted-foreground">Aluguel</p><p className="font-semibold text-foreground">{pending.data.lease.monthly_rent != null ? brl(pending.data.lease.monthly_rent) : "—"}</p></div>
                                 <div><p className="text-muted-foreground">Início</p><p className="font-semibold text-foreground">{formatDateBR(pending.data.lease.start_date)}</p></div>
                                 <div><p className="text-muted-foreground">Término</p><p className="font-semibold text-foreground">{formatDateBR(pending.data.lease.end_date)}</p></div>
-                                <div><p className="text-muted-foreground">Inquilino</p><p className="truncate font-semibold text-foreground" title={tenant?.full_name}>{tenant?.full_name ?? "—"}</p></div>
+                                <div><p className="text-muted-foreground">Inquilino</p><p className="break-words font-semibold text-foreground">{tenant?.full_name ?? "—"}</p></div>
                             </div>
 
                             <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-2.5 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">
@@ -288,7 +288,7 @@ export default function LeaseBatchImportModal({ dropdowns, refreshDropdowns, onC
                                 <li key={`${o.file.name}-${i}`} className="flex items-center gap-2 px-3 py-2 text-sm">
                                     {o.result === "failed" ? <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600" /> : o.result === "skipped" ? <SkipForward className="h-4 w-4 shrink-0 text-muted-foreground" /> : <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />}
                                     <span className="min-w-0 flex-1">
-                                        <span className="block truncate text-foreground">{o.file.name}</span>
+                                        <span className="block break-words text-foreground">{o.file.name}</span>
                                         <span className="block text-xs text-muted-foreground">
                                             {o.result === "created" ? `Contrato criado${o.fileSkipped ? " · o arquivo não pôde ser anexado" : " com o arquivo anexado"}`
                                                 : o.result === "existed" ? "Já estava cadastrado (mesma unidade, inquilino e início)"

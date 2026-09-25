@@ -42,6 +42,21 @@ function termHint(row: LeaseRow): { text: string; tone?: string } {
 }
 
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString("pt-BR")} ${n === 1 ? one : many}`;
+
+/**
+ * The line under the title: only what the title does not already say. A reference that follows the
+ * suggestion ("SANTO ANTONIO · Kitnet 35 - Robson Mesquita - 2024") names both the place and the
+ * tenant, so it gets no subtitle; a bare place gets the tenant; a custom name gets both.
+ */
+function subtitleOf(row: LeaseRow): string | null {
+    const title = row.title.toLowerCase();
+    const tenant = row.lease.primary_tenant_name;
+    const parts = [
+        title.includes(row.place.toLowerCase()) ? null : row.place,
+        tenant ? (title.includes(tenant.toLowerCase()) ? null : tenant) : "Sem inquilino",
+    ].filter(Boolean);
+    return parts.length > 0 ? parts.join(" · ") : null;
+}
 const pct = (v: number) => `${v > 0 ? "+" : ""}${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 
 function sortValue(row: LeaseRow, key: SortKey): string | number {
@@ -86,7 +101,7 @@ export default function LeaseTable({ rows, actions }: Props) {
     return (
         <div className="overflow-hidden rounded-xl border border-border/80 bg-card">
             <div className="overflow-x-auto">
-                <table className="w-full text-xs [&_td]:whitespace-nowrap">
+                <table className="w-full text-xs">
                     <thead className="border-b border-border/60 bg-muted/30">
                         <tr>
                             <Th label="Contrato" sortKey="title" {...th} />
@@ -110,6 +125,7 @@ export default function LeaseTable({ rows, actions }: Props) {
                             // no figure before the first month of the cycle is published
                             const acc = summary.monthsCounted > 0 ? summary.accumulatedPct : null;
                             const busy = actions.openingFileId === lease.id;
+                            const subtitle = subtitleOf(row);
                             return (
                                 <tr
                                     key={lease.id}
@@ -118,21 +134,19 @@ export default function LeaseTable({ rows, actions }: Props) {
                                     onKeyDown={e => { if (e.key === "Enter") actions.onOpen(row); }}
                                     tabIndex={0}
                                 >
-                                    <td className="max-w-[260px] px-3 py-2.5">
-                                        <span className="block truncate text-sm font-semibold text-foreground" title={row.title}>{row.title}</span>
-                                        <span className="block truncate text-[11px] text-muted-foreground" title={`${row.place} · ${lease.primary_tenant_name ?? "—"}`}>
-                                            {row.title !== row.place ? `${row.place} · ` : ""}{lease.primary_tenant_name ?? "Sem inquilino"}
-                                        </span>
+                                    <td className="min-w-[220px] max-w-[420px] px-3 py-2.5">
+                                        <span className="block break-words text-sm font-semibold leading-snug text-foreground">{row.title}</span>
+                                        {subtitle && <span className="block break-words text-[11px] leading-snug text-muted-foreground">{subtitle}</span>}
                                     </td>
-                                    <td className="px-3 py-2.5">
+                                    <td className="whitespace-nowrap px-3 py-2.5">
                                         <span className={cn("inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", meta.pill)}>{meta.label}</span>
                                     </td>
-                                    <td className="px-3 py-2.5 text-right">
+                                    <td className="whitespace-nowrap px-3 py-2.5 text-right">
                                         <span className="block text-sm font-semibold tabular-nums text-foreground">{brl(Number(lease.monthly_rent) || 0)}</span>
                                         <span className="block text-[11px] text-muted-foreground">dia {lease.rent_due_day}</span>
                                     </td>
-                                    <td className="px-3 py-2.5 tabular-nums text-foreground">{formatDateBR(lease.start_date)}</td>
-                                    <td className="px-3 py-2.5">
+                                    <td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-foreground">{formatDateBR(lease.start_date)}</td>
+                                    <td className="whitespace-nowrap px-3 py-2.5">
                                         <span className="block tabular-nums text-foreground">{summary.effectiveEnd ? formatDateBR(summary.effectiveEnd) : "—"}</span>
                                         <span className={cn("block text-[11px] text-muted-foreground", hint.tone)}>{hint.text}</span>
                                         {progress !== null && row.inForce && (
@@ -141,7 +155,7 @@ export default function LeaseTable({ rows, actions }: Props) {
                                             </span>
                                         )}
                                     </td>
-                                    <td className="px-3 py-2.5">
+                                    <td className="whitespace-nowrap px-3 py-2.5">
                                         {nextAdj ? (
                                             <>
                                                 <span className="block tabular-nums text-foreground">{formatDateBR(nextAdj)}</span>
@@ -154,13 +168,13 @@ export default function LeaseTable({ rows, actions }: Props) {
                                             <span className="text-muted-foreground">{row.inForce ? row.indexLabel : "—"}</span>
                                         )}
                                     </td>
-                                    <td className="max-w-[180px] px-3 py-2.5">
-                                        <span className="block truncate text-foreground" title={lease.agency_name ?? lease.agent_name ?? MANAGEMENT_LABELS[lease.management_type]}>
+                                    <td className="min-w-[160px] max-w-[280px] px-3 py-2.5">
+                                        <span className="block break-words leading-snug text-foreground">
                                             {lease.management_type === "AGENCY" ? lease.agency_name ?? "Imobiliária" : lease.management_type === "AGENT" ? lease.agent_name ?? "Corretor" : "Própria"}
                                         </span>
                                         <span className="block text-[11px] text-muted-foreground">{MANAGEMENT_LABELS[lease.management_type]}</span>
                                     </td>
-                                    <td className="px-3 py-2.5 text-center">
+                                    <td className="whitespace-nowrap px-3 py-2.5 text-center">
                                         {row.hasFile ? (
                                             <button
                                                 type="button"
@@ -176,7 +190,7 @@ export default function LeaseTable({ rows, actions }: Props) {
                                             <span className="text-[11px] text-muted-foreground" title="Sem arquivo: anexe o PDF no painel do contrato">sem PDF</span>
                                         )}
                                     </td>
-                                    <td className="px-2 py-2.5">
+                                    <td className="whitespace-nowrap px-2 py-2.5">
                                         <span className="flex items-center justify-end gap-0.5">
                                             <button type="button" onClick={e => { e.stopPropagation(); actions.onEdit(row); }} title="Editar contrato" aria-label={`Editar ${row.title}`} className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground">
                                                 <PenLine className="h-4 w-4" />

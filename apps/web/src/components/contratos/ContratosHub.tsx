@@ -33,20 +33,21 @@ type Mode = "lista" | "linha";
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString("pt-BR")} ${n === 1 ? one : many}`;
 const pctText = (v: number) => `${v > 0 ? "+" : ""}${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 
-function Item({ icon, label, value, hint, tone, valueTone, onClick, title }: { icon: React.ReactNode; label: string; value: string; hint: string; tone: string; valueTone?: string; onClick?: () => void; title?: string }) {
+/** One KPI. The hint wraps (two short lines at most by construction): nothing on the strip is ever clipped. */
+function Item({ icon, label, value, hint, tone, valueTone, onClick, title }: { icon: React.ReactNode; label: string; value: string; hint: React.ReactNode; tone: string; valueTone?: string; onClick?: () => void; title?: string }) {
     const Tag = onClick ? "button" : "div";
     return (
         <Tag
             type={onClick ? "button" : undefined}
             onClick={onClick}
             title={title}
-            className={cn("min-w-0 space-y-0.5 rounded-xl border border-border/80 bg-card px-4 py-3 text-left", onClick && "cursor-pointer transition-colors hover:border-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500")}
+            className={cn("flex min-w-0 flex-col gap-0.5 rounded-xl border border-border/80 bg-card px-4 py-3 text-left", onClick && "cursor-pointer transition-colors hover:border-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500")}
         >
             <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 <span className={tone}>{icon}</span>{label}
             </span>
-            <span className={cn("block truncate text-xl font-bold", valueTone ?? "text-foreground")}>{value}</span>
-            <span className="block truncate text-xs text-muted-foreground" title={hint}>{hint}</span>
+            <span className={cn("block break-words text-xl font-bold leading-tight", valueTone ?? "text-foreground")}>{value}</span>
+            <span className="block break-words text-xs leading-snug text-muted-foreground">{hint}</span>
         </Tag>
     );
 }
@@ -124,23 +125,27 @@ export default function ContratosHub({ rows, today, loading, error, view, onView
                     <Item
                         icon={<DollarSign className="h-3.5 w-3.5" />} tone="text-emerald-600" label="Aluguel contratado"
                         value={`${brl(totals.contractedRent, 0)}/mês`}
-                        hint={`${brl(totals.contractedRent * 12, 0)} por ano · ${plural(totals.agencyManaged, "via imobiliária", "via imobiliária")}`}
+                        hint={<>{brl(totals.contractedRent * 12, 0)} por ano<br />{plural(totals.agencyManaged, "via imobiliária", "via imobiliária")}{totals.selfManaged > 0 ? ` · ${totals.selfManaged} própria` : ""}</>}
                         title="Soma do aluguel de contrato dos contratos em vigor (valor bruto, antes da taxa da imobiliária)"
                     />
                     <Item
                         icon={<CalendarClock className="h-3.5 w-3.5" />} tone={totals.nextEnd && totals.nextEnd.days <= 90 ? "text-amber-600" : "text-slate-500"} label="Próximo término"
                         value={totals.nextEnd ? formatDateBR(totals.nextEnd.date) : "—"}
-                        hint={totals.nextEnd ? `${totals.nextEnd.row.title} · em ${plural(totals.nextEnd.days, "dia", "dias")}` : totals.overdueTerm > 0 ? "só contratos com o prazo vencido" : "nenhum prazo a vencer"}
+                        hint={totals.nextEnd
+                            ? <>{totals.nextEnd.days === 0 ? "hoje" : `em ${plural(totals.nextEnd.days, "dia", "dias")}`}<br />{totals.nextEnd.row.place}</>
+                            : totals.overdueTerm > 0 ? "só contratos com o prazo vencido" : "nenhum prazo a vencer"}
                         valueTone={totals.nextEnd && totals.nextEnd.days <= 90 ? "text-amber-600" : undefined}
                         onClick={totals.nextEnd ? () => actions.onOpen(totals.nextEnd!.row) : undefined}
+                        title={totals.nextEnd ? `Abrir ${totals.nextEnd.row.title}` : undefined}
                     />
                     <Item
                         icon={<TrendingUp className="h-3.5 w-3.5" />} tone="text-violet-600" label="Próximo reajuste"
                         value={totals.nextAdjustment ? formatDateBR(totals.nextAdjustment.date) : "—"}
                         hint={totals.nextAdjustment
-                            ? `${totals.nextAdjustment.row.indexLabel}${totals.nextAdjustment.accumulatedPct !== null ? ` ${pctText(totals.nextAdjustment.accumulatedPct)} até agora` : ""} · ${totals.nextAdjustment.row.title}`
+                            ? <>{totals.nextAdjustment.row.indexLabel}{totals.nextAdjustment.accumulatedPct !== null ? ` ${pctText(totals.nextAdjustment.accumulatedPct)} até agora` : ""}<br />{totals.nextAdjustment.row.place}</>
                             : "nenhum reajuste previsto"}
                         onClick={totals.nextAdjustment ? () => actions.onOpen(totals.nextAdjustment!.row) : undefined}
+                        title={totals.nextAdjustment ? `Abrir ${totals.nextAdjustment.row.title}` : undefined}
                     />
                     <Item
                         icon={<PiggyBank className="h-3.5 w-3.5" />} tone="text-blue-600" label="Caução em mãos"
@@ -151,7 +156,7 @@ export default function ContratosHub({ rows, today, loading, error, view, onView
                     <Item
                         icon={<FileText className="h-3.5 w-3.5" />} tone={totals.withFile < totals.total ? "text-amber-600" : "text-emerald-600"} label="Arquivos"
                         value={`${totals.withFile} de ${totals.total}`}
-                        hint={totals.withFile < totals.total ? `${plural(totals.total - totals.withFile, "contrato sem o PDF", "contratos sem o PDF")} anexado` : "todos os contratos com o PDF anexado"}
+                        hint={totals.withFile < totals.total ? `${plural(totals.total - totals.withFile, "contrato sem o PDF", "contratos sem o PDF")}` : "todos com o PDF anexado"}
                         valueTone={totals.withFile < totals.total ? "text-amber-600" : undefined}
                     />
                 </div>
