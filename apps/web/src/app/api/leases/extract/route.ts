@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import OpenAI from "openai";
 import { extractText, getDocumentProxy } from "unpdf";
+import { extractLogoFromPdf, type PDFDocument } from "@/lib/agency-logo";
 import { readJsonBody, withAuth } from "@/lib/api-route";
 import { downloadStagedUpload, mimeTypeOfStagedPath, ownStagedPath } from "@/lib/lease-uploads-server";
 import type { AdminSupabase } from "@/lib/api-auth";
@@ -214,9 +215,10 @@ export const POST = withAuth(
         }
 
         let textContent = "";
+        let pdf: PDFDocument | null = null;
         if (mimeType === "application/pdf") {
             try {
-                const pdf = await getDocumentProxy(new Uint8Array(buffer));
+                pdf = await getDocumentProxy(new Uint8Array(buffer));
                 textContent = (await extractText(pdf, { mergePages: true })).text || "";
             } catch (pdfError) {
                 console.warn(`[${TAG}] PDF text extraction failed:`, pdfError);
@@ -243,12 +245,23 @@ export const POST = withAuth(
         }
 
         const candidates = await loadCandidates(supabase, profileId);
+        const agencyMatch = matchAgency(data.agency, candidates.agencies);
+        // The agency's logo sits in the header of a digital PDF: when the agency is new to the account, it goes along for the record created from this contract
+        let agencyLogo: string | null = null;
+        if (data.agency && !agencyMatch && pdf) {
+            try {
+                agencyLogo = await extractLogoFromPdf(pdf, null);
+            } catch (logoErr) {
+                console.warn(`[${TAG}] logo extraction failed:`, logoErr);
+            }
+        }
         return NextResponse.json({
             success: true,
             data,
+            agency_logo: agencyLogo,
             matches: {
                 property: matchProperty(data.property, candidates.properties),
-                agency: matchAgency(data.agency, candidates.agencies),
+                agency: agencyMatch,
                 agents: data.agents.map((g) => matchAgent(g, candidates.agents)),
                 tenants: data.tenants.map((t) => matchTenant(t, candidates.tenants)),
             },

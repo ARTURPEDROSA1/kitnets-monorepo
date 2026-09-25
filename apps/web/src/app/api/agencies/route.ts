@@ -3,38 +3,18 @@ import { withAuth } from "@/lib/api-route";
 import { agencyInputSchema } from "@/lib/schemas/agency";
 import { agencyUniqueViolation, assertAgencyCnpjUnique, writeAgency } from "@/lib/agencies-server";
 import { withSignedAgreement } from "@/lib/agency-agreement";
+import { loadAgencyList } from "@/lib/agency-views-server";
 
-type MembershipRow = {
-    role?: string | null;
-    agencies?: (Record<string, unknown> & { service_agreement_url?: string | null }) | null;
-};
+type AgencyRecord = Record<string, unknown> & { service_agreement_url?: string | null };
 
 /**
  * GET /api/agencies
- * Every agency the account is a member of, with the caller's role and a
- * signed URL for the (private) service agreement.
+ * Every agency the account is a member of, with the caller's role and a signed URL for the
+ * (private) service agreement, plus the account's leases, tenants and corretores that name one
+ * of them — what the Imobiliárias hub shows (lib/agency-views-server.ts).
  */
 export const GET = withAuth({ tag: "Agencies GET" }, async ({ profileId, supabase }) => {
-    const { data: memberships, error } = await supabase
-        .from("agency_members")
-        .select(`
-            role,
-            agencies!inner(*)
-        `)
-        .eq("user_id", profileId)
-        .is("agencies.deleted_at", null);
-
-    if (error || !memberships || memberships.length === 0) {
-        return NextResponse.json({ agencies: [] });
-    }
-
-    const agencies = await Promise.all(
-        (memberships as unknown as MembershipRow[])
-            .filter((m) => m.agencies)
-            .map((m) => withSignedAgreement(supabase, { ...m.agencies, role: m.role || "VIEWER" }))
-    );
-
-    return NextResponse.json({ agencies });
+    return NextResponse.json(await loadAgencyList(supabase, profileId));
 });
 
 /**
@@ -65,6 +45,6 @@ export const POST = withAuth({ body: agencyInputSchema, tag: "Agencies POST" }, 
 
     return NextResponse.json({
         success: true,
-        agency: await withSignedAgreement(supabase, { ...(agency as NonNullable<MembershipRow["agencies"]>), role: "OWNER" }),
+        agency: await withSignedAgreement(supabase, { ...(agency as AgencyRecord), role: "OWNER" }),
     });
 });

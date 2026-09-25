@@ -86,12 +86,14 @@ interface Props {
     fallback: React.ReactNode;
     /** Signed URLs (query strings) must skip next/image's optimizer. */
     unoptimized?: boolean;
+    /** "contain" shows the whole picture on a plain light background — for logos, which must not be cropped. */
+    fit?: "cover" | "contain";
     className?: string;
     /** Badges and buttons laid over the picture; they get the card's `group` hover like everything else. */
     children?: React.ReactNode;
 }
 
-export function CoverCarousel({ photos, alt, state, fallback, unoptimized = false, className, children }: Props) {
+export function CoverCarousel({ photos, alt, state, fallback, unoptimized = false, fit = "cover", className, children }: Props) {
     const { count, index, seen, goTo } = state;
     const touchStartX = useRef<number | null>(null);
 
@@ -103,7 +105,7 @@ export function CoverCarousel({ photos, alt, state, fallback, unoptimized = fals
 
     return (
         <div
-            className={cn("relative h-32 w-full bg-gradient-to-br from-emerald-500/15 via-blue-500/10 to-violet-500/15", className)}
+            className={cn("relative h-32 w-full", fit === "contain" ? "bg-white dark:bg-slate-100" : "bg-gradient-to-br from-emerald-500/15 via-blue-500/10 to-violet-500/15", className)}
             onTouchStart={e => { touchStartX.current = e.touches[0]?.clientX ?? null; }}
             onTouchEnd={e => {
                 const start = touchStartX.current;
@@ -123,7 +125,7 @@ export function CoverCarousel({ photos, alt, state, fallback, unoptimized = fals
                             alt={i === 0 ? alt : `${alt} — foto ${i + 1}`}
                             fill
                             sizes="(max-width: 768px) 100vw, 400px"
-                            className={cn("object-cover transition-opacity duration-700 ease-in-out", i === index ? "opacity-100" : "opacity-0")}
+                            className={cn(fit === "contain" ? "object-contain p-4" : "object-cover", "transition-opacity duration-700 ease-in-out", i === index ? "opacity-100" : "opacity-0")}
                             aria-hidden={i !== index}
                             unoptimized={unoptimized}
                         />

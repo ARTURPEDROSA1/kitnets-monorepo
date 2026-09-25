@@ -1,70 +1,49 @@
-import { auth } from "@clerk/nextjs/server";
-import { createClient } from "@supabase/supabase-js";
-import { getDictionary } from "../../../dictionaries";
+import { Suspense } from "react";
+import { Loader2 } from "lucide-react";
 import ImobiliariaContent from "./ImobiliariaContent";
-import { withSignedAgreement } from '@/lib/agency-agreement';
-import type { AgencyWithRole } from "@/types/agency";
+import { UUID_REGEX, requireProfile } from "@/lib/api-auth";
+import { loadAgencyDashboard, loadAgencyList } from "@/lib/agency-views-server";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export async function generateMetadata() {
     return {
-        title: 'Imobiliária',
-        description: 'Cadastre e gerencie sua imobiliária no Kitnets.com.',
+        title: "Imobiliárias",
+        description: "Quem administra os seus contratos: o que cada imobiliária responde, o que a taxa dela custa por mês e como falar com ela.",
     };
 }
 
-async function getInitialAgencies(): Promise<AgencyWithRole[]> {
-    try {
-        const { userId } = await auth();
-        if (!userId) return [];
-
-        const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-        if (!url || !key) return [];
-        const supabase = createClient(url, key);
-
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('clerk_id', userId)
-            .maybeSingle();
-
-        if (!profile) return [];
-
-        const { data: memberships, error } = await supabase
-            .from('agency_members')
-            .select(`
-                role,
-                agencies!inner(*)
-            `)
-            .eq('user_id', profile.id)
-            .is('agencies.deleted_at', null);
-
-        if (error || !memberships || memberships.length === 0) return [];
-
-        type MembershipRow = {
-            role?: string | null;
-            agencies?: (Record<string, unknown> & { service_agreement_url?: string | null }) | null;
-        };
-        return (await Promise.all(
-            (memberships as unknown as MembershipRow[])
-                .filter((m) => m.agencies)
-                .map((m) =>
-                    // Agreements live in a private bucket: hand out a signed URL
-                    withSignedAgreement(supabase, { ...m.agencies, role: m.role || 'VIEWER' })
-                )
-        )) as AgencyWithRole[];
-    } catch (e) {
-        console.error('[ImobiliariaPage] Error fetching initial agencies:', e);
-        return [];
-    }
+/** Preloads the list (and the dashboard of `?id=`, or the old `?agency=`) on the server so the first paint has it. */
+async function ImobiliariaLoader({ lang, id }: { lang: string; id: string | null }) {
+    const authed = await requireProfile();
+    if ("response" in authed) return <ImobiliariaContent lang={lang} />;
+    const { profileId, supabase } = authed.ctx;
+    const [initial, initialDashboard] = await Promise.all([
+        loadAgencyList(supabase, profileId).catch(err => { console.error("[Imobiliária] list preload failed:", err); return null; }),
+        id && UUID_REGEX.test(id) ? loadAgencyDashboard(supabase, id, profileId).catch(() => null) : Promise.resolve(null),
+    ]);
+    return <ImobiliariaContent lang={lang} initial={initial} initialDashboard={initialDashboard} />;
 }
 
-export default async function ImobiliariaPage({ params }: { params: Promise<{ lang: "en" | "pt" | "es" }> }) {
-    const { lang } = await params;
-    const initialAgencies = await getInitialAgencies();
-
-    return <ImobiliariaContent lang={lang} initialAgencies={initialAgencies} />;
+export default async function ImobiliariaPage({
+    params,
+    searchParams,
+}: {
+    params: Promise<{ lang: "en" | "pt" | "es" }>;
+    searchParams: Promise<{ id?: string | string[]; agency?: string | string[] }>;
+}) {
+    const [{ lang }, { id, agency }] = await Promise.all([params, searchParams]);
+    const selected = typeof id === "string" ? id : typeof agency === "string" ? agency : null;
+    return (
+        <Suspense
+            fallback={
+                <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
+                </div>
+            }
+        >
+            <ImobiliariaLoader lang={lang} id={selected} />
+        </Suspense>
+    );
 }
