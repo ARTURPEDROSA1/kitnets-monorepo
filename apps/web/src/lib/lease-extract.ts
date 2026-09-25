@@ -94,6 +94,17 @@ Retorne SOMENTE um JSON válido (sem markdown, sem explicações) com esta estru
         "state": "UF ou null",
         "management_fee": "taxa de administração em % (número) ou null"
     },
+    "agents": [
+        {
+            "full_name": "nome da PESSOA FÍSICA que intermedeia ou representa a imobiliária na locação (sócio, representante legal, corretor responsável, corretor autônomo)",
+            "cpf": "CPF ou null",
+            "creci_number": "número do CRECI DESTA PESSOA (CRECI-F) ou null — nunca o CRECI-J da imobiliária",
+            "creci_state": "UF do CRECI ou null",
+            "main_phone": "telefone com DDD desta pessoa ou null",
+            "email": "e-mail desta pessoa ou null",
+            "role": "REPRESENTANTE (assina ou responde pela imobiliária) | CORRETOR (corretor autônomo, sem imobiliária)"
+        }
+    ],
     "confidence": 0.0
 }
 
@@ -102,6 +113,7 @@ Regras:
 - Converta decimais brasileiros: "1.500,00" → "1500.00". Converta datas: "01/03/2026" → "2026-03-01".
 - Liste em "charges" somente os encargos que o contrato menciona.
 - ENERGIA ELÉTRICA e CONDOMÍNIO com valor fixo cobrado junto com o aluguel (comum em kitnets e imóveis com várias unidades: "taxa de energia de R$ 300,00", "condomínio de R$ 150,00") SEMPRE entram em "charges" com o "amount" e com a regra de reajuste do próprio encargo, que pode ser diferente da do aluguel. Se o contrato disser que o encargo é reajustado "pelo mesmo índice do aluguel", repita o índice do aluguel.
+- "agents": os corretores (pessoas físicas) do contrato: quem assina pela imobiliária, o corretor responsável indicado no cabeçalho, no rodapé ou na qualificação das partes (com CRECI-F), ou o corretor autônomo que intermedeia. Locador, locatário e fiador NÃO são corretores. Sem ninguém assim, use uma lista vazia.
 - "confidence" (0.0 a 1.0) reflete a qualidade geral da extração.`;
 
 // ── Extracted shape ──────────────────────────────────────────────────
@@ -153,6 +165,21 @@ export interface ExtractedAgency {
     management_fee: number | null;
 }
 
+export type ExtractedAgentRole = "REPRESENTANTE" | "CORRETOR";
+
+/** A natural person with a CRECI: the agency's representative on the contract, or an autonomous broker. */
+export interface ExtractedAgent {
+    full_name: string;
+    /** 11 digits or "" */
+    cpf: string;
+    creci_number: string | null;
+    /** UF or null */
+    creci_state: string | null;
+    main_phone: string | null;
+    email: string | null;
+    role: ExtractedAgentRole;
+}
+
 export interface ExtractedCharge {
     charge_type: (typeof LEASE_CHARGE_TYPES)[number];
     label: string;
@@ -178,6 +205,8 @@ export interface ExtractedLease {
     tenants: ExtractedTenant[];
     property: ExtractedProperty | null;
     agency: ExtractedAgency | null;
+    /** the corretores named on the contract (usually the agency's representative), most often one */
+    agents: ExtractedAgent[];
     confidence: number | null;
 }
 
@@ -415,6 +444,34 @@ export function normalizeLeaseExtraction(raw: unknown): ExtractedLease {
           }
         : null;
 
+    const agents: ExtractedAgent[] = [];
+    for (const item of Array.isArray(root.agents) ? root.agents : []) {
+        const g = obj(item);
+        const fullName = text(g?.full_name, 200);
+        if (!g || !fullName) continue;
+        const cpfDigits = parseCPF(text(g.cpf, 30) ?? "");
+        const cpf = cpfDigits.length === 11 ? cpfDigits : "";
+        const creciNumber = creci(g.creci_number);
+        const creciState = uf(g.creci_state);
+        // the agency's own registration (CRECI-J) is not the person's
+        const ownCreci = creciNumber && !(agency?.creci_number && creci(agency.creci_number) === creciNumber) ? creciNumber : null;
+        const key = cpf || (ownCreci ? `${ownCreci}/${creciState ?? ""}` : normalizeText(fullName));
+        if (agents.some((x) => (x.cpf && x.cpf === cpf) || (x.creci_number && `${x.creci_number}/${x.creci_state ?? ""}` === key) || normalizeText(x.full_name) === normalizeText(fullName))) continue;
+        agents.push({
+            full_name: fullName,
+            cpf,
+            creci_number: ownCreci,
+            creci_state: ownCreci ? creciState : null,
+            main_phone: text(g.main_phone, 40),
+            email: text(g.email, 200)?.toLowerCase() ?? null,
+            role: oneOf(["REPRESENTANTE", "CORRETOR"] as const, g.role) ?? (agency ? "REPRESENTANTE" : "CORRETOR"),
+        });
+    }
+    // Nobody listed, but the agency names its representative: offer that person (the CRECI stays to be typed).
+    if (agents.length === 0 && agency?.owner_name) {
+        agents.push({ full_name: agency.owner_name, cpf: "", creci_number: null, creci_state: null, main_phone: null, email: null, role: "REPRESENTANTE" });
+    }
+
     const hasProperty = property && Object.values(property).some(Boolean);
     const confidence = typeof root.confidence === "number" && root.confidence >= 0 && root.confidence <= 1 ? root.confidence : null;
 
@@ -434,8 +491,15 @@ export function normalizeLeaseExtraction(raw: unknown): ExtractedLease {
         tenants,
         property: hasProperty ? property : null,
         agency,
+        agents,
         confidence,
     };
+}
+
+/** "CRECI-MG 12.345-F", "12345/F" → "12345"; null without digits. */
+export function creci(v: unknown): string | null {
+    const digits = (text(v, 40) ?? "").replace(/\D/g, "");
+    return digits.length >= 3 && digits.length <= 10 ? digits : null;
 }
 
 /** True when the model found nothing a lease form could use. */
@@ -449,7 +513,7 @@ export function isEmptyExtraction(e: ExtractedLease): boolean {
 export function normalizeText(v: string | null | undefined): string {
     return (v ?? "")
         .normalize("NFD")
-        .replace(/[̀-ͯ]/g, "")
+        .replace(/[\u0300-\u036f]/g, "")
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, " ")
         .trim();
@@ -498,7 +562,7 @@ export interface MatchResult {
     id: string;
     name: string;
     /** What the match was made on, for the review screen. */
-    by: "cpf" | "cnpj" | "name" | "address";
+    by: "cpf" | "cnpj" | "creci" | "name" | "address";
 }
 
 function candidateHasAddress(c: PropertyCandidate, street: string, number: string): boolean {
@@ -591,6 +655,35 @@ export function matchTenant(extracted: ExtractedTenant, candidates: TenantCandid
         // The CPF is unique per account: with a valid one in hand, a name-only match would be another person.
         if (validateCPF(extracted.cpf)) return null;
     }
+    const name = normalizeText(extracted.full_name);
+    const hits = candidates.filter((c) => normalizeText(c.full_name) === name);
+    return hits.length === 1 ? { id: hits[0].id, name: hits[0].full_name, by: "name" } : null;
+}
+
+export interface AgentCandidate {
+    id: string;
+    full_name: string;
+    cpf?: string | null;
+    creci_number: string;
+    creci_state: string;
+}
+
+/**
+ * A corretor is a person with a registration: the CRECI (number + UF) settles it, the CPF next,
+ * and an exact name only when neither is at hand — a CRECI or a valid CPF that is not in the
+ * account is a new person, whatever the name says.
+ */
+export function matchAgent(extracted: ExtractedAgent, candidates: AgentCandidate[]): MatchResult | null {
+    if (extracted.creci_number) {
+        const hits = candidates.filter((c) => creci(c.creci_number) === extracted.creci_number && (!extracted.creci_state || !c.creci_state || c.creci_state.toUpperCase() === extracted.creci_state));
+        if (hits.length === 1) return { id: hits[0].id, name: hits[0].full_name, by: "creci" };
+    }
+    if (extracted.cpf) {
+        const hit = candidates.find((c) => c.cpf && parseCPF(c.cpf) === extracted.cpf);
+        if (hit) return { id: hit.id, name: hit.full_name, by: "cpf" };
+        if (validateCPF(extracted.cpf)) return null;
+    }
+    if (extracted.creci_number) return null;
     const name = normalizeText(extracted.full_name);
     const hits = candidates.filter((c) => normalizeText(c.full_name) === name);
     return hits.length === 1 ? { id: hits[0].id, name: hits[0].full_name, by: "name" } : null;

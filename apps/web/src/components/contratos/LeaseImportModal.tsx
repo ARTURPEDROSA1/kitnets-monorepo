@@ -38,6 +38,8 @@ export interface LeaseImportResult {
     data: ExtractedLease;
     propertyId: string;
     agencyId: string;
+    /** the corretor named on the contract (matched or created here), '' when none */
+    agentId: string;
     primaryTenantId: string;
     additionalTenants: AdditionalTenantFormItem[];
 }
@@ -84,6 +86,17 @@ interface TenantDraft {
     full_name: string; cpf: string; main_phone: string; email: string;
     rg: string | null;
     date_of_birth: string | null;
+    errors: FieldErrors;
+}
+
+/** The corretor the contract names: the agency's representative, or an autonomous broker. */
+interface AgentDraft {
+    /** Set when the corretor already exists (matched) or has just been created. */
+    agentId: string;
+    matchedBy: MatchResult['by'] | null;
+    create: boolean;
+    full_name: string; cpf: string; creci_number: string; creci_state: string; main_phone: string; email: string;
+    role: 'REPRESENTANTE' | 'CORRETOR';
     errors: FieldErrors;
 }
 
@@ -149,6 +162,7 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
     const [agencyEditing, setAgencyEditing] = useState(false);
 
     const [tenantDrafts, setTenantDrafts] = useState<TenantDraft[]>([]);
+    const [agentDrafts, setAgentDrafts] = useState<AgentDraft[]>([]);
     const [applying, setApplying] = useState(false);
     const [completeErrors, setCompleteErrors] = useState<string[]>([]);
 
@@ -210,7 +224,7 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
             }
 
             const extracted = json.data as ExtractedLease;
-            const matches = (json.matches || {}) as { property?: MatchResult | null; agency?: MatchResult | null; tenants?: (MatchResult | null)[] };
+            const matches = (json.matches || {}) as { property?: MatchResult | null; agency?: MatchResult | null; agents?: (MatchResult | null)[]; tenants?: (MatchResult | null)[] };
 
             setFile(picked);
             setData(extracted);
@@ -267,6 +281,23 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                     email: t.email ?? '',
                     rg: t.rg,
                     date_of_birth: t.date_of_birth,
+                    errors: {},
+                };
+            }));
+
+            setAgentDrafts((extracted.agents ?? []).map((g, i) => {
+                const match = matches.agents?.[i] ?? null;
+                return {
+                    agentId: match?.id ?? '',
+                    matchedBy: match?.by ?? null,
+                    create: !match,
+                    full_name: match?.name ?? g.full_name,
+                    cpf: g.cpf ? formatCPF(g.cpf) : '',
+                    creci_number: g.creci_number ?? '',
+                    creci_state: g.creci_state ?? '',
+                    main_phone: g.main_phone ? maskPhone(g.main_phone) : '',
+                    email: g.email ?? '',
+                    role: g.role,
                     errors: {},
                 };
             }));
@@ -343,6 +374,48 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                 setAgencyEditing(false);
             }
 
+            // 2b. Corretores: the agency's representative (or the autonomous broker), with their own CRECI.
+            const agentsNext = [...agentDrafts];
+            let agentFailed = false;
+            for (let i = 0; i < agentsNext.length; i++) {
+                const g = agentsNext[i];
+                if (g.agentId || !g.create) continue;
+                const errors: FieldErrors = {};
+                if (!g.full_name.trim()) errors.full_name = 'Nome é obrigatório.';
+                if (!g.creci_number.trim()) errors.creci_number = 'Informe o CRECI do corretor (o contrato não traz).';
+                if (!g.creci_state.trim()) errors.creci_state = 'UF do CRECI.';
+                if (Object.keys(errors).length > 0) {
+                    agentsNext[i] = { ...g, errors };
+                    agentFailed = true;
+                    continue;
+                }
+                const { ok, json } = await postJson('/api/agents', {
+                    full_name: g.full_name,
+                    cpf: g.cpf,
+                    creci_number: g.creci_number,
+                    creci_state: g.creci_state,
+                    agent_type: finalAgencyId ? 'IMOBILIARIA' : 'AUTONOMO',
+                    agency_id: finalAgencyId || '',
+                    main_phone: g.main_phone,
+                    main_phone_whatsapp: !!g.main_phone.trim(),
+                    additional_phone: '',
+                    email: g.email,
+                    website: '',
+                    notes: 'Cadastrado a partir do contrato de locação.',
+                    status: 'ACTIVE',
+                });
+                const created = json.agent as { id: string } | undefined;
+                if (!ok || !created) {
+                    agentsNext[i] = { ...g, errors: errorsFrom(json, 'Não foi possível cadastrar o corretor.') };
+                    agentFailed = true;
+                    continue;
+                }
+                agentsNext[i] = { ...g, agentId: created.id, create: false, errors: {} };
+            }
+            setAgentDrafts(agentsNext);
+            if (agentFailed) return;
+            const finalAgentId = agentsNext.find(g => g.agentId)?.agentId ?? '';
+
             // 3. Tenants (a tenant record needs a property).
             const drafts = [...tenantDrafts];
             let failed = false;
@@ -360,6 +433,7 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                     use_property_address: true,
                     management_type: finalAgencyId ? 'AGENCY' : 'SELF_MANAGED',
                     agency_id: finalAgencyId || null,
+                    agent_id: finalAgentId || null,
                     move_in_date: data.lease.start_date,
                     status: 'ACTIVE',
                 });
@@ -382,6 +456,7 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                 data,
                 propertyId: finalPropertyId,
                 agencyId: finalAgencyId,
+                agentId: finalAgentId,
                 primaryTenantId: primary?.tenantId ?? '',
                 additionalTenants: linked
                     .filter(t => t !== primary)
@@ -444,9 +519,11 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
 
     const tenantsToCreate = tenantDrafts.filter(t => !t.tenantId && t.create);
     const willHaveProperty = propertyMode === 'create' || (propertyMode === 'existing' && !!propertyId);
+    const agentsToCreate = agentDrafts.filter(g => !g.agentId && g.create);
     const createLabels = [
         propertyMode === 'create' ? 'imóvel' : null,
         agencyMode === 'create' ? 'imobiliária' : null,
+        agentsToCreate.length > 0 ? (agentsToCreate.length === 1 ? 'corretor' : `${agentsToCreate.length} corretores`) : null,
         tenantsToCreate.length > 0 && willHaveProperty ? (tenantsToCreate.length === 1 ? 'inquilino' : `${tenantsToCreate.length} inquilinos`) : null,
     ].filter(Boolean);
 
@@ -759,6 +836,75 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                                     </div>
                                 )}
                                 {otherErrors(agencyErrors, agencyMode === 'create' ? ['name', 'cnpj', 'main_phone', 'email', 'postal_code', 'street', 'street_number', 'neighborhood', 'city', 'state'] : [])}
+                            </section>
+
+                            {/* ── Corretor ── */}
+                            <section className="space-y-3 rounded-xl border border-border p-4">
+                                <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground"><Users className="h-4 w-4" /> Corretor</h3>
+
+                                {agentDrafts.length === 0 && (
+                                    <p className="text-sm text-muted-foreground">O contrato não nomeia um corretor (o representante da imobiliária ou um corretor autônomo com CRECI).</p>
+                                )}
+
+                                {agentDrafts.map((g, idx) => (
+                                    <div key={idx} className="space-y-2 rounded-lg border border-border p-3">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <p className="text-sm font-medium text-foreground">
+                                                {g.full_name}
+                                                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                                                    {g.role === 'CORRETOR' ? 'Corretor autônomo' : 'Representante da imobiliária'}
+                                                </span>
+                                            </p>
+                                            {g.agentId ? (
+                                                <span className="flex shrink-0 items-center gap-1 text-xs text-emerald-700 dark:text-emerald-400">
+                                                    <CheckCircle2 className="h-3.5 w-3.5" /> {g.matchedBy ? (g.matchedBy === 'creci' ? 'Já cadastrado (CRECI)' : g.matchedBy === 'cpf' ? 'Já cadastrado (CPF)' : 'Já cadastrado') : 'Cadastrado'}
+                                                </span>
+                                            ) : (
+                                                <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs text-foreground">
+                                                    <input type="checkbox" checked={g.create} disabled={applying} onChange={e => setAgentDrafts(prev => prev.map((x, i) => (i === idx ? { ...x, create: e.target.checked } : x)))} />
+                                                    Cadastrar em Corretores
+                                                </label>
+                                            )}
+                                        </div>
+
+                                        {!g.agentId && g.create && (
+                                            <div className="grid gap-3 sm:grid-cols-6">
+                                                <div className="sm:col-span-3">
+                                                    <Label className="text-xs">Nome completo *</Label>
+                                                    <Input className="h-9" value={g.full_name} onChange={e => setAgentDrafts(prev => prev.map((x, i) => (i === idx ? { ...x, full_name: e.target.value } : x)))} />
+                                                    {fieldError(g.errors, 'full_name')}
+                                                </div>
+                                                <div className="sm:col-span-3">
+                                                    <Label className="text-xs">CPF</Label>
+                                                    <Input className="h-9" value={g.cpf} onChange={e => setAgentDrafts(prev => prev.map((x, i) => (i === idx ? { ...x, cpf: maskCPF(e.target.value) } : x)))} placeholder="000.000.000-00" />
+                                                    {fieldError(g.errors, 'cpf')}
+                                                </div>
+                                                <div className="sm:col-span-2">
+                                                    <Label className="text-xs">Nº CRECI *</Label>
+                                                    <Input className="h-9" value={g.creci_number} onChange={e => setAgentDrafts(prev => prev.map((x, i) => (i === idx ? { ...x, creci_number: e.target.value } : x)))} placeholder="Ex: 12345" />
+                                                    {fieldError(g.errors, 'creci_number')}
+                                                </div>
+                                                <div className="sm:col-span-1">
+                                                    <Label className="text-xs">UF *</Label>
+                                                    <Input className="h-9" maxLength={2} value={g.creci_state} onChange={e => setAgentDrafts(prev => prev.map((x, i) => (i === idx ? { ...x, creci_state: e.target.value.toUpperCase() } : x)))} />
+                                                    {fieldError(g.errors, 'creci_state')}
+                                                </div>
+                                                <div className="sm:col-span-3">
+                                                    <Label className="text-xs">Telefone (WhatsApp)</Label>
+                                                    <Input className="h-9" value={g.main_phone} onChange={e => setAgentDrafts(prev => prev.map((x, i) => (i === idx ? { ...x, main_phone: maskPhone(e.target.value) } : x)))} placeholder="(00) 00000-0000" />
+                                                    {fieldError(g.errors, 'main_phone')}
+                                                </div>
+                                                <div className="sm:col-span-6">
+                                                    <Label className="text-xs">E-mail</Label>
+                                                    <Input className="h-9" value={g.email} onChange={e => setAgentDrafts(prev => prev.map((x, i) => (i === idx ? { ...x, email: e.target.value } : x)))} />
+                                                    {fieldError(g.errors, 'email')}
+                                                </div>
+                                                {!g.creci_number && <p className="text-xs text-muted-foreground sm:col-span-6">O contrato não traz o CRECI desta pessoa (só o da imobiliária, que é outro): informe-o para cadastrar, ou desmarque.</p>}
+                                            </div>
+                                        )}
+                                        {otherErrors(g.errors, ['full_name', 'cpf', 'creci_number', 'creci_state', 'main_phone', 'email'])}
+                                    </div>
+                                ))}
                             </section>
 
                             {/* ── Tenants ── */}

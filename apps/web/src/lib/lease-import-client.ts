@@ -30,9 +30,10 @@ export function leasePayloadFromImport(
         property_id: result.propertyId,
         unit_id: opts.unitId,
         primary_tenant_id: result.primaryTenantId,
-        management_type: result.agencyId ? "AGENCY" : "SELF_MANAGED",
+        // an agency runs the lease when there is one; a corretor alone is an autonomous broker; else the owner
+        management_type: result.agencyId ? "AGENCY" : result.agentId ? "AGENT" : "SELF_MANAGED",
         agency_id: result.agencyId || null,
-        agent_id: null,
+        agent_id: result.agentId || null,
         start_date: lease.start_date,
         end_date: lease.end_date,
         monthly_rent: lease.monthly_rent,

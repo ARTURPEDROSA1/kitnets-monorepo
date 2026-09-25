@@ -19,9 +19,14 @@ interface Props {
     editable?: boolean;
     onChanged?: () => Promise<void> | void;
     className?: string;
+    /** the photo route (POST multipart / DELETE); the tenants' one by default — the corretores share this widget */
+    endpoint?: string;
+    /** what the confirmation names ("deste inquilino") */
+    subject?: string;
 }
 
-export default function TenantPhoto({ tenantId, url, name, size = 96, editable = false, onChanged, className }: Props) {
+export default function TenantPhoto({ tenantId, url, name, size = 96, editable = false, onChanged, className, endpoint, subject = "deste inquilino" }: Props) {
+    const photoUrl = endpoint ?? `/api/tenants/${tenantId}/photo`;
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const input = useRef<HTMLInputElement>(null);
@@ -32,7 +37,7 @@ export default function TenantPhoto({ tenantId, url, name, size = 96, editable =
         try {
             const body = new FormData();
             body.append("file", file);
-            const res = await fetch(`/api/tenants/${tenantId}/photo`, { method: "POST", body });
+            const res = await fetch(photoUrl, { method: "POST", body });
             const json = await res.json().catch(() => ({}));
             if (!res.ok) { setError(typeof json.error === "string" ? json.error : "Não foi possível enviar a foto."); return; }
             await onChanged?.();
@@ -44,10 +49,10 @@ export default function TenantPhoto({ tenantId, url, name, size = 96, editable =
     };
 
     const remove = async () => {
-        if (!window.confirm("Remover a foto deste inquilino?")) return;
+        if (!window.confirm(`Remover a foto ${subject}?`)) return;
         setBusy(true);
         setError(null);
-        const res = await fetch(`/api/tenants/${tenantId}/photo`, { method: "DELETE" });
+        const res = await fetch(photoUrl, { method: "DELETE" });
         setBusy(false);
         if (!res.ok) { setError("Não foi possível remover a foto."); return; }
         await onChanged?.();

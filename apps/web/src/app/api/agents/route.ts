@@ -2,33 +2,21 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/api-route";
 import { agentInputSchema } from "@/lib/schemas/agent";
 import { agentUniqueViolation, assertAgentRelations } from "@/lib/agents-server";
+import { loadAgentList } from "@/lib/agent-views-server";
 
 /**
  * GET /api/agents
- * All of the account's agents (soft-deleted excluded) with the agency name flattened in.
+ * All of the account's agents (soft-deleted excluded) with the agency name flattened in, plus the
+ * leases and tenants that name a corretor (`leases`, `tenants`). Same builder the Corretores
+ * page preloads with (lib/agent-views-server.ts).
  */
 export const GET = withAuth({ tag: "Agents GET" }, async ({ profileId, supabase }) => {
-    const { data: agents, error } = await supabase
-        .from("agents")
-        .select(`
-            *,
-            agencies!agents_agency_id_fkey ( name )
-        `)
-        .eq("user_id", profileId)
-        .is("deleted_at", null)
-        .order("created_at", { ascending: false });
-
-    if (error) {
-        console.error("[Agents GET] Error:", error);
-        return NextResponse.json({ agents: [] });
+    try {
+        return NextResponse.json(await loadAgentList(supabase, profileId));
+    } catch (err) {
+        console.error("[Agents GET] Error:", (err as Error).message);
+        return NextResponse.json({ agents: [], leases: [], tenants: [] });
     }
-
-    const agentsWithAgency = (agents || []).map((a: Record<string, unknown>) => {
-        const agencies = a.agencies as { name: string } | null;
-        return { ...a, agency_name: agencies?.name || null, agencies: undefined };
-    });
-
-    return NextResponse.json({ agents: agentsWithAgency });
 });
 
 /**

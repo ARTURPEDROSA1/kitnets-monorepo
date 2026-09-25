@@ -47,9 +47,10 @@ export const agentInputSchema = z
         creci_state: requiredText("UF do CRECI é obrigatório.", 2).transform((v) => v.toUpperCase()),
         agent_type: z.enum(AGENT_TYPES, { errorMap: () => ({ message: "Tipo de atuação é obrigatório." }) }),
         agency_id: optionalText(64),
-        main_phone: requiredText("Telefone principal é obrigatório.", 40)
-            .refine((v) => validatePhone(v), "Telefone principal inválido.")
-            .transform((v) => parsePhoneToE164(v)),
+        // Optional: a corretor registered from a lease agreement may have no phone yet.
+        main_phone: optionalText(40)
+            .refine((v) => v == null || validatePhone(v), "Telefone principal inválido.")
+            .transform((v) => (v ? parsePhoneToE164(v) : null)),
         main_phone_whatsapp: z.boolean().optional().transform((v) => v === true),
         additional_phone: optionalText(40)
             .refine((v) => v == null || validatePhone(v), "Telefone adicional inválido.")
@@ -73,6 +74,7 @@ export const agentInputSchema = z
         ...d,
         agency_id: d.agent_type === "IMOBILIARIA" ? d.agency_id : null,
         // A WhatsApp flag without a number is meaningless.
+        main_phone_whatsapp: d.main_phone ? d.main_phone_whatsapp : false,
         additional_phone_whatsapp: d.additional_phone ? d.additional_phone_whatsapp : false,
     }));
 

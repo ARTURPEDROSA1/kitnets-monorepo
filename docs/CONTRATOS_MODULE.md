@@ -501,6 +501,9 @@ Several PDFs of contracts that already ran, in one go. Each file goes through th
 
 ## 8. UI Flow, States & Modals
 
+### 7.6 The corretor read from the contract
+The extraction prompt asks for `agents`: the natural person who signs or answers for the agency (sócio, representante legal, corretor responsável — with their own CRECI-F, never the agency's CRECI-J) or the autonomous broker intermediating. `normalizeLeaseExtraction` keeps only the person's own CRECI, dedupes by CRECI, CPF and name, and — when nobody was listed but the agency names its representative — offers that person with the CRECI left to be typed. `matchAgent` (route `POST /api/leases/extract`, `matches.agents`) matches by CRECI (number + UF), then CPF, then an exact name. The review step of `LeaseImportModal` shows a **Corretor** section: matched → linked; not matched → "Cadastrar em Corretores" with name, CPF, CRECI + UF (required), phone and e-mail, created through `POST /api/agents` as IMOBILIARIA (linked to the contract's agency) or AUTONOMO. The lease gets `agent_id`; `management_type` is AGENCY when there is an agency, AGENT when only a corretor, SELF_MANAGED otherwise (`leasePayloadFromImport`, the form prefill). Tenants created in the same review carry the corretor too.
+
 ### 8.1 State Machine
 
 ```mermaid
@@ -616,6 +619,8 @@ If a property already has a contract with `status = 'ACTIVE'` and the user attem
 ---
 
 ## 12. Changelog
+
+- **2026-09-25** — The AI import reads the corretor: `agents` in the extraction, `matchAgent`, the Corretor section of the review, `agent_id` on the lease and the tenants created from it (§7.6).
 
 - **2026-09-25 (v1.1)** — Contratos redesigned:
   - The card list became a **hub** with a KPI strip, an "Atenção" list, view pills in the URL, filters, a sortable table and a Gantt-style timeline (`ContratosHub`, `LeaseTable`, `LeaseTimeline`).
