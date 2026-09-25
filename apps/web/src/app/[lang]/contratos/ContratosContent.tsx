@@ -1,1687 +1,312 @@
 "use client";
 
-import { ReturnToPropertyLink, useReturnPropertyId } from '@/components/properties/ReturnToPropertyLink';
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Button } from '@kitnets/ui';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Loader2,
-    Save,
-    ArrowLeft,
-    Search,
-    AlertTriangle,
-    Plus,
-    ChevronDown,
-    ChevronUp,
-    X,
-    Home,
-    Building2,
-    Calendar,
-    FileText,
-    DollarSign,
-    TrendingUp,
-    Zap,
-    Upload,
-    Trash2,
-    Download,
-    Users,
-    Ban,
-    PenLine,
-    Eye,
-    Sparkles,
-} from 'lucide-react';
+/**
+ * Contratos — the hub of the account's leases, one contract's dashboard (`?id=`, the old
+ * `?lease=` still works) and the form that creates or edits one. The list and the dashboard are
+ * preloaded by the page on the server; refreshes go through the API. Modals — terminate, delete,
+ * the AI import of a new contract, the batch import of old ones — are owned here so the hub and
+ * the dashboard share them.
+ */
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Ban, Loader2 } from "lucide-react";
+import { Button } from "@kitnets/ui";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { PdfViewerModal } from "@/components/ui/PdfViewerModal";
+import { ReturnToPropertyLink, useReturnPropertyId } from "@/components/properties/ReturnToPropertyLink";
+import ContratosHub from "@/components/contratos/ContratosHub";
+import LeaseDashboard from "@/components/contratos/LeaseDashboard";
+import LeaseForm, { EMPTY_LEASE_FORM, emptyLeaseInitial, formatDateBR, leaseToInitial, maskDate, moneyToMask, parseDateBR, type LeaseFormDropdowns, type LeaseFormInitial } from "@/components/contratos/LeaseForm";
+import LeaseImportModal, { type LeaseImportResult } from "@/components/contratos/LeaseImportModal";
+import LeaseBatchImportModal from "@/components/contratos/LeaseBatchImportModal";
+import { summarizeLeases, todayBRT, viewFromParam, type LeaseRow, type LeaseView } from "@/lib/lease-dashboard";
+import { leaseIndexSeriesCode, type IndexPoint } from "@/lib/lease-summary";
+import type { LeaseDashboardView, LeaseListView } from "@/lib/lease-views";
+import type { LeaseWithDetails } from "@/types/lease";
+import { toISODate } from "@/lib/dates";
+import { LEASE_UPLOAD_MAX_SIZE } from "@/lib/lease-upload-client";
 
-import { cn } from '@/lib/utils';
-import LeaseProfileCard from '@/components/contratos/LeaseProfileCard';
-import LeaseImportModal, { type LeaseImportResult } from '@/components/contratos/LeaseImportModal';
-import { attachLeaseContract } from '@/lib/lease-upload-client';
-import { PdfViewerModal } from '@/components/ui/PdfViewerModal';
-import { Badge } from '@/components/ui/badge';
-import type {
-    LeaseWithDetails,
-    LeaseFormData,
-    LeaseStatus,
-    LeaseManagementType,
-    AdditionalTenantFormItem,
-    ChargeFormItem,
-    ChargeType,
-    ChargeResponsibility,
-    LeaseTenantRole,
-    LeaseDocument,
-    LeasePropertyOption,
-    LeaseTenantOption,
-    LeaseAgencyOption,
-    LeaseAgentOption,
-} from '@/types/lease';
-import { formatDateBR as formatDateOnlyBR, nextOccurrence, toISODate } from "@/lib/dates";
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Files the multipart route takes when the direct upload is not available (POST /api/leases/[id]/documents).
+const ROUTE_MIME_TYPES = ["application/pdf", "image/jpeg", "image/jpg", "image/png"];
 
-// ── Types ────────────────────────────────────────────────────────────
-
-type PageState = 'loading' | 'list' | 'form' | 'editing';
-
-interface FieldErrors {
-    [key: string]: string;
+interface FormState {
+    editingId: string | null;
+    initial: LeaseFormInitial;
+    aiImported: boolean;
+    importedFile: File | null;
+    importedStoragePath: string | null;
 }
 
-// ── Date helpers (DD/MM/YYYY ↔ ISO) ─────────────────────────────────
-
-function maskDate(value: string): string {
-    const digits = value.replace(/\D/g, '').slice(0, 8);
-    if (digits.length <= 2) return digits;
-    if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-    return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+interface Props {
+    lang: string;
+    /** The list as the page preloaded it on the server — the first paint has the rows; refreshes go through the API. */
+    initial?: LeaseListView | null;
+    /** The dashboard of `?id=`, preloaded the same way. */
+    initialDashboard?: LeaseDashboardView | null;
 }
 
-function parseDateBR(dateStr: string): string {
-    if (!dateStr) return '';
-    const parts = dateStr.split('/');
-    if (parts.length !== 3 || parts[2].length !== 4) return '';
-    return `${parts[2]}-${parts[1]}-${parts[0]}`;
-}
+export default function ContratosContent({ lang, initial = null, initialDashboard = null }: Props) {
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const rawId = searchParams.get("id") ?? searchParams.get("lease");
+    const selectedId = rawId && UUID.test(rawId) ? rawId : null;
+    const view = viewFromParam(searchParams.get("view"));
+    const today = useMemo(() => todayBRT(), []);
+    const base = lang === "pt" ? "/contratos" : `/${lang}/contratos`;
 
-function formatDateBR(isoDate: string | null): string {
-    if (!isoDate) return '';
-    const parts = isoDate.split('T')[0].split('-');
-    if (parts.length !== 3) return isoDate;
-    return `${parts[2]}/${parts[1]}/${parts[0]}`;
-}
+    // ── List ──────────────────────────────────────────────────────
+    const [leases, setLeases] = useState<LeaseWithDetails[] | null>(initial?.leases ?? null);
+    const [series, setSeries] = useState<Record<string, IndexPoint[] | null>>(initial?.series ?? {});
+    const seriesRef = useRef(series);
+    seriesRef.current = series;
+    /** Seeded from the server: no first fetch. Read once — later prop changes must not reset the list. */
+    const [seeded] = useState(initial !== null);
+    const [listError, setListError] = useState<string | null>(null);
 
-// ── Currency helpers ─────────────────────────────────────────────────
-
-function maskCurrency(value: string): string {
-    const digits = value.replace(/\D/g, '');
-    if (!digits) return '';
-    const num = parseInt(digits, 10) / 100;
-    return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function formatCurrencyBRL(value: number | null): string {
-    if (value === null || value === undefined) return '';
-    return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
-
-// ── Status helpers ───────────────────────────────────────────────────
-
-function getStatusLabel(status: string): { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' } {
-    switch (status) {
-        case 'ACTIVE': return { label: 'Ativo', variant: 'default' };
-        case 'DRAFT': return { label: 'Rascunho', variant: 'outline' };
-        case 'EXPIRING_SOON': return { label: 'Vencendo', variant: 'secondary' };
-        case 'EXPIRED': return { label: 'Expirado', variant: 'destructive' };
-        case 'TERMINATED': return { label: 'Rescindido', variant: 'destructive' };
-        case 'CANCELLED': return { label: 'Cancelado', variant: 'secondary' };
-        default: return { label: status, variant: 'outline' };
-    }
-}
-
-function getManagementLabel(type: string): string {
-    switch (type) {
-        case 'SELF_MANAGED': return 'Gestão própria';
-        case 'AGENCY': return 'Imobiliária';
-        case 'AGENT': return 'Corretor';
-        default: return type;
-    }
-}
-
-function computeDisplayStatus(lease: LeaseWithDetails): LeaseStatus {
-    if (lease.status === 'TERMINATED' || lease.status === 'CANCELLED') return lease.status;
-    if (lease.end_date) {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const end = new Date(lease.end_date + 'T00:00:00');
-        if (end < today) return 'EXPIRED';
-        const diffMs = end.getTime() - today.getTime();
-        const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-        if (diffDays <= 30 && lease.status === 'ACTIVE') return 'EXPIRING_SOON';
-    }
-    return lease.status;
-}
-
-/** Separates property and unit in the value of the form's "Imóvel" select */
-const UNIT_SEP = '::';
-
-// ── Empty form ───────────────────────────────────────────────────────
-
-const EMPTY_FORM: LeaseFormData = {
-    reference_name: '',
-    property_id: '',
-    unit_id: '',
-    primary_tenant_id: '',
-    management_type: 'SELF_MANAGED',
-    agency_id: '',
-    agent_id: '',
-    start_date: '',
-    end_date: '',
-    monthly_rent: '',
-    rent_due_day: '',
-    security_deposit: '',
-    deposit_months: '',
-    adjustment_index: '',
-    adjustment_frequency: '12',
-    next_adjustment_date: '',
-    status: 'ACTIVE',
-    notes: '',
-};
-
-const CHARGE_TYPES: { value: ChargeType; label: string }[] = [
-    { value: 'CONDOMINIUM', label: 'Condomínio' },
-    { value: 'IPTU', label: 'IPTU' },
-    { value: 'WATER', label: 'Água' },
-    { value: 'ELECTRICITY', label: 'Energia Elétrica' },
-    { value: 'GAS', label: 'Gás' },
-    { value: 'INTERNET', label: 'Internet' },
-    { value: 'OTHER', label: 'Outro' },
-];
-
-const RESPONSIBILITY_OPTIONS: { value: ChargeResponsibility; label: string }[] = [
-    { value: 'TENANT', label: 'Inquilino' },
-    { value: 'LANDLORD', label: 'Proprietário' },
-    { value: 'INCLUDED', label: 'Incluso no aluguel' },
-];
-
-const ADJUSTMENT_OPTIONS = [
-    { value: '', label: 'Selecionar...' },
-    { value: 'IPCA', label: 'IPCA' },
-    { value: 'IGP_M', label: 'IGP-M' },
-    { value: 'INPC', label: 'INPC' },
-    { value: 'IVAR', label: 'IVAR' },
-    { value: 'CUSTOM', label: 'Personalizado' },
-    { value: 'NONE', label: 'Sem reajuste automático' },
-];
-
-const CHARGE_ADJUSTMENT_OPTIONS = [
-    { value: '', label: 'Não informado' },
-    { value: 'IPCA', label: 'IPCA' },
-    { value: 'IGP_M', label: 'IGP-M' },
-    { value: 'INPC', label: 'INPC' },
-    { value: 'IVAR', label: 'IVAR' },
-    { value: 'CUSTOM', label: 'Outra regra' },
-    { value: 'NONE', label: 'Valor fixo (sem reajuste)' },
-];
-
-// Same limits as POST /api/leases/[id]/documents.
-const DOCUMENT_MIME_TYPES = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
-const DOCUMENT_MAX_SIZE = 5 * 1024 * 1024;
-
-const DOCUMENT_TYPE_OPTIONS = [
-    { value: 'CONTRACT', label: 'Contrato' },
-    { value: 'ADDENDUM', label: 'Aditivo' },
-    { value: 'INSPECTION', label: 'Laudo de Vistoria' },
-    { value: 'TENANT_DOC', label: 'Documento do Inquilino' },
-    { value: 'DEPOSIT_RECEIPT', label: 'Recibo de Caução' },
-    { value: 'OTHER', label: 'Outro' },
-];
-
-// ── Component ────────────────────────────────────────────────────────
-
-export default function ContratosContent({ lang }: { lang: string }) {
-    // State
-    const [pageState, setPageState] = useState<PageState>('loading');
-    const [leases, setLeases] = useState<LeaseWithDetails[]>([]);
-    const [form, setForm] = useState<LeaseFormData>({ ...EMPTY_FORM });
-    const [additionalTenants, setAdditionalTenants] = useState<AdditionalTenantFormItem[]>([]);
-    const [charges, setCharges] = useState<ChargeFormItem[]>([]);
-    const [errors, setErrors] = useState<FieldErrors>({});
-    const [saving, setSaving] = useState(false);
-    const [editingId, setEditingId] = useState<string | null>(null);
-    const [expandedId, setExpandedId] = useState<string | null>(null);
-    const [deleteTarget, setDeleteTarget] = useState<LeaseWithDetails | null>(null);
-    const [warning, setWarning] = useState<string | null>(null);
-    const [viewingDoc, setViewingDoc] = useState<{ url: string; title: string; fileName: string } | null>(null);
-
-    // Dropdowns
-    const [properties, setProperties] = useState<LeasePropertyOption[]>([]);
-    const [tenants, setTenants] = useState<LeaseTenantOption[]>([]);
-    const [agencies, setAgencies] = useState<LeaseAgencyOption[]>([]);
-    const [agents, setAgents] = useState<LeaseAgentOption[]>([]);
-
-    // Filters
-    const [searchQuery, setSearchQuery] = useState('');
-    const [filterStatus, setFilterStatus] = useState('');
-    const [filterProperty, setFilterProperty] = useState('');
-    // Name stored with the lease being edited, shown if its unit no longer exists in the property
-    const [savedUnitName, setSavedUnitName] = useState('');
-    const [filterManagement, setFilterManagement] = useState('');
-
-    // Collapsible form sections
-    const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-        property_tenant: true,
-        terms: true,
-        management: true,
-        adjustment: false,
-        charges: false,
-        documents: false,
-        notes: false,
-    });
-
-    // Documents state (for editing)
-    const [existingDocuments, setExistingDocuments] = useState<LeaseDocument[]>([]);
-    const [uploadingDoc, setUploadingDoc] = useState(false);
-    const [uploadDocType, setUploadDocType] = useState('CONTRACT');
-
-    // Terminate modal
-    const [terminateTarget, setTerminateTarget] = useState<LeaseWithDetails | null>(null);
-    const [terminateDate, setTerminateDate] = useState('');
-    const [terminateReason, setTerminateReason] = useState('');
-    const [terminating, setTerminating] = useState(false);
-
-    // AI import ("Novo Contrato" → upload the lease agreement)
-    const [importOpen, setImportOpen] = useState(false);
-    const [aiImported, setAiImported] = useState(false);
-    // The imported agreement, attached as the CONTRACT document once the lease exists.
-    const [importedFile, setImportedFile] = useState<File | null>(null);
-    // The imported agreement when it already sits in storage (direct upload): the saved lease adopts it
-    const [importedStoragePath, setImportedStoragePath] = useState<string | null>(null);
-
-    // ── Fetch leases ──────────────────────────────────────────────
-
-    const fetchLeases = useCallback(async () => {
-        try {
-            const res = await fetch('/api/leases');
-            const data = await res.json();
-            setLeases(data.leases || []);
-        } catch {
-            console.error('Error fetching leases');
-        }
+    const loadSeries = useCallback(async (list: LeaseWithDetails[], known: Record<string, IndexPoint[] | null>) => {
+        const codes = [...new Set(list.map(l => leaseIndexSeriesCode(l.adjustment_index)).filter((c): c is string => Boolean(c)))].filter(c => !(c in known));
+        if (codes.length === 0) return;
+        const entries = await Promise.all(codes.map(async (code): Promise<[string, IndexPoint[] | null]> => {
+            try {
+                const res = await fetch(`/api/indices/${code}/calculator-data`);
+                const json = await res.json();
+                return [code, Array.isArray(json) ? json : null];
+            } catch {
+                return [code, null];
+            }
+        }));
+        setSeries(prev => ({ ...prev, ...Object.fromEntries(entries) }));
     }, []);
 
-    const fetchDropdowns = useCallback(async () => {
+    const load = useCallback(async () => {
+        const res = await fetch("/api/leases");
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json.error || "Erro ao carregar os contratos");
+        const list = (json.leases ?? []) as LeaseWithDetails[];
+        setLeases(list);
+        void loadSeries(list, seriesRef.current);
+    }, [loadSeries]);
+
+    useEffect(() => {
+        if (seeded) return;
+        let alive = true;
+        load().catch(err => { if (alive) { setListError(err instanceof Error ? err.message : "Erro ao carregar"); setLeases([]); } });
+        return () => { alive = false; };
+    }, [load, seeded]);
+
+    const rows = useMemo(() => summarizeLeases(leases ?? [], series, today), [leases, series, today]);
+
+    // ── Dropdowns (the form, the import modals) ──────────────────
+    const [dropdowns, setDropdowns] = useState<LeaseFormDropdowns | null>(null);
+    const fetchDropdowns = useCallback(async (): Promise<LeaseFormDropdowns | null> => {
         try {
-            const res = await fetch('/api/leases/dropdowns');
+            const res = await fetch("/api/leases/dropdowns");
             const data = await res.json();
-            setProperties(data.properties || []);
-            setTenants(data.tenants || []);
-            setAgencies(data.agencies || []);
-            setAgents(data.agents || []);
-            return data as { properties?: LeasePropertyOption[]; tenants?: LeaseTenantOption[] };
+            const next: LeaseFormDropdowns = { properties: data.properties || [], tenants: data.tenants || [], agencies: data.agencies || [], agents: data.agents || [] };
+            setDropdowns(next);
+            return next;
         } catch {
-            console.error('Error fetching dropdowns');
+            console.error("Error fetching dropdowns");
             return null;
         }
     }, []);
+    useEffect(() => { void fetchDropdowns(); }, [fetchDropdowns]);
 
-    useEffect(() => {
-        Promise.all([fetchLeases(), fetchDropdowns()]).then(() => {
-            setPageState('list');
-        });
-    }, [fetchLeases, fetchDropdowns]);
-
-    // ── Filter logic ──────────────────────────────────────────────
-
-    const filteredLeases = useMemo(() => {
-        return leases.filter(l => {
-            const displayStatus = computeDisplayStatus(l);
-
-            if (filterStatus && displayStatus !== filterStatus) return false;
-            if (filterProperty && l.property_id !== filterProperty) return false;
-            if (filterManagement && l.management_type !== filterManagement) return false;
-
-            if (searchQuery) {
-                const q = searchQuery.toLowerCase();
-                const searchable = [
-                    l.reference_name,
-                    l.property_name,
-                    l.unit_name,
-                    l.primary_tenant_name,
-                ].filter(Boolean).join(' ').toLowerCase();
-                if (!searchable.includes(q)) return false;
-            }
-
-            return true;
-        });
-    }, [leases, searchQuery, filterStatus, filterProperty, filterManagement]);
-
-    // ── Auto-calculate next adjustment date ───────────────────────
-
-    useEffect(() => {
-        if (form.start_date && form.adjustment_frequency && form.adjustment_index && form.adjustment_index !== 'NONE') {
-            const iso = parseDateBR(form.start_date);
-            if (iso) {
-                const freq = parseInt(form.adjustment_frequency, 10);
-                if (!isNaN(freq) && freq > 0) {
-                    // Anchored on the start day and clamped to short months, so a
-                    // contract starting on the 31st does not drift to the 28th forever.
-                    const next = nextOccurrence(iso, freq, new Date());
-                    const computed = next ? formatDateOnlyBR(toISODate(next)) : '';
-
-                    if (computed && form.next_adjustment_date !== computed) {
-                        setForm(prev => ({ ...prev, next_adjustment_date: computed }));
-                    }
-                }
-            }
-        } else if (form.adjustment_index === 'NONE' || !form.adjustment_index) {
-            if (form.next_adjustment_date) {
-                setForm(prev => ({ ...prev, next_adjustment_date: '' }));
-            }
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [form.start_date, form.adjustment_frequency, form.adjustment_index]);
-
-    // ── Form helpers ──────────────────────────────────────────────
-
-    const toggleSection = (key: string) => {
-        setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
-    };
-
-    const updateForm = (field: keyof LeaseFormData, value: string | LeaseStatus | LeaseManagementType) => {
-        setForm(prev => ({ ...prev, [field]: value }));
-        if (errors[field]) {
-            setErrors(prev => {
-                const next = { ...prev };
-                delete next[field];
-                return next;
-            });
-        }
-    };
-
-    const resetForm = () => {
-        setForm({ ...EMPTY_FORM });
-        setSavedUnitName('');
-        setAdditionalTenants([]);
-        setCharges([]);
-        setErrors({});
-        setEditingId(null);
-        setWarning(null);
-        setExistingDocuments([]);
-        setAiImported(false);
-        setImportedFile(null);
-        setImportedStoragePath(null);
-        setOpenSections({
-            property_tenant: true,
-            terms: true,
-            management: true,
-            adjustment: false,
-            charges: false,
-            documents: false,
-            notes: false,
-        });
-    };
-
-    // ── Validation ────────────────────────────────────────────────
-
-    const validate = (): boolean => {
-        const e: FieldErrors = {};
-
-        if (!form.property_id) e.property_id = 'Selecione um imóvel.';
-        if (!form.primary_tenant_id) e.primary_tenant_id = 'Selecione um inquilino.';
-        if (!form.management_type) e.management_type = 'Tipo de gestão é obrigatório.';
-        if (form.management_type === 'AGENCY' && !form.agency_id) e.agency_id = 'Selecione a imobiliária.';
-        if (form.management_type === 'AGENT' && !form.agent_id) e.agent_id = 'Selecione o corretor.';
-        if (!form.start_date) e.start_date = 'Data de início é obrigatória.';
-        else if (parseDateBR(form.start_date) === '') e.start_date = 'Data inválida. Use DD/MM/AAAA.';
-
-        if (form.end_date) {
-            const endIso = parseDateBR(form.end_date);
-            const startIso = parseDateBR(form.start_date);
-            if (endIso === '') e.end_date = 'Data inválida. Use DD/MM/AAAA.';
-            else if (startIso && endIso <= startIso) e.end_date = 'Data de término deve ser posterior à data de início.';
-        }
-
-        if (!form.monthly_rent) e.monthly_rent = 'Valor do aluguel é obrigatório.';
-        else {
-            const val = parseFloat(form.monthly_rent.replace(/\D/g, ''));
-            if (val <= 0) e.monthly_rent = 'Valor do aluguel deve ser maior que zero.';
-        }
-
-        if (!form.rent_due_day) e.rent_due_day = 'Dia de vencimento é obrigatório.';
-        else {
-            const day = parseInt(form.rent_due_day, 10);
-            if (isNaN(day) || day < 1 || day > 31) e.rent_due_day = 'Dia de vencimento deve ser entre 1 e 31.';
-        }
-
-        if (form.next_adjustment_date && parseDateBR(form.next_adjustment_date) === '') {
-            e.next_adjustment_date = 'Data inválida. Use DD/MM/AAAA.';
-        }
-
-        setErrors(e);
-
-        if (Object.keys(e).length > 0) {
-            const firstField = Object.keys(e)[0];
-            const el = document.getElementById(`field-${firstField}`);
-            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            return false;
-        }
-
-        return true;
-    };
-
-    // ── Save ──────────────────────────────────────────────────────
-
-    const handleSave = async (forceDraft?: boolean) => {
-        if (!validate()) return;
-
-        setSaving(true);
-        setWarning(null);
-
-        const payload = {
-            reference_name: form.reference_name,
-            property_id: form.property_id,
-            unit_id: form.unit_id || null,
-            primary_tenant_id: form.primary_tenant_id,
-            management_type: form.management_type,
-            agency_id: form.agency_id || null,
-            agent_id: form.agent_id || null,
-            start_date: parseDateBR(form.start_date),
-            end_date: form.end_date ? parseDateBR(form.end_date) : null,
-            monthly_rent: form.monthly_rent,
-            rent_due_day: form.rent_due_day,
-            security_deposit: form.security_deposit || null,
-            deposit_months: form.deposit_months || null,
-            adjustment_index: form.adjustment_index || null,
-            adjustment_frequency: form.adjustment_frequency || '12',
-            next_adjustment_date: form.next_adjustment_date ? parseDateBR(form.next_adjustment_date) : null,
-            status: forceDraft ? 'DRAFT' : form.status,
-            notes: form.notes || null,
-            additional_tenants: additionalTenants.filter(t => t.tenant_id),
-            charges: charges.filter(c => c.charge_type),
-        };
-
-        try {
-            const url = editingId ? `/api/leases/${editingId}` : '/api/leases';
-            const method = editingId ? 'PUT' : 'POST';
-
-            const res = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
-
-            const data = await res.json();
-
-            if (!res.ok) {
-                if (data.errors) {
-                    setErrors(data.errors);
-                    const firstField = Object.keys(data.errors)[0];
-                    const el = document.getElementById(`field-${firstField}`);
-                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }
-                return;
-            }
-
-            if (data.warning) {
-                setWarning(data.warning);
-            }
-
-            if (!editingId && importedFile && data.lease?.id) {
-                const attached = await attachLeaseContract(data.lease.id, importedFile, importedStoragePath);
-                if (!attached) console.error('Error attaching imported contract');
-            }
-
-            resetForm();
-            await fetchLeases();
-            setPageState('list');
-        } catch {
-            console.error('Error saving lease');
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    // ── AI import ─────────────────────────────────────────────────
-
-    const handleImportComplete = async (result: LeaseImportResult) => {
-        // The import may have just created the property, the agency and the tenants.
-        const dropdowns = await fetchDropdowns();
-        const { lease } = result.data;
-        const toMask = (n: number | null) => (n ? maskCurrency((n * 100).toFixed(0)) : '');
-
-        const propertyName = dropdowns?.properties?.find(p => p.id === result.propertyId)?.name;
-        const tenantName = dropdowns?.tenants?.find(t => t.id === result.primaryTenantId)?.full_name;
-        const year = lease.start_date ? lease.start_date.slice(0, 4) : new Date().getFullYear();
-
-        resetForm();
-        setForm({
-            ...EMPTY_FORM,
-            reference_name: propertyName && tenantName ? `${propertyName} - ${tenantName} - ${year}` : '',
-            property_id: result.propertyId,
-            primary_tenant_id: result.primaryTenantId,
-            management_type: result.agencyId ? 'AGENCY' : 'SELF_MANAGED',
-            agency_id: result.agencyId,
-            start_date: formatDateBR(lease.start_date),
-            end_date: formatDateBR(lease.end_date),
-            monthly_rent: toMask(lease.monthly_rent),
-            rent_due_day: lease.rent_due_day?.toString() || '',
-            security_deposit: toMask(lease.security_deposit),
-            deposit_months: lease.deposit_months?.toString() || '',
-            adjustment_index: lease.adjustment_index || '',
-            adjustment_frequency: lease.adjustment_frequency?.toString() || '12',
-            status: lease.end_date && lease.end_date < toISODate(new Date()) ? 'EXPIRED' : 'ACTIVE',
-            notes: lease.notes || '',
-        });
-        setAdditionalTenants(result.additionalTenants);
-        setCharges(result.data.charges.map(c => ({
-            charge_type: c.charge_type,
-            label: c.label,
-            responsibility: c.responsibility,
-            amount: toMask(c.amount),
-            adjustment_index: c.adjustment_index || '',
-            adjustment_notes: c.adjustment_notes || '',
-        })));
-        // Everything the AI filled must be in sight for the review.
-        setOpenSections(prev => ({
-            ...prev,
-            adjustment: !!lease.adjustment_index,
-            charges: result.data.charges.length > 0,
-            notes: !!lease.notes,
-        }));
-        // A file already in storage is adopted whatever its size; one that still has to go through the route must fit it
-        setImportedStoragePath(result.storagePath);
-        setImportedFile(
-            result.storagePath || (DOCUMENT_MIME_TYPES.includes(result.file.type) && result.file.size <= DOCUMENT_MAX_SIZE) ? result.file : null
-        );
-        setAiImported(true);
-        setImportOpen(false);
-        setPageState('form');
-    };
-
-    // ── Edit ──────────────────────────────────────────────────────
-
-    const handleEdit = async (lease: LeaseWithDetails) => {
-        // Fetch full lease details
-        try {
-            const res = await fetch(`/api/leases/${lease.id}`);
-            const data = await res.json();
-            const full = data.lease as LeaseWithDetails;
-
-            setSavedUnitName(full.unit_name || '');
-            setForm({
-                reference_name: full.reference_name || '',
-                property_id: full.property_id,
-                unit_id: full.unit_id || '',
-                primary_tenant_id: full.primary_tenant_id,
-                management_type: full.management_type,
-                agency_id: full.agency_id || '',
-                agent_id: full.agent_id || '',
-                start_date: formatDateBR(full.start_date),
-                end_date: formatDateBR(full.end_date),
-                monthly_rent: full.monthly_rent ? maskCurrency((full.monthly_rent * 100).toFixed(0)) : '',
-                rent_due_day: full.rent_due_day?.toString() || '',
-                security_deposit: full.security_deposit ? maskCurrency((full.security_deposit * 100).toFixed(0)) : '',
-                deposit_months: full.deposit_months?.toString() || '',
-                adjustment_index: full.adjustment_index || '',
-                adjustment_frequency: full.adjustment_frequency?.toString() || '12',
-                next_adjustment_date: formatDateBR(full.next_adjustment_date),
-                status: full.status,
-                notes: full.notes || '',
-            });
-
-            setAdditionalTenants(
-                (full.additional_tenants || []).map(t => ({
-                    tenant_id: t.tenant_id,
-                    role: t.role,
-                }))
-            );
-
-            setCharges(
-                (full.charges || []).map(c => ({
-                    charge_type: c.charge_type,
-                    label: c.label || '',
-                    responsibility: c.responsibility,
-                    amount: c.amount ? maskCurrency((c.amount * 100).toFixed(0)) : '',
-                    adjustment_index: c.adjustment_index || '',
-                    adjustment_notes: c.adjustment_notes || '',
-                }))
-            );
-
-            setExistingDocuments(full.documents || []);
-            setEditingId(lease.id);
-            setPageState('editing');
-        } catch {
-            console.error('Error loading lease for edit');
-        }
-    };
+    // ── Navigation ────────────────────────────────────────────────
+    const viewQuery = view === "vigentes" ? "" : `view=${view}`;
+    const select = useCallback((id: string | null) => {
+        const query = [id ? `id=${id}` : "", viewQuery].filter(Boolean).join("&");
+        router.push(query ? `${base}?${query}` : base, { scroll: true });
+    }, [router, base, viewQuery]);
+    const setView = (next: LeaseView) => router.replace(next === "vigentes" ? base : `${base}?view=${next}`, { scroll: false });
 
     // Opened from a property's "Contrato de Aluguel" card (?property=<id>): offers the way back
     const returnPropertyId = useReturnPropertyId();
 
-    /** Opens the lease's contract file (the CONTRACT document, else the most recent one) in the viewer. */
-    const [openingDocFor, setOpeningDocFor] = useState<string | null>(null);
-    const openContractFile = async (lease: LeaseWithDetails) => {
-        setOpeningDocFor(lease.id);
-        try {
-            const res = await fetch(`/api/leases/${lease.id}`);
-            const data = await res.json();
-            const docs = ((data.lease?.documents ?? []) as Array<{ document_type: string; file_name: string; file_url: string }>);
-            const doc = docs.find(d => d.document_type === 'CONTRACT') ?? docs[0];
-            if (!doc) return;
-            if (/\.pdf$/i.test(doc.file_name)) setViewingDoc({ url: doc.file_url, title: lease.reference_name || 'Contrato de locação', fileName: doc.file_name });
-            else window.open(doc.file_url, '_blank', 'noopener,noreferrer');
-        } catch {
-            console.error('Error opening the contract file');
-        } finally {
-            setOpeningDocFor(null);
+    // ── Form ──────────────────────────────────────────────────────
+    const [formState, setFormState] = useState<FormState | null>(null);
+    const [notice, setNotice] = useState<string | null>(null);
+    const [dashboardKey, setDashboardKey] = useState(0);
+
+    const openNewForm = () => setFormState({ editingId: null, initial: emptyLeaseInitial(), aiImported: false, importedFile: null, importedStoragePath: null });
+
+    const openEdit = async (id: string, known?: LeaseWithDetails) => {
+        let full = known;
+        if (!full || !full.charges) {
+            try {
+                const res = await fetch(`/api/leases/${id}`);
+                const data = await res.json();
+                full = data.lease as LeaseWithDetails;
+            } catch {
+                console.error("Error loading lease for edit");
+                return;
+            }
         }
+        if (!full) return;
+        setFormState({ editingId: id, initial: leaseToInitial(full), aiImported: false, importedFile: null, importedStoragePath: null });
     };
 
-    // Deep link: /contratos?lease=<id> opens that contract (the property page's "Contrato" link)
-    const deepLinkDone = useRef(false);
-    useEffect(() => {
-        if (deepLinkDone.current || pageState !== 'list') return;
-        const id = new URLSearchParams(window.location.search).get('lease');
-        if (!id) { deepLinkDone.current = true; return; }
-        const target = leases.find(l => l.id === id);
-        if (!target) return;   // the list is still loading
-        deepLinkDone.current = true;
-        void handleEdit(target);
-    }, [pageState, leases]);
+    const onSaved = async (id: string, warning: string | null) => {
+        setFormState(null);
+        setNotice(warning);
+        setDashboardKey(k => k + 1);
+        await load().catch(() => {});
+        select(id);
+    };
 
-    // ── Delete ────────────────────────────────────────────────────
+    // ── AI import of a new contract ───────────────────────────────
+    const [importOpen, setImportOpen] = useState(false);
+    const [batchOpen, setBatchOpen] = useState(false);
 
-    const handleDelete = async () => {
-        if (!deleteTarget) return;
+    const handleImportComplete = async (result: LeaseImportResult) => {
+        // The import may have just created the property, the agency and the tenants.
+        const fresh = await fetchDropdowns();
+        const { lease } = result.data;
+        const propertyName = fresh?.properties.find(p => p.id === result.propertyId)?.name;
+        const tenantName = fresh?.tenants.find(t => t.id === result.primaryTenantId)?.full_name;
+        const year = lease.start_date ? lease.start_date.slice(0, 4) : new Date().getFullYear();
+
+        const initialForm: LeaseFormInitial = {
+            form: {
+                ...EMPTY_LEASE_FORM,
+                reference_name: propertyName && tenantName ? `${propertyName} - ${tenantName} - ${year}` : "",
+                property_id: result.propertyId,
+                primary_tenant_id: result.primaryTenantId,
+                management_type: result.agencyId ? "AGENCY" : "SELF_MANAGED",
+                agency_id: result.agencyId,
+                start_date: formatDateBR(lease.start_date),
+                end_date: formatDateBR(lease.end_date),
+                monthly_rent: moneyToMask(lease.monthly_rent),
+                rent_due_day: lease.rent_due_day?.toString() || "",
+                security_deposit: moneyToMask(lease.security_deposit),
+                deposit_months: lease.deposit_months?.toString() || "",
+                adjustment_index: lease.adjustment_index || "",
+                adjustment_frequency: lease.adjustment_frequency?.toString() || "12",
+                status: lease.end_date && lease.end_date < toISODate(new Date()) ? "EXPIRED" : "ACTIVE",
+                notes: lease.notes || "",
+            },
+            additionalTenants: result.additionalTenants,
+            charges: result.data.charges.map(c => ({
+                charge_type: c.charge_type,
+                label: c.label,
+                responsibility: c.responsibility,
+                amount: moneyToMask(c.amount),
+                adjustment_index: c.adjustment_index || "",
+                adjustment_notes: c.adjustment_notes || "",
+            })),
+            // Everything the AI filled must be in sight for the review.
+            openSections: { adjustment: !!lease.adjustment_index, charges: result.data.charges.length > 0, notes: !!lease.notes },
+        };
+        // A file already in storage is adopted whatever its size; one that still has to go through the route must fit it
+        const importedFile = result.storagePath || (ROUTE_MIME_TYPES.includes(result.file.type) && result.file.size <= LEASE_UPLOAD_MAX_SIZE) ? result.file : null;
+        setImportOpen(false);
+        setFormState({ editingId: null, initial: initialForm, aiImported: true, importedFile, importedStoragePath: result.storagePath });
+    };
+
+    // ── Files (open the contract PDF from the list) ───────────────
+    const [viewingDoc, setViewingDoc] = useState<{ url: string; title: string; fileName: string } | null>(null);
+    const [openingFileId, setOpeningFileId] = useState<string | null>(null);
+    const openContractFile = async (row: LeaseRow) => {
+        setOpeningFileId(row.lease.id);
         try {
-            await fetch(`/api/leases/${deleteTarget.id}`, { method: 'DELETE' });
-            setDeleteTarget(null);
-            await fetchLeases();
+            const res = await fetch(`/api/leases/${row.lease.id}`);
+            const data = await res.json();
+            const docs = (data.lease?.documents ?? []) as Array<{ document_type: string; file_name: string; file_url: string }>;
+            const doc = docs.find(d => d.document_type === "CONTRACT") ?? docs[0];
+            if (!doc) return;
+            if (/\.pdf$/i.test(doc.file_name)) setViewingDoc({ url: doc.file_url, title: row.title, fileName: doc.file_name });
+            else window.open(doc.file_url, "_blank", "noopener,noreferrer");
         } catch {
-            console.error('Error deleting lease');
+            console.error("Error opening the contract file");
+        } finally {
+            setOpeningFileId(null);
         }
     };
 
     // ── Terminate ─────────────────────────────────────────────────
+    const [terminateTarget, setTerminateTarget] = useState<LeaseWithDetails | null>(null);
+    const [terminateDate, setTerminateDate] = useState("");
+    const [terminateReason, setTerminateReason] = useState("");
+    const [terminating, setTerminating] = useState(false);
+    const [terminateError, setTerminateError] = useState<string | null>(null);
 
+    const openTerminate = (lease: LeaseWithDetails) => { setTerminateTarget(lease); setTerminateDate(""); setTerminateReason(""); setTerminateError(null); };
     const handleTerminate = async () => {
         if (!terminateTarget || !terminateDate) return;
+        const iso = parseDateBR(terminateDate);
+        if (!iso) { setTerminateError("Data inválida. Use DD/MM/AAAA."); return; }
         setTerminating(true);
+        setTerminateError(null);
         try {
             const res = await fetch(`/api/leases/${terminateTarget.id}/terminate`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    termination_date: parseDateBR(terminateDate),
-                    termination_reason: terminateReason,
-                }),
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ termination_date: iso, termination_reason: terminateReason }),
             });
-
-            if (res.ok) {
-                setTerminateTarget(null);
-                setTerminateDate('');
-                setTerminateReason('');
-                await fetchLeases();
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                setTerminateError(typeof json.error === "string" ? json.error : Object.values(json.errors ?? {})[0] as string ?? "Não foi possível rescindir o contrato.");
+                return;
             }
+            setTerminateTarget(null);
+            setDashboardKey(k => k + 1);
+            await load().catch(() => {});
         } catch {
-            console.error('Error terminating lease');
+            setTerminateError("Erro de conexão. Tente novamente.");
         } finally {
             setTerminating(false);
         }
     };
 
-    // ── Document upload ───────────────────────────────────────────
-
-    const handleDocUpload = async (file: File) => {
-        if (!editingId) return;
-        setUploadingDoc(true);
+    // ── Delete ────────────────────────────────────────────────────
+    const [deleteTarget, setDeleteTarget] = useState<LeaseWithDetails | null>(null);
+    const [deleting, setDeleting] = useState(false);
+    const handleDelete = async () => {
+        if (!deleteTarget) return;
+        setDeleting(true);
         try {
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('document_type', uploadDocType);
-
-            const res = await fetch(`/api/leases/${editingId}/documents`, {
-                method: 'POST',
-                body: formData,
-            });
-
-            if (res.ok) {
-                const data = await res.json();
-                setExistingDocuments(prev => [data.document, ...prev]);
-            }
+            const res = await fetch(`/api/leases/${deleteTarget.id}`, { method: "DELETE" });
+            if (!res.ok) { setListError("Não foi possível excluir o contrato."); return; }
+            const wasSelected = selectedId === deleteTarget.id;
+            setDeleteTarget(null);
+            await load().catch(() => {});
+            if (wasSelected) select(null);
         } catch {
-            console.error('Error uploading document');
+            console.error("Error deleting lease");
         } finally {
-            setUploadingDoc(false);
+            setDeleting(false);
         }
     };
 
-    const handleDocDelete = async (docId: string) => {
-        if (!editingId) return;
-        try {
-            await fetch(`/api/leases/${editingId}/documents?doc_id=${docId}`, { method: 'DELETE' });
-            setExistingDocuments(prev => prev.filter(d => d.id !== docId));
-        } catch {
-            console.error('Error deleting document');
-        }
-    };
+    // ── Render ────────────────────────────────────────────────────
 
-    // ── Auto-generate reference name ──────────────────────────────
-
-    const autoReferenceName = useMemo(() => {
-        const prop = properties.find(p => p.id === form.property_id);
-        const tenant = tenants.find(t => t.id === form.primary_tenant_id);
-        if (!prop || !tenant) return '';
-        const unit = prop.units?.find(u => u.id === form.unit_id);
-        const year = new Date().getFullYear();
-        return `${unit ? `${prop.name} · ${unit.name}` : prop.name} - ${tenant.full_name} - ${year}`;
-    }, [form.property_id, form.unit_id, form.primary_tenant_id, properties, tenants]);
-
-    // Filtered agents based on management type / agency
-    const filteredAgents = useMemo(() => {
-        if (form.management_type === 'AGENCY' && form.agency_id) {
-            return agents.filter(a => a.agency_id === form.agency_id);
-        }
-        return agents;
-    }, [agents, form.management_type, form.agency_id]);
-
-    // ── Render: Loading ───────────────────────────────────────────
-
-    if (pageState === 'loading') {
-        return (
-            <div className="flex items-center justify-center py-20">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-        );
-    }
-
-    // ── Render: Form (add / edit) ─────────────────────────────────
-
-    if (pageState === 'form' || pageState === 'editing') {
-        return (
-            <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
-                <ReturnToPropertyLink propertyId={returnPropertyId} />
-                {/* Header */}
-                <div className="flex items-center gap-3">
-                    <Button variant="ghost" size="icon" onClick={() => { resetForm(); setPageState('list'); }}>
-                        <ArrowLeft className="h-5 w-5" />
-                    </Button>
-                    <div>
-                        <h1 className="text-2xl font-bold text-foreground">
-                            {pageState === 'editing' ? 'Editar Contrato' : 'Novo Contrato de Locação'}
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            {pageState === 'editing' ? 'Atualize os dados do contrato.' : 'Preencha os dados para criar um novo contrato.'}
-                        </p>
-                    </div>
-                </div>
-
-                {warning && (
-                    <div className="flex items-start gap-2 rounded-lg border border-yellow-300 bg-yellow-50 p-3 dark:border-yellow-700 dark:bg-yellow-950">
-                        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-yellow-600" />
-                        <p className="text-sm text-yellow-800 dark:text-yellow-200">{warning}</p>
-                    </div>
-                )}
-
-                {aiImported && (
-                    <div className="flex items-start gap-3.5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-800 dark:bg-amber-950/30">
-                        <div className="shrink-0 rounded-xl bg-amber-100 p-2 text-amber-600 dark:bg-amber-900/50">
-                            <Sparkles className="h-5 w-5" />
-                        </div>
-                        <div className="space-y-1">
-                            <p className="text-sm font-semibold text-foreground">Dados preenchidos automaticamente via IA!</p>
-                            <p className="text-xs leading-relaxed text-muted-foreground">
-                                As informações foram extraídas do contrato enviado. Revise todos os campos antes de salvar.
-                                {importedFile && ' O arquivo enviado será anexado aos documentos do contrato.'}
-                            </p>
-                        </div>
-                    </div>
-                )}
-
-                {/* ── Section 1: Property & Tenant ─────────────────────── */}
-                <FormSection
-                    id="property_tenant"
-                    title="Imóvel & Inquilino"
-                    description="Selecione o imóvel e o inquilino principal."
-                    icon={<Home className="h-5 w-5" />}
-                    open={openSections.property_tenant}
-                    onToggle={() => toggleSection('property_tenant')}
-                >
-                    {/* Reference name */}
-                    <div id="field-reference_name">
-                        <Label>Nome / Referência do Contrato</Label>
-                        <Input
-                            value={form.reference_name}
-                            onChange={e => updateForm('reference_name', e.target.value)}
-                            placeholder={autoReferenceName || 'Ex: Kitnet 03 - João Silva - 2026'}
-                        />
-                        {autoReferenceName && !form.reference_name && (
-                            <button
-                                type="button"
-                                className="mt-1 text-xs text-primary hover:underline"
-                                onClick={() => updateForm('reference_name', autoReferenceName)}
-                            >
-                                Usar sugestão: &ldquo;{autoReferenceName}&rdquo;
-                            </button>
-                        )}
-                    </div>
-
-                    {/* Property */}
-                    <div id="field-property_id">
-                        <Label>Imóvel *</Label>
-                        <select
-                            className={cn('flex h-10 w-full rounded-md border bg-background px-3 py-2 text-sm', errors.property_id && 'border-red-500')}
-                            value={form.unit_id ? `${form.property_id}${UNIT_SEP}${form.unit_id}` : form.property_id}
-                            onChange={e => {
-                                // A multi-unit property lists "the whole property" plus each of its units
-                                const [propertyId, unitId = ''] = e.target.value.split(UNIT_SEP);
-                                setForm(prev => ({ ...prev, unit_id: unitId }));
-                                updateForm('property_id', propertyId);
-                            }}
-                        >
-                            <option value="">Selecione um imóvel...</option>
-                            {properties.map(p => {
-                                const units = p.units ?? [];
-                                if (units.length === 0) return <option key={p.id} value={p.id}>{p.name}</option>;
-                                const unitGone = form.property_id === p.id && !!form.unit_id && !units.some(u => u.id === form.unit_id);
-                                return (
-                                    <optgroup key={p.id} label={p.name}>
-                                        {units.map(u => (
-                                            <option key={u.id} value={`${p.id}${UNIT_SEP}${u.id}`}>{p.name} · {u.name}</option>
-                                        ))}
-                                        {unitGone && (
-                                            <option value={`${p.id}${UNIT_SEP}${form.unit_id}`}>{p.name} · {savedUnitName || 'Unidade'} (removida do imóvel)</option>
-                                        )}
-                                        <option value={p.id}>{p.name} · Imóvel inteiro (todas as unidades)</option>
-                                    </optgroup>
-                                );
-                            })}
-                        </select>
-                        {errors.property_id && <p className="mt-1 text-xs text-red-500">{errors.property_id}</p>}
-                    </div>
-
-                    {/* Primary tenant */}
-                    <div id="field-primary_tenant_id">
-                        <Label>Inquilino Principal *</Label>
-                        <select
-                            className={cn('flex h-10 w-full rounded-md border bg-background px-3 py-2 text-sm', errors.primary_tenant_id && 'border-red-500')}
-                            value={form.primary_tenant_id}
-                            onChange={e => updateForm('primary_tenant_id', e.target.value)}
-                        >
-                            <option value="">Selecione um inquilino...</option>
-                            {tenants.map(t => (
-                                <option key={t.id} value={t.id}>{t.full_name}</option>
-                            ))}
-                        </select>
-                        {errors.primary_tenant_id && <p className="mt-1 text-xs text-red-500">{errors.primary_tenant_id}</p>}
-                    </div>
-
-                    {/* Additional tenants */}
-                    <div>
-                        <Label>Inquilinos Adicionais</Label>
-                        {additionalTenants.map((at, idx) => (
-                            <div key={idx} className="mt-2 flex items-center gap-2">
-                                <select
-                                    className="flex h-10 flex-1 rounded-md border bg-background px-3 py-2 text-sm"
-                                    value={at.tenant_id}
-                                    onChange={e => {
-                                        const next = [...additionalTenants];
-                                        next[idx].tenant_id = e.target.value;
-                                        setAdditionalTenants(next);
-                                    }}
-                                >
-                                    <option value="">Selecionar inquilino...</option>
-                                    {tenants.filter(t => t.id !== form.primary_tenant_id).map(t => (
-                                        <option key={t.id} value={t.id}>{t.full_name}</option>
-                                    ))}
-                                </select>
-                                <select
-                                    className="flex h-10 w-40 rounded-md border bg-background px-3 py-2 text-sm"
-                                    value={at.role}
-                                    onChange={e => {
-                                        const next = [...additionalTenants];
-                                        next[idx].role = e.target.value as LeaseTenantRole;
-                                        setAdditionalTenants(next);
-                                    }}
-                                >
-                                    <option value="CO_TENANT">Co-inquilino</option>
-                                    <option value="OCCUPANT">Ocupante</option>
-                                </select>
-                                <Button variant="ghost" size="icon" onClick={() => setAdditionalTenants(prev => prev.filter((_, i) => i !== idx))}>
-                                    <X className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        ))}
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="mt-2"
-                            onClick={() => setAdditionalTenants(prev => [...prev, { tenant_id: '', role: 'CO_TENANT' }])}
-                        >
-                            <Plus className="mr-1 h-4 w-4" /> Adicionar Inquilino
-                        </Button>
-                    </div>
-                </FormSection>
-
-                {/* ── Section 2: Lease Terms ───────────────────────────── */}
-                <FormSection
-                    id="terms"
-                    title="Termos do Contrato"
-                    description="Datas, valor do aluguel e caução."
-                    icon={<Calendar className="h-5 w-5" />}
-                    open={openSections.terms}
-                    onToggle={() => toggleSection('terms')}
-                >
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <div id="field-start_date">
-                            <Label>Data de Início *</Label>
-                            <Input
-                                value={form.start_date}
-                                onChange={e => updateForm('start_date', maskDate(e.target.value))}
-                                placeholder="DD/MM/AAAA"
-                                maxLength={10}
-                                className={errors.start_date ? 'border-red-500' : ''}
-                            />
-                            {errors.start_date && <p className="mt-1 text-xs text-red-500">{errors.start_date}</p>}
-                        </div>
-
-                        <div id="field-end_date">
-                            <Label>Data de Término</Label>
-                            <Input
-                                value={form.end_date}
-                                onChange={e => updateForm('end_date', maskDate(e.target.value))}
-                                placeholder="DD/MM/AAAA (opcional)"
-                                maxLength={10}
-                                className={errors.end_date ? 'border-red-500' : ''}
-                            />
-                            {errors.end_date && <p className="mt-1 text-xs text-red-500">{errors.end_date}</p>}
-                            <p className="mt-1 text-xs text-muted-foreground">Deixe vazio para contrato sem prazo definido.</p>
-                        </div>
-                    </div>
-
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <div id="field-monthly_rent">
-                            <Label>Aluguel Mensal (R$) *</Label>
-                            <div className="relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">R$</span>
-                                <Input
-                                    value={form.monthly_rent}
-                                    onChange={e => updateForm('monthly_rent', maskCurrency(e.target.value))}
-                                    placeholder="0,00"
-                                    className={cn('pl-10', errors.monthly_rent && 'border-red-500')}
-                                />
-                            </div>
-                            {errors.monthly_rent && <p className="mt-1 text-xs text-red-500">{errors.monthly_rent}</p>}
-                        </div>
-
-                        <div id="field-rent_due_day">
-                            <Label>Dia de Vencimento *</Label>
-                            <Input
-                                type="number"
-                                min={1}
-                                max={31}
-                                value={form.rent_due_day}
-                                onChange={e => updateForm('rent_due_day', e.target.value)}
-                                placeholder="Ex: 10"
-                                className={errors.rent_due_day ? 'border-red-500' : ''}
-                            />
-                            {errors.rent_due_day && <p className="mt-1 text-xs text-red-500">{errors.rent_due_day}</p>}
-                        </div>
-                    </div>
-
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <div id="field-security_deposit">
-                            <Label>Caução (R$)</Label>
-                            <div className="relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">R$</span>
-                                <Input
-                                    value={form.security_deposit}
-                                    onChange={e => updateForm('security_deposit', maskCurrency(e.target.value))}
-                                    placeholder="0,00"
-                                    className="pl-10"
-                                />
-                            </div>
-                        </div>
-
-                        <div id="field-deposit_months">
-                            <Label>Meses de Caução</Label>
-                            <Input
-                                type="number"
-                                min={0}
-                                value={form.deposit_months}
-                                onChange={e => updateForm('deposit_months', e.target.value)}
-                                placeholder="Ex: 3"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Status selector */}
-                    <div id="field-status">
-                        <Label>Status do Contrato *</Label>
-                        <select
-                            className="flex h-10 w-full rounded-md border bg-background px-3 py-2 text-sm"
-                            value={form.status}
-                            onChange={e => updateForm('status', e.target.value as LeaseStatus)}
-                        >
-                            <option value="ACTIVE">Ativo</option>
-                            <option value="DRAFT">Rascunho</option>
-                            <option value="EXPIRED">Expirado</option>
-                            <option value="CANCELLED">Cancelado</option>
-                        </select>
-                    </div>
-                </FormSection>
-
-                {/* ── Section 3: Management ────────────────────────────── */}
-                <FormSection
-                    id="management"
-                    title="Administração"
-                    description="Quem gerencia este contrato?"
-                    icon={<Building2 className="h-5 w-5" />}
-                    open={openSections.management}
-                    onToggle={() => toggleSection('management')}
-                >
-                    <div id="field-management_type">
-                        <Label>Tipo de Gestão *</Label>
-                        <div className="mt-2 flex flex-wrap gap-3">
-                            {([
-                                { value: 'SELF_MANAGED', label: 'Gestão Própria', icon: <Home className="h-4 w-4" /> },
-                                { value: 'AGENCY', label: 'Imobiliária', icon: <Building2 className="h-4 w-4" /> },
-                                { value: 'AGENT', label: 'Corretor', icon: <Users className="h-4 w-4" /> },
-                            ] as { value: LeaseManagementType; label: string; icon: React.ReactNode }[]).map(opt => (
-                                <button
-                                    key={opt.value}
-                                    type="button"
-                                    className={cn(
-                                        'flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition',
-                                        form.management_type === opt.value
-                                            ? 'border-primary bg-primary/10 text-primary'
-                                            : 'border-border bg-background text-foreground hover:bg-accent'
-                                    )}
-                                    onClick={() => {
-                                        updateForm('management_type', opt.value);
-                                        if (opt.value === 'SELF_MANAGED') {
-                                            updateForm('agency_id', '');
-                                            updateForm('agent_id', '');
-                                        }
-                                    }}
-                                >
-                                    {opt.icon} {opt.label}
-                                </button>
-                            ))}
-                        </div>
-                        {errors.management_type && <p className="mt-1 text-xs text-red-500">{errors.management_type}</p>}
-                    </div>
-
-                    {form.management_type === 'AGENCY' && (
-                        <div id="field-agency_id">
-                            <Label>Imobiliária *</Label>
-                            <select
-                                className={cn('flex h-10 w-full rounded-md border bg-background px-3 py-2 text-sm', errors.agency_id && 'border-red-500')}
-                                value={form.agency_id}
-                                onChange={e => updateForm('agency_id', e.target.value)}
-                            >
-                                <option value="">Selecione uma imobiliária...</option>
-                                {agencies.map(a => (
-                                    <option key={a.id} value={a.id}>{a.name}</option>
-                                ))}
-                            </select>
-                            {errors.agency_id && <p className="mt-1 text-xs text-red-500">{errors.agency_id}</p>}
-                        </div>
-                    )}
-
-                    {(form.management_type === 'AGENCY' || form.management_type === 'AGENT') && (
-                        <div id="field-agent_id">
-                            <Label>{form.management_type === 'AGENT' ? 'Corretor *' : 'Corretor (opcional)'}</Label>
-                            <select
-                                className={cn('flex h-10 w-full rounded-md border bg-background px-3 py-2 text-sm', errors.agent_id && 'border-red-500')}
-                                value={form.agent_id}
-                                onChange={e => {
-                                    updateForm('agent_id', e.target.value);
-                                    // Auto-fill agency if agent has one
-                                    if (form.management_type === 'AGENT' && e.target.value) {
-                                        const selectedAgent = agents.find(a => a.id === e.target.value);
-                                        if (selectedAgent?.agency_id) {
-                                            updateForm('agency_id', selectedAgent.agency_id);
-                                        }
-                                    }
-                                }}
-                            >
-                                <option value="">Selecione um corretor...</option>
-                                {filteredAgents.map(a => (
-                                    <option key={a.id} value={a.id}>{a.full_name}</option>
-                                ))}
-                            </select>
-                            {errors.agent_id && <p className="mt-1 text-xs text-red-500">{errors.agent_id}</p>}
-                            {form.management_type === 'AGENT' && form.agent_id && (() => {
-                                const sel = agents.find(a => a.id === form.agent_id);
-                                if (sel?.agency_id) {
-                                    const ag = agencies.find(a => a.id === sel.agency_id);
-                                    if (ag) return <p className="mt-1 text-xs text-muted-foreground">Vinculado à imobiliária: {ag.name}</p>;
-                                }
-                                return null;
-                            })()}
-                        </div>
-                    )}
-                </FormSection>
-
-                {/* ── Section 4: Rent Adjustment ───────────────────────── */}
-                <FormSection
-                    id="adjustment"
-                    title="Reajuste do Aluguel"
-                    description="Índice e frequência de reajuste."
-                    icon={<TrendingUp className="h-5 w-5" />}
-                    open={openSections.adjustment}
-                    onToggle={() => toggleSection('adjustment')}
-                >
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <div id="field-adjustment_index">
-                            <Label>Índice de Reajuste</Label>
-                            <select
-                                className="flex h-10 w-full rounded-md border bg-background px-3 py-2 text-sm"
-                                value={form.adjustment_index}
-                                onChange={e => updateForm('adjustment_index', e.target.value)}
-                            >
-                                {ADJUSTMENT_OPTIONS.map(opt => (
-                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div id="field-adjustment_frequency">
-                            <Label>Frequência (meses)</Label>
-                            <Input
-                                type="number"
-                                min={1}
-                                value={form.adjustment_frequency}
-                                onChange={e => updateForm('adjustment_frequency', e.target.value)}
-                                placeholder="12"
-                            />
-                        </div>
-                    </div>
-
-                    <div id="field-next_adjustment_date">
-                        <Label>Próximo Reajuste</Label>
-                        <Input
-                            value={form.next_adjustment_date}
-                            readOnly
-                            placeholder={form.adjustment_index && form.adjustment_index !== 'NONE' ? 'Calculado automaticamente' : 'Selecione um índice de reajuste'}
-                            className="bg-muted/50 cursor-default"
-                        />
-                        <p className="mt-1 text-xs text-muted-foreground">
-                            {form.next_adjustment_date
-                                ? 'Calculado automaticamente a partir da data de início + frequência.'
-                                : 'Preencha a data de início e selecione um índice para calcular.'}
-                        </p>
-                    </div>
-                </FormSection>
-
-                {/* ── Section 5: Additional Charges ────────────────────── */}
-                <FormSection
-                    id="charges"
-                    title="Encargos Adicionais"
-                    description="Condomínio, IPTU, contas e responsabilidades."
-                    icon={<Zap className="h-5 w-5" />}
-                    open={openSections.charges}
-                    onToggle={() => toggleSection('charges')}
-                >
-                    {charges.map((charge, idx) => (
-                        <div key={idx} className="space-y-2 rounded-lg border border-border p-3">
-                            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
-                                <div className="flex-1">
-                                    <Label className="text-xs">Tipo</Label>
-                                    <select
-                                        className="flex h-9 w-full rounded-md border bg-background px-2 py-1 text-sm"
-                                        value={charge.charge_type}
-                                        onChange={e => {
-                                            const next = [...charges];
-                                            next[idx].charge_type = e.target.value as ChargeType;
-                                            setCharges(next);
-                                        }}
-                                    >
-                                        {CHARGE_TYPES.map(ct => (
-                                            <option key={ct.value} value={ct.value}>{ct.label}</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                {charge.charge_type === 'OTHER' && (
-                                    <div className="flex-1">
-                                        <Label className="text-xs">Descrição</Label>
-                                        <Input
-                                            value={charge.label}
-                                            onChange={e => {
-                                                const next = [...charges];
-                                                next[idx].label = e.target.value;
-                                                setCharges(next);
-                                            }}
-                                            placeholder="Descreva..."
-                                            className="h-9"
-                                        />
-                                    </div>
-                                )}
-
-                                <div className="w-full sm:w-44">
-                                    <Label className="text-xs">Responsabilidade</Label>
-                                    <select
-                                        className="flex h-9 w-full rounded-md border bg-background px-2 py-1 text-sm"
-                                        value={charge.responsibility}
-                                        onChange={e => {
-                                            const next = [...charges];
-                                            next[idx].responsibility = e.target.value as ChargeResponsibility;
-                                            setCharges(next);
-                                        }}
-                                    >
-                                        {RESPONSIBILITY_OPTIONS.map(r => (
-                                            <option key={r.value} value={r.value}>{r.label}</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                <div className="w-full sm:w-32">
-                                    <Label className="text-xs">Valor (R$)</Label>
-                                    <Input
-                                        value={charge.amount}
-                                        onChange={e => {
-                                            const next = [...charges];
-                                            next[idx].amount = maskCurrency(e.target.value);
-                                            setCharges(next);
-                                        }}
-                                        placeholder="0,00"
-                                        className="h-9"
-                                    />
-                                </div>
-
-                                <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => setCharges(prev => prev.filter((_, i) => i !== idx))}>
-                                    <X className="h-4 w-4" />
-                                </Button>
-                            </div>
-
-                            {/* How this charge's amount is readjusted (often not the rent's index) */}
-                            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
-                                <div className="w-full sm:w-52">
-                                    <Label className="text-xs">Reajuste do encargo</Label>
-                                    <select
-                                        className="flex h-9 w-full rounded-md border bg-background px-2 py-1 text-sm"
-                                        value={charge.adjustment_index}
-                                        onChange={e => {
-                                            const next = [...charges];
-                                            next[idx].adjustment_index = e.target.value;
-                                            setCharges(next);
-                                        }}
-                                    >
-                                        {CHARGE_ADJUSTMENT_OPTIONS.map(opt => (
-                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="flex-1">
-                                    <Label className="text-xs">Regra de reajuste (opcional)</Label>
-                                    <Input
-                                        value={charge.adjustment_notes}
-                                        onChange={e => {
-                                            const next = [...charges];
-                                            next[idx].adjustment_notes = e.target.value;
-                                            setCharges(next);
-                                        }}
-                                        placeholder="Ex: Fixo por 12 meses; revisto conforme o consumo"
-                                        maxLength={300}
-                                        className="h-9"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCharges(prev => [...prev, { charge_type: 'CONDOMINIUM', label: '', responsibility: 'TENANT', amount: '', adjustment_index: '', adjustment_notes: '' }])}
-                    >
-                        <Plus className="mr-1 h-4 w-4" /> Adicionar Encargo
-                    </Button>
-                </FormSection>
-
-                {/* ── Section 6: Documents (only in edit mode) ──────────── */}
-                {pageState === 'editing' && (
-                    <FormSection
-                        id="documents"
-                        title="Documentos"
-                        description="Contrato, laudos, aditivos e recibos."
-                        icon={<FileText className="h-5 w-5" />}
-                        open={openSections.documents}
-                        onToggle={() => toggleSection('documents')}
-                    >
-                        {/* Upload */}
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                            <div className="flex-1">
-                                <Label className="text-xs">Tipo do Documento</Label>
-                                <select
-                                    className="flex h-9 w-full rounded-md border bg-background px-2 py-1 text-sm"
-                                    value={uploadDocType}
-                                    onChange={e => setUploadDocType(e.target.value)}
-                                >
-                                    {DOCUMENT_TYPE_OPTIONS.map(d => (
-                                        <option key={d.value} value={d.value}>{d.label}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-accent">
-                                    {uploadingDoc ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                                    Enviar Arquivo
-                                    <input
-                                        type="file"
-                                        accept=".pdf,.jpg,.jpeg,.png"
-                                        className="hidden"
-                                        onChange={e => {
-                                            const f = e.target.files?.[0];
-                                            if (f) handleDocUpload(f);
-                                            e.target.value = '';
-                                        }}
-                                        disabled={uploadingDoc}
-                                    />
-                                </label>
-                            </div>
-                        </div>
-                        <p className="text-xs text-muted-foreground">PDF, JPG ou PNG. Máximo 5 MB.</p>
-
-                        {/* List */}
-                        {existingDocuments.length > 0 && (
-                            <div className="mt-3 space-y-2">
-                                {existingDocuments.map(doc => (
-                                    <div key={doc.id} className="flex items-center justify-between rounded-lg border border-border p-2.5">
-                                        <button
-                                            type="button"
-                                            onClick={() => setViewingDoc({
-                                                url: doc.file_url,
-                                                title: doc.file_name || 'Documento do Contrato',
-                                                fileName: doc.file_name ? (doc.file_name.toLowerCase().endsWith('.pdf') ? doc.file_name : `${doc.file_name}.pdf`) : 'contrato.pdf',
-                                            })}
-                                            className="flex items-center gap-2 text-sm hover:underline text-left cursor-pointer flex-1 min-w-0 mr-2"
-                                        >
-                                            <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-                                            <span className="font-medium truncate">{doc.file_name}</span>
-                                            <Badge variant="outline" className="text-xs shrink-0">
-                                                {DOCUMENT_TYPE_OPTIONS.find(d => d.value === doc.document_type)?.label || doc.document_type}
-                                            </Badge>
-                                        </button>
-                                        <div className="flex items-center gap-1 shrink-0">
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8 text-primary hover:bg-primary/10"
-                                                title="Visualizar documento dentro do Kitnets"
-                                                onClick={() => setViewingDoc({
-                                                    url: doc.file_url,
-                                                    title: doc.file_name || 'Documento do Contrato',
-                                                    fileName: doc.file_name ? (doc.file_name.toLowerCase().endsWith('.pdf') ? doc.file_name : `${doc.file_name}.pdf`) : 'contrato.pdf',
-                                                })}
-                                            >
-                                                <Eye className="h-4 w-4" />
-                                            </Button>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-700" onClick={() => handleDocDelete(doc.id)}>
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </FormSection>
-                )}
-
-                {/* ── Section 7: Notes ─────────────────────────────────── */}
-                <FormSection
-                    id="notes"
-                    title="Observações"
-                    description="Notas internas e privadas."
-                    icon={<PenLine className="h-5 w-5" />}
-                    open={openSections.notes}
-                    onToggle={() => toggleSection('notes')}
-                >
-                    <div id="field-notes">
-                        <Label>Observações Internas</Label>
-                        <textarea
-                            className="flex min-h-[100px] w-full rounded-md border bg-background px-3 py-2 text-sm"
-                            value={form.notes}
-                            onChange={e => updateForm('notes', e.target.value)}
-                            placeholder="Informações adicionais sobre o contrato..."
-                        />
-                    </div>
-                </FormSection>
-
-                {/* ── Actions ──────────────────────────────────────────── */}
-                <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-                    <Button variant="outline" onClick={() => { resetForm(); setPageState('list'); }} disabled={saving}>
-                        Cancelar
-                    </Button>
-                    {!editingId && (
-                        <Button variant="secondary" onClick={() => handleSave(true)} disabled={saving}>
-                            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
-                            Salvar como Rascunho
-                        </Button>
-                    )}
-                    <Button onClick={() => handleSave(false)} disabled={saving}>
-                        {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                        {editingId ? 'Salvar Alterações' : 'Salvar Contrato'}
-                    </Button>
-                </div>
-            </div>
-        );
-    }
-
-    // ── Render: List ──────────────────────────────────────────────
-
-    return (
-        <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-foreground">Contratos de Locação</h1>
-                    <p className="text-sm text-muted-foreground">
-                        {leases.length} {leases.length === 1 ? 'contrato registrado' : 'contratos registrados'}
-                    </p>
-                </div>
-                <Button onClick={() => { resetForm(); setImportOpen(true); }}>
-                    <Plus className="mr-2 h-4 w-4" /> Novo Contrato
-                </Button>
-            </div>
-
-            {/* Search & filters */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                        className="pl-9"
-                        placeholder="Buscar por imóvel, inquilino ou referência..."
-                        value={searchQuery}
-                        onChange={e => setSearchQuery(e.target.value)}
-                    />
-                </div>
-                <div className="flex gap-2">
-                    <select
-                        className="flex h-10 rounded-md border bg-background px-3 py-2 text-sm"
-                        value={filterStatus}
-                        onChange={e => setFilterStatus(e.target.value)}
-                    >
-                        <option value="">Todos os status</option>
-                        <option value="ACTIVE">Ativo</option>
-                        <option value="DRAFT">Rascunho</option>
-                        <option value="EXPIRING_SOON">Vencendo</option>
-                        <option value="EXPIRED">Expirado</option>
-                        <option value="TERMINATED">Rescindido</option>
-                        <option value="CANCELLED">Cancelado</option>
-                    </select>
-                    <select
-                        className="flex h-10 rounded-md border bg-background px-3 py-2 text-sm"
-                        value={filterProperty}
-                        onChange={e => setFilterProperty(e.target.value)}
-                    >
-                        <option value="">Todos os imóveis</option>
-                        {properties.map(p => (
-                            <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                    </select>
-                    <select
-                        className="flex h-10 rounded-md border bg-background px-3 py-2 text-sm"
-                        value={filterManagement}
-                        onChange={e => setFilterManagement(e.target.value)}
-                    >
-                        <option value="">Todas as gestões</option>
-                        <option value="SELF_MANAGED">Gestão própria</option>
-                        <option value="AGENCY">Imobiliária</option>
-                        <option value="AGENT">Corretor</option>
-                    </select>
-                    {(searchQuery || filterStatus || filterProperty || filterManagement) && (
-                        <Button variant="ghost" size="sm" onClick={() => { setSearchQuery(''); setFilterStatus(''); setFilterProperty(''); setFilterManagement(''); }}>
-                            <X className="mr-1 h-4 w-4" /> Limpar
-                        </Button>
-                    )}
-                </div>
-            </div>
-
-            {/* Empty state */}
-            {filteredLeases.length === 0 && (
-                <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border py-16">
-                    <FileText className="mb-4 h-12 w-12 text-muted-foreground" />
-                    <h3 className="text-lg font-semibold text-foreground">
-                        {leases.length === 0 ? 'Nenhum contrato registrado' : 'Nenhum contrato encontrado'}
-                    </h3>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                        {leases.length === 0
-                            ? 'Clique em "Novo Contrato" para criar o primeiro.'
-                            : 'Tente ajustar os filtros de busca.'
-                        }
-                    </p>
-                </div>
-            )}
-
-            {/* Lease rows */}
-            <div className="space-y-3">
-                {filteredLeases.map(lease => {
-                    const displayStatus = computeDisplayStatus(lease);
-                    const statusInfo = getStatusLabel(displayStatus);
-                    const isExpanded = expandedId === lease.id;
-
-                    return (
-                        <div key={lease.id} className="overflow-hidden rounded-lg border border-border bg-card">
-                            {/* Row header */}
-                            <div className="flex items-center gap-3 p-4">
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <h3 className="font-semibold text-foreground truncate">
-                                            {lease.reference_name || lease.property_name || 'Contrato'}
-                                        </h3>
-                                        <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
-                                    </div>
-                                    <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                                        <span className="flex items-center gap-1">
-                                            <Home className="h-3.5 w-3.5" /> {lease.property_name || '—'}{lease.unit_name ? ` · ${lease.unit_name}` : ''}
-                                        </span>
-                                        <span className="flex items-center gap-1">
-                                            <Users className="h-3.5 w-3.5" /> {lease.primary_tenant_name || '—'}
-                                        </span>
-                                        <span className="flex items-center gap-1">
-                                            <DollarSign className="h-3.5 w-3.5" /> {formatCurrencyBRL(lease.monthly_rent)}
-                                        </span>
-                                        <span className="flex items-center gap-1">
-                                            <Calendar className="h-3.5 w-3.5" />
-                                            {formatDateBR(lease.start_date)}
-                                            {lease.end_date ? ` — ${formatDateBR(lease.end_date)}` : ' — Indeterminado'}
-                                        </span>
-                                        <span className="flex items-center gap-1">
-                                            <Building2 className="h-3.5 w-3.5" /> {getManagementLabel(lease.management_type)}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                {/* Actions */}
-                                <div className="flex items-center gap-1 shrink-0">
-                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setExpandedId(isExpanded ? null : lease.id)}>
-                                        {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                                    </Button>
-                                    {(lease.document_count ?? 0) > 0 && (
-                                        <Button variant="ghost" size="icon" className="h-8 w-8" title="Abrir o PDF do contrato" aria-label="Abrir o PDF do contrato" disabled={openingDocFor === lease.id} onClick={() => openContractFile(lease)}>
-                                            {openingDocFor === lease.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4 text-blue-600" />}
-                                        </Button>
-                                    )}
-                                    <Button variant="ghost" size="icon" className="h-8 w-8" title="Editar contrato" onClick={() => handleEdit(lease)}>
-                                        <PenLine className="h-4 w-4" />
-                                    </Button>
-                                    {displayStatus === 'ACTIVE' && (
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-8 w-8 text-orange-500 hover:text-orange-700"
-                                            onClick={() => { setTerminateTarget(lease); setTerminateDate(''); setTerminateReason(''); }}
-                                            title="Rescindir contrato"
-                                        >
-                                            <Ban className="h-4 w-4" />
-                                        </Button>
-                                    )}
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 text-red-500 hover:text-red-700"
-                                        onClick={() => setDeleteTarget(lease)}
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            </div>
-
-                            {/* Expanded detail */}
-                            {isExpanded && (
-                                <div className="border-t border-border">
-                                    <LeaseProfileCard
-                                        lease={{ ...lease, status: displayStatus }}
-                                        agencies={agencies}
-                                        agents={agents}
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    );
-                })}
-            </div>
-
-            {/* Delete modal */}
-            {deleteTarget && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-                    <div className="mx-4 w-full max-w-md rounded-lg bg-background p-6 shadow-xl">
-                        <h3 className="text-lg font-semibold text-foreground">Excluir Contrato</h3>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                            Tem certeza que deseja excluir o contrato <strong>&ldquo;{deleteTarget.reference_name || deleteTarget.property_name}&rdquo;</strong>?
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">O registro será mantido no histórico.</p>
-                        <div className="mt-6 flex justify-end gap-2">
-                            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancelar</Button>
-                            <Button variant="destructive" onClick={handleDelete}>Excluir</Button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Terminate modal */}
+    const modals = (
+        <>
             {terminateTarget && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-                    <div className="mx-4 w-full max-w-md rounded-lg bg-background p-6 shadow-xl">
-                        <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                            <Ban className="h-5 w-5 text-orange-500" /> Rescindir Contrato
+                    <div className="mx-4 w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">
+                        <h3 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+                            <Ban className="h-5 w-5 text-amber-500" /> Rescindir Contrato
                         </h3>
                         <p className="mt-2 text-sm text-muted-foreground">
-                            Rescindir <strong>&ldquo;{terminateTarget.reference_name || terminateTarget.property_name}&rdquo;</strong>.
-                            O contrato será mantido no histórico.
+                            Rescindir <strong>&ldquo;{terminateTarget.reference_name || terminateTarget.property_name}&rdquo;</strong>. O contrato fica no histórico, marcado como rescindido.
                         </p>
-
                         <div className="mt-4 space-y-3">
                             <div>
                                 <Label>Data de Rescisão *</Label>
-                                <Input
-                                    value={terminateDate}
-                                    onChange={e => setTerminateDate(maskDate(e.target.value))}
-                                    placeholder="DD/MM/AAAA"
-                                    maxLength={10}
-                                />
+                                <Input value={terminateDate} onChange={e => setTerminateDate(maskDate(e.target.value))} placeholder="DD/MM/AAAA" maxLength={10} />
                             </div>
                             <div>
                                 <Label>Motivo da Rescisão</Label>
-                                <textarea
-                                    className="flex min-h-[80px] w-full rounded-md border bg-background px-3 py-2 text-sm"
-                                    value={terminateReason}
-                                    onChange={e => setTerminateReason(e.target.value)}
-                                    placeholder="Motivo (opcional)..."
-                                />
+                                <textarea className="flex min-h-[80px] w-full rounded-md border bg-background px-3 py-2 text-sm" value={terminateReason} onChange={e => setTerminateReason(e.target.value)} placeholder="Motivo (opcional)..." />
                             </div>
+                            {terminateError && <p className="text-xs text-rose-600">{terminateError}</p>}
                         </div>
-
                         <div className="mt-6 flex justify-end gap-2">
-                            <Button variant="outline" onClick={() => setTerminateTarget(null)} disabled={terminating}>
-                                Cancelar
-                            </Button>
-                            <Button
-                                variant="destructive"
-                                onClick={handleTerminate}
-                                disabled={!terminateDate || terminating}
-                            >
+                            <Button variant="outline" onClick={() => setTerminateTarget(null)} disabled={terminating}>Cancelar</Button>
+                            <Button variant="destructive" onClick={handleTerminate} disabled={!terminateDate || terminating}>
                                 {terminating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Ban className="mr-2 h-4 w-4" />}
                                 Rescindir
                             </Button>
@@ -1690,77 +315,127 @@ export default function ContratosContent({ lang }: { lang: string }) {
                 </div>
             )}
 
-            {/* AI import of a lease agreement */}
-            {importOpen && (
+            {deleteTarget && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div className="mx-4 w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">
+                        <h3 className="text-lg font-semibold text-foreground">Excluir Contrato</h3>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                            Tem certeza que deseja excluir o contrato <strong>&ldquo;{deleteTarget.reference_name || deleteTarget.property_name}&rdquo;</strong>?
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">O registro sai das listas, mas é mantido no histórico.</p>
+                        <div className="mt-6 flex justify-end gap-2">
+                            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>Cancelar</Button>
+                            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+                                {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Excluir
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {importOpen && dropdowns && (
                 <LeaseImportModal
-                    properties={properties}
-                    agencies={agencies}
+                    properties={dropdowns.properties}
+                    agencies={dropdowns.agencies}
                     onClose={() => {
                         setImportOpen(false);
                         // The import may have created records before it was cancelled.
-                        fetchDropdowns();
+                        void fetchDropdowns();
                     }}
-                    onManual={() => { setImportOpen(false); setPageState('form'); }}
+                    onManual={() => { setImportOpen(false); openNewForm(); }}
                     onComplete={handleImportComplete}
                 />
             )}
 
-            {/* In-App PDF Document Viewer */}
-            {viewingDoc && (
-                <PdfViewerModal
-                    isOpen={!!viewingDoc}
-                    onClose={() => setViewingDoc(null)}
-                    url={viewingDoc.url}
-                    title={viewingDoc.title}
-                    fileName={viewingDoc.fileName}
+            {batchOpen && (
+                <LeaseBatchImportModal
+                    dropdowns={dropdowns}
+                    refreshDropdowns={fetchDropdowns}
+                    onClose={created => {
+                        setBatchOpen(false);
+                        if (created.length > 0) load().catch(() => {});
+                    }}
+                    onOpenLease={id => select(id)}
                 />
             )}
-        </div>
-    );
-}
 
-// ── Collapsible Form Section Component ───────────────────────────────
-
-function FormSection({
-    id,
-    title,
-    description,
-    icon,
-    open,
-    onToggle,
-    children,
-}: {
-    id: string;
-    title: string;
-    description: string;
-    icon: React.ReactNode;
-    open: boolean;
-    onToggle: () => void;
-    children: React.ReactNode;
-}) {
-    return (
-        <div className="overflow-hidden rounded-lg border border-border bg-card">
-            <button
-                type="button"
-                className="flex w-full items-center justify-between p-4 text-left hover:bg-accent/50 transition"
-                onClick={onToggle}
-            >
-                <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                        {icon}
-                    </div>
-                    <div>
-                        <h3 className="font-semibold text-foreground">{title}</h3>
-                        <p className="text-xs text-muted-foreground">{description}</p>
-                    </div>
-                </div>
-                {open ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
-            </button>
-            {open && (
-                <div className="space-y-4 border-t border-border p-4">
-                    {children}
-                </div>
+            {viewingDoc && (
+                <PdfViewerModal isOpen onClose={() => setViewingDoc(null)} url={viewingDoc.url} title={viewingDoc.title} fileName={viewingDoc.fileName} />
             )}
-        </div>
+        </>
+    );
+
+    if (formState) {
+        if (!dropdowns) {
+            return (
+                <div className="flex items-center justify-center gap-2 py-20 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
+                </div>
+            );
+        }
+        return (
+            <>
+                <LeaseForm
+                    key={formState.editingId ?? "new"}
+                    editingId={formState.editingId}
+                    initial={formState.initial}
+                    dropdowns={dropdowns}
+                    aiImported={formState.aiImported}
+                    importedFile={formState.importedFile}
+                    importedStoragePath={formState.importedStoragePath}
+                    onSaved={onSaved}
+                    onCancel={() => setFormState(null)}
+                    topSlot={<ReturnToPropertyLink propertyId={returnPropertyId} />}
+                />
+                {modals}
+            </>
+        );
+    }
+
+    if (selectedId) {
+        return (
+            <div className="mx-auto max-w-[1600px] space-y-4 p-4 sm:p-6">
+                <ReturnToPropertyLink propertyId={returnPropertyId} />
+                <LeaseDashboard
+                    key={selectedId}
+                    leaseId={selectedId}
+                    lang={lang}
+                    today={today}
+                    initialBundle={initialDashboard}
+                    refreshKey={dashboardKey}
+                    notice={notice}
+                    onDismissNotice={() => setNotice(null)}
+                    onBack={() => select(null)}
+                    onEdit={bundle => { void openEdit(bundle.lease.id, bundle.lease); }}
+                    onTerminate={openTerminate}
+                    onDelete={setDeleteTarget}
+                />
+                {modals}
+            </div>
+        );
+    }
+
+    return (
+        <>
+            <ContratosHub
+                rows={rows}
+                today={today}
+                loading={leases === null}
+                error={listError}
+                view={view}
+                onViewChange={setView}
+                actions={{
+                    onOpen: row => select(row.lease.id),
+                    onEdit: row => { void openEdit(row.lease.id); },
+                    onTerminate: row => openTerminate(row.lease),
+                    onDelete: row => setDeleteTarget(row.lease),
+                    onOpenFile: row => { void openContractFile(row); },
+                    openingFileId,
+                }}
+                onNew={() => { if (dropdowns) setImportOpen(true); else openNewForm(); }}
+                onImportOld={() => setBatchOpen(true)}
+            />
+            {modals}
+        </>
     );
 }
