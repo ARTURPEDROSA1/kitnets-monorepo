@@ -9,7 +9,7 @@ import React, { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, Ban, FileText, Loader2, PenLine, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDateBR } from "@/lib/dates";
-import { MANAGEMENT_LABELS, STATUS_META, brl, type LeaseRow } from "@/lib/lease-dashboard";
+import { MANAGEMENT_LABELS, brl, statusMeta, type LeaseRow } from "@/lib/lease-dashboard";
 
 export interface LeaseTableActions {
     onOpen: (row: LeaseRow) => void;
@@ -102,8 +102,8 @@ export default function LeaseTable({ rows, actions }: Props) {
                     </thead>
                     <tbody>
                         {sorted.map(row => {
-                            const { lease, summary, status } = row;
-                            const meta = STATUS_META[status];
+                            const { lease, summary } = row;
+                            const meta = statusMeta(row);
                             const hint = termHint(row);
                             const progress = summary.progressPct;
                             const nextAdj = row.inForce ? summary.nextAdjustmentDate : null;

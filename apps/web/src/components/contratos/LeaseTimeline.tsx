@@ -10,7 +10,7 @@
 import React, { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { formatDateBR } from "@/lib/dates";
-import { STATUS_META, adjustmentDates, brl, positionPct, timelineBounds, timelineTicks, type LeaseRow } from "@/lib/lease-dashboard";
+import { adjustmentDates, brl, positionPct, statusMeta, timelineBounds, timelineTicks, type LeaseRow } from "@/lib/lease-dashboard";
 
 interface Props {
     rows: LeaseRow[];
@@ -54,8 +54,8 @@ export default function LeaseTimeline({ rows, today, onOpen }: Props) {
                     {/* Rows */}
                     <ul>
                         {sorted.map(row => {
-                            const { lease, summary, status } = row;
-                            const meta = STATUS_META[status];
+                            const { lease, summary } = row;
+                            const meta = statusMeta(row);
                             const start = lease.start_date.slice(0, 10);
                             const end = summary.effectiveEnd;
                             const openEnded = !end;
