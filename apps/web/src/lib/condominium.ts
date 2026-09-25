@@ -143,6 +143,8 @@ export interface Condominium {
     property_address: string;
     units: number;
     kpis: CondominiumKpis;
+    /** the property's photos (public URLs, the cover first): the card's cover carousel */
+    photos: string[];
 }
 
 export interface CondominiumKpis {
@@ -153,12 +155,17 @@ export interface CondominiumKpis {
     /** the calendar year the `ytd` figures cover */
     year: number;
     ytd: Pick<CondominiumSummary, "revenue" | "totalCost" | "result" | "marginPct" | "months">;
+    /** months of the year with revenue (not previsto) whose costs were never entered */
+    ytdMonthsWithoutCosts: number;
+    /** months of the year (not previsto) that closed in the red */
+    ytdNegativeMonths: number;
 }
 
 /** Figures of a condominium card: latest month and the current year to date. */
 export function condominiumKpis(months: CondominiumMonth[], now = new Date()): CondominiumKpis {
     const year = now.getFullYear();
-    const ytd = summarizeCondominium(months.filter(m => m.month.startsWith(`${year}-`)));
+    const yearMonths = months.filter(m => m.month.startsWith(`${year}-`));
+    const ytd = summarizeCondominium(yearMonths);
     const sorted = [...months].sort((a, b) => (a.month < b.month ? 1 : -1));
     return {
         latest: sorted[0] ?? null,
@@ -166,6 +173,8 @@ export function condominiumKpis(months: CondominiumMonth[], now = new Date()): C
         monthsWithCosts: months.filter(m => m.hasCosts).length,
         year,
         ytd: { revenue: ytd.revenue, totalCost: ytd.totalCost, result: ytd.result, marginPct: ytd.marginPct, months: ytd.months },
+        ytdMonthsWithoutCosts: yearMonths.filter(m => m.revenue > 0 && !m.expected && !m.hasCosts).length,
+        ytdNegativeMonths: yearMonths.filter(m => !m.expected && m.result < 0).length,
     };
 }
 

@@ -1,49 +1,25 @@
 import { NextResponse } from "next/server";
 import { getOwnedProperty, requireProfile } from "@/lib/api-auth";
 import { loadPropertyUnits } from "@/lib/property-units-server";
-import { condominiumKpis, type Condominium } from "@/lib/condominium";
-import { CONDOMINIUMS_TABLE, loadMonthsByProperty } from "@/lib/condominium-server";
+import { CONDOMINIUMS_TABLE } from "@/lib/condominium-server";
+import { CONDOMINIUM_COLUMNS, loadCondominiumList } from "@/lib/condominium-views-server";
 
 export const dynamic = "force-dynamic";
 
 /**
- *   GET  /api/condominium                        → { condominiums }   the owner's condominiums with their card KPIs
+ *   GET  /api/condominium                        → { condominiums }   the owner's condominiums with their card KPIs and the property's photos
  *   POST /api/condominium { property_id, name }  → { condominium }    creates the condominium of a multi-unit property
  *
  * A condominium belongs to one multi-unit property (a property with units) and a property has one condominium.
+ * The list is built by lib/condominium-views-server.ts, which the Condomínio page preloads with as well.
  */
-
-const COLUMNS = "id, property_id, name, notes, solar_payback_from_result, created_at, updated_at";
 
 export async function GET() {
     const authed = await requireProfile();
     if ("response" in authed) return authed.response;
     const { profileId, supabase } = authed.ctx;
     try {
-        const [{ data, error }, units] = await Promise.all([
-            supabase.from(CONDOMINIUMS_TABLE).select(COLUMNS).eq("owner_id", profileId).order("created_at", { ascending: true }),
-            loadPropertyUnits(supabase, profileId),
-        ]);
-        if (error) throw new Error(error.message);
-        const rows = data ?? [];
-        if (rows.length === 0) return NextResponse.json({ condominiums: [] });
-        const ids = rows.map(r => r.property_id);
-        const [{ data: props, error: e2 }, months] = await Promise.all([
-            supabase.from("properties").select("id, name, address, city, state").in("id", ids),
-            loadMonthsByProperty(supabase, profileId, ids),
-        ]);
-        if (e2) throw new Error(e2.message);
-        const condominiums: Condominium[] = rows.map(r => {
-            const p = (props ?? []).find(x => x.id === r.property_id);
-            return {
-                id: r.id, property_id: r.property_id, name: r.name, notes: r.notes ?? null, solar_payback_from_result: r.solar_payback_from_result === true,
-                property_name: p?.name || "Imóvel",
-                property_address: [p?.address, p?.city, p?.state].filter(Boolean).join(", "),
-                units: units.get(r.property_id)?.length ?? 0,
-                kpis: condominiumKpis(months.get(r.property_id) ?? []),
-            };
-        });
-        return NextResponse.json({ condominiums });
+        return NextResponse.json({ condominiums: await loadCondominiumList(supabase, profileId) });
     } catch (err) {
         console.error("[Condominiums GET]", (err as Error).message);
         return NextResponse.json({ error: "Erro ao carregar os condomínios" }, { status: 500 });
@@ -74,7 +50,7 @@ export async function POST(request: Request) {
     const { data, error } = await supabase
         .from(CONDOMINIUMS_TABLE)
         .insert({ owner_id: profileId, property_id: propertyId, name, notes })
-        .select(COLUMNS)
+        .select(CONDOMINIUM_COLUMNS)
         .single();
     if (error) {
         if (error.code === "23505") return NextResponse.json({ error: "Este imóvel já tem um condomínio." }, { status: 409 });
