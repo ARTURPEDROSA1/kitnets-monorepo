@@ -13,10 +13,12 @@ import {
     LEASE_EXTRACTION_PROMPT,
     isEmptyExtraction,
     matchAgency,
+    matchAgent,
     matchProperty,
     matchTenant,
     normalizeLeaseExtraction,
     type AgencyCandidate,
+    type AgentCandidate,
     type PropertyCandidate,
     type TenantCandidate,
 } from "@/lib/lease-extract";
@@ -112,13 +114,14 @@ function isStandaloneUc(electronicId: unknown): boolean {
     }
 }
 
-/** The account's rentable properties, tenants and agencies, with what the matcher compares. */
+/** The account's rentable properties, tenants, agencies and corretores, with what the matcher compares. */
 async function loadCandidates(supabase: AdminSupabase, profileId: string) {
-    const [propertiesRes, tenantsRes, membershipsRes, profileRes] = await Promise.all([
+    const [propertiesRes, tenantsRes, membershipsRes, profileRes, agentsRes] = await Promise.all([
         supabase.from("properties").select("id, name, address, city, zip, electronic_id").eq("owner_id", profileId),
         supabase.from("tenants").select("id, full_name, cpf").eq("user_id", profileId).is("deleted_at", null),
         supabase.from("agency_members").select("agency_id").eq("user_id", profileId),
         supabase.from("profiles").select("property_details, property_address, additional_properties").eq("id", profileId).maybeSingle(),
+        supabase.from("agents").select("id, full_name, cpf, creci_number, creci_state").eq("user_id", profileId).is("deleted_at", null),
     ]);
 
     // The structured address lives in the profile JSON (Imóveis page); the row only has the one-line version.
@@ -165,7 +168,12 @@ async function loadCandidates(supabase: AdminSupabase, profileId: string) {
         agencies = (data as AgencyCandidate[] | null) || [];
     }
 
-    return { properties, tenants: (tenantsRes.data as TenantCandidate[] | null) || [], agencies };
+    return {
+        properties,
+        tenants: (tenantsRes.data as TenantCandidate[] | null) || [],
+        agencies,
+        agents: (agentsRes.data as AgentCandidate[] | null) || [],
+    };
 }
 
 /**
@@ -174,8 +182,8 @@ async function loadCandidates(supabase: AdminSupabase, profileId: string) {
  * is how files past Vercel's 4.5 MB body limit get here — or multipart/form-data with `file`.
  *
  * Reads the contract with AI and matches what it found against the account's
- * properties, agencies and tenants. Read-only: nothing is created here. The
- * Contratos import flow asks the user before creating whatever did not match.
+ * properties, agencies, corretores and tenants. Read-only: nothing is created here.
+ * The Contratos import flow asks the user before creating whatever did not match.
  */
 export const POST = withAuth(
     { tag: TAG, limit: { scope: "ai:extract-lease", limit: 30, windowMs: HOUR } },
@@ -241,6 +249,7 @@ export const POST = withAuth(
             matches: {
                 property: matchProperty(data.property, candidates.properties),
                 agency: matchAgency(data.agency, candidates.agencies),
+                agents: data.agents.map((g) => matchAgent(g, candidates.agents)),
                 tenants: data.tenants.map((t) => matchTenant(t, candidates.tenants)),
             },
         });

@@ -1,7 +1,7 @@
 # Corretores (Real Estate Agents) Module
 
-**Version:** 1.0  
-**Last updated:** 2026-09-02  
+**Version:** 1.1  
+**Last updated:** 2026-09-25  
 **Author:** Kitnets Engineering  
 
 ---
@@ -79,24 +79,34 @@ The **Corretores Module** (`/[lang]/corretores`) allows authenticated Kitnets.co
 ```
 apps/web/src/
 ├── app/[lang]/corretores/
-│   ├── page.tsx                       # Server Component (metadata, force-dynamic)
-│   └── CorretoresContent.tsx          # Client Component (orchestrates list/form/accordion/photo)
+│   ├── page.tsx                       # Server component: preloads the list (and the dashboard of ?id=) before the first paint
+│   └── CorretoresContent.tsx          # Client orchestrator: hub ↔ corretor dashboard (?id=) ↔ form; owns the delete modal
 ├── app/api/agents/
-│   ├── route.ts                       # GET (list all) + POST (create agent)
+│   ├── route.ts                       # GET (list + leases/tenants per corretor, via lib/agent-views-server) + POST (create)
 │   └── [id]/
 │       ├── route.ts                   # PUT (update) + DELETE (soft-delete)
-│       └── photo/
-│           └── route.ts               # POST (upload image) + DELETE (remove image)
+│       ├── dashboard/route.ts         # GET: the corretor's bundle (agent, leases, tenants)
+│       └── photo/route.ts             # POST (upload image, public agent-photos bucket) + DELETE
 ├── components/
-│   ├── Sidebar.tsx                    # "Corretores" nav item with Users icon
-│   └── corretores/
-│       └── AgentProfileCard.tsx       # Expanded profile card with full contact/details
+│   ├── Sidebar.tsx                    # "Corretores" nav item
+│   ├── corretores/
+│   │   ├── CorretoresHub.tsx          # The hub: KPI strip, "Atenção" list, view pills, filters, the cards
+│   │   ├── AgentSquareCard.tsx        # One card per corretor (photo cover, CRECI, agency, contracts, tenants, contact icons)
+│   │   ├── AgentDashboard.tsx         # One corretor: photo, contact chips, tiles, contracts, tenants, ficha
+│   │   └── AgentForm.tsx              # Create / edit form (the photo is uploaded on the dashboard)
+│   └── inquilinos/TenantPhoto.tsx     # The round avatar with upload/remove, shared with the tenants (`endpoint` prop)
+├── lib/
+│   ├── agent-dashboard.ts (+ test)    # Pure maths: status meta, views, rows (contracts, rent, tenants), totals, attention
+│   ├── agent-views.ts                 # The list / dashboard view types (client-safe)
+│   ├── agent-views-server.ts          # Builds those views (agents + the leases and tenants that name them)
+│   ├── lease-extract.ts (+ test)      # `agents` in the lease extraction and `matchAgent` (Contratos import)
+│   └── schemas/agent.ts (+ test)      # zod input schema (main_phone optional since v1.1)
 ├── types/
 │   └── agent.ts                       # Agent, AgentWithAgency, AgentFormData, AgentType, AgentStatus
 └── middleware.ts                      # Route protection (/corretores(.*))
 
-supabase/legacy/core/
-└── agent_setup.sql                    # Table schema, indexes, trigger, RLS, storage setup
+supabase/migrations/
+└── 20260925170000_agent_phone_optional.sql   # main_phone nullable
 ```
 
 ---
@@ -126,7 +136,7 @@ export interface Agent {
     agency_id: string | null;                     // FK to public.agencies(id)
 
     // Contact
-    main_phone: string;                           // E.164: "+5531999999999"
+    main_phone: string | null;                    // E.164: "+5531999999999"; null until known (v1.1)
     main_phone_whatsapp: boolean;
     additional_phone: string | null;
     additional_phone_whatsapp: boolean;
@@ -219,7 +229,7 @@ CREATE TABLE IF NOT EXISTS public.agents (
     agency_id UUID REFERENCES public.agencies(id) ON DELETE SET NULL,
 
     -- Contact
-    main_phone TEXT NOT NULL,                        -- E.164: "+5531999999999"
+    main_phone TEXT,                                 -- E.164: "+5531999999999"; NULL until known (v1.1)
     main_phone_whatsapp BOOLEAN NOT NULL DEFAULT FALSE,
     additional_phone TEXT,
     additional_phone_whatsapp BOOLEAN NOT NULL DEFAULT FALSE,
@@ -363,6 +373,10 @@ SET deleted_at = NOW(), deleted_by = profile.id
 WHERE id = agentId;
 ```
 
+### 6.7 GET /api/agents/[id]/dashboard
+
+One corretor with the agency name, the leases that name them (`leases.agent_id`, newest first, with place, tenant, dates, status and rent) and the tenants they look after (`tenants.agent_id`). The page preloads the same bundle (`loadAgentDashboard` in `lib/agent-views-server.ts`); the client calls this to refresh after an edit.
+
 ### 6.5 POST /api/agents/[id]/photo
 
 Uploads agent avatar:
@@ -388,21 +402,14 @@ Located at `apps/web/src/app/[lang]/corretores/page.tsx`:
 
 ### 7.2 CorretoresContent (Page Orchestrator)
 
-Client component at `apps/web/src/app/[lang]/corretores/CorretoresContent.tsx`:
-- **State Machine:** `loading` → `list` ↔ `form` / `editing`.
-- **Photo Workflow:** Manages local file selection (`handlePhotoSelect`), immediate thumbnail preview (`photoPreview`), and upload invocation (`uploadPhoto`) following agent save.
-- **Accordion:** Manages `expandedId` to reveal one detailed `AgentProfileCard` at a time.
-- **Masking:** Handles phone (`(XX) XXXXX-XXXX`), CPF (`000.000.000-00`), and CRECI formatting.
+Client component at `apps/web/src/app/[lang]/corretores/CorretoresContent.tsx` — three screens: the **hub** (`/corretores`), one corretor's **dashboard** (`?id=<agent>`; the old `?agent=` deep link kept) and the **form** (create / edit, component state). Seeds from what `page.tsx` preloaded; refreshes through `GET /api/agents` and `GET /api/agents/[id]/dashboard`. The view (`?view=ativos|inativos|todos`) lives in the URL. Owns the delete modal and the Ativar / Desativar toggle (a `PUT` with the status flipped).
 
-### 7.3 AgentProfileCard (Detailed Profile View)
+### 7.3 CorretoresHub, AgentSquareCard, AgentDashboard, AgentForm
 
-Presentational component at `apps/web/src/components/corretores/AgentProfileCard.tsx`:
-- Displays large photo avatar (or colored initials fallback).
-- Header with agent name, CRECI tag, agency badge, and active/inactive status.
-- Section 1: **Dados Profissionais & Pessoais** (CPF, CRECI, Tipo de atuação, Imobiliária vinculada).
-- Section 2: **Contato** (Main phone with WhatsApp indicator/link, additional phone with WhatsApp indicator/link, email, website).
-- Section 3: **Observações** (Rendered if notes are present).
-- Actions: "Editar dados" and "Excluir" buttons.
+- **CorretoresHub**: KPI strip (`agentHubTotals` in `lib/agent-dashboard.ts`: active corretores, contracts in force with a corretor, the rent they add up to — each contract once —, tenants served, agencies and autonomous corretores, corretores without contact), **Atenção** (`agentAttention`: an inactive corretor still on contracts in force, an agency link gone, no phone, nothing to do), view pills with counts, search (name, CRECI, agency, property, tenant) and an affiliation filter, then the cards.
+- **AgentSquareCard**: the photo as the cover (`CoverCarousel`, like the other hubs), status pill, name and CRECI, agency (or "Corretor autônomo"), two tiles (contracts in force with the rent under management, tenants served) and the contact icons (WhatsApp when flagged, phone, e-mail, website), "desde mm/aaaa".
+- **AgentDashboard**: the photo (`TenantPhoto` with the agents' endpoint), name, CRECI, status, agency link, contact chips; Editar / Desativar / Excluir; six tiles (contracts in force, rent under management, tenants served, atuação, CRECI, registered since); the contracts that name the corretor (link to each contract's dashboard), the tenants they look after (link to each tenant) and the ficha.
+- **AgentForm**: the four sections of the old form (dados, atuação, contato, observações e status) without the photo, which is uploaded on the dashboard. The phone is optional.
 
 ---
 
@@ -563,6 +570,7 @@ ALTER TABLE public.agents ADD COLUMN IF NOT EXISTS additional_phone_whatsapp BOO
 
 ## 13. Changelog
 
+- **2026-09-25 (v1.1):** Redesign in the shape of Inquilinos: hub with KPI strip, "Atenção" list, views in the URL and one card per corretor with the photo as the cover; corretor dashboard (`?id=`) with tiles, the contracts they run, the tenants they look after and the ficha; `GET /api/agents/[id]/dashboard`; `GET /api/agents` returns the leases and tenants per corretor; `main_phone` optional (migration `20260925170000`); the form moved to `AgentForm.tsx`, `AgentProfileCard` retired. **The Contratos AI import now reads the corretor** from the lease agreement (the agency's representative with their CRECI, or the autonomous broker), matches by CRECI / CPF / name and offers to register them; the lease and the tenants created from the contract carry the corretor.
 - **2026-09-02 (v1.0):** Initial release of Corretores module:
   - Agent CRUD with photo upload, CPF/CRECI validation, and agency linkage.
   - Replaced separate WhatsApp input with inline checkboxes for main and additional phones.

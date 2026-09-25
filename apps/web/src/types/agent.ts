@@ -21,7 +21,8 @@ export interface Agent {
     agency_id: string | null;
 
     // Contact
-    main_phone: string;                   // E.164
+    /** E.164; null when not known yet (a corretor registered from a lease agreement) */
+    main_phone: string | null;
     main_phone_whatsapp: boolean;
     additional_phone: string | null;
     additional_phone_whatsapp: boolean;

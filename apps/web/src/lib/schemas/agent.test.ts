@@ -40,7 +40,7 @@ describe("agentInputSchema", () => {
             expect(e.creci_number).toBe("CRECI é obrigatório.");
             expect(e.creci_state).toBe("UF do CRECI é obrigatório.");
             expect(e.agent_type).toBe("Tipo de atuação é obrigatório.");
-            expect(e.main_phone).toBe("Telefone principal é obrigatório.");
+            expect(e.main_phone).toBeUndefined();
             expect(e.status).toBe("Status é obrigatório.");
         }
     });
@@ -55,6 +55,13 @@ describe("agentInputSchema", () => {
             expect(e.additional_phone).toBe("Telefone adicional inválido.");
             expect(e.website).toBe("Website inválido.");
         }
+    });
+
+    it("accepts a corretor without a phone (registered from a lease agreement) and drops the WhatsApp flag", () => {
+        const out = agentInputSchema.parse({ ...valid, main_phone: "", main_phone_whatsapp: true });
+        expect(out.main_phone).toBeNull();
+        expect(out.main_phone_whatsapp).toBe(false);
+        expect(agentInputSchema.safeParse({ ...valid, main_phone: "12" }).success).toBe(false);
     });
 
     it("stores a valid CPF as digits and treats a blank one as null", () => {

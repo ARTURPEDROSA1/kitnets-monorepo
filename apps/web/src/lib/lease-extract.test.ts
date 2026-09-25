@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
     companyKey,
+    creci,
     endDateFromDuration,
     isEmptyExtraction,
     matchAgency,
+    matchAgent,
     matchProperty,
     matchTenant,
     normalizeLeaseExtraction,
@@ -118,6 +120,61 @@ describe("normalizeLeaseExtraction", () => {
         });
         expect(out.tenants).toHaveLength(1);
         expect(out.tenants[0]).toMatchObject({ role: "PRIMARY", cpf: "", email: null });
+    });
+});
+
+describe("agents in the extraction", () => {
+    const base = { lease: { start_date: "2026-03-01", monthly_rent: "1500" }, tenants: [{ full_name: "João", cpf: VALID_CPF }] };
+
+    it("reads the corretores, keeps only the person's own CRECI and dedupes by CRECI, CPF and name", () => {
+        const out = normalizeLeaseExtraction({
+            ...base,
+            agency: { name: "MR IMÓVEIS LTDA", cnpj: "11.222.333/0001-81", creci_number: "CRECI-J 5.678", creci_state: "MG", owner_name: "Marcos Ribeiro" },
+            agents: [
+                { full_name: "Marcos Ribeiro", cpf: "111.444.777-35", creci_number: "CRECI-MG 12.345-F", creci_state: "mg", main_phone: "(31) 98888-0000", email: "Marcos@MR.com", role: "representante" },
+                { full_name: "MARCOS RIBEIRO", creci_number: "12345", creci_state: "MG" },
+                { full_name: "Paula Lima", creci_number: "5678", creci_state: "MG", role: "corretor" },
+                { full_name: "", creci_number: "999" },
+            ],
+        });
+        expect(out.agents).toEqual([
+            { full_name: "Marcos Ribeiro", cpf: OTHER_VALID_CPF, creci_number: "12345", creci_state: "MG", main_phone: "(31) 98888-0000", email: "marcos@mr.com", role: "REPRESENTANTE" },
+            // her "CRECI" is the agency's CRECI-J: not hers
+            { full_name: "Paula Lima", cpf: "", creci_number: null, creci_state: null, main_phone: null, email: null, role: "CORRETOR" },
+        ]);
+    });
+
+    it("offers the agency's representative when nobody was listed, and nobody without an agency", () => {
+        const withOwner = normalizeLeaseExtraction({ ...base, agency: { name: "MR IMÓVEIS", owner_name: "Marcos Ribeiro" } });
+        expect(withOwner.agents).toEqual([{ full_name: "Marcos Ribeiro", cpf: "", creci_number: null, creci_state: null, main_phone: null, email: null, role: "REPRESENTANTE" }]);
+        expect(normalizeLeaseExtraction(base).agents).toEqual([]);
+        expect(normalizeLeaseExtraction({ ...base, agents: "garbage" }).agents).toEqual([]);
+    });
+
+    it("parses a CRECI", () => {
+        expect(creci("CRECI-MG 12.345-F")).toBe("12345");
+        expect(creci("12345/F")).toBe("12345");
+        expect(creci("F")).toBeNull();
+        expect(creci(null)).toBeNull();
+    });
+});
+
+describe("matchAgent", () => {
+    const candidates = [
+        { id: "a1", full_name: "Marcos Ribeiro", cpf: OTHER_VALID_CPF, creci_number: "12345", creci_state: "MG" },
+        { id: "a2", full_name: "Paula Lima", cpf: null, creci_number: "777", creci_state: "SP" },
+    ];
+    const agent = (over: Partial<Parameters<typeof matchAgent>[0]>) => ({ full_name: "x", cpf: "", creci_number: null, creci_state: null, main_phone: null, email: null, role: "REPRESENTANTE" as const, ...over });
+
+    it("matches on the CRECI first, then the CPF, then an exact name", () => {
+        expect(matchAgent(agent({ full_name: "M. Ribeiro", creci_number: "12345", creci_state: "MG" }), candidates)).toEqual({ id: "a1", name: "Marcos Ribeiro", by: "creci" });
+        expect(matchAgent(agent({ full_name: "Outro Nome", cpf: OTHER_VALID_CPF }), candidates)).toEqual({ id: "a1", name: "Marcos Ribeiro", by: "cpf" });
+        expect(matchAgent(agent({ full_name: "paula lima" }), candidates)).toEqual({ id: "a2", name: "Paula Lima", by: "name" });
+    });
+    it("treats an unknown CRECI or valid CPF as a new person, whatever the name", () => {
+        expect(matchAgent(agent({ full_name: "Marcos Ribeiro", creci_number: "99999", creci_state: "MG" }), candidates)).toBeNull();
+        expect(matchAgent(agent({ full_name: "Paula Lima", cpf: VALID_CPF }), candidates)).toBeNull();
+        expect(matchAgent(agent({ full_name: "Ninguém" }), candidates)).toBeNull();
     });
 });
 

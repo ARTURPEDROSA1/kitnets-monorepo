@@ -8,6 +8,7 @@ const result = {
     storagePath: null,
     propertyId: "prop-1",
     agencyId: "agency-1",
+    agentId: "agent-1",
     primaryTenantId: "tenant-1",
     additionalTenants: [{ tenant_id: "tenant-2", role: "CO_TENANT" }],
     data: {
@@ -26,7 +27,7 @@ describe("leasePayloadFromImport", () => {
         const parsed = leaseInputSchema.parse(payload);
         expect(parsed.lease).toMatchObject({
             property_id: "prop-1", unit_id: "unit-35c", primary_tenant_id: "tenant-1",
-            management_type: "AGENCY", agency_id: "agency-1", status: "ACTIVE",
+            management_type: "AGENCY", agency_id: "agency-1", agent_id: "agent-1", status: "ACTIVE",
             monthly_rent: 1250.5, rent_due_day: 10, adjustment_frequency: 12,
         });
         expect(parsed.additional_tenants).toEqual([{ tenant_id: "tenant-2", role: "CO_TENANT" }]);
@@ -34,8 +35,13 @@ describe("leasePayloadFromImport", () => {
     });
 
     it("is self-managed without an agency and expired once the term is over", () => {
-        const payload = leasePayloadFromImport({ ...result, agencyId: "" }, { unitId: null, referenceName: "x", today: "2029-03-17" });
-        expect(payload).toMatchObject({ management_type: "SELF_MANAGED", agency_id: null, unit_id: null, status: "EXPIRED" });
+        const payload = leasePayloadFromImport({ ...result, agencyId: "", agentId: "" }, { unitId: null, referenceName: "x", today: "2029-03-17" });
+        expect(payload).toMatchObject({ management_type: "SELF_MANAGED", agency_id: null, agent_id: null, unit_id: null, status: "EXPIRED" });
+    });
+
+    it("is run by the corretor when the contract has one but no agency", () => {
+        const payload = leasePayloadFromImport({ ...result, agencyId: "" }, { unitId: null, referenceName: "x", today: "2026-09-18" });
+        expect(payload).toMatchObject({ management_type: "AGENT", agency_id: null, agent_id: "agent-1" });
     });
 
     it("takes a forced status for a contract imported as history", () => {
