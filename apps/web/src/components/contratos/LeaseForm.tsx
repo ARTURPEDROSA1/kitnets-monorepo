@@ -616,10 +616,10 @@ export default function LeaseForm({ editingId, initial, dropdowns, aiImported = 
                     <select className={selectClass} value={form.status} onChange={e => updateForm("status", e.target.value as LeaseStatus)}>
                         <option value="ACTIVE">Ativo</option>
                         <option value="DRAFT">Rascunho</option>
-                        <option value="EXPIRED">Encerrado (prazo vencido)</option>
+                        <option value="EXPIRED">Encerrado</option>
                         <option value="CANCELLED">Cancelado</option>
                     </select>
-                    <p className="mt-1 text-xs text-muted-foreground">Um contrato antigo, já encerrado, fica como &ldquo;Encerrado&rdquo;: entra no histórico sem contar como vigente.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Um contrato que já terminou fica como &ldquo;Encerrado&rdquo;: entra no histórico sem contar como vigente. Um contrato ativo cujo prazo passou continua vigente (prazo indeterminado) até ser encerrado ou rescindido.</p>
                 </div>
             </FormSection>
 

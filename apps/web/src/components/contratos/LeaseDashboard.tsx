@@ -42,10 +42,10 @@ import { formatMonthKey } from "@/lib/property-income";
 import { formatPhone } from "@/lib/validators";
 import {
     MANAGEMENT_LABELS,
-    STATUS_META,
     brl,
     leaseIncome,
     milestones,
+    statusMeta,
     summarizeLease,
     type Milestone,
 } from "@/lib/lease-dashboard";
@@ -138,7 +138,7 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
 
     const { lease, tenant } = bundle;
     const { summary, status } = row;
-    const meta = STATUS_META[status];
+    const meta = statusMeta(row);
     const contractFile = lease.documents.find(d => d.document_type === "CONTRACT") ?? lease.documents[0] ?? null;
     const rent = Number(lease.monthly_rent) || 0;
     const agencyManaged = lease.management_type === "AGENCY";

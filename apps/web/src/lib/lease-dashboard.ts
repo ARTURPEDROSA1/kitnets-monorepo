@@ -55,14 +55,29 @@ export interface StatusMeta {
     text: string;
 }
 
+const SLATE = { pill: "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300", bar: "bg-slate-400", text: "text-slate-600 dark:text-slate-300" };
+
+/** By display status. EXPIRED here is the term over while the contract is still in force; a closed contract wears `CLOSED_META`. */
 export const STATUS_META: Record<LeaseStatus, StatusMeta> = {
     ACTIVE: { label: "Ativo", pill: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300", bar: "bg-emerald-500", text: "text-emerald-600 dark:text-emerald-400" },
     EXPIRING_SOON: { label: "Vencendo", pill: "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300", bar: "bg-amber-500", text: "text-amber-600 dark:text-amber-400" },
-    EXPIRED: { label: "Vencido", pill: "bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300", bar: "bg-rose-500", text: "text-rose-600 dark:text-rose-400" },
-    TERMINATED: { label: "Rescindido", pill: "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300", bar: "bg-slate-400", text: "text-slate-600 dark:text-slate-300" },
-    CANCELLED: { label: "Cancelado", pill: "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300", bar: "bg-slate-400", text: "text-slate-600 dark:text-slate-300" },
+    EXPIRED: { label: "Prazo vencido", pill: "bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300", bar: "bg-rose-500", text: "text-rose-600 dark:text-rose-400" },
+    TERMINATED: { label: "Rescindido", ...SLATE },
+    CANCELLED: { label: "Cancelado", ...SLATE },
     DRAFT: { label: "Rascunho", pill: "bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-300", bar: "bg-sky-400", text: "text-sky-600 dark:text-sky-400" },
 };
+
+/** A contract stored as EXPIRED: over, in the history — not the rose "prazo vencido" of one that keeps running. */
+export const CLOSED_META: StatusMeta = { label: "Encerrado", ...SLATE };
+
+/**
+ * What a row's pill says. The rent still due after the term is "Prazo vencido" (rose: decide something);
+ * a contract closed as EXPIRED is "Encerrado" (slate, like rescindido); everything else by status.
+ */
+export function statusMeta(row: { status: LeaseStatus; inForce: boolean }): StatusMeta {
+    if (row.status === "EXPIRED") return row.inForce ? STATUS_META.EXPIRED : CLOSED_META;
+    return STATUS_META[row.status];
+}
 
 export const MANAGEMENT_LABELS: Record<string, string> = { SELF_MANAGED: "Gestão própria", AGENCY: "Imobiliária", AGENT: "Corretor" };
 

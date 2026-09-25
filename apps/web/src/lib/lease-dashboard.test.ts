@@ -12,6 +12,7 @@ import {
     milestones,
     positionPct,
     referenceNameFor,
+    statusMeta,
     summarizeLeases,
     termMonths,
     timelineBounds,
@@ -79,6 +80,16 @@ describe("displayStatus", () => {
     it("leaves closed and draft contracts alone", () => {
         expect(displayStatus({ status: "TERMINATED", end_date: "2027-01-01" }, TODAY)).toBe("TERMINATED");
         expect(displayStatus({ status: "DRAFT", end_date: "2026-01-01" }, TODAY)).toBe("DRAFT");
+    });
+});
+
+describe("statusMeta", () => {
+    it("tells the term over while in force from a contract closed as EXPIRED", () => {
+        expect(statusMeta({ status: "EXPIRED", inForce: true }).label).toBe("Prazo vencido");
+        expect(statusMeta({ status: "EXPIRED", inForce: false }).label).toBe("Encerrado");
+        expect(statusMeta({ status: "EXPIRED", inForce: false }).bar).toBe("bg-slate-400");
+        expect(statusMeta({ status: "ACTIVE", inForce: true }).label).toBe("Ativo");
+        expect(statusMeta({ status: "TERMINATED", inForce: false }).label).toBe("Rescindido");
     });
 });
 

@@ -516,8 +516,8 @@ stateDiagram-v2
 ```
 
 ### 8.2 Hub, Views & Dynamic Status
-- **In force** = stored status ACTIVE / EXPIRING_SOON, whatever the calendar says: a Brazilian lease whose term ended keeps running month to month and the rent keeps coming, so it stays in "Vigentes" flagged **Vencido** (prazo vencido) and in "Vencendo". Stored EXPIRED / TERMINATED / CANCELLED are "Encerrados".
-- **Display status** (`displayStatus`): ACTIVE within 30 days of the end → Vencendo; past the end → Vencido; DRAFT / TERMINATED / CANCELLED as stored.
+- **In force** = stored status ACTIVE / EXPIRING_SOON, whatever the calendar says: a Brazilian lease whose term ended keeps running month to month and the rent keeps coming, so it stays in "Vigentes" flagged **Prazo vencido** (rose) and in "Vencendo". Stored EXPIRED / TERMINATED / CANCELLED are "Encerrados" (a stored EXPIRED reads **Encerrado**, slate). Decision confirmed by the user on 2026-09-25: counting stays, only the label says it is the term, not the contract, that is over.
+- **Display status** (`displayStatus`): ACTIVE within 30 days of the end → Vencendo; past the end → Prazo vencido (`statusMeta` picks the pill); DRAFT / TERMINATED / CANCELLED as stored.
 - Views: Vigentes (default) · Vencendo · Encerrados · Rascunhos · Todos, kept in `?view=`; search and filters by property and management apply on top; Lista or Linha do tempo.
 
 ### 8.3 Contract Form Sections
