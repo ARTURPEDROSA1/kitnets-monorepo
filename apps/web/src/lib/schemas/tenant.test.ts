@@ -16,6 +16,26 @@ const valid = {
     use_property_address: true,
 };
 
+describe("tenantInputSchema profile fields", () => {
+    it("normalises the occupation and the social links", () => {
+        const out = tenantInputSchema.parse({ ...valid, occupation: "  Enfermeira ", instagram: "@Ana.Silva", linkedin: "linkedin.com/in/ana-silva" });
+        expect(out.occupation).toBe("Enfermeira");
+        expect(out.instagram).toBe("ana.silva");
+        expect(out.linkedin).toBe("https://www.linkedin.com/in/ana-silva/");
+        expect(tenantInputSchema.parse(valid).instagram).toBeNull();
+        expect(tenantInputSchema.parse({ ...valid, instagram: "", linkedin: "" }).linkedin).toBeNull();
+    });
+    it("refuses links that are not profiles", () => {
+        const r = tenantInputSchema.safeParse({ ...valid, instagram: "ana silva", linkedin: "https://instagram.com/ana" });
+        expect(r.success).toBe(false);
+        if (!r.success) {
+            const e = fieldErrors(r.error);
+            expect(e.instagram).toBe("Instagram inválido: use o @ ou o link do perfil.");
+            expect(e.linkedin).toBe("LinkedIn inválido: use o link do perfil.");
+        }
+    });
+});
+
 describe("tenantInputSchema", () => {
     it("normalises a valid payload", () => {
         const out = tenantInputSchema.parse(valid);

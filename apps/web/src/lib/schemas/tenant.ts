@@ -9,6 +9,7 @@ import {
     validateEmail,
     validatePhone,
 } from "@/lib/validators";
+import { normalizeInstagram, normalizeLinkedin } from "@/lib/social-links";
 
 /**
  * Input schema for POST /api/tenants and PUT /api/tenants/[id].
@@ -51,6 +52,14 @@ export const tenantInputSchema = z
         date_of_birth: optionalText(10),
         rg: optionalText(30),
         additional_phone: optionalPhone("Telefone adicional inválido."),
+        occupation: optionalText(120),
+        // stored canonical: the handle without the @, the profile URL
+        instagram: optionalText(200)
+            .refine((v) => v == null || normalizeInstagram(v) !== null, "Instagram inválido: use o @ ou o link do perfil.")
+            .transform((v) => (v ? normalizeInstagram(v) : null)),
+        linkedin: optionalText(300)
+            .refine((v) => v == null || normalizeLinkedin(v) !== null, "LinkedIn inválido: use o link do perfil.")
+            .transform((v) => (v ? normalizeLinkedin(v) : null)),
         postal_code: optionalText(12)
             .refine((v) => {
                 if (v == null) return true;

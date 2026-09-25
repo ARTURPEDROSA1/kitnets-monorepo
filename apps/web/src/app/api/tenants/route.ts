@@ -2,46 +2,22 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/api-route";
 import { tenantInputSchema } from "@/lib/schemas/tenant";
 import { assertTenantRelations, cpfUniqueViolation } from "@/lib/tenants-server";
+import { loadTenantList } from "@/lib/tenant-views-server";
 
 /**
  * GET /api/tenants
- * All of the account's tenants (soft-deleted excluded) with property, agency
- * and agent names flattened in.
+ * All of the account's tenants (soft-deleted excluded) with property, agency and agent names
+ * flattened in and a signed photo URL, plus every lease of the account keyed by tenant
+ * (`leases`, one entry per tenant on the lease). Same builder the Inquilinos page preloads
+ * with (lib/tenant-views-server.ts).
  */
 export const GET = withAuth({ tag: "Tenants GET" }, async ({ profileId, supabase }) => {
-    const { data: tenants, error } = await supabase
-        .from("tenants")
-        .select(`
-            *,
-            properties!tenants_property_id_fkey ( name ),
-            agencies!tenants_agency_id_fkey ( name ),
-            agents!tenants_agent_id_fkey ( full_name )
-        `)
-        .eq("user_id", profileId)
-        .is("deleted_at", null)
-        .order("created_at", { ascending: false });
-
-    if (error) {
-        console.error("[Tenants GET] Error:", error);
-        return NextResponse.json({ tenants: [] });
+    try {
+        return NextResponse.json(await loadTenantList(supabase, profileId));
+    } catch (err) {
+        console.error("[Tenants GET] Error:", (err as Error).message);
+        return NextResponse.json({ tenants: [], leases: [] });
     }
-
-    const tenantsWithDetails = (tenants || []).map((t: Record<string, unknown>) => {
-        const property = t.properties as { name: string } | null;
-        const agency = t.agencies as { name: string } | null;
-        const agent = t.agents as { full_name: string } | null;
-        return {
-            ...t,
-            property_name: property?.name || null,
-            agency_name: agency?.name || null,
-            agent_name: agent?.full_name || null,
-            properties: undefined,
-            agencies: undefined,
-            agents: undefined,
-        };
-    });
-
-    return NextResponse.json({ tenants: tenantsWithDetails });
 });
 
 /**
@@ -67,6 +43,6 @@ export const POST = withAuth({ body: tenantInputSchema, tag: "Tenants POST" }, a
 
     return NextResponse.json({
         success: true,
-        tenant: { ...tenant, property_name: null, agency_name: null, agent_name: null },
+        tenant: { ...tenant, property_name: null, agency_name: null, agent_name: null, photo_url: null },
     });
 });

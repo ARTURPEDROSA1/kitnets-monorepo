@@ -48,7 +48,7 @@ output type. Rules:
 
 | Family | Routes | Status |
 |---|---|---|
-| tenants | 3 files, 5 handlers | migrated (reference implementation) |
+| tenants | 5 files, 9 handlers (list + leases per tenant, create, update, soft delete, dropdown properties, photo upload/delete, dashboard) | migrated (reference implementation). `GET /api/tenants` now returns `{ tenants, leases }` with signed photo URLs and every lease keyed by tenant; `GET /api/tenants/[id]/dashboard` is the bundle the tenant's dashboard shows; `POST/DELETE /api/tenants/[id]/photo` keep the photo in the private `tenant-photos` bucket (`lib/tenant-views-server.ts`) |
 | agents | 3 files, 6 handlers (incl. multipart photo upload) | migrated |
 | agencies | 4 files, 8 handlers (role-based: OWNER/ADMIN edit, OWNER delete; logo + agreement uploads) | migrated. The service agreement, fee and contract dates are real columns (migration `20260916120000_agency_agreement_columns`); the old description-metadata fallback is gone |
 | leases | 6 files, 10 handlers (lease + additional tenants + charges, terminate, dropdowns, private document uploads, dashboard) | migrated. Additional tenants are now restricted to the account's own tenants. `GET /api/leases/[id]/dashboard` returns everything one contract's dashboard shows in one request (lease with names, tenants, charges, signed documents, the tenant's contact, the property's income ledger over the lease's months, the index series); the Contratos page preloads the same bundle server-side (`lib/lease-views-server.ts`) |

@@ -1,24 +1,9 @@
 import { NextResponse } from "next/server";
-import { forbidden, notFound, withAuth } from "@/lib/api-route";
-import type { AdminSupabase } from "@/lib/api-auth";
+import { withAuth } from "@/lib/api-route";
 import { tenantInputSchema } from "@/lib/schemas/tenant";
-import { assertTenantRelations, cpfUniqueViolation } from "@/lib/tenants-server";
+import { assertTenantRelations, cpfUniqueViolation, loadOwnedTenant } from "@/lib/tenants-server";
 
 type Params = { id: string };
-
-/** The tenant if it exists and is not deleted; 404/403 otherwise. */
-async function loadOwnedTenant(supabase: AdminSupabase, tenantId: string, profileId: string, action: string) {
-    const { data: tenant } = await supabase
-        .from("tenants")
-        .select("id, user_id, cpf, status")
-        .eq("id", tenantId)
-        .is("deleted_at", null)
-        .maybeSingle();
-
-    if (!tenant) throw notFound("Inquilino não encontrado.");
-    if (tenant.user_id !== profileId) throw forbidden(`Sem permissão para ${action} este inquilino.`);
-    return tenant;
-}
 
 /**
  * PUT /api/tenants/[id]
@@ -28,7 +13,7 @@ export const PUT = withAuth<typeof tenantInputSchema, Params>(
     { body: tenantInputSchema, tag: "Tenants PUT" },
     async ({ body, params, profileId, supabase }) => {
         const existing = await loadOwnedTenant(supabase, params.id, profileId, "editar");
-        await assertTenantRelations(supabase, profileId, body, { excludeTenantId: params.id, previousCpf: existing.cpf });
+        await assertTenantRelations(supabase, profileId, body, { excludeTenantId: params.id, previousCpf: existing.cpf as string });
 
         const { data: tenant, error } = await supabase
             .from("tenants")
@@ -47,7 +32,7 @@ export const PUT = withAuth<typeof tenantInputSchema, Params>(
 
         return NextResponse.json({
             success: true,
-            tenant: { ...tenant, property_name: null, agency_name: null, agent_name: null },
+            tenant: { ...tenant, property_name: null, agency_name: null, agent_name: null, photo_url: null },
         });
     }
 );
