@@ -77,6 +77,9 @@ export default function ManualBillEntryPage() {
     const [extractionConfidence, setExtractionConfidence] = useState<number | null>(null);
     const [dragActive, setDragActive] = useState(false);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
+    /** the bill file the AI read: kept as the current PDF after the save (and its header logo becomes the card's cover in Água) */
+    const [sourceFile, setSourceFile] = useState<File | null>(null);
+    const [docNote, setDocNote] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -196,6 +199,7 @@ export default function ManualBillEntryPage() {
         setExtracting(true);
         setError(null);
         setExtractionConfidence(null);
+        setSourceFile(file);
 
         try {
             let uploadFile = file;
@@ -335,6 +339,19 @@ export default function ManualBillEntryPage() {
                 setError(`Erro ao salvar: ${data.error || res.statusText}`);
             } else {
                 setSuccess(true);
+                // The file the AI read becomes the current bill's PDF (and, without a logo yet, gives the utility's logo)
+                if (sourceFile) {
+                    try {
+                        const doc = new window.FormData();
+                        doc.append("file", sourceFile);
+                        doc.append("referenceMonth", form.referenceMonth);
+                        const docRes = await fetch(`/api/water-bills/document/${propertyId}`, { method: "POST", body: doc });
+                        const docJson = await docRes.json().catch(() => ({}));
+                        if (docRes.ok) setDocNote(docJson.logoExtracted ? "PDF da conta guardado; o logo da concessionária foi lido e virou a capa do imóvel em Água." : docJson.pdfStored ? "PDF da conta guardado como conta vigente." : null);
+                    } catch {
+                        // the bill is saved; the PDF can be sent from the property's page
+                    }
+                }
                 window.scrollTo({ top: 0, behavior: "smooth" });
                 // Auto-navigate back after brief delay
                 setTimeout(() => {
@@ -387,6 +404,7 @@ export default function ManualBillEntryPage() {
                         <p className="text-sm text-emerald-600 dark:text-emerald-400">
                             Referência: {form.referenceMonth} — {formatCurrency(parseFloat(form.totalAmount))}
                         </p>
+                        {docNote && <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">{docNote}</p>}
                     </div>
                     <Link
                         href={backHref}
@@ -474,7 +492,7 @@ export default function ManualBillEntryPage() {
                                     Arraste a conta de água aqui
                                 </p>
                                 <p className="text-sm text-muted-foreground mt-1">
-                                    ou clique para selecionar • PDF, JPG, PNG (máx 10MB)
+                                    ou clique para selecionar • PDF, JPG, PNG (máx 10MB) • o PDF fica guardado como conta vigente e o logo da concessionária vira a capa em Água
                                 </p>
                             </div>
                             <span className="inline-flex items-center gap-1.5 mt-1 px-3 py-1 bg-primary/10 text-primary text-xs font-medium rounded-full">

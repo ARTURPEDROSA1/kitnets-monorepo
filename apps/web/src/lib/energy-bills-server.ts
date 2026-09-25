@@ -2,6 +2,7 @@ import type { AdminSupabase } from "@/lib/api-auth";
 import { HttpError, notFound } from "@/lib/api-route";
 import { UUID_REGEX } from "@/lib/api-auth";
 import { resolveAvailabilityKwh } from "@/lib/energy-availability";
+import { removeWaterFiles } from "@/lib/water-bills-server";
 
 /**
  * Server-side pieces of the energy-bills routes: resolving which property a
@@ -293,6 +294,11 @@ export async function deletePropertyCascade(supabase: AdminSupabase, propertyId:
         }
     } catch (storageErr) {
         console.warn(`[${tag}] Storage cleanup warning:`, storageErr);
+    }
+    try {
+        await removeWaterFiles(supabase, propertyId);
+    } catch (storageErr) {
+        console.warn(`[${tag}] Water storage cleanup warning:`, storageErr);
     }
 
     const { error } = await supabase.from("properties").delete().eq("id", propertyId);

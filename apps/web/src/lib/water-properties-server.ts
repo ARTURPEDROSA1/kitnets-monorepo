@@ -1,5 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
+import type { AdminSupabase } from "@/lib/api-auth";
 import { getOwnerPropertiesSummary } from "./energy-properties-server";
+import { listWaterFiles, signWaterFiles } from "./water-bills-server";
+import { EMPTY_WATER_PERIOD, summarizeWaterBills, type WaterBillLike, type WaterLatest, type WaterPeriod } from "./water-hub";
 
 /**
  * Rental properties whose main water meter is paid by the landlord ("Água" under
@@ -27,20 +30,22 @@ export interface WaterPropertySummary {
     /** averages over the last 12 bills */
     avgConsumptionM3: number | null;
     avgTotalAmount: number | null;
+    /** signed URL of the current bill's PDF kept in the water-bills bucket */
+    latestBillPdfUrl?: string | null;
+    /** signed URL of the water utility's logo (the card's cover) */
+    logoUrl?: string | null;
+    /** the newest bill's figures (the hub's tiles and KPIs); null without bills */
+    latest?: WaterLatest | null;
+    /** the twelve months up to the newest bill */
+    last12?: WaterPeriod;
 }
 
-function getServiceSupabase() {
+function getServiceSupabase(): AdminSupabase {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!url || !key) throw new Error("Missing Supabase service credentials");
     return createClient(url, key);
 }
-
-const num = (v: unknown): number | null => {
-    if (v === null || v === undefined || v === "") return null;
-    const n = Number(v);
-    return Number.isFinite(n) ? n : null;
-};
 
 export async function getOwnerWaterPropertiesSummary(userId: string): Promise<WaterPropertySummary[]> {
     if (!userId) return [];
@@ -52,33 +57,32 @@ export async function getOwnerWaterPropertiesSummary(userId: string): Promise<Wa
 
         const supabase = getServiceSupabase();
         const ids = withWater.map(p => p.id);
-        const [{ data: rows }, { data: bills }] = await Promise.all([
+        const [{ data: rows }, { data: bills }, files] = await Promise.all([
             supabase.from("properties").select("id, connection_code").in("id", ids),
             supabase
                 .from("water_bills")
-                .select("property_id, reference_month, consumption_m3, total_amount, due_date, effective_rate_per_m3, meter_number")
+                .select("property_id, reference_month, consumption_m3, billed_consumption_m3, total_amount, due_date, reading_date, effective_rate_per_m3, meter_number, occurrence_code")
                 .in("property_id", ids)
                 .order("reference_month", { ascending: false }),
+            // the current PDF and the utility's logo, per property
+            Promise.all(ids.map(async id => [id, await signWaterFiles(supabase, id, await listWaterFiles(supabase, id))] as const)),
         ]);
+        const urlsById = new Map(files);
 
         const connectionById = new Map<string, string | null>();
         for (const r of rows ?? []) connectionById.set(r.id as string, (r.connection_code as string | null) ?? null);
 
-        const billsByProperty = new Map<string, NonNullable<typeof bills>>();
+        const billsByProperty = new Map<string, WaterBillLike[]>();
         for (const b of bills ?? []) {
             const list = billsByProperty.get(b.property_id as string) ?? [];
-            list.push(b);
+            list.push(b as WaterBillLike);
             billsByProperty.set(b.property_id as string, list);
         }
 
         return withWater.map(p => {
             const list = billsByProperty.get(p.id) ?? [];
-            const latest = list[0] ?? null;
-            const last12 = list.slice(0, 12);
-            const avg = (pick: (b: (typeof list)[number]) => number | null) => {
-                const vals = last12.map(pick).filter((v): v is number => v !== null);
-                return vals.length ? Math.round((vals.reduce((s, v) => s + v, 0) / vals.length) * 100) / 100 : null;
-            };
+            const { latest, last12 } = summarizeWaterBills(list);
+            const urls = urlsById.get(p.id);
             return {
                 id: p.id,
                 name: p.name,
@@ -87,15 +91,19 @@ export async function getOwnerWaterPropertiesSummary(userId: string): Promise<Wa
                 state: p.state,
                 zip: p.zip,
                 connectionCode: connectionById.get(p.id) ?? null,
-                meterNumber: latest ? ((latest.meter_number as string | null) ?? null) : null,
+                meterNumber: latest?.meterNumber ?? null,
                 billsCount: list.length,
-                latestMonth: latest ? String(latest.reference_month) : null,
-                latestConsumptionM3: latest ? num(latest.consumption_m3) : null,
-                latestTotalAmount: latest ? num(latest.total_amount) : null,
-                latestDueDate: latest ? ((latest.due_date as string | null) ?? null) : null,
-                latestRatePerM3: latest ? num(latest.effective_rate_per_m3) : null,
-                avgConsumptionM3: avg(b => num(b.consumption_m3)),
-                avgTotalAmount: avg(b => num(b.total_amount)),
+                latestMonth: latest?.month ?? null,
+                latestConsumptionM3: latest ? latest.consumptionM3 : null,
+                latestTotalAmount: latest ? latest.total : null,
+                latestDueDate: latest?.dueDate ?? null,
+                latestRatePerM3: latest?.ratePerM3 ?? null,
+                avgConsumptionM3: last12.months > 0 ? Math.round(last12.avgConsumptionM3 * 100) / 100 : null,
+                avgTotalAmount: last12.months > 0 ? Math.round(last12.avgAmount * 100) / 100 : null,
+                latestBillPdfUrl: urls?.currentPdfUrl ?? null,
+                logoUrl: urls?.logoUrl ?? null,
+                latest,
+                last12: last12 ?? EMPTY_WATER_PERIOD,
             };
         });
     } catch (err) {
