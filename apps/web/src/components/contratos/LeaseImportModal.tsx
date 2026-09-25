@@ -841,7 +841,7 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                         <div className="flex flex-col gap-3 border-t border-border p-4 sm:flex-row sm:items-center sm:justify-between sm:px-7">
                             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                 <FileText className="h-3.5 w-3.5 shrink-0" />
-                                <span className="truncate">{createLabels.length > 0 || createsLease ? `Será criado: ${[...createLabels, createsLease ? 'contrato' : null].filter(Boolean).join(', ')}.` : 'Nenhum cadastro novo será criado.'}</span>
+                                <span className="break-words">{createLabels.length > 0 || createsLease ? `Será criado: ${[...createLabels, createsLease ? 'contrato' : null].filter(Boolean).join(', ')}.` : 'Nenhum cadastro novo será criado.'}</span>
                             </p>
                             <div className="flex shrink-0 justify-end gap-2">
                                 <Button type="button" variant="outline" onClick={onClose} disabled={applying}>Cancelar</Button>

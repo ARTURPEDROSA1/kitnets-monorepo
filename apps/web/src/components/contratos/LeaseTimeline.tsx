@@ -18,7 +18,7 @@ interface Props {
     onOpen: (row: LeaseRow) => void;
 }
 
-const LABEL_WIDTH = "w-52 min-w-52";
+const LABEL_WIDTH = "w-64 min-w-64";
 
 export default function LeaseTimeline({ rows, today, onOpen }: Props) {
     const sorted = useMemo(() => [...rows].sort((a, b) => a.lease.start_date.localeCompare(b.lease.start_date) || a.title.localeCompare(b.title)), [rows]);
@@ -77,8 +77,10 @@ export default function LeaseTimeline({ rows, today, onOpen }: Props) {
                                         className={cn(LABEL_WIDTH, "shrink-0 px-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500")}
                                         title={title}
                                     >
-                                        <span className="block truncate text-xs font-semibold text-foreground">{row.title}</span>
-                                        <span className="block truncate text-[11px] text-muted-foreground">{lease.primary_tenant_name ?? "—"} · {rent}</span>
+                                        <span className="block break-words text-xs font-semibold leading-snug text-foreground">{row.title}</span>
+                                        <span className="block break-words text-[11px] leading-snug text-muted-foreground">
+                                            {row.title.toLowerCase().includes((lease.primary_tenant_name ?? "\u0000").toLowerCase()) ? rent : `${lease.primary_tenant_name ?? "Sem inquilino"} · ${rent}`}
+                                        </span>
                                     </button>
                                     <div className="relative flex-1 cursor-pointer" onClick={() => onOpen(row)} title={title} role="presentation">
                                         {ticks.filter(t => t.major).map(t => (

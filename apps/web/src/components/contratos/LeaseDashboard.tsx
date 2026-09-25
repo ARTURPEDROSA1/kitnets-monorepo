@@ -91,7 +91,7 @@ function Field({ label, children, className }: { label: string; children: React.
     );
 }
 
-const chip = "inline-flex max-w-full items-center gap-1.5 rounded-md border border-input bg-background px-2 py-1 text-xs font-medium hover:bg-muted transition-colors";
+const chip = "inline-flex max-w-full items-center gap-1.5 rounded-md border border-input bg-background px-2 py-1 text-left text-xs font-medium leading-snug hover:bg-muted transition-colors";
 
 export default function LeaseDashboard({ leaseId, lang, today, initialBundle = null, refreshKey, notice, onDismissNotice, onBack, onEdit, onTerminate, onDelete }: Props) {
     const preloaded = initialBundle && initialBundle.lease.id === leaseId ? initialBundle : null;
@@ -362,13 +362,13 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-3 p-4">
                         <Field label="Imóvel" className="col-span-2">
                             <Link href={`${base}/imoveis?id=${lease.property_id}`} className={chip} title="Abrir o imóvel">
-                                <Home className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{row.place}</span>
+                                <Home className="h-3.5 w-3.5 shrink-0" /> <span className="break-words">{row.place}</span>
                             </Link>
                         </Field>
                         <Field label="Inquilino principal" className="col-span-2">
                             <div className="flex flex-wrap items-center gap-1.5">
                                 <Link href={`${base}/inquilinos?tenant=${lease.primary_tenant_id}&property=${lease.property_id}`} className={chip} title="Abrir o inquilino">
-                                    <User className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{lease.primary_tenant_name ?? "Inquilino"}</span>
+                                    <User className="h-3.5 w-3.5 shrink-0" /> <span className="break-words">{lease.primary_tenant_name ?? "Inquilino"}</span>
                                 </Link>
                                 {phone && (
                                     <a href={waLink ?? undefined} target="_blank" rel="noopener noreferrer" className={chip} title="Conversar no WhatsApp">
@@ -391,7 +391,7 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                         <Field label="Gestão" className="col-span-2">
                             {agencyManaged && lease.agency_id ? (
                                 <Link href={`${base}/imobiliaria?agency=${lease.agency_id}&property=${lease.property_id}`} className={chip} title="Abrir a imobiliária">
-                                    <Building2 className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{lease.agency_name ?? "Imobiliária"}</span>
+                                    <Building2 className="h-3.5 w-3.5 shrink-0" /> <span className="break-words">{lease.agency_name ?? "Imobiliária"}</span>
                                 </Link>
                             ) : (
                                 <span className="inline-flex items-center gap-1.5 text-sm"><Building2 className="h-3.5 w-3.5 text-muted-foreground" /> {lease.management_type === "AGENT" ? `Corretor ${lease.agent_name ?? ""}`.trim() : MANAGEMENT_LABELS[lease.management_type]}</span>

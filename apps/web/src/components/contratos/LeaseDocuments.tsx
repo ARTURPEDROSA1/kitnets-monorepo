@@ -196,7 +196,7 @@ export default function LeaseDocuments({ leaseId, documents, onChanged, onView }
                                                 ) : (
                                                     <span className="flex items-center gap-2 px-3 py-3 text-sm text-foreground">
                                                         <FileText className="h-4 w-4 shrink-0 text-rose-600" />
-                                                        <span className="line-clamp-1">{doc.file_name}</span>
+                                                        <span className="break-words leading-snug">{doc.file_name}</span>
                                                     </span>
                                                 )}
                                                 <span className="flex items-center gap-1.5 whitespace-nowrap px-3 py-1 pr-10 text-[10px] tabular-nums text-muted-foreground">
