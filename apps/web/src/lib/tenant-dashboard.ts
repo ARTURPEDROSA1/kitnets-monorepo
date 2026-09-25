@@ -170,8 +170,9 @@ export interface TenantHubTotals {
     active: number;
     future: number;
     former: number;
-    /** Σ rent of the contracts in force of the current tenants */
+    /** Σ rent of the contracts in force of the current tenants — each contract once, however many people are on it */
     rentTotal: number;
+    /** distinct contracts in force behind `rentTotal` */
     rentCount: number;
     /** average months living, over the current tenants with a start date */
     avgMonths: number | null;
@@ -191,14 +192,16 @@ export function tenantHubTotals(rows: TenantRow[]): TenantHubTotals {
     const withMonths = active.filter(r => r.monthsLiving !== null);
     let longest: TenantHubTotals["longest"] = null;
     for (const r of withMonths) if (!longest || (r.monthsLiving ?? 0) > longest.months) longest = { row: r, months: r.monthsLiving ?? 0 };
-    const rented = active.filter(r => r.rent !== null);
+    // One contract can carry several people (a co-tenant, an occupant): its rent counts once.
+    const rentByLease = new Map<string, number>();
+    for (const r of active) if (r.current) rentByLease.set(r.current.id, Number(r.current.monthly_rent) || 0);
     return {
         total: rows.length,
         active: active.length,
         future: rows.filter(r => r.status === "FUTURE").length,
         former: rows.filter(r => r.status === "FORMER").length,
-        rentTotal: Math.round(rented.reduce((s, r) => s + (r.rent ?? 0), 0) * 100) / 100,
-        rentCount: rented.length,
+        rentTotal: Math.round([...rentByLease.values()].reduce((s, v) => s + v, 0) * 100) / 100,
+        rentCount: rentByLease.size,
         avgMonths: withMonths.length > 0 ? Math.round(withMonths.reduce((s, r) => s + (r.monthsLiving ?? 0), 0) / withMonths.length) : null,
         longest,
         withoutLease: active.filter(r => !r.current).length,

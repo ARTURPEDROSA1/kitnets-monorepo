@@ -69,9 +69,12 @@ describe("tenantRows", () => {
         tenant({ id: "t2", full_name: "Maria Souza", status: "FORMER", move_out_date: null, date_of_birth: "1985-09-26", main_phone: null }),
         tenant({ id: "t3", full_name: "Bruno Alves", status: "FUTURE", move_in_date: "2026-10-21", date_of_birth: null, email: null }),
         tenant({ id: "t4", full_name: "Joana Prado", status: "ACTIVE", property_name: "VALE DO SOL", property_id: "p2", main_phone: null, date_of_birth: null }),
+        // Ana shares Luiz's contract (co-tenant): a second person on the same lease, not a second rent
+        tenant({ id: "t5", full_name: "Ana Torres", status: "ACTIVE", date_of_birth: null }),
     ];
     const leases = [
         lease({ id: "l1", tenant_id: "t1" }),
+        lease({ id: "l1", tenant_id: "t5", role: "CO_TENANT" }),
         lease({ id: "l0", tenant_id: "t1", start_date: "2023-01-06", end_date: "2024-12-31", status: "EXPIRED", monthly_rent: 1100 }),
         lease({ id: "l2", tenant_id: "t2", start_date: "2024-03-16", end_date: "2026-09-15", status: "EXPIRED", unit_id: "u35c", unit_name: "Kitnet 35C", monthly_rent: 1100 }),
         lease({ id: "l3", tenant_id: "t3", start_date: "2026-10-21", end_date: "2029-04-20", status: "DRAFT", unit_id: "u35", unit_name: "Kitnet 35", monthly_rent: 1550 }),
@@ -114,10 +117,12 @@ describe("tenantRows", () => {
         expect(byId.t4.haystack).toContain("vale do sol");
     });
 
-    it("adds the hub up", () => {
+    it("adds the hub up, counting a shared contract's rent once", () => {
         const t = tenantHubTotals(rows);
-        expect(t).toMatchObject({ total: 4, active: 2, future: 1, former: 1, rentTotal: 2200, rentCount: 2, withoutLease: 0, withoutPhone: 1, birthdays30: 1, ending90: 0 });
-        expect(t.avgMonths).toBe(32);   // (20 + 43) / 2, rounded
+        // three current tenants but two contracts in force: l1 (Luiz + Ana) and l4 (Joana)
+        expect(t).toMatchObject({ total: 5, active: 3, future: 1, former: 1, rentTotal: 2200, rentCount: 2, withoutLease: 0, withoutPhone: 1, birthdays30: 1, ending90: 0 });
+        expect(byId.t5.rent).toBe(1300);   // the card still says what the contract costs
+        expect(t.avgMonths).toBe(28);   // (20 + 43 + 20) / 3, rounded
         expect(t.longest?.row.tenant.id).toBe("t4");
     });
 
