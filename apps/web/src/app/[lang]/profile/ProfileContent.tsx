@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import Image from 'next/image';
 import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera, Video, Sparkles, Save, UploadCloud, Home, Building2, User, ShieldCheck, Fingerprint, ChevronDown, ChevronUp, Wand2, Plus, ArrowRight, Minus, Edit3, X, Search, Sun, ArrowLeft } from 'lucide-react';
 import PropertyDetailsCard, { PropertyDetails, SubUnit, SubUnitsSection, Checkbox as DetailCheckbox, defaultSubUnit, type UnitContractFile } from '@/components/profile/PropertyDetailsCard';
+import SubUnitsFlatSection from '@/components/profile/SubUnitsFlatSection';
 import LeaseImportModal, { type LeaseImportResult } from '@/components/contratos/LeaseImportModal';
 import LeaseBatchImportModal from '@/components/contratos/LeaseBatchImportModal';
 import type { LeaseFormDropdowns } from '@/components/contratos/LeaseForm';
@@ -2831,31 +2832,23 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                 />
 
                 {pType === 'multi' && (
-                    <div className="pt-4 border-t border-border space-y-4">
-                        <div className="flex items-center justify-between">
-                            <h4 className="text-base font-semibold text-foreground flex items-center gap-2">
-                                <Building2 className="w-4 h-4 text-violet-600" />
-                                Unidades Locáveis ({pSubUnits.length})
-                            </h4>
-                        </div>
-                        <SubUnitsSection
-                            key={`subunits-manage-${propIdx}-${prop.subUnitOpenIdx}`}
-                            details={pDetails}
-                            units={pSubUnits}
-                            onDetailsChange={setPDetails}
-                            onUnitsChange={setPSubUnitsInline}
-                            onCommit={requestUnitsSave}
-                            saveState={unitsSaveState}
-                            unitContracts={prop.id ? unitContracts[prop.id] : undefined}
-                            leasedUnitIds={prop.id ? leasedUnits[prop.id] : undefined}
-                            onGenerateDescription={(unitIdx) => generateUnitDescription(propIdx, unitIdx)}
-                            generatingDescriptionIdx={generatingUnitDescriptionIdx}
-                            onImportContract={(unitIdx, file) => importContract(propIdx, unitIdx, file)}
-                            importingContractIdx={importingContractIdx}
-                            initialOpenIdx={prop.subUnitOpenIdx}
-                            propertyIndex={propIdx}
-                        />
-                    </div>
+                    <SubUnitsFlatSection
+                        key={`subunits-manage-${propIdx}-${prop.subUnitOpenIdx}`}
+                        details={pDetails}
+                        units={pSubUnits}
+                        onDetailsChange={setPDetails}
+                        onUnitsChange={setPSubUnitsInline}
+                        onCommit={requestUnitsSave}
+                        saveState={unitsSaveState}
+                        unitContracts={prop.id ? unitContracts[prop.id] : undefined}
+                        leasedUnitIds={prop.id ? leasedUnits[prop.id] : undefined}
+                        onGenerateDescription={(unitIdx) => generateUnitDescription(propIdx, unitIdx)}
+                        generatingDescriptionIdx={generatingUnitDescriptionIdx}
+                        onImportContract={(unitIdx, file) => importContract(propIdx, unitIdx, file)}
+                        importingContractIdx={importingContractIdx}
+                        initialOpenIdx={prop.subUnitOpenIdx}
+                        propertyIndex={propIdx}
+                    />
                 )}
             </div>
         );
