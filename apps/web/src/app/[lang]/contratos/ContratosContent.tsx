@@ -53,6 +53,8 @@ export default function ContratosContent({ lang, initial = null, initialDashboar
     const rawId = searchParams.get("id") ?? searchParams.get("lease");
     const selectedId = rawId && UUID.test(rawId) ? rawId : null;
     const view = viewFromParam(searchParams.get("view"));
+    // ?importar=1 (the dashboard's "Importar contrato"): the import of current contracts opens straight away
+    const wantsImport = searchParams.get("importar") === "1";
     const today = useMemo(() => todayBRT(), []);
     const base = lang === "pt" ? "/contratos" : `/${lang}/contratos`;
 
@@ -158,7 +160,14 @@ export default function ContratosContent({ lang, initial = null, initialDashboar
 
     // ── AI import of a new contract ───────────────────────────────
     const [importOpen, setImportOpen] = useState(false);
-    const [batchOpen, setBatchOpen] = useState(false);
+    const [batchOpen, setBatchOpen] = useState(wantsImport);
+    /** "history" for "Importar contratos antigos"; "current" when the dashboard asked for an import */
+    const [batchMode, setBatchMode] = useState<"history" | "current">(wantsImport ? "current" : "history");
+    // the parameter is consumed: a reload does not reopen the import
+    useEffect(() => {
+        if (wantsImport) router.replace(base, { scroll: false });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handleImportComplete = async (result: LeaseImportResult) => {
         // The import may have just created the property, the agency and the tenants.
@@ -352,6 +361,7 @@ export default function ContratosContent({ lang, initial = null, initialDashboar
                 <LeaseBatchImportModal
                     dropdowns={dropdowns}
                     refreshDropdowns={fetchDropdowns}
+                    mode={batchMode}
                     onClose={created => {
                         setBatchOpen(false);
                         if (created.length > 0) load().catch(() => {});
@@ -434,7 +444,7 @@ export default function ContratosContent({ lang, initial = null, initialDashboar
                     openingFileId,
                 }}
                 onNew={() => { if (dropdowns) setImportOpen(true); else openNewForm(); }}
-                onImportOld={() => setBatchOpen(true)}
+                onImportOld={() => { setBatchMode("history"); setBatchOpen(true); }}
             />
             {modals}
         </>

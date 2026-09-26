@@ -10,7 +10,9 @@
         "CRON_SECRET",
         "OPENAI_API_KEY",
         "GEMINI_API_KEY",
-        "BIGDATACORP_TOKEN"
+        "BIGDATACORP_TOKEN",
+        "GOOGLE_MAPS_SERVER_KEY",
+        "GATEWAY_PILOT_EMAILS"
     ],
     "tasks": {
         "build": {
