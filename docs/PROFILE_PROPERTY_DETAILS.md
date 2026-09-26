@@ -478,6 +478,8 @@ Renders the **"Dados da Propriedade"** card:
 
 ### 5.4 SubUnitsSection (Multi-family Sub-Units)
 
+> **v2.3:** the accordion below is the wizard's. A **saved** property renders `SubUnitsFlatSection` (`components/profile/SubUnitsFlatSection.tsx`) instead: the same props, one flat block per unit (summary → Editar in place → Concluir persists). Both share `subUnitActions(...)` (update / condo / add / duplicate / remove / media handlers), `SubUnitFields` (the form fields) and `isSubUnitComplete` exported from `PropertyDetailsCard.tsx`.
+
 **File:** `apps/web/src/components/profile/PropertyDetailsCard.tsx`  
 **Export:** Named export (`SubUnitsSection`)
 
@@ -551,7 +553,7 @@ A property opened from the `/imoveis` hub shows, under its cost-centre dashboard
 1. **Ficha do imóvel** (`PropertyRegisterSection`, §5.6) — Endereço, Dados do imóvel, Descrição, read flat, edited in place.
 2. The GPT Vision address banner, when a document was just read.
 3. **Arquivos do imóvel** (`PropertyFilesSection`, §5.6) — documents by category, photos (cover star), videos, one upload button per kind.
-4. **Unidades Locáveis** (`SubUnitsSection`) for multi-unit properties, unchanged.
+4. **Unidades locáveis** (`SubUnitsFlatSection`, §5.4) for multi-unit properties: one flat block per unit — its data as a summary (type, area, rooms, amenities, condominium), its photos and videos always on screen with upload buttons, the *alugada / disponível* and *preenchida / a preencher* badges, and **Editar** opening the wizard's own fields (`SubUnitFields`) in place; "Contrato desta unidade" (the AI import pinned to that unit) / "Ver contrato", duplicate and delete sit in the block's header.
 
 The block's header has **Importar contrato** (only when the property has a `properties.id`): it opens `LeaseBatchImportModal` in `mode="current"` with `fixedProperty` = this property, so the AI reads one or more lease agreements of this property and creates the contract, the agency, the corretor and the tenants that do not exist yet (the unit is settled per contract; duplicates are skipped — see `docs/CONTRATOS_MODULE.md` §7.8). Closing it reloads the property's unit contracts.
 
@@ -981,6 +983,7 @@ Property details and sub-units are stored as JSONB in the `profiles` table becau
 1. **Flat layout** for a saved property (`mode === 'manage'`): `PropertyRegisterSection` (Endereço / Dados do imóvel / Descrição as summaries with edit-in-place) and `PropertyFilesSection` (documents by category, photos with the cover star, videos, one upload button per kind, in the style of the projects' "Arquivos do projeto") replace the six accordion cards; the wizard of a new property keeps them. §5.6, §6.3.
 2. **Importar contrato** on the property's page (`LeaseBatchImportModal`, `mode="current"`, `fixedProperty`) and **Importar contrato de locação** in "Adicionar Propriedade" (no fixed property: the AI creates the property too). Both create the contract, the agency, the corretor and the tenants that are missing. `LeaseBatchImportModal` gained `fixedProperty`.
 3. `handlePropPhotoSelect` / `handlePropVideoSelect` became wrappers of `uploadPropPhotos(files)` / `uploadPropVideos(files)`; `removePropSavedVideo` now persists the removal to the profile row; the energy-dashboard handoff moved to `openEnergyDashboard` (shared by both layouts); `profileReloadTick` re-runs the profile load after an import.
+4. **Units flat** (`SubUnitsFlatSection`): on the saved property's page the units are no longer an accordion — each unit is a flat block with its data, photos and videos, edited in place with the wizard's fields; `subUnitActions`, `SubUnitFields` and `isSubUnitComplete` were extracted from `SubUnitsSection` so both layouts share them. §5.4, §6.3.
 
 ### v2.2 — 2026-09-07
 

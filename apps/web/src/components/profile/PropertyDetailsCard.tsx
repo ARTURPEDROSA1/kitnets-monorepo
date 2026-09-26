@@ -154,7 +154,7 @@ export function Checkbox({
 }
 
 // ── Select Component ───────────────────────────────────────────────
-function SelectField({
+export function SelectField({
     label,
     value,
     onChange,
@@ -189,7 +189,7 @@ function SelectField({
 }
 
 // ── File Preview Component ─────────────────────────────────────────
-function FilePreview({ file, onRemove, isVideo }: { file: File; onRemove: () => void; isVideo?: boolean }) {
+export function FilePreview({ file, onRemove, isVideo }: { file: File; onRemove: () => void; isVideo?: boolean }) {
     const preview = useMemo(() => URL.createObjectURL(file), [file]);
 
     useEffect(() => {
@@ -635,7 +635,7 @@ export default function PropertyDetailsCard({
 // ══════════════════════════════════════════════════════════════════
 //  SubUnitsSection — Rendered separately in profile page
 // ══════════════════════════════════════════════════════════════════
-interface SubUnitsSectionProps {
+export interface SubUnitsSectionProps {
     details: PropertyDetails;
     units: SubUnit[];
     onDetailsChange: (details: PropertyDetails) => void;
@@ -662,7 +662,7 @@ export interface UnitContractFile {
     reference_name?: string | null;
 }
 
-const UNIT_TYPE_OPTIONS = [
+export const UNIT_TYPE_OPTIONS = [
     { value: '', label: 'Selecione o tipo' },
     { value: 'kitnet', label: 'Kitnet' },
     { value: 'studio', label: 'Studio' },
@@ -674,57 +674,35 @@ const UNIT_TYPE_OPTIONS = [
     { value: 'other', label: 'Outro' },
 ];
 
-export function SubUnitsSection({
-    details,
-    units,
-    onDetailsChange,
-    onUnitsChange,
-    onGenerateDescription,
-    generatingDescriptionIdx,
-    onImportContract,
-    importingContractIdx,
-    initialOpenIdx,
-    propertyIndex,
-    unitContracts,
-    leasedUnitIds,
-    onCommit,
-    saveState = 'idle',
-}: SubUnitsSectionProps) {
-    const [contractViewer, setContractViewer] = useState<UnitContractFile | null>(null);
-    const unitHasLease = (unit: SubUnit) => !!unit.id && (!!leasedUnitIds?.includes(unit.id) || !!unitContracts?.[unit.id]);
-
-    // A unit is "complete" when all mandatory fields are filled
-    const isUnitComplete = (unit: SubUnit): boolean => {
-        const totalPhotos = (unit.photos?.length || 0) + (unit.newPhotos?.length || 0);
-        return !!(
-            unit.unitType &&
-            unit.name?.trim() &&
-            unit.sqMeters?.trim() &&
-            unit.rooms?.trim() &&
-            unit.bedrooms?.trim() &&
-            unit.bathrooms?.trim() &&
-            unit.description?.trim() &&
-            totalPhotos >= 2
-        );
-    };
-
-    // Compute a stable key representing unit completion states
-    const allComplete = useMemo(() =>
-        units.length > 0 && units.every(u => isUnitComplete(u)),
-        [units]
+/** A unit is "complete" when every mandatory field is filled and it has at least two photos. */
+export function isSubUnitComplete(unit: SubUnit): boolean {
+    const totalPhotos = (unit.photos?.length || 0) + (unit.newPhotos?.length || 0);
+    return !!(
+        unit.unitType &&
+        unit.name?.trim() &&
+        unit.sqMeters?.trim() &&
+        unit.rooms?.trim() &&
+        unit.bedrooms?.trim() &&
+        unit.bathrooms?.trim() &&
+        unit.description?.trim() &&
+        totalPhotos >= 2
     );
+}
 
-    // Use initialOpenIdx from parent if provided (number or null = explicit), otherwise auto-pick
-    const [openUnitIndex, setOpenUnitIndex] = useState<number | null>(() => {
-        if (initialOpenIdx !== undefined) return initialOpenIdx; // null = all collapsed, number = open that one
-        // Auto-pick: all collapsed if complete, else first incomplete
-        if (allComplete) return null;
-        const firstIncomplete = units.findIndex(u => !isUnitComplete(u));
-        return firstIncomplete >= 0 ? firstIncomplete : null;
-    });
-
-    // Typed fields are persisted when they lose focus (onBlur of the list below);
-    // selects, checkboxes, media and add/remove pass `commit` to persist right away.
+/**
+ * Everything that changes the unit list, shared by the wizard's accordion and the flat section of a saved property.
+ * Typed fields are persisted when they lose focus (the sections' onBlur); selects, checkboxes, media and add/remove
+ * pass `commit` to persist right away.
+ */
+export function subUnitActions({ details, units, onDetailsChange, onUnitsChange, onCommit, onInserted }: {
+    details: PropertyDetails;
+    units: SubUnit[];
+    onDetailsChange: (details: PropertyDetails) => void;
+    onUnitsChange: (units: SubUnit[]) => void;
+    onCommit?: () => void;
+    /** a unit was added or duplicated at this index — open it */
+    onInserted?: (index: number, unit: SubUnit) => void;
+}) {
     const updateUnit = (index: number, partial: Partial<SubUnit>, commit = false) => {
         const updated = [...units];
         updated[index] = { ...updated[index], ...partial };
@@ -742,14 +720,15 @@ export function SubUnitsSection({
         onCommit?.();
     };
 
-    const removeUnit = (index: number) => {
-        // The removal is persisted right away, so it asks first
+    /** Asks first (the removal is persisted right away); true when the unit was removed. */
+    const removeUnit = (index: number): boolean => {
         const label = units[index]?.name || `Unidade ${index + 1}`;
-        if (!window.confirm(`Excluir "${label}"? Esta ação não pode ser desfeita.`)) return;
+        if (!window.confirm(`Excluir "${label}"? Esta ação não pode ser desfeita.`)) return false;
         const updated = units.filter((_, i) => i !== index);
         onDetailsChange({ ...details, numberOfUnits: updated.length });
         onUnitsChange(updated);
         onCommit?.();
+        return true;
     };
 
     const duplicateUnit = (index: number) => {
@@ -771,29 +750,31 @@ export function SubUnitsSection({
         onDetailsChange({ ...details, numberOfUnits: newUnits.length });
         onUnitsChange(newUnits);
         onCommit?.();
-        setOpenUnitIndex(index + 1);
+        onInserted?.(index + 1, cloned);
     };
 
-    const handleUnitPhotoSelect = (idx: number, e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!e.target.files || e.target.files.length === 0) return;
+    const addUnit = () => {
+        const newUnits = [...units, defaultSubUnit(units.length)];
+        onUnitsChange(newUnits);
+        onDetailsChange({ ...details, numberOfUnits: newUnits.length });
+        onCommit?.();
+        onInserted?.(newUnits.length - 1, newUnits[newUnits.length - 1]);
+    };
+
+    const addUnitPhotos = (idx: number, files: File[]) => {
+        if (files.length === 0) return;
         const unit = units[idx];
-        const totalPhotos = (unit.photos?.length || 0) + (unit.newPhotos?.length || 0);
-        const remaining = 10 - totalPhotos;
+        const remaining = 10 - ((unit.photos?.length || 0) + (unit.newPhotos?.length || 0));
         if (remaining <= 0) { alert("Máximo de 10 fotos por unidade."); return; }
-        const newFiles = Array.from(e.target.files).slice(0, remaining);
-        updateUnit(idx, { newPhotos: [...(unit.newPhotos || []), ...newFiles] }, true);
-        e.target.value = '';
+        updateUnit(idx, { newPhotos: [...(unit.newPhotos || []), ...files.slice(0, remaining)] }, true);
     };
 
-    const handleUnitVideoSelect = (idx: number, e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!e.target.files || e.target.files.length === 0) return;
+    const addUnitVideos = (idx: number, files: File[]) => {
+        if (files.length === 0) return;
         const unit = units[idx];
-        const totalVideos = (unit.videos?.length || 0) + (unit.newVideos?.length || 0);
-        const remaining = 2 - totalVideos;
+        const remaining = 2 - ((unit.videos?.length || 0) + (unit.newVideos?.length || 0));
         if (remaining <= 0) { alert("Máximo de 2 vídeos por unidade."); return; }
-        const newFiles = Array.from(e.target.files).slice(0, remaining);
-        updateUnit(idx, { newVideos: [...(unit.newVideos || []), ...newFiles] }, true);
-        e.target.value = '';
+        updateUnit(idx, { newVideos: [...(unit.newVideos || []), ...files.slice(0, remaining)] }, true);
     };
 
     const removeUnitNewPhoto = (unitIdx: number, photoIdx: number) => {
@@ -815,6 +796,260 @@ export function SubUnitsSection({
         const unit = units[unitIdx];
         updateUnit(unitIdx, { videos: (unit.videos || []).filter(u => u !== url) }, true);
     };
+
+    return { updateUnit, updateUnitCondo, removeUnit, duplicateUnit, addUnit, addUnitPhotos, addUnitVideos, removeUnitNewPhoto, removeUnitNewVideo, removeUnitSavedPhoto, removeUnitSavedVideo };
+}
+
+/** The fields of one unit (type, name, area, rooms, amenities, condominium): the wizard's accordion and the flat section share them. */
+export function SubUnitFields({ unit, idx, updateUnit, updateUnitCondo }: {
+    unit: SubUnit;
+    idx: number;
+    updateUnit: (index: number, partial: Partial<SubUnit>, commit?: boolean) => void;
+    updateUnitCondo: (index: number, field: keyof SubUnit["condominiumIncludes"], val: boolean) => void;
+}) {
+    return (
+        <div className="space-y-5">
+            {/* Unit Type Dropdown */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                    <Label className="flex items-center gap-1.5">
+                        <Home className="w-4 h-4 text-muted-foreground" />
+                        Tipo da Unidade
+                    </Label>
+                    <select
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        value={unit.unitType || ''}
+                        onChange={(e) => updateUnit(idx, { unitType: e.target.value as SubUnit['unitType'] }, true)}
+                    >
+                        {UNIT_TYPE_OPTIONS.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+
+            {/* Unit Name + SqM */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                    <Label>Nome da Unidade</Label>
+                    <Input
+                        value={unit.name}
+                        onChange={(e) => updateUnit(idx, { name: e.target.value })}
+                        placeholder="ex: Kitnet 35A"
+                    />
+                </div>
+                <div className="space-y-1.5">
+                    <Label className="flex items-center gap-1.5">
+                        <DoorOpen className="w-4 h-4 text-muted-foreground" />
+                        Área (m²)
+                    </Label>
+                    <Input
+                        type="number"
+                        min={0}
+                        value={unit.sqMeters}
+                        onChange={(e) => updateUnit(idx, { sqMeters: e.target.value })}
+                        placeholder="ex: 30"
+                    />
+                </div>
+            </div>
+
+            {/* Rooms + Bedrooms + Bathrooms */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="space-y-1.5">
+                    <Label className="flex items-center gap-1.5">
+                        <DoorOpen className="w-4 h-4 text-muted-foreground" />
+                        Cômodos
+                    </Label>
+                    <Input
+                        type="number"
+                        min={0}
+                        value={unit.rooms}
+                        onChange={(e) => updateUnit(idx, { rooms: e.target.value })}
+                        placeholder="ex: 4"
+                    />
+                </div>
+                <div className="space-y-1.5">
+                    <Label className="flex items-center gap-1.5">
+                        <BedDouble className="w-4 h-4 text-muted-foreground" />
+                        Quartos
+                    </Label>
+                    <Input
+                        type="number"
+                        min={0}
+                        value={unit.bedrooms}
+                        onChange={(e) => updateUnit(idx, { bedrooms: e.target.value })}
+                        placeholder="ex: 1"
+                    />
+                </div>
+                <div className="space-y-1.5">
+                    <Label className="flex items-center gap-1.5">
+                        <Bath className="w-4 h-4 text-muted-foreground" />
+                        Banheiros
+                    </Label>
+                    <Input
+                        type="number"
+                        min={0}
+                        value={unit.bathrooms}
+                        onChange={(e) => updateUnit(idx, { bathrooms: e.target.value })}
+                        placeholder="ex: 1"
+                    />
+                </div>
+            </div>
+
+            {/* Garage + Kitchen Cabinets */}
+            <div className="flex flex-wrap gap-5">
+                <Checkbox
+                    checked={unit.garage}
+                    onChange={(val) => updateUnit(idx, { garage: val }, true)}
+                    label="Garagem"
+                    icon={<Car className="w-4 h-4" />}
+                />
+                <Checkbox
+                    checked={unit.kitchenCabinets}
+                    onChange={(val) => updateUnit(idx, { kitchenCabinets: val }, true)}
+                    label="Armários de Cozinha"
+                    icon={<CookingPot className="w-4 h-4" />}
+                />
+            </div>
+
+            {/* Selects: Laundry, AC, Cooktop */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <SelectField
+                    label="Lavanderia"
+                    value={unit.laundry}
+                    onChange={(val) => updateUnit(idx, { laundry: val as SubUnit["laundry"] }, true)}
+                    icon={<Shirt className="w-4 h-4 text-muted-foreground" />}
+                    options={[
+                        { value: "none", label: "Não possui" },
+                        { value: "individual", label: "Individual" },
+                        { value: "shared", label: "Compartilhada" },
+                    ]}
+                />
+                <SelectField
+                    label="Ar-Condicionado"
+                    value={unit.ac}
+                    onChange={(val) => updateUnit(idx, { ac: val as SubUnit["ac"] }, true)}
+                    icon={<Wind className="w-4 h-4 text-muted-foreground" />}
+                    options={[
+                        { value: "none", label: "Não possui" },
+                        { value: "cold", label: "Frio" },
+                        { value: "cold_hot", label: "Quente e Frio" },
+                    ]}
+                />
+                <SelectField
+                    label="Cooktop"
+                    value={unit.cooktop}
+                    onChange={(val) => updateUnit(idx, { cooktop: val as SubUnit["cooktop"] }, true)}
+                    icon={<CookingPot className="w-4 h-4 text-muted-foreground" />}
+                    options={[
+                        { value: "none", label: "Não possui" },
+                        { value: "gas", label: "Gás" },
+                        { value: "electric", label: "Elétrico" },
+                        { value: "induction", label: "Indução" },
+                    ]}
+                />
+            </div>
+
+            {/* Condominium — below Lavanderia/AC/Cooktop */}
+            <div className="space-y-3 pt-2 border-t border-border">
+                <Checkbox
+                    checked={unit.condominium}
+                    onChange={(val) => updateUnit(idx, { condominium: val }, true)}
+                    label="Condomínio"
+                    icon={<Building2 className="w-4 h-4" />}
+                />
+                {unit.condominium && (
+                    <div className="ml-9 space-y-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                        <div className="space-y-1.5 max-w-xs">
+                            <Label>Valor do Condomínio (R$)</Label>
+                            <Input
+                                type="number"
+                                min={0}
+                                step={0.01}
+                                value={unit.condominiumValue}
+                                onChange={(e) => updateUnit(idx, { condominiumValue: e.target.value })}
+                                placeholder="ex: 350.00"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <p className="text-sm font-medium text-foreground">Incluso no condomínio:</p>
+                            <div className="flex flex-wrap gap-4">
+                                <Checkbox
+                                    checked={unit.condominiumIncludes.energy}
+                                    onChange={(val) => updateUnitCondo(idx, "energy", val)}
+                                    label="Energia"
+                                    icon={<Zap className="w-3.5 h-3.5" />}
+                                />
+                                <Checkbox
+                                    checked={unit.condominiumIncludes.water}
+                                    onChange={(val) => updateUnitCondo(idx, "water", val)}
+                                    label="Água"
+                                    icon={<Droplets className="w-3.5 h-3.5" />}
+                                />
+                                <Checkbox
+                                    checked={unit.condominiumIncludes.internet}
+                                    onChange={(val) => updateUnitCondo(idx, "internet", val)}
+                                    label="Internet"
+                                    icon={<Wifi className="w-3.5 h-3.5" />}
+                                />
+                                <Checkbox
+                                    checked={unit.condominiumIncludes.iptu}
+                                    onChange={(val) => updateUnitCondo(idx, "iptu", val)}
+                                    label="IPTU"
+                                />
+                                <Checkbox
+                                    checked={unit.condominiumIncludes.gas}
+                                    onChange={(val) => updateUnitCondo(idx, "gas", val)}
+                                    label="Gás"
+                                    icon={<Flame className="w-3.5 h-3.5" />}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+export function SubUnitsSection({
+    details,
+    units,
+    onDetailsChange,
+    onUnitsChange,
+    onGenerateDescription,
+    generatingDescriptionIdx,
+    onImportContract,
+    importingContractIdx,
+    initialOpenIdx,
+    propertyIndex,
+    unitContracts,
+    leasedUnitIds,
+    onCommit,
+    saveState = 'idle',
+}: SubUnitsSectionProps) {
+    const [contractViewer, setContractViewer] = useState<UnitContractFile | null>(null);
+    const unitHasLease = (unit: SubUnit) => !!unit.id && (!!leasedUnitIds?.includes(unit.id) || !!unitContracts?.[unit.id]);
+
+    // Compute a stable key representing unit completion states
+    const allComplete = useMemo(() =>
+        units.length > 0 && units.every(u => isSubUnitComplete(u)),
+        [units]
+    );
+
+    // Use initialOpenIdx from parent if provided (number or null = explicit), otherwise auto-pick
+    const [openUnitIndex, setOpenUnitIndex] = useState<number | null>(() => {
+        if (initialOpenIdx !== undefined) return initialOpenIdx; // null = all collapsed, number = open that one
+        // Auto-pick: all collapsed if complete, else first incomplete
+        if (allComplete) return null;
+        const firstIncomplete = units.findIndex(u => !isSubUnitComplete(u));
+        return firstIncomplete >= 0 ? firstIncomplete : null;
+    });
+
+    const { updateUnit, updateUnitCondo, removeUnit, duplicateUnit, addUnit, addUnitPhotos, addUnitVideos, removeUnitNewPhoto, removeUnitNewVideo, removeUnitSavedPhoto, removeUnitSavedVideo } =
+        subUnitActions({ details, units, onDetailsChange, onUnitsChange, onCommit, onInserted: setOpenUnitIndex });
+    const handleUnitPhotoSelect = (idx: number, e: React.ChangeEvent<HTMLInputElement>) => { const files = Array.from(e.target.files ?? []); e.target.value = ''; addUnitPhotos(idx, files); };
+    const handleUnitVideoSelect = (idx: number, e: React.ChangeEvent<HTMLInputElement>) => { const files = Array.from(e.target.files ?? []); e.target.value = ''; addUnitVideos(idx, files); };
 
     return (
         <div
@@ -849,13 +1084,7 @@ export function SubUnitsSection({
                     title="Adicionar"
                     aria-label="Adicionar"
                     className="h-8 w-8 p-0"
-                    onClick={() => {
-                        const newUnits = [...units, defaultSubUnit(units.length)];
-                        onUnitsChange(newUnits);
-                        onDetailsChange({ ...details, numberOfUnits: newUnits.length });
-                        onCommit?.();
-                        setOpenUnitIndex(newUnits.length - 1);
-                    }}
+                    onClick={addUnit}
                 >
                     <Plus className="w-4 h-4" />
                 </Button>
@@ -886,7 +1115,7 @@ export function SubUnitsSection({
                             <div className="text-left">
                                 <div className="flex items-center gap-2">
                                     <p className="text-sm font-semibold text-foreground">{unit.name || `Unidade ${idx + 1}`}</p>
-                                    {openUnitIndex !== idx && isUnitComplete(unit) && (
+                                    {openUnitIndex !== idx && isSubUnitComplete(unit) && (
                                         <span className="text-xs bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full">
                                             Preenchido ✓
                                         </span>
@@ -996,205 +1225,7 @@ export function SubUnitsSection({
                                 </div>
                             )}
 
-                            {/* Unit Type Dropdown */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="space-y-1.5">
-                                    <Label className="flex items-center gap-1.5">
-                                        <Home className="w-4 h-4 text-muted-foreground" />
-                                        Tipo da Unidade
-                                    </Label>
-                                    <select
-                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                                        value={unit.unitType || ''}
-                                        onChange={(e) => updateUnit(idx, { unitType: e.target.value as SubUnit['unitType'] }, true)}
-                                    >
-                                        {UNIT_TYPE_OPTIONS.map(opt => (
-                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            {/* Unit Name + SqM */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="space-y-1.5">
-                                    <Label>Nome da Unidade</Label>
-                                    <Input
-                                        value={unit.name}
-                                        onChange={(e) => updateUnit(idx, { name: e.target.value })}
-                                        placeholder="ex: Kitnet 35A"
-                                    />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label className="flex items-center gap-1.5">
-                                        <DoorOpen className="w-4 h-4 text-muted-foreground" />
-                                        Área (m²)
-                                    </Label>
-                                    <Input
-                                        type="number"
-                                        min={0}
-                                        value={unit.sqMeters}
-                                        onChange={(e) => updateUnit(idx, { sqMeters: e.target.value })}
-                                        placeholder="ex: 30"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Rooms + Bedrooms + Bathrooms */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <div className="space-y-1.5">
-                                    <Label className="flex items-center gap-1.5">
-                                        <DoorOpen className="w-4 h-4 text-muted-foreground" />
-                                        Cômodos
-                                    </Label>
-                                    <Input
-                                        type="number"
-                                        min={0}
-                                        value={unit.rooms}
-                                        onChange={(e) => updateUnit(idx, { rooms: e.target.value })}
-                                        placeholder="ex: 4"
-                                    />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label className="flex items-center gap-1.5">
-                                        <BedDouble className="w-4 h-4 text-muted-foreground" />
-                                        Quartos
-                                    </Label>
-                                    <Input
-                                        type="number"
-                                        min={0}
-                                        value={unit.bedrooms}
-                                        onChange={(e) => updateUnit(idx, { bedrooms: e.target.value })}
-                                        placeholder="ex: 1"
-                                    />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label className="flex items-center gap-1.5">
-                                        <Bath className="w-4 h-4 text-muted-foreground" />
-                                        Banheiros
-                                    </Label>
-                                    <Input
-                                        type="number"
-                                        min={0}
-                                        value={unit.bathrooms}
-                                        onChange={(e) => updateUnit(idx, { bathrooms: e.target.value })}
-                                        placeholder="ex: 1"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Garage + Kitchen Cabinets */}
-                            <div className="flex flex-wrap gap-5">
-                                <Checkbox
-                                    checked={unit.garage}
-                                    onChange={(val) => updateUnit(idx, { garage: val }, true)}
-                                    label="Garagem"
-                                    icon={<Car className="w-4 h-4" />}
-                                />
-                                <Checkbox
-                                    checked={unit.kitchenCabinets}
-                                    onChange={(val) => updateUnit(idx, { kitchenCabinets: val }, true)}
-                                    label="Armários de Cozinha"
-                                    icon={<CookingPot className="w-4 h-4" />}
-                                />
-                            </div>
-
-                            {/* Selects: Laundry, AC, Cooktop */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <SelectField
-                                    label="Lavanderia"
-                                    value={unit.laundry}
-                                    onChange={(val) => updateUnit(idx, { laundry: val as SubUnit["laundry"] }, true)}
-                                    icon={<Shirt className="w-4 h-4 text-muted-foreground" />}
-                                    options={[
-                                        { value: "none", label: "Não possui" },
-                                        { value: "individual", label: "Individual" },
-                                        { value: "shared", label: "Compartilhada" },
-                                    ]}
-                                />
-                                <SelectField
-                                    label="Ar-Condicionado"
-                                    value={unit.ac}
-                                    onChange={(val) => updateUnit(idx, { ac: val as SubUnit["ac"] }, true)}
-                                    icon={<Wind className="w-4 h-4 text-muted-foreground" />}
-                                    options={[
-                                        { value: "none", label: "Não possui" },
-                                        { value: "cold", label: "Frio" },
-                                        { value: "cold_hot", label: "Quente e Frio" },
-                                    ]}
-                                />
-                                <SelectField
-                                    label="Cooktop"
-                                    value={unit.cooktop}
-                                    onChange={(val) => updateUnit(idx, { cooktop: val as SubUnit["cooktop"] }, true)}
-                                    icon={<CookingPot className="w-4 h-4 text-muted-foreground" />}
-                                    options={[
-                                        { value: "none", label: "Não possui" },
-                                        { value: "gas", label: "Gás" },
-                                        { value: "electric", label: "Elétrico" },
-                                        { value: "induction", label: "Indução" },
-                                    ]}
-                                />
-                            </div>
-
-                            {/* Condominium — below Lavanderia/AC/Cooktop */}
-                            <div className="space-y-3 pt-2 border-t border-border">
-                                <Checkbox
-                                    checked={unit.condominium}
-                                    onChange={(val) => updateUnit(idx, { condominium: val }, true)}
-                                    label="Condomínio"
-                                    icon={<Building2 className="w-4 h-4" />}
-                                />
-                                {unit.condominium && (
-                                    <div className="ml-9 space-y-4 animate-in fade-in slide-in-from-top-1 duration-200">
-                                        <div className="space-y-1.5 max-w-xs">
-                                            <Label>Valor do Condomínio (R$)</Label>
-                                            <Input
-                                                type="number"
-                                                min={0}
-                                                step={0.01}
-                                                value={unit.condominiumValue}
-                                                onChange={(e) => updateUnit(idx, { condominiumValue: e.target.value })}
-                                                placeholder="ex: 350.00"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <p className="text-sm font-medium text-foreground">Incluso no condomínio:</p>
-                                            <div className="flex flex-wrap gap-4">
-                                                <Checkbox
-                                                    checked={unit.condominiumIncludes.energy}
-                                                    onChange={(val) => updateUnitCondo(idx, "energy", val)}
-                                                    label="Energia"
-                                                    icon={<Zap className="w-3.5 h-3.5" />}
-                                                />
-                                                <Checkbox
-                                                    checked={unit.condominiumIncludes.water}
-                                                    onChange={(val) => updateUnitCondo(idx, "water", val)}
-                                                    label="Água"
-                                                    icon={<Droplets className="w-3.5 h-3.5" />}
-                                                />
-                                                <Checkbox
-                                                    checked={unit.condominiumIncludes.internet}
-                                                    onChange={(val) => updateUnitCondo(idx, "internet", val)}
-                                                    label="Internet"
-                                                    icon={<Wifi className="w-3.5 h-3.5" />}
-                                                />
-                                                <Checkbox
-                                                    checked={unit.condominiumIncludes.iptu}
-                                                    onChange={(val) => updateUnitCondo(idx, "iptu", val)}
-                                                    label="IPTU"
-                                                />
-                                                <Checkbox
-                                                    checked={unit.condominiumIncludes.gas}
-                                                    onChange={(val) => updateUnitCondo(idx, "gas", val)}
-                                                    label="Gás"
-                                                    icon={<Flame className="w-3.5 h-3.5" />}
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
+                            <SubUnitFields unit={unit} idx={idx} updateUnit={updateUnit} updateUnitCondo={updateUnitCondo} />
 
                             {/* Photos (up to 10) */}
                             <div className="space-y-2 pt-2 border-t border-border">

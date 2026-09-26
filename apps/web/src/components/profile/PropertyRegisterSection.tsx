@@ -61,7 +61,8 @@ function Block({ icon, title, filled, editing, onToggle, saving, summary, editor
     );
 }
 
-function Field({ label, value }: { label: string; value: React.ReactNode }) {
+/** One label + value of a flat summary (the ficha's and the units'). */
+export function Field({ label, value }: { label: string; value: React.ReactNode }) {
     return (
         <div className="min-w-0">
             <dt className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</dt>
@@ -70,7 +71,9 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
     );
 }
 
-const dash = (v: string | number | null | undefined, suffix = "") => (v === null || v === undefined || String(v).trim() === "" ? <span className="text-muted-foreground">—</span> : `${v}${suffix}`);
+export const muted = (t: string) => <span className="text-muted-foreground">{t}</span>;
+/** The value, with its unit, or a muted dash when empty. */
+export const dash = (v: string | number | null | undefined, suffix = "") => (v === null || v === undefined || String(v).trim() === "" ? muted("—") : `${v}${suffix}`);
 
 export default function PropertyRegisterSection({ propertyType, details, address, unitsCount, saving, editingAddress, onEditAddress, addressEditor, editingDetails, onEditDetails, detailsEditor, editingDescription, onEditDescription, descriptionEditor, onSave }: Props) {
     const addressFilled = Boolean(address.street?.trim() || address.cep?.trim());

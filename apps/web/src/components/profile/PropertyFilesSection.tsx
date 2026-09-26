@@ -87,6 +87,13 @@ export default function PropertyFilesSection({ proofs, pendingFiles, fileAnalysi
     const [photoIndex, setPhotoIndex] = useState<number | null>(null);
     const [video, setVideo] = useState<string | null>(null);
     const inputs = useRef<Partial<Record<UploadKind, HTMLInputElement | null>>>({});
+    // The video player closes on Escape, like the other overlays
+    React.useEffect(() => {
+        if (!video) return;
+        const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setVideo(null); };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [video]);
 
     const docs = useMemo<DocItem[]>(() => [
         ...proofs.filter(Boolean).map(p => ({
@@ -296,8 +303,8 @@ export default function PropertyFilesSection({ proofs, pendingFiles, fileAnalysi
             <PhotoLightbox photos={docLightbox?.photos ?? []} index={docLightbox?.index ?? null} onClose={() => setDocLightbox(null)} onNavigate={() => {}} />
             {viewer && <PdfViewerModal isOpen onClose={() => setViewer(null)} url={viewer.url} title={viewer.title} fileName={viewer.fileName} />}
             {video && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setVideo(null)}>
-                    <button type="button" onClick={() => setVideo(null)} className="absolute right-4 top-4 rounded-lg bg-background/20 p-2 text-white hover:bg-background/40" aria-label="Fechar"><X className="h-5 w-5" /></button>
+                <div role="dialog" aria-modal="true" aria-label="Vídeo do imóvel" className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setVideo(null)}>
+                    <button type="button" autoFocus onClick={() => setVideo(null)} className="absolute right-4 top-4 rounded-lg bg-white/20 p-2 text-white hover:bg-white/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white" aria-label="Fechar o vídeo (Esc)"><X className="h-5 w-5" /></button>
                     <video src={video} controls autoPlay className="max-h-[85vh] max-w-full rounded-xl" onClick={e => e.stopPropagation()} />
                 </div>
             )}
