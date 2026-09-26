@@ -6,6 +6,7 @@
 
 ---
 
+> **2026-09-25 — pilot only.** The gateway is a founder-only pilot, not a product of Kitnets.com. The "Meus Gateways" block on `/dashboard` is rendered only for the accounts listed in `GATEWAY_PILOT_EMAILS` (default `pedrosa.ac@gmail.com`; `lib/gateways-access.ts`); the dashboard itself was rebuilt as the portfolio panel (`docs/DASHBOARD_MODULE.md`). The gateway pages under `/dashboard/gateway/*` and the API routes are unchanged.
 ## Table of Contents
 
 1. [System Overview](#1-system-overview)

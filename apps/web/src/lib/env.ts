@@ -37,6 +37,11 @@ export const serverSchema = z.object({
     OPENAI_MINI_MODEL: nonEmpty.optional(),
     // CPF enrichment; the feature is disabled when absent.
     BIGDATACORP_TOKEN: nonEmpty.optional(),
+    // Google Geocoding API (server-side; restrict the key by IP/API, never by referrer). Without it the
+    // dashboard map locates addresses through BrasilAPI's CEP coordinates instead.
+    GOOGLE_MAPS_SERVER_KEY: nonEmpty.optional(),
+    // Accounts that see the IoT gateways block on the dashboard, comma-separated. Defaults to the founder's e-mail.
+    GATEWAY_PILOT_EMAILS: nonEmpty.optional(),
     // Source-map upload at build time only.
     SENTRY_ORG: nonEmpty.optional(),
     SENTRY_PROJECT: nonEmpty.optional(),
@@ -51,6 +56,10 @@ export const clientSchema = z.object({
     // Every read in the app falls back to the production domain; mirror that here.
     NEXT_PUBLIC_BASE_URL: url.default("https://kitnets.com"),
     NEXT_PUBLIC_SENTRY_DSN: url.optional(),
+    // Google Maps JavaScript API browser key (HTTP-referrer restricted). The dashboard map is hidden when absent.
+    NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: nonEmpty.optional(),
+    // Cloud-console Map ID for the map's advanced markers; the demo id is used when absent.
+    NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID: nonEmpty.optional(),
     NEXT_PUBLIC_CLERK_SIGN_IN_URL: z.string().default("/login/proprietario"),
     NEXT_PUBLIC_CLERK_SIGN_UP_URL: z.string().default("/signup/proprietario"),
     NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: z.string().default("/dashboard"),
@@ -123,6 +132,8 @@ const clientRuntime = {
     NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
     NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,
     NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
+    NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
+    NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID: process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID,
     NEXT_PUBLIC_CLERK_SIGN_IN_URL: process.env.NEXT_PUBLIC_CLERK_SIGN_IN_URL,
     NEXT_PUBLIC_CLERK_SIGN_UP_URL: process.env.NEXT_PUBLIC_CLERK_SIGN_UP_URL,
     NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: process.env.NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL,

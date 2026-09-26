@@ -512,6 +512,8 @@ The same import runs from **Imobiliárias**: the hub's "Importar contrato" and t
 ### 7.8 The import from Imóveis
 Since 2026-09-25 the same batch import also runs from **Imóveis**. On a saved property's page the header of "Dados Cadastrais & Documentação" has **Importar contrato**: `LeaseBatchImportModal` in `mode="current"` with `fixedProperty` = that property, so the property section of the review is settled (the unit of a multi-unit property is still chosen in the settle step) and each agreement creates the contract, the agency, the corretor and the tenants that do not exist yet — `createLeaseFromImport`'s duplicate guard keeps a re-import from adding a second lease. **Adicionar Propriedade** offers **Importar contrato de locação** too: the same modal without a fixed property, where the review's "criar imóvel" creates the property from the address the AI read (`POST /api/properties`, `createRentalProperty`) before the contract; the Imóveis page reloads the profile when the modal closes. `LeaseBatchImportModal` passes `fixedProperty` through to `LeaseImportModal` and names the property in its intro.
 
+`/contratos?importar=1` opens the same import (`mode="current"`, no fixed property or agency) as soon as the page loads — the dashboard's "Importar contrato" links there — and the parameter is removed from the URL, so a reload does not reopen it. "Importar contratos antigos" keeps `mode="history"`.
+
 ### 8.1 State Machine
 
 ```mermaid
@@ -628,6 +630,7 @@ If a property already has a contract with `status = 'ACTIVE'` and the user attem
 
 ## 12. Changelog
 
+- **2026-09-25** — `?importar=1` opens the import of current contracts on arrival (the dashboard's "Importar contrato"; §7.8).
 - **2026-09-25** — The lease import also runs from Imóveis: "Importar contrato" on a property's page (`fixedProperty`) and "Importar contrato de locação" in Adicionar Propriedade, which creates the property as well (§7.8).
 - **2026-09-25** — The agency's header logo travels with the import (`agency_logo`) and becomes the logo of the agency created from the contract; the lease import also runs from Imobiliárias, with the agency fixed from its dashboard (§7.7).
 - **2026-09-25** — The AI import reads the corretor: `agents` in the extraction, `matchAgent`, the Corretor section of the review, `agent_id` on the lease and the tenants created from it (§7.6).

@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import type { AdminSupabase } from "@/lib/api-auth";
-import { getOwnerPropertiesSummary } from "./energy-properties-server";
+import { getOwnerPropertiesSummary, type OwnerPropertySummary } from "./energy-properties-server";
 import { listWaterFiles, signWaterFiles } from "./water-bills-server";
 import { EMPTY_WATER_PERIOD, summarizeWaterBills, type WaterBillLike, type WaterLatest, type WaterPeriod } from "./water-hub";
 
@@ -47,11 +47,15 @@ function getServiceSupabase(): AdminSupabase {
     return createClient(url, key);
 }
 
-export async function getOwnerWaterPropertiesSummary(userId: string): Promise<WaterPropertySummary[]> {
+/**
+ * `preloaded`: the energy summary already loaded in the same request (the dashboard), so its row creation
+ * runs once — two concurrent runs would both insert the same missing `properties` row.
+ */
+export async function getOwnerWaterPropertiesSummary(userId: string, preloaded?: OwnerPropertySummary[]): Promise<WaterPropertySummary[]> {
     if (!userId) return [];
     try {
         // Reuses the profile ↔ properties matching (and row creation) of the energy hub
-        const all = await getOwnerPropertiesSummary(userId);
+        const all = preloaded ?? await getOwnerPropertiesSummary(userId);
         const withWater = all.filter(p => !p.isStandaloneUc && !p.isOrphaned && p.hasWaterMeter);
         if (withWater.length === 0) return [];
 
