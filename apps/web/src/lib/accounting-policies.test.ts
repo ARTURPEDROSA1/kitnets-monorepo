@@ -1,0 +1,47 @@
+import { describe, expect, it } from "vitest";
+import { DEFAULT_SETTINGS, pendingDecisions, validateSettings } from "./accounting-policies";
+
+describe("validateSettings", () => {
+    it("keeps the current values for fields not sent", () => {
+        const r = validateSettings({ nire: " 31 2 0000000 1 " });
+        expect(r).toHaveProperty("value");
+        if ("value" in r) {
+            expect(r.value.nire).toBe("31 2 0000000 1");
+            expect(r.value.accounting_standard).toBe("NBC_TG_1002");
+        }
+    });
+
+    it("refuses fair value under NBC TG 1002 and accepts it under the full standards", () => {
+        expect(validateSettings({ property_measurement: "FAIR_VALUE" })).toHaveProperty("error");
+        const r = validateSettings({ accounting_standard: "NBC_TG_COMPLETAS", property_measurement: "FAIR_VALUE" });
+        expect("value" in r && r.value.property_measurement).toBe("FAIR_VALUE");
+    });
+
+    it("pins the useful life to 25 years when it follows the Receita", () => {
+        const r = validateSettings({ useful_life_basis: "RFB", building_useful_life_years: 40 });
+        expect("value" in r && r.value.building_useful_life_years).toBe(25);
+        const e = validateSettings({ useful_life_basis: "ESTIMATIVA", building_useful_life_years: 40 });
+        expect("value" in e && e.value.building_useful_life_years).toBe(40);
+        expect(validateSettings({ useful_life_basis: "ESTIMATIVA", building_useful_life_years: 0 })).toHaveProperty("error");
+    });
+
+    it("validates the contador's UF and e-mail and the opening date", () => {
+        expect(validateSettings({ accountant_crc_uf: "XX" })).toHaveProperty("error");
+        const r = validateSettings({ accountant_crc_uf: "sp" });
+        expect("value" in r && r.value.accountant_crc_uf).toBe("SP");
+        expect(validateSettings({ accountant_email: "nope" })).toHaveProperty("error");
+        expect(validateSettings({ opening_date: "2026-01-15" })).toHaveProperty("error");
+    });
+});
+
+describe("pendingDecisions", () => {
+    it("lists everything open on a fresh holding and nothing once decided", () => {
+        expect(pendingDecisions(DEFAULT_SETTINGS)).toHaveLength(5);
+        expect(pendingDecisions({
+            ...DEFAULT_SETTINGS,
+            accountant_name: "Fulana", accountant_crc: "MG-123456/O", accountant_crc_uf: "MG",
+            policies_decided_by: "Fulana (CRC-MG 123456/O)", policies_decided_on: "2026-10-01",
+            tax_basis: "COMPETENCIA", reimbursements_policy: "REPASSE", first_adoption_deemed_cost: false,
+        })).toEqual([]);
+    });
+});

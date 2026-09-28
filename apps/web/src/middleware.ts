@@ -17,6 +17,7 @@ const PROTECTED_SEGMENTS = [
     "inquilinos",
     "contratos",
     "condominio",
+    "contabil",
     "onboarding",
 ];
 const isProtectedRoute = createRouteMatcher([
