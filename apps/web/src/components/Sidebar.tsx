@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@kitnets/ui";
 import { SignOutButton, useAuth } from "@clerk/nextjs";
-import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Rocket, HardHat, Briefcase, Building2, User, Users, UserCheck, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart, ArrowLeftRight, FileText, AlertCircle, Plus, Minus, Gem, X, Zap, Building, ChevronsLeft, ChevronsRight, Landmark, Droplets, MapPinned } from "lucide-react";
+import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Rocket, HardHat, Briefcase, Building2, User, Users, UserCheck, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart, ArrowLeftRight, FileText, AlertCircle, Plus, Minus, Gem, X, Zap, Building, ChevronsLeft, ChevronsRight, Landmark, Droplets, MapPinned, BookOpenCheck, BookText, NotebookPen } from "lucide-react";
 import { PropertyFilters } from "./PropertyFilters";
 
 import { useTheme } from "next-themes";
@@ -441,6 +441,39 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                             {!navCollapsed && (
                                                 <li className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Contábil &amp; Fiscal</li>
                                             )}
+                                            <li>
+                                                <Link
+                                                    title={navCollapsed ? "Políticas contábeis" : undefined}
+                                                    href={lang === 'pt' ? '/contabil/politicas' : `/${lang}/contabil/politicas`}
+                                                    aria-current={isActive(lang === 'pt' ? '/contabil/politicas' : `/${lang}/contabil/politicas`) ? "page" : undefined}
+                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/contabil/politicas' : `/${lang}/contabil/politicas`) ? 'bg-accent' : ''}`}
+                                                >
+                                                    <BookOpenCheck className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3 sidebar-label">Políticas contábeis</span>
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <Link
+                                                    title={navCollapsed ? "Plano de contas" : undefined}
+                                                    href={lang === 'pt' ? '/contabil/plano-de-contas' : `/${lang}/contabil/plano-de-contas`}
+                                                    aria-current={isActive(lang === 'pt' ? '/contabil/plano-de-contas' : `/${lang}/contabil/plano-de-contas`) ? "page" : undefined}
+                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/contabil/plano-de-contas' : `/${lang}/contabil/plano-de-contas`) ? 'bg-accent' : ''}`}
+                                                >
+                                                    <BookText className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3 sidebar-label">Plano de contas</span>
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <Link
+                                                    title={navCollapsed ? "Lançamentos" : undefined}
+                                                    href={lang === 'pt' ? '/contabil/lancamentos' : `/${lang}/contabil/lancamentos`}
+                                                    aria-current={isActive(lang === 'pt' ? '/contabil/lancamentos' : `/${lang}/contabil/lancamentos`) ? "page" : undefined}
+                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/contabil/lancamentos' : `/${lang}/contabil/lancamentos`) ? 'bg-accent' : ''}`}
+                                                >
+                                                    <NotebookPen className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3 sidebar-label">Lançamentos</span>
+                                                </Link>
+                                            </li>
                                             <li>
                                                 <Link
                                                     title={navCollapsed ? "Contas bancárias" : undefined}

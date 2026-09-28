@@ -59,6 +59,19 @@ jobs:
         if: steps.has_migrations.outputs.present == 'true'
         run: supabase db lint --level warning
 
+      # Behaviour checks for rules the database enforces (e.g. the accounting journal:
+      # balanced entries, closed months). Each file runs in a rolled-back transaction and
+      # raises on the first failed expectation.
+      - name: Run database checks
+        if: steps.has_migrations.outputs.present == 'true'
+        run: |
+          shopt -s nullglob
+          for f in supabase/checks/*.sql; do
+            echo "::group::$f"
+            psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f "$f"
+            echo "::endgroup::"
+          done
+
   # Merge to main: push the new migrations to production.
   deploy:
     if: github.event_name == 'push'
