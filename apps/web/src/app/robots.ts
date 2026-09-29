@@ -7,7 +7,11 @@ export default function robots(): MetadataRoute.Robots {
         rules: {
             userAgent: '*',
             allow: '/',
-            disallow: ['/dashboard/', '/api/', '/onboarding/'],
+            disallow: [
+                '/dashboard/', '/api/', '/onboarding/',
+                // FipeZAP city pages: only the canonical URL, never the reader-state variants (src/lib/crawler-guard.ts)
+                '/*indices/fipezap/cidades*?',
+            ],
         },
         sitemap: `${baseUrl}/sitemap.xml`,
     };

@@ -201,7 +201,7 @@ export async function FipezapCitiesPage({ lang, state }: { lang: string; state: 
                         <Link href={`${lang === "pt" ? "" : `/${lang}`}/indices/ipca`} className="underline-offset-2 hover:underline">IPCA</Link>
                         <Link href={`${lang === "pt" ? "" : `/${lang}`}/indices/igpm`} className="underline-offset-2 hover:underline">IGP-M</Link>
                         <Link href={`${lang === "pt" ? "" : `/${lang}`}/indices/cdi`} className="underline-offset-2 hover:underline">CDI</Link>
-                        {FIPEZAP_CITIES.filter(c => c.isCapital).slice(0, 6).map(c => <Link key={c.slug} href={buildFipezapCitiesHref(lang, state, { cidade: c.slug, comparar: [] })} className="underline-offset-2 hover:underline">{c.name}</Link>)}
+                        {FIPEZAP_CITIES.filter(c => c.isCapital).slice(0, 6).map(c => <Link key={c.slug} href={buildFipezapCitiesHref(lang, state, { cidade: c.slug, comparar: [] })} prefetch={false} className="underline-offset-2 hover:underline">{c.name}</Link>)}
                     </p>
                 </section>
             </div>

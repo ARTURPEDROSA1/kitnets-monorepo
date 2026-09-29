@@ -101,7 +101,7 @@ export function FipezapResultsTable({ state, lang, national, cities, ipca, igpm,
                         {national && (
                             <tr className={cn("bg-muted/20 font-semibold", rowClass(national.city.slug))}>
                                 <th scope="row" className="sticky left-0 z-10 bg-card px-3 py-2 text-left whitespace-nowrap">
-                                    <Link href={href(national.city.slug)} className="hover:underline underline-offset-2">{t.labels.national}</Link>
+                                    <Link href={href(national.city.slug)} prefetch={false} className="hover:underline underline-offset-2">{t.labels.national}</Link>
                                     <span className="ml-1.5 text-[10px] font-normal text-muted-foreground">{monthShort(national.month, lang)}</span>
                                 </th>
                                 {columns.slice(1).map(c => <td key={c.key} className="px-3 py-2 text-right">{cell(national, c.key)}</td>)}
@@ -112,7 +112,7 @@ export function FipezapResultsTable({ state, lang, national, cities, ipca, igpm,
                                 {g.rows.map(r => (
                                     <tr key={r.city.slug} className={cn("hover:bg-muted/30 transition-colors", rowClass(r.city.slug))}>
                                         <th scope="row" className={cn("sticky left-0 z-10 bg-card px-3 py-1.5 text-left font-normal whitespace-nowrap", rowClass(r.city.slug) && "bg-card")}>
-                                            <Link href={href(r.city.slug)} className="hover:underline underline-offset-2">{r.city.name}</Link>
+                                            <Link href={href(r.city.slug)} prefetch={false} className="hover:underline underline-offset-2">{r.city.name}</Link>
                                             <span className="ml-1 text-[10px] text-muted-foreground">{r.city.uf}</span>
                                             {r.month !== (national?.month ?? r.month) && <span className="ml-1.5 text-[10px] text-muted-foreground">{monthShort(r.month, lang)}</span>}
                                         </th>
