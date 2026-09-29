@@ -14,6 +14,30 @@ import { landlordTaxesByMonth, type PropertyTax } from "./property-taxes";
 export const ACCOUNT_COLUMNS = "id, code, name, account_type, nature, analytic, system_key, referential_code, active";
 const SETTINGS_COLUMNS = "legal_nature, company_size, nire, tax_regime, tax_basis, accounting_standard, property_measurement, building_useful_life_years, useful_life_basis, reimbursements_policy, first_adoption_deemed_cost, opening_date, accountant_name, accountant_crc, accountant_crc_uf, accountant_email, policies_decided_by, policies_decided_on";
 
+/** The API returns at most 1000 rows per select: page through with `.range()`. `page` must build a fresh query each call. */
+export async function fetchAllPages<T>(
+    page: (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>,
+    opts: { pageSize?: number; max?: number } = {}
+): Promise<T[]> {
+    const size = opts.pageSize ?? 1000, max = opts.max ?? 100000;
+    const out: T[] = [];
+    for (let from = 0; from < max; from += size) {
+        const { data, error } = await page(from, from + size - 1);
+        if (error) throw new Error(error.message);
+        const rows = (data ?? []) as T[];
+        out.push(...rows);
+        if (rows.length < size) break;
+    }
+    return out;
+}
+
+/** Splits a long `.in()` list: a URL with a thousand ids is too long for the API. */
+export function chunk<T>(items: T[], size = 150): T[][] {
+    const out: T[][] = [];
+    for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+    return out;
+}
+
 export interface HoldingIdentity {
     person_type: string | null;
     cnpj: string | null;
@@ -64,8 +88,9 @@ export async function loadAccounts(supabase: AdminSupabase, ownerId: string): Pr
  */
 export async function ensureChart(supabase: AdminSupabase, ownerId: string, measurement: PropertyMeasurement): Promise<AccountingAccount[]> {
     let accounts = await loadAccounts(supabase, ownerId);
-    if (accounts.length === 0) {
-        const rows = chartTemplate(measurement).map(a => ({
+    const missing = missingTemplateAccounts(accounts, measurement);
+    if (missing.length) {
+        const rows = missing.map(a => ({
             owner_id: ownerId, code: a.code, name: a.name, account_type: a.type, nature: a.nature,
             analytic: a.analytic, system_key: a.systemKey, active: a.active,
         }));
@@ -76,6 +101,17 @@ export async function ensureChart(supabase: AdminSupabase, ownerId: string, meas
     }
     await syncModelAccounts(supabase, ownerId, measurement, accounts);
     return accounts;
+}
+
+/**
+ * Template accounts a chart does not have yet: the whole template the first time, then the
+ * accounts added to the template later (by system key; groups by code). A code already taken
+ * by an account the contador created is left alone.
+ */
+export function missingTemplateAccounts(accounts: Pick<AccountingAccount, "code" | "system_key">[], measurement: PropertyMeasurement) {
+    const codes = new Set(accounts.map(a => a.code));
+    const keys = new Set(accounts.map(a => a.system_key).filter(Boolean));
+    return chartTemplate(measurement).filter(t => (t.systemKey ? !keys.has(t.systemKey) : true) && !codes.has(t.code));
 }
 
 /** Turns the depreciation / fair-value accounts on or off for the chosen model. Mutates `accounts`. */
@@ -102,12 +138,11 @@ export function closedMonths(periods: AccountingPeriod[]): Set<string> {
 
 /** Entries dated in [from, to] (ISO dates), lines ordered, with who reversed each one. */
 export async function loadEntries(supabase: AdminSupabase, ownerId: string, from: string, to: string): Promise<JournalEntry[]> {
-    const { data, error } = await supabase.from("journal_entries")
+    const data = await fetchAllPages<Record<string, unknown>>((a, b) => supabase.from("journal_entries")
         .select("id, entry_date, description, source, source_ref, reverses_entry_id, created_by, created_at, journal_lines(id, line_no, account_id, debit, credit, property_id, unit_id, memo)")
         .eq("owner_id", ownerId).gte("entry_date", from).lte("entry_date", to)
-        .order("entry_date", { ascending: false }).order("created_at", { ascending: false }).limit(2000);
-    if (error) throw new Error(error.message);
-    const entries = (data ?? []).map(raw => {
+        .order("entry_date", { ascending: false }).order("created_at", { ascending: false }).order("id").range(a, b), { max: 10000 });
+    const entries = data.map(raw => {
         const r = raw as unknown as Omit<JournalEntry, "lines"> & { journal_lines: JournalLine[] };
         const lines = (r.journal_lines ?? [])
             .map(l => ({ ...l, debit: Number(l.debit) || 0, credit: Number(l.credit) || 0 }))
@@ -116,12 +151,12 @@ export async function loadEntries(supabase: AdminSupabase, ownerId: string, from
         void _lines;
         return { ...rest, lines, reversed_by: null } as JournalEntry;
     });
-    const ids = entries.map(e => e.id);
-    if (ids.length) {
+    const by = new Map<string, string>();
+    for (const ids of chunk(entries.map(e => e.id))) {
         const { data: rev } = await supabase.from("journal_entries").select("id, reverses_entry_id").eq("owner_id", ownerId).in("reverses_entry_id", ids);
-        const by = new Map(((rev ?? []) as Array<{ id: string; reverses_entry_id: string }>).map(r => [r.reverses_entry_id, r.id]));
-        for (const e of entries) e.reversed_by = by.get(e.id) ?? null;
+        for (const r of (rev ?? []) as Array<{ id: string; reverses_entry_id: string }>) by.set(r.reverses_entry_id, r.id);
     }
+    for (const e of entries) e.reversed_by = by.get(e.id) ?? null;
     return entries;
 }
 

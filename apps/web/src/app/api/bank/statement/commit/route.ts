@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { requireProfile, UUID_REGEX, type AdminSupabase } from "@/lib/api-auth";
 import { routingProblem, type BankDestination, type BankSource } from "@/lib/bank-ledger";
-import { BANK_TABLE, loadBankRows } from "@/lib/bank-ledger-server";
+import { BANK_TABLE, existingReferences, loadBankRows } from "@/lib/bank-ledger-server";
+import { postBankRows, type PostingSummary } from "@/lib/accounting-bank-server";
 import { TRANSACTION_KIND_VALUES, type TransactionKind } from "@/lib/property-investment";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;   // a year of statement rows, routed and posted to the books
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const SOURCES: BankSource[] = ["OFX", "CSV", "PDF", "API"];
@@ -69,8 +71,9 @@ async function routeInvestment(supabase: AdminSupabase, ownerId: string, row: Co
 
 /**
  * POST /api/bank/statement/commit  body: { rows: CommitRow[] }
- * → { imported, skipped, income, investment, ignored, rows }
- * Writes each row once to the bank ledger and routes it to the property ledgers.
+ * → { imported, skipped, income, investment, ignored, rows, accounting }
+ * Writes each row once to the bank ledger, routes it to the property ledgers and posts it to
+ * the holding's books (Contábil & Fiscal); rows the rules cannot place become questions there.
  */
 export async function POST(request: Request) {
     const authed = await requireProfile();
@@ -91,9 +94,9 @@ export async function POST(request: Request) {
         if (!(await ownsProperty(supabase, profileId, pid))) return NextResponse.json({ error: "Imóvel não encontrado" }, { status: 404 });
     }
 
-    const { data: existing } = await supabase.from(BANK_TABLE).select("reference").eq("owner_id", profileId).in("reference", rows.map(r => r.reference));
-    const seen = new Set((existing ?? []).map(e => e.reference));
+    const seen = await existingReferences(supabase, profileId, rows.map(r => r.reference));
     const counts = { imported: 0, skipped: 0, income: 0, investment: 0, ignored: 0 };
+    const newIds: string[] = [];
     try {
         for (const row of rows) {
             if (seen.has(row.reference)) { counts.skipped++; continue; }
@@ -101,15 +104,22 @@ export async function POST(request: Request) {
             if (row.destination === "INCOME") { linked = await routeIncome(supabase, profileId, row); counts.income++; }
             else if (row.destination === "INVESTMENT") { linked = await routeInvestment(supabase, profileId, row); counts.investment++; }
             else counts.ignored++;
-            const { error } = await supabase.from(BANK_TABLE).insert({
+            const { data: inserted, error } = await supabase.from(BANK_TABLE).insert({
                 owner_id: profileId, occurred_on: row.date, amount: row.amount, memo: row.memo, reference: row.reference, source: row.source, bank: row.bank ?? null,
                 destination: row.destination, property_id: row.property_id, kind: row.kind, linked_id: linked,
-            });
+            }).select("id").single();
             if (error) throw new Error(error.message);
+            if (inserted?.id) newIds.push(inserted.id);
             seen.add(row.reference);
             counts.imported++;
         }
-        return NextResponse.json({ ...counts, rows: await loadBankRows(supabase, profileId, 200) });
+        // The books: best effort — a failure here never undoes the import (Contábil › Conciliação retries).
+        let accounting: PostingSummary | null = null;
+        if (newIds.length) {
+            try { accounting = await postBankRows(supabase, profileId, { ids: newIds }); }
+            catch (err) { console.error("[Bank commit → books]", (err as Error).message); }
+        }
+        return NextResponse.json({ ...counts, rows: await loadBankRows(supabase, profileId, 200), accounting });
     } catch (err) {
         console.error("[Bank commit]", (err as Error).message);
         return NextResponse.json({ error: "Erro ao importar lançamentos", ...counts }, { status: 500 });

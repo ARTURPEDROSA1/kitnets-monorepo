@@ -31,17 +31,23 @@ describe("validateSettings", () => {
         expect("value" in r && r.value.accountant_crc_uf).toBe("SP");
         expect(validateSettings({ accountant_email: "nope" })).toHaveProperty("error");
         expect(validateSettings({ opening_date: "2026-01-15" })).toHaveProperty("error");
+        const set = validateSettings({ opening_date: "2025-01-01" });
+        expect("value" in set && set.value.opening_date).toBe("2025-01-01");
+        expect(DEFAULT_SETTINGS.opening_date).toBeNull();   // no default: the owner decides
+        const cleared = validateSettings({ opening_date: "" }, { ...DEFAULT_SETTINGS, opening_date: "2025-01-01" });
+        expect("value" in cleared && cleared.value.opening_date).toBeNull();
     });
 });
 
 describe("pendingDecisions", () => {
     it("lists everything open on a fresh holding and nothing once decided", () => {
-        expect(pendingDecisions(DEFAULT_SETTINGS)).toHaveLength(5);
+        expect(pendingDecisions(DEFAULT_SETTINGS)).toHaveLength(6);
+        expect(pendingDecisions(DEFAULT_SETTINGS)[0]).toMatch(/início da escrituração/);
         expect(pendingDecisions({
             ...DEFAULT_SETTINGS,
             accountant_name: "Fulana", accountant_crc: "MG-123456/O", accountant_crc_uf: "MG",
             policies_decided_by: "Fulana (CRC-MG 123456/O)", policies_decided_on: "2026-10-01",
-            tax_basis: "COMPETENCIA", reimbursements_policy: "REPASSE", first_adoption_deemed_cost: false,
+            tax_basis: "COMPETENCIA", reimbursements_policy: "REPASSE", first_adoption_deemed_cost: false, opening_date: "2025-01-01",
         })).toEqual([]);
     });
 });

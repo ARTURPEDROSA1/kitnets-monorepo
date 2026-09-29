@@ -16,12 +16,15 @@ export async function GET() {
     if ("response" in authed) return authed.response;
     const { profileId, supabase } = authed.ctx;
     try {
-        const [{ settings, saved }, identity, defaults] = await Promise.all([
+        const [{ settings, saved }, identity, defaults, firstBank] = await Promise.all([
             loadSettings(supabase, profileId),
             loadIdentity(supabase, profileId),
             simulationDefaults(supabase, profileId),
+            supabase.from("bank_transactions").select("occurred_on").eq("owner_id", profileId).order("occurred_on").limit(1).maybeSingle(),
         ]);
-        return NextResponse.json({ settings, saved, identity, pending: pendingDecisions(settings), defaults });
+        // the first imported statement date only informs the owner's choice of the start; it never sets it
+        const firstBankDate = (firstBank.data as { occurred_on?: string } | null)?.occurred_on ?? null;
+        return NextResponse.json({ settings, saved, identity, pending: pendingDecisions(settings), defaults, firstBankDate });
     } catch (err) {
         console.error("[Accounting settings GET]", (err as Error).message);
         return NextResponse.json({ error: "Erro ao carregar as políticas contábeis" }, { status: 500 });
@@ -45,6 +48,10 @@ export async function PUT(request: Request) {
         const { settings: current } = await loadSettings(supabase, profileId);
         const v = validateSettings(body, current);
         if ("error" in v) return NextResponse.json({ error: v.error }, { status: 400 });
+        if (current.opening_date && !v.value.opening_date) {
+            const { count } = await supabase.from("journal_entries").select("id", { count: "exact", head: true }).eq("owner_id", profileId);
+            if ((count ?? 0) > 0) return NextResponse.json({ error: "Já há lançamentos na escrituração: o início pode ser mudado, mas não apagado" }, { status: 409 });
+        }
         await saveSettings(supabase, profileId, v.value);
         if (v.value.property_measurement !== current.property_measurement) {
             const accounts = await loadAccounts(supabase, profileId);

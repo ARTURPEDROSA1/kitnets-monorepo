@@ -8,7 +8,9 @@ import { cn } from "@/lib/utils";
 const TABS = [
     { href: "/contabil/politicas", label: "Políticas contábeis" },
     { href: "/contabil/plano-de-contas", label: "Plano de contas" },
+    { href: "/contabil/saldo-de-abertura", label: "Saldo de abertura" },
     { href: "/contabil/lancamentos", label: "Lançamentos" },
+    { href: "/contabil/conciliacao", label: "Extrato e conciliação" },
     { href: "/contabil/contas-bancarias", label: "Contas bancárias" },
 ];
 

@@ -38,8 +38,8 @@ export interface RoutedRow extends StatementRow {
     kind: TransactionKind | null;
     /** already in the bank ledger */
     duplicate: boolean;
-    /** why the suggestion was made */
-    reason: "history" | "memo" | "kind" | "single-property" | null;
+    /** why the suggestion was made; "income-exists": the month already has income rows, so the deposit is not routed into them */
+    reason: "history" | "memo" | "kind" | "single-property" | "income-exists" | null;
 }
 
 export const DESTINATION_LABELS: Record<BankDestination, string> = {
@@ -114,6 +114,18 @@ export function suggestRouting(
         if (INFLOW_RENT.test(r.memo.toLowerCase()) && property) return { ...r, source, destination: "INCOME", property_id: property, kind: null, duplicate, reason };
         return { ...r, source, destination: "IGNORED", property_id: property, kind: null, duplicate, reason };
     });
+}
+
+/**
+ * Rent deposits into a month that already has income rows typed or imported for the property
+ * are not routed into Receitas: routing adds a property-level row next to the unit rows and
+ * double-counts the month. They stay "só contábil" — the books still post them.
+ * `filled` holds "propertyId|YYYY-MM" for months with non-bank income rows.
+ */
+export function keepFilledIncomeMonths(rows: RoutedRow[], filled: Set<string>): RoutedRow[] {
+    return rows.map(r => (r.destination === "INCOME" && r.property_id && filled.has(`${r.property_id}|${r.date.slice(0, 7)}`)
+        ? { ...r, destination: "IGNORED", reason: "income-exists" }
+        : r));
 }
 
 /** A routed row is ready to import when it has a property for a ledger destination and a kind for investment. */

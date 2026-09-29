@@ -30,7 +30,7 @@ const STEPS: Array<{ title: string; detail: string; done: boolean }> = [
     { title: "Receitas e investimento de cada imóvel", detail: "Entradas (PIX/TED do inquilino) viram meses em Receitas de Aluguel com origem BANK; saídas classificadas vão para o registro de investimento do imóvel.", done: true },
     { title: "Credenciais da API do Banco Inter", detail: "Certificado mTLS e chave privada, client id e client secret da aplicação, agência e conta. Guardados como segredos no servidor, nunca no navegador.", done: false },
     { title: "Sincronização diária", detail: "Busca os lançamentos da conta, classifica com as mesmas regras e deixa os novos para revisão — sem precisar do e-mail.", done: false },
-    { title: "Plano de contas da holding", detail: "Cada lançamento vira uma conta contábil (receita de aluguel, despesas, financiamento, impostos) para gerar DRE, balanço e apuração de impostos.", done: false },
+    { title: "Plano de contas da holding", detail: "Cada lançamento do extrato vira um lançamento contábil (partidas dobradas) no plano de contas da holding; o que as regras não souberem classificar vira uma pergunta em Contábil › Conciliação.", done: true },
 ];
 
 export default function ContasBancariasContent({ lang }: Props) {
@@ -92,7 +92,9 @@ export default function ContasBancariasContent({ lang }: Props) {
             if (!res.ok) throw new Error(d.error || "Erro ao importar");
             setLedger(d.rows ?? []);
             setRows([]);
-            setNotice(`${d.imported} lançamentos importados · ${d.income} para receitas · ${d.investment} para investimento · ${d.ignored} só contábil${d.skipped ? ` · ${d.skipped} já existiam` : ""}`);
+            const acc = d.accounting as { posted: number; questions: number; waitingStart?: number } | null | undefined;
+            setNotice(`${d.imported} lançamentos importados · ${d.income} para receitas · ${d.investment} para investimento · ${d.ignored} só contábil${d.skipped ? ` · ${d.skipped} já existiam` : ""}`
+                + (acc ? ` · ${acc.posted} contabilizados${acc.questions ? ` · ${acc.questions} com dúvida em Conciliação` : ""}${acc.waitingStart ? ` · ${acc.waitingStart} aguardando o início da escrituração (defina em Políticas contábeis)` : ""}` : ""));
         } catch (err) { setError((err as Error).message); } finally { setImporting(false); }
     };
 
@@ -166,6 +168,7 @@ export default function ContasBancariasContent({ lang }: Props) {
                                                     {r.memo}
                                                     {r.duplicate && <span className="ml-1 text-[10px] text-muted-foreground">(já importado)</span>}
                                                     {r.reason === "history" && !r.duplicate && <span className="ml-1 text-[10px] text-emerald-700">(como da última vez)</span>}
+                                                    {r.reason === "income-exists" && !r.duplicate && <span className="ml-1 text-[10px] text-amber-700" title="O mês já tem receita lançada em Receitas de Aluguel; o depósito fica só na contabilidade para não contar em dobro">(mês já lançado em Receitas)</span>}
                                                 </td>
                                                 <td className={cn("px-2 py-1 text-right tabular-nums whitespace-nowrap font-semibold", r.amount > 0 ? "text-emerald-700 dark:text-emerald-400" : "text-foreground")}>{formatBRL(r.amount)}</td>
                                                 <td className="px-2 py-1">

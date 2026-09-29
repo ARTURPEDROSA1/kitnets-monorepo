@@ -13,9 +13,10 @@ export async function GET() {
     try {
         const { settings } = await loadSettings(supabase, profileId);
         const accounts = await ensureChart(supabase, profileId, settings.property_measurement);
-        const { data: used } = await supabase.from("journal_lines").select("account_id").eq("owner_id", profileId).limit(50000);
+        const { data: used, error } = await supabase.rpc("accounting_account_usage", { p_owner: profileId });
+        if (error) throw new Error(error.message);
         const usage: Record<string, number> = {};
-        for (const r of (used ?? []) as Array<{ account_id: string }>) usage[r.account_id] = (usage[r.account_id] ?? 0) + 1;
+        for (const r of (used ?? []) as Array<{ account_id: string; lines: number | string }>) usage[r.account_id] = Number(r.lines) || 0;
         return NextResponse.json({ accounts, usage, measurement: settings.property_measurement });
     } catch (err) {
         console.error("[Accounting accounts GET]", (err as Error).message);

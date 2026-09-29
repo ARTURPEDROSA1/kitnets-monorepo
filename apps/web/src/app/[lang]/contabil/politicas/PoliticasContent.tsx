@@ -75,6 +75,7 @@ export default function PoliticasContent({ lang }: Props) {
     const [sim, setSim] = useState<MeasurementSimulationInput | null>(null);
     const [landPct, setLandPct] = useState(20);
     const [defaults, setDefaults] = useState<Defaults | null>(null);
+    const [firstBankDate, setFirstBankDate] = useState<string | null>(null);
 
     useEffect(() => {
         (async () => {
@@ -86,6 +87,7 @@ export default function PoliticasContent({ lang }: Props) {
                 setSavedJson(JSON.stringify(d.settings));
                 setIdentity(d.identity);
                 setPending(d.pending ?? []);
+                setFirstBankDate(d.firstBankDate ?? null);
                 const def = d.defaults as Defaults;
                 setDefaults(def);
                 const cost = def.purchaseTotal || def.marketValueTotal;
@@ -206,8 +208,12 @@ export default function PoliticasContent({ lang }: Props) {
                                     {Object.entries(TAX_BASIS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                                 </select>
                             </Field>
-                            <Field label="Início da escrituração na Kitnets.com" hint="Primeiro dia do mês do saldo de abertura.">
-                                <DateInput mode="month" value={form.opening_date.slice(0, 7)} onChange={ym => ym && patch({ opening_date: `${ym}-01` })} className="h-10 rounded-lg text-sm" />
+                            <Field
+                                label="Início da escrituração na Kitnets.com *"
+                                hint={`Você decide, com o contador: o mês em que os livros começam aqui (o saldo de abertura é o do dia anterior). Enquanto não estiver definido, o extrato não é contabilizado.${firstBankDate ? ` Seu extrato importado mais antigo é de ${firstBankDate.slice(5, 7)}/${firstBankDate.slice(0, 4)}.` : ""}`}
+                            >
+                                <DateInput mode="month" value={form.opening_date ? form.opening_date.slice(0, 7) : ""} onChange={ym => patch({ opening_date: ym ? `${ym}-01` : null })}
+                                    className={cn("h-10 rounded-lg text-sm", !form.opening_date && "border-amber-500")} />
                             </Field>
                         </div>
                     </section>

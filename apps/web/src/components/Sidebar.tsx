@@ -476,6 +476,17 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                             </li>
                                             <li>
                                                 <Link
+                                                    title={navCollapsed ? "Extrato e conciliação" : undefined}
+                                                    href={lang === 'pt' ? '/contabil/conciliacao' : `/${lang}/contabil/conciliacao`}
+                                                    aria-current={isActive(lang === 'pt' ? '/contabil/conciliacao' : `/${lang}/contabil/conciliacao`) ? "page" : undefined}
+                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/contabil/conciliacao' : `/${lang}/contabil/conciliacao`) ? 'bg-accent' : ''}`}
+                                                >
+                                                    <ArrowLeftRight className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3 sidebar-label">Extrato e conciliação</span>
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <Link
                                                     title={navCollapsed ? "Contas bancárias" : undefined}
                                                     href={lang === 'pt' ? '/contabil/contas-bancarias' : `/${lang}/contabil/contas-bancarias`}
                                                     aria-current={isActive(lang === 'pt' ? '/contabil/contas-bancarias' : `/${lang}/contabil/contas-bancarias`) ? "page" : undefined}
