@@ -10,7 +10,8 @@
  * the form only says so earlier.
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Loader2, Lock, LockOpen, NotebookPen, Plus, RotateCcw, Trash2, X } from "lucide-react";
+import Link from "next/link";
+import { CalendarCheck, ChevronLeft, ChevronRight, Loader2, Lock, LockOpen, NotebookPen, Plus, RotateCcw, Trash2, X } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/DateInput";
@@ -18,7 +19,7 @@ import { ContabilNav } from "@/components/contabil/ContabilNav";
 import { cn } from "@/lib/utils";
 import { compareCodes, type AccountingAccount } from "@/lib/accounting-chart";
 import {
-    ENTRY_SOURCE_LABELS, entryTotals, formatMoney, parseAmountInput, validateEntryDraft, type AccountingPeriod, type EntrySource, type JournalEntry,
+    ENTRY_SOURCE_LABELS, canReverse, entryTotals, formatMoney, isAutoSource, parseAmountInput, validateEntryDraft, type AccountingPeriod, type EntrySource, type JournalEntry,
 } from "@/lib/accounting-journal";
 
 interface Props { lang: "en" | "pt" | "es" }
@@ -134,24 +135,6 @@ export default function LancamentosContent({ lang }: Props) {
         } catch (err) { setError((err as Error).message); } finally { setBusy(null); }
     };
 
-    const setPeriod = async (action: "close" | "reopen") => {
-        let payload: Record<string, string> = { month, action };
-        if (action === "reopen") {
-            const reason = window.prompt(`Motivo para reabrir ${monthLabel(month)} (fica registrado):`);
-            if (!reason?.trim()) return;
-            payload = { ...payload, reason };
-        } else if (!window.confirm(`Fechar ${monthLabel(month)}? Nada mais poderá ser lançado, alterado ou excluído nele; correções serão estornos em um mês aberto.`)) {
-            return;
-        }
-        setBusy("period"); setError(null);
-        try {
-            const res = await fetch("/api/accounting/periods", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-            const d = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(d.error || "Erro");
-            setPeriods(d.periods ?? []);
-        } catch (err) { setError((err as Error).message); } finally { setBusy(null); }
-    };
-
     const monthTotals = useMemo(() => entryTotals(entries.flatMap(e => e.lines)), [entries]);
 
     return (
@@ -180,11 +163,9 @@ export default function LancamentosContent({ lang }: Props) {
                 {closed && period?.closed_at && <span className="text-xs text-muted-foreground">em {dateBR(period.closed_at.slice(0, 10))}{period.closed_note ? ` · ${period.closed_note}` : ""}</span>}
                 {!closed && period?.reopen_reason && <span className="text-xs text-muted-foreground">reaberto: {period.reopen_reason}</span>}
                 <div className="ml-auto flex gap-2">
-                    {closed ? (
-                        <Button variant="outline" size="sm" onClick={() => setPeriod("reopen")} disabled={busy === "period"}>Reabrir mês</Button>
-                    ) : (
-                        month < currentMonth() && <Button variant="outline" size="sm" onClick={() => setPeriod("close")} disabled={busy === "period"}>Fechar mês</Button>
-                    )}
+                    <Button asChild variant="outline" size="sm" className="gap-1">
+                        <Link href={`${lang === "pt" ? "" : `/${lang}`}/contabil/fechamento?month=${month}`}><CalendarCheck className="w-4 h-4" /> {closed ? "Fechamento do mês" : "Fechar o mês"}</Link>
+                    </Button>
                     <Button size="sm" className="gap-1" onClick={() => { setFormOpen(o => !o); if (!formOpen) setDate(month === currentMonth() ? new Date().toISOString().slice(0, 10) : `${month}-01`); }} disabled={closed && !formOpen}>
                         <Plus className="w-4 h-4" /> Novo lançamento
                     </Button>
@@ -293,7 +274,7 @@ export default function LancamentosContent({ lang }: Props) {
                     <p className="text-xs text-muted-foreground">{entries.length} lançamento(s) · débitos {formatMoney(monthTotals.debit)} · créditos {formatMoney(monthTotals.credit)}</p>
                     {entries.map(e => {
                         const canDelete = !closed && (e.source === "MANUAL" || e.source === "OPENING" || e.source === "REVERSAL") && !e.reversed_by;
-                        const canReverse = e.source !== "REVERSAL" && !e.reversed_by;
+                        const reversible = canReverse(e);
                         return (
                             <div key={e.id} className={cn("bg-card border border-border rounded-xl p-4 space-y-2", e.reversed_by && "opacity-70")}>
                                 <div className="flex flex-wrap items-center gap-2">
@@ -303,9 +284,10 @@ export default function LancamentosContent({ lang }: Props) {
                                     {e.reversed_by && <span className="text-[10px] uppercase tracking-wide rounded bg-amber-100 dark:bg-amber-950/40 px-1.5 py-0.5 text-amber-800 dark:text-amber-200">estornado</span>}
                                     <div className="ml-auto flex items-center gap-1">
                                         {e.created_by && <span className="text-[11px] text-muted-foreground mr-2">por {e.created_by}</span>}
-                                        {canReverse && (
+                                        {reversible && (
                                             <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" disabled={busy === e.id} onClick={() => reverse(e)}><RotateCcw className="w-3.5 h-3.5" /> Estornar</Button>
                                         )}
+                                        {isAutoSource(e.source) && <span className="text-[11px] text-muted-foreground" title="Segue o registro de origem: corrija o registro e atualize o mês em Fechamento do mês">automático</span>}
                                         {canDelete && (
                                             <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-rose-600" disabled={busy === e.id} onClick={() => remove(e)} aria-label="Excluir"><Trash2 className="w-3.5 h-3.5" /></Button>
                                         )}

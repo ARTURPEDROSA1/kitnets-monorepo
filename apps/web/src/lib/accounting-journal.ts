@@ -23,6 +23,23 @@ export const ENTRY_SOURCE_LABELS: Record<EntrySource, string> = {
 /** Sources a person may post by hand; the others come from the automation or from reversals. */
 export const MANUAL_SOURCES: EntrySource[] = ["MANUAL", "OPENING"];
 
+/**
+ * Entries the monthly close keeps by itself (lib/accounting-accruals.ts): recomputed from the
+ * records while the month is open, so they are not deleted or reversed by hand — the fix is
+ * in the record they come from.
+ */
+export const AUTO_SOURCES = ["ACCRUAL", "DEPRECIATION", "FAIR_VALUE"] as const satisfies readonly EntrySource[];
+export type AutoSource = (typeof AUTO_SOURCES)[number];
+
+export function isAutoSource(source: string): source is AutoSource {
+    return (AUTO_SOURCES as readonly string[]).includes(source);
+}
+
+/** A reversal is the correction of a closed month; reversals and automated entries are not reversed. */
+export function canReverse(e: { source: string; reversed_by?: string | null }): boolean {
+    return e.source !== "REVERSAL" && !isAutoSource(e.source) && !e.reversed_by;
+}
+
 export interface JournalLine {
     id: string;
     line_no: number;

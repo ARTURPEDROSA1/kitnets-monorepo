@@ -178,12 +178,17 @@ export async function postBankRows(supabase: AdminSupabase, ownerId: string, opt
     return summary;
 }
 
-/** Removes the entry of a bank row so it can be reclassified or deleted; refused in a closed month. */
+/**
+ * Removes the entry of a bank row so it can be reclassified or deleted, with the interest split
+ * of a financing instalment made from it (fin:{row}); refused in a closed month.
+ */
 export async function unpostBankRow(supabase: AdminSupabase, ownerId: string, rowId: string): Promise<{ ok: true } | { error: string }> {
     const { data } = await supabase.from("journal_entries").select("id, entry_date").eq("owner_id", ownerId).eq("source", "BANK").eq("source_ref", rowId).maybeSingle();
     if (!data) return { ok: true };
     const { count } = await supabase.from("journal_entries").select("id", { count: "exact", head: true }).eq("owner_id", ownerId).eq("reverses_entry_id", data.id);
     if ((count ?? 0) > 0) return { error: "O lançamento deste extrato foi estornado: ajuste pelo livro de lançamentos" };
+    const split = await supabase.from("journal_entries").delete().eq("owner_id", ownerId).eq("source", "ACCRUAL").eq("source_ref", `fin:${rowId}`);
+    if (split.error) return { error: postingErrorMessage(split.error.message) };
     const { error } = await supabase.from("journal_entries").delete().eq("id", data.id).eq("owner_id", ownerId);
     if (error) return { error: postingErrorMessage(error.message) };
     return { ok: true };

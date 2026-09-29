@@ -12,6 +12,8 @@ const TABS = [
     { href: "/contabil/lancamentos", label: "Lançamentos" },
     { href: "/contabil/conciliacao", label: "Extrato e conciliação" },
     { href: "/contabil/contas-bancarias", label: "Contas bancárias" },
+    { href: "/contabil/fechamento", label: "Fechamento do mês" },
+    { href: "/contabil/balancete", label: "Balancete" },
 ];
 
 export function ContabilNav({ lang }: { lang: "en" | "pt" | "es" }) {

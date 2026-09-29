@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireProfile } from "@/lib/api-auth";
 import { pendingDecisions, validateSettings } from "@/lib/accounting-policies";
-import { loadAccounts, loadIdentity, loadSettings, saveSettings, simulationDefaults, syncModelAccounts } from "@/lib/accounting-server";
+import { closedMonths, loadAccounts, loadIdentity, loadPeriods, loadSettings, saveSettings, simulationDefaults, syncModelAccounts } from "@/lib/accounting-server";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +51,17 @@ export async function PUT(request: Request) {
         if (current.opening_date && !v.value.opening_date) {
             const { count } = await supabase.from("journal_entries").select("id", { count: "exact", head: true }).eq("owner_id", profileId);
             if ((count ?? 0) > 0) return NextResponse.json({ error: "Já há lançamentos na escrituração: o início pode ser mudado, mas não apagado" }, { status: 409 });
+        }
+        // a change of model is a change of accounting policy (CPC 23): closed months keep the entries of the old one
+        if (v.value.property_measurement !== current.property_measurement) {
+            const [{ data: modelEntries }, periods] = await Promise.all([
+                supabase.from("journal_entries").select("entry_date").eq("owner_id", profileId).in("source", ["DEPRECIATION", "FAIR_VALUE"]).limit(1000),
+                loadPeriods(supabase, profileId),
+            ]);
+            const closed = closedMonths(periods);
+            if (((modelEntries ?? []) as Array<{ entry_date: string }>).some(e => closed.has(e.entry_date.slice(0, 7)))) {
+                return NextResponse.json({ error: "Há depreciação ou ajuste a valor justo em meses já fechados: para mudar o modelo, reabra esses meses (mudança de política contábil, CPC 23)" }, { status: 409 });
+            }
         }
         await saveSettings(supabase, profileId, v.value);
         if (v.value.property_measurement !== current.property_measurement) {

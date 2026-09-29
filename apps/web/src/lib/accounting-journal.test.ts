@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { balancesByAccount, entryTotals, isValidIsoDate, postingErrorMessage, toPostPayload, validateEntryDraft, type EntryDraft } from "./accounting-journal";
+import { balancesByAccount, canReverse, entryTotals, isAutoSource, isValidIsoDate, postingErrorMessage, toPostPayload, validateEntryDraft, type EntryDraft } from "./accounting-journal";
 
 const accounts = new Map([
     ["bank", { id: "bank", code: "1.1.1.02", name: "Bancos", analytic: true, active: true, nature: "D" as const }],
@@ -63,5 +63,19 @@ describe("helpers", () => {
     it("maps database errors", () => {
         expect(postingErrorMessage('duplicate key value violates unique constraint "journal_entries_owner_source_ref"')).toBe("Esse lançamento já foi gerado");
         expect(postingErrorMessage("O mês de 09/2026 está fechado: não é possível lançar nele")).toMatch(/fechado/);
+    });
+});
+
+describe("canReverse", () => {
+    it("reverses manual and bank entries once, never reversals or the monthly close's own entries", () => {
+        expect(canReverse({ source: "MANUAL" })).toBe(true);
+        expect(canReverse({ source: "BANK", reversed_by: null })).toBe(true);
+        expect(canReverse({ source: "BANK", reversed_by: "x" })).toBe(false);
+        expect(canReverse({ source: "REVERSAL" })).toBe(false);
+        for (const s of ["ACCRUAL", "DEPRECIATION", "FAIR_VALUE"]) {
+            expect(isAutoSource(s)).toBe(true);
+            expect(canReverse({ source: s })).toBe(false);
+        }
+        expect(isAutoSource("OPENING")).toBe(false);
     });
 });

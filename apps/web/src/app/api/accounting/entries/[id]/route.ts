@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireProfile, UUID_REGEX } from "@/lib/api-auth";
-import { postingErrorMessage } from "@/lib/accounting-journal";
+import { isAutoSource, postingErrorMessage } from "@/lib/accounting-journal";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +23,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
 
     const { data: entry } = await supabase.from("journal_entries").select("id, source").eq("id", id).eq("owner_id", profileId).maybeSingle();
     if (!entry) return NextResponse.json({ error: "Lançamento não encontrado" }, { status: 404 });
+    if (isAutoSource(entry.source)) return NextResponse.json({ error: "Lançamentos automáticos do fechamento seguem os registros de origem: corrija o registro e atualize o mês em Fechamento do mês" }, { status: 409 });
     if (!DELETABLE.has(entry.source)) return NextResponse.json({ error: "Lançamentos automáticos não são excluídos aqui: estorne-o" }, { status: 409 });
     const { count } = await supabase.from("journal_entries").select("id", { count: "exact", head: true }).eq("owner_id", profileId).eq("reverses_entry_id", id);
     if ((count ?? 0) > 0) return NextResponse.json({ error: "Este lançamento foi estornado: exclua primeiro o estorno" }, { status: 409 });

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@kitnets/ui";
 import { SignOutButton, useAuth } from "@clerk/nextjs";
-import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Rocket, HardHat, Briefcase, Building2, User, Users, UserCheck, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart, ArrowLeftRight, FileText, AlertCircle, Plus, Minus, Gem, X, Zap, Building, ChevronsLeft, ChevronsRight, Landmark, Droplets, MapPinned, BookOpenCheck, BookText, NotebookPen } from "lucide-react";
+import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Rocket, HardHat, Briefcase, Building2, User, Users, UserCheck, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart, ArrowLeftRight, FileText, AlertCircle, Plus, Minus, Gem, X, Zap, Building, ChevronsLeft, ChevronsRight, Landmark, Droplets, MapPinned, BookOpenCheck, BookText, NotebookPen, CalendarCheck } from "lucide-react";
 import { PropertyFilters } from "./PropertyFilters";
 
 import { useTheme } from "next-themes";
@@ -494,6 +494,17 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                                 >
                                                     <Landmark className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
                                                     <span className="ms-3 sidebar-label">Contas bancárias</span>
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <Link
+                                                    title={navCollapsed ? "Fechamento do mês" : undefined}
+                                                    href={lang === 'pt' ? '/contabil/fechamento' : `/${lang}/contabil/fechamento`}
+                                                    aria-current={isActive(lang === 'pt' ? '/contabil/fechamento' : `/${lang}/contabil/fechamento`) ? "page" : undefined}
+                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/contabil/fechamento' : `/${lang}/contabil/fechamento`) ? 'bg-accent' : ''}`}
+                                                >
+                                                    <CalendarCheck className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
+                                                    <span className="ms-3 sidebar-label">Fechamento do mês</span>
                                                 </Link>
                                             </li>
                                             <li className="my-2 border-t border-border" />

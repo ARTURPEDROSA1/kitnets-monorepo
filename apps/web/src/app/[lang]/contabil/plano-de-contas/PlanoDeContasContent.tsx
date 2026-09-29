@@ -21,7 +21,7 @@ interface Props { lang: "en" | "pt" | "es" }
 export default function PlanoDeContasContent({ lang }: Props) {
     const [accounts, setAccounts] = useState<AccountingAccount[]>([]);
     const [usage, setUsage] = useState<Record<string, number>>({});
-    const [measurement, setMeasurement] = useState<string>("COST");
+    const [measurement, setMeasurement] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState<string | null>(null);
@@ -36,7 +36,7 @@ export default function PlanoDeContasContent({ lang }: Props) {
             if (!res.ok) throw new Error(d.error || "Erro ao carregar");
             setAccounts(d.accounts ?? []);
             setUsage(d.usage ?? {});
-            setMeasurement(d.measurement ?? "COST");
+            setMeasurement(d.measurement ?? null);
         } catch (err) { setError((err as Error).message); } finally { setLoading(false); }
     }, []);
     useEffect(() => { void load(); }, [load]);
@@ -108,7 +108,7 @@ export default function PlanoDeContasContent({ lang }: Props) {
             <ContabilNav lang={lang} />
 
             <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                <span>Modelo dos imóveis: <strong className="text-foreground">{measurement === "FAIR_VALUE" ? "valor justo" : "custo menos depreciação"}</strong> (contas de depreciação ou de valor justo ligadas conforme as políticas)</span>
+                <span>Modelo dos imóveis: <strong className="text-foreground">{measurement === "FAIR_VALUE" ? "valor justo" : measurement === "COST" ? "custo menos depreciação" : "a definir"}</strong> ({measurement ? "contas de depreciação ou de valor justo ligadas conforme as políticas" : "até a escolha, as contas dos dois modelos ficam ativas para o saldo de abertura"})</span>
                 <label className="flex items-center gap-1.5 ml-auto cursor-pointer">
                     <input type="checkbox" checked={showInactive} onChange={e => setShowInactive(e.target.checked)} /> Mostrar contas inativas
                 </label>
