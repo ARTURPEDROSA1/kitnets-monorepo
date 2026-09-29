@@ -53,14 +53,14 @@ export function FipezapYearlyTable({ years, rows, national, inflation, state, la
                         {pinnedRow(labels.igpm, "FGV", columns.map(c => (c.year !== null ? inflation.igpm[c.year] ?? null : inflation.igpmLatest)), "igpm")}
                         {national && (
                             <tr className="font-semibold">
-                                <th scope="row" className="sticky left-0 z-10 bg-card px-3 py-1.5 text-left whitespace-nowrap"><Link href={href("brasil")} className="hover:underline underline-offset-2">{labels.national}</Link></th>
+                                <th scope="row" className="sticky left-0 z-10 bg-card px-3 py-1.5 text-left whitespace-nowrap"><Link href={href("brasil")} prefetch={false} className="hover:underline underline-offset-2">{labels.national}</Link></th>
                                 {columns.map(c => { const v = valueOf(national, c); return <td key={c.key} className="p-0.5"><div className={cn("rounded px-1 py-1 text-center tabular-nums", yearlyHeatClass(v, ipcaOf(c)))}><Delta value={v} lang={lang} digits={1} arrow={false} className="!text-inherit" /></div></td>; })}
                             </tr>
                         )}
                         {visible.map(r => (
                             <tr key={r.city.slug} className={cn(r.city.slug === state.cidade && "font-semibold", state.comparar.includes(r.city.slug) && "bg-muted/30")}>
                                 <th scope="row" className={cn("sticky left-0 z-10 bg-card px-3 py-1.5 text-left font-normal whitespace-nowrap", r.city.slug === state.cidade && "font-semibold")}>
-                                    <Link href={href(r.city.slug)} className="hover:underline underline-offset-2">{r.city.name}</Link><span className="ml-1 text-[10px] text-muted-foreground">{r.city.uf}</span>
+                                    <Link href={href(r.city.slug)} prefetch={false} className="hover:underline underline-offset-2">{r.city.name}</Link><span className="ml-1 text-[10px] text-muted-foreground">{r.city.uf}</span>
                                 </th>
                                 {columns.map(c => { const v = valueOf(r, c); return <td key={c.key} className="p-0.5"><div className={cn("rounded px-1 py-1 text-center tabular-nums", yearlyHeatClass(v, ipcaOf(c)))}>{v === null ? <span className="text-muted-foreground/40">–</span> : <Delta value={v} lang={lang} digits={1} arrow={false} className="!text-inherit" />}</div></td>; })}
                             </tr>

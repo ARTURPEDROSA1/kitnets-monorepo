@@ -1,5 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { isCrawlerQueryTrap } from "@/lib/crawler-guard";
 
 const locales = ["en", "pt", "es"];
 const defaultLocale = "pt";
@@ -44,6 +45,13 @@ export default clerkMiddleware(async (auth, req) => {
         (locale) => pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`
     );
 
+    // Crawlers get the canonical FipeZAP city page, never its endless query variants (src/lib/crawler-guard.ts)
+    if (isCrawlerQueryTrap(pathname, req.nextUrl.search, req.headers.get("user-agent"))) {
+        const canonical = new URL(pathnameHasLocale ? pathname : `/${defaultLocale}${pathname}`, req.url);
+        canonical.search = "";
+        return NextResponse.redirect(canonical, 301);
+    }
+
     if (pathnameHasLocale) return;
 
     // If no locale, redirect to default locale
@@ -56,8 +64,9 @@ export default clerkMiddleware(async (auth, req) => {
 
 export const config = {
     matcher: [
-        // Skip Next.js internals and all static files, unless found in search params
-        '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest|xml)).*)',
+        // Skip Next.js internals and all static files, unless found in search params.
+        // txt keeps /robots.txt out of the locale redirect (it went to /pt/robots.txt, a 404).
+        '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest|xml|txt)).*)',
         // Always run for API routes
         '/(api|trpc)(.*)',
     ],

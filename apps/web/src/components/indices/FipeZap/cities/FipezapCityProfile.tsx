@@ -60,7 +60,7 @@ export function FipezapCityProfile({ snapshot, national, history, nationalHistor
                 {neighbours.length > 0 && (
                     <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                         <span>{t.labels.comparingWith}:</span>
-                        {neighbours.map(n => <Link key={n.slug} href={buildFipezapCitiesHref(lang, state, { comparar: [...state.comparar, n.slug].slice(0, 5) })} className="rounded-full border border-dashed border-border px-2 py-0.5 hover:bg-accent hover:text-foreground">+ {n.name}</Link>)}
+                        {neighbours.map(n => <Link key={n.slug} href={buildFipezapCitiesHref(lang, state, { comparar: [...state.comparar, n.slug].slice(0, 5) })} rel="nofollow" prefetch={false} className="rounded-full border border-dashed border-border px-2 py-0.5 hover:bg-accent hover:text-foreground">+ {n.name}</Link>)}
                     </div>
                 )}
             </div>
