@@ -4,8 +4,8 @@ import { requireUserWithLimit } from "@/lib/session";
 import { HOUR } from "@/lib/rate-limit";
 import { xlsxToTsv } from "@/lib/income-template";
 import { parseStatement } from "@/lib/bank-statement";
-import { rowsFromExtraction, suggestRouting, type BankSource } from "@/lib/bank-ledger";
-import { extractStatementPdf, loadBankRows, loadPropertyRefs } from "@/lib/bank-ledger-server";
+import { keepFilledIncomeMonths, rowsFromExtraction, suggestRouting, type BankSource } from "@/lib/bank-ledger";
+import { existingReferences, extractStatementPdf, filledIncomeMonths, loadBankRows, loadPropertyRefs } from "@/lib/bank-ledger-server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -65,9 +65,14 @@ export async function POST(request: Request) {
         }
         if (parsed.length === 0) return NextResponse.json({ error: "Nenhum lançamento reconhecido no arquivo" }, { status: 422 });
 
-        const [properties, history] = await Promise.all([loadPropertyRefs(supabase, profileId), loadBankRows(supabase, profileId, 1000)]);
-        const existing = new Set(history.map(h => h.reference));
-        const rows = suggestRouting(parsed, source, properties, history, existing);
+        const dates = parsed.map(p => p.date).sort();
+        const [properties, history, existing, filled] = await Promise.all([
+            loadPropertyRefs(supabase, profileId),
+            loadBankRows(supabase, profileId, 1000),   // the latest rows are enough to learn the routing
+            existingReferences(supabase, profileId, parsed.map(p => p.reference)),
+            filledIncomeMonths(supabase, profileId, dates[0], dates[dates.length - 1]),
+        ]);
+        const rows = keepFilledIncomeMonths(suggestRouting(parsed, source, properties, history, existing), filled);
         return NextResponse.json({ rows, properties: properties.map(p => ({ id: p.id, name: p.name })), source });
     } catch (err) {
         console.error("[Bank statement]", (err as Error).message);

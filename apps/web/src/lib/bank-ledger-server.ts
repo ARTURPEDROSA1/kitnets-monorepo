@@ -10,6 +10,31 @@ import type { BankTransaction, PropertyRef } from "./bank-ledger";
 export const BANK_TABLE = "bank_transactions";
 export const BANK_COLUMNS = "id, occurred_on, amount, memo, reference, source, bank, destination, property_id, kind, linked_id, created_at";
 
+/** References already in the bank ledger, among `refs` (queried in slices: a long `.in()` list overflows the URL). */
+export async function existingReferences(supabase: AdminSupabase, ownerId: string, refs: string[]): Promise<Set<string>> {
+    const out = new Set<string>();
+    for (let i = 0; i < refs.length; i += 150) {
+        const { data, error } = await supabase.from(BANK_TABLE).select("reference").eq("owner_id", ownerId).in("reference", refs.slice(i, i + 150));
+        if (error) throw new Error(error.message);
+        for (const r of (data ?? []) as Array<{ reference: string }>) out.add(r.reference);
+    }
+    return out;
+}
+
+/** "propertyId|YYYY-MM" of the months, between two dates, that have income rows not created from the bank. */
+export async function filledIncomeMonths(supabase: AdminSupabase, ownerId: string, fromDate: string, toDate: string): Promise<Set<string>> {
+    const out = new Set<string>();
+    for (let from = 0; ; from += 1000) {
+        const { data, error } = await supabase.from("property_income_months").select("property_id, month")
+            .eq("owner_id", ownerId).neq("source", "BANK").gte("month", `${fromDate.slice(0, 7)}-01`).lte("month", toDate)
+            .order("id").range(from, from + 999);
+        if (error) throw new Error(error.message);
+        for (const r of (data ?? []) as Array<{ property_id: string; month: string }>) out.add(`${r.property_id}|${String(r.month).slice(0, 7)}`);
+        if ((data ?? []).length < 1000) break;
+    }
+    return out;
+}
+
 export async function loadBankRows(supabase: AdminSupabase, ownerId: string, limit = 500): Promise<BankTransaction[]> {
     const { data, error } = await supabase
         .from(BANK_TABLE).select(BANK_COLUMNS).eq("owner_id", ownerId)

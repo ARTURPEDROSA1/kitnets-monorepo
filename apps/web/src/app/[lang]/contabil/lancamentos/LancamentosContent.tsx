@@ -18,7 +18,7 @@ import { ContabilNav } from "@/components/contabil/ContabilNav";
 import { cn } from "@/lib/utils";
 import { compareCodes, type AccountingAccount } from "@/lib/accounting-chart";
 import {
-    ENTRY_SOURCE_LABELS, entryTotals, formatMoney, validateEntryDraft, type AccountingPeriod, type EntrySource, type JournalEntry,
+    ENTRY_SOURCE_LABELS, entryTotals, formatMoney, parseAmountInput, validateEntryDraft, type AccountingPeriod, type EntrySource, type JournalEntry,
 } from "@/lib/accounting-journal";
 
 interface Props { lang: "en" | "pt" | "es" }
@@ -38,14 +38,6 @@ const monthLabel = (m: string) => {
 };
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const dateBR = (iso: string) => iso.split("-").reverse().join("/");
-/** "1.500,50" / "1500,50" / "1500.50" / "1.500" → number (a lone dot with 1–2 decimals is the decimal point). */
-const toNumber = (s: string) => {
-    const t = s.trim().replace(/\s|R\$/g, "");
-    if (t === "") return 0;
-    if (t.includes(",")) return Number(t.replace(/\./g, "").replace(",", "."));
-    return /^\d+\.\d{1,2}$/.test(t) ? Number(t) : Number(t.replace(/\./g, ""));
-};
-
 let lineKey = 0;
 const emptyLine = (): DraftLine => ({ key: ++lineKey, account_id: "", debit: "", credit: "", property_id: "", memo: "" });
 
@@ -93,7 +85,7 @@ export default function LancamentosContent({ lang }: Props) {
         entry_date: date,
         description,
         source,
-        lines: lines.map(l => ({ account_id: l.account_id, debit: toNumber(l.debit), credit: toNumber(l.credit), property_id: l.property_id || null, memo: l.memo || null })),
+        lines: lines.map(l => ({ account_id: l.account_id, debit: parseAmountInput(l.debit), credit: parseAmountInput(l.credit), property_id: l.property_id || null, memo: l.memo || null })),
     }), [date, description, source, lines]);
     const totals = entryTotals(draft.lines);
 

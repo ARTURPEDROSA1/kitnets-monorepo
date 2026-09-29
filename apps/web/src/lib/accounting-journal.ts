@@ -183,6 +183,14 @@ export function balancesByAccount(lines: Pick<JournalLine, "account_id" | "debit
     return new Map([...cents].map(([k, v]) => [k, v / 100]));
 }
 
+/** Typed amount → number: "1.500,50" / "1500,50" / "1500.50" / "1.500" / "R$ 10" (a lone dot with 1–2 decimals is the decimal point). */
+export function parseAmountInput(s: string): number {
+    const t = String(s ?? "").trim().replace(/\s|R\$/g, "");
+    if (t === "") return 0;
+    if (t.includes(",")) return Number(t.replace(/\./g, "").replace(",", "."));
+    return /^-?\d+\.\d{1,2}$/.test(t) ? Number(t) : Number(t.replace(/\./g, ""));
+}
+
 export function formatMoney(v: number): string {
     return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }

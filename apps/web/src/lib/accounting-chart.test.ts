@@ -59,8 +59,8 @@ describe("validateNewAccount", () => {
     const existing = chartTemplate("COST").map(a => ({ code: a.code, analytic: a.analytic, nature: a.nature, account_type: a.type }));
 
     it("adds an analytic account under a group, inheriting the nature", () => {
-        const r = validateNewAccount({ code: "4.1.1.09", name: "Limpeza", analytic: true }, existing);
-        expect(r).toEqual({ row: { code: "4.1.1.09", name: "Limpeza", account_type: "DESPESA", nature: "D", analytic: true } });
+        const r = validateNewAccount({ code: "4.1.1.10", name: "Limpeza", analytic: true }, existing);
+        expect(r).toEqual({ row: { code: "4.1.1.10", name: "Limpeza", account_type: "DESPESA", nature: "D", analytic: true } });
     });
 
     it("rejects duplicates, missing groups and children of analytic accounts", () => {

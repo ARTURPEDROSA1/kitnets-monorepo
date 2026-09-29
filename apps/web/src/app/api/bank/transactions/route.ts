@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireProfile, UUID_REGEX } from "@/lib/api-auth";
 import { BANK_TABLE, loadBankRows, loadPropertyRefs } from "@/lib/bank-ledger-server";
+import { unpostBankRow } from "@/lib/accounting-bank-server";
 
 export const dynamic = "force-dynamic";
 
@@ -21,8 +22,9 @@ export async function GET(request: Request) {
 
 /**
  * DELETE /api/bank/transactions?id=<uuid> → { ok }
- * Removes the bank row and the ledger row it created (investment transaction);
- * an income month is left untouched because it may carry hand-entered fields.
+ * Removes the bank row, the ledger row it created (investment transaction) and its entry in
+ * the holding's books — refused when that entry is in a closed month. An income month is left
+ * untouched because it may carry hand-entered fields.
  */
 export async function DELETE(request: Request) {
     const authed = await requireProfile();
@@ -32,6 +34,8 @@ export async function DELETE(request: Request) {
     if (!id || !UUID_REGEX.test(id)) return NextResponse.json({ error: "id inválido" }, { status: 400 });
     const { data: row } = await supabase.from(BANK_TABLE).select("id, destination, linked_id, property_id").eq("id", id).eq("owner_id", profileId).maybeSingle();
     if (!row) return NextResponse.json({ error: "Lançamento não encontrado" }, { status: 404 });
+    const unposted = await unpostBankRow(supabase, profileId, id);
+    if ("error" in unposted) return NextResponse.json({ error: unposted.error }, { status: 409 });
     if (row.destination === "INVESTMENT" && row.linked_id) {
         await supabase.from("property_transactions").delete().eq("id", row.linked_id).eq("owner_id", profileId);
     }
