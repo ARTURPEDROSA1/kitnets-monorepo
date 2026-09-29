@@ -227,12 +227,13 @@ export function bankEntryPayload(row: BankRowForPosting, bankAccountId: string, 
     };
 }
 
-export type BankRowStatus = "POSTED" | "READY" | "QUESTION" | "BEFORE_OPENING" | "CLOSED_MONTH";
+export type BankRowStatus = "POSTED" | "READY" | "QUESTION" | "NO_START" | "BEFORE_OPENING" | "CLOSED_MONTH";
 
 export const BANK_STATUS_LABELS: Record<BankRowStatus, string> = {
     POSTED: "Contabilizado",
     READY: "Pronto para contabilizar",
     QUESTION: "Dúvida",
+    NO_START: "Aguardando o início da escrituração",
     BEFORE_OPENING: "Antes do início da escrituração",
     CLOSED_MONTH: "Mês fechado",
 };

@@ -107,14 +107,16 @@ export async function bankContext(supabase: AdminSupabase, ownerId: string): Pro
     };
 }
 
-/** Status of each row: posted, a question for the owner, before the opening date or in a closed month. */
+/** Status of each row: posted, a question for the owner, waiting for the start date, before it, or in a closed month. */
 export function viewRows(rows: BankRowForPosting[], posted: Map<string, PostedBankEntry>, ctx: BankContext): BankRowView[] {
+    const start = ctx.settings.opening_date;
     return rows.map(row => {
         const done = posted.get(row.id);
         const s = suggestCounterpart(row, ctx.suggest);
         let status: BankRowStatus;
         if (done) status = "POSTED";
-        else if (row.occurred_on < ctx.settings.opening_date) status = "BEFORE_OPENING";
+        else if (!start) status = "NO_START";
+        else if (row.occurred_on < start) status = "BEFORE_OPENING";
         else if (ctx.closed.has(monthOf(row.occurred_on))) status = "CLOSED_MONTH";
         else status = s.counterpart ? "READY" : "QUESTION";
         return {
@@ -133,20 +135,26 @@ export interface PostingSummary {
     questions: number;
     closedMonth: number;
     beforeOpening: number;
+    /** rows waiting because the owner has not chosen the start of the books yet */
+    waitingStart: number;
     errors: string[];
 }
 
-/** Posts every row (or the given ones) that has no entry yet and a counterpart. Idempotent. */
+export const EMPTY_POSTING_SUMMARY: PostingSummary = { posted: 0, questions: 0, closedMonth: 0, beforeOpening: 0, waitingStart: 0, errors: [] };
+
+/** Posts every row (or the given ones) that has no entry yet and a counterpart. Idempotent. Posts nothing until the start of the books is chosen. */
 export async function postBankRows(supabase: AdminSupabase, ownerId: string, opts: { ids?: string[] } = {}): Promise<PostingSummary> {
     const ctx = await bankContext(supabase, ownerId);
     const rows = await loadBankRowsForPosting(supabase, ownerId, opts.ids);
     const posted = await postedBankEntries(supabase, ownerId, ctx.bankAccountId, opts.ids);
-    const summary: PostingSummary = { posted: 0, questions: 0, closedMonth: 0, beforeOpening: 0, errors: [] };
+    const summary: PostingSummary = { ...EMPTY_POSTING_SUMMARY, errors: [] };
+    const start = ctx.settings.opening_date;
 
     const toPost: Array<{ row: BankRowForPosting; accountId: string }> = [];
     for (const row of rows) {
         if (posted.has(row.id) || !row.amount) continue;
-        if (row.occurred_on < ctx.settings.opening_date) { summary.beforeOpening++; continue; }
+        if (!start) { summary.waitingStart++; continue; }
+        if (row.occurred_on < start) { summary.beforeOpening++; continue; }
         if (ctx.closed.has(monthOf(row.occurred_on))) { summary.closedMonth++; continue; }
         const s = suggestCounterpart(row, ctx.suggest);
         if (!s.counterpart) { summary.questions++; continue; }

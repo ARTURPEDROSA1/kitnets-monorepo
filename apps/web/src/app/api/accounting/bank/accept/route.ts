@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireProfile, UUID_REGEX } from "@/lib/api-auth";
 import { resolveAnswer } from "@/lib/accounting-bank-posting";
-import { bankContext, loadBankRowsForPosting, postBankRows, postedBankEntries, viewRows } from "@/lib/accounting-bank-server";
+import { bankContext, EMPTY_POSTING_SUMMARY, loadBankRowsForPosting, postBankRows, postedBankEntries, viewRows } from "@/lib/accounting-bank-server";
 import { chunk } from "@/lib/accounting-server";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
                 accepted.push(...part);
             }
         }
-        const summary = accepted.length ? await postBankRows(supabase, profileId, { ids: accepted }) : { posted: 0, questions: 0, closedMonth: 0, beforeOpening: 0, errors: [] };
+        const summary = accepted.length ? await postBankRows(supabase, profileId, { ids: accepted }) : EMPTY_POSTING_SUMMARY;
         return NextResponse.json({ accepted: accepted.length, summary });
     } catch (err) {
         console.error("[Accounting bank accept]", (err as Error).message);

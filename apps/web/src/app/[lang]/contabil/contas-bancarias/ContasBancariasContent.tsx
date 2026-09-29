@@ -92,9 +92,9 @@ export default function ContasBancariasContent({ lang }: Props) {
             if (!res.ok) throw new Error(d.error || "Erro ao importar");
             setLedger(d.rows ?? []);
             setRows([]);
-            const acc = d.accounting as { posted: number; questions: number } | null | undefined;
+            const acc = d.accounting as { posted: number; questions: number; waitingStart?: number } | null | undefined;
             setNotice(`${d.imported} lançamentos importados · ${d.income} para receitas · ${d.investment} para investimento · ${d.ignored} só contábil${d.skipped ? ` · ${d.skipped} já existiam` : ""}`
-                + (acc ? ` · ${acc.posted} contabilizados${acc.questions ? ` · ${acc.questions} com dúvida em Conciliação` : ""}` : ""));
+                + (acc ? ` · ${acc.posted} contabilizados${acc.questions ? ` · ${acc.questions} com dúvida em Conciliação` : ""}${acc.waitingStart ? ` · ${acc.waitingStart} aguardando o início da escrituração (defina em Políticas contábeis)` : ""}` : ""));
         } catch (err) { setError((err as Error).message); } finally { setImporting(false); }
     };
 

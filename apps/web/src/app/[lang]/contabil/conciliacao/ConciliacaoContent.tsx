@@ -46,6 +46,7 @@ const STATUS_STYLE: Record<BankRowStatus, string> = {
     POSTED: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200",
     READY: "bg-sky-100 text-sky-800 dark:bg-sky-950/40 dark:text-sky-200",
     QUESTION: "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200",
+    NO_START: "bg-muted text-muted-foreground",
     BEFORE_OPENING: "bg-muted text-muted-foreground",
     CLOSED_MONTH: "bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-100",
 };
@@ -62,6 +63,7 @@ export default function ConciliacaoContent({ lang }: Props) {
     const [accounts, setAccounts] = useState<Acc[]>([]);
     const [allAccounts, setAllAccounts] = useState<Acc[]>([]);
     const [properties, setProperties] = useState<Array<{ id: string; name: string }>>([]);
+    const [openingDate, setOpeningDate] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
@@ -85,6 +87,7 @@ export default function ConciliacaoContent({ lang }: Props) {
             setAccounts(d.accounts ?? []);
             setAllAccounts(d.allAccounts ?? []);
             setProperties(d.properties ?? []);
+            setOpeningDate(d.openingDate ?? null);
         } catch (err) { setError((err as Error).message); } finally { setLoading(false); }
     }, []);
     useEffect(() => { void load(); }, [load]);
@@ -183,6 +186,11 @@ export default function ConciliacaoContent({ lang }: Props) {
 
             {error && <div className="rounded-xl border border-rose-300 bg-rose-50 dark:bg-rose-950/30 px-4 py-3 text-sm text-rose-700 dark:text-rose-300">{error}</div>}
             {notice && <div className="rounded-xl border border-emerald-300 bg-emerald-50 dark:bg-emerald-950/30 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" /> {notice}</div>}
+            {!loading && !openingDate && (
+                <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
+                    O extrato só é contabilizado depois que você escolher o <strong>início da escrituração</strong> (o mês do saldo de abertura) em <Link href={`${base}/contabil/politicas`} className="underline">Políticas contábeis</Link>. Até lá, as linhas ficam aguardando.
+                </div>
+            )}
 
             {loading ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="w-4 h-4 animate-spin" /> Carregando…</div>
@@ -217,14 +225,16 @@ export default function ConciliacaoContent({ lang }: Props) {
                     </div>
 
                     {visible.length === 0 ? (
-                        <p className="text-sm text-muted-foreground flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-600" /> Nenhuma dúvida: todo o extrato está classificado.</p>
+                        (counts.NO_START ?? 0) > 0
+                            ? <p className="text-sm text-muted-foreground">As linhas do extrato aguardam o início da escrituração; as dúvidas aparecem depois.</p>
+                            : <p className="text-sm text-muted-foreground flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-600" /> Nenhuma dúvida: todo o extrato está classificado.</p>
                     ) : (
                         <ul className="divide-y divide-border">
                             {visible.map(r => {
                                 const dir = direction(r.amount);
                                 const opts = options.filter(o => o.direction === dir);
                                 const c = choice[r.id];
-                                const canEdit = r.status !== "BEFORE_OPENING" && r.status !== "CLOSED_MONTH";
+                                const canEdit = r.status !== "BEFORE_OPENING" && r.status !== "CLOSED_MONTH" && r.status !== "NO_START";
                                 return (
                                     <li key={r.id} className="py-3 space-y-2">
                                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">

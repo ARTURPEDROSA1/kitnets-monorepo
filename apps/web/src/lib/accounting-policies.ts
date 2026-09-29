@@ -40,7 +40,8 @@ export interface AccountingSettings {
     useful_life_basis: UsefulLifeBasis;
     reimbursements_policy: ReimbursementsPolicy | null;
     first_adoption_deemed_cost: boolean | null;
-    opening_date: string;
+    /** first day of the first month in the platform books; null until the owner decides */
+    opening_date: string | null;
     accountant_name: string | null;
     accountant_crc: string | null;
     accountant_crc_uf: string | null;
@@ -64,7 +65,7 @@ export const DEFAULT_SETTINGS: AccountingSettings = {
     useful_life_basis: "RFB",
     reimbursements_policy: null,
     first_adoption_deemed_cost: null,
-    opening_date: "2026-01-01",
+    opening_date: null,
     accountant_name: null,
     accountant_crc: null,
     accountant_crc_uf: null,
@@ -162,9 +163,10 @@ export function validateSettings(body: Record<string, unknown>, current: Account
     if (has("reimbursements_policy")) next.reimbursements_policy = oneOf(body.reimbursements_policy, ["RECEITA", "REPASSE"] as const);
     if (has("first_adoption_deemed_cost")) next.first_adoption_deemed_cost = typeof body.first_adoption_deemed_cost === "boolean" ? body.first_adoption_deemed_cost : null;
     if (has("opening_date")) {
-        const v = typeof body.opening_date === "string" ? body.opening_date : "";
-        if (!ISO.test(v) || !v.endsWith("-01")) return { error: "A escrituração começa no primeiro dia de um mês" };
-        next.opening_date = v;
+        const v = typeof body.opening_date === "string" ? body.opening_date.trim() : "";
+        if (!v) next.opening_date = null;
+        else if (!ISO.test(v) || !v.endsWith("-01")) return { error: "A escrituração começa no primeiro dia de um mês" };
+        else next.opening_date = v;
     }
     if (has("accountant_name")) next.accountant_name = text(body.accountant_name, 120);
     if (has("accountant_crc")) next.accountant_crc = text(body.accountant_crc, 30);
@@ -189,6 +191,7 @@ export function validateSettings(body: Record<string, unknown>, current: Account
 /** Decisions still open, for the "Atenção" list and the contador package. */
 export function pendingDecisions(s: AccountingSettings): string[] {
     const out: string[] = [];
+    if (!s.opening_date) out.push("Definir o início da escrituração na Kitnets.com (o mês do saldo de abertura): sem ele, o extrato não é contabilizado");
     if (!s.accountant_name || !s.accountant_crc || !s.accountant_crc_uf) out.push("Cadastrar o contador responsável (nome, CRC e UF)");
     if (!s.policies_decided_by || !s.policies_decided_on) out.push("Registrar a decisão do contador sobre a norma e o modelo de mensuração");
     if (!s.tax_basis) out.push("Definir o regime de apuração dos tributos (caixa ou competência)");

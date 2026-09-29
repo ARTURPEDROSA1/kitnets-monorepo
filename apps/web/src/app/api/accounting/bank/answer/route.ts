@@ -24,6 +24,7 @@ export async function POST(request: Request) {
         const ctx = await bankContext(supabase, profileId);
         const [row] = await loadBankRowsForPosting(supabase, profileId, [body.id]);
         if (!row) return NextResponse.json({ error: "Lançamento do extrato não encontrado" }, { status: 404 });
+        if (!ctx.settings.opening_date) return NextResponse.json({ error: "Defina primeiro o início da escrituração em Políticas contábeis" }, { status: 409 });
         if (row.occurred_on < ctx.settings.opening_date) return NextResponse.json({ error: "Este lançamento é anterior ao início da escrituração: ele está no saldo de abertura" }, { status: 409 });
         if (ctx.closed.has(monthOf(row.occurred_on))) return NextResponse.json({ error: "O mês deste lançamento está fechado: reabra o mês ou faça um lançamento de reclassificação" }, { status: 409 });
 

@@ -32,7 +32,7 @@ export async function GET() {
         const lines = (entry?.journal_lines ?? []).map(l => ({ account_id: l.account_id, debit: Number(l.debit) || 0, credit: Number(l.credit) || 0 }));
         return NextResponse.json({
             openingDate: settings.opening_date,
-            locked: closedMonths(periods).has(monthOf(settings.opening_date)),
+            locked: settings.opening_date ? closedMonths(periods).has(monthOf(settings.opening_date)) : false,
             entry: entry ? { id: entry.id, created_by: entry.created_by, created_at: entry.created_at } : null,
             lines,
             accounts: accounts.filter(isBalanceSheet),
@@ -63,7 +63,9 @@ export async function PUT(request: Request) {
             loadOpening(supabase, profileId),
             actorName(supabase, profileId),
         ]);
-        if (closedMonths(periods).has(monthOf(settings.opening_date))) {
+        const openingDate = settings.opening_date;
+        if (!openingDate) return NextResponse.json({ error: "Defina primeiro o início da escrituração em Políticas contábeis" }, { status: 409 });
+        if (closedMonths(periods).has(monthOf(openingDate))) {
             return NextResponse.json({ error: "O mês do saldo de abertura está fechado: reabra-o para alterar" }, { status: 409 });
         }
         const byKey = new Map(accounts.filter(a => a.system_key).map(a => [a.system_key!, a.id]));
@@ -75,7 +77,7 @@ export async function PUT(request: Request) {
         const tempRef = `${OPENING_SOURCE_REF}-${Date.now()}`;
         const { data: newId, error } = await supabase.rpc("accounting_post_entry", {
             p_owner: profileId,
-            p_entry: { entry_date: settings.opening_date, description: "Saldo de abertura", source: "OPENING", source_ref: current ? tempRef : OPENING_SOURCE_REF, created_by: actor },
+            p_entry: { entry_date: openingDate, description: "Saldo de abertura", source: "OPENING", source_ref: current ? tempRef : OPENING_SOURCE_REF, created_by: actor },
             p_lines: built.lines.map(l => ({ ...l, property_id: null, unit_id: null, memo: null })),
         });
         if (error) return NextResponse.json({ error: postingErrorMessage(error.message) }, { status: 400 });

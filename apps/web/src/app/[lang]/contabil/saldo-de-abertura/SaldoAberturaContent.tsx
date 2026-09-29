@@ -32,7 +32,7 @@ export default function SaldoAberturaContent({ lang }: Props) {
     const base = lang === "pt" ? "" : `/${lang}`;
     const [accounts, setAccounts] = useState<Acc[]>([]);
     const [values, setValues] = useState<Record<string, { debit: string; credit: string }>>({});
-    const [openingDate, setOpeningDate] = useState<string>("");
+    const [openingDate, setOpeningDate] = useState<string | null>(null);
     const [locked, setLocked] = useState(false);
     const [entry, setEntry] = useState<{ created_by: string | null; created_at: string } | null>(null);
     const [plug, setPlug] = useState(false);
@@ -48,7 +48,7 @@ export default function SaldoAberturaContent({ lang }: Props) {
                 const d = await res.json().catch(() => ({}));
                 if (!res.ok) throw new Error(d.error || "Erro ao carregar");
                 setAccounts(d.accounts ?? []);
-                setOpeningDate(d.openingDate);
+                setOpeningDate(d.openingDate ?? null);
                 setLocked(Boolean(d.locked));
                 setEntry(d.entry);
                 const v: Record<string, { debit: string; credit: string }> = {};
@@ -65,6 +65,7 @@ export default function SaldoAberturaContent({ lang }: Props) {
     const totals = entryTotals(lines);
     const difference = Math.round((totals.debit - totals.credit) * 100) / 100;
 
+    const readOnly = locked || !openingDate;
     const set = (id: string, side: "debit" | "credit", text: string) =>
         setValues(prev => ({ ...prev, [id]: { debit: side === "debit" ? text : text ? "" : prev[id]?.debit ?? "", credit: side === "credit" ? text : text ? "" : prev[id]?.credit ?? "" } }));
 
@@ -98,6 +99,11 @@ export default function SaldoAberturaContent({ lang }: Props) {
             {error && <div className="rounded-xl border border-rose-300 bg-rose-50 dark:bg-rose-950/30 px-4 py-3 text-sm text-rose-700 dark:text-rose-300">{error}</div>}
             {notice && <div className="rounded-xl border border-emerald-300 bg-emerald-50 dark:bg-emerald-950/30 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" /> {notice}</div>}
             {locked && <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm flex items-center gap-2"><Lock className="w-4 h-4" /> O mês do saldo de abertura está fechado: reabra-o em Lançamentos para alterar.</div>}
+            {!loading && !openingDate && (
+                <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
+                    Escolha primeiro o <strong>início da escrituração</strong> em <Link href={`${base}/contabil/politicas`} className="underline">Políticas contábeis</Link>: o saldo de abertura é o do dia anterior a ele.
+                </div>
+            )}
             {entry && !notice && <p className="text-xs text-muted-foreground">Saldo de abertura lançado{entry.created_by ? ` por ${entry.created_by}` : ""} em {dateBR(entry.created_at.slice(0, 10))}. Salvar de novo substitui o lançamento.</p>}
             <p className="text-xs text-muted-foreground">A data de início fica em <Link href={`${base}/contabil/politicas`} className="text-emerald-700 hover:underline">Políticas contábeis</Link>.</p>
 
@@ -121,8 +127,8 @@ export default function SaldoAberturaContent({ lang }: Props) {
                                     {list.map(a => a.analytic ? (
                                         <tr key={a.id} className="border-t border-border/60">
                                             <td className="px-3 py-1"><span className="font-mono text-xs text-muted-foreground mr-2">{a.code}</span>{a.name}</td>
-                                            <td className="px-2 py-1"><Input disabled={locked} inputMode="decimal" value={values[a.id]?.debit ?? ""} placeholder={a.nature === "D" ? "0,00" : ""} onChange={e => set(a.id, "debit", e.target.value)} className="h-8 text-right text-sm" /></td>
-                                            <td className="px-2 py-1"><Input disabled={locked} inputMode="decimal" value={values[a.id]?.credit ?? ""} placeholder={a.nature === "C" ? "0,00" : ""} onChange={e => set(a.id, "credit", e.target.value)} className="h-8 text-right text-sm" /></td>
+                                            <td className="px-2 py-1"><Input disabled={readOnly} inputMode="decimal" value={values[a.id]?.debit ?? ""} placeholder={a.nature === "D" ? "0,00" : ""} onChange={e => set(a.id, "debit", e.target.value)} className="h-8 text-right text-sm" /></td>
+                                            <td className="px-2 py-1"><Input disabled={readOnly} inputMode="decimal" value={values[a.id]?.credit ?? ""} placeholder={a.nature === "C" ? "0,00" : ""} onChange={e => set(a.id, "credit", e.target.value)} className="h-8 text-right text-sm" /></td>
                                         </tr>
                                     ) : (
                                         <tr key={a.id} className="border-t border-border/60">
@@ -150,11 +156,11 @@ export default function SaldoAberturaContent({ lang }: Props) {
                     </span>
                     {difference !== 0 && (
                         <label className="text-sm flex items-center gap-2">
-                            <input type="checkbox" checked={plug} onChange={e => setPlug(e.target.checked)} disabled={locked} />
+                            <input type="checkbox" checked={plug} onChange={e => setPlug(e.target.checked)} disabled={readOnly} />
                             Lançar a diferença em {difference > 0 ? "lucros acumulados" : "prejuízos acumulados"}
                         </label>
                     )}
-                    <Button onClick={save} disabled={locked || saving || lines.length < 2 || (difference !== 0 && !plug)} className="gap-2 ml-auto">
+                    <Button onClick={save} disabled={readOnly || saving || lines.length < 2 || (difference !== 0 && !plug)} className="gap-2 ml-auto">
                         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Lançar saldo de abertura
                     </Button>
                 </div>

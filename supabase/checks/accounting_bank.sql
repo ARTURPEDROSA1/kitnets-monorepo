@@ -70,7 +70,20 @@ BEGIN
     END IF;
     RAISE NOTICE 'ok: balance and usage summed in the database';
 
-    -- 4. One reconciliation per date.
+    -- 4. The start of the books has no default and is always the first day of a month.
+    INSERT INTO public.accounting_settings (owner_id) VALUES (v_owner);
+    IF (SELECT opening_date FROM public.accounting_settings WHERE owner_id = v_owner) IS NOT NULL THEN
+        RAISE EXCEPTION 'FAIL: opening_date got a default';
+    END IF;
+    BEGIN
+        UPDATE public.accounting_settings SET opening_date = '2025-01-15' WHERE owner_id = v_owner;
+        RAISE EXCEPTION 'FAIL: opening date mid-month accepted' USING ERRCODE = 'P0001';
+    EXCEPTION WHEN check_violation THEN
+        RAISE NOTICE 'ok: opening date is the owner''s choice, first day of a month';
+    END;
+    UPDATE public.accounting_settings SET opening_date = '2025-01-01' WHERE owner_id = v_owner;
+
+    -- 5. One reconciliation per date.
     INSERT INTO public.bank_reconciliations (owner_id, as_of, statement_balance, book_balance) VALUES (v_owner, '2026-09-30', 1000, 990);
     BEGIN
         INSERT INTO public.bank_reconciliations (owner_id, as_of, statement_balance, book_balance) VALUES (v_owner, '2026-09-30', 1000, 1000);
