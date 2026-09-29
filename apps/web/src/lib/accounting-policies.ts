@@ -34,8 +34,10 @@ export interface AccountingSettings {
     nire: string | null;
     tax_regime: TaxRegime;
     tax_basis: TaxBasis | null;
-    accounting_standard: AccountingStandard;
-    property_measurement: PropertyMeasurement;
+    /** chosen with the contador; null until decided */
+    accounting_standard: AccountingStandard | null;
+    /** null until decided: no depreciation or fair-value entry is generated before */
+    property_measurement: PropertyMeasurement | null;
     building_useful_life_years: number;
     useful_life_basis: UsefulLifeBasis;
     reimbursements_policy: ReimbursementsPolicy | null;
@@ -59,8 +61,8 @@ export const DEFAULT_SETTINGS: AccountingSettings = {
     nire: null,
     tax_regime: "LUCRO_PRESUMIDO",
     tax_basis: null,
-    accounting_standard: "NBC_TG_1002",
-    property_measurement: "COST",
+    accounting_standard: null,
+    property_measurement: null,
     building_useful_life_years: RFB_BUILDING_USEFUL_LIFE_YEARS,
     useful_life_basis: "RFB",
     reimbursements_policy: null,
@@ -109,8 +111,8 @@ export const BRAZIL_UFS = ["AC", "AL", "AM", "AP", "BA", "CE", "DF", "ES", "GO",
  * NBC TG 1002 has no fair-value option (Seção 17); the full standards do (CPC 28 §30).
  * NBC TG 1000/1001 are not blocked here: the contador confirms the option in the chosen standard.
  */
-export function allowsFairValue(standard: AccountingStandard): boolean {
-    return standard !== "NBC_TG_1002";
+export function allowsFairValue(standard: AccountingStandard | null): boolean {
+    return standard !== null && standard !== "NBC_TG_1002";
 }
 
 const oneOf = <T extends string>(v: unknown, values: readonly T[]): T | null => (typeof v === "string" && (values as readonly string[]).includes(v) ? (v as T) : null);
@@ -136,18 +138,24 @@ export function validateSettings(body: Record<string, unknown>, current: Account
         next.tax_regime = v;
     }
     if (has("tax_basis")) next.tax_basis = oneOf(body.tax_basis, ["COMPETENCIA", "CAIXA"] as const);
+    // null / "" = not decided yet (a decision of the owner with the contador, never a default)
+    const undecided = (v: unknown) => v === null || v === "";
     if (has("accounting_standard")) {
         const v = oneOf(body.accounting_standard, ["NBC_TG_1002", "NBC_TG_1001", "NBC_TG_1000", "NBC_TG_COMPLETAS"] as const);
-        if (!v) return { error: "Norma contábil inválida" };
+        if (!v && !undecided(body.accounting_standard)) return { error: "Norma contábil inválida" };
         next.accounting_standard = v;
     }
     if (has("property_measurement")) {
         const v = oneOf(body.property_measurement, ["COST", "FAIR_VALUE"] as const);
-        if (!v) return { error: "Modelo de mensuração inválido" };
+        if (!v && !undecided(body.property_measurement)) return { error: "Modelo de mensuração inválido" };
         next.property_measurement = v;
     }
     if (next.property_measurement === "FAIR_VALUE" && !allowsFairValue(next.accounting_standard)) {
-        return { error: "A NBC TG 1002 não tem a opção de valor justo: para usar o CPC 28 a valor justo, adote as normas completas" };
+        return {
+            error: next.accounting_standard
+                ? "A NBC TG 1002 não tem a opção de valor justo: para usar o CPC 28 a valor justo, adote as normas completas"
+                : "Escolha a norma contábil antes do valor justo (a NBC TG 1002 não tem essa opção)",
+        };
     }
     if (has("useful_life_basis")) {
         const v = oneOf(body.useful_life_basis, ["RFB", "ESTIMATIVA"] as const);
@@ -193,9 +201,10 @@ export function pendingDecisions(s: AccountingSettings): string[] {
     const out: string[] = [];
     if (!s.opening_date) out.push("Definir o início da escrituração na Kitnets.com (o mês do saldo de abertura): sem ele, o extrato não é contabilizado");
     if (!s.accountant_name || !s.accountant_crc || !s.accountant_crc_uf) out.push("Cadastrar o contador responsável (nome, CRC e UF)");
+    if (!s.accounting_standard || !s.property_measurement) out.push("Escolher, com o contador, a norma e o modelo de mensuração dos imóveis alugados (custo ou valor justo): sem eles, a depreciação e o ajuste a valor justo não são lançados");
     if (!s.policies_decided_by || !s.policies_decided_on) out.push("Registrar a decisão do contador sobre a norma e o modelo de mensuração");
     if (!s.tax_basis) out.push("Definir o regime de apuração dos tributos (caixa ou competência)");
-    if (!s.reimbursements_policy) out.push("Definir se IPTU e condomínio reembolsados pelo inquilino são receita ou repasse");
+    if (!s.reimbursements_policy) out.push("Definir se energia, condomínio e IPTU pagos pelo inquilino são receita ou repasse: até lá, só o aluguel entra por competência");
     if (s.first_adoption_deemed_cost === null) out.push("Confirmar se é a primeira adoção formal da norma (custo atribuído, NBC TG 1002 item 35.3)");
     return out;
 }

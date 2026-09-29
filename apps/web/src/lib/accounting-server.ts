@@ -86,7 +86,7 @@ export async function loadAccounts(supabase: AdminSupabase, ownerId: string): Pr
  * measurement model follow the current setting (only their `active` flag changes; lines
  * already posted stay where they are).
  */
-export async function ensureChart(supabase: AdminSupabase, ownerId: string, measurement: PropertyMeasurement): Promise<AccountingAccount[]> {
+export async function ensureChart(supabase: AdminSupabase, ownerId: string, measurement: PropertyMeasurement | null): Promise<AccountingAccount[]> {
     let accounts = await loadAccounts(supabase, ownerId);
     const missing = missingTemplateAccounts(accounts, measurement);
     if (missing.length) {
@@ -108,14 +108,14 @@ export async function ensureChart(supabase: AdminSupabase, ownerId: string, meas
  * accounts added to the template later (by system key; groups by code). A code already taken
  * by an account the contador created is left alone.
  */
-export function missingTemplateAccounts(accounts: Pick<AccountingAccount, "code" | "system_key">[], measurement: PropertyMeasurement) {
+export function missingTemplateAccounts(accounts: Pick<AccountingAccount, "code" | "system_key">[], measurement: PropertyMeasurement | null) {
     const codes = new Set(accounts.map(a => a.code));
     const keys = new Set(accounts.map(a => a.system_key).filter(Boolean));
     return chartTemplate(measurement).filter(t => (t.systemKey ? !keys.has(t.systemKey) : true) && !codes.has(t.code));
 }
 
 /** Turns the depreciation / fair-value accounts on or off for the chosen model. Mutates `accounts`. */
-export async function syncModelAccounts(supabase: AdminSupabase, ownerId: string, measurement: PropertyMeasurement, accounts: AccountingAccount[]): Promise<void> {
+export async function syncModelAccounts(supabase: AdminSupabase, ownerId: string, measurement: PropertyMeasurement | null, accounts: AccountingAccount[]): Promise<void> {
     const activation = modelAccountActivation(measurement);
     for (const a of accounts) {
         if (!a.system_key || !(a.system_key in activation) || a.active === activation[a.system_key]) continue;

@@ -286,7 +286,7 @@ export default function ConciliacaoContent({ lang }: Props) {
                         </ul>
                     )}
                     <p className="text-xs text-muted-foreground">
-                        Aluguéis recebidos baixam &quot;aluguéis a receber&quot;: a receita bruta e a taxa da imobiliária entram pela competência dos contratos. A resposta dada a um lançamento vale para os próximos com o mesmo histórico.
+                        Aluguéis recebidos baixam &quot;aluguéis a receber&quot;: a receita bruta e a taxa da imobiliária entram por competência, a partir de Receitas de cada imóvel, no <Link href={`${base}/contabil/fechamento`} className="text-emerald-700 hover:underline">Fechamento do mês</Link>. A resposta dada a um lançamento vale para os próximos com o mesmo histórico.
                     </p>
                 </section>
             )}

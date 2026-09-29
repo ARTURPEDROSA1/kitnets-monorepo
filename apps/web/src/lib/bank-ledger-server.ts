@@ -43,18 +43,25 @@ export async function loadBankRows(supabase: AdminSupabase, ownerId: string, lim
     return ((data ?? []) as unknown as BankTransaction[]).map(r => ({ ...r, amount: Number(r.amount) || 0 }));
 }
 
-/** Owner's properties with the words that identify them in a memo (name, street, tenant names from active leases). */
+/** Owner's properties with the words that identify them in a memo (name, street, names of the tenants of its leases). */
 export async function loadPropertyRefs(supabase: AdminSupabase, ownerId: string): Promise<PropertyRef[]> {
     const { data, error } = await supabase.from("properties").select("id, name, address").eq("owner_id", ownerId).order("name");
     if (error) throw new Error(error.message);
     const refs: PropertyRef[] = (data ?? []).map(p => ({ id: p.id, name: p.name, aliases: p.address ? [String(p.address).split(",")[0]] : [] }));
-    try {
-        const { data: leases } = await supabase.from("leases").select("property_id, tenant_name").eq("owner_id", ownerId);
-        for (const l of (leases ?? []) as Array<{ property_id: string | null; tenant_name: string | null }>) {
-            const ref = refs.find(r => r.id === l.property_id);
-            if (ref && l.tenant_name) ref.aliases!.push(l.tenant_name);
-        }
-    } catch { /* leases table shape may differ; names are enough */ }
+    // leases are owned through user_id; the tenant's name lives on tenants (primary_tenant_id)
+    const { data: leases, error: leasesError } = await supabase.from("leases")
+        .select("property_id, status, tenant:tenants!primary_tenant_id(full_name)")
+        .eq("user_id", ownerId).is("deleted_at", null);
+    if (leasesError) {
+        console.error("[Bank ledger] lease aliases:", leasesError.message);
+        return refs;
+    }
+    for (const l of (leases ?? []) as unknown as Array<{ property_id: string | null; status: string | null; tenant: { full_name: string | null } | null }>) {
+        if (l.status === "DRAFT" || l.status === "CANCELLED") continue;
+        const ref = refs.find(r => r.id === l.property_id);
+        const name = l.tenant?.full_name?.trim();
+        if (ref && name && !ref.aliases!.includes(name)) ref.aliases!.push(name);
+    }
     return refs;
 }
 

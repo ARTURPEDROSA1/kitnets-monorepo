@@ -228,16 +228,20 @@ const ROWS: Row[] = [
 export const COST_MODEL_KEYS = ["PPI_DEPRECIACAO_ACUMULADA", "DESP_DEPRECIACAO_PPI"] as const;
 export const FAIR_VALUE_MODEL_KEYS = ["PPI_AJUSTE_VALOR_JUSTO", "GANHO_AVJ", "PERDA_AVJ", "RESERVA_AVJ"] as const;
 
-/** system_key → active for the model-dependent accounts. */
-export function modelAccountActivation(measurement: PropertyMeasurement): Record<string, boolean> {
+/**
+ * system_key → active for the model-dependent accounts. Until the model is chosen (null) both
+ * sets stay active — the opening balance may carry accumulated depreciation or a fair-value
+ * adjustment — and nothing model-dependent is posted automatically.
+ */
+export function modelAccountActivation(measurement: PropertyMeasurement | null): Record<string, boolean> {
     const out: Record<string, boolean> = {};
-    for (const k of COST_MODEL_KEYS) out[k] = measurement === "COST";
-    for (const k of FAIR_VALUE_MODEL_KEYS) out[k] = measurement === "FAIR_VALUE";
+    for (const k of COST_MODEL_KEYS) out[k] = measurement !== "FAIR_VALUE";
+    for (const k of FAIR_VALUE_MODEL_KEYS) out[k] = measurement !== "COST";
     return out;
 }
 
 /** The template for a holding, with the model-dependent accounts set for `measurement`. */
-export function chartTemplate(measurement: PropertyMeasurement = "COST"): TemplateAccount[] {
+export function chartTemplate(measurement: PropertyMeasurement | null = null): TemplateAccount[] {
     const activation = modelAccountActivation(measurement);
     return ROWS.map(([code, name, systemKey, opts]) => {
         const type = typeFromCode(code)!;

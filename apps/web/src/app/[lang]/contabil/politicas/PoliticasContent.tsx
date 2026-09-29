@@ -113,8 +113,10 @@ export default function PoliticasContent({ lang }: Props) {
     const patch = (p: Partial<AccountingSettings>) => setForm(f => (f ? { ...f, ...p } : f));
     const patchSim = (p: Partial<MeasurementSimulationInput>) => setSim(s => (s ? { ...s, ...p } : s));
 
-    const setModel = (standard: AccountingStandard, measurement: PropertyMeasurement) => {
-        patch({ accounting_standard: standard, property_measurement: allowsFairValue(standard) ? measurement : "COST" });
+    // NBC TG 1002 only has the cost model; fair value needs a standard that allows it
+    const setModel = (standard: AccountingStandard | null, measurement: PropertyMeasurement | null) => {
+        const m = standard === "NBC_TG_1002" ? "COST" : measurement === "FAIR_VALUE" && !allowsFairValue(standard) ? null : measurement;
+        patch({ accounting_standard: standard, property_measurement: m });
     };
 
     const splitLand = (pct: number) => {
@@ -242,6 +244,7 @@ export default function PoliticasContent({ lang }: Props) {
                         <h2 className="font-bold text-base flex items-center gap-2"><Scale className="w-4 h-4 text-emerald-600" /> Norma e modelo de mensuração dos imóveis alugados</h2>
                         <p className="text-xs text-muted-foreground">
                             Os imóveis alugados são <strong>propriedades para investimento</strong> (CPC 28). Imobilizado fica só para imóvel de uso da própria holding (CPC 27), e estoque só para imóvel mantido para revenda (CPC 16).
+                            {" "}Não há modelo padrão: enquanto a norma e o modelo não forem escolhidos com o contador, a depreciação e o ajuste a valor justo não são lançados.
                         </p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <button type="button" onClick={() => setModel("NBC_TG_1002", "COST")}
@@ -257,12 +260,16 @@ export default function PoliticasContent({ lang }: Props) {
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <Field label="Norma">
-                                <select className={SELECT} value={form.accounting_standard} onChange={e => setModel(e.target.value as AccountingStandard, form.property_measurement)}>
+                                <select className={cn(SELECT, !form.accounting_standard && "border-amber-500")} value={form.accounting_standard ?? ""}
+                                    onChange={e => setModel((e.target.value || null) as AccountingStandard | null, form.property_measurement)}>
+                                    <option value="">A definir</option>
                                     {Object.entries(STANDARD_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                                 </select>
                             </Field>
                             <Field label="Mensuração">
-                                <select className={SELECT} value={form.property_measurement} onChange={e => patch({ property_measurement: e.target.value as PropertyMeasurement })}>
+                                <select className={cn(SELECT, !form.property_measurement && "border-amber-500")} value={form.property_measurement ?? ""}
+                                    onChange={e => patch({ property_measurement: (e.target.value || null) as PropertyMeasurement | null })}>
+                                    <option value="">A definir</option>
                                     <option value="COST">Custo menos depreciação</option>
                                     <option value="FAIR_VALUE" disabled={!allowsFairValue(form.accounting_standard)}>Valor justo (CPC 28)</option>
                                 </select>
@@ -279,8 +286,8 @@ export default function PoliticasContent({ lang }: Props) {
                                     </Field>
                                 </>
                             )}
-                            <Field label="IPTU e condomínio reembolsados pelo inquilino">
-                                <select className={SELECT} value={form.reimbursements_policy ?? ""} onChange={e => patch({ reimbursements_policy: (e.target.value || null) as AccountingSettings["reimbursements_policy"] })}>
+                            <Field label="Energia, condomínio e IPTU pagos pelo inquilino" hint="Receita entra na receita bruta (e nos tributos); repasse abate a despesa que a holding paga.">
+                                <select className={cn(SELECT, !form.reimbursements_policy && "border-amber-500")} value={form.reimbursements_policy ?? ""} onChange={e => patch({ reimbursements_policy: (e.target.value || null) as AccountingSettings["reimbursements_policy"] })}>
                                     <option value="">A definir</option>
                                     {Object.entries(REIMBURSEMENTS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                                 </select>
