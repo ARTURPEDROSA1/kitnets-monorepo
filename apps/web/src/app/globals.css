@@ -220,4 +220,45 @@ body {
   html[data-sidebar="collapsed"] .sidebar-brand img {
     margin-inline-end: 0;
   }
+
+  /* Rail-only adjustments: sub-menu headings disappear, the footer tool buttons stack. */
+  html[data-sidebar="collapsed"] .sidebar-rail-hidden {
+    display: none;
+  }
+
+  html[data-sidebar="collapsed"] .sidebar-tools {
+    flex-direction: column;
+  }
+}
+
+/* Sidebar menu groups (Operação, Contábil & Fiscal, Ferramentas, Configurações).
+   The collapsed groups are listed in <html data-nav-collapsed="contabil ferramentas">, set before
+   first paint by the inline script in app/[lang]/layout.tsx and kept in sync by
+   lib/sidebar-preferences.ts. A group that holds the current page stays open (data-nav-active)
+   so the active item is always visible. */
+html[data-nav-collapsed~="operacao"] [data-nav-group="operacao"]:not([data-nav-active]) > .nav-group-items,
+html[data-nav-collapsed~="contabil"] [data-nav-group="contabil"]:not([data-nav-active]) > .nav-group-items,
+html[data-nav-collapsed~="ferramentas"] [data-nav-group="ferramentas"]:not([data-nav-active]) > .nav-group-items,
+html[data-nav-collapsed~="configuracoes"] [data-nav-group="configuracoes"]:not([data-nav-active]) > .nav-group-items {
+  display: none;
+}
+
+/* Privacy toggles (the eye and the dollar buttons in the sidebar footer).
+   <html data-hide-sensitive="1"> hides addresses, CPF/CNPJ, meter ids, account numbers, phones;
+   <html data-hide-money="1"> hides every amount in R$. Both are set before first paint by the inline
+   script in app/[lang]/layout.tsx and kept in sync by lib/privacy.ts. Values are wrapped in
+   <Sensitive> / <Money> (components/privacy) or carry the classes below. The blur scales with the
+   font size so headline figures are as unreadable as body text; `privacy-cover` is for maps and
+   other large regions. */
+html[data-hide-sensitive="1"] .privacy-sensitive,
+html[data-hide-money="1"] .privacy-money {
+  filter: blur(0.45em);
+  user-select: none;
+  pointer-events: none;
+}
+
+html[data-hide-sensitive="1"] .privacy-sensitive.privacy-cover,
+html[data-hide-money="1"] .privacy-money.privacy-cover {
+  filter: blur(1.5rem);
+  overflow: hidden;
 }
