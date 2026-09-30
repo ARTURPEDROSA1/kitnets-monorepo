@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@kitnets/ui";
+import { Sensitive } from "@/components/privacy";
 import {
     ArrowLeft, Save, Trash2, Camera, Router as RouterIcon,
     Loader2, CheckCircle2, AlertTriangle, Image as ImageIcon, Gauge, Building2
@@ -228,7 +229,7 @@ export default function EditGatewayPage() {
                     </div>
                     <div>
                         <h1 className="text-2xl font-bold text-foreground">Editar Gateway</h1>
-                        <p className="text-sm text-muted-foreground font-mono">{gateway.serial_number}</p>
+                        <Sensitive as="p" className="text-sm text-muted-foreground font-mono">{gateway.serial_number}</Sensitive>
                     </div>
                 </div>
             </div>
@@ -452,7 +453,7 @@ export default function EditGatewayPage() {
                             <h3 className="text-lg font-semibold text-foreground">Remover Gateway</h3>
                         </div>
                         <p className="text-sm text-muted-foreground">
-                            Tem certeza que deseja remover o gateway <strong>{gateway.label}</strong> ({gateway.serial_number})?
+                            Tem certeza que deseja remover o gateway <strong>{gateway.label}</strong> (<Sensitive>{gateway.serial_number}</Sensitive>)?
                             O gateway ficará disponível para ser adicionado novamente por qualquer usuário.
                         </p>
                         <p className="text-sm text-muted-foreground">

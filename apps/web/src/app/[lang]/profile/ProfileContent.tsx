@@ -23,6 +23,7 @@ import PortfolioStrip, { type PortfolioIncomeData, type PortfolioTotalsData } fr
 import PhotoLightbox from '@/components/investments/PhotoLightbox';
 import PropertyCostCenterDashboard from '@/components/properties/PropertyCostCenterDashboard';
 import { cn } from '@/lib/utils';
+import { Sensitive } from '@/components/privacy';
 import { useUser, useAuth } from '@clerk/nextjs';
 import { useSearchParams, useParams, useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
@@ -3475,9 +3476,9 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                     <span className="text-xs text-muted-foreground whitespace-nowrap">({propTypeName})</span>
                                 </div>
                                 {!isExpanded && pAddr.street && (
-                                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                                    <Sensitive as="p" className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
                                         {[pAddr.street, pAddr.number, pAddr.neighborhood, pAddr.city, pAddr.state, pAddr.cep].filter(Boolean).join(', ')}
-                                    </p>
+                                    </Sensitive>
                                 )}
                                 {propComplete && !isExpanded && (
                                     <span className="text-xs text-emerald-600 flex items-center gap-1 mt-0.5">
@@ -4175,14 +4176,14 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                                         {personType === 'pf' && (
                                                             <>
                                                                 {ext.nome && (<><span className="text-muted-foreground">Nome:</span><span className="font-medium">{String(ext.nome)}</span></>)}
-                                                                {ext.cpf && (<><span className="text-muted-foreground">CPF:</span><span className="font-medium">{String(ext.cpf)}</span></>)}
+                                                                {ext.cpf && (<><span className="text-muted-foreground">CPF:</span><Sensitive className="font-medium">{String(ext.cpf)}</Sensitive></>)}
                                                                 {ext.data_nascimento && (<><span className="text-muted-foreground">Nascimento:</span><span className="font-medium">{String(ext.data_nascimento)}</span></>)}
-                                                                {ext.rg && (<><span className="text-muted-foreground">RG:</span><span className="font-medium">{String(ext.rg)}</span></>)}
+                                                                {ext.rg && (<><span className="text-muted-foreground">RG:</span><Sensitive className="font-medium">{String(ext.rg)}</Sensitive></>)}
                                                             </>
                                                         )}
                                                         {personType === 'pj' && (
                                                             <>
-                                                                {ext.cnpj && (<><span className="text-muted-foreground">CNPJ:</span><span className="font-medium">{String(ext.cnpj)}</span></>)}
+                                                                {ext.cnpj && (<><span className="text-muted-foreground">CNPJ:</span><Sensitive className="font-medium">{String(ext.cnpj)}</Sensitive></>)}
                                                                 {ext.razao_social && (<><span className="text-muted-foreground">Razão Social:</span><span className="font-medium">{String(ext.razao_social)}</span></>)}
                                                                 {ext.nome_fantasia && (<><span className="text-muted-foreground">Fantasia:</span><span className="font-medium">{String(ext.nome_fantasia)}</span></>)}
                                                                 {ext.situacao_cadastral && (<><span className="text-muted-foreground">Situação:</span><span className="font-medium">{String(ext.situacao_cadastral)}</span></>)}

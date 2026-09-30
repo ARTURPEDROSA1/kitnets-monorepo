@@ -10,6 +10,7 @@ import React from "react";
 import { Check, FileText, Home, MapPin, PenLine, SlidersHorizontal, Sun } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { cn } from "@/lib/utils";
+import { Sensitive } from "@/components/privacy";
 import type { PropertyDetails } from "@/components/profile/PropertyDetailsCard";
 
 export interface PropertyAddressData {
@@ -74,6 +75,8 @@ export function Field({ label, value }: { label: string; value: React.ReactNode 
 export const muted = (t: string) => <span className="text-muted-foreground">{t}</span>;
 /** The value, with its unit, or a muted dash when empty. */
 export const dash = (v: string | number | null | undefined, suffix = "") => (v === null || v === undefined || String(v).trim() === "" ? muted("—") : `${v}${suffix}`);
+/** A registry / IPTU number: `dash`, marked for the eye privacy toggle (components/privacy) when present. */
+const sensitiveDash = (v: string | number | null | undefined) => (v === null || v === undefined || String(v).trim() === "" ? dash(v) : <Sensitive>{dash(v)}</Sensitive>);
 
 export default function PropertyRegisterSection({ propertyType, details, address, unitsCount, saving, editingAddress, onEditAddress, addressEditor, editingDetails, onEditDetails, detailsEditor, editingDescription, onEditDescription, descriptionEditor, onSave }: Props) {
     const addressFilled = Boolean(address.street?.trim() || address.cep?.trim());
@@ -92,9 +95,9 @@ export default function PropertyRegisterSection({ propertyType, details, address
             <Block
                 icon={<MapPin className="h-4 w-4" />} title="Endereço" filled={addressFilled} editing={editingAddress} onToggle={toggle(onEditAddress)} saving={saving}
                 summary={addressFilled ? (
-                    <p className="text-sm text-foreground">
+                    <Sensitive as="p" className="text-sm text-foreground">
                         {[[address.street, address.number].filter(Boolean).join(", "), address.complement, address.neighborhood, [address.city, address.state].filter(Boolean).join("/"), address.cep ? `CEP ${address.cep}` : null].filter(Boolean).join(" · ")}
-                    </p>
+                    </Sensitive>
                 ) : <p className="text-sm text-muted-foreground">Nenhum endereço ainda. Envie o IPTU ou a matrícula em Arquivos do imóvel — a IA lê o endereço — ou clique em Editar.</p>}
                 editor={addressEditor}
             />
@@ -108,9 +111,9 @@ export default function PropertyRegisterSection({ propertyType, details, address
                         <Field label="Área total" value={dash(details.totalSqMeters, " m²")} />
                         <Field label="Área edificada" value={dash(details.areaEdificada, " m²")} />
                         <Field label="Área do lote" value={dash(details.areaLote, " m²")} />
-                        <Field label="Cadastro imobiliário" value={dash(details.cadastroImobiliario)} />
-                        <Field label="Inscrição imobiliária" value={dash(details.inscricaoImobiliaria)} />
-                        <Field label="Matrícula" value={dash(details.matricula)} />
+                        <Field label="Cadastro imobiliário" value={sensitiveDash(details.cadastroImobiliario)} />
+                        <Field label="Inscrição imobiliária" value={sensitiveDash(details.inscricaoImobiliaria)} />
+                        <Field label="Matrícula" value={sensitiveDash(details.matricula)} />
                         {propertyType === "single" && <Field label="Cômodos" value={[details.bedrooms ? `${details.bedrooms} quartos` : null, details.bathrooms ? `${details.bathrooms} banheiros` : null, details.parkingSpaces ? `${details.parkingSpaces} vagas` : null].filter(Boolean).join(" · ") || <span className="text-muted-foreground">—</span>} />}
                         <Field label="Medidores principais" value={meters || <span className="text-muted-foreground">nenhum pago por você</span>} />
                         <Field label="Internet" value={details.internetBill ? "conta do imóvel" : <span className="text-muted-foreground">não</span>} />

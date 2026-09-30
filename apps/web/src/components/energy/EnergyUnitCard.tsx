@@ -10,6 +10,7 @@ import React from "react";
 import Link from "next/link";
 import { FileText, MapPin, Sun, Trash2, Upload, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Money, Sensitive } from "@/components/privacy";
 import { CoverCarousel, useCoverCarousel } from "@/components/ui/CoverCarousel";
 import { EnergyDistributorLogo } from "./EnergyDistributorLogo";
 import { monthLabel, type EnergyUnitRow } from "@/lib/energy-hub";
@@ -77,13 +78,13 @@ export default function EnergyUnitCard({ row, lang, onSelect, onDelete, onViewPd
                 <div className="space-y-0.5">
                     <h3 className="break-words font-semibold leading-tight text-foreground">{unit.name}</h3>
                     <p className="break-words text-xs text-muted-foreground">
-                        {unit.consumerUnit ? <span className="font-mono">UC {unit.consumerUnit}</span> : "UC não informada"} · {row.distributor}
+                        {unit.consumerUnit ? <span className="font-mono">UC <Sensitive>{unit.consumerUnit}</Sensitive></span> : "UC não informada"} · {row.distributor}
                     </p>
                 </div>
 
                 <p className="flex items-start gap-1.5 text-xs text-foreground">
                     <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    <span className="break-words">{[unit.address, unit.city].filter(Boolean).join(", ") || "endereço não informado"}</span>
+                    <Sensitive className="break-words">{[unit.address, unit.city].filter(Boolean).join(", ") || "endereço não informado"}</Sensitive>
                 </p>
 
                 <dl className="mt-auto grid grid-cols-2 gap-2 text-[11px]">
@@ -94,7 +95,7 @@ export default function EnergyUnitCard({ row, lang, onSelect, onDelete, onViewPd
                     </div>
                     <div className="rounded-lg bg-muted/40 px-2 py-1.5">
                         <dt className="flex items-center gap-1 text-muted-foreground"><FileText className="h-3 w-3" /> Fatura</dt>
-                        <dd className={cn("font-semibold tabular-nums", row.dueState === "overdue" ? "text-rose-600" : "text-foreground")}>{latest && latest.total > 0 ? brl(latest.total, 0) : "—"}</dd>
+                        <dd className={cn("font-semibold tabular-nums", row.dueState === "overdue" ? "text-rose-600" : "text-foreground")}><Money>{latest && latest.total > 0 ? brl(latest.total, 0) : "—"}</Money></dd>
                         <dd className={cn("leading-snug", row.dueState === "overdue" ? "text-rose-600" : row.dueState === "due_soon" ? "text-amber-600" : "text-muted-foreground")}>{latest ? (latest.total > 0 ? dueHint : "só histórico de consumo") : "importe a conta de luz"}</dd>
                     </div>
                 </dl>
@@ -114,7 +115,7 @@ export default function EnergyUnitCard({ row, lang, onSelect, onDelete, onViewPd
                         {latest && latest.balanceKwh > 0
                             ? <span className="text-emerald-700 dark:text-emerald-400">saldo {kwh(latest.balanceKwh)}</span>
                             : latest && latest.savingsAmount > 0
-                                ? <span className="text-amber-700 dark:text-amber-400">economia {brl(latest.savingsAmount, 0)}{latest.savingsEstimated ? " (est.)" : ""}</span>
+                                ? <span className="text-amber-700 dark:text-amber-400">economia <Money>{brl(latest.savingsAmount, 0)}</Money>{latest.savingsEstimated ? " (est.)" : ""}</span>
                                 : unit.billsCount > 0
                                     ? `${unit.billsCount} ${unit.billsCount === 1 ? "registro" : "registros"}`
                                     : "pronta para importar"}

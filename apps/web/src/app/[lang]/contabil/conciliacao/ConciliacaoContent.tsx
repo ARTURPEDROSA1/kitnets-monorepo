@@ -15,6 +15,7 @@ import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/DateInput";
 import { ContabilNav } from "@/components/contabil/ContabilNav";
+import { Money } from "@/components/privacy";
 import { cn } from "@/lib/utils";
 import { BANK_STATUS_LABELS, direction, type BankOption, type BankRowStatus, type CounterpartSource } from "@/lib/accounting-bank-posting";
 import { formatMoney, parseAmountInput } from "@/lib/accounting-journal";
@@ -41,6 +42,8 @@ interface Recon { as_of: string; statement_balance: number; book_balance: number
 const SELECT = "h-9 w-full rounded-lg border border-input bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
 const OTHER = "__OUTRA__";
 const dateBR = (iso: string) => iso.split("-").reverse().join("/");
+/** A statement memo that carries the counterparty's CPF/CNPJ, PIX key or e-mail is hidden whole by the eye toggle (components/privacy): the identifier sits inside the free text. */
+const IDENTIFIER = /\d{3}\.?\d{3}\.?\d{3}-?\d{2}|\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}|@|\+55|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 const SOURCE_LABELS: Record<CounterpartSource, string> = { ANSWER: "resposta", ROUTING: "pela importação", HISTORY: "aprendido", RULE: "regra" };
 const STATUS_STYLE: Record<BankRowStatus, string> = {
     POSTED: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200",
@@ -239,8 +242,8 @@ export default function ConciliacaoContent({ lang }: Props) {
                                     <li key={r.id} className="py-3 space-y-2">
                                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                                             <span className="font-medium w-24">{dateBR(r.occurred_on)}</span>
-                                            <span className={cn("font-semibold tabular-nums w-32 text-right", r.amount >= 0 ? "text-emerald-700" : "text-rose-700")}>{formatMoney(r.amount)}</span>
-                                            <span className="flex-1 min-w-[200px] truncate" title={r.memo}>{r.memo || "—"}</span>
+                                            <Money className={cn("font-semibold tabular-nums w-32 text-right", r.amount >= 0 ? "text-emerald-700" : "text-rose-700")}>{formatMoney(r.amount)}</Money>
+                                            <span className={cn("flex-1 min-w-[200px] truncate", IDENTIFIER.test(r.memo) && "privacy-sensitive")} title={r.memo}>{r.memo || "—"}</span>
                                             {r.property_id && <span className="text-xs text-muted-foreground">{propertyName(r.property_id)}</span>}
                                             <span className={cn("rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide", STATUS_STYLE[r.status])}>{BANK_STATUS_LABELS[r.status]}</span>
                                         </div>
@@ -308,18 +311,18 @@ export default function ConciliacaoContent({ lang }: Props) {
                     </label>
                     <div className="space-y-1">
                         <span className="text-xs font-medium text-muted-foreground">Saldo nos livros</span>
-                        <p className="h-9 flex items-center justify-end text-sm font-semibold tabular-nums">{recon ? formatMoney(recon.bookBalance) : "…"}</p>
+                        <Money as="p" className="h-9 flex items-center justify-end text-sm font-semibold tabular-nums">{recon ? formatMoney(recon.bookBalance) : "…"}</Money>
                     </div>
                     <div className="space-y-1">
                         <span className="text-xs font-medium text-muted-foreground">Diferença</span>
                         <p className={cn("h-9 flex items-center justify-end text-sm font-semibold tabular-nums", difference === null ? "text-muted-foreground" : difference === 0 ? "text-emerald-700" : "text-amber-700")}>
-                            {difference === null ? "—" : difference === 0 ? "Conferido" : formatMoney(difference)}
+                            {difference === null ? "—" : difference === 0 ? "Conferido" : <Money>{formatMoney(difference)}</Money>}
                         </p>
                     </div>
                 </div>
                 {recon && recon.unposted.length > 0 && (
                     <p className="text-xs text-amber-800 dark:text-amber-200">
-                        {recon.unposted.length} lançamento(s) do extrato até {dateBR(asOf)} ainda fora dos livros (dúvidas, prontos ou em mês fechado) — somam {formatMoney(recon.unposted.reduce((s, r) => s + r.amount, 0))} e explicam parte da diferença.
+                        {recon.unposted.length} lançamento(s) do extrato até {dateBR(asOf)} ainda fora dos livros (dúvidas, prontos ou em mês fechado) — somam <Money>{formatMoney(recon.unposted.reduce((s, r) => s + r.amount, 0))}</Money> e explicam parte da diferença.
                     </p>
                 )}
                 <Button size="sm" onClick={saveRecon} disabled={busy === "recon" || statementValue === null || !Number.isFinite(statementValue)} className="gap-1">
@@ -342,9 +345,9 @@ export default function ConciliacaoContent({ lang }: Props) {
                                 return (
                                     <tr key={h.as_of} className="border-b border-border/60">
                                         <td className="py-1">{dateBR(h.as_of)}</td>
-                                        <td className="text-right">{formatMoney(Number(h.statement_balance))}</td>
-                                        <td className="text-right">{formatMoney(Number(h.book_balance))}</td>
-                                        <td className={cn("text-right", diff === 0 ? "text-emerald-700" : "text-amber-700")}>{diff === 0 ? "Conferido" : formatMoney(diff)}</td>
+                                        <Money as="td" className="text-right">{formatMoney(Number(h.statement_balance))}</Money>
+                                        <Money as="td" className="text-right">{formatMoney(Number(h.book_balance))}</Money>
+                                        <td className={cn("text-right", diff === 0 ? "text-emerald-700" : "text-amber-700")}>{diff === 0 ? "Conferido" : <Money>{formatMoney(diff)}</Money>}</td>
                                         <td className="text-right">{h.unposted_rows}</td>
                                     </tr>
                                 );

@@ -14,6 +14,7 @@ import { CalendarCheck, CheckCircle2, Loader2, Scale } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { DateInput } from "@/components/ui/DateInput";
 import { ContabilNav } from "@/components/contabil/ContabilNav";
+import { Money } from "@/components/privacy";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/accounting-journal";
 import { formatBalance, type TrialBalanceRow } from "@/lib/accounting-reports";
@@ -121,10 +122,10 @@ export default function BalanceteContent({ lang, initialFrom, initialTo }: Props
                                     <td className="px-3 py-1.5" style={{ paddingLeft: onlyAnalytic ? undefined : `${0.75 + (r.level - 1) * 0.75}rem` }}>
                                         <span className="font-mono text-xs text-muted-foreground mr-2">{r.code}</span>{r.name}
                                     </td>
-                                    <td className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap">{formatBalance(r.opening)}</td>
-                                    <td className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap">{r.debit ? formatMoney(r.debit) : "—"}</td>
-                                    <td className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap">{r.credit ? formatMoney(r.credit) : "—"}</td>
-                                    <td className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap">{formatBalance(r.closing)}</td>
+                                    <Money as="td" className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap">{formatBalance(r.opening)}</Money>
+                                    <Money as="td" className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap">{r.debit ? formatMoney(r.debit) : "—"}</Money>
+                                    <Money as="td" className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap">{r.credit ? formatMoney(r.credit) : "—"}</Money>
+                                    <Money as="td" className="px-3 py-1.5 text-right tabular-nums whitespace-nowrap">{formatBalance(r.closing)}</Money>
                                 </tr>
                             ))}
                         </tbody>
@@ -133,8 +134,8 @@ export default function BalanceteContent({ lang, initialFrom, initialTo }: Props
                                 <tr className="border-t-2 border-border font-semibold">
                                     <td className="px-3 py-2">Totais</td>
                                     <td />
-                                    <td className="px-3 py-2 text-right tabular-nums">{formatMoney(totals.debit)}</td>
-                                    <td className="px-3 py-2 text-right tabular-nums">{formatMoney(totals.credit)}</td>
+                                    <Money as="td" className="px-3 py-2 text-right tabular-nums">{formatMoney(totals.debit)}</Money>
+                                    <Money as="td" className="px-3 py-2 text-right tabular-nums">{formatMoney(totals.credit)}</Money>
                                     <td className="px-3 py-2 text-right text-xs">
                                         {balanced ? <span className="inline-flex items-center gap-1 text-emerald-700"><CheckCircle2 className="w-3.5 h-3.5" /> débitos = créditos</span> : <span className="text-rose-700">débitos ≠ créditos</span>}
                                     </td>

@@ -8,6 +8,7 @@
 import React from "react";
 import { Building, Building2, MapPin, Sun, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Money, Sensitive } from "@/components/privacy";
 import { CoverCarousel, useCoverCarousel } from "@/components/ui/CoverCarousel";
 import { monthLabel, type CondoRow } from "@/lib/condominium-hub";
 
@@ -63,18 +64,18 @@ export default function CondominiumSquareCard({ row, onSelect, onDelete, isDelet
 
                 <p className="flex items-start gap-1.5 text-xs text-foreground">
                     <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    <span className="break-words">{condo.property_address || "endereço não informado"}</span>
+                    <Sensitive className="break-words">{condo.property_address || "endereço não informado"}</Sensitive>
                 </p>
 
                 <dl className="mt-auto grid grid-cols-2 gap-2 text-[11px]">
                     <div className="rounded-lg bg-muted/40 px-2 py-1.5">
                         <dt className="text-muted-foreground">Receita {latest ? monthLabel(latest.month) : "do mês"}</dt>
-                        <dd className="font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">{latest ? brl(latest.revenue) : "—"}</dd>
-                        <dd className="leading-snug text-muted-foreground">{latest ? `custos ${brl(latest.totalCost)}` : "sem meses"}</dd>
+                        <dd className="font-semibold tabular-nums text-emerald-700 dark:text-emerald-400"><Money>{latest ? brl(latest.revenue) : "—"}</Money></dd>
+                        <dd className="leading-snug text-muted-foreground">{latest ? <>custos <Money>{brl(latest.totalCost)}</Money></> : "sem meses"}</dd>
                     </div>
                     <div className="rounded-lg bg-muted/40 px-2 py-1.5">
                         <dt className="text-muted-foreground">Resultado</dt>
-                        <dd className={cn("font-semibold tabular-nums", latest && latest.result < 0 ? "text-rose-600" : "text-foreground")}>{latest ? brl(latest.result) : "—"}</dd>
+                        <dd className={cn("font-semibold tabular-nums", latest && latest.result < 0 ? "text-rose-600" : "text-foreground")}><Money>{latest ? brl(latest.result) : "—"}</Money></dd>
                         <dd className={cn("leading-snug", latest?.expected ? "text-amber-600" : "text-muted-foreground")}>{latest ? (latest.expected ? "previsto" : latest.hasCosts ? "confirmado" : "custos a lançar") : "—"}</dd>
                     </div>
                 </dl>
@@ -82,7 +83,7 @@ export default function CondominiumSquareCard({ row, onSelect, onDelete, isDelet
                 <div className="flex flex-wrap items-start justify-between gap-2 border-t border-border/60 pt-2 text-[11px]">
                     <span className="text-muted-foreground">{row.ytdMonths > 0 ? `${row.year}: ${row.ytdMonths} ${row.ytdMonths === 1 ? "mês" : "meses"}` : `${row.year}: nenhum mês`}</span>
                     <span className={cn("min-w-0 break-words text-right", row.ytdResult < 0 ? "text-rose-600" : "text-foreground")}>
-                        {row.ytdMonths > 0 ? <>resultado {brl(row.ytdResult)}{row.ytdMarginPct !== null ? ` · ${row.ytdMarginPct.toLocaleString("pt-BR")}%` : ""}</> : "—"}
+                        {row.ytdMonths > 0 ? <>resultado <Money>{brl(row.ytdResult)}</Money>{row.ytdMarginPct !== null ? ` · ${row.ytdMarginPct.toLocaleString("pt-BR")}%` : ""}</> : "—"}
                     </span>
                 </div>
             </div>

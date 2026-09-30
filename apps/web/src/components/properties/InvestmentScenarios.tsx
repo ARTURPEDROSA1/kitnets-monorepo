@@ -5,6 +5,7 @@ import React, { useMemo, useState } from "react";
 import { CartesianGrid, ComposedChart, Legend, Line, ReferenceLine, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from "recharts";
 import { ChevronDown, ChevronUp, FlaskConical, RotateCcw } from "lucide-react";
 import Tile, { type TileInfo } from "./Tile";
+import { Money } from "@/components/privacy";
 import { projectScenario } from "@/lib/investment-scenarios";
 import type { InvestmentMetrics } from "@/lib/investment-metrics";
 import { formatMonthKey } from "@/lib/property-income";
@@ -132,11 +133,11 @@ export default function InvestmentScenarios({ metrics, investment }: Props) {
                         <Tile label={financed ? "Financiamento" : "Renda até a venda"} tone="blue" icon={<FlaskConical className="w-4 h-4" />} info={scenarioInfo.middle}
                             value={financed
                                 ? `${result.remainingInstalments} prestações`
-                                : result.noiUntilSale !== null ? formatBRL(result.noiUntilSale) : "—"}
+                                : result.noiUntilSale !== null ? <Money>{formatBRL(result.noiUntilSale)}</Money> : "—"}
                             hint={financed
-                                ? result.interestSaved !== null ? `Amortizando ${formatBRL(s.prepayNow)} hoje: ${result.instalmentsSaved} prestações a menos e ${formatBRL(result.interestSaved)} de juros economizados` : result.remainingInterest !== null ? `Juros restantes ${formatBRL(result.remainingInterest)}` : "Informe juros, prazo e sistema em Aquisição & financiamento para simular"
+                                ? result.interestSaved !== null ? <>Amortizando <Money>{formatBRL(s.prepayNow)}</Money> hoje: {result.instalmentsSaved} prestações a menos e <Money>{formatBRL(result.interestSaved)}</Money> de juros economizados</> : result.remainingInterest !== null ? <>Juros restantes <Money>{formatBRL(result.remainingInterest)}</Money></> : "Informe juros, prazo e sistema em Aquisição & financiamento para simular"
                                 : result.saleMonth ? `Renda líquida projetada até ${formatMonthKey(result.saleMonth)}` : "Escolha um ano de venda"} />
-                        <Tile label="Venda" tone="emerald" icon={<FlaskConical className="w-4 h-4" />} info={scenarioInfo.sale}
+                        <Tile label="Venda" tone="emerald" icon={<FlaskConical className="w-4 h-4" />} info={scenarioInfo.sale} money
                             value={result.saleValue !== null ? formatBRL(result.saleValue) : "—"}
                             hint={result.saleValue !== null
                                 ? `Em ${formatMonthKey(result.saleMonth!)} · líquido ${formatBRL(result.saleProceeds ?? 0)} após custos${result.balanceAtSale ? ` e saldo devedor ${formatBRL(result.balanceAtSale)}` : ""} · base ${result.valueBaseSource === "VALUATION" ? "avaliação" : "valor de compra"}`
@@ -147,7 +148,7 @@ export default function InvestmentScenarios({ metrics, investment }: Props) {
                     </div>
 
                     {chart.length > 1 && (
-                        <div className="h-[220px] w-full">
+                        <Money as="div" className="h-[220px] w-full">
                             <ResponsiveContainer width="100%" height="100%">
                                 <ComposedChart data={chart} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
@@ -162,10 +163,10 @@ export default function InvestmentScenarios({ metrics, investment }: Props) {
                                     {result.saleMonth && <ReferenceLine x={formatMonthKey(result.saleMonth)} stroke="#10b981" strokeDasharray="3 3" label={{ value: "Venda", position: "insideTopLeft", fontSize: 11, fill: "#10b981" }} />}
                                 </ComposedChart>
                             </ResponsiveContainer>
-                        </div>
+                        </Money>
                     )}
                     <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-                        <span>O cenário parte da renda líquida média dos últimos 12 meses ({formatBRL(metrics.monthlyNoiPace)}/mês){metrics.rentGrowthPctYear !== null ? `, com o reajuste histórico do aluguel (${metrics.forecastGrowthPctYear.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% a.a.) como padrão` : ""} e do valor de mercado atual{metrics.marketValue === null ? " (sem avaliação: usa o valor de compra)" : ""}. Estimativas, não previsões.</span>
+                        <span>O cenário parte da renda líquida média dos últimos 12 meses (<Money>{formatBRL(metrics.monthlyNoiPace)}</Money>/mês){metrics.rentGrowthPctYear !== null ? `, com o reajuste histórico do aluguel (${metrics.forecastGrowthPctYear.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% a.a.) como padrão` : ""} e do valor de mercado atual{metrics.marketValue === null ? " (sem avaliação: usa o valor de compra)" : ""}. Estimativas, não previsões.</span>
                         <button type="button" onClick={() => setS({ ...DEFAULTS, rentGrowthPctYear: null })} className="inline-flex items-center gap-1 hover:text-foreground shrink-0"><RotateCcw className="w-3 h-3" /> Padrões</button>
                     </div>
                 </div>

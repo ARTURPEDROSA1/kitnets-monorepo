@@ -12,6 +12,7 @@ import dynamic from "next/dynamic";
 import { ArrowLeft, Building2, Cake, CalendarClock, CalendarDays, DollarSign, ExternalLink, FileSignature, Home, Instagram, Linkedin, Loader2, Mail, MapPin, MessageCircle, PenLine, Phone, PiggyBank, Shield, Trash2, Wallet, X } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import Tile from "@/components/properties/Tile";
+import { Money, Sensitive } from "@/components/privacy";
 import { cn } from "@/lib/utils";
 import { formatDateBR } from "@/lib/dates";
 import { formatCEP, formatCPF, formatPhone } from "@/lib/validators";
@@ -142,18 +143,18 @@ export default function TenantDashboard({ tenantId, lang, today, initialBundle =
                             <div className="flex flex-wrap items-center gap-1.5 pt-1">
                                 {wa ? (
                                     <a href={wa} target="_blank" rel="noopener noreferrer" className={cn(chip, "border-emerald-500 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-300")}>
-                                        <MessageCircle className="h-3.5 w-3.5" /> WhatsApp · {formatPhone(tenant.main_phone as string)}
+                                        <MessageCircle className="h-3.5 w-3.5" /> WhatsApp · <Sensitive>{formatPhone(tenant.main_phone as string)}</Sensitive>
                                     </a>
                                 ) : (
                                     <button type="button" onClick={() => onEdit(tenant)} className={cn(chip, "italic text-muted-foreground")}><Phone className="h-3.5 w-3.5" /> sem telefone — informar</button>
                                 )}
                                 {tel && <a href={tel} className={chip} title="Ligar"><Phone className="h-3.5 w-3.5" /> Ligar</a>}
                                 {tenant.additional_phone && whatsappUrl(tenant.additional_phone) && (
-                                    <a href={whatsappUrl(tenant.additional_phone) as string} target="_blank" rel="noopener noreferrer" className={chip} title="Telefone adicional"><Phone className="h-3.5 w-3.5" /> {formatPhone(tenant.additional_phone)}</a>
+                                    <a href={whatsappUrl(tenant.additional_phone) as string} target="_blank" rel="noopener noreferrer" className={chip} title="Telefone adicional"><Phone className="h-3.5 w-3.5" /> <Sensitive>{formatPhone(tenant.additional_phone)}</Sensitive></a>
                                 )}
-                                {tenant.email && <a href={`mailto:${tenant.email}`} className={chip}><Mail className="h-3.5 w-3.5" /> {tenant.email}</a>}
-                                {tenant.instagram && <a href={instagramUrl(tenant.instagram)} target="_blank" rel="noopener noreferrer" className={chip}><Instagram className="h-3.5 w-3.5" /> @{tenant.instagram}</a>}
-                                {tenant.linkedin && <a href={tenant.linkedin} target="_blank" rel="noopener noreferrer" className={chip}><Linkedin className="h-3.5 w-3.5" /> {linkedinLabel(tenant.linkedin)}</a>}
+                                {tenant.email && <a href={`mailto:${tenant.email}`} className={chip}><Mail className="h-3.5 w-3.5" /> <Sensitive>{tenant.email}</Sensitive></a>}
+                                {tenant.instagram && <a href={instagramUrl(tenant.instagram)} target="_blank" rel="noopener noreferrer" className={chip}><Instagram className="h-3.5 w-3.5" /> <Sensitive>@{tenant.instagram}</Sensitive></a>}
+                                {tenant.linkedin && <a href={tenant.linkedin} target="_blank" rel="noopener noreferrer" className={chip}><Linkedin className="h-3.5 w-3.5" /> <Sensitive>{linkedinLabel(tenant.linkedin)}</Sensitive></a>}
                             </div>
                         </div>
                     </div>
@@ -185,6 +186,7 @@ export default function TenantDashboard({ tenantId, lang, today, initialBundle =
                     value={row.rent !== null ? brl(row.rent, 0) : "—"}
                     hint={current ? `vence dia ${current.rent_due_day} · ${current.reference_name ?? placeOfLease(current)}` : row.last ? `último contrato: ${brl(Number(row.last.monthly_rent) || 0, 0)}` : "sem contrato cadastrado"}
                     info={{ what: "O aluguel de contrato em vigor deste inquilino (valor bruto, antes da taxa da imobiliária).", formula: "aluguel do contrato em vigor (o mais recente, quando há mais de um)" }}
+                    money
                 />
                 <Tile
                     label="Tempo de casa"
@@ -218,6 +220,7 @@ export default function TenantDashboard({ tenantId, lang, today, initialBundle =
                             : incomeLease ? "sem lançamentos na razão de receitas" : "sem contrato"
                     }
                     info={{ what: "O que chegou ao proprietário nos meses do contrato deste inquilino, segundo a razão de receitas do imóvel.", formula: "Σ recebido dos meses confirmados do contrato em vigor (ou do último)" }}
+                    money
                 />
                 <Tile
                     label="Caução"
@@ -226,6 +229,7 @@ export default function TenantDashboard({ tenantId, lang, today, initialBundle =
                     value={current?.security_deposit ? brl(Number(current.security_deposit), 0) : "—"}
                     hint={current?.security_deposit ? "devolvida no fim do contrato" : current ? "sem caução no contrato" : "—"}
                     info={{ what: "A garantia em dinheiro deixada no contrato em vigor, devolvida corrigida no fim, descontado o que ficar devendo.", formula: "caução do contrato (até 3 aluguéis por lei)" }}
+                    money
                 />
                 <Tile
                     label="Aniversário"
@@ -295,14 +299,14 @@ export default function TenantDashboard({ tenantId, lang, today, initialBundle =
                         <h2 className="text-sm font-semibold text-foreground">Ficha do inquilino</h2>
                     </header>
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-3 p-4">
-                        <Field label="CPF">{formatCPF(tenant.cpf)}</Field>
-                        <Field label="RG">{tenant.rg || "—"}</Field>
+                        <Field label="CPF"><Sensitive>{formatCPF(tenant.cpf)}</Sensitive></Field>
+                        <Field label="RG">{tenant.rg ? <Sensitive>{tenant.rg}</Sensitive> : "—"}</Field>
                         <Field label="Nascimento">{tenant.date_of_birth ? `${formatDateBR(tenant.date_of_birth)}${row.age !== null ? ` (${row.age} anos)` : ""}` : "—"}</Field>
                         <Field label="Ocupação">{tenant.occupation || "—"}</Field>
                         <Field label="Endereço" className="col-span-2">
                             {tenant.use_property_address ? (
                                 <span className="inline-flex items-center gap-1.5 text-muted-foreground"><MapPin className="h-3.5 w-3.5" /> Mora no imóvel alugado</span>
-                            ) : address || "—"}
+                            ) : address ? <Sensitive>{address}</Sensitive> : "—"}
                         </Field>
                         <Field label="Imóvel cadastrado" className="col-span-2">
                             <Link href={`${base}/imoveis?id=${tenant.property_id}`} className={chip}><Home className="h-3.5 w-3.5" /> {tenant.property_name ?? "Imóvel"}</Link>
@@ -319,7 +323,7 @@ export default function TenantDashboard({ tenantId, lang, today, initialBundle =
                             <Field label="Contato de emergência" className="col-span-2">
                                 <span className="inline-flex flex-wrap items-center gap-1.5"><Shield className="h-3.5 w-3.5 text-muted-foreground" /> {tenant.emergency_contact_name}
                                     {tenant.emergency_contact_phone && whatsappUrl(tenant.emergency_contact_phone) && (
-                                        <a href={whatsappUrl(tenant.emergency_contact_phone) as string} target="_blank" rel="noopener noreferrer" className={chip}><MessageCircle className="h-3.5 w-3.5 text-emerald-600" /> {formatPhone(tenant.emergency_contact_phone)}</a>
+                                        <a href={whatsappUrl(tenant.emergency_contact_phone) as string} target="_blank" rel="noopener noreferrer" className={chip}><MessageCircle className="h-3.5 w-3.5 text-emerald-600" /> <Sensitive>{formatPhone(tenant.emergency_contact_phone)}</Sensitive></a>
                                     )}
                                 </span>
                             </Field>
@@ -356,7 +360,7 @@ function LeaseLine({ lease, base }: { lease: TenantLeaseSummary; base: string })
                     {lease.management_type === "AGENCY" && lease.agency_name ? ` · ${lease.agency_name}` : ""}
                 </p>
             </div>
-            <span className="text-sm font-semibold tabular-nums text-foreground">{brl(Number(lease.monthly_rent) || 0)}<span className="text-xs font-normal text-muted-foreground">/mês</span></span>
+            <span className="text-sm font-semibold tabular-nums text-foreground"><Money>{brl(Number(lease.monthly_rent) || 0)}</Money><span className="text-xs font-normal text-muted-foreground">/mês</span></span>
             <Link href={`${base}/contratos?id=${lease.id}`} className={chip} title="Abrir o contrato"><FileSignature className="h-3.5 w-3.5" /> Abrir</Link>
         </li>
     );

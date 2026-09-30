@@ -38,6 +38,7 @@ import {
 import { AlertCircle, Check, Gem, HelpCircle, KeyRound, Loader2, Percent, TrendingUp } from "lucide-react";
 import { DateInput } from "@/components/ui/DateInput";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Money } from "@/components/privacy";
 import {
     assumptionsOf,
     formatMonthLabel,
@@ -332,7 +333,7 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
                 </div>
 
                 {chart.length > 1 ? (
-                    <div className="h-[320px] w-full">
+                    <Money as="div" className="h-[320px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
                             <ComposedChart data={chart} margin={{ top: 12, right: 16, left: 0, bottom: 0 }} stackOffset="sign">
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
@@ -387,7 +388,7 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
                                 )}
                             </ComposedChart>
                         </ResponsiveContainer>
-                    </div>
+                    </Money>
                 ) : (
                     <p className="py-10 text-center text-sm text-muted-foreground">
                         Cadastre o plano de pagamento ou lance um pagamento para ver o fluxo de caixa.
@@ -397,27 +398,27 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
                 <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 text-xs">
                     <div className={tileCls}>
                         <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Total desembolsado</span>
-                        <span className="block text-base font-bold tabular-nums text-foreground">{formatBRL(result.totalOutflow, 0)}</span>
+                        <Money className="block text-base font-bold tabular-nums text-foreground">{formatBRL(result.totalOutflow, 0)}</Money>
                         <span className="text-muted-foreground">
-                            {sold ? "pago até a venda" : `pago + previsto no contrato${result.totalDelivery > 0 ? ` + ${formatBRL(result.totalDelivery, 0)} na entrega` : ""}`}
+                            {sold ? "pago até a venda" : <>pago + previsto no contrato{result.totalDelivery > 0 ? <> + <Money>{formatBRL(result.totalDelivery, 0)}</Money> na entrega</> : ""}</>}
                         </span>
                     </div>
                     {sold && realizedSale ? (
                         <div className={tileCls}>
                             <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Venda líquida</span>
-                            <span className="block text-base font-bold tabular-nums text-emerald-600">{formatBRL(realizedSale.net, 0)}</span>
+                            <Money className="block text-base font-bold tabular-nums text-emerald-600">{formatBRL(realizedSale.net, 0)}</Money>
                             <span className="text-muted-foreground">em {formatMonthLabel(realizedSale.month)}{investment.sale_costs_pct > 0 ? ` · após ${pct(investment.sale_costs_pct)} de custos` : ""}</span>
                         </div>
                     ) : sellMode ? (
                         <div className={tileCls}>
                             <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Venda na {completion.toLowerCase()}</span>
-                            <span className="block text-base font-bold tabular-nums text-emerald-600">{result.totalSale > 0 ? formatBRL(result.totalSale, 0) : "—"}</span>
+                            <Money className="block text-base font-bold tabular-nums text-emerald-600">{result.totalSale > 0 ? formatBRL(result.totalSale, 0) : "—"}</Money>
                             <span className="text-muted-foreground">{result.totalSale > 0 && keysLabel ? `em ${keysLabel}` : "informe a valorização"}</span>
                         </div>
                     ) : (
                         <div className={tileCls}>
                             <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Aluguel no horizonte</span>
-                            <span className="block text-base font-bold tabular-nums text-emerald-600">{formatBRL(result.totalRent, 0)}</span>
+                            <Money className="block text-base font-bold tabular-nums text-emerald-600">{formatBRL(result.totalRent, 0)}</Money>
                             <span className="text-muted-foreground">
                                 {result.rentStart ? `a partir de ${formatMonthLabel(result.rentStart)}` : "informe o primeiro aluguel"}
                             </span>
@@ -431,11 +432,11 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
                             <span className="block text-[10px] uppercase tracking-wider text-muted-foreground inline-flex items-center gap-1">
                                 <Gem className="w-3 h-3" /> Ganho realizado
                             </span>
-                            <span className={`block text-base font-bold tabular-nums ${metrics.realizedGain >= 0 ? "text-emerald-700 dark:text-emerald-300" : "text-rose-700 dark:text-rose-300"}`}>
+                            <Money className={`block text-base font-bold tabular-nums ${metrics.realizedGain >= 0 ? "text-emerald-700 dark:text-emerald-300" : "text-rose-700 dark:text-rose-300"}`}>
                                 {signed(metrics.realizedGain)}
-                            </span>
+                            </Money>
                             <span className="text-muted-foreground">
-                                {metrics.realizedGainPct !== null ? `${metrics.realizedGainPct > 0 ? "+" : ""}${pct(metrics.realizedGainPct)} sobre ${formatBRL(metrics.paidToDate, 0)} pagos` : ""}
+                                {metrics.realizedGainPct !== null ? <>{metrics.realizedGainPct > 0 ? "+" : ""}{pct(metrics.realizedGainPct)} sobre <Money>{formatBRL(metrics.paidToDate, 0)}</Money> pagos</> : ""}
                             </span>
                         </div>
                     ) : (
@@ -446,12 +447,12 @@ export default function InvestmentCashFlowSimulator({ investment, schedules, pay
                         <span className="block text-[10px] uppercase tracking-wider text-muted-foreground inline-flex items-center gap-1">
                             <Gem className="w-3 h-3" /> Valorização
                         </span>
-                        <span className={`block text-base font-bold tabular-nums ${gain === null ? "text-foreground" : gain >= 0 ? "text-emerald-700 dark:text-emerald-300" : "text-rose-700 dark:text-rose-300"}`}>
+                        <Money className={`block text-base font-bold tabular-nums ${gain === null ? "text-foreground" : gain >= 0 ? "text-emerald-700 dark:text-emerald-300" : "text-rose-700 dark:text-rose-300"}`}>
                             {gain !== null ? signed(gain) : "—"}
-                        </span>
+                        </Money>
                         <span className="text-muted-foreground">
                             {delivery.value !== null && gain !== null
-                                ? `${gain > 0 ? "+" : ""}${pct((gain / metrics.committed) * 100)} · vale ${formatBRL(delivery.value, 0)}${delivery.source === "m2" ? " (área × R$/m²)" : delivery.source === "typed" ? " (valor informado)" : ""}`
+                                ? <>{gain > 0 ? "+" : ""}{pct((gain / metrics.committed) * 100)} · vale <Money>{formatBRL(delivery.value, 0)}</Money>{delivery.source === "m2" ? " (área × R$/m²)" : delivery.source === "typed" ? " (valor informado)" : ""}</>
                                 : "digite a valorização esperada (%)"}
                             {benchmarks.fipezapSale12mPct !== null && ` · FipeZap 12 m ${benchmarks.fipezapSale12mPct > 0 ? "+" : ""}${pct(benchmarks.fipezapSale12mPct)}`}
                         </span>

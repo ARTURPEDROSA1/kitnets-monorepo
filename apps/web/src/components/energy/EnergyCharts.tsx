@@ -14,6 +14,7 @@ import {
     Tooltip,
     Legend,
 } from "recharts";
+import { Money } from "@/components/privacy";
 
 export interface EnergyChartPoint {
     reference_month: string;
@@ -165,7 +166,8 @@ export function FinancialAnalysisChart({ data, height = 300 }: { data: EnergyCha
     }
 
     return (
-        <div style={{ width: "100%", height }}>
+        // amounts on the axis, the bars and the tooltip: the dollar toggle hides the whole chart
+        <Money as="div" style={{ width: "100%", height }}>
             <ResponsiveContainer>
                 <BarChart data={financialData} margin={{ top: 20, right: 25, left: 10, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
@@ -218,7 +220,7 @@ export function FinancialAnalysisChart({ data, height = 300 }: { data: EnergyCha
                     <Bar dataKey="estimated_savings" name="Economia Solar Compensada (R$)" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={32} />
                 </BarChart>
             </ResponsiveContainer>
-        </div>
+        </Money>
     );
 }
 

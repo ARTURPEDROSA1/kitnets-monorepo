@@ -74,14 +74,22 @@ export function CardInfoIcon({ label, icon, info, className }: { label: string; 
     );
 }
 
-/** Small KPI card used by the property sections (label, icon, value, hint). With `info`, the icon opens an explanation popup. */
-export default function Tile({ label, value, hint, icon, tone, title, info, action, onClick }: { label: string; value: React.ReactNode; hint: React.ReactNode; icon: React.ReactNode; tone: TileTone; title?: string; info?: TileInfo; action?: React.ReactNode; /** makes the whole card a button (the info icon keeps its own click) */ onClick?: () => void }) {
+/**
+ * Small KPI card used by the property sections (label, icon, value, hint). With `info`, the icon opens an
+ * explanation popup. `money` / `sensitive` mark the figure for the sidebar privacy toggles (components/privacy):
+ * the value, the hint and the worked example get the class the CSS blurs when the toggle is on.
+ */
+export default function Tile({ label, value, hint, icon, tone, title, info, action, onClick, money, sensitive }: { label: string; value: React.ReactNode; hint: React.ReactNode; icon: React.ReactNode; tone: TileTone; title?: string; info?: TileInfo; action?: React.ReactNode; /** makes the whole card a button (the info icon keeps its own click) */ onClick?: () => void; /** the figure is an amount in R$ (hidden by the dollar toggle) */ money?: boolean; /** the figure identifies something (hidden by the eye toggle) */ sensitive?: boolean }) {
     const clickable = onClick ? {
         role: "button" as const,
         tabIndex: 0,
         onClick,
         onKeyDown: (e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } },
     } : {};
+    const privacy = cn(money && "privacy-money", sensitive && "privacy-sensitive");
+    const tileInfo = info && privacy && (info.example || info.note)
+        ? { ...info, example: info.example ? <span className={privacy}>{info.example}</span> : undefined, note: info.note ? <span className={privacy}>{info.note}</span> : undefined }
+        : info;
     return (
         <div
             className={cn("p-3.5 rounded-xl border border-border/80 bg-muted/20 space-y-1 flex flex-col", onClick && "cursor-pointer transition-colors hover:border-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500")}
@@ -90,10 +98,10 @@ export default function Tile({ label, value, hint, icon, tone, title, info, acti
         >
             <div className="flex items-start justify-between gap-2 text-muted-foreground">
                 <span className="text-[10px] font-semibold uppercase tracking-wider leading-tight">{label}</span>
-                <CardInfoIcon label={label} icon={icon} info={info} className={TILE_TONES[tone]} />
+                <CardInfoIcon label={label} icon={icon} info={tileInfo} className={TILE_TONES[tone]} />
             </div>
-            <span className="text-lg font-bold text-foreground block tabular-nums leading-tight">{value}</span>
-            <span className="text-[11px] text-muted-foreground block leading-snug break-words">{hint}</span>
+            <span className={cn("text-lg font-bold text-foreground block tabular-nums leading-tight", privacy)}>{value}</span>
+            <span className={cn("text-[11px] text-muted-foreground block leading-snug break-words", privacy)}>{hint}</span>
             {action}
         </div>
     );

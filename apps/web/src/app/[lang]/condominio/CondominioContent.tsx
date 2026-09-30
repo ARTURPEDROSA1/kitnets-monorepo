@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { CoverCarousel, useCoverCarousel } from "@/components/ui/CoverCarousel";
 import CondominioHub from "@/components/condominium/CondominioHub";
 import CondominiumLedger from "@/components/condominium/CondominiumLedger";
+import { Sensitive } from "@/components/privacy";
 import { condoRows, condoViewFromParam, type CondoRow, type CondoView } from "@/lib/condominium-hub";
 import type { Condominium } from "@/lib/condominium";
 
@@ -337,7 +338,7 @@ function CondominiumHeader({ condominium: c, lang, renaming, renameText, onRenam
                 )}
                 <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
                     <span className="inline-flex items-center gap-1"><Building2 className="h-3.5 w-3.5" /> {c.property_name}</span>
-                    {c.property_address && <><span>·</span><span>{c.property_address}</span></>}
+                    {c.property_address && <><span>·</span><Sensitive>{c.property_address}</Sensitive></>}
                     <span>·</span>
                     <span>{c.units} {c.units === 1 ? "unidade" : "unidades"}</span>
                     {c.solar_payback_from_result && <><span>·</span><span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400"><Sun className="h-3.5 w-3.5" /> resultado conta como retorno solar</span></>}

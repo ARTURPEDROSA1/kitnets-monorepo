@@ -13,6 +13,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/DateInput";
+import { Money } from "@/components/privacy";
 import {
     INDEX_LABELS,
     PAYMENT_KINDS,
@@ -176,9 +177,9 @@ export default function InvestmentScheduleEditor({
                                             {INDEX_CODES.map(c => <option key={c} value={c}>{INDEX_LABELS[c]}</option>)}
                                         </select>
                                     </td>
-                                    <td className="px-2 py-1 text-right text-xs tabular-nums text-muted-foreground whitespace-nowrap">
+                                    <Money as="td" className="px-2 py-1 text-right text-xs tabular-nums text-muted-foreground whitespace-nowrap">
                                         {formatBRL(blockTotal(s), 0)}
-                                    </td>
+                                    </Money>
                                     <td className="px-1 py-1">
                                         <button
                                             type="button"
@@ -197,7 +198,7 @@ export default function InvestmentScheduleEditor({
                         <tfoot>
                             <tr>
                                 <td colSpan={6} className="px-2 py-2 text-right text-[10px] uppercase tracking-wider text-muted-foreground">Total do plano</td>
-                                <td colSpan={3} className="px-2 py-2 text-right text-sm font-semibold tabular-nums">{formatBRL(scheduleTotal(schedules))}</td>
+                                <td colSpan={3} className="px-2 py-2 text-right text-sm font-semibold tabular-nums"><Money>{formatBRL(scheduleTotal(schedules))}</Money></td>
                             </tr>
                         </tfoot>
                     </table>

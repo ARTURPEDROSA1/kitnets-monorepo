@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/DateInput";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Money } from "@/components/privacy";
 import InvestmentScheduleEditor, { INDEX_CODES, type ScheduleDraft, scheduleTotal } from "./InvestmentScheduleEditor";
 import {
     INDEX_LABELS,
@@ -209,7 +210,7 @@ function PlanForm({ investment, schedules, paymentCount, onSave, onClose }: Omit
                         <p>
                             O plano passa a ter <strong className="text-foreground">{preview.count} parcelas</strong>, de{" "}
                             {formatMonthLabel(preview.first)} a {formatMonthLabel(preview.last)}, somando{" "}
-                            <strong className="text-foreground tabular-nums">{formatBRL(total)}</strong>.
+                            <Money as="strong" className="text-foreground tabular-nums">{formatBRL(total)}</Money>.
                         </p>
                     ) : (
                         <p>Sem blocos, o investimento fica sem previsão de parcelas: o gráfico mostra só o que já foi pago.</p>
@@ -217,7 +218,7 @@ function PlanForm({ investment, schedules, paymentCount, onSave, onClose }: Omit
                     {contractPrice > 0 && Math.abs(difference) >= 0.01 && (
                         <p>
                             {difference > 0 ? "Acima" : "Abaixo"} do preço do contrato em{" "}
-                            <span className="tabular-nums">{formatBRL(Math.abs(difference))}</span>. Isso é normal quando
+                            <Money className="tabular-nums">{formatBRL(Math.abs(difference))}</Money>. Isso é normal quando
                             o sinal foi pago fora do plano ou uma parcela já embute correção.
                         </p>
                     )}

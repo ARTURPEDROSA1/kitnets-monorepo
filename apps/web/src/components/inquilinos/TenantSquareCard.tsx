@@ -12,6 +12,7 @@ import { Building2, CalendarClock, Home, Instagram, Linkedin, Mail, MessageCircl
 import { cn } from "@/lib/utils";
 import { formatDateBR } from "@/lib/dates";
 import { CoverCarousel, useCoverCarousel } from "@/components/ui/CoverCarousel";
+import { Money } from "@/components/privacy";
 import { TENANT_MANAGEMENT_LABELS, TENANT_STATUS_META, brl, livingLabel, type TenantRow } from "@/lib/tenant-dashboard";
 import { instagramUrl, telUrl, whatsappUrl } from "@/lib/social-links";
 
@@ -81,9 +82,9 @@ export default function TenantSquareCard({ row, onSelect, onDelete, isDeleting =
                     <p className="flex items-start gap-1.5 text-foreground"><Home className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" /> <span className="break-words">{row.place}</span></p>
                     <p className="flex items-baseline justify-between gap-2">
                         {row.rent !== null ? (
-                            <span className="font-semibold tabular-nums text-foreground">{brl(row.rent, 0)}<span className="font-normal text-muted-foreground">/mês · dia {row.current?.rent_due_day}</span></span>
+                            <span className="font-semibold tabular-nums text-foreground"><Money>{brl(row.rent, 0)}</Money><span className="font-normal text-muted-foreground">/mês · dia {row.current?.rent_due_day}</span></span>
                         ) : row.last ? (
-                            <span className="text-muted-foreground">{row.status === "FORMER" ? "Pagava" : "Contrato"} {brl(Number(row.last.monthly_rent) || 0, 0)}/mês</span>
+                            <span className="text-muted-foreground">{row.status === "FORMER" ? "Pagava" : "Contrato"} <Money>{brl(Number(row.last.monthly_rent) || 0, 0)}</Money>/mês</span>
                         ) : (
                             <span className="text-muted-foreground">Sem contrato cadastrado</span>
                         )}

@@ -22,6 +22,7 @@ import {
     Tooltip,
     CartesianGrid,
 } from "recharts";
+import { Money } from "@/components/privacy";
 import type { EnergyBillRecord } from "@/app/[lang]/dashboard/energy/[propertyId]/page";
 
 interface HistoricUnitPriceModalProps {
@@ -271,9 +272,9 @@ export function HistoricUnitPriceModal({
                             <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                                 Tarifa Vigente
                             </span>
-                            <p className="text-lg font-black font-mono text-foreground">
+                            <Money as="p" className="text-lg font-black font-mono text-foreground">
                                 R$ {formatNumber(stats.latest, 4)}
-                            </p>
+                            </Money>
                             <span className="text-[10px] text-muted-foreground">Último ciclo faturado</span>
                         </div>
 
@@ -282,9 +283,9 @@ export function HistoricUnitPriceModal({
                             <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                                 Tarifa Média
                             </span>
-                            <p className="text-lg font-bold font-mono text-foreground">
+                            <Money as="p" className="text-lg font-bold font-mono text-foreground">
                                 R$ {formatNumber(stats.avg, 4)}
-                            </p>
+                            </Money>
                             <span className="text-[10px] text-muted-foreground">Média do período</span>
                         </div>
 
@@ -293,9 +294,9 @@ export function HistoricUnitPriceModal({
                             <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
                                 Mínima
                             </span>
-                            <p className="text-lg font-bold font-mono text-emerald-700 dark:text-emerald-300">
+                            <Money as="p" className="text-lg font-bold font-mono text-emerald-700 dark:text-emerald-300">
                                 R$ {formatNumber(stats.min, 4)}
-                            </p>
+                            </Money>
                             <span className="text-[10px] text-muted-foreground">Menor valor registrado</span>
                         </div>
 
@@ -304,9 +305,9 @@ export function HistoricUnitPriceModal({
                             <span className="text-[11px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">
                                 Máxima
                             </span>
-                            <p className="text-lg font-bold font-mono text-amber-700 dark:text-amber-300">
+                            <Money as="p" className="text-lg font-bold font-mono text-amber-700 dark:text-amber-300">
                                 R$ {formatNumber(stats.max, 4)}
-                            </p>
+                            </Money>
                             <span className="text-[10px] text-muted-foreground">Maior valor registrado</span>
                         </div>
                     </div>
@@ -355,7 +356,7 @@ export function HistoricUnitPriceModal({
                         </div>
 
                         {tariffHistory.length > 0 ? (
-                            <div style={{ width: "100%", height: isMaximized ? 380 : 260 }}>
+                            <Money as="div" style={{ width: "100%", height: isMaximized ? 380 : 260 }}>
                                 <ResponsiveContainer>
                                     <AreaChart
                                         data={tariffHistory}
@@ -439,7 +440,7 @@ export function HistoricUnitPriceModal({
                                         />
                                     </AreaChart>
                                 </ResponsiveContainer>
-                            </div>
+                            </Money>
                         ) : (
                             <div className="h-44 flex items-center justify-center border border-dashed border-border rounded-xl text-xs text-muted-foreground text-center p-4">
                                 Envie uma fatura recente completa para renderizar o gráfico histórico de tarifas.
@@ -481,7 +482,7 @@ export function HistoricUnitPriceModal({
                                                     {item.label}
                                                 </td>
                                                 <td className="py-2.5 px-3.5 text-right font-mono font-bold text-sky-700 dark:text-sky-300 border-b border-border whitespace-nowrap">
-                                                    R$ {formatNumber(item.unit_price, 4)}
+                                                    <Money>R$ {formatNumber(item.unit_price, 4)}</Money>
                                                 </td>
                                                 <td className="py-2.5 px-3.5 text-center border-b border-border whitespace-nowrap">
                                                     {getFlagBadge(item.flag_type)}
@@ -490,7 +491,7 @@ export function HistoricUnitPriceModal({
                                                     {item.grid_consumption_kwh > 0 ? `${item.grid_consumption_kwh} kWh` : "-"}
                                                 </td>
                                                 <td className="py-2.5 px-3.5 text-right font-medium text-foreground border-b border-border whitespace-nowrap">
-                                                    {item.total_amount > 0 ? formatCurrency(item.total_amount) : "-"}
+                                                    <Money>{item.total_amount > 0 ? formatCurrency(item.total_amount) : "-"}</Money>
                                                 </td>
                                             </tr>
                                         ))}

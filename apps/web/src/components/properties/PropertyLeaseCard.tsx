@@ -12,6 +12,7 @@ import Link from "next/link";
 import { Building2, CalendarClock, ExternalLink, FileSignature, FileText, Loader2, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PdfViewerModal } from "@/components/ui/PdfViewerModal";
+import { Money } from "@/components/privacy";
 import { CardInfoIcon, TILE_TONES, type TileInfo } from "./Tile";
 import { LEASE_INDEX_LABELS, leaseIndexSeriesCode, leaseSummary, type IndexPoint, type LeaseForSummary } from "@/lib/lease-summary";
 
@@ -127,7 +128,7 @@ function LeaseRow({ lease, series, seriesLoaded, propertyId, lang, today, showHe
                         label: "Vencimento do aluguel", value: `Todo dia ${lease.rent_due_day}`,
                         hint: <>Próximo: {formatDate(s.nextDueDate)}<br />{s.daysToDue === 0 ? "Vence hoje" : `Em ${days(s.daysToDue)}`}</>,
                     }}
-                    right={{ label: "Aluguel atual", value: formatBRL(lease.monthly_rent), hint: "Valor do contrato" }}
+                    right={{ label: "Aluguel atual", value: <Money>{formatBRL(lease.monthly_rent)}</Money>, hint: "Valor do contrato" }}
                 />
                 <Pair
                     left={{ label: "Índice de reajuste", value: indexLabel, hint: s.nextAdjustmentDate ? `A cada ${s.frequencyMonths} meses` : "Contrato sem reajuste" }}
@@ -147,9 +148,9 @@ function LeaseRow({ lease, series, seriesLoaded, propertyId, lang, today, showHe
                         hint: s.daysToAdjustment === null ? "—" : `Em ${days(s.daysToAdjustment)}`,
                     }}
                     right={{
-                        label: "Aluguel reajustado até hoje", value: s.adjustedRent !== null ? formatBRL(s.adjustedRent) : "—",
+                        label: "Aluguel reajustado até hoje", value: s.adjustedRent !== null ? <Money>{formatBRL(s.adjustedRent)}</Money> : "—",
                         hint: s.adjustedRent !== null
-                            ? <>{s.adjustedRent >= lease.monthly_rent ? "+" : "−"}{formatBRL(Math.abs(s.adjustedRent - lease.monthly_rent))} sobre o atual<br />Prévia com os meses já divulgados</>
+                            ? <><Money>{s.adjustedRent >= lease.monthly_rent ? "+" : "−"}{formatBRL(Math.abs(s.adjustedRent - lease.monthly_rent))}</Money> sobre o atual<br />Prévia com os meses já divulgados</>
                             : "—",
                     }}
                 />
@@ -241,7 +242,7 @@ export default function PropertyLeaseCard({ propertyId, lang = "pt" }: { propert
             ? "O contrato de locação em vigor em cada unidade deste imóvel, uma linha por unidade. O reajuste segue a prática dos contratos brasileiros: a cada aniversário o aluguel é corrigido pelo índice acumulado no ciclo que terminou. Um ciclo que começa em abril soma os meses de abril a março, e o novo valor vale a partir de abril."
             : "O contrato de locação em vigor neste imóvel. O reajuste segue a prática dos contratos brasileiros: a cada aniversário o aluguel é corrigido pelo índice acumulado no ciclo que terminou. Um ciclo que começa em abril soma os meses de abril a março, e o novo valor vale a partir de abril.",
         formula: <>Acumulado no ciclo = Π (1 + variação mensal) − 1, dos meses já divulgados do ciclo<br />Aluguel reajustado até hoje = aluguel atual × (1 + acumulado)<br />Próximo reajuste = próximo aniversário do início, na periodicidade do contrato</>,
-        example: example && example.s.accumulatedPct !== null ? <>{example.lease.unit_label ? <>{example.lease.unit_label}: </> : null}{formatBRL(example.lease.monthly_rent)} × (1 {example.s.accumulatedPct >= 0 ? "+" : "−"} {Math.abs(example.s.accumulatedPct).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}%) = {formatBRL(example.s.adjustedRent ?? 0)}<br />{example.s.monthsCounted} de {example.s.frequencyMonths} meses do ciclo, até {formatMonth(example.s.indexThrough)}</> : undefined,
+        example: example && example.s.accumulatedPct !== null ? <>{example.lease.unit_label ? <>{example.lease.unit_label}: </> : null}<Money>{formatBRL(example.lease.monthly_rent)}</Money> × (1 {example.s.accumulatedPct >= 0 ? "+" : "−"} {Math.abs(example.s.accumulatedPct).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}%) = <Money>{formatBRL(example.s.adjustedRent ?? 0)}</Money><br />{example.s.monthsCounted} de {example.s.frequencyMonths} meses do ciclo, até {formatMonth(example.s.indexThrough)}</> : undefined,
         note: "O valor reajustado é uma prévia: o percentual definitivo só fecha quando o último mês do ciclo é divulgado. Com índice negativo, a maioria dos contratos mantém o aluguel.",
     };
 

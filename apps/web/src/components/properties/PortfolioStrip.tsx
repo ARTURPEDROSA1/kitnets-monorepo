@@ -8,6 +8,7 @@
 import React from "react";
 import { BadgeDollarSign, CalendarClock, DollarSign, Gauge, Percent, PiggyBank, Wallet } from "lucide-react";
 import { formatMonthKey } from "@/lib/property-income";
+import { Money } from "@/components/privacy";
 
 export interface PortfolioTotalsData {
     count: number;
@@ -33,13 +34,14 @@ export interface PortfolioIncomeData {
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 const pct = (v: number | null) => (v === null ? "—" : `${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`);
 
-function Item({ icon, label, value, hint, tone, valueTone }: { icon: React.ReactNode; label: string; value: string; hint: string; tone: string; valueTone?: string }) {
+/** `money`: the figure is an amount in R$, hidden by the sidebar's dollar toggle (components/privacy). */
+function Item({ icon, label, value, hint, tone, valueTone, money }: { icon: React.ReactNode; label: string; value: string; hint: React.ReactNode; tone: string; valueTone?: string; money?: boolean }) {
     return (
         <div className="rounded-xl border border-border/80 bg-card px-4 py-3 space-y-0.5 min-w-0">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                 <span className={tone}>{icon}</span>{label}
             </span>
-            <span className={`text-xl font-bold block tabular-nums truncate ${valueTone ?? "text-foreground"}`}>{value}</span>
+            <span className={`text-xl font-bold block tabular-nums truncate ${valueTone ?? "text-foreground"}${money ? " privacy-money" : ""}`}>{value}</span>
             <span className="text-xs text-muted-foreground block truncate">{hint}</span>
         </div>
     );
@@ -56,16 +58,16 @@ export default function PortfolioStrip({ totals, income }: { totals: PortfolioTo
               : `${income.realCount} de ${income.count} com receitas reais`;
     return (
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-            <Item icon={<DollarSign className="w-3.5 h-3.5" />} tone="text-emerald-600" label="Receita mensal" value={brl(income.revenue)} hint={sourceHint} />
-            <Item icon={<Percent className="w-3.5 h-3.5" />} tone="text-blue-600" label="Resultado líquido (NOI)" value={brl(income.noi)} valueTone="text-emerald-600"
+            <Item icon={<DollarSign className="w-3.5 h-3.5" />} tone="text-emerald-600" label="Receita mensal" value={brl(income.revenue)} hint={sourceHint} money />
+            <Item icon={<Percent className="w-3.5 h-3.5" />} tone="text-blue-600" label="Resultado líquido (NOI)" value={brl(income.noi)} valueTone="text-emerald-600" money
                 hint={margin !== null ? `margem ${pct(margin)}` : "—"} />
-            <Item icon={<PiggyBank className="w-3.5 h-3.5" />} tone="text-emerald-600" label="Investido" value={totals ? brl(totals.invested) : "—"}
+            <Item icon={<PiggyBank className="w-3.5 h-3.5" />} tone="text-emerald-600" label="Investido" value={totals ? brl(totals.invested) : "—"} money
                 hint={totals ? `${totals.count} ${totals.count === 1 ? "imóvel com registro" : "imóveis com registro"}` : "carregando…"} />
             <Item icon={<Gauge className="w-3.5 h-3.5" />} tone={paid ? "text-emerald-600" : "text-amber-600"} label="Payback do portfólio" value={totals ? pct(totals.paybackPct) : "—"}
                 hint={!totals ? "renda líquida ÷ investido" : paid ? "investimento recuperado" : totals.lastForecastMonth ? `último imóvel previsto para ${formatMonthKey(totals.lastForecastMonth)}` : "renda líquida ÷ investido"} />
             <Item icon={<Wallet className="w-3.5 h-3.5" />} tone="text-violet-600" label="Yield líquido (12 m)" value={totals ? pct(totals.blendedYield) : "—"}
-                hint={totals ? `renda líquida 12 m ${brl(totals.noi12m)} ÷ investido` : "renda líquida dos últimos 12 meses ÷ investido"} />
-            <Item icon={totals?.marketValue != null ? <BadgeDollarSign className="w-3.5 h-3.5" /> : <CalendarClock className="w-3.5 h-3.5" />} tone="text-emerald-600" label="Valor de mercado"
+                hint={totals ? <>renda líquida 12 m <Money>{brl(totals.noi12m)}</Money> ÷ investido</> : "renda líquida dos últimos 12 meses ÷ investido"} />
+            <Item icon={totals?.marketValue != null ? <BadgeDollarSign className="w-3.5 h-3.5" /> : <CalendarClock className="w-3.5 h-3.5" />} tone="text-emerald-600" label="Valor de mercado" money
                 value={totals?.marketValue != null ? brl(totals.marketValue) : "—"}
                 hint={totals?.marketValue != null ? `${totals.valuedCount} de ${totals.count} avaliados · estimado` : "cadastre avaliações na análise de cada imóvel"} />
         </div>

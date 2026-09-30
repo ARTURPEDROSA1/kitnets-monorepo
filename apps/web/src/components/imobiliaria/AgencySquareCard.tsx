@@ -10,6 +10,7 @@ import React from "react";
 import { Building2, FileSignature, FileText, Globe, Mail, MapPin, MessageCircle, Percent, Phone, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CoverCarousel, useCoverCarousel } from "@/components/ui/CoverCarousel";
+import { Money } from "@/components/privacy";
 import { AGENCY_STATUS_META, brl, type AgencyRow } from "@/lib/agency-dashboard";
 import { formatDateBR } from "@/lib/dates";
 
@@ -60,24 +61,25 @@ export default function AgencySquareCard({ row, onSelect, onDelete, isDeleting =
             <div className="flex flex-1 flex-col gap-3 p-4">
                 <div className="space-y-0.5">
                     <h3 className="break-words font-semibold leading-tight text-foreground">{row.displayName}</h3>
-                    <p className="break-words text-xs text-muted-foreground">{[row.cnpj ? `CNPJ ${row.cnpj}` : null, row.creci].filter(Boolean).join(" · ") || agency.name}</p>
+                    {/* CNPJ / CRECI are hidden by the eye toggle; the fallback (the razão social) is not */}
+                    <p className={cn("break-words text-xs text-muted-foreground", (row.cnpj || row.creci) && "privacy-sensitive")}>{[row.cnpj ? `CNPJ ${row.cnpj}` : null, row.creci].filter(Boolean).join(" · ") || agency.name}</p>
                 </div>
 
                 <p className="flex items-start gap-1.5 text-xs text-foreground">
                     <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    <span className="break-words">{[agency.neighborhood, row.place].filter(Boolean).join(" · ") || "endereço não informado"}</span>
+                    <span className={cn("break-words", agency.neighborhood && "privacy-sensitive")}>{[agency.neighborhood, row.place].filter(Boolean).join(" · ") || "endereço não informado"}</span>
                 </p>
 
                 <dl className="mt-auto grid grid-cols-2 gap-2 text-[11px]">
                     <div className="rounded-lg bg-muted/40 px-2 py-1.5">
                         <dt className="flex items-center gap-1 text-muted-foreground"><FileSignature className="h-3 w-3" /> Contratos</dt>
                         <dd className="font-semibold tabular-nums text-foreground">{plural(row.inForce.length, "em vigor", "em vigor")}</dd>
-                        <dd className="leading-snug text-muted-foreground">{row.inForce.length > 0 ? `${brl(row.rentManaged, 0)}/mês` : row.leases.length > 0 ? plural(row.leases.length, "encerrado", "encerrados") : "nenhum contrato"}</dd>
+                        <dd className="leading-snug text-muted-foreground">{row.inForce.length > 0 ? <><Money>{brl(row.rentManaged, 0)}</Money>/mês</> : row.leases.length > 0 ? plural(row.leases.length, "encerrado", "encerrados") : "nenhum contrato"}</dd>
                     </div>
                     <div className="rounded-lg bg-muted/40 px-2 py-1.5">
                         <dt className="flex items-center gap-1 text-muted-foreground"><Percent className="h-3 w-3" /> Taxa</dt>
                         <dd className={cn("font-semibold tabular-nums", row.feePct == null ? "text-amber-600" : "text-foreground")}>{row.feePct != null ? `${row.feePct.toLocaleString("pt-BR")}%` : "não informada"}</dd>
-                        <dd className="leading-snug text-muted-foreground">{row.feePct != null && row.inForce.length > 0 ? `${brl(row.monthlyFee, 0)}/mês` : row.feePct != null ? "do aluguel" : "informe no cadastro"}</dd>
+                        <dd className="leading-snug text-muted-foreground">{row.feePct != null && row.inForce.length > 0 ? <><Money>{brl(row.monthlyFee, 0)}</Money>/mês</> : row.feePct != null ? "do aluguel" : "informe no cadastro"}</dd>
                     </div>
                 </dl>
 

@@ -10,6 +10,7 @@
 import React, { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { formatDateBR } from "@/lib/dates";
+import { Money } from "@/components/privacy";
 import { adjustmentDates, brl, positionPct, statusMeta, timelineBounds, timelineTicks, type LeaseRow } from "@/lib/lease-dashboard";
 
 interface Props {
@@ -79,7 +80,7 @@ export default function LeaseTimeline({ rows, today, onOpen }: Props) {
                                     >
                                         <span className="block break-words text-xs font-semibold leading-snug text-foreground">{row.title}</span>
                                         <span className="block break-words text-[11px] leading-snug text-muted-foreground">
-                                            {row.title.toLowerCase().includes((lease.primary_tenant_name ?? "\u0000").toLowerCase()) ? rent : `${lease.primary_tenant_name ?? "Sem inquilino"} · ${rent}`}
+                                            {row.title.toLowerCase().includes((lease.primary_tenant_name ?? "\u0000").toLowerCase()) ? <Money>{rent}</Money> : <>{lease.primary_tenant_name ?? "Sem inquilino"} · <Money>{rent}</Money></>}
                                         </span>
                                     </button>
                                     <div className="relative flex-1 cursor-pointer" onClick={() => onOpen(row)} title={title} role="presentation">

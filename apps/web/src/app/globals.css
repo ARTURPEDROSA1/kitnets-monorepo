@@ -262,3 +262,9 @@ html[data-hide-money="1"] .privacy-money.privacy-cover {
   filter: blur(1.5rem);
   overflow: hidden;
 }
+
+/* Editable amounts (components/properties/MoneyInput.tsx, the ledgers' cells): blurred at rest,
+   readable while the cell is being edited, still clickable. */
+html[data-hide-money="1"] .privacy-money-input:not(:focus) {
+  filter: blur(0.45em);
+}

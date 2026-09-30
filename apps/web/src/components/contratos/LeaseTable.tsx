@@ -9,6 +9,7 @@ import React, { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, Ban, FileText, Loader2, PenLine, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDateBR } from "@/lib/dates";
+import { Money } from "@/components/privacy";
 import { MANAGEMENT_LABELS, brl, statusMeta, type LeaseRow } from "@/lib/lease-dashboard";
 
 export interface LeaseTableActions {
@@ -142,7 +143,7 @@ export default function LeaseTable({ rows, actions }: Props) {
                                         <span className={cn("inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", meta.pill)}>{meta.label}</span>
                                     </td>
                                     <td className="whitespace-nowrap px-3 py-2.5 text-right">
-                                        <span className="block text-sm font-semibold tabular-nums text-foreground">{brl(Number(lease.monthly_rent) || 0)}</span>
+                                        <Money className="block text-sm font-semibold tabular-nums text-foreground">{brl(Number(lease.monthly_rent) || 0)}</Money>
                                         <span className="block text-[11px] text-muted-foreground">dia {lease.rent_due_day}</span>
                                     </td>
                                     <td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-foreground">{formatDateBR(lease.start_date)}</td>

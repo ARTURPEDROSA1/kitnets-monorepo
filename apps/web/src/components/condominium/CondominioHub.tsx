@@ -9,6 +9,7 @@ import React, { useMemo, useState } from "react";
 import { AlertCircle, Building, ChevronDown, ChevronUp, DollarSign, Loader2, Percent, Plus, Receipt, Search, Sparkles, Sun, TrendingUp, X } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
+import { Money } from "@/components/privacy";
 import { cn } from "@/lib/utils";
 import { normalizeText } from "@/lib/lease-extract";
 import { CONDO_VIEWS, condoAttention, condoHubTotals, inCondoView, type CondoRow, type CondoView } from "@/lib/condominium-hub";
@@ -30,8 +31,11 @@ interface Props {
 
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString("pt-BR")} ${n === 1 ? one : many}`;
 const brl = (v: number, digits = 0) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: digits, maximumFractionDigits: digits });
+/** An attention sentence that quotes an amount (lib/condominium-hub builds them): the dollar toggle hides the whole sentence. */
+const hasAmount = (text: string) => /R\$\s?\d/.test(text);
 
-function Item({ icon, label, value, hint, tone, valueTone, onClick, title }: { icon: React.ReactNode; label: string; value: string; hint: React.ReactNode; tone: string; valueTone?: string; onClick?: () => void; title?: string }) {
+/** `money`: the value is an amount in R$, hidden by the sidebar's dollar toggle (components/privacy); amounts in `hint` are wrapped in <Money> by the caller. */
+function Item({ icon, label, value, hint, tone, valueTone, onClick, title, money }: { icon: React.ReactNode; label: string; value: string; hint: React.ReactNode; tone: string; valueTone?: string; onClick?: () => void; title?: string; money?: boolean }) {
     const Tag = onClick ? "button" : "div";
     return (
         <Tag
@@ -43,7 +47,7 @@ function Item({ icon, label, value, hint, tone, valueTone, onClick, title }: { i
             <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 <span className={tone}>{icon}</span>{label}
             </span>
-            <span className={cn("block break-words text-xl font-bold leading-tight", valueTone ?? "text-foreground")}>{value}</span>
+            <span className={cn("block break-words text-xl font-bold leading-tight", valueTone ?? "text-foreground", money && "privacy-money")}>{value}</span>
             <span className="block break-words text-xs leading-snug text-muted-foreground">{hint}</span>
         </Tag>
     );
@@ -97,25 +101,25 @@ export default function CondominioHub({ rows, loading, error, view, onViewChange
                         onClick={() => onViewChange("todos")}
                     />
                     <Item
-                        icon={<DollarSign className="h-3.5 w-3.5" />} tone="text-emerald-600" label="Receita do mês"
+                        icon={<DollarSign className="h-3.5 w-3.5" />} tone="text-emerald-600" label="Receita do mês" money
                         value={totals.revenueLatest > 0 ? brl(totals.revenueLatest) : "—"}
-                        hint={totals.revenueYtd > 0 ? `${totals.year}: ${brl(totals.revenueYtd)}` : "condomínio cobrado das unidades no mês mais recente"}
+                        hint={totals.revenueYtd > 0 ? <>{totals.year}: <Money>{brl(totals.revenueYtd)}</Money></> : "condomínio cobrado das unidades no mês mais recente"}
                         title="Condomínio cobrado das unidades no mês mais recente de cada condomínio (Receitas de Aluguel)"
                     />
                     <Item
-                        icon={<Receipt className="h-3.5 w-3.5" />} tone="text-rose-600" label="Custos do mês"
+                        icon={<Receipt className="h-3.5 w-3.5" />} tone="text-rose-600" label="Custos do mês" money
                         value={totals.costLatest > 0 ? brl(totals.costLatest) : "—"}
-                        hint={totals.costYtd > 0 ? `${totals.year}: ${brl(totals.costYtd)}` : "energia, internet, água, IPTU e manutenção"}
+                        hint={totals.costYtd > 0 ? <>{totals.year}: <Money>{brl(totals.costYtd)}</Money></> : "energia, internet, água, IPTU e manutenção"}
                         title="Custos do mês mais recente de cada condomínio"
                     />
                     <Item
-                        icon={<TrendingUp className="h-3.5 w-3.5" />} tone={totals.resultLatest < 0 ? "text-rose-600" : "text-blue-600"} label="Resultado do mês"
+                        icon={<TrendingUp className="h-3.5 w-3.5" />} tone={totals.resultLatest < 0 ? "text-rose-600" : "text-blue-600"} label="Resultado do mês" money
                         value={totals.revenueLatest > 0 || totals.costLatest > 0 ? brl(totals.resultLatest) : "—"}
                         hint={totals.negativeCondos > 0 ? `${plural(totals.negativeCondos, "condomínio no vermelho", "condomínios no vermelho")} no ano` : "receita − custos"}
                         valueTone={totals.resultLatest < 0 ? "text-rose-600" : undefined}
                     />
                     <Item
-                        icon={<Percent className="h-3.5 w-3.5" />} tone={totals.resultYtd < 0 ? "text-rose-600" : "text-violet-600"} label={`Resultado ${totals.year}`}
+                        icon={<Percent className="h-3.5 w-3.5" />} tone={totals.resultYtd < 0 ? "text-rose-600" : "text-violet-600"} label={`Resultado ${totals.year}`} money
                         value={totals.revenueYtd > 0 || totals.costYtd > 0 ? brl(totals.resultYtd) : "—"}
                         hint={totals.marginYtd !== null ? `margem ${totals.marginYtd.toLocaleString("pt-BR")}% da receita` : "resultado ÷ receita"}
                         valueTone={totals.resultYtd < 0 ? "text-rose-600" : undefined}
@@ -150,7 +154,7 @@ export default function CondominioHub({ rows, loading, error, view, onViewChange
                                 <span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", DOT[item.tone])} />
                                 <span className="min-w-0 flex-1">
                                     <button type="button" onClick={() => onOpen(item.row)} className="font-semibold text-foreground underline-offset-2 hover:underline">{item.row.condo.name}</button>
-                                    <span className="text-muted-foreground"> — {item.text}</span>
+                                    <span className="text-muted-foreground"> — {hasAmount(item.text) ? <Money>{item.text}</Money> : item.text}</span>
                                 </span>
                             </li>
                         ))}

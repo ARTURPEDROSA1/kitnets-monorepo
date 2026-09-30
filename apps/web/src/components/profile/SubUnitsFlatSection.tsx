@@ -10,6 +10,7 @@ import Image from "next/image";
 import { Camera, Check, CheckCircle2, Copy, FileSignature, Home, Loader2, PenLine, Play, Plus, Sparkles, Trash2, Video, Wand2, X } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { cn } from "@/lib/utils";
+import { Money } from "@/components/privacy";
 import { PdfViewerModal } from "@/components/ui/PdfViewerModal";
 import PhotoLightbox, { type LightboxPhoto } from "@/components/investments/PhotoLightbox";
 import { FilePreview, SubUnitFields, isSubUnitComplete, subUnitActions, type SubUnit, type SubUnitsSectionProps, type UnitContractFile } from "@/components/profile/PropertyDetailsCard";
@@ -129,8 +130,11 @@ export default function SubUnitsFlatSection({
                     const complete = isSubUnitComplete(unit);
                     const photoCount = (unit.photos?.length || 0) + (unit.newPhotos?.length || 0);
                     const videoCount = (unit.videos?.length || 0) + (unit.newVideos?.length || 0);
+                    // "R$ 350,00 · inclui energia, água": the amount alone follows the dollar privacy toggle
+                    const condoValue = unit.condominium ? brl(unit.condominiumValue) : null;
+                    const condoIncludes = unit.condominium ? CONDO_INCLUDES.filter(([k]) => unit.condominiumIncludes?.[k]).map(([, l]) => l).join(", ") || null : null;
                     const condo = unit.condominium
-                        ? [brl(unit.condominiumValue) ?? "sim", CONDO_INCLUDES.filter(([k]) => unit.condominiumIncludes?.[k]).map(([, l]) => l).join(", ") || null].filter(Boolean).join(" · inclui ")
+                        ? <>{condoValue ? <Money>{condoValue}</Money> : "sim"}{condoIncludes ? ` · inclui ${condoIncludes}` : ""}</>
                         : null;
                     const importing = importingContractIdx === idx;
                     const name = unit.name || `Unidade ${idx + 1}`;

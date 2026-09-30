@@ -13,6 +13,7 @@ import { CheckCircle2, Landmark, Loader2, Lock, Save } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
 import { ContabilNav } from "@/components/contabil/ContabilNav";
+import { Money, Sensitive } from "@/components/privacy";
 import { cn } from "@/lib/utils";
 import { ACCOUNT_TYPE_LABELS, type AccountingAccount, type AccountType } from "@/lib/accounting-chart";
 import { entryTotals, formatMoney, parseAmountInput } from "@/lib/accounting-journal";
@@ -104,7 +105,7 @@ export default function SaldoAberturaContent({ lang }: Props) {
                     Escolha primeiro o <strong>início da escrituração</strong> em <Link href={`${base}/contabil/politicas`} className="underline">Políticas contábeis</Link>: o saldo de abertura é o do dia anterior a ele.
                 </div>
             )}
-            {entry && !notice && <p className="text-xs text-muted-foreground">Saldo de abertura lançado{entry.created_by ? ` por ${entry.created_by}` : ""} em {dateBR(entry.created_at.slice(0, 10))}. Salvar de novo substitui o lançamento.</p>}
+            {entry && !notice && <p className="text-xs text-muted-foreground">Saldo de abertura lançado{entry.created_by ? <> por {entry.created_by.includes("@") ? <Sensitive>{entry.created_by}</Sensitive> : entry.created_by}</> : ""} em {dateBR(entry.created_at.slice(0, 10))}. Salvar de novo substitui o lançamento.</p>}
             <p className="text-xs text-muted-foreground">A data de início fica em <Link href={`${base}/contabil/politicas`} className="text-emerald-700 hover:underline">Políticas contábeis</Link>.</p>
 
             {loading ? (
@@ -141,8 +142,8 @@ export default function SaldoAberturaContent({ lang }: Props) {
                         <tfoot>
                             <tr className="border-t-2 border-border font-semibold">
                                 <td className="px-3 py-2">Totais</td>
-                                <td className="px-3 py-2 text-right tabular-nums">{formatMoney(totals.debit)}</td>
-                                <td className="px-3 py-2 text-right tabular-nums">{formatMoney(totals.credit)}</td>
+                                <Money as="td" className="px-3 py-2 text-right tabular-nums">{formatMoney(totals.debit)}</Money>
+                                <Money as="td" className="px-3 py-2 text-right tabular-nums">{formatMoney(totals.credit)}</Money>
                             </tr>
                         </tfoot>
                     </table>
@@ -152,7 +153,7 @@ export default function SaldoAberturaContent({ lang }: Props) {
             {!loading && (
                 <div className="flex flex-wrap items-center gap-4">
                     <span className={cn("text-sm font-medium", difference === 0 ? "text-emerald-700" : "text-amber-700")}>
-                        {difference === 0 ? (lines.length ? "Balanceado" : "Informe os saldos") : `Diferença: ${formatMoney(Math.abs(difference))} (${difference > 0 ? "devedores maiores" : "credores maiores"})`}
+                        {difference === 0 ? (lines.length ? "Balanceado" : "Informe os saldos") : <>Diferença: <Money>{formatMoney(Math.abs(difference))}</Money> ({difference > 0 ? "devedores maiores" : "credores maiores"})</>}
                     </span>
                     {difference !== 0 && (
                         <label className="text-sm flex items-center gap-2">

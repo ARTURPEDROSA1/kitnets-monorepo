@@ -295,7 +295,7 @@ export function ColumnHeaders<T>({ columns: allColumns, ctl, leading, trailing, 
                         </button>
                         {c.headerExtra}
                         {sums.has(c.key) && (
-                            <span className="block mt-0.5 text-[11px] normal-case tracking-normal font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums" title="Soma das linhas filtradas">
+                            <span className={cn("block mt-0.5 text-[11px] normal-case tracking-normal font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums", !c.formatSum && "privacy-money")} title="Soma das linhas filtradas">
                                 {(c.formatSum ?? formatBRL)(sums.get(c.key)!)}
                             </span>
                         )}
@@ -324,7 +324,8 @@ export function FilterChips<T>({ columns, ctl }: { columns: ColumnDef<T>[]; ctl:
             <Filter className="w-3.5 h-3.5 text-muted-foreground" />
             {columns.filter(c => ctl.isActive(c.key)).map(c => (
                 <span key={c.key} className="inline-flex items-center gap-1 rounded-full border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 px-2 py-0.5">
-                    {describe(c, ctl.filters[c.key])}
+                    {/* the bounds typed for an R$ column (number, summed in R$) are amounts too */}
+                    <span className={cn(c.kind === "number" && c.sum !== false && !c.formatSum && "privacy-money")}>{describe(c, ctl.filters[c.key])}</span>
                     <button type="button" onClick={() => ctl.clearColumn(c.key)} className="hover:text-foreground" title="Remover filtro"><X className="w-3 h-3" /></button>
                 </span>
             ))}
