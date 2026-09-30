@@ -5,19 +5,31 @@ import { MinimumWageData } from "@/lib/minimum-wage";
 import { MinimumWageTable } from "./MinimumWageTable";
 import { MinimumWageHeatmap } from "./MinimumWageHeatmap";
 import { MinimumWageChart } from "./MinimumWageChart";
-import { IndexDateFilter } from "../IndexDateFilter";
+import { PeriodSelector } from "../PeriodSelector";
+import { useIndexPeriod } from "../useIndexPeriod";
+import { useLeadGate } from "../useLeadGate";
+import { DEFAULT_YEARLY_PERIOD, YEARLY_PRESETS, filterByRange, formatRangeLabel } from "@/lib/index-period";
 
 interface Props {
+    /** the whole series, newest first */
     data: MinimumWageData[];
     latest: MinimumWageData | null;
-    startDate: string;
-    endDate: string;
     nextAdjustment?: MinimumWageData | null;
-    /** correction calculator, rendered between the cards and the filter */
+    /** correction calculator, rendered between the cards and the history */
     calculator?: React.ReactNode;
 }
 
-export function MinimumWageDashboardWrapper({ data, latest, startDate, endDate, nextAdjustment, calculator }: Props) {
+export function MinimumWageDashboardWrapper({ data: allData, latest, nextAdjustment, calculator }: Props) {
+    // The period buttons of the chart slice the series for the chart, the heatmap, the table and the
+    // "acumulado no período" card; the presets count years, one adjustment a year.
+    const { earliest, newest } = useMemo(() => {
+        const dates = allData.map((d) => d.reference_date).sort();
+        return { earliest: dates[0] ?? "", newest: dates[dates.length - 1] ?? "" };
+    }, [allData]);
+    const { period, custom, range, redundant, select, setCustom } = useIndexPeriod(earliest, newest, YEARLY_PRESETS, DEFAULT_YEARLY_PERIOD);
+    const { guard, modal } = useLeadGate();
+    const data = useMemo(() => filterByRange(allData, range), [allData, range]); // still newest first
+
     // 1. Calculate Accumulated in Period
     // Formula: (LastValue / FirstValue - 1) * 100
     // Data is sorted DESC (newest first).
@@ -95,8 +107,8 @@ export function MinimumWageDashboardWrapper({ data, latest, startDate, endDate, 
                         <div className="text-2xl md:text-3xl font-bold text-primary">
                             {accumulatedPeriod !== null ? `+${accumulatedPeriod.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%` : '--'}
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1 truncate" title={`${startDate} a ${endDate}`}>
-                            De {new Date(startDate).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit', timeZone: 'UTC' })} até {new Date(endDate).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit', timeZone: 'UTC' })}
+                        <p className="text-xs text-muted-foreground mt-1 truncate" title={`${range.start} a ${range.end}`}>
+                            {formatRangeLabel(range)}
                         </p>
                     </div>
                 </div>
@@ -145,26 +157,33 @@ export function MinimumWageDashboardWrapper({ data, latest, startDate, endDate, 
             {/* Correction calculator: same position as on every index page (after the cards, before the filter) */}
             {calculator && <div className="md:col-span-3 min-w-0">{calculator}</div>}
 
-            {/* Filter */}
-            <div className="md:col-span-3 min-w-0">
-                <IndexDateFilter
-                    defaultStartDate={startDate}
-                    defaultEndDate={endDate}
-                />
-            </div>
-
-            {/* Chart */}
+            {/* Chart, with the period buttons that scope the heatmap and the table too */}
             <div className="md:col-span-3 min-w-0">
                 <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
-                    <div className="flex flex-col space-y-1.5 p-3 md:p-6">
-                        <h3 className="text-lg md:text-2xl font-semibold leading-none tracking-tight">Histórico de Reajuste</h3>
-                        <p className="text-xs md:text-sm text-muted-foreground">Evolução do valor nominal e percentual de reajuste.</p>
+                    <div className="flex flex-col gap-3 p-3 md:flex-row md:items-start md:justify-between md:p-6">
+                        <div className="space-y-1.5">
+                            <h3 className="text-lg md:text-2xl font-semibold leading-none tracking-tight">Histórico de Reajuste</h3>
+                            <p className="text-xs md:text-sm text-muted-foreground">Evolução do valor nominal e percentual de reajuste.</p>
+                            <p className="text-xs text-muted-foreground">{formatRangeLabel(range)} · {data.length} {data.length === 1 ? "reajuste" : "reajustes"}</p>
+                        </div>
+                        {allData.length > 0 && (
+                            <PeriodSelector
+                                presets={YEARLY_PRESETS}
+                                value={period}
+                                onSelect={(key) => guard(() => select(key))}
+                                custom={custom}
+                                onCustomChange={setCustom}
+                                redundant={redundant}
+                                bounds={{ start: earliest, end: newest }}
+                            />
+                        )}
                     </div>
                     <div className="p-3 md:p-6 pt-0">
                         <MinimumWageChart data={data} />
                     </div>
                 </div>
             </div>
+            {modal}
 
             {/* Heatmap */}
             <div className="md:col-span-3 min-w-0">

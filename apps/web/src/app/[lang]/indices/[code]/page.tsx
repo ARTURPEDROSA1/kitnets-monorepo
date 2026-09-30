@@ -4,10 +4,7 @@ import { notFound } from 'next/navigation';
 import { getIndexMetadata, getIndexValuesByDateRange, getAllIndexes } from '@/lib/indexes';
 import { getFipeZapData } from '@/lib/fipezap';
 import { getDictionary } from '../../../../dictionaries';
-import { IndexChartLazy } from '@/components/indices/IndexChartLazy';
-import { IndexHeatmapLazy } from '@/components/indices/IndexHeatmapLazy';
-import { IndexDateFilterLazy } from '@/components/indices/IndexDateFilterLazy';
-import { IndexHistoryTableLazy } from '@/components/indices/IndexHistoryTableLazy';
+import { IndexHistoryDashboardLazy } from '@/components/indices/IndexHistoryDashboardLazy';
 import { IPCACalculatorLazy } from '@/components/indices/IPCACalculatorLazy';
 import { FipeZapCalculator } from '@/components/indices/FipeZap/FipeZapCalculator';
 import { CALCULATOR_INDEXES } from '@/lib/index-calculator';
@@ -134,12 +131,13 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
 
 export default async function IndexPage({ params, searchParams }: Props) {
     const { code: codeParam, lang } = await params;
-    const { startDate, endDate, type, bedrooms } = await searchParams;
+    const { type, bedrooms } = await searchParams;
     const code = codeParam.toUpperCase();
 
-    // Default dates logic applied to all indexes
-    const defaultStartDate = '2021-01-01';
-    const defaultEndDate = new Date().toISOString().split('T')[0];
+    // The whole series is loaded once; the period buttons of the history slice it in the browser,
+    // so the URL carries no dates (these public pages stay free of query-string variants).
+    const seriesStart = '1900-01-01';
+    const todayStr = new Date().toISOString().split('T')[0];
 
     const dict = getDictionary(lang as "pt" | "en" | "es");
     const indices = dict.indices ?? {};
@@ -152,11 +150,8 @@ export default async function IndexPage({ params, searchParams }: Props) {
     // The index code is ASCII ("REAJUSTE-SALARIO-MINIMO"); the heading needs the real spelling.
     const minWageTitle = indexContent?.title ?? ({ pt: 'Reajuste do Salário Mínimo', en: 'Minimum Wage Adjustment', es: 'Reajuste del Salario Mínimo' } as Record<string, string>)[lang] ?? 'Reajuste do Salário Mínimo';
 
-    const startDateStr = typeof startDate === 'string' ? startDate : defaultStartDate;
-    const endDateStr = typeof endDate === 'string' ? endDate : defaultEndDate;
-
-    // Fetch history based on date range or default to recent
-    const history = await getIndexValuesByDateRange(metadata.id, startDateStr, endDateStr);
+    // Every published month, newest first
+    const history = await getIndexValuesByDateRange(metadata.id, seriesStart, todayStr);
     const latest = history[0];
 
     // Prepare Minimum Wage Data
@@ -167,8 +162,8 @@ export default async function IndexPage({ params, searchParams }: Props) {
     if (code === 'REAJUSTE-SALARIO-MINIMO') {
         const allMw = await getMinimumWageData(); // Sorted DESC
 
-        // Filter for dashboard table/charts
-        minWageData = allMw.filter(d => d.reference_date >= startDateStr && d.reference_date <= endDateStr);
+        // the dashboard's period buttons slice it
+        minWageData = allMw;
 
         const today = new Date().toISOString().split('T')[0];
         minWageLatest = allMw.find(d => !d.is_projection && d.reference_date <= today) || null;
@@ -438,11 +433,9 @@ export default async function IndexPage({ params, searchParams }: Props) {
                 <div className="md:col-span-3 min-w-0">
                     <FipeZapDashboardWrapper
                         lang={lang}
-                        startDate={startDateStr}
-                        endDate={endDateStr}
                         type={(type as string) || 'locacao'}
                         bedrooms={(bedrooms as string) || 'todos'}
-                        data={await getFipeZapData(startDateStr, endDateStr, (bedrooms as string) || 'todos')}
+                        data={await getFipeZapData('2000-01-01', todayStr, (bedrooms as string) || 'todos')}
                         calculator={<FipeZapCalculator initialType={(type as string) === 'venda' ? 'venda' : 'locacao'} initialBedrooms={bedrooms as string | undefined} />}
                     />
                 </div>
@@ -453,8 +446,6 @@ export default async function IndexPage({ params, searchParams }: Props) {
                     <MinimumWageDashboardWrapper
                         data={minWageData}
                         latest={minWageLatest}
-                        startDate={startDateStr}
-                        endDate={endDateStr}
                         nextAdjustment={minWageNext}
                         calculator={
                             <Suspense fallback={<div className="rounded-xl border bg-card shadow-sm p-6 h-48 animate-pulse" />}>
@@ -493,70 +484,20 @@ export default async function IndexPage({ params, searchParams }: Props) {
                     )}
 
 
-                    {/* Date Filter */}
-                    <div className="md:col-span-3 min-w-0">
-                        <h3 className="text-lg md:text-xl font-semibold text-foreground mb-3">
-                            {t.filterHistory} {code !== 'FIPEZAP' ? `do ${code}` : ''}
-                        </h3>
-                        <Suspense fallback={<div className="bg-card border rounded-xl p-4 shadow-sm mb-6 h-20 animate-pulse" />}>
-                            <IndexDateFilterLazy
-                                defaultStartDate={defaultStartDate}
-                                defaultEndDate={defaultEndDate}
-                            />
-                        </Suspense>
-                    </div>
-
-                    {/* Chart Section */}
-                    <div id="grafico" className="md:col-span-3 min-w-0 scroll-mt-20">
-                        <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
-                            <div className="flex flex-col space-y-1.5 p-3 md:p-6">
-                                <h3 className="text-lg md:text-2xl font-semibold leading-none tracking-tight">{t.chartTitle}</h3>
-                                <p className="text-xs md:text-sm text-muted-foreground">{t.chartSubtitle}</p>
-                            </div>
-                            <div className="p-3 md:p-6 pt-0">
-                                <Suspense fallback={<div className="h-[250px] md:h-[350px] w-full bg-muted/20 animate-pulse rounded-lg" />}>
-                                    <IndexChartLazy data={history} indexCode={code} />
-                                </Suspense>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Heatmap Section */}
-                    <div id="mapa-calor" className="md:col-span-3 min-w-0 scroll-mt-20">
-                        <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
-                            <div className="flex flex-col space-y-1.5 p-3 md:p-6">
-                                <h3 className="text-lg md:text-2xl font-semibold leading-none tracking-tight">{t.heatmapTitle}</h3>
-                                <p className="text-xs md:text-sm text-muted-foreground">{t.heatmapSubtitle}</p>
-                            </div>
-                            <div className="p-3 md:p-6 pt-0">
-                                <Suspense fallback={<div className="h-[300px] w-full bg-muted/20 animate-pulse rounded-lg" />}>
-                                    <IndexHeatmapLazy data={history} />
-                                </Suspense>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Table Section */}
-                    <div id="tabela" className="md:col-span-3 min-w-0 scroll-mt-20">
-                        <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
-                            <div className="flex flex-col space-y-1.5 p-3 md:p-6">
-                                <h3 className="text-lg md:text-2xl font-semibold leading-none tracking-tight">{t.tableTitle}</h3>
-                                <p className="text-xs md:text-sm text-muted-foreground">{t.tableSubtitle}</p>
-                            </div>
-                            <div className="p-3 md:p-6 pt-0">
-                                <Suspense fallback={
-                                    <div className="w-full space-y-2">
-                                        {Array.from({ length: 6 }).map((_, i) => (
-                                            <div key={i} className="h-10 w-full bg-muted/20 animate-pulse rounded" />
-                                        ))}
-                                    </div>
-                                }>
-                                    <IndexHistoryTableLazy data={history} />
-                                </Suspense>
-                            </div>
-                            <p className="text-xs text-center text-muted-foreground pb-3 md:hidden">{t.swipeHint}</p>
-                        </div>
-                    </div>
+                    {/* History: the chart with its period buttons, the heatmap and the table, one slice for all three */}
+                    <IndexHistoryDashboardLazy
+                        data={history}
+                        indexCode={code}
+                        labels={{
+                            chartTitle: t.chartTitle,
+                            chartSubtitle: t.chartSubtitle,
+                            heatmapTitle: t.heatmapTitle,
+                            heatmapSubtitle: t.heatmapSubtitle,
+                            tableTitle: t.tableTitle,
+                            tableSubtitle: t.tableSubtitle,
+                            swipeHint: t.swipeHint,
+                        }}
+                    />
 
                     {/* IGPM Calendar */}
                     {code === 'IGPM' && (
