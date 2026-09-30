@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@kitnets/ui";
 import { SignOutButton, useAuth } from "@clerk/nextjs";
-import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Rocket, HardHat, Briefcase, Building2, User, Users, UserCheck, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart, ArrowLeftRight, FileText, AlertCircle, Plus, Minus, Gem, X, Zap, Building, ChevronsLeft, ChevronsRight, Landmark, Droplets, MapPinned, BookOpenCheck, BookText, NotebookPen, CalendarCheck, Eye, EyeOff, DollarSign, ArrowLeft, LogOut, type LucideIcon } from "lucide-react";
+import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Rocket, HardHat, Briefcase, Building2, User, Users, UserCheck, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart, ArrowLeftRight, FileText, AlertCircle, Plus, Minus, Gem, X, Zap, Building, ChevronsLeft, ChevronsRight, Landmark, Droplets, MapPinned, BookOpenCheck, BookText, NotebookPen, CalendarCheck, Eye, EyeOff, DollarSign, ArrowLeft, LogOut, LogIn, type LucideIcon } from "lucide-react";
 import { PropertyFilters } from "./PropertyFilters";
 
 import { useTheme } from "next-themes";
@@ -245,6 +245,9 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                 </button>
                 <ul id={listId} className="nav-group-items space-y-1 pt-1">
                     {group.items.map(renderItem)}
+                    {group.key === 'configuracoes' && toolsInGroup && (
+                        <li className="space-y-2 px-2 pt-2">{toolRows}</li>
+                    )}
                 </ul>
             </li>
         );
@@ -263,7 +266,8 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
     ];
 
     const loginItems: NavItem[] = [
-        { label: dict.menu.owner as string, path: '/login/proprietario', icon: KeyRound, match: 'exact' },
+        // Public pages: the sign-in entry reads "Login" (the account is the owner's)
+        { label: (dict.menu.login as string | undefined) ?? "Login", path: '/login/proprietario', icon: LogIn, match: 'exact' },
         ...(FLAGS.SHOW_LOGIN_LINKS ? [
             { label: dict.menu.brokers as string, path: '/login/corretor', icon: Briefcase, match: 'exact' as const },
             { label: dict.menu.agencies as string, path: '/login/imobiliaria', icon: Building2, match: 'exact' as const },
@@ -351,6 +355,84 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
 
     const toolButton = "h-9 w-9 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-accent transition-colors";
     const toolButtonOn = "h-9 w-9 rounded-lg border border-primary/40 bg-accent text-foreground hover:bg-accent/80 transition-colors";
+
+    // Language, theme, the compact-rail toggle and, while signed in, the privacy toggles. In the
+    // signed-in main menu they live inside the Configurações group; on the public pages and in the
+    // calculators / indicators sub-menus (where the groups are not shown) they stay in the footer so
+    // they remain reachable. Icons only; the tooltip says what each one does. Stack vertically on the rail.
+    const toolsInGroup = Boolean(isSignedIn && FLAGS.SHOW_DASHBOARD_LINKS && sidebarView === 'main');
+    const toolRows = (
+        <>
+            <div className="sidebar-footer-row flex items-center gap-2">
+                <div className="sidebar-lang flex-1 min-w-0">
+                    <select
+                        value={lang}
+                        onChange={(e) => handleLanguageChange(e.target.value)}
+                        aria-label="Selecionar idioma"
+                        className="w-full bg-background border border-border text-foreground text-xs rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2"
+                    >
+                        {languages.map((l) => (
+                            <option key={l.code} value={l.code}>{l.label}</option>
+                        ))}
+                    </select>
+                </div>
+                <div className="flex items-center shrink-0">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                        className={toolButton}
+                        title={theme === 'dark' ? "Mudar para modo claro" : "Mudar para modo escuro"}
+                        aria-label={theme === 'dark' ? "Mudar para modo claro" : "Mudar para modo escuro"}
+                    >
+                        {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+                    </Button>
+                </div>
+            </div>
+            <div className="sidebar-tools flex items-center gap-2">
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    type="button"
+                    onClick={toggleCollapsed}
+                    aria-pressed={collapsed}
+                    title={collapsed ? dict.menu.showMore : dict.menu.showLess}
+                    aria-label={collapsed ? dict.menu.showMore : dict.menu.showLess}
+                    className={`hidden sm:inline-flex ${toolButton}`}
+                >
+                    {collapsed ? <ChevronsRight className="h-5 w-5" /> : <ChevronsLeft className="h-5 w-5" />}
+                </Button>
+                {isSignedIn && (
+                    <>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            type="button"
+                            onClick={toggleSensitive}
+                            aria-pressed={hideSensitive}
+                            title={hideSensitive ? "Mostrar dados sensíveis (endereços, CPF/CNPJ, medidores)" : "Ocultar dados sensíveis (endereços, CPF/CNPJ, medidores) em todas as páginas"}
+                            aria-label={hideSensitive ? "Mostrar dados sensíveis" : "Ocultar dados sensíveis"}
+                            className={hideSensitive ? toolButtonOn : toolButton}
+                        >
+                            {hideSensitive ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            type="button"
+                            onClick={toggleMoney}
+                            aria-pressed={hideMoney}
+                            title={hideMoney ? "Mostrar valores em R$" : "Ocultar valores em R$ em todas as páginas"}
+                            aria-label={hideMoney ? "Mostrar valores em R$" : "Ocultar valores em R$"}
+                            className={hideMoney ? toolButtonOn : toolButton}
+                        >
+                            <DollarSign className={`h-5 w-5 ${hideMoney ? 'opacity-40' : ''}`} />
+                        </Button>
+                    </>
+                )}
+            </div>
+        </>
+    );
 
     return (
         <>
@@ -486,77 +568,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
 
 
                     <div className="mt-auto space-y-2 pt-4 border-t border-border w-full px-2 pb-2">
-                        <div className="sidebar-footer-row flex items-center gap-2">
-                            <div className="sidebar-lang flex-1 min-w-0">
-                                <select
-                                    value={lang}
-                                    onChange={(e) => handleLanguageChange(e.target.value)}
-                                    aria-label="Selecionar idioma"
-                                    className="w-full bg-background border border-border text-foreground text-xs rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2"
-                                >
-                                    {languages.map((l) => (
-                                        <option key={l.code} value={l.code}>{l.label}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="flex items-center shrink-0">
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                                    className={toolButton}
-                                    title={theme === 'dark' ? "Mudar para modo claro" : "Mudar para modo escuro"}
-                                    aria-label={theme === 'dark' ? "Mudar para modo claro" : "Mudar para modo escuro"}
-                                >
-                                    {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-                                </Button>
-                            </div>
-                        </div>
-
-                        {/* Tool row: compact rail toggle plus, while signed in, the global privacy toggles.
-                            Icons only; the tooltip says what each one does. Stacks vertically on the rail. */}
-                        <div className="sidebar-tools flex items-center gap-2">
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                type="button"
-                                onClick={toggleCollapsed}
-                                aria-pressed={collapsed}
-                                title={collapsed ? dict.menu.showMore : dict.menu.showLess}
-                                aria-label={collapsed ? dict.menu.showMore : dict.menu.showLess}
-                                className={`hidden sm:inline-flex ${toolButton}`}
-                            >
-                                {collapsed ? <ChevronsRight className="h-5 w-5" /> : <ChevronsLeft className="h-5 w-5" />}
-                            </Button>
-                            {isSignedIn && (
-                                <>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        type="button"
-                                        onClick={toggleSensitive}
-                                        aria-pressed={hideSensitive}
-                                        title={hideSensitive ? "Mostrar dados sensíveis (endereços, CPF/CNPJ, medidores)" : "Ocultar dados sensíveis (endereços, CPF/CNPJ, medidores) em todas as páginas"}
-                                        aria-label={hideSensitive ? "Mostrar dados sensíveis" : "Ocultar dados sensíveis"}
-                                        className={hideSensitive ? toolButtonOn : toolButton}
-                                    >
-                                        {hideSensitive ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        type="button"
-                                        onClick={toggleMoney}
-                                        aria-pressed={hideMoney}
-                                        title={hideMoney ? "Mostrar valores em R$" : "Ocultar valores em R$ em todas as páginas"}
-                                        aria-label={hideMoney ? "Mostrar valores em R$" : "Ocultar valores em R$"}
-                                        className={hideMoney ? toolButtonOn : toolButton}
-                                    >
-                                        <DollarSign className={`h-5 w-5 ${hideMoney ? 'opacity-40' : ''}`} />
-                                    </Button>
-                                </>
-                            )}
-                        </div>
+                        {!toolsInGroup && toolRows}
 
                         {isSignedIn && FLAGS.SHOW_DASHBOARD_LINKS && (
                             <SignOutButton>
