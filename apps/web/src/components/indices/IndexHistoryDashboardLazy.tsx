@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import type { IndexValue } from "@/lib/indexes";
+import type { ComparisonSeries } from "@/lib/index-compare";
 import type { HistoryLabels } from "./IndexHistoryDashboard";
 
 const Skeleton = () => (
@@ -28,7 +29,7 @@ interface Props {
     data: IndexValue[];
     indexCode: string;
     labels: HistoryLabels;
-    leadGate?: boolean;
+    compare?: ComparisonSeries[];
 }
 
 export function IndexHistoryDashboardLazy(props: Props) {

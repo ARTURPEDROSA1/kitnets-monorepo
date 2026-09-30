@@ -4,20 +4,20 @@
  * The history of the FipeZAP page: the trend chart with the series switch (Locação · Venda · Yield),
  * the bedroom bucket and the period buttons, then the heatmap and the table, all showing the same
  * slice. The series and the period change in the browser; the bedroom bucket is another database
- * series, so it goes through the URL (?bedrooms=) and the page fetches it again. The first change
- * asks the visitor for a contact (useLeadGate), as the old filter form did.
+ * series, so it goes through the URL (?bedrooms=) and the page fetches it again.
  */
 import { useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { FipeZapContext, FipeZapDataPoint } from "@/lib/fipezap";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { MAIN_SERIES_COLOR, type ComparisonSeries } from "@/lib/index-compare";
 import { DEFAULT_MONTHLY_PERIOD, MONTHLY_PRESETS, filterByRange, formatRangeLabel, summarizeSeries } from "@/lib/index-period";
+import { CompareToggle } from "../CompareToggle";
 import { IndexTrendChart, formatPercent, type TrendPoint } from "../IndexTrendChart";
 import { PeriodSelector } from "../PeriodSelector";
 import { PeriodStats } from "../PeriodStats";
 import { useIndexPeriod } from "../useIndexPeriod";
-import { useLeadGate } from "../useLeadGate";
 import { FipeZapHeatmap } from "./FipeZapHeatmap";
 import { FipeZapTable } from "./FipeZapTable";
 
@@ -48,13 +48,14 @@ interface Props {
     initialType: string;
     /** the bucket from the URL (?bedrooms=) */
     bedrooms: string;
+    /** the indexes the chart can overlay ("Comparar com") */
+    compare?: ComparisonSeries[];
 }
 
-export function FipeZapHistoryDashboard({ data, initialType, bedrooms }: Props) {
+export function FipeZapHistoryDashboard({ data, initialType, bedrooms, compare = [] }: Props) {
     const router = useRouter();
     const pathname = usePathname();
     const [series, setSeries] = useState<Series>(isSeries(initialType) ? initialType : "locacao");
-    const { guard, modal } = useLeadGate();
 
     // the period helpers key on reference_date
     const rows = useMemo(
@@ -77,16 +78,29 @@ export function FipeZapHistoryDashboard({ data, initialType, bedrooms }: Props) 
     })), [slice, kind]);
     const summary = useMemo(() => summarizeSeries(points.map((p) => ({ date: p.date, value: p.value })), kind), [points, kind]);
 
+    // "Comparar com": the chosen indexes, cut to the same period as the chart
+    const [comparing, setComparing] = useState<ReadonlySet<string>>(() => new Set());
+    const toggleCompare = (code: string) => setComparing((prev) => {
+        const next = new Set(prev);
+        if (next.has(code)) next.delete(code);
+        else next.add(code);
+        return next;
+    });
+    const overlays = useMemo(
+        () => compare.filter((c) => comparing.has(c.code)).map((c) => ({ ...c, points: c.points.filter((p) => p.date >= range.start && p.date <= range.end) })),
+        [compare, comparing, range],
+    );
+
     const current = SERIES.find((s) => s.value === series)!;
     const bucket = BEDROOMS.find((b) => b.value === bedrooms) ?? BEDROOMS[0];
 
-    const changeBedrooms = (next: string) => guard(() => {
+    const changeBedrooms = (next: string) => {
         const params = new URLSearchParams();
         if (series !== "locacao") params.set("type", series);
         if (next !== "todos") params.set("bedrooms", next);
         const query = params.toString();
         router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
-    });
+    };
 
     return (
         <div className="grid gap-6">
@@ -98,15 +112,18 @@ export function FipeZapHistoryDashboard({ data, initialType, bedrooms }: Props) 
                         <p className="text-xs text-muted-foreground">{rows.length > 0 ? `${formatRangeLabel(range)} · ${slice.length} ${slice.length === 1 ? "mês" : "meses"}` : "Sem dados"}</p>
                     </div>
                     {rows.length > 0 && (
-                        <PeriodSelector
-                            presets={MONTHLY_PRESETS}
-                            value={period}
-                            onSelect={(key) => guard(() => select(key))}
-                            custom={custom}
-                            onCustomChange={setCustom}
-                            redundant={redundant}
-                            bounds={{ start: earliest, end: latest }}
-                        />
+                        <div className="flex flex-col items-start gap-2 sm:items-end">
+                            <PeriodSelector
+                                presets={MONTHLY_PRESETS}
+                                value={period}
+                                onSelect={select}
+                                custom={custom}
+                                onCustomChange={setCustom}
+                                redundant={redundant}
+                                bounds={{ start: earliest, end: latest }}
+                            />
+                            <CompareToggle options={compare} active={comparing} onToggle={toggleCompare} mainLabel={`FipeZAP ${current.label}`} mainColor={MAIN_SERIES_COLOR} />
+                        </div>
                     )}
                 </div>
                 <div className="space-y-4 p-3 pt-0 md:p-6 md:pt-0">
@@ -116,7 +133,7 @@ export function FipeZapHistoryDashboard({ data, initialType, bedrooms }: Props) 
                                 <button
                                     key={s.value}
                                     type="button"
-                                    onClick={() => guard(() => setSeries(s.value))}
+                                    onClick={() => setSeries(s.value)}
                                     aria-pressed={series === s.value}
                                     className={cn("rounded-md px-3 py-1.5 text-xs font-semibold transition-colors", series === s.value ? "border border-border bg-background text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground")}
                                 >
@@ -137,7 +154,7 @@ export function FipeZapHistoryDashboard({ data, initialType, bedrooms }: Props) 
                         </label>
                     </div>
                     <PeriodStats summary={summary} format={formatPercent} kind={kind} averageLabel={kind === "level" ? "Yield médio" : "Média mensal"} />
-                    <IndexTrendChart points={points} name={`FipeZAP ${current.label}`} />
+                    <IndexTrendChart points={points} name={`FipeZAP ${current.label}`} compare={overlays} />
                 </div>
             </div>
 
@@ -148,8 +165,6 @@ export function FipeZapHistoryDashboard({ data, initialType, bedrooms }: Props) 
             <div id="table" className="min-w-0">
                 <FipeZapTable data={slice} />
             </div>
-
-            {modal}
         </div>
     );
 }

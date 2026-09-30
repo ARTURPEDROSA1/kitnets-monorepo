@@ -8,6 +8,7 @@ import { IndexHistoryDashboardLazy } from '@/components/indices/IndexHistoryDash
 import { IPCACalculatorLazy } from '@/components/indices/IPCACalculatorLazy';
 import { FipeZapCalculator } from '@/components/indices/FipeZap/FipeZapCalculator';
 import { CALCULATOR_INDEXES } from '@/lib/index-calculator';
+import { COMPARE_COLORS, COMPARE_LABELS, MAIN_SERIES_COLOR, compareCodesFor, type ComparisonSeries } from '@/lib/index-compare';
 import { IPCAAlertFormLazy } from '@/components/indices/IPCAAlertFormLazy';
 import Link from 'next/link';
 import { ArrowLeft, MapPinned, Home, CalendarDays, Hourglass } from 'lucide-react';
@@ -153,6 +154,19 @@ export default async function IndexPage({ params, searchParams }: Props) {
     // Every published month, newest first
     const history = await getIndexValuesByDateRange(metadata.id, seriesStart, todayStr);
     const latest = history[0];
+
+    // "Comparar com" on the trend chart: the other indexes this page can overlay (lib/index-compare.ts)
+    const compare: ComparisonSeries[] = (await Promise.all(compareCodesFor(code).map(async (other) => {
+        const meta = await getIndexMetadata(other);
+        if (!meta) return null;
+        const values = await getIndexValuesByDateRange(meta.id, seriesStart, todayStr);
+        return {
+            code: other,
+            label: COMPARE_LABELS[other] ?? meta.code,
+            color: COMPARE_COLORS[other] ?? MAIN_SERIES_COLOR,
+            points: values.map(v => ({ date: v.reference_date, value: Number(v.value_percent) })),
+        };
+    }))).filter((c): c is ComparisonSeries => c !== null);
 
     // Prepare Minimum Wage Data
     let minWageData: MinimumWageData[] = [];
@@ -435,6 +449,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
                         lang={lang}
                         type={(type as string) || 'locacao'}
                         bedrooms={(bedrooms as string) || 'todos'}
+                        compare={compare}
                         data={await getFipeZapData('2000-01-01', todayStr, (bedrooms as string) || 'todos')}
                         calculator={<FipeZapCalculator initialType={(type as string) === 'venda' ? 'venda' : 'locacao'} initialBedrooms={bedrooms as string | undefined} />}
                     />
@@ -488,6 +503,7 @@ export default async function IndexPage({ params, searchParams }: Props) {
                     <IndexHistoryDashboardLazy
                         data={history}
                         indexCode={code}
+                        compare={compare}
                         labels={{
                             chartTitle: t.chartTitle,
                             chartSubtitle: t.chartSubtitle,
