@@ -54,20 +54,20 @@ export function MinimumWageChart({ data }: Props) {
                             </defs>
                             <XAxis
                                 dataKey="displayDate"
-                                stroke="#888888"
+                                stroke="hsl(var(--muted-foreground))"
                                 fontSize={12}
                                 tickLine={false}
                                 axisLine={false}
                                 minTickGap={30}
                             />
                             <YAxis
-                                stroke="#888888"
+                                stroke="hsl(var(--muted-foreground))"
                                 fontSize={12}
                                 tickLine={false}
                                 axisLine={false}
                                 tickFormatter={(value) => `R$${value}`}
                             />
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                            <CartesianGrid vertical={false} stroke="hsl(var(--border))" strokeOpacity={0.7} />
                             <Tooltip content={<CustomTooltip />} />
                             <Area
                                 type="monotone"
@@ -82,20 +82,20 @@ export function MinimumWageChart({ data }: Props) {
                         <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                             <XAxis
                                 dataKey="displayDate"
-                                stroke="#888888"
+                                stroke="hsl(var(--muted-foreground))"
                                 fontSize={12}
                                 tickLine={false}
                                 axisLine={false}
                                 minTickGap={30}
                             />
                             <YAxis
-                                stroke="#888888"
+                                stroke="hsl(var(--muted-foreground))"
                                 fontSize={12}
                                 tickLine={false}
                                 axisLine={false}
                                 tickFormatter={(value) => `${value}%`}
                             />
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                            <CartesianGrid vertical={false} stroke="hsl(var(--border))" strokeOpacity={0.7} />
                             <Tooltip content={<CustomTooltip />} />
                             <Bar
                                 dataKey="variation"
