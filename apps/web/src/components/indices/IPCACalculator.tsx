@@ -2,6 +2,8 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { IndexValueForCalc } from "@/lib/indexes";
+import { DateInput } from "@/components/ui/DateInput";
+import { addMonths, correctByIndex, firstDayOfMonth, formatDateBR, formatMonthBR, formatMonthsCount, lastDayOfMonth, normalizeCalcDate, type CorrectionResult } from "@/lib/index-correction";
 import {
     Line,
     XAxis,
@@ -52,106 +54,10 @@ function parseBRLInput(raw: string): number {
     return parseFloat(cleaned.replace(",", ".")) || 0;
 }
 
-function formatMonthLabel(monthStr: string): string {
-    const [y, m] = monthStr.split("-");
-    return `${m}/${y}`;
-}
+/** ISO dates compare as strings */
+const laterOf = (a: string, b: string) => (a < b ? b : a);
 
-function addMonths(monthStr: string, n: number): string {
-    const [y, m] = monthStr.split("-").map(Number);
-    const totalMonths = y * 12 + (m - 1) + n;
-    const newYear = Math.floor(totalMonths / 12);
-    const newMonth = (totalMonths % 12) + 1;
-    return `${newYear}-${String(newMonth).padStart(2, "0")}`;
-}
-
-// ────────────────────────────────────────────
-// Calculation
-// ────────────────────────────────────────────
-
-interface CalculationResult {
-    correctedValue: number;
-    totalCorrection: number;
-    accumulatedPercent: number;
-    numMonths: number;
-    startMonth: string;
-    endMonth: string;
-    monthlyBreakdown: MonthRow[];
-}
-
-interface MonthRow {
-    month: string;
-    ipcaPercent: number;
-    factor: number;
-    valueAtMonth: number;
-    deltaMonth: number;
-}
-
-function calculate(
-    originalValue: number,
-    startMonth: string,
-    endMonth: string,
-    data: IndexValueForCalc[]
-): CalculationResult | { error: string } {
-    // Build a map for fast lookup
-    const dataMap = new Map<string, number>();
-    for (const d of data) {
-        dataMap.set(d.month, d.value);
-    }
-
-    // Apply IPCA from month after startMonth through endMonth (inclusive)
-    // i.e., exclusive of startMonth, inclusive of endMonth
-    const appliedStart = addMonths(startMonth, 1);
-
-    const breakdown: MonthRow[] = [];
-    let current = appliedStart;
-    let prevValue = originalValue;
-
-    while (current <= endMonth) {
-        const ipca = dataMap.get(current);
-        if (ipca === undefined) {
-            return { error: `Dados indisponíveis para ${formatMonthLabel(current)}. Ajuste o período.` };
-        }
-
-        const factor = 1 + ipca / 100;
-        const newValue = prevValue * factor;
-        const delta = newValue - prevValue;
-
-        breakdown.push({
-            month: current,
-            ipcaPercent: ipca,
-            factor,
-            valueAtMonth: newValue,
-            deltaMonth: delta,
-        });
-
-        prevValue = newValue;
-        current = addMonths(current, 1);
-    }
-
-    if (breakdown.length === 0) {
-        return {
-            correctedValue: originalValue,
-            totalCorrection: 0,
-            accumulatedPercent: 0,
-            numMonths: 0,
-            startMonth,
-            endMonth,
-            monthlyBreakdown: [],
-        };
-    }
-
-    const finalValue = breakdown[breakdown.length - 1].valueAtMonth;
-    return {
-        correctedValue: finalValue,
-        totalCorrection: finalValue - originalValue,
-        accumulatedPercent: ((finalValue / originalValue) - 1) * 100,
-        numMonths: breakdown.length,
-        startMonth,
-        endMonth,
-        monthlyBreakdown: breakdown,
-    };
-}
+const DATE_INPUT = "w-full h-11 px-3 rounded-lg border border-input bg-background text-sm ring-offset-background transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500";
 
 // ────────────────────────────────────────────
 // Component
@@ -161,19 +67,22 @@ export function IPCACalculator({ data, indexLabel = "IPCA", feminine = false }: 
     const pelo = feminine ? "pela" : "pelo";
     const artigo = feminine ? "a" : "o";
     const anchorId = `calculadora-${indexLabel.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-")}`;
-    // Boundaries from data
+    // Boundaries from data: the series is monthly, so the dates run from the first day of the
+    // earliest month to the last day of the latest one
     const earliestMonth = data.length > 0 ? data[0].month : "1995-01";
     const latestMonth = data.length > 0 ? data[data.length - 1].month : "2026-01";
+    const minDate = firstDayOfMonth(earliestMonth);
+    const maxDate = lastDayOfMonth(latestMonth);
 
-    // Default: 12 months ago
-    const defaultEnd = latestMonth;
-    const defaultStart = addMonths(latestMonth, -12);
+    // Default: the last twelve published months (a month's last day to the latest month's last day)
+    const defaultEnd = maxDate;
+    const defaultStart = laterOf(lastDayOfMonth(addMonths(latestMonth, -12)), minDate);
 
     // State
     const [rawValue, setRawValue] = useState("1.000,00");
-    const [startMonth, setStartMonth] = useState(defaultStart < earliestMonth ? earliestMonth : defaultStart);
-    const [endMonth, setEndMonth] = useState(defaultEnd);
-    const [result, setResult] = useState<CalculationResult | null>(null);
+    const [startDate, setStartDate] = useState(defaultStart);
+    const [endDate, setEndDate] = useState(defaultEnd);
+    const [result, setResult] = useState<CorrectionResult | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [valueError, setValueError] = useState<string | null>(null);
     const [tablePage, setTablePage] = useState(0);
@@ -183,11 +92,6 @@ export function IPCACalculator({ data, indexLabel = "IPCA", feminine = false }: 
     const [detailsOpen, setDetailsOpen] = useState(false);
 
     const ROWS_PER_PAGE = 25;
-
-    // Month options for select
-    const monthOptions = useMemo(() => {
-        return data.map(d => d.month);
-    }, [data]);
 
     // Currency input handler
     const handleValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -207,22 +111,14 @@ export function IPCACalculator({ data, indexLabel = "IPCA", feminine = false }: 
         }
     };
 
-    // Quick picks
+    // Quick picks: "this year" starts on the last day of the previous year, so January counts whole
     const quickPicks = useMemo(() => {
         const currentYear = new Date().getFullYear();
         return [
-            {
-                label: "Últimos 12 meses",
-                start: addMonths(latestMonth, -12) < earliestMonth ? earliestMonth : addMonths(latestMonth, -12),
-                end: latestMonth,
-            },
-            {
-                label: "Esse Ano",
-                start: `${currentYear}-01` < earliestMonth ? earliestMonth : `${currentYear}-01`,
-                end: latestMonth,
-            },
+            { label: "Últimos 12 meses", start: laterOf(lastDayOfMonth(addMonths(latestMonth, -12)), minDate), end: maxDate },
+            { label: "Esse Ano", start: laterOf(`${currentYear - 1}-12-31`, minDate), end: maxDate },
         ];
-    }, [earliestMonth, latestMonth]);
+    }, [latestMonth, minDate, maxDate]);
 
     // Calculate
     const handleCalculate = useCallback(() => {
@@ -235,7 +131,12 @@ export function IPCACalculator({ data, indexLabel = "IPCA", feminine = false }: 
         }
         setValueError(null);
 
-        if (endMonth <= startMonth) {
+        if (!startDate || !endDate) {
+            setError("Informe as duas datas (dd/mm/aaaa).");
+            setResult(null);
+            return;
+        }
+        if (endDate <= startDate) {
             setError("A data final deve ser posterior à data inicial.");
             setResult(null);
             return;
@@ -244,7 +145,7 @@ export function IPCACalculator({ data, indexLabel = "IPCA", feminine = false }: 
         setIsCalculating(true);
         // Use requestAnimationFrame to allow UI update before heavy calc
         requestAnimationFrame(() => {
-            const res = calculate(valor, startMonth, endMonth, data);
+            const res = correctByIndex(valor, startDate, endDate, data);
             if ("error" in res) {
                 setError(res.error);
                 setResult(null);
@@ -255,13 +156,13 @@ export function IPCACalculator({ data, indexLabel = "IPCA", feminine = false }: 
             }
             setIsCalculating(false);
         });
-    }, [rawValue, startMonth, endMonth, data]);
+    }, [rawValue, startDate, endDate, data]);
 
     // Clear
     const handleClear = () => {
         setRawValue("1.000,00");
-        setStartMonth(defaultStart < earliestMonth ? earliestMonth : defaultStart);
-        setEndMonth(defaultEnd);
+        setStartDate(defaultStart);
+        setEndDate(defaultEnd);
         setResult(null);
         setError(null);
         setValueError(null);
@@ -273,8 +174,8 @@ export function IPCACalculator({ data, indexLabel = "IPCA", feminine = false }: 
         const valor = parseBRLInput(rawValue);
         const url = new URL(window.location.href);
         url.searchParams.set("calcValor", String(valor));
-        url.searchParams.set("calcInicio", startMonth);
-        url.searchParams.set("calcFim", endMonth);
+        url.searchParams.set("calcInicio", startDate);
+        url.searchParams.set("calcFim", endDate);
         navigator.clipboard.writeText(url.toString());
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
@@ -285,17 +186,18 @@ export function IPCACalculator({ data, indexLabel = "IPCA", feminine = false }: 
         if (typeof window === "undefined") return;
         const params = new URLSearchParams(window.location.search);
         const v = params.get("calcValor");
-        const s = params.get("calcInicio");
-        const e = params.get("calcFim");
+        // links from before day precision carry months: they meant the month's last day
+        const s = normalizeCalcDate(params.get("calcInicio"));
+        const e = normalizeCalcDate(params.get("calcFim"));
         if (v && s && e) {
             const numVal = parseFloat(v);
             if (numVal > 0) {
                 setRawValue(formatBRL(numVal));
-                setStartMonth(s);
-                setEndMonth(e);
+                setStartDate(s);
+                setEndDate(e);
                 // Auto-calculate
                 setTimeout(() => {
-                    const res = calculate(numVal, s, e, data);
+                    const res = correctByIndex(numVal, s, e, data);
                     if (!("error" in res)) {
                         setResult(res);
                     }
@@ -307,15 +209,16 @@ export function IPCACalculator({ data, indexLabel = "IPCA", feminine = false }: 
 
     // Chart data
     const chartData = useMemo(() => {
-        if (!result || result.monthlyBreakdown.length === 0) return [];
+        if (!result || result.rows.length === 0) return [];
         const originalValue = parseBRLInput(rawValue);
         return [
-            { month: formatMonthLabel(result.startMonth), corrected: originalValue, original: originalValue },
-            ...result.monthlyBreakdown.map(row => ({
-                month: formatMonthLabel(row.month),
+            { month: formatDateBR(result.startDate), corrected: originalValue, original: originalValue },
+            ...result.rows.map((row, i) => ({
+                // a partial last month is labelled by the end date, a whole month by its name
+                month: i === result.rows.length - 1 && row.fraction < 1 ? formatDateBR(result.endDate) : formatMonthBR(row.month),
                 corrected: parseFloat(row.valueAtMonth.toFixed(2)),
                 original: originalValue,
-                ipca: row.ipcaPercent,
+                ipca: row.appliedPercent,
                 delta: parseFloat(row.deltaMonth.toFixed(2)),
             })),
         ];
@@ -323,13 +226,13 @@ export function IPCACalculator({ data, indexLabel = "IPCA", feminine = false }: 
 
     // Table pagination
     const totalPages = result
-        ? Math.ceil(result.monthlyBreakdown.length / ROWS_PER_PAGE)
+        ? Math.ceil(result.rows.length / ROWS_PER_PAGE)
         : 0;
 
     const paginatedRows = useMemo(() => {
         if (!result) return [];
         const start = tablePage * ROWS_PER_PAGE;
-        return result.monthlyBreakdown.slice(start, start + ROWS_PER_PAGE);
+        return result.rows.slice(start, start + ROWS_PER_PAGE);
     }, [result, tablePage]);
 
     return (
@@ -367,8 +270,8 @@ export function IPCACalculator({ data, indexLabel = "IPCA", feminine = false }: 
                                 key={qp.label}
                                 type="button"
                                 onClick={() => {
-                                    setStartMonth(qp.start);
-                                    setEndMonth(qp.end);
+                                    setStartDate(qp.start);
+                                    setEndDate(qp.end);
                                 }}
                                 className="px-3 py-1.5 text-xs font-medium rounded-full border border-border bg-background 
                                     hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700
@@ -425,20 +328,13 @@ export function IPCACalculator({ data, indexLabel = "IPCA", feminine = false }: 
                                 <CalendarRange className="h-3.5 w-3.5 text-emerald-600" />
                                 Data inicial
                             </label>
-                            <select
+                            <DateInput
                                 id="calc-start"
-                                value={startMonth}
-                                onChange={(e) => setStartMonth(e.target.value)}
-                                className="w-full h-11 px-3 rounded-lg border border-input bg-background text-sm
-                                    ring-offset-background transition-all cursor-pointer
-                                    focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500"
-                            >
-                                {monthOptions.map((m) => (
-                                    <option key={m} value={m}>
-                                        {formatMonthLabel(m)}
-                                    </option>
-                                ))}
-                            </select>
+                                value={startDate}
+                                onChange={setStartDate}
+                                variant="bare"
+                                className={DATE_INPUT}
+                            />
                         </div>
 
                         {/* Data final */}
@@ -450,20 +346,13 @@ export function IPCACalculator({ data, indexLabel = "IPCA", feminine = false }: 
                                 <CalendarRange className="h-3.5 w-3.5 text-emerald-600" />
                                 Data final
                             </label>
-                            <select
+                            <DateInput
                                 id="calc-end"
-                                value={endMonth}
-                                onChange={(e) => setEndMonth(e.target.value)}
-                                className="w-full h-11 px-3 rounded-lg border border-input bg-background text-sm
-                                    ring-offset-background transition-all cursor-pointer
-                                    focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500"
-                            >
-                                {monthOptions.map((m) => (
-                                    <option key={m} value={m}>
-                                        {formatMonthLabel(m)}
-                                    </option>
-                                ))}
-                            </select>
+                                value={endDate}
+                                onChange={setEndDate}
+                                variant="bare"
+                                className={DATE_INPUT}
+                            />
                         </div>
 
                         {/* Buttons */}
@@ -500,11 +389,11 @@ export function IPCACalculator({ data, indexLabel = "IPCA", feminine = false }: 
                     {/* Helper note */}
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
-                            <Info className="h-3 w-3" />
-                            A correção considera {artigo} {indexLabel} a partir do mês seguinte ao inicial até o mês final.
+                            <Info className="h-3 w-3 shrink-0" />
+                            Conta os dias corridos entre as datas; nos meses parciais {artigo} {indexLabel} entra pro rata die, com capitalização composta.
                         </span>
                         <span>
-                            {feminine ? "Última" : "Último"} {indexLabel} disponível: <strong>{formatMonthLabel(latestMonth)}</strong>
+                            {feminine ? "Última" : "Último"} {indexLabel} disponível: <strong>{formatMonthBR(latestMonth)}</strong> (datas de {formatDateBR(minDate)} a {formatDateBR(maxDate)})
                         </span>
                     </div>
 
@@ -532,7 +421,7 @@ export function IPCACalculator({ data, indexLabel = "IPCA", feminine = false }: 
                                         R$ {formatBRL(result.correctedValue)}
                                     </p>
                                     <p className="text-xs text-muted-foreground">
-                                        Na data final ({formatMonthLabel(result.endMonth)})
+                                        Em {formatDateBR(result.endDate)}
                                     </p>
                                 </div>
 
@@ -568,10 +457,10 @@ export function IPCACalculator({ data, indexLabel = "IPCA", feminine = false }: 
                                         <CalendarRange className="h-3 w-3" /> Período
                                     </p>
                                     <p className="text-base md:text-lg font-bold text-foreground">
-                                        {formatMonthLabel(result.startMonth)} → {formatMonthLabel(result.endMonth)}
+                                        {formatDateBR(result.startDate)} → {formatDateBR(result.endDate)}
                                     </p>
                                     <p className="text-xs text-muted-foreground">
-                                        {result.numMonths} {result.numMonths === 1 ? "mês" : "meses"} de correção
+                                        {result.days} {result.days === 1 ? "dia" : "dias"} · {formatMonthsCount(result.months)} {formatMonthsCount(result.months) === "1" ? "mês" : "meses"} de índice
                                     </p>
                                 </div>
                             </div>
@@ -598,7 +487,7 @@ export function IPCACalculator({ data, indexLabel = "IPCA", feminine = false }: 
                             </div>
 
                             {/* Collapsible Details: Chart + Table */}
-                            {(chartData.length > 1 || result.monthlyBreakdown.length > 0) && (
+                            {(chartData.length > 1 || result.rows.length > 0) && (
                                 <div className="rounded-xl border bg-card overflow-hidden">
                                     <button
                                         type="button"
@@ -722,7 +611,7 @@ export function IPCACalculator({ data, indexLabel = "IPCA", feminine = false }: 
                                             )}
 
                                             {/* Monthly Breakdown Table */}
-                                            {result.monthlyBreakdown.length > 0 && (
+                                            {result.rows.length > 0 && (
                                                 <div className="space-y-3">
                                                     <h4 className="text-sm font-semibold text-foreground">
                                                         Detalhamento Mês a Mês
@@ -732,7 +621,9 @@ export function IPCACalculator({ data, indexLabel = "IPCA", feminine = false }: 
                                                             <thead className="bg-muted/50 text-muted-foreground text-xs uppercase">
                                                                 <tr className="border-b">
                                                                     <th className="p-3 font-medium min-w-[100px]">Mês/Ano</th>
+                                                                    <th className="p-3 font-medium text-right min-w-[80px] hidden sm:table-cell" title="Dias corridos do mês dentro do período">Dias</th>
                                                                     <th className="p-3 font-medium text-right min-w-[100px]">{indexLabel} (%)</th>
+                                                                    <th className="p-3 font-medium text-right min-w-[110px]" title="Índice aplicado: igual ao do mês quando o mês entra inteiro, pro rata die quando entra em parte">Aplicado (%)</th>
                                                                     <th className="p-3 font-medium text-right min-w-[120px] hidden sm:table-cell">Fator</th>
                                                                     <th className="p-3 font-medium text-right min-w-[140px]">Valor corrigido</th>
                                                                     <th className="p-3 font-medium text-right min-w-[120px] hidden md:table-cell">Variação (R$)</th>
@@ -744,9 +635,15 @@ export function IPCACalculator({ data, indexLabel = "IPCA", feminine = false }: 
                                                                         key={row.month}
                                                                         className="hover:bg-muted/30 transition-colors"
                                                                     >
-                                                                        <td className="p-3 font-medium">{formatMonthLabel(row.month)}</td>
-                                                                        <td className={`p-3 text-right tabular-nums ${row.ipcaPercent >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-                                                                            {row.ipcaPercent.toFixed(2).replace(".", ",")}%
+                                                                        <td className="p-3 font-medium">{formatMonthBR(row.month)}</td>
+                                                                        <td className="p-3 text-right tabular-nums text-muted-foreground hidden sm:table-cell" title={row.fraction < 1 ? "Mês parcial: índice pro rata die" : undefined}>
+                                                                            {row.daysApplied}/{row.daysInMonth}
+                                                                        </td>
+                                                                        <td className={`p-3 text-right tabular-nums ${row.indexPercent >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                                                                            {row.indexPercent.toFixed(2).replace(".", ",")}%
+                                                                        </td>
+                                                                        <td className={`p-3 text-right tabular-nums ${row.fraction < 1 ? "font-medium" : "text-muted-foreground"}`}>
+                                                                            {row.appliedPercent.toFixed(row.fraction < 1 ? 4 : 2).replace(".", ",")}%
                                                                         </td>
                                                                         <td className="p-3 text-right tabular-nums text-muted-foreground hidden sm:table-cell">
                                                                             {row.factor.toFixed(6).replace(".", ",")}
@@ -768,8 +665,8 @@ export function IPCACalculator({ data, indexLabel = "IPCA", feminine = false }: 
                                                         <div className="flex items-center justify-between pt-1">
                                                             <p className="text-xs text-muted-foreground">
                                                                 Mostrando {tablePage * ROWS_PER_PAGE + 1}–
-                                                                {Math.min((tablePage + 1) * ROWS_PER_PAGE, result.monthlyBreakdown.length)} de{" "}
-                                                                {result.monthlyBreakdown.length} meses
+                                                                {Math.min((tablePage + 1) * ROWS_PER_PAGE, result.rows.length)} de{" "}
+                                                                {result.rows.length} meses
                                                             </p>
                                                             <div className="flex gap-1">
                                                                 <button
