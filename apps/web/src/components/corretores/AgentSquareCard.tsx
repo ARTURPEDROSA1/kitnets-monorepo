@@ -10,6 +10,7 @@ import React from "react";
 import { Building2, FileSignature, Globe, Mail, MessageCircle, Phone, Trash2, User, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CoverCarousel, useCoverCarousel } from "@/components/ui/CoverCarousel";
+import { Money, Sensitive } from "@/components/privacy";
 import { AGENT_STATUS_META, brl, monthsLabel, type AgentRow } from "@/lib/agent-dashboard";
 
 interface Props {
@@ -58,7 +59,7 @@ export default function AgentSquareCard({ row, onSelect, onDelete, isDeleting = 
             <div className="flex flex-1 flex-col gap-3 p-4">
                 <div className="space-y-0.5">
                     <h3 className="break-words font-semibold leading-tight text-foreground">{agent.full_name}</h3>
-                    <p className="text-xs text-muted-foreground">{row.creci}</p>
+                    <p className="text-xs text-muted-foreground"><Sensitive>{row.creci}</Sensitive></p>
                 </div>
 
                 <p className="flex items-start gap-1.5 text-xs text-foreground">
@@ -70,7 +71,7 @@ export default function AgentSquareCard({ row, onSelect, onDelete, isDeleting = 
                     <div className="rounded-lg bg-muted/40 px-2 py-1.5">
                         <dt className="flex items-center gap-1 text-muted-foreground"><FileSignature className="h-3 w-3" /> Contratos</dt>
                         <dd className="font-semibold tabular-nums text-foreground">{plural(row.inForce.length, "em vigor", "em vigor")}</dd>
-                        <dd className="leading-snug text-muted-foreground">{row.inForce.length > 0 ? `${brl(row.rentManaged, 0)}/mês` : row.leases.length > 0 ? `${plural(row.leases.length, "encerrado", "encerrados")}` : "nenhum contrato"}</dd>
+                        <dd className="leading-snug text-muted-foreground">{row.inForce.length > 0 ? <><Money>{brl(row.rentManaged, 0)}</Money>/mês</> : row.leases.length > 0 ? `${plural(row.leases.length, "encerrado", "encerrados")}` : "nenhum contrato"}</dd>
                     </div>
                     <div className="rounded-lg bg-muted/40 px-2 py-1.5">
                         <dt className="flex items-center gap-1 text-muted-foreground"><Users className="h-3 w-3" /> Inquilinos</dt>

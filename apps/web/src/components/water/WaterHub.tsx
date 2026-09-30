@@ -11,6 +11,7 @@ import Link from "next/link";
 import { AlertCircle, Building2, ChevronDown, ChevronUp, DollarSign, Droplets, FileText, Gauge, Search, Sparkles, X } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
+import { Money } from "@/components/privacy";
 import { cn } from "@/lib/utils";
 import { normalizeText } from "@/lib/lease-extract";
 import { WATER_VIEWS, inWaterView, waterAttention, waterHubTotals, type WaterUnitRow, type WaterView } from "@/lib/water-hub";
@@ -28,8 +29,11 @@ interface Props {
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString("pt-BR")} ${n === 1 ? one : many}`;
 const brl = (v: number, digits = 0) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: digits, maximumFractionDigits: digits });
 const m3 = (v: number) => `${v.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} m³`;
+/** An attention sentence that quotes an amount (lib/water-hub builds them): the dollar toggle hides the whole sentence. */
+const hasAmount = (text: string) => /R\$\s?\d/.test(text);
 
-function Item({ icon, label, value, hint, tone, valueTone, onClick, title }: { icon: React.ReactNode; label: string; value: string; hint: React.ReactNode; tone: string; valueTone?: string; onClick?: () => void; title?: string }) {
+/** `money`: the value is an amount in R$, hidden by the sidebar's dollar toggle (components/privacy); amounts in `hint` are wrapped in <Money> by the caller. */
+function Item({ icon, label, value, hint, tone, valueTone, onClick, title, money }: { icon: React.ReactNode; label: string; value: string; hint: React.ReactNode; tone: string; valueTone?: string; onClick?: () => void; title?: string; money?: boolean }) {
     const Tag = onClick ? "button" : "div";
     return (
         <Tag
@@ -41,7 +45,7 @@ function Item({ icon, label, value, hint, tone, valueTone, onClick, title }: { i
             <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 <span className={tone}>{icon}</span>{label}
             </span>
-            <span className={cn("block break-words text-xl font-bold leading-tight", valueTone ?? "text-foreground")}>{value}</span>
+            <span className={cn("block break-words text-xl font-bold leading-tight", valueTone ?? "text-foreground", money && "privacy-money")}>{value}</span>
             <span className="block break-words text-xs leading-snug text-muted-foreground">{hint}</span>
         </Tag>
     );
@@ -76,7 +80,7 @@ export default function WaterHub({ lang, rows, view, onViewChange, onOpen, onVie
         ? `${plural(totals.overdue, "vencida", "vencidas")}${totals.dueSoon > 0 ? ` · ${plural(totals.dueSoon, "vence", "vencem")} em 7 dias` : ""}`
         : totals.dueSoon > 0
             ? `${plural(totals.dueSoon, "vence", "vencem")} em até 7 dias`
-            : totals.paid12 > 0 ? `12 meses: ${brl(totals.paid12)}` : "contas mais recentes de cada imóvel";
+            : totals.paid12 > 0 ? <>12 meses: <Money>{brl(totals.paid12)}</Money></> : "contas mais recentes de cada imóvel";
 
     return (
         <div className="mx-auto max-w-[1600px] space-y-5 p-4 sm:p-6">
@@ -109,16 +113,16 @@ export default function WaterHub({ lang, rows, view, onViewChange, onOpen, onVie
                         title="Consumo medido na conta mais recente de cada imóvel"
                     />
                     <Item
-                        icon={<DollarSign className="h-3.5 w-3.5" />} tone={totals.overdue > 0 ? "text-rose-600" : totals.dueSoon > 0 ? "text-amber-600" : "text-emerald-600"} label="Contas do mês"
+                        icon={<DollarSign className="h-3.5 w-3.5" />} tone={totals.overdue > 0 ? "text-rose-600" : totals.dueSoon > 0 ? "text-amber-600" : "text-emerald-600"} label="Contas do mês" money
                         value={totals.withBills > 0 ? brl(totals.billsLatest) : "—"}
                         hint={billsHint}
                         valueTone={totals.overdue > 0 ? "text-rose-600" : undefined}
                         title="Valor a pagar na conta mais recente de cada imóvel"
                     />
                     <Item
-                        icon={<Gauge className="h-3.5 w-3.5" />} tone="text-violet-600" label="Custo por m³"
+                        icon={<Gauge className="h-3.5 w-3.5" />} tone="text-violet-600" label="Custo por m³" money
                         value={totals.rateLatest != null ? `R$ ${totals.rateLatest.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
-                        hint={totals.rate12 != null ? `12 meses: R$ ${totals.rate12.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/m³` : "valor ÷ consumo das contas do mês"}
+                        hint={totals.rate12 != null ? <>12 meses: <Money>{`R$ ${totals.rate12.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Money>/m³</> : "valor ÷ consumo das contas do mês"}
                         title="Valor pago dividido pelo consumo, nas contas mais recentes"
                     />
                     <Item
@@ -155,7 +159,7 @@ export default function WaterHub({ lang, rows, view, onViewChange, onOpen, onVie
                                 <span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", DOT[item.tone])} />
                                 <span className="min-w-0 flex-1">
                                     <button type="button" onClick={() => onOpen(item.row)} className="font-semibold text-foreground underline-offset-2 hover:underline">{item.row.unit.name}</button>
-                                    <span className="text-muted-foreground"> — {item.text}</span>
+                                    <span className="text-muted-foreground"> — {hasAmount(item.text) ? <Money>{item.text}</Money> : item.text}</span>
                                 </span>
                             </li>
                         ))}

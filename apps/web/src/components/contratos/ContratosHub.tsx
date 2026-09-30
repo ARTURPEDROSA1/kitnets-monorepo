@@ -34,7 +34,7 @@ const plural = (n: number, one: string, many: string) => `${n.toLocaleString("pt
 const pctText = (v: number) => `${v > 0 ? "+" : ""}${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 
 /** One KPI. The hint wraps (two short lines at most by construction): nothing on the strip is ever clipped. */
-function Item({ icon, label, value, hint, tone, valueTone, onClick, title }: { icon: React.ReactNode; label: string; value: string; hint: React.ReactNode; tone: string; valueTone?: string; onClick?: () => void; title?: string }) {
+function Item({ icon, label, value, hint, tone, valueTone, onClick, title, money }: { icon: React.ReactNode; label: string; value: string; hint: React.ReactNode; tone: string; valueTone?: string; onClick?: () => void; title?: string; /** the figure is an amount in R$: value and hint get the class the dollar toggle blurs (components/privacy) */ money?: boolean }) {
     const Tag = onClick ? "button" : "div";
     return (
         <Tag
@@ -46,8 +46,8 @@ function Item({ icon, label, value, hint, tone, valueTone, onClick, title }: { i
             <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 <span className={tone}>{icon}</span>{label}
             </span>
-            <span className={cn("block break-words text-xl font-bold leading-tight", valueTone ?? "text-foreground")}>{value}</span>
-            <span className="block break-words text-xs leading-snug text-muted-foreground">{hint}</span>
+            <span className={cn("block break-words text-xl font-bold leading-tight", valueTone ?? "text-foreground", money && "privacy-money")}>{value}</span>
+            <span className={cn("block break-words text-xs leading-snug text-muted-foreground", money && "privacy-money")}>{hint}</span>
         </Tag>
     );
 }
@@ -127,6 +127,7 @@ export default function ContratosHub({ rows, today, loading, error, view, onView
                         value={`${brl(totals.contractedRent, 0)}/mês`}
                         hint={<>{brl(totals.contractedRent * 12, 0)} por ano<br />{plural(totals.agencyManaged, "via imobiliária", "via imobiliária")}{totals.selfManaged > 0 ? ` · ${totals.selfManaged} própria` : ""}</>}
                         title="Soma do aluguel de contrato dos contratos em vigor (valor bruto, antes da taxa da imobiliária)"
+                        money
                     />
                     <Item
                         icon={<CalendarClock className="h-3.5 w-3.5" />} tone={totals.nextEnd && totals.nextEnd.days <= 90 ? "text-amber-600" : "text-slate-500"} label="Próximo término"
@@ -152,6 +153,7 @@ export default function ContratosHub({ rows, today, loading, error, view, onView
                         value={brl(totals.deposits, 0)}
                         hint={totals.depositsCount > 0 ? `${totals.depositsCount} de ${totals.inForce} contratos com caução` : "nenhum contrato em vigor com caução"}
                         title="Soma das cauções dos contratos em vigor: dinheiro do inquilino que volta no fim do contrato"
+                        money
                     />
                     <Item
                         icon={<FileText className="h-3.5 w-3.5" />} tone={totals.withFile < totals.total ? "text-amber-600" : "text-emerald-600"} label="Arquivos"
@@ -182,7 +184,8 @@ export default function ContratosHub({ rows, today, loading, error, view, onView
                                 <span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", DOT[item.tone])} />
                                 <span className="min-w-0 flex-1">
                                     <button type="button" onClick={() => actions.onOpen(item.row)} className="font-semibold text-foreground hover:underline underline-offset-2">{item.row.title}</button>
-                                    <span className="text-muted-foreground"> — {item.text}</span>
+                                    {/* the adjustment line carries the projected rent ("→ R$ …") once a month of the cycle is out */}
+                                    <span className={cn("text-muted-foreground", item.kind === "adjustment" && item.row.summary.monthsCounted > 0 && item.row.summary.adjustedRent !== null && "privacy-money")}> — {item.text}</span>
                                 </span>
                                 {item.date && <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{formatDateBR(item.date)}</span>}
                             </li>

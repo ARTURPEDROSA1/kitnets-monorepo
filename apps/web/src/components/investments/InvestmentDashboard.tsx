@@ -32,6 +32,7 @@ import { Label } from "@/components/ui/label";
 import { DateInput } from "@/components/ui/DateInput";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Tile from "@/components/properties/Tile";
+import { Money, Sensitive } from "@/components/privacy";
 import { PdfViewerModal } from "@/components/ui/PdfViewerModal";
 import InvestmentPaymentsTable, { type PaymentDraft } from "./InvestmentPaymentsTable";
 import InvestmentCashFlowSimulator from "./InvestmentCashFlowSimulator";
@@ -241,9 +242,9 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                             STRATEGY_LABELS[investment.strategy],
                             `para ${(EXIT_PLAN_LABELS[investment.exit_plan] ?? "alugar").toLowerCase()}`,
                             investment.developer,
-                            investment.address,
+                            investment.address ? <Sensitive>{investment.address}</Sensitive> : null,
                             investment.city,
-                        ].filter(Boolean).join(" · ")}
+                        ].filter(Boolean).map((part, i) => <React.Fragment key={i}>{i > 0 && " · "}{part}</React.Fragment>)}
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -291,6 +292,7 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                 <Tile
                     label="Pago até agora"
                     tone="emerald"
+                    money
                     icon={<Wallet className="w-4 h-4" />}
                     value={formatBRL(metrics.paidToDate, 0)}
                     hint={
@@ -323,6 +325,7 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                 <Tile
                     label="Falta pagar"
                     tone="amber"
+                    money
                     icon={<CalendarClock className="w-4 h-4" />}
                     value={formatBRL(metrics.remaining, 0)}
                     hint={
@@ -351,6 +354,7 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                 <Tile
                     label="Custo total"
                     tone="blue"
+                    money
                     icon={<Banknote className="w-4 h-4" />}
                     value={formatBRL(metrics.committed, 0)}
                     hint={metrics.contractPrice > 0 ? `Contrato: ${formatBRL(metrics.contractPrice, 0)}` : "Informe o preço do contrato"}
@@ -364,6 +368,7 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                 <Tile
                     label="Próxima parcela"
                     tone={metrics.overdueCount > 0 ? "rose" : "violet"}
+                    money
                     icon={<Receipt className="w-4 h-4" />}
                     value={metrics.nextDueOn ? formatBRL(metrics.nextDueAmount, 0) : "—"}
                     hint={
@@ -423,7 +428,7 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                         metrics.sold
                             ? "Vendido — a unidade não vai render aluguel"
                             : metrics.netMonthlyRent !== null
-                              ? `Aluguel líquido ${formatBRL(metrics.netMonthlyRent, 0)}/mês${metrics.paybackMonths ? ` · payback ${Math.round(metrics.paybackMonths / 12)} anos` : ""}`
+                              ? <>Aluguel líquido <Money>{formatBRL(metrics.netMonthlyRent, 0)}</Money>/mês{metrics.paybackMonths ? ` · payback ${Math.round(metrics.paybackMonths / 12)} anos` : ""}</>
                               : "Informe o aluguel estimado no simulador"
                     }
                     info={{
@@ -431,7 +436,7 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                         formula: "12 × aluguel líquido ÷ custo total",
                         example:
                             metrics.netMonthlyRent !== null
-                                ? `12 × ${formatBRL(metrics.netMonthlyRent)} ÷ ${formatBRL(metrics.committed)} = ${metrics.netYieldPct}%`
+                                ? <>12 × <Money>{formatBRL(metrics.netMonthlyRent)}</Money> ÷ <Money>{formatBRL(metrics.committed)}</Money> = {metrics.netYieldPct}%</>
                                 : undefined,
                     }}
                 />
@@ -444,12 +449,12 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                 >
                     <Handshake className="w-5 h-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
                     <span>
-                        Vendido em <strong>{formatDateBR(investment.sold_on)}</strong> por <strong className="tabular-nums">{formatBRL(investment.sale_price ?? 0)}</strong>
-                        {investment.sale_costs_pct > 0 ? ` (líquido ${formatBRL(metrics.saleNet)} após ${pct1(investment.sale_costs_pct)}% de custos)` : ""} — ganho de{" "}
-                        <strong className={`text-base font-bold tabular-nums ${metrics.realizedGain >= 0 ? "" : "text-rose-700 dark:text-rose-300"}`}>
+                        Vendido em <strong>{formatDateBR(investment.sold_on)}</strong> por <Money as="strong" className="tabular-nums">{formatBRL(investment.sale_price ?? 0)}</Money>
+                        {investment.sale_costs_pct > 0 ? <>{" "}(líquido <Money>{formatBRL(metrics.saleNet)}</Money> após {pct1(investment.sale_costs_pct)}% de custos)</> : ""} — ganho de{" "}
+                        <Money as="strong" className={`text-base font-bold tabular-nums ${metrics.realizedGain >= 0 ? "" : "text-rose-700 dark:text-rose-300"}`}>
                             {metrics.realizedGain > 0 ? "+" : ""}{formatBRL(metrics.realizedGain)}
-                        </strong>
-                        {metrics.realizedGainPct !== null ? ` (${metrics.realizedGainPct > 0 ? "+" : ""}${pct1(metrics.realizedGainPct)}%)` : ""} sobre {formatBRL(metrics.paidToDate)} pagos
+                        </Money>
+                        {metrics.realizedGainPct !== null ? ` (${metrics.realizedGainPct > 0 ? "+" : ""}${pct1(metrics.realizedGainPct)}%)` : ""} sobre <Money>{formatBRL(metrics.paidToDate)}</Money> pagos
                         {metrics.realizedIrrAnnualPct !== null ? ` · TIR ${pct1(metrics.realizedIrrAnnualPct)}% a.a.` : "."}
                     </span>
                     <button type="button" onClick={() => void undoSale()} className="text-xs underline underline-offset-2 text-emerald-800/80 dark:text-emerald-300/80 hover:text-emerald-900">
@@ -466,7 +471,7 @@ export default function InvestmentDashboard({ investmentId, lang, onBack, onChan
                 >
                     <PiggyBank className="w-5 h-5 shrink-0 text-amber-600 dark:text-amber-400" />
                     <span>
-                        <strong className="text-base font-bold tabular-nums">{formatBRL(metrics.correctionsPaid)}</strong> do que já foi pago é
+                        <Money as="strong" className="text-base font-bold tabular-nums">{formatBRL(metrics.correctionsPaid)}</Money> do que já foi pago é
                         correção monetária <span className="font-semibold">({INDEX_LABELS[investment.index_before_keys]})</span> —{" "}
                         <strong className="tabular-nums">{((metrics.correctionsPaid / Math.max(1, metrics.paidToDate)) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%</strong> do desembolso.
                     </span>

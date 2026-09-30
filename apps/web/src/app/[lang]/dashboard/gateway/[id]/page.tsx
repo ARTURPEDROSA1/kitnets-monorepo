@@ -8,6 +8,7 @@ import { KPICard } from "@/components/dashboard/KPICards";
 import { ConsumptionChart } from "@/components/dashboard/ConsumptionChart";
 import { ConsumptionTabs, DailyTotal } from "@/components/dashboard/ConsumptionTabs";
 import { DateRangePicker } from "@/components/dashboard/DateRangePicker";
+import { Money, Sensitive } from "@/components/privacy";
 import { format, differenceInDays, startOfMonth, startOfYear, subMonths, endOfMonth } from "date-fns";
 
 interface DateRange {
@@ -386,7 +387,7 @@ export default function GatewayDetailPage() {
                         <div>
                             <h1 className="text-3xl font-bold text-foreground">{gateway.label}</h1>
                             <div className="flex items-center mt-2 space-x-4">
-                                <p className="font-mono text-sm text-muted-foreground">{gateway.serial_number}</p>
+                                <Sensitive as="p" className="font-mono text-sm text-muted-foreground">{gateway.serial_number}</Sensitive>
                                 <span
                                     className={`px-2 py-0.5 rounded-full text-xs font-medium ${gateway.status === "online"
                                         ? "bg-green-100 text-green-700"
@@ -487,6 +488,7 @@ export default function GatewayDetailPage() {
                         description={kpis.rateInfo || "Sem tarifa configurada"}
                         icon="money"
                         loading={loading}
+                        money
                     />
                 </div>
 
@@ -552,7 +554,7 @@ export default function GatewayDetailPage() {
                                 </div>
                                 <div>
                                     <h3 className="font-medium text-foreground">
-                                        {meter.display_name || meter.id}
+                                        {meter.display_name || <Sensitive>{meter.id}</Sensitive>}
                                     </h3>
                                     <p className="text-xs text-muted-foreground capitalize">
                                         {meter.type === "water" ? "Água" : meter.type}
@@ -574,19 +576,19 @@ export default function GatewayDetailPage() {
                                         {/* Equal split */}
                                         <div className="flex items-center justify-end gap-1.5">
                                             <span className="text-xs uppercase tracking-wider text-muted-foreground">Rateio igual</span>
-                                            <span className="text-xs font-semibold text-foreground bg-muted/60 px-1.5 py-0.5 rounded">
+                                            <Money className="text-xs font-semibold text-foreground bg-muted/60 px-1.5 py-0.5 rounded">
                                                 R$ {(kpis.estimatedCost / metersData.length).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                            </span>
+                                            </Money>
                                         </div>
                                         {/* Proportional split */}
                                         <div className="flex items-center justify-end gap-1.5">
                                             <span className="text-xs uppercase tracking-wider text-muted-foreground">Proporcional</span>
-                                            <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-400 px-1.5 py-0.5 rounded">
+                                            <Money className="text-xs font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-400 px-1.5 py-0.5 rounded">
                                                 R$ {(kpis.totalConsumption > 0
                                                     ? (meter.totalConsumption / kpis.totalConsumption) * kpis.estimatedCost
                                                     : 0
                                                 ).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                            </span>
+                                            </Money>
                                         </div>
                                         {/* Percentage of total */}
                                         <p className="text-xs text-muted-foreground">

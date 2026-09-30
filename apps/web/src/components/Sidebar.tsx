@@ -5,12 +5,16 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@kitnets/ui";
 import { SignOutButton, useAuth } from "@clerk/nextjs";
-import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Rocket, HardHat, Briefcase, Building2, User, Users, UserCheck, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart, ArrowLeftRight, FileText, AlertCircle, Plus, Minus, Gem, X, Zap, Building, ChevronsLeft, ChevronsRight, Landmark, Droplets, MapPinned, BookOpenCheck, BookText, NotebookPen, CalendarCheck } from "lucide-react";
+import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Rocket, HardHat, Briefcase, Building2, User, Users, UserCheck, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart, ArrowLeftRight, FileText, AlertCircle, Plus, Minus, Gem, X, Zap, Building, ChevronsLeft, ChevronsRight, Landmark, Droplets, MapPinned, BookOpenCheck, BookText, NotebookPen, CalendarCheck, Eye, EyeOff, DollarSign, ArrowLeft, LogOut, type LucideIcon } from "lucide-react";
 import { PropertyFilters } from "./PropertyFilters";
 
 import { useTheme } from "next-themes";
 import Image from "next/image";
 import { FLAGS } from "../lib/flags";
+import { readCollapsedPreference, useCollapsedGroups, useSidebarCollapsed, writeCollapsedPreference } from "../lib/sidebar-preferences";
+import { usePrivacy } from "../lib/privacy";
+
+export { SIDEBAR_COLLAPSED_KEY } from "../lib/sidebar-preferences";
 
 const languages = [
     { code: "pt", label: "Português" },
@@ -18,65 +22,112 @@ const languages = [
     { code: "es", label: "Español" },
 ];
 
-// Persisted "show less information" (collapsed) preference, exposed as a tiny
-// external store so useSyncExternalStore can hydrate it without a setState-in-
-// effect. The root layout reads the same key in an inline <head> script so the
-// first paint already uses the stored width (see app/[lang]/layout.tsx).
-export const SIDEBAR_COLLAPSED_KEY = "kitnets_sidebar_collapsed";
+type SidebarView = 'main' | 'rent-filters' | 'buy-filters' | 'launches-filters' | 'calculators-menu' | 'indices-menu';
 
-const collapsedListeners = new Set<() => void>();
-let collapsedFallback = false; // used when localStorage is unavailable
+/** The views that fit the compact rail; the property filters need the full width. */
+const RAIL_VIEWS: ReadonlySet<SidebarView> = new Set<SidebarView>(['main', 'calculators-menu', 'indices-menu']);
 
-function readCollapsedPreference(): boolean {
-    try {
-        return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
-    } catch {
-        return collapsedFallback;
-    }
+interface NavItem {
+    label: string;
+    /** path without the language prefix */
+    path: string;
+    icon: LucideIcon;
+    /** colour of the icon (muted by default) */
+    iconClassName?: string;
+    /** "exact" for hubs whose sub-pages belong to other items (Dashboard); "prefix" otherwise */
+    match?: 'exact' | 'prefix';
+    /** other path prefixes that highlight this item */
+    alsoActive?: string[];
+    /** the sub-menu the item opens (Calculadoras, Indicadores) */
+    view?: SidebarView;
 }
 
-function writeCollapsedPreference(next: boolean) {
-    collapsedFallback = next;
-    try {
-        window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
-    } catch {
-        // Storage blocked (private mode etc.): the in-memory fallback still works for this session.
-    }
-    collapsedListeners.forEach((listener) => listener());
+type NavGroupKey = 'operacao' | 'contabil' | 'ferramentas' | 'configuracoes';
+
+interface NavGroup {
+    key: NavGroupKey;
+    label: string;
+    /** path prefixes (beyond the items') that count as "inside this group", e.g. the other Contábil pages */
+    prefixes?: string[];
+    items: NavItem[];
 }
 
-function subscribeCollapsedPreference(listener: () => void) {
-    collapsedListeners.add(listener);
-    window.addEventListener("storage", listener); // keep other tabs in sync
-    return () => {
-        collapsedListeners.delete(listener);
-        window.removeEventListener("storage", listener);
-    };
-}
+const ICON = "h-5 w-5 shrink-0 text-muted-foreground transition duration-75 group-hover:text-foreground";
 
-const getServerCollapsed = () => false;
+/** The tools every visitor gets; while signed in they live in the Ferramentas group. */
+const TOOL_ITEMS: NavItem[] = [
+    ...(FLAGS.SHOW_CALCULATORS ? [{ label: "Calculadoras", path: '/calculadoras', icon: Calculator, view: 'calculators-menu' as SidebarView }] : []),
+    { label: "Indicadores", path: '/indices/panorama', icon: LineChart, view: 'indices-menu', alsoActive: ['/indices'] },
+];
+
+const SIGNED_IN_GROUPS: NavGroup[] = [
+    {
+        key: 'operacao',
+        label: "Operação",
+        items: [
+            { label: "Dashboard", path: '/dashboard', icon: LayoutDashboard, match: 'exact' },
+            { label: "Imóveis", path: '/imoveis', icon: Home },
+            { label: "Condomínio", path: '/condominio', icon: Building },
+            { label: "Energia", path: '/dashboard/energy', icon: Zap, iconClassName: "text-amber-500 group-hover:text-amber-600" },
+            { label: "Água", path: '/dashboard/water', icon: Droplets, iconClassName: "text-blue-500 group-hover:text-blue-600", alsoActive: ['/dashboard/billing'] },
+            { label: "Imobiliária", path: '/imobiliaria', icon: Building2 },
+            { label: "Corretores", path: '/corretores', icon: Users },
+            { label: "Inquilinos", path: '/inquilinos', icon: UserCheck },
+            { label: "Contratos", path: '/contratos', icon: FileText },
+            { label: "Projetos", path: '/projetos', icon: HardHat },
+        ],
+    },
+    {
+        // Holding-level accounting fed by the bank account
+        key: 'contabil',
+        label: "Contábil & Fiscal",
+        prefixes: ['/contabil'],
+        items: [
+            { label: "Políticas contábeis", path: '/contabil/politicas', icon: BookOpenCheck },
+            { label: "Plano de contas", path: '/contabil/plano-de-contas', icon: BookText },
+            { label: "Lançamentos", path: '/contabil/lancamentos', icon: NotebookPen },
+            { label: "Extrato e conciliação", path: '/contabil/conciliacao', icon: ArrowLeftRight },
+            { label: "Contas bancárias", path: '/contabil/contas-bancarias', icon: Landmark },
+            { label: "Fechamento do mês", path: '/contabil/fechamento', icon: CalendarCheck },
+        ],
+    },
+    {
+        key: 'ferramentas',
+        label: "Ferramentas",
+        items: TOOL_ITEMS,
+    },
+    {
+        key: 'configuracoes',
+        label: "Configurações",
+        items: [
+            { label: "Proprietário", path: '/proprietario', icon: User },
+        ],
+    },
+];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
     const pathname = usePathname();
     const { setTheme, theme } = useTheme();
     const { isSignedIn } = useAuth();
-    const [sidebarView, setSidebarView] = React.useState<'main' | 'rent-filters' | 'buy-filters' | 'launches-filters' | 'calculators-menu' | 'indices-menu'>('main');
+    const [sidebarView, setSidebarView] = React.useState<SidebarView>('main');
     const [expandedSections, setExpandedSections] = React.useState<Record<string, boolean>>({});
     const [isMobileOpen, setIsMobileOpen] = React.useState(false);
     // Server renders expanded; the client snapshot takes over after hydration.
-    const collapsed = React.useSyncExternalStore(subscribeCollapsedPreference, readCollapsedPreference, getServerCollapsed);
+    const collapsed = useSidebarCollapsed();
+    const { collapsed: collapsedGroups, toggle: toggleGroup } = useCollapsedGroups();
+    const { hideSensitive, hideMoney, toggleSensitive, toggleMoney } = usePrivacy();
 
-    // The compact rail only makes sense for the main menu; filter and
-    // sub-menu views need the full width, so they temporarily expand.
-    const navCollapsed = collapsed && sidebarView === 'main';
+    // The compact rail applies to the main menu and to the calculators / indicators sub-menus
+    // (every item there has an icon); the property filters need the full width, so they temporarily expand.
+    const navCollapsed = collapsed && RAIL_VIEWS.has(sidebarView);
 
     // Mirror the effective state onto <html data-sidebar> so CSS can size the
     // rail and the page offset (globals.css). Read the store directly so the
     // hydration pass (which still sees the server value) cannot undo what the
     // inline script applied before first paint.
     React.useEffect(() => {
-        const active = readCollapsedPreference() && sidebarView === 'main';
+        const active = readCollapsedPreference() && RAIL_VIEWS.has(sidebarView);
         if (active) {
             document.documentElement.setAttribute('data-sidebar', 'collapsed');
         } else {
@@ -85,8 +136,6 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
     }, [collapsed, sidebarView]);
 
     const toggleCollapsed = () => writeCollapsedPreference(!collapsed);
-
-    // Dictionary is now passed as prop
 
     // Detect active section and update sidebar view
     React.useEffect(() => {
@@ -141,12 +190,172 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
         setSidebarView('main');
     };
 
+    const localized = (path: string) => (lang === 'pt' ? path : `/${lang}${path}`);
+    const homeHref = lang === 'pt' ? '/' : `/${lang}`;
     const isActive = (path: string) => pathname === path;
+    const startsWith = (path: string) => pathname === path || pathname.startsWith(`${path}/`);
+
+    const isItemActive = (item: NavItem) => {
+        const href = localized(item.path);
+        if (item.match === 'exact' ? isActive(href) : startsWith(href)) return true;
+        return (item.alsoActive ?? []).some((prefix) => startsWith(localized(prefix)));
+    };
+
+    const isGroupActive = (group: NavGroup) =>
+        group.items.some(isItemActive) || (group.prefixes ?? []).some((prefix) => startsWith(localized(prefix)));
+
+    /** One menu entry: icon + label, label hidden and tooltip shown on the compact rail. */
+    const renderItem = (item: NavItem) => {
+        const href = localized(item.path);
+        const active = isItemActive(item);
+        const Icon = item.icon;
+        return (
+            <li key={item.path}>
+                <Link
+                    title={navCollapsed ? item.label : undefined}
+                    href={href}
+                    onClick={item.view ? () => setSidebarView(item.view as SidebarView) : undefined}
+                    aria-current={active ? "page" : undefined}
+                    className={`sidebar-item flex w-full items-center rounded-lg p-2 text-left text-foreground hover:bg-accent group min-h-[44px] ${active ? 'bg-accent' : ''}`}
+                >
+                    <Icon className={`${ICON} ${item.iconClassName ?? ''}`} />
+                    <span className="ms-3 sidebar-label">{item.label}</span>
+                </Link>
+            </li>
+        );
+    };
+
+    /** A collapsible group: a small uppercase heading with a +/- toggle, then its items. */
+    const renderGroup = (group: NavGroup) => {
+        const active = isGroupActive(group);
+        const open = active || !collapsedGroups.has(group.key);
+        const listId = `sidebar-group-${group.key}`;
+        return (
+            <li key={group.key} data-nav-group={group.key} data-nav-active={active ? "" : undefined} className="nav-group border-t border-border pt-2 first:border-t-0 first:pt-0">
+                <button
+                    type="button"
+                    onClick={() => toggleGroup(group.key)}
+                    aria-expanded={open}
+                    aria-controls={listId}
+                    title={navCollapsed ? group.label : (open ? `Recolher ${group.label}` : `Expandir ${group.label}`)}
+                    className="sidebar-item flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hover:bg-accent hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                    <span className="sidebar-label">{group.label}</span>
+                    {open ? <Minus className="h-4 w-4 shrink-0" aria-hidden="true" /> : <Plus className="h-4 w-4 shrink-0" aria-hidden="true" />}
+                </button>
+                <ul id={listId} className="nav-group-items space-y-1 pt-1">
+                    {group.items.map(renderItem)}
+                </ul>
+            </li>
+        );
+    };
+
+    const signedOutItems: NavItem[] = [
+        ...(FLAGS.SHOW_MARKETPLACE ? [
+            { label: dict.menu.advertise as string, path: '/anunciar', icon: Megaphone, match: 'exact' as const },
+            { label: dict.menu.rent as string, path: '/alugar', icon: Key, match: 'exact' as const, view: 'rent-filters' as SidebarView },
+            { label: dict.menu.buy as string, path: '/comprar', icon: Home, match: 'exact' as const, view: 'buy-filters' as SidebarView },
+            { label: dict.menu.launches as string, path: '/lancamentos', icon: Rocket, match: 'exact' as const, view: 'launches-filters' as SidebarView },
+        ] : []),
+        ...TOOL_ITEMS.map((item) => (item.path === '/calculadoras' ? { ...item, label: dict.menu.calculators as string } : item)),
+        ...(FLAGS.SHOW_USEFUL_LINKS ? [{ label: dict.menu.usefulLinks as string, path: '/links-uteis', icon: LinkIcon, match: 'exact' as const }] : []),
+        ...(FLAGS.SHOW_FAQ ? [{ label: dict.menu.faq as string, path: '/perguntas-frequentes', icon: HelpCircle, match: 'exact' as const }] : []),
+    ];
+
+    const loginItems: NavItem[] = [
+        { label: dict.menu.owner as string, path: '/login/proprietario', icon: KeyRound, match: 'exact' },
+        ...(FLAGS.SHOW_LOGIN_LINKS ? [
+            { label: dict.menu.brokers as string, path: '/login/corretor', icon: Briefcase, match: 'exact' as const },
+            { label: dict.menu.agencies as string, path: '/login/imobiliaria', icon: Building2, match: 'exact' as const },
+            { label: dict.menu.residents as string, path: '/login', icon: User, match: 'exact' as const },
+            { label: dict.menu.owners as string, path: '/login/proprietario', icon: KeyRound, match: 'exact' as const },
+            { label: dict.menu.developers as string, path: '/login/construtora', icon: HardHat, match: 'exact' as const },
+        ] : []),
+    ];
+
+    /** The calculator sub-menu, by category; on the rail every calculator is listed as an icon. */
+    const calculatorSections: { key: string; label: string; items: NavItem[] }[] = [
+        {
+            key: 'taxes', label: dict.menu.taxes, items: [
+                { label: dict.menu.rentOnIndividual, path: '/calculadoras/imposto-aluguel-pessoa-fisica', icon: User },
+                { label: dict.menu.rentalOnHolding, path: '/calculadoras/aluguel-na-holding', icon: Building2 },
+                { label: dict.menu.irpf2026, path: '/calculadoras/irpf-2026', icon: Calculator },
+                { label: dict.menu.highIncomeTax, path: '/calculadoras/imposto-minimo-altas-rendas', icon: Gem },
+            ],
+        },
+        {
+            key: 'finance', label: dict.menu.finance, items: [
+                { label: "Conversor de Juros Mensal e Anual", path: '/calculadoras/conversor-juros-mensal-anual', icon: ArrowLeftRight },
+                { label: "Juros Compostos", path: '/calculadora-juros-compostos', icon: TrendingUp },
+                { label: "Payback de Imóvel", path: '/calculadora-payback-imovel', icon: PiggyBank },
+                { label: dict.menu.financialIndependence, path: '/calculadora-independencia-financeira', icon: Sun },
+            ],
+        },
+        {
+            key: 'rent', label: dict.menu.rentCategory, items: [
+                { label: "Reajuste de Aluguel", path: '/calculadora-reajuste-aluguel', icon: TrendingUp },
+                { label: dict.rentLateFineCalculatorPage?.menuTitle || "Multa por Atraso", path: '/calculadoras/multa-atraso-aluguel', icon: AlertCircle },
+                { label: dict.rentFineCalculatorPage?.menuTitle || "Calculadora Rescisão", path: '/calculadoras/multa-rescisao-contrato-aluguel', icon: FileText },
+                { label: dict.proRataRentCalculatorPage?.menuTitle || "Aluguel Proporcional", path: '/calculadoras/aluguel-proporcional', icon: Calculator },
+            ],
+        },
+        {
+            key: 'investment', label: dict.menu.investment, items: [
+                { label: "Renda do Aluguel paga o Imóvel?", path: '/calculadoras/renda-aluguel', icon: Coins },
+                { label: "Simulador de Amortização", path: '/calculadora-amortizacao-financiamento-imobiliario', icon: PiggyBank },
+            ],
+        },
+    ];
+
+    const indexItems: NavItem[] = [
+        { label: "Panorama Econômico", path: '/indices/panorama', icon: LayoutDashboard },
+        ...['CDI', 'FipeZAP', 'IGPM', 'INPC', 'IPCA', 'IVAR', 'REAJUSTE-SALARIO-MINIMO', 'SELIC'].map((code) => ({
+            label: code === 'IGPM' ? 'IGP-M' : code === 'REAJUSTE-SALARIO-MINIMO' ? 'Salário Mínimo' : code,
+            path: `/indices/${code.toLowerCase()}`,
+            icon: TrendingUp,
+        })),
+        { label: "FipeZAP por cidade", path: '/indices/fipezap/cidades', icon: MapPinned },
+    ];
+
+    /** A sub-menu entry (calculators / indicators): smaller text, icon + tooltip on the rail. */
+    const renderSubItem = (item: NavItem) => {
+        const Icon = item.icon;
+        const href = localized(item.path);
+        const active = isActive(href);
+        return (
+            <li key={item.path}>
+                <Link
+                    href={href}
+                    title={navCollapsed ? item.label : undefined}
+                    aria-current={active ? "page" : undefined}
+                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${active ? 'bg-accent' : ''}`}
+                >
+                    <Icon className={ICON} />
+                    <span className="ms-3 sidebar-label text-sm">{item.label}</span>
+                </Link>
+            </li>
+        );
+    };
+
+    const backButton = (
+        <button
+            type="button"
+            onClick={backToMain}
+            title={navCollapsed ? dict.menu.back : undefined}
+            className="sidebar-item mb-2 flex w-full items-center rounded-lg p-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground min-h-[44px]"
+        >
+            <ArrowLeft className="h-5 w-5 shrink-0" aria-hidden="true" />
+            <span className="ms-3 sidebar-label">{dict.menu.back}</span>
+        </button>
+    );
+
+    const toolButton = "h-9 w-9 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-accent transition-colors";
+    const toolButtonOn = "h-9 w-9 rounded-lg border border-primary/40 bg-accent text-foreground hover:bg-accent/80 transition-colors";
 
     return (
         <>
             <div className="fixed top-0 left-0 right-0 z-50 flex h-16 items-center justify-between border-b border-border bg-background px-4 sm:hidden">
-                <Link href={lang === 'pt' ? '/' : `/${lang}`} className="flex items-center gap-2">
+                <Link href={homeHref} className="flex items-center gap-2">
                     <div className="relative h-8 w-8">
                         <Image
                             src="/icon.png"
@@ -186,7 +395,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                     {sidebarView === 'main' ? (
                         <div>
                             <div className="sidebar-header flex items-center justify-between mb-5 ps-2.5">
-                                <Link href={lang === 'pt' ? '/' : `/${lang}`} className="sidebar-brand flex items-baseline" title={navCollapsed ? "Kitnets.com" : undefined}>
+                                <Link href={homeHref} className="sidebar-brand flex items-baseline" title={navCollapsed ? "Kitnets.com" : undefined}>
                                     <Image
                                         src="/kitnets-logo.png"
                                         alt="Kitnets Logo"
@@ -208,443 +417,19 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                     <X className="h-5 w-5" />
                                 </button>
                             </div>
-                            <ul className="space-y-2 font-medium">
-
-                                {!isSignedIn && (
-                                    <>
-                                        {FLAGS.SHOW_MARKETPLACE && (
-                                            <>
-                                                <li>
-                                                    <Link
-                                                        title={navCollapsed ? dict.menu.advertise : undefined}
-                                                        href={lang === 'pt' ? '/anunciar' : `/${lang}/anunciar`}
-                                                        aria-current={isActive(lang === 'pt' ? '/anunciar' : `/${lang}/anunciar`) ? "page" : undefined}
-                                                        className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/anunciar' : `/${lang}/anunciar`) ? 'bg-accent' : ''}`}
-                                                    >
-                                                        <Megaphone className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                        <span className="ms-3 sidebar-label">{dict.menu.advertise}</span>
-                                                    </Link>
-                                                </li>
-                                                <li>
-                                                    <Link
-                                                        title={navCollapsed ? dict.menu.rent : undefined}
-                                                        href={lang === 'pt' ? '/alugar' : `/${lang}/alugar`}
-                                                        onClick={() => setSidebarView('rent-filters')}
-                                                        aria-current={isActive(lang === 'pt' ? '/alugar' : `/${lang}/alugar`) ? "page" : undefined}
-                                                        className={`sidebar-item w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/alugar' : `/${lang}/alugar`) ? 'bg-accent' : ''}`}
-                                                    >
-                                                        <Key className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                        <span className="ms-3 sidebar-label">{dict.menu.rent}</span>
-                                                    </Link>
-                                                </li>
-                                                <li>
-                                                    <Link
-                                                        title={navCollapsed ? dict.menu.buy : undefined}
-                                                        href={lang === 'pt' ? '/comprar' : `/${lang}/comprar`}
-                                                        onClick={() => setSidebarView('buy-filters')}
-                                                        aria-current={isActive(lang === 'pt' ? '/comprar' : `/${lang}/comprar`) ? "page" : undefined}
-                                                        className={`sidebar-item w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/comprar' : `/${lang}/comprar`) ? 'bg-accent' : ''}`}
-                                                    >
-                                                        <Home className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                        <span className="ms-3 sidebar-label">{dict.menu.buy}</span>
-                                                    </Link>
-                                                </li>
-                                                <li>
-                                                    <Link
-                                                        title={navCollapsed ? dict.menu.launches : undefined}
-                                                        href={lang === 'pt' ? '/lancamentos' : `/${lang}/lancamentos`}
-                                                        onClick={() => setSidebarView('launches-filters')}
-                                                        aria-current={isActive(lang === 'pt' ? '/lancamentos' : `/${lang}/lancamentos`) ? "page" : undefined}
-                                                        className={`sidebar-item w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/lancamentos' : `/${lang}/lancamentos`) ? 'bg-accent' : ''}`}
-                                                    >
-                                                        <Rocket className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                        <span className="ms-3 sidebar-label">{dict.menu.launches}</span>
-                                                    </Link>
-                                                </li>
-                                            </>
-                                        )}
-
-                                        {FLAGS.SHOW_CALCULATORS && (
-                                            <li>
-                                                <Link
-                                                    title={navCollapsed ? dict.menu.calculators : undefined}
-                                                    href={lang === 'pt' ? '/calculadoras' : `/${lang}/calculadoras`}
-                                                    onClick={() => setSidebarView('calculators-menu')}
-                                                    aria-current={isActive(lang === 'pt' ? '/calculadoras' : `/${lang}/calculadoras`) ? "page" : undefined}
-                                                    className={`sidebar-item w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/calculadoras' : `/${lang}/calculadoras`) ? 'bg-accent' : ''}`}
-                                                >
-                                                    <Calculator className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 sidebar-label">{dict.menu.calculators}</span>
-                                                </Link>
-                                            </li>
-                                        )}
-
-                                        <li>
-                                            <Link
-                                                title={navCollapsed ? "Indicadores" : undefined}
-                                                href={lang === 'pt' ? '/indices/panorama' : `/${lang}/indices/panorama`}
-                                                onClick={() => setSidebarView('indices-menu')}
-                                                aria-current={isActive(lang === 'pt' ? '/indices/panorama' : `/${lang}/indices/panorama`) ? "page" : undefined}
-                                                className={`sidebar-item w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/indices/panorama' : `/${lang}/indices/panorama`) ? 'bg-accent' : ''}`}
-                                            >
-                                                <LineChart className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                <span className="ms-3 sidebar-label">Indicadores</span>
-                                            </Link>
-                                        </li>
-
-                                        {FLAGS.SHOW_USEFUL_LINKS && (
-                                            <li>
-                                                <Link
-                                                    title={navCollapsed ? dict.menu.usefulLinks : undefined}
-                                                    href={lang === 'pt' ? '/links-uteis' : `/${lang}/links-uteis`}
-                                                    aria-current={isActive(lang === 'pt' ? '/links-uteis' : `/${lang}/links-uteis`) ? "page" : undefined}
-                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/links-uteis' : `/${lang}/links-uteis`) ? 'bg-accent' : ''}`}
-                                                >
-                                                    <LinkIcon className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 sidebar-label">{dict.menu.usefulLinks}</span>
-                                                </Link>
-                                            </li>
-                                        )}
-
-                                        {FLAGS.SHOW_FAQ && (
-                                            <li>
-                                                <Link
-                                                    title={navCollapsed ? dict.menu.faq : undefined}
-                                                    href={lang === 'pt' ? '/perguntas-frequentes' : `/${lang}/perguntas-frequentes`}
-                                                    aria-current={isActive(lang === 'pt' ? '/perguntas-frequentes' : `/${lang}/perguntas-frequentes`) ? "page" : undefined}
-                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/perguntas-frequentes' : `/${lang}/perguntas-frequentes`) ? 'bg-accent' : ''}`}
-                                                >
-                                                    <HelpCircle className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 sidebar-label">{dict.menu.faq}</span>
-                                                </Link>
-                                            </li>
-                                        )}
-
-                                        <li className="my-2 border-t border-border" />
-                                    </>
-                                )}
-                                {isSignedIn ? (
-                                    FLAGS.SHOW_DASHBOARD_LINKS && (
-                                        <>
-                                            <li>
-                                                <Link
-                                                    title={navCollapsed ? "Dashboard" : undefined}
-                                                    href={lang === 'pt' ? '/dashboard' : `/${lang}/dashboard`}
-                                                    aria-current={isActive(lang === 'pt' ? '/dashboard' : `/${lang}/dashboard`) ? "page" : undefined}
-                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/dashboard' : `/${lang}/dashboard`) ? 'bg-accent' : ''}`}
-                                                >
-                                                    <LayoutDashboard className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 sidebar-label">Dashboard</span>
-                                                </Link>
-                                            </li>
-                                            <li>
-                                                <Link
-                                                    title={navCollapsed ? "Imóveis" : undefined}
-                                                    href={lang === 'pt' ? '/imoveis' : `/${lang}/imoveis`}
-                                                    aria-current={isActive(lang === 'pt' ? '/imoveis' : `/${lang}/imoveis`) ? "page" : undefined}
-                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/imoveis' : `/${lang}/imoveis`) ? 'bg-accent' : ''}`}
-                                                >
-                                                    <Home className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 sidebar-label">Imóveis</span>
-                                                </Link>
-                                            </li>
-                                            <li>
-                                                <Link
-                                                    title={navCollapsed ? "Condomínio" : undefined}
-                                                    href={lang === 'pt' ? '/condominio' : `/${lang}/condominio`}
-                                                    aria-current={isActive(lang === 'pt' ? '/condominio' : `/${lang}/condominio`) ? "page" : undefined}
-                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/condominio' : `/${lang}/condominio`) ? 'bg-accent' : ''}`}
-                                                >
-                                                    <Building className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 sidebar-label">Condomínio</span>
-                                                </Link>
-                                            </li>
-                                            <li>
-                                                <Link
-                                                    title={navCollapsed ? "Energia" : undefined}
-                                                    href={lang === 'pt' ? '/dashboard/energy' : `/${lang}/dashboard/energy`}
-                                                    aria-current={pathname.includes('/dashboard/energy') ? "page" : undefined}
-                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${pathname.includes('/dashboard/energy') ? 'bg-accent font-medium' : ''}`}
-                                                >
-                                                    <Zap className="h-5 w-5 text-amber-500 transition duration-75 group-hover:text-amber-600" />
-                                                    <span className="ms-3 sidebar-label">Energia</span>
-                                                </Link>
-                                            </li>
-                                            <li>
-                                                <Link
-                                                    title={navCollapsed ? "Água" : undefined}
-                                                    href={lang === 'pt' ? '/dashboard/water' : `/${lang}/dashboard/water`}
-                                                    aria-current={pathname.includes('/dashboard/water') || pathname.includes('/dashboard/billing') ? "page" : undefined}
-                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${pathname.includes('/dashboard/water') || pathname.includes('/dashboard/billing') ? 'bg-accent font-medium' : ''}`}
-                                                >
-                                                    <Droplets className="h-5 w-5 text-blue-500 transition duration-75 group-hover:text-blue-600" />
-                                                    <span className="ms-3 sidebar-label">Água</span>
-                                                </Link>
-                                            </li>
-                                            <li>
-                                                <Link
-                                                    title={navCollapsed ? "Imobiliária" : undefined}
-                                                    href={lang === 'pt' ? '/imobiliaria' : `/${lang}/imobiliaria`}
-                                                    aria-current={isActive(lang === 'pt' ? '/imobiliaria' : `/${lang}/imobiliaria`) ? "page" : undefined}
-                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/imobiliaria' : `/${lang}/imobiliaria`) ? 'bg-accent' : ''}`}
-                                                >
-                                                    <Building2 className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 sidebar-label">Imobiliária</span>
-                                                </Link>
-                                            </li>
-                                            <li>
-                                                <Link
-                                                    title={navCollapsed ? "Corretores" : undefined}
-                                                    href={lang === 'pt' ? '/corretores' : `/${lang}/corretores`}
-                                                    aria-current={isActive(lang === 'pt' ? '/corretores' : `/${lang}/corretores`) ? "page" : undefined}
-                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/corretores' : `/${lang}/corretores`) ? 'bg-accent' : ''}`}
-                                                >
-                                                    <Users className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 sidebar-label">Corretores</span>
-                                                </Link>
-                                            </li>
-                                            <li>
-                                                <Link
-                                                    title={navCollapsed ? "Inquilinos" : undefined}
-                                                    href={lang === 'pt' ? '/inquilinos' : `/${lang}/inquilinos`}
-                                                    aria-current={isActive(lang === 'pt' ? '/inquilinos' : `/${lang}/inquilinos`) ? "page" : undefined}
-                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/inquilinos' : `/${lang}/inquilinos`) ? 'bg-accent' : ''}`}
-                                                >
-                                                    <UserCheck className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 sidebar-label">Inquilinos</span>
-                                                </Link>
-                                            </li>
-                                            <li>
-                                                <Link
-                                                    title={navCollapsed ? "Contratos" : undefined}
-                                                    href={lang === 'pt' ? '/contratos' : `/${lang}/contratos`}
-                                                    aria-current={isActive(lang === 'pt' ? '/contratos' : `/${lang}/contratos`) ? "page" : undefined}
-                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/contratos' : `/${lang}/contratos`) ? 'bg-accent' : ''}`}
-                                                >
-                                                    <FileText className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 sidebar-label">Contratos</span>
-                                                </Link>
-                                            </li>
-                                            <li>
-                                                <Link
-                                                    title={navCollapsed ? "Projetos" : undefined}
-                                                    href={lang === 'pt' ? '/projetos' : `/${lang}/projetos`}
-                                                    aria-current={isActive(lang === 'pt' ? '/projetos' : `/${lang}/projetos`) ? "page" : undefined}
-                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/projetos' : `/${lang}/projetos`) ? 'bg-accent' : ''}`}
-                                                >
-                                                    <HardHat className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 sidebar-label">Projetos</span>
-                                                </Link>
-                                            </li>
-                                            {/* Contábil & Fiscal: holding-level accounting fed by the bank account */}
-                                            <li className="my-2 border-t border-border" />
-                                            {!navCollapsed && (
-                                                <li className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Contábil &amp; Fiscal</li>
-                                            )}
-                                            <li>
-                                                <Link
-                                                    title={navCollapsed ? "Políticas contábeis" : undefined}
-                                                    href={lang === 'pt' ? '/contabil/politicas' : `/${lang}/contabil/politicas`}
-                                                    aria-current={isActive(lang === 'pt' ? '/contabil/politicas' : `/${lang}/contabil/politicas`) ? "page" : undefined}
-                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/contabil/politicas' : `/${lang}/contabil/politicas`) ? 'bg-accent' : ''}`}
-                                                >
-                                                    <BookOpenCheck className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 sidebar-label">Políticas contábeis</span>
-                                                </Link>
-                                            </li>
-                                            <li>
-                                                <Link
-                                                    title={navCollapsed ? "Plano de contas" : undefined}
-                                                    href={lang === 'pt' ? '/contabil/plano-de-contas' : `/${lang}/contabil/plano-de-contas`}
-                                                    aria-current={isActive(lang === 'pt' ? '/contabil/plano-de-contas' : `/${lang}/contabil/plano-de-contas`) ? "page" : undefined}
-                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/contabil/plano-de-contas' : `/${lang}/contabil/plano-de-contas`) ? 'bg-accent' : ''}`}
-                                                >
-                                                    <BookText className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 sidebar-label">Plano de contas</span>
-                                                </Link>
-                                            </li>
-                                            <li>
-                                                <Link
-                                                    title={navCollapsed ? "Lançamentos" : undefined}
-                                                    href={lang === 'pt' ? '/contabil/lancamentos' : `/${lang}/contabil/lancamentos`}
-                                                    aria-current={isActive(lang === 'pt' ? '/contabil/lancamentos' : `/${lang}/contabil/lancamentos`) ? "page" : undefined}
-                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/contabil/lancamentos' : `/${lang}/contabil/lancamentos`) ? 'bg-accent' : ''}`}
-                                                >
-                                                    <NotebookPen className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 sidebar-label">Lançamentos</span>
-                                                </Link>
-                                            </li>
-                                            <li>
-                                                <Link
-                                                    title={navCollapsed ? "Extrato e conciliação" : undefined}
-                                                    href={lang === 'pt' ? '/contabil/conciliacao' : `/${lang}/contabil/conciliacao`}
-                                                    aria-current={isActive(lang === 'pt' ? '/contabil/conciliacao' : `/${lang}/contabil/conciliacao`) ? "page" : undefined}
-                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/contabil/conciliacao' : `/${lang}/contabil/conciliacao`) ? 'bg-accent' : ''}`}
-                                                >
-                                                    <ArrowLeftRight className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 sidebar-label">Extrato e conciliação</span>
-                                                </Link>
-                                            </li>
-                                            <li>
-                                                <Link
-                                                    title={navCollapsed ? "Contas bancárias" : undefined}
-                                                    href={lang === 'pt' ? '/contabil/contas-bancarias' : `/${lang}/contabil/contas-bancarias`}
-                                                    aria-current={isActive(lang === 'pt' ? '/contabil/contas-bancarias' : `/${lang}/contabil/contas-bancarias`) ? "page" : undefined}
-                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/contabil/contas-bancarias' : `/${lang}/contabil/contas-bancarias`) ? 'bg-accent' : ''}`}
-                                                >
-                                                    <Landmark className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 sidebar-label">Contas bancárias</span>
-                                                </Link>
-                                            </li>
-                                            <li>
-                                                <Link
-                                                    title={navCollapsed ? "Fechamento do mês" : undefined}
-                                                    href={lang === 'pt' ? '/contabil/fechamento' : `/${lang}/contabil/fechamento`}
-                                                    aria-current={isActive(lang === 'pt' ? '/contabil/fechamento' : `/${lang}/contabil/fechamento`) ? "page" : undefined}
-                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/contabil/fechamento' : `/${lang}/contabil/fechamento`) ? 'bg-accent' : ''}`}
-                                                >
-                                                    <CalendarCheck className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 sidebar-label">Fechamento do mês</span>
-                                                </Link>
-                                            </li>
-                                            <li className="my-2 border-t border-border" />
-                                            {/* Tools also reachable while signed in (same sub-menus as the public sidebar) */}
-                                            {FLAGS.SHOW_CALCULATORS && (
-                                                <li>
-                                                    <Link
-                                                        title={navCollapsed ? dict.menu.calculators : undefined}
-                                                        href={lang === 'pt' ? '/calculadoras' : `/${lang}/calculadoras`}
-                                                        onClick={() => setSidebarView('calculators-menu')}
-                                                        aria-current={isActive(lang === 'pt' ? '/calculadoras' : `/${lang}/calculadoras`) ? "page" : undefined}
-                                                        className={`sidebar-item w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/calculadoras' : `/${lang}/calculadoras`) ? 'bg-accent' : ''}`}
-                                                    >
-                                                        <Calculator className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                        <span className="ms-3 sidebar-label">{dict.menu.calculators}</span>
-                                                    </Link>
-                                                </li>
-                                            )}
-                                            <li>
-                                                <Link
-                                                    title={navCollapsed ? "Indicadores" : undefined}
-                                                    href={lang === 'pt' ? '/indices/panorama' : `/${lang}/indices/panorama`}
-                                                    onClick={() => setSidebarView('indices-menu')}
-                                                    aria-current={isActive(lang === 'pt' ? '/indices/panorama' : `/${lang}/indices/panorama`) ? "page" : undefined}
-                                                    className={`sidebar-item w-full flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] text-left ${isActive(lang === 'pt' ? '/indices/panorama' : `/${lang}/indices/panorama`) ? 'bg-accent' : ''}`}
-                                                >
-                                                    <LineChart className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 sidebar-label">Indicadores</span>
-                                                </Link>
-                                            </li>
-                                            <li className="my-2 border-t border-border" />
-                                            <li>
-                                                <Link
-                                                    title={navCollapsed ? "Proprietário" : undefined}
-                                                    href={lang === 'pt' ? '/proprietario' : `/${lang}/proprietario`}
-                                                    aria-current={isActive(lang === 'pt' ? '/proprietario' : `/${lang}/proprietario`) ? "page" : undefined}
-                                                    className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/proprietario' : `/${lang}/proprietario`) ? 'bg-accent' : ''}`}
-                                                >
-                                                    <User className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 sidebar-label">Proprietário</span>
-                                                </Link>
-                                            </li>
-                                            <li>
-                                                <SignOutButton>
-                                                    <button
-                                                        title={navCollapsed ? "Sair" : undefined}
-                                                        className="sidebar-item flex w-full items-center rounded-lg p-2 text-foreground hover:bg-red-50 hover:text-red-600 group min-h-[44px]">
-                                                        <svg
-                                                            className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-red-600"
-                                                            aria-hidden="true"
-                                                            xmlns="http://www.w3.org/2000/svg"
-                                                            fill="none"
-                                                            viewBox="0 0 18 16"
-                                                        >
-                                                            <path
-                                                                stroke="currentColor"
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                                strokeWidth="2"
-                                                                d="M1 8h11m0 0L8 4m4 4-4 4m4-11h3a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-3"
-                                                            />
-                                                        </svg>
-                                                        <span className="ms-3 sidebar-label">Sair</span>
-                                                    </button>
-                                                </SignOutButton>
-                                            </li>
-                                        </>
-                                    )
-                                ) : (
-                                    <>
-                                        <li>
-                                            <Link
-                                                title={navCollapsed ? dict.menu.owner : undefined}
-                                                href={lang === 'pt' ? '/login/proprietario' : `/${lang}/login/proprietario`}
-                                                aria-current={isActive(lang === 'pt' ? '/login/proprietario' : `/${lang}/login/proprietario`) ? "page" : undefined}
-                                                className={`sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px] ${isActive(lang === 'pt' ? '/login/proprietario' : `/${lang}/login/proprietario`) ? 'bg-accent' : ''}`}
-                                            >
-                                                <KeyRound className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                <span className="ms-3 sidebar-label">{dict.menu.owner}</span>
-                                            </Link>
-                                        </li>
-                                        {FLAGS.SHOW_LOGIN_LINKS && (
-                                            <>
-                                                <li>
-                                                    <Link
-                                                        title={navCollapsed ? dict.menu.brokers : undefined}
-                                                        href={lang === 'pt' ? '/login/corretor' : `/${lang}/login/corretor`}
-                                                        className="sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
-                                                    >
-                                                        <Briefcase className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                        <span className="ms-3 sidebar-label">{dict.menu.brokers}</span>
-                                                    </Link>
-                                                </li>
-                                                <li>
-                                                    <Link
-                                                        title={navCollapsed ? dict.menu.agencies : undefined}
-                                                        href={lang === 'pt' ? '/login/imobiliaria' : `/${lang}/login/imobiliaria`}
-                                                        className="sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
-                                                    >
-                                                        <Building2 className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                        <span className="ms-3 sidebar-label">{dict.menu.agencies}</span>
-                                                    </Link>
-                                                </li>
-                                                <li>
-                                                    <Link
-                                                        title={navCollapsed ? dict.menu.residents : undefined}
-                                                        href={lang === 'pt' ? '/login' : `/${lang}/login`}
-                                                        className="sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
-                                                    >
-                                                        <User className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                        <span className="ms-3 sidebar-label">{dict.menu.residents}</span>
-                                                    </Link>
-                                                </li>
-                                                <li>
-                                                    <Link
-                                                        title={navCollapsed ? dict.menu.owners : undefined}
-                                                        href={lang === 'pt' ? '/login/proprietario' : `/${lang}/login/proprietario`}
-                                                        className="sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
-                                                    >
-                                                        <KeyRound className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                        <span className="ms-3 sidebar-label">{dict.menu.owners}</span>
-                                                    </Link>
-                                                </li>
-                                                <li>
-                                                    <Link
-                                                        title={navCollapsed ? dict.menu.developers : undefined}
-                                                        href={lang === 'pt' ? '/login/construtora' : `/${lang}/login/construtora`}
-                                                        className="sidebar-item flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
-                                                    >
-                                                        <HardHat className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                        <span className="ms-3 sidebar-label">{dict.menu.developers}</span>
-                                                    </Link>
-                                                </li>
-                                            </>
-                                        )
-                                        }
-                                    </>
+                            {isSignedIn ? (
+                                FLAGS.SHOW_DASHBOARD_LINKS && (
+                                    <ul className="space-y-2 font-medium">
+                                        {SIGNED_IN_GROUPS.map(renderGroup)}
+                                    </ul>
                                 )
-                                }
-                            </ul>
+                            ) : (
+                                <ul className="space-y-2 font-medium">
+                                    {signedOutItems.map(renderItem)}
+                                    <li className="my-2 border-t border-border" />
+                                    {loginItems.map(renderItem)}
+                                </ul>
+                            )}
                         </div>
                     ) : sidebarView === 'rent-filters' || sidebarView === 'buy-filters' || sidebarView === 'launches-filters' ? (
                         <PropertyFilters
@@ -656,259 +441,45 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                             toggleSection={toggleSection}
                         />
                     ) : sidebarView === 'calculators-menu' ? (
-                        <div className="space-y-4">
-                            <button onClick={backToMain} className="flex items-center text-sm text-muted-foreground hover:text-foreground mb-4">
-                                <span className="mr-1">←</span> {dict.menu.back}
-                            </button>
+                        <div className="space-y-2">
+                            {backButton}
 
-                            <h2 className="text-lg font-semibold text-foreground">{dict.menu.calculators}</h2>
+                            <h2 className="sidebar-rail-hidden px-2 pb-2 text-lg font-semibold text-foreground">{dict.menu.calculators}</h2>
 
-                            <div className="space-y-6">
-                                {/* Impostos */}
-                                <div className="space-y-1">
-                                    <button
-                                        onClick={() => toggleSection('taxes')}
-                                        className="flex w-full items-center justify-between px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground focus:outline-none"
-                                    >
-                                        {dict.menu.taxes}
-                                        {expandedSections['taxes'] ? (
-                                            <Minus className="h-4 w-4" />
-                                        ) : (
-                                            <Plus className="h-4 w-4" />
+                            <div className="space-y-4">
+                                {calculatorSections.map((section, index) => (
+                                    <div key={section.key} className="space-y-1">
+                                        {navCollapsed && index > 0 && <div className="my-1 border-t border-border" aria-hidden="true" />}
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleSection(section.key)}
+                                            aria-expanded={!!expandedSections[section.key]}
+                                            className="sidebar-rail-hidden flex w-full items-center justify-between px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground focus:outline-none"
+                                        >
+                                            {section.label}
+                                            {expandedSections[section.key] ? (
+                                                <Minus className="h-4 w-4" />
+                                            ) : (
+                                                <Plus className="h-4 w-4" />
+                                            )}
+                                        </button>
+                                        {(navCollapsed || expandedSections[section.key]) && (
+                                            <ul className="space-y-1 font-medium animate-in slide-in-from-top-1 fade-in duration-200">
+                                                {section.items.map(renderSubItem)}
+                                            </ul>
                                         )}
-                                    </button>
-                                    {expandedSections['taxes'] && (
-                                        <ul className="space-y-1 font-medium animate-in slide-in-from-top-1 fade-in duration-200">
-                                            <li>
-                                                <Link
-                                                    href={lang === 'pt' ? '/calculadoras/imposto-aluguel-pessoa-fisica' : `/${lang}/calculadoras/imposto-aluguel-pessoa-fisica`}
-                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
-                                                >
-                                                    <User className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 text-sm">{dict.menu.rentOnIndividual}</span>
-                                                </Link>
-                                            </li>
-                                            <li>
-                                                <Link
-                                                    href={lang === 'pt' ? '/calculadoras/aluguel-na-holding' : `/${lang}/calculadoras/aluguel-na-holding`}
-                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
-                                                >
-                                                    <Building2 className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 text-sm">{dict.menu.rentalOnHolding}</span>
-                                                </Link>
-                                            </li>
-                                            <li>
-                                                <Link
-                                                    href={lang === 'pt' ? '/calculadoras/irpf-2026' : `/${lang}/calculadoras/irpf-2026`}
-                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
-                                                >
-                                                    <Calculator className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 text-sm">{dict.menu.irpf2026}</span>
-                                                </Link>
-                                            </li>
-                                            <li>
-                                                <Link
-                                                    href={lang === 'pt' ? '/calculadoras/imposto-minimo-altas-rendas' : `/${lang}/calculadoras/imposto-minimo-altas-rendas`}
-                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
-                                                >
-                                                    <Gem className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 text-sm">{dict.menu.highIncomeTax}</span>
-                                                </Link>
-                                            </li>
-
-                                        </ul>
-                                    )}
-                                </div>
-
-                                {/* Financeiro */}
-                                <div className="space-y-1">
-                                    <button
-                                        onClick={() => toggleSection('finance')}
-                                        className="flex w-full items-center justify-between px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground focus:outline-none"
-                                    >
-                                        {dict.menu.finance}
-                                        {expandedSections['finance'] ? (
-                                            <Minus className="h-4 w-4" />
-                                        ) : (
-                                            <Plus className="h-4 w-4" />
-                                        )}
-                                    </button>
-                                    {expandedSections['finance'] && (
-                                        <ul className="space-y-1 font-medium animate-in slide-in-from-top-1 fade-in duration-200">
-                                            <li>
-                                                <Link
-                                                    href={lang === 'pt' ? '/calculadoras/conversor-juros-mensal-anual' : `/${lang}/calculadoras/conversor-juros-mensal-anual`}
-                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
-                                                >
-                                                    <ArrowLeftRight className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 text-sm">Conversor de Juros Mensal e Anual</span>
-                                                </Link>
-                                            </li>
-                                            <li>
-                                                <Link
-                                                    href={lang === 'pt' ? '/calculadora-juros-compostos' : `/${lang}/calculadora-juros-compostos`}
-                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
-                                                >
-                                                    <TrendingUp className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 text-sm">Juros Compostos</span>
-                                                </Link>
-                                            </li>
-                                            <li>
-                                                <Link
-                                                    href={lang === 'pt' ? '/calculadora-payback-imovel' : `/${lang}/calculadora-payback-imovel`}
-                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
-                                                >
-                                                    <PiggyBank className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 text-sm">Payback de Imóvel</span>
-                                                </Link>
-                                            </li>
-                                            <li>
-                                                <Link
-                                                    href={lang === 'pt' ? '/calculadora-independencia-financeira' : `/${lang}/calculadora-independencia-financeira`}
-                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
-                                                >
-                                                    <Sun className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 text-sm">{dict.menu.financialIndependence}</span>
-                                                </Link>
-                                            </li>
-                                        </ul>
-                                    )}
-                                </div>
-
-                                {/* Aluguel */}
-                                <div className="space-y-1">
-                                    <button
-                                        onClick={() => toggleSection('rent')}
-                                        className="flex w-full items-center justify-between px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground focus:outline-none"
-                                    >
-                                        {dict.menu.rentCategory}
-                                        {expandedSections['rent'] ? (
-                                            <Minus className="h-4 w-4" />
-                                        ) : (
-                                            <Plus className="h-4 w-4" />
-                                        )}
-                                    </button>
-                                    {expandedSections['rent'] && (
-                                        <ul className="space-y-1 font-medium animate-in slide-in-from-top-1 fade-in duration-200">
-                                            <li>
-                                                <Link
-                                                    href={lang === 'pt' ? '/calculadora-reajuste-aluguel' : `/${lang}/calculadora-reajuste-aluguel`}
-                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
-                                                >
-                                                    <TrendingUp className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 text-sm">Reajuste de Aluguel</span>
-                                                </Link>
-                                            </li>
-                                            <li>
-                                                <Link
-                                                    href={lang === 'pt' ? '/calculadoras/multa-atraso-aluguel' : `/${lang}/calculadoras/multa-atraso-aluguel`}
-                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
-                                                >
-                                                    <AlertCircle className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 text-sm">{dict.rentLateFineCalculatorPage?.menuTitle || "Multa por Atraso"}</span>
-                                                </Link>
-                                            </li>
-                                            <li>
-                                                <Link
-                                                    href={lang === 'pt' ? '/calculadoras/multa-rescisao-contrato-aluguel' : `/${lang}/calculadoras/multa-rescisao-contrato-aluguel`}
-                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
-                                                >
-                                                    <FileText className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 text-sm">{dict.rentFineCalculatorPage?.menuTitle || "Calculadora Rescisão"}</span>
-                                                </Link>
-                                            </li>
-                                            <li>
-                                                <Link
-                                                    href={lang === 'pt' ? '/calculadoras/aluguel-proporcional' : `/${lang}/calculadoras/aluguel-proporcional`}
-                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
-                                                >
-                                                    <Calculator className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 text-sm">{dict.proRataRentCalculatorPage?.menuTitle || "Aluguel Proporcional"}</span>
-                                                </Link>
-                                            </li>
-                                        </ul>
-                                    )}
-                                </div>
-
-                                {/* Investimento */}
-                                <div className="space-y-1">
-                                    <button
-                                        onClick={() => toggleSection('investment')}
-                                        className="flex w-full items-center justify-between px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground focus:outline-none"
-                                    >
-                                        {dict.menu.investment}
-                                        {expandedSections['investment'] ? (
-                                            <Minus className="h-4 w-4" />
-                                        ) : (
-                                            <Plus className="h-4 w-4" />
-                                        )}
-                                    </button>
-                                    {expandedSections['investment'] && (
-                                        <ul className="space-y-1 font-medium animate-in slide-in-from-top-1 fade-in duration-200">
-                                            <li>
-                                                <Link
-                                                    href={lang === 'pt' ? '/calculadoras/renda-aluguel' : `/${lang}/calculadoras/renda-aluguel`}
-                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
-                                                >
-                                                    <Coins className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 text-sm">Renda do Aluguel paga o Imóvel?</span>
-                                                </Link>
-                                            </li>
-                                            <li>
-                                                <Link
-                                                    href={lang === 'pt' ? '/calculadora-amortizacao-financiamento-imobiliario' : `/${lang}/calculadora-amortizacao-financiamento-imobiliario`}
-                                                    className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
-                                                >
-                                                    <PiggyBank className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                                    <span className="ms-3 text-sm">Simulador de Amortização</span>
-                                                </Link>
-                                            </li>
-                                        </ul>
-                                    )}
-                                </div>
-
-
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     ) : sidebarView === 'indices-menu' ? (
-                        <div className="space-y-4">
-                            <button onClick={backToMain} className="flex items-center text-sm text-muted-foreground hover:text-foreground mb-4">
-                                <span className="mr-1">←</span> {dict.menu.back}
-                            </button>
+                        <div className="space-y-2">
+                            {backButton}
 
-                            <h2 className="text-lg font-semibold text-foreground">Indicadores</h2>
+                            <h2 className="sidebar-rail-hidden px-2 pb-2 text-lg font-semibold text-foreground">Indicadores</h2>
 
-                            <ul className="space-y-2 font-medium">
-                                <li>
-                                    <Link
-                                        href={lang === 'pt' ? '/indices/panorama' : `/${lang}/indices/panorama`}
-                                        className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
-                                    >
-                                        <LayoutDashboard className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                        <span className="ms-3 text-sm">Panorama Econômico</span>
-                                    </Link>
-                                </li>
-                                {['CDI', 'FipeZAP', 'IGPM', 'INPC', 'IPCA', 'IVAR', 'REAJUSTE-SALARIO-MINIMO', 'SELIC'].map((code) => (
-                                    <li key={code}>
-                                        <Link
-                                            href={lang === 'pt' ? `/indices/${code.toLowerCase()}` : `/${lang}/indices/${code.toLowerCase()}`}
-                                            className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
-                                        >
-                                            <TrendingUp className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                            <span className="ms-3 text-sm">{code === 'IGPM' ? 'IGP-M' : code === 'REAJUSTE-SALARIO-MINIMO' ? 'Salário Mínimo' : code}</span>
-                                        </Link>
-                                    </li>
-                                ))}
-                                <li>
-                                    <Link
-                                        href={lang === 'pt' ? '/indices/fipezap/cidades' : `/${lang}/indices/fipezap/cidades`}
-                                        className="flex items-center rounded-lg p-2 text-foreground hover:bg-accent group min-h-[44px]"
-                                        title="FipeZAP por cidade"
-                                    >
-                                        <MapPinned className="h-5 w-5 text-muted-foreground transition duration-75 group-hover:text-foreground" />
-                                        <span className="ms-3 text-sm">FipeZAP por cidade</span>
-                                    </Link>
-                                </li>
+                            <ul className="space-y-1 font-medium">
+                                {indexItems.map(renderSubItem)}
                             </ul>
                         </div>
                     ) : null}
@@ -933,7 +504,7 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                     variant="ghost"
                                     size="icon"
                                     onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                                    className="h-9 w-9 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                                    className={toolButton}
                                     title={theme === 'dark' ? "Mudar para modo claro" : "Mudar para modo escuro"}
                                     aria-label={theme === 'dark' ? "Mudar para modo claro" : "Mudar para modo escuro"}
                                 >
@@ -941,18 +512,64 @@ export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
                                 </Button>
                             </div>
                         </div>
-                        <button
-                            type="button"
-                            onClick={toggleCollapsed}
-                            aria-pressed={collapsed}
-                            title={collapsed ? dict.menu.showMore : dict.menu.showLess}
-                            className="sidebar-item hidden sm:flex w-full items-center rounded-lg p-2 text-xs text-muted-foreground hover:text-foreground hover:bg-accent min-h-[44px] transition-colors"
-                        >
-                            {collapsed
-                                ? <ChevronsRight className="h-5 w-5 shrink-0" />
-                                : <ChevronsLeft className="h-5 w-5 shrink-0" />}
-                            <span className="ms-3 sidebar-label">{collapsed ? dict.menu.showMore : dict.menu.showLess}</span>
-                        </button>
+
+                        {/* Tool row: compact rail toggle plus, while signed in, the global privacy toggles.
+                            Icons only; the tooltip says what each one does. Stacks vertically on the rail. */}
+                        <div className="sidebar-tools flex items-center gap-2">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                type="button"
+                                onClick={toggleCollapsed}
+                                aria-pressed={collapsed}
+                                title={collapsed ? dict.menu.showMore : dict.menu.showLess}
+                                aria-label={collapsed ? dict.menu.showMore : dict.menu.showLess}
+                                className={`hidden sm:inline-flex ${toolButton}`}
+                            >
+                                {collapsed ? <ChevronsRight className="h-5 w-5" /> : <ChevronsLeft className="h-5 w-5" />}
+                            </Button>
+                            {isSignedIn && (
+                                <>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        type="button"
+                                        onClick={toggleSensitive}
+                                        aria-pressed={hideSensitive}
+                                        title={hideSensitive ? "Mostrar dados sensíveis (endereços, CPF/CNPJ, medidores)" : "Ocultar dados sensíveis (endereços, CPF/CNPJ, medidores) em todas as páginas"}
+                                        aria-label={hideSensitive ? "Mostrar dados sensíveis" : "Ocultar dados sensíveis"}
+                                        className={hideSensitive ? toolButtonOn : toolButton}
+                                    >
+                                        {hideSensitive ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        type="button"
+                                        onClick={toggleMoney}
+                                        aria-pressed={hideMoney}
+                                        title={hideMoney ? "Mostrar valores em R$" : "Ocultar valores em R$ em todas as páginas"}
+                                        aria-label={hideMoney ? "Mostrar valores em R$" : "Ocultar valores em R$"}
+                                        className={hideMoney ? toolButtonOn : toolButton}
+                                    >
+                                        <DollarSign className={`h-5 w-5 ${hideMoney ? 'opacity-40' : ''}`} />
+                                    </Button>
+                                </>
+                            )}
+                        </div>
+
+                        {isSignedIn && FLAGS.SHOW_DASHBOARD_LINKS && (
+                            <SignOutButton>
+                                <button
+                                    type="button"
+                                    title={navCollapsed ? "Sair" : undefined}
+                                    className="sidebar-item flex w-full items-center rounded-lg p-2 text-foreground hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 group min-h-[44px]"
+                                >
+                                    <LogOut className="h-5 w-5 shrink-0 text-muted-foreground transition duration-75 group-hover:text-red-600" aria-hidden="true" />
+                                    <span className="ms-3 sidebar-label">Sair</span>
+                                </button>
+                            </SignOutButton>
+                        )}
                     </div>
                 </div>
             </aside>

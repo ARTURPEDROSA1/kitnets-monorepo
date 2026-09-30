@@ -10,6 +10,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle, Building, ExternalLink, Loader2, Percent, Receipt, Trash2, TrendingUp, Wallet } from "lucide-react";
 import Link from "next/link";
 import { Bar, CartesianGrid, Cell, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from "recharts";
+import { Money } from "@/components/privacy";
 import { cn } from "@/lib/utils";
 import { CONDO_COST_KEYS, CONDO_COST_LABELS, isAutoCostKey, summarizeCondominium, type CondoAutoKey, type CondoCostKey, type CondominiumCostInput, type CondominiumMonth } from "@/lib/condominium";
 import { formatMonthKey } from "@/lib/property-income";
@@ -154,7 +155,7 @@ export default function CondominiumLedger({ propertyId, lang = "pt" }: { propert
         margin: {
             what: "Quanto da receita do condomínio vira resultado.",
             formula: "Margem = resultado ÷ receita",
-            example: summary.marginPct !== null ? <>{formatBRL(summary.result)} ÷ {formatBRL(summary.revenue)} = {summary.marginPct}%</> : undefined,
+            example: summary.marginPct !== null ? <><Money>{formatBRL(summary.result)}</Money> ÷ <Money>{formatBRL(summary.revenue)}</Money> = {summary.marginPct}%</> : undefined,
         },
     };
 
@@ -172,9 +173,9 @@ export default function CondominiumLedger({ propertyId, lang = "pt" }: { propert
 
             {/* KPIs of the period */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <Tile label="Receita do condomínio" value={formatBRL(summary.revenue)} hint={summary.months ? `${summary.months} ${summary.months === 1 ? "mês" : "meses"} · ${periodLabel(period)}` : `Nenhum mês · ${periodLabel(period)}`} icon={<Wallet className="w-4 h-4" />} tone="emerald" info={info.revenue} />
-                <Tile label="Custos" value={formatBRL(summary.totalCost)} hint={summary.revenue > 0 ? `${Math.round((summary.totalCost / summary.revenue) * 100)}% da receita` : "—"} icon={<Receipt className="w-4 h-4" />} tone="rose" info={info.cost} />
-                <Tile label="Resultado" value={<span className={summary.result < 0 ? "text-rose-600" : undefined}>{formatBRL(summary.result)}</span>} hint={summary.months ? `Média ${formatBRL(summary.result / summary.months)}/mês` : "—"} icon={<TrendingUp className="w-4 h-4" />} tone="blue" info={info.result} />
+                <Tile label="Receita do condomínio" value={formatBRL(summary.revenue)} hint={summary.months ? `${summary.months} ${summary.months === 1 ? "mês" : "meses"} · ${periodLabel(period)}` : `Nenhum mês · ${periodLabel(period)}`} icon={<Wallet className="w-4 h-4" />} tone="emerald" info={info.revenue} money />
+                <Tile label="Custos" value={formatBRL(summary.totalCost)} hint={summary.revenue > 0 ? `${Math.round((summary.totalCost / summary.revenue) * 100)}% da receita` : "—"} icon={<Receipt className="w-4 h-4" />} tone="rose" info={info.cost} money />
+                <Tile label="Resultado" value={<span className={summary.result < 0 ? "text-rose-600" : undefined}>{formatBRL(summary.result)}</span>} hint={summary.months ? `Média ${formatBRL(summary.result / summary.months)}/mês` : "—"} icon={<TrendingUp className="w-4 h-4" />} tone="blue" info={info.result} money />
                 <Tile label="Margem" value={summary.marginPct !== null ? `${summary.marginPct}%` : "—"} hint="Resultado ÷ receita" icon={<Percent className="w-4 h-4" />} tone="violet" info={info.margin} />
             </div>
 
@@ -191,7 +192,7 @@ export default function CondominiumLedger({ propertyId, lang = "pt" }: { propert
                     </div>
                 </div>
                 {chartPoints.length > 0 ? (
-                    <div className="h-[260px] w-full">
+                    <Money as="div" className="h-[260px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
                             <ComposedChart data={chartPoints} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
@@ -211,7 +212,7 @@ export default function CondominiumLedger({ propertyId, lang = "pt" }: { propert
                                 <Line type="monotone" dataKey="resultado" name="Resultado" stroke="#3b82f6" strokeWidth={3} dot={chartPoints.length > 24 ? false : { r: 4 }} />
                             </ComposedChart>
                         </ResponsiveContainer>
-                    </div>
+                    </Money>
                 ) : (
                     <p className="text-sm text-muted-foreground py-6 text-center">Nenhum mês no período. Os meses vêm de Receitas de Aluguel: um mês aparece aqui assim que uma unidade do imóvel tem aluguel ou condomínio registrado.</p>
                 )}
@@ -255,10 +256,10 @@ export default function CondominiumLedger({ propertyId, lang = "pt" }: { propert
                                                 {row.expected && <span className="ml-1 text-[10px] font-semibold text-amber-700 dark:text-amber-400">previsto</span>}
                                                 {busy && <Loader2 className="inline w-3 h-3 ml-1 animate-spin text-muted-foreground" />}
                                             </td>
-                                            {show("revenue") && <td {...sel.cellProps("revenue", row.month, row.revenue, "px-2 py-1 text-right font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums")} title={row.units ? `${row.units} ${row.units === 1 ? "unidade" : "unidades"} com condomínio no mês` : "Nenhuma unidade com condomínio neste mês em Receitas de Aluguel"}>{formatBRL(row.revenue)}</td>}
+                                            {show("revenue") && <td {...sel.cellProps("revenue", row.month, row.revenue, "px-2 py-1 text-right font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums")} title={row.units ? `${row.units} ${row.units === 1 ? "unidade" : "unidades"} com condomínio no mês` : "Nenhuma unidade com condomínio neste mês em Receitas de Aluguel"}><Money>{formatBRL(row.revenue)}</Money></td>}
                                             {CONDO_COST_KEYS.map(k => show(k) && (isAutoCostKey(k) ? (
                                                 <td key={k} {...sel.cellProps(k, row.month, row[k], "px-2 py-1 text-right tabular-nums text-muted-foreground")} title={source[k].title}>
-                                                    {row[k] > 0 ? formatBRL(row[k]) : (
+                                                    {row[k] > 0 ? <Money>{formatBRL(row[k])}</Money> : (
                                                         <Link href={source[k].href} onClick={e => e.stopPropagation()} className="inline-flex items-center gap-1 text-[11px] text-emerald-700 dark:text-emerald-400 hover:underline" title={`Sem valor neste mês · abrir ${source[k].label}`}>
                                                             — <ExternalLink className="w-3 h-3" />
                                                         </Link>
@@ -267,8 +268,8 @@ export default function CondominiumLedger({ propertyId, lang = "pt" }: { propert
                                             ) : (
                                                 <td key={k} {...sel.cellProps(k, row.month, row[k], "px-2 py-1 text-right", () => cancelDraft(row.month, k))}>{cell(k)}</td>
                                             )))}
-                                            {show("totalCost") && <td {...sel.cellProps("totalCost", row.month, row.totalCost, "px-2 py-1 text-right font-semibold text-rose-600 tabular-nums")}>{formatBRL(row.totalCost)}</td>}
-                                            {show("result") && <td {...sel.cellProps("result", row.month, row.result, cn("px-2 py-1 text-right font-semibold tabular-nums", row.result < 0 ? "text-rose-600" : "text-foreground"))}>{formatBRL(row.result)}</td>}
+                                            {show("totalCost") && <td {...sel.cellProps("totalCost", row.month, row.totalCost, "px-2 py-1 text-right font-semibold text-rose-600 tabular-nums")}><Money>{formatBRL(row.totalCost)}</Money></td>}
+                                            {show("result") && <td {...sel.cellProps("result", row.month, row.result, cn("px-2 py-1 text-right font-semibold tabular-nums", row.result < 0 ? "text-rose-600" : "text-foreground"))}><Money>{formatBRL(row.result)}</Money></td>}
                                             {show("notes") && <td {...sel.cellProps("notes", row.month, null, "px-2 py-1", () => cancelDraft(row.month, "notes"))}>
                                                 <input
                                                     type="text" disabled={busy} value={d.notes ?? (row.notes ?? "")} placeholder="—"

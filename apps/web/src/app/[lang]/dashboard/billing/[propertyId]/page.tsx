@@ -24,6 +24,7 @@ import {
 import { PdfViewerModal } from "@/components/ui/PdfViewerModal";
 import AgencyLogo from "@/components/imobiliaria/AgencyLogo";
 import { ConsumptionChart } from "@/components/dashboard/ConsumptionChart";
+import { Money, Sensitive } from "@/components/privacy";
 import { cn } from "@/lib/utils";
 import { columnTableKey, recordTableKey } from "@/lib/ui-preferences";
 import { CellSumBar, useCellSum } from "@/components/properties/TableCellSum";
@@ -185,7 +186,7 @@ function UnitInput({ value, draft, onDraft, onCommit, decimals, prefix = "", suf
             onChange={ev => onDraft(ev.target.value)}
             onBlur={() => { setEditing(false); onCommit(); }}
             onKeyDown={ev => { if (ev.key === "Enter") (ev.target as HTMLInputElement).blur(); }}
-            className={cn(CELL_INPUT, className)}
+            className={cn(CELL_INPUT, prefix.includes("R$") && "privacy-money-input", className)}   // R$ cells blur at rest under the sidebar dollar toggle
         />
     );
 }
@@ -481,19 +482,19 @@ export default function BillingPage() {
                                 {property?.address && (
                                     <span className="text-xs text-muted-foreground flex items-center gap-1 mr-1">
                                         <MapPin className="w-3 h-3" />
-                                        {property.address}{property.city ? ` — ${property.city}${property.state ? `/${property.state}` : ""}` : ""}
+                                        <Sensitive>{property.address}</Sensitive>{property.city ? ` — ${property.city}${property.state ? `/${property.state}` : ""}` : ""}
                                     </span>
                                 )}
                                 {property?.connection_code && (
                                     <span className="text-xs bg-muted text-muted-foreground px-2.5 py-0.5 rounded-full font-mono flex items-center gap-1">
                                         <Link2 className="w-3 h-3" />
-                                        Ligação: {property.connection_code}
+                                        Ligação: <Sensitive>{property.connection_code}</Sensitive>
                                     </span>
                                 )}
                                 {latest?.meter_number && (
                                     <span className="text-xs bg-muted text-muted-foreground px-2.5 py-0.5 rounded-full font-mono flex items-center gap-1">
                                         <Gauge className="w-3 h-3" />
-                                        Hidrômetro: {latest.meter_number}
+                                        Hidrômetro: <Sensitive>{latest.meter_number}</Sensitive>
                                     </span>
                                 )}
                                 <span className="text-xs bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
@@ -616,7 +617,7 @@ export default function BillingPage() {
                                     <span className="text-xs font-semibold uppercase tracking-wider">Valor a pagar</span>
                                     <DollarSign className="w-4 h-4" />
                                 </div>
-                                <p className="text-2xl font-bold text-foreground">{formatCurrency(latest.total_amount)}</p>
+                                <Money as="p" className="text-2xl font-bold text-foreground">{formatCurrency(latest.total_amount)}</Money>
                                 <p className="text-[11px] text-muted-foreground">Vencimento {formatDate(latest.due_date)}</p>
                             </div>
                             <div className="bg-card border border-border rounded-xl p-4 shadow-xs space-y-1">
@@ -625,7 +626,7 @@ export default function BillingPage() {
                                     <TrendingUp className="w-4 h-4" />
                                 </div>
                                 <p className="text-2xl font-bold text-foreground">
-                                    {latest.effective_rate_per_m3 !== null ? `R$ ${formatNumber(latest.effective_rate_per_m3, 2)}` : "-"}
+                                    <Money>{latest.effective_rate_per_m3 !== null ? `R$ ${formatNumber(latest.effective_rate_per_m3, 2)}` : "-"}</Money>
                                     <span className="text-sm font-normal text-muted-foreground"> /m³</span>
                                 </p>
                                 <p className="text-[11px] text-muted-foreground">Valor ÷ consumo da conta atual</p>
@@ -647,7 +648,7 @@ export default function BillingPage() {
                                     <span className="text-xs font-semibold uppercase tracking-wider">Média mensal</span>
                                     <BarChart3 className="w-4 h-4" />
                                 </div>
-                                <p className="text-2xl font-bold text-foreground">{formatCurrency(summary.avgCost)}</p>
+                                <Money as="p" className="text-2xl font-bold text-foreground">{formatCurrency(summary.avgCost)}</Money>
                                 <p className="text-[11px] text-muted-foreground">{formatNumber(summary.avgM3, 1)} m³/mês · {summary.months} {summary.months === 1 ? "mês" : "meses"}</p>
                             </div>
                             <div className="bg-card border border-border rounded-xl p-4 shadow-xs space-y-1">
@@ -655,7 +656,7 @@ export default function BillingPage() {
                                     <span className="text-xs font-semibold uppercase tracking-wider">Total no período</span>
                                     <DollarSign className="w-4 h-4" />
                                 </div>
-                                <p className="text-2xl font-bold text-foreground">{formatCurrency(summary.totalCost)}</p>
+                                <Money as="p" className="text-2xl font-bold text-foreground">{formatCurrency(summary.totalCost)}</Money>
                                 <p className="text-[11px] text-muted-foreground">{formatNumber(summary.totalM3, 0)} m³ consumidos</p>
                             </div>
                             <div className="bg-card border border-border rounded-xl p-4 shadow-xs space-y-1">
@@ -663,7 +664,7 @@ export default function BillingPage() {
                                     <span className="text-xs font-semibold uppercase tracking-wider">Conta mais alta</span>
                                     <Calendar className="w-4 h-4" />
                                 </div>
-                                <p className="text-2xl font-bold text-foreground">{formatCurrency(summary.highest.total_amount)}</p>
+                                <Money as="p" className="text-2xl font-bold text-foreground">{formatCurrency(summary.highest.total_amount)}</Money>
                                 <p className="text-[11px] text-muted-foreground">{formatMonth(summary.highest.reference_month)} · {formatNumber(summary.highest.consumption_m3, 0)} m³</p>
                             </div>
                         </div>
@@ -698,7 +699,7 @@ export default function BillingPage() {
                             <div className="bg-card border border-border rounded-xl p-6 shadow-xs">
                                 <h3 className="text-sm font-bold text-foreground">Valor mensal (R$)</h3>
                                 <p className="text-xs text-muted-foreground mb-4">Custo da conta de água mês a mês</p>
-                                <ConsumptionChart data={chartData} dataKey="cost" unit="R$" color="#10b981" height={280} />
+                                <Money as="div"><ConsumptionChart data={chartData} dataKey="cost" unit="R$" color="#10b981" height={280} /></Money>
                             </div>
                         </div>
                     </div>
@@ -769,7 +770,7 @@ export default function BillingPage() {
                                                     {show("total") && cell("total", "total_amount", 2, { prefix: "R$ ", className: "font-bold text-foreground" })}
                                                     {show("rate") && (
                                                         <td {...sel.cellProps("rate", b.id, b.effective_rate_per_m3, cn(ro, "font-mono text-muted-foreground"))}>
-                                                            {b.effective_rate_per_m3 !== null ? `R$ ${formatNumber(b.effective_rate_per_m3, 2)}` : "-"}
+                                                            <Money>{b.effective_rate_per_m3 !== null ? `R$ ${formatNumber(b.effective_rate_per_m3, 2)}` : "-"}</Money>
                                                         </td>
                                                     )}
                                                     {show("occurrence") && (

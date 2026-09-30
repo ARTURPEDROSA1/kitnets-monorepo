@@ -12,6 +12,7 @@ import { ArrowLeft, Building2, DollarSign, Eye, FileSignature, FileText, Globe, 
 import { Button } from "@kitnets/ui";
 import Tile from "@/components/properties/Tile";
 import AgencyLogo from "./AgencyLogo";
+import { Money, Sensitive } from "@/components/privacy";
 import { cn } from "@/lib/utils";
 import { formatDateBR } from "@/lib/dates";
 import { formatCEP, formatPhone } from "@/lib/validators";
@@ -120,27 +121,27 @@ export default function AgencyDashboard({ agencyId, lang, today, initialBundle =
                             </div>
                             {agency.trade_name && <p className="break-words text-sm text-muted-foreground">{agency.name}</p>}
                             <p className="flex flex-wrap items-center gap-x-2 text-sm text-foreground">
-                                {row.cnpj && <span>CNPJ {row.cnpj}</span>}
+                                {row.cnpj && <span>CNPJ <Sensitive>{row.cnpj}</Sensitive></span>}
                                 {row.cnpj && row.creci && <span className="text-muted-foreground">·</span>}
-                                {row.creci && <span className="inline-flex items-center gap-1"><Shield className="h-3.5 w-3.5 text-muted-foreground" /> {row.creci}</span>}
+                                {row.creci && <span className="inline-flex items-center gap-1"><Shield className="h-3.5 w-3.5 text-muted-foreground" /> <Sensitive>{row.creci}</Sensitive></span>}
                                 {!row.cnpj && !row.creci && <span className="text-muted-foreground">sem CNPJ nem CRECI informados</span>}
                             </p>
                             <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
                                 {agency.owner_name && <span className="inline-flex items-center gap-1"><User className="h-3.5 w-3.5" /> {agency.owner_name}</span>}
                                 {agency.owner_name && <span>·</span>}
-                                <span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {address || "endereço não informado"}</span>
+                                <span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {address ? <Sensitive>{address}</Sensitive> : "endereço não informado"}</span>
                                 <span>·</span>
                                 <span>cadastrada há {monthsLabel(row.monthsRegistered)}</span>
                             </p>
                             <div className="flex flex-wrap items-center gap-1.5 pt-1">
                                 {row.whatsapp && (
                                     <a href={row.whatsapp} target="_blank" rel="noopener noreferrer" className={cn(chip, "border-emerald-500 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-300")}>
-                                        <MessageCircle className="h-3.5 w-3.5" /> WhatsApp · {formatPhone((agency.main_phone_whatsapp ? agency.main_phone : agency.additional_phone) as string)}
+                                        <MessageCircle className="h-3.5 w-3.5" /> WhatsApp · <Sensitive>{formatPhone((agency.main_phone_whatsapp ? agency.main_phone : agency.additional_phone) as string)}</Sensitive>
                                     </a>
                                 )}
-                                {agency.main_phone && <a href={`tel:${agency.main_phone}`} className={chip} title="Ligar"><Phone className="h-3.5 w-3.5" /> {formatPhone(agency.main_phone)}</a>}
-                                {agency.additional_phone && <a href={`tel:${agency.additional_phone}`} className={chip} title="Telefone adicional"><Phone className="h-3.5 w-3.5" /> {formatPhone(agency.additional_phone)}</a>}
-                                {agency.email && <a href={`mailto:${agency.email}`} className={chip}><Mail className="h-3.5 w-3.5" /> {agency.email}</a>}
+                                {agency.main_phone && <a href={`tel:${agency.main_phone}`} className={chip} title="Ligar"><Phone className="h-3.5 w-3.5" /> <Sensitive>{formatPhone(agency.main_phone)}</Sensitive></a>}
+                                {agency.additional_phone && <a href={`tel:${agency.additional_phone}`} className={chip} title="Telefone adicional"><Phone className="h-3.5 w-3.5" /> <Sensitive>{formatPhone(agency.additional_phone)}</Sensitive></a>}
+                                {agency.email && <a href={`mailto:${agency.email}`} className={chip}><Mail className="h-3.5 w-3.5" /> <Sensitive>{agency.email}</Sensitive></a>}
                                 {agency.website && <a href={agency.website} target="_blank" rel="noopener noreferrer" className={chip}><Globe className="h-3.5 w-3.5" /> {agency.website.replace(/^https?:\/\//, "")}</a>}
                                 {!row.hasContact && canEdit && <button type="button" onClick={() => onEdit(agency)} className={cn(chip, "italic text-muted-foreground")}><Phone className="h-3.5 w-3.5" /> sem contato — informar</button>}
                             </div>
@@ -189,13 +190,14 @@ export default function AgencyDashboard({ agencyId, lang, today, initialBundle =
                     value={row.inForce.length > 0 ? brl(row.rentManaged, 0) : "—"}
                     hint={row.inForce.length > 0 ? `${brl(row.rentManaged * 12, 0)} por ano · valor de contrato` : "—"}
                     info={{ what: "A soma do aluguel de contrato (bruto) dos contratos em vigor desta imobiliária.", formula: "Σ aluguel dos contratos em vigor" }}
+                    money
                 />
                 <Tile
                     label="Taxa de administração"
                     tone="amber"
                     icon={<Percent className="h-4 w-4" />}
                     value={row.feePct != null ? `${row.feePct.toLocaleString("pt-BR")}%` : "—"}
-                    hint={row.feePct == null ? "não informada: preencha no cadastro" : row.inForce.length > 0 ? `${brl(row.monthlyFee, 0)}/mês · ${brl(row.monthlyFee * 12, 0)} por ano` : "do aluguel de cada contrato"}
+                    hint={row.feePct == null ? "não informada: preencha no cadastro" : row.inForce.length > 0 ? <Money>{`${brl(row.monthlyFee, 0)}/mês · ${brl(row.monthlyFee * 12, 0)} por ano`}</Money> : "do aluguel de cada contrato"}
                     info={{ what: "O percentual do aluguel que a imobiliária retém todo mês, e o que isso custa nos contratos em vigor — a economia potencial com autogestão.", formula: "Σ aluguel em vigor × taxa" }}
                 />
                 <Tile
@@ -318,14 +320,14 @@ export default function AgencyDashboard({ agencyId, lang, today, initialBundle =
                         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 p-4">
                             <Field label="Razão social" className="col-span-2">{agency.name}</Field>
                             <Field label="Nome fantasia">{agency.trade_name || "—"}</Field>
-                            <Field label="CNPJ">{row.cnpj || "—"}</Field>
-                            <Field label="CRECI">{row.creci || "—"}</Field>
+                            <Field label="CNPJ">{row.cnpj ? <Sensitive>{row.cnpj}</Sensitive> : "—"}</Field>
+                            <Field label="CRECI">{row.creci ? <Sensitive>{row.creci}</Sensitive> : "—"}</Field>
                             <Field label="Responsável legal">{agency.owner_name || "—"}</Field>
-                            <Field label="Telefone principal">{agency.main_phone ? <>{formatPhone(agency.main_phone)}{agency.main_phone_whatsapp ? " · WhatsApp" : ""}</> : "—"}</Field>
-                            <Field label="Telefone adicional">{agency.additional_phone ? <>{formatPhone(agency.additional_phone)}{agency.additional_phone_whatsapp ? " · WhatsApp" : ""}</> : "—"}</Field>
-                            <Field label="E-mail" className="col-span-2">{agency.email ? <a href={`mailto:${agency.email}`} className="underline-offset-2 hover:underline">{agency.email}</a> : "—"}</Field>
+                            <Field label="Telefone principal">{agency.main_phone ? <><Sensitive>{formatPhone(agency.main_phone)}</Sensitive>{agency.main_phone_whatsapp ? " · WhatsApp" : ""}</> : "—"}</Field>
+                            <Field label="Telefone adicional">{agency.additional_phone ? <><Sensitive>{formatPhone(agency.additional_phone)}</Sensitive>{agency.additional_phone_whatsapp ? " · WhatsApp" : ""}</> : "—"}</Field>
+                            <Field label="E-mail" className="col-span-2">{agency.email ? <a href={`mailto:${agency.email}`} className="underline-offset-2 hover:underline"><Sensitive>{agency.email}</Sensitive></a> : "—"}</Field>
                             <Field label="Website" className="col-span-2">{agency.website ? <a href={agency.website} target="_blank" rel="noopener noreferrer" className="underline-offset-2 hover:underline">{agency.website.replace(/^https?:\/\//, "")}</a> : "—"}</Field>
-                            <Field label="Endereço" className="col-span-2">{address || "—"}{agency.postal_code ? <span className="text-muted-foreground"> · CEP {formatCEP(agency.postal_code)}</span> : null}</Field>
+                            <Field label="Endereço" className="col-span-2">{address ? <Sensitive>{address}</Sensitive> : "—"}{agency.postal_code ? <span className="text-muted-foreground"> · CEP <Sensitive>{formatCEP(agency.postal_code)}</Sensitive></span> : null}</Field>
                             {agency.description && <Field label="Notas internas" className="col-span-2"><p className="whitespace-pre-wrap text-xs text-muted-foreground">{agency.description}</p></Field>}
                             <Field label="Registro" className="col-span-2">
                                 <span className="text-xs text-muted-foreground">
@@ -360,8 +362,8 @@ function LeaseLine({ lease, base, feePct }: { lease: AgencyLeaseSummary; base: s
                 </p>
             </div>
             <span className="text-right text-sm font-semibold tabular-nums text-foreground">
-                {brl(rent)}<span className="text-xs font-normal text-muted-foreground">/mês</span>
-                {feePct != null && inForce && <span className="block text-[11px] font-normal text-amber-700 dark:text-amber-400">taxa {brl((rent * feePct) / 100, 0)}</span>}
+                <Money>{brl(rent)}</Money><span className="text-xs font-normal text-muted-foreground">/mês</span>
+                {feePct != null && inForce && <span className="block text-[11px] font-normal text-amber-700 dark:text-amber-400">taxa <Money>{brl((rent * feePct) / 100, 0)}</Money></span>}
             </span>
             <Link href={`${base}/contratos?id=${lease.id}`} className={chip} title="Abrir o contrato"><FileSignature className="h-3.5 w-3.5" /> Abrir</Link>
         </li>
@@ -380,7 +382,7 @@ function TenantLine({ tenant, base }: { tenant: AgencyTenantSummary; base: strin
                 </p>
                 <p className="text-xs text-muted-foreground"><Home className="mr-1 inline h-3 w-3 align-[-2px]" />{tenant.property_name ?? "Imóvel"}</p>
             </div>
-            {wa && <a href={wa} target="_blank" rel="noopener noreferrer" className={cn(chip, "text-emerald-700")} title="WhatsApp"><MessageCircle className="h-3.5 w-3.5" /> {formatPhone(tenant.main_phone as string)}</a>}
+            {wa && <a href={wa} target="_blank" rel="noopener noreferrer" className={cn(chip, "text-emerald-700")} title="WhatsApp"><MessageCircle className="h-3.5 w-3.5" /> <Sensitive>{formatPhone(tenant.main_phone as string)}</Sensitive></a>}
             <Link href={`${base}/inquilinos?id=${tenant.id}`} className={chip} title="Abrir o inquilino"><Users className="h-3.5 w-3.5" /> Abrir</Link>
         </li>
     );
@@ -396,10 +398,10 @@ function AgentLine({ agent, base }: { agent: AgencyAgentSummary; base: string })
                     <Link href={`${base}/corretores?id=${agent.id}`} className="break-words font-semibold text-foreground underline-offset-2 hover:underline">{agent.full_name}</Link>
                     <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", meta.pill)}>{meta.label}</span>
                 </p>
-                <p className="text-xs text-muted-foreground"><Shield className="mr-1 inline h-3 w-3 align-[-2px]" />CRECI-{agent.creci_state} {agent.creci_number}{agent.email ? ` · ${agent.email}` : ""}</p>
+                <p className="text-xs text-muted-foreground"><Shield className="mr-1 inline h-3 w-3 align-[-2px]" /><Sensitive>CRECI-{agent.creci_state} {agent.creci_number}{agent.email ? ` · ${agent.email}` : ""}</Sensitive></p>
             </div>
-            {wa && <a href={wa} target="_blank" rel="noopener noreferrer" className={cn(chip, "text-emerald-700")} title="WhatsApp"><MessageCircle className="h-3.5 w-3.5" /> {formatPhone(agent.main_phone as string)}</a>}
-            {!wa && agent.main_phone && <a href={`tel:${agent.main_phone}`} className={chip} title="Ligar"><Phone className="h-3.5 w-3.5" /> {formatPhone(agent.main_phone)}</a>}
+            {wa && <a href={wa} target="_blank" rel="noopener noreferrer" className={cn(chip, "text-emerald-700")} title="WhatsApp"><MessageCircle className="h-3.5 w-3.5" /> <Sensitive>{formatPhone(agent.main_phone as string)}</Sensitive></a>}
+            {!wa && agent.main_phone && <a href={`tel:${agent.main_phone}`} className={chip} title="Ligar"><Phone className="h-3.5 w-3.5" /> <Sensitive>{formatPhone(agent.main_phone)}</Sensitive></a>}
             <Link href={`${base}/corretores?id=${agent.id}`} className={chip} title="Abrir o corretor"><UserCheck className="h-3.5 w-3.5" /> Abrir</Link>
         </li>
     );

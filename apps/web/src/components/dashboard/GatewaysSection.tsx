@@ -8,6 +8,7 @@ import React from "react";
 import Link from "next/link";
 import { Activity, Plus, Router as RouterIcon } from "lucide-react";
 import { Button } from "@kitnets/ui";
+import { Sensitive } from "@/components/privacy";
 import type { DashboardGateway } from "@/lib/dashboard-views";
 import { cn } from "@/lib/utils";
 
@@ -57,7 +58,7 @@ export default function GatewaysSection({ gateways, base }: { gateways: Dashboar
                                     </div>
                                     <div>
                                         <h4 className="font-semibold text-foreground">{gw.label || "Gateway sem nome"}</h4>
-                                        <p className="font-mono text-xs text-muted-foreground">{gw.serialNumber}</p>
+                                        <Sensitive as="p" className="font-mono text-xs text-muted-foreground">{gw.serialNumber}</Sensitive>
                                     </div>
                                 </div>
                                 <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold", gw.online ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400")}>

@@ -6,6 +6,7 @@ import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, C
 import { effectiveTax, iptuByMonth, iptuSeries, type PropertyTax } from "@/lib/property-taxes";
 import { groupMonthly, inPeriod, periodLabel, periodRange, type ChartGroup, type PeriodFilterValue } from "@/lib/period-filter";
 import PeriodFilter, { GroupSelect } from "./PeriodFilter";
+import { Money } from "@/components/privacy";
 
 interface IptuHistoryModalProps {
     isOpen: boolean;
@@ -108,22 +109,22 @@ export function IptuHistoryModal({ isOpen, onClose, rows }: IptuHistoryModalProp
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <div className="bg-muted/40 border border-border rounded-xl p-3 space-y-1">
                             <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">IPTU atual</span>
-                            <p className="text-lg font-black font-mono text-foreground">{stats ? formatCurrency(stats.latest.amount) : "—"}</p>
+                            <Money as="p" className="text-lg font-black font-mono text-foreground">{stats ? formatCurrency(stats.latest.amount) : "—"}</Money>
                             <span className="text-[10px] text-muted-foreground">{stats ? `Exercício ${stats.latest.year} · ${pct(stats.latest.growthPct)} vs anterior` : "Sem dados"}</span>
                         </div>
                         <div className="bg-muted/40 border border-border rounded-xl p-3 space-y-1">
                             <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Média</span>
-                            <p className="text-lg font-bold font-mono text-foreground">{stats ? formatCurrency(stats.avg) : "—"}</p>
+                            <Money as="p" className="text-lg font-bold font-mono text-foreground">{stats ? formatCurrency(stats.avg) : "—"}</Money>
                             <span className="text-[10px] text-muted-foreground">{stats ? `${stats.years} exercícios` : ""}</span>
                         </div>
                         <div className="bg-muted/40 border border-border rounded-xl p-3 space-y-1">
                             <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Mínimo</span>
-                            <p className="text-lg font-bold font-mono text-emerald-700 dark:text-emerald-300">{stats ? formatCurrency(stats.min) : "—"}</p>
+                            <Money as="p" className="text-lg font-bold font-mono text-emerald-700 dark:text-emerald-300">{stats ? formatCurrency(stats.min) : "—"}</Money>
                             <span className="text-[10px] text-muted-foreground">Menor exercício do período</span>
                         </div>
                         <div className="bg-muted/40 border border-border rounded-xl p-3 space-y-1">
                             <span className="text-[11px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">Máximo</span>
-                            <p className="text-lg font-bold font-mono text-amber-700 dark:text-amber-300">{stats ? formatCurrency(stats.max) : "—"}</p>
+                            <Money as="p" className="text-lg font-bold font-mono text-amber-700 dark:text-amber-300">{stats ? formatCurrency(stats.max) : "—"}</Money>
                             <span className="text-[10px] text-muted-foreground">Maior exercício do período</span>
                         </div>
                     </div>
@@ -148,7 +149,7 @@ export function IptuHistoryModal({ isOpen, onClose, rows }: IptuHistoryModalProp
                                 <GroupSelect value={group} onChange={setGroup} title="Agrupar o IPTU pago" />
                             </div>
                         </div>
-                        <div className={isMaximized ? "h-[380px]" : "h-[260px]"}>
+                        <Money as="div" className={isMaximized ? "h-[380px]" : "h-[260px]"}>
                             <ResponsiveContainer width="100%" height="100%">
                                 <ComposedChart data={chartPoints} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
@@ -165,7 +166,7 @@ export function IptuHistoryModal({ isOpen, onClose, rows }: IptuHistoryModalProp
                                     <Line type="monotone" dataKey="total" stroke="#d97706" strokeWidth={2.5} dot={{ r: 3 }} />
                                 </ComposedChart>
                             </ResponsiveContainer>
-                        </div>
+                        </Money>
                     </div>
 
                     {/* Records */}
@@ -194,14 +195,14 @@ export function IptuHistoryModal({ isOpen, onClose, rows }: IptuHistoryModalProp
                                         return (
                                             <tr key={p.year} className="border-t border-border/60">
                                                 <td className="px-3 py-2 font-semibold">{p.year}</td>
-                                                <td className="px-3 py-2 text-right tabular-nums font-semibold">{formatCurrency(p.amount)}</td>
+                                                <Money as="td" className="px-3 py-2 text-right tabular-nums font-semibold">{formatCurrency(p.amount)}</Money>
                                                 <td className={`px-3 py-2 text-right tabular-nums ${p.growthPct === null ? "text-muted-foreground" : p.growthPct > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}`}>{pct(p.growthPct)}</td>
                                                 <td className="px-3 py-2">{payer}</td>
-                                                <td className="px-3 py-2 text-right tabular-nums">{d?.valor_venal_imovel ? formatCurrency(Number(d.valor_venal_imovel)) : "—"}</td>
+                                                <Money as="td" className="px-3 py-2 text-right tabular-nums">{d?.valor_venal_imovel ? formatCurrency(Number(d.valor_venal_imovel)) : "—"}</Money>
                                                 <td className="px-3 py-2 text-right tabular-nums">{d?.aliquota_pct ? `${Number(d.aliquota_pct).toLocaleString("pt-BR", { maximumFractionDigits: 4 })}%` : "—"}</td>
-                                                <td className="px-3 py-2 text-right tabular-nums">{d?.valor_imposto ? formatCurrency(Number(d.valor_imposto)) : "—"}</td>
-                                                <td className="px-3 py-2 text-right tabular-nums">{d?.coleta_lixo ? formatCurrency(Number(d.coleta_lixo)) : "—"}</td>
-                                                <td className="px-3 py-2 text-right tabular-nums">{d?.desconto ? formatCurrency(Number(d.desconto)) : "—"}</td>
+                                                <Money as="td" className="px-3 py-2 text-right tabular-nums">{d?.valor_imposto ? formatCurrency(Number(d.valor_imposto)) : "—"}</Money>
+                                                <Money as="td" className="px-3 py-2 text-right tabular-nums">{d?.coleta_lixo ? formatCurrency(Number(d.coleta_lixo)) : "—"}</Money>
+                                                <Money as="td" className="px-3 py-2 text-right tabular-nums">{d?.desconto ? formatCurrency(Number(d.desconto)) : "—"}</Money>
                                             </tr>
                                         );
                                     })}

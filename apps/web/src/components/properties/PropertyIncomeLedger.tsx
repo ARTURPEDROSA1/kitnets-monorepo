@@ -47,6 +47,7 @@ import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDe
 import { CellSumBar, useCellSum } from "./TableCellSum";
 import MoneyInput, { parseMoneyText } from "./MoneyInput";
 import Tile, { type TileInfo } from "./Tile";
+import { Money } from "@/components/privacy";
 import { ColumnVisibilityMenu, useColumnVisibility } from "./TableColumnVisibility";
 import { columnTableKey, recordTableKey } from "@/lib/ui-preferences";
 import { DateInput } from "@/components/ui/DateInput";
@@ -784,6 +785,7 @@ export default function PropertyIncomeLedger({
                     icon={<Landmark className="w-4 h-4" />}
                     tone="emerald"
                     info={ledgerInfo.gross}
+                    money
                 />
                 <Tile
                     label="Recebido no período"
@@ -794,6 +796,7 @@ export default function PropertyIncomeLedger({
                     icon={<Wallet className="w-4 h-4" />}
                     tone="blue"
                     info={ledgerInfo.received}
+                    money
                 />
                 <Tile
                     label="Aluguel líquido no período"
@@ -802,6 +805,7 @@ export default function PropertyIncomeLedger({
                     icon={<CheckCircle2 className="w-4 h-4" />}
                     tone="violet"
                     info={ledgerInfo.net}
+                    money
                 />
                 {multiUnit ? (
                     <Tile
@@ -817,6 +821,7 @@ export default function PropertyIncomeLedger({
                         icon={<Building className="w-4 h-4" />}
                         tone="amber"
                         info={ledgerInfo.condo}
+                        money
                     />
                 ) : (
                 <Tile
@@ -832,6 +837,7 @@ export default function PropertyIncomeLedger({
                     icon={<Zap className="w-4 h-4" />}
                     tone="amber"
                     info={ledgerInfo.energy}
+                    money
                 />
                 )}
                 <Tile
@@ -841,6 +847,7 @@ export default function PropertyIncomeLedger({
                     icon={<Building2 className="w-4 h-4" />}
                     tone="rose"
                     info={ledgerInfo.fee}
+                    money
                 />
             </div>
 
@@ -859,7 +866,7 @@ export default function PropertyIncomeLedger({
 
             {/* Chart */}
             {chartPoints.length > (chartGroup === "month" ? 1 : 0) && (
-                <div className="h-[220px] w-full">
+                <Money as="div" className="h-[220px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
                         <ComposedChart data={chartPoints} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
@@ -884,7 +891,7 @@ export default function PropertyIncomeLedger({
                             <Line type="monotone" dataKey="bruto" name="Aluguel bruto" stroke="#3b82f6" strokeWidth={2} dot={false} />
                         </ComposedChart>
                     </ResponsiveContainer>
-                </div>
+                </Money>
             )}
 
             {/* Table */}
@@ -982,7 +989,7 @@ export default function PropertyIncomeLedger({
                                         )}
                                         {show("gross") && <td {...sel.cellProps("gross", rk, b.grossRent, "px-2 py-1 text-right", () => cancelDraft(rk, "gross"))}>{cell("gross", b.grossRent)}</td>}
                                         {show("pct") && <td {...sel.cellProps("pct", rk, b.feePct, "px-2 py-1 text-right", () => cancelDraft(rk, "pct"))}>{cell("pct", b.feePct, "0.5")}</td>}
-                                        {show("net") && <td {...sel.cellProps("net", rk, b.netRent, "px-2 py-1 text-right font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums")}>{formatBRL(b.netRent)}</td>}
+                                        {show("net") && <td {...sel.cellProps("net", rk, b.netRent, "px-2 py-1 text-right font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums")}><Money>{formatBRL(b.netRent)}</Money></td>}
                                         {show("energy") && <td {...sel.cellProps("energy", rk, b.energy, "px-2 py-1 text-right", () => cancelDraft(rk, "energy"))}>{cell("energy", b.energy)}</td>}
                                         {show("received") && <td {...sel.cellProps("received", rk, b.received, "px-2 py-1 text-right", () => cancelDraft(rk, "received"))}>{cell("received", b.received)}</td>}
                                         {show("other") && <td {...sel.cellProps("other", rk, b.other, "px-2 py-1 text-right", () => cancelDraft(rk, "other"))}>{cell("other", b.other)}</td>}
@@ -1200,7 +1207,7 @@ export default function PropertyIncomeLedger({
                         {parseInput(addForm.received) !== null && (
                             <p className="text-xs text-muted-foreground">
                                 Aluguel líquido:{" "}
-                                <span className="font-semibold text-foreground">
+                                <Money className="font-semibold text-foreground">
                                     {formatBRL(breakdown({
                                         received_amount: parseInput(addForm.received) ?? 0,
                                         energy_portion: parseInput(addForm.energy) ?? 0,
@@ -1209,10 +1216,10 @@ export default function PropertyIncomeLedger({
                                         fee_on_condo: addForm.feeOnCondo,
                                         agency_fee_pct: parseInput(addForm.pct) ?? 0,
                                     }).netRent)}
-                                </span>
+                                </Money>
                                 {(parseInput(addForm.condo) ?? 0) > 0 && (() => {
                                     const c = breakdown({ received_amount: parseInput(addForm.received) ?? 0, energy_portion: parseInput(addForm.energy) ?? 0, other_income: 0, condo_amount: parseInput(addForm.condo) ?? 0, fee_on_condo: addForm.feeOnCondo, agency_fee_pct: parseInput(addForm.pct) ?? 0 });
-                                    return <> · condomínio no depósito: <span className="font-semibold text-foreground">{formatBRL(c.condoIn)}</span>{c.condoFee > 0 && <> (taxa de {formatBRL(c.condoFee)})</>} · taxa total: <span className="font-semibold text-foreground">{formatBRL(c.feeAmount)}</span></>;
+                                    return <> · condomínio no depósito: <Money className="font-semibold text-foreground">{formatBRL(c.condoIn)}</Money>{c.condoFee > 0 && <> (taxa de <Money>{formatBRL(c.condoFee)}</Money>)</>} · taxa total: <Money className="font-semibold text-foreground">{formatBRL(c.feeAmount)}</Money></>;
                                 })()}
                                 {addForm.month > currentMonthKey() && " · será marcado como previsto"}
                             </p>
@@ -1367,13 +1374,13 @@ export default function PropertyIncomeLedger({
                                                 <tr key={`${r.month}|${r.unit_name ?? ""}`} className="border-t border-border/60">
                                                     <td className="px-2 py-1 font-semibold">{formatMonthKey(r.month)}</td>
                                                     {importHasUnits && <td className="px-2 py-1">{r.unit_name ?? "Imóvel inteiro"}</td>}
-                                                    <td className="px-2 py-1 text-right tabular-nums">{r.gross_rent !== undefined ? formatBRL(r.gross_rent) : "—"}</td>
+                                                    <Money as="td" className="px-2 py-1 text-right tabular-nums">{r.gross_rent !== undefined ? formatBRL(r.gross_rent) : "—"}</Money>
                                                     <td className="px-2 py-1 text-right tabular-nums">{r.agency_fee_pct !== undefined ? `${r.agency_fee_pct}%` : "—"}</td>
-                                                    <td className="px-2 py-1 text-right tabular-nums">{r.received_amount !== undefined ? formatBRL(r.received_amount) : r.gross_rent !== undefined ? "calculado" : "—"}</td>
-                                                    <td className="px-2 py-1 text-right tabular-nums">{r.energy_portion !== undefined ? formatBRL(r.energy_portion) : "—"}</td>
-                                                    <td className="px-2 py-1 text-right tabular-nums">{r.other_income !== undefined ? formatBRL(r.other_income) : "—"}</td>
-                                                    <td className="px-2 py-1 text-right tabular-nums">{r.other_expenses !== undefined ? formatBRL(r.other_expenses) : "—"}</td>
-                                                    <td className="px-2 py-1 text-right tabular-nums">{r.condo_amount !== undefined ? formatBRL(r.condo_amount) : "—"}</td>
+                                                    <Money as="td" className="px-2 py-1 text-right tabular-nums">{r.received_amount !== undefined ? formatBRL(r.received_amount) : r.gross_rent !== undefined ? "calculado" : "—"}</Money>
+                                                    <Money as="td" className="px-2 py-1 text-right tabular-nums">{r.energy_portion !== undefined ? formatBRL(r.energy_portion) : "—"}</Money>
+                                                    <Money as="td" className="px-2 py-1 text-right tabular-nums">{r.other_income !== undefined ? formatBRL(r.other_income) : "—"}</Money>
+                                                    <Money as="td" className="px-2 py-1 text-right tabular-nums">{r.other_expenses !== undefined ? formatBRL(r.other_expenses) : "—"}</Money>
+                                                    <Money as="td" className="px-2 py-1 text-right tabular-nums">{r.condo_amount !== undefined ? formatBRL(r.condo_amount) : "—"}</Money>
                                                     <td className="px-2 py-1 truncate max-w-[180px]">{r.notes ?? ""}</td>
                                                 </tr>
                                             ))}

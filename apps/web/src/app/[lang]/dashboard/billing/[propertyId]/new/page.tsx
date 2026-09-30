@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { ArrowLeft, Save, Calculator, AlertCircle, CheckCircle2, Upload, FileText } from "lucide-react";
 import Link from "next/link";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
+import { Money, Sensitive } from "@/components/privacy";
 
 interface PropertyInfo {
     id: string;
@@ -388,7 +389,7 @@ export default function ManualBillEntryPage() {
                 </h1>
                 {property && (
                     <p className="mt-2 text-muted-foreground">
-                        {property.name} — {property.connection_code && `Ligação ${property.connection_code}`}
+                        {property.name} — {property.connection_code && <>Ligação <Sensitive>{property.connection_code}</Sensitive></>}
                     </p>
                 )}
             </div>
@@ -402,7 +403,7 @@ export default function ManualBillEntryPage() {
                             {isEditMode ? "Conta atualizada com sucesso!" : "Conta salva com sucesso!"}
                         </p>
                         <p className="text-sm text-emerald-600 dark:text-emerald-400">
-                            Referência: {form.referenceMonth} — {formatCurrency(parseFloat(form.totalAmount))}
+                            Referência: {form.referenceMonth} — <Money>{formatCurrency(parseFloat(form.totalAmount))}</Money>
                         </p>
                         {docNote && <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">{docNote}</p>}
                     </div>
@@ -773,9 +774,9 @@ export default function ManualBillEntryPage() {
                             {effectiveRate && (
                                 <div>
                                     <p className="text-xs text-muted-foreground">Taxa Efetiva (R$/m³)</p>
-                                    <p className="text-lg font-bold text-foreground">
+                                    <Money as="p" className="text-lg font-bold text-foreground">
                                         R$ {effectiveRate.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                                    </p>
+                                    </Money>
                                 </div>
                             )}
                             {dailyAverage && (
@@ -789,9 +790,9 @@ export default function ManualBillEntryPage() {
                             {form.totalAmount && parseFloat(form.consumptionM3) > 0 && (
                                 <div>
                                     <p className="text-xs text-muted-foreground">Custo por Litro</p>
-                                    <p className="text-lg font-bold text-foreground">
+                                    <Money as="p" className="text-lg font-bold text-foreground">
                                         R$ {(parseFloat(form.totalAmount) / (parseFloat(form.consumptionM3) * 1000)).toLocaleString("pt-BR", { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
-                                    </p>
+                                    </Money>
                                 </div>
                             )}
                         </div>

@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Money, Sensitive } from "@/components/privacy";
 import {
     X,
     UploadCloud,
@@ -360,9 +361,9 @@ export function EnergyBillUploadModal({
                                         </div>
                                         <div className="flex justify-between py-1 border-b border-border/40">
                                             <span className="text-muted-foreground">Unidade Consumidora:</span>
-                                            <span className="font-mono text-foreground font-semibold">
+                                            <Sensitive className="font-mono text-foreground font-semibold">
                                                 {extracted.consumerUnit || "-"}
-                                            </span>
+                                            </Sensitive>
                                         </div>
                                         <div className="flex justify-between py-1">
                                             <span className="text-muted-foreground">Dias Faturados:</span>
@@ -425,21 +426,21 @@ export function EnergyBillUploadModal({
                                     <div className="space-y-1.5 text-xs">
                                         <div className="flex justify-between py-1.5 border-b border-border/40 bg-muted/50 px-2 rounded-md">
                                             <span className="font-bold text-foreground">Total a Pagar:</span>
-                                            <span className="font-extrabold text-base text-foreground">
+                                            <Money className="font-extrabold text-base text-foreground">
                                                 {formatCurrency(extracted.totalAmount)}
-                                            </span>
+                                            </Money>
                                         </div>
                                         <div className="flex justify-between py-1 border-b border-border/40">
                                             <span className="text-muted-foreground">Custo de Disponibilidade:</span>
-                                            <span className="font-medium text-foreground">
+                                            <Money className="font-medium text-foreground">
                                                 {formatCurrency(extracted.availabilityCostAmount)}
-                                            </span>
+                                            </Money>
                                         </div>
                                         <div className="flex justify-between py-1">
                                             <span className="text-muted-foreground">Preço Unitário (kWh):</span>
-                                            <span className="font-mono text-foreground">
+                                            <Money className="font-mono text-foreground">
                                                 {extracted.unitPrice ? `R$ ${formatNumber(extracted.unitPrice, 4)}` : "-"}
-                                            </span>
+                                            </Money>
                                         </div>
                                     </div>
                                 </div>

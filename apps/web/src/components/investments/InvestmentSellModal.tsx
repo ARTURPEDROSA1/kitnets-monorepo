@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DateInput } from "@/components/ui/DateInput";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Money } from "@/components/privacy";
 import { formatBRL, type NewInvestment } from "@/lib/new-investments";
 
 interface Props {
@@ -98,17 +99,17 @@ function SellForm({ investment, paidToDate, onSell, onClose }: Omit<Props, "open
                 <dl className="grid grid-cols-3 gap-2 rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-xs">
                     <div>
                         <dt className="text-[10px] uppercase tracking-wider text-muted-foreground">Venda líquida</dt>
-                        <dd className="font-semibold tabular-nums">{net !== null ? formatBRL(net, 0) : "—"}</dd>
-                        {price !== null && costsPct > 0 && <dd className="text-[10px] text-muted-foreground tabular-nums">− {formatBRL(price - net!, 0)} de custos</dd>}
+                        <Money as="dd" className="font-semibold tabular-nums">{net !== null ? formatBRL(net, 0) : "—"}</Money>
+                        {price !== null && costsPct > 0 && <dd className="text-[10px] text-muted-foreground tabular-nums">− <Money>{formatBRL(price - net!, 0)}</Money> de custos</dd>}
                     </div>
                     <div>
                         <dt className="text-[10px] uppercase tracking-wider text-muted-foreground">Pago até agora</dt>
-                        <dd className="font-semibold tabular-nums">{formatBRL(paidToDate, 0)}</dd>
+                        <Money as="dd" className="font-semibold tabular-nums">{formatBRL(paidToDate, 0)}</Money>
                     </div>
                     <div>
                         <dt className="text-[10px] uppercase tracking-wider text-muted-foreground">Ganho</dt>
                         <dd className={`font-semibold tabular-nums ${gain === null ? "" : gain >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
-                            {gain !== null ? `${gain > 0 ? "+" : ""}${formatBRL(gain, 0)}${paidToDate > 0 ? ` (${((gain / paidToDate) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}%)` : ""}` : "—"}
+                            {gain !== null ? <><Money>{gain > 0 ? "+" : ""}{formatBRL(gain, 0)}</Money>{paidToDate > 0 ? ` (${((gain / paidToDate) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}%)` : ""}</> : "—"}
                         </dd>
                     </div>
                 </dl>

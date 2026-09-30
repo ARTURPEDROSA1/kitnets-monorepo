@@ -40,8 +40,8 @@ export interface CellSumController {
         "data-cell": string;
     };
     isSelected: (col: string, rowId: string) => boolean;
-    /** count / sum over the current selection (numeric cells only for the sum); `format` prints the sum in the selected column's unit */
-    stats: () => { count: number; numeric: number; total: number; format: (v: number) => string };
+    /** count / sum over the current selection (numeric cells only for the sum); `format` prints the sum in the selected column's unit; `money` = printed in R$ (hidden by the dollar privacy toggle) */
+    stats: () => { count: number; numeric: number; total: number; format: (v: number) => string; money: boolean };
     count: number;
     clear: () => void;
 }
@@ -217,7 +217,7 @@ export function useCellSum(options: CellSumOptions = {}): CellSumController {
         }
         // one unit across the selection → print it; mixed units → plain numbers
         const format = formats.size <= 1 ? ([...formats][0] ?? formatBRL) : formatPlain;
-        return { count: selected.size, numeric, total: Math.round(total * 100) / 100, format };
+        return { count: selected.size, numeric, total: Math.round(total * 100) / 100, format, money: format === formatBRL };
     }, [selected]);
     return { cellProps, isSelected, stats, count: selected.size, clear };
 }
@@ -225,15 +225,16 @@ export function useCellSum(options: CellSumOptions = {}): CellSumController {
 /** Floating status bar (bottom centre) with count, sum and average of the selected cells. */
 export function CellSumBar({ ctl }: { ctl: CellSumController }) {
     if (ctl.count === 0) return null;
-    const { count, numeric, total, format } = ctl.stats();
+    const { count, numeric, total, format, money } = ctl.stats();
     return (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-full border border-emerald-300 bg-background/95 backdrop-blur px-4 py-2 text-xs shadow-lg">
             <Sigma className="w-4 h-4 text-emerald-600" />
             <span><span className="font-semibold text-foreground">{count}</span> {count === 1 ? "célula" : "células"}</span>
             {numeric > 0 && (
                 <>
-                    <span>Soma <span className="font-bold text-foreground tabular-nums">{format(total)}</span></span>
-                    <span className="text-muted-foreground">Média {format(total / numeric)}</span>
+                    {/* sums in R$ follow the dollar privacy toggle (components/privacy); sums in another unit (kWh, m³) stay readable */}
+                    <span>Soma <span className={cn("font-bold text-foreground tabular-nums", money && "privacy-money")}>{format(total)}</span></span>
+                    <span className="text-muted-foreground">Média <span className={cn(money && "privacy-money")}>{format(total / numeric)}</span></span>
                 </>
             )}
             <button type="button" onClick={ctl.clear} className="text-muted-foreground hover:text-foreground" title="Limpar seleção (Esc)"><X className="w-3.5 h-3.5" /></button>

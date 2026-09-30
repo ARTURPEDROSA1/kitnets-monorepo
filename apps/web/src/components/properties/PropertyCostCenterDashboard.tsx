@@ -39,6 +39,7 @@ import {
 } from 'recharts';
 import { Button } from '@kitnets/ui';
 import { cn } from '@/lib/utils';
+import { Money, Sensitive } from '@/components/privacy';
 import type { PropertyDetails, SubUnit } from '@/components/profile/PropertyDetailsCard';
 import PropertyIncomeLedger from './PropertyIncomeLedger';
 import PropertyInvestmentSection from './PropertyInvestmentSection';
@@ -402,24 +403,24 @@ export default function PropertyCostCenterDashboard({
         condo: {
             what: 'O condomínio das unidades como centro de custos, no mês mais recente: o que as unidades pagam de condomínio, o que o condomínio gastou (energia das áreas comuns, internet, água, IPTU, manutenção) e o resultado.',
             formula: 'Resultado = condomínio das unidades − custos do condomínio',
-            example: condoCard ? <>{brl(condoCard.revenue)} − {brl(condoCard.cost)} = {brl(condoCard.result)}{condoCard.month ? ` em ${formatMonthKey(condoCard.month)}` : ''}</> : undefined,
+            example: condoCard ? <><Money>{brl(condoCard.revenue)}</Money> − <Money>{brl(condoCard.cost)}</Money> = <Money>{brl(condoCard.result)}</Money>{condoCard.month ? ` em ${formatMonthKey(condoCard.month)}` : ''}</> : undefined,
             note: 'Clique no card para abrir o condomínio: os custos são lançados lá, mês a mês.',
         },
         revenue: {
             what: 'Tudo o que o inquilino pagou no mês mais recente confirmado: o aluguel bruto (valor de contrato, antes da taxa da administradora) mais a parcela de energia.',
             formula: <>Receita bruta = aluguel bruto + energia recebida + condomínio pago pelo inquilino<br />Aluguel bruto = (recebido − energia − condomínio no depósito) ÷ (1 − taxa)<br />Valor m² = aluguel bruto ÷ área construída</>,
-            example: financials.realIncomeMonth ? <>{brl(financials.currentGrossRent)} + {brl(financials.energyIncome)} = {brl(financials.grossMonthlyRevenue)} em {financials.realIncomeMonth}</> : undefined,
+            example: financials.realIncomeMonth ? <><Money>{brl(financials.currentGrossRent)}</Money> + <Money>{brl(financials.energyIncome)}</Money> = <Money>{brl(financials.grossMonthlyRevenue)}</Money> em {financials.realIncomeMonth}</> : undefined,
             note: 'Este card mostra o mês mais recente e não segue o período do gráfico. Clique no card para ver o histórico do aluguel.',
         },
         opex: {
             what: 'Custos operacionais do mês mais recente: taxa da administradora, custo de energia, outras despesas, condomínio e o IPTU que você pagou naquele mês (do registro Tributos do imóvel). Prestações do financiamento e reformas não entram: são investimento.',
             formula: 'OPEX = taxa da imobiliária + custo de energia + outras despesas + condomínio + IPTU pago no mês',
-            example: financials.realIncomeMonth ? <>{financials.expenseBreakdown.map(i => `${i.name} ${brl(i.value)}`).join(' + ') || 'sem custos no mês'} = {brl(financials.totalExpenses)}<br />{((financials.totalExpenses / (financials.grossMonthlyRevenue || 1)) * 100).toFixed(0)}% da receita bruta</> : undefined,
+            example: financials.realIncomeMonth ? <><Money>{financials.expenseBreakdown.map(i => `${i.name} ${brl(i.value)}`).join(' + ') || 'sem custos no mês'} = {brl(financials.totalExpenses)}</Money><br />{((financials.totalExpenses / (financials.grossMonthlyRevenue || 1)) * 100).toFixed(0)}% da receita bruta</> : undefined,
         },
         noi: {
             what: 'Resultado operacional líquido: o que sobra da receita depois dos custos operacionais do mês. É a renda que paga o investimento (payback) e a base do yield e do cap rate.',
             formula: <>NOI = receita bruta − OPEX<br />Margem líquida = NOI ÷ receita bruta</>,
-            example: financials.realIncomeMonth ? <>{brl(financials.grossMonthlyRevenue)} − {brl(financials.totalExpenses)} = {brl(financials.noi)} · margem {financials.margin.toFixed(0)}%</> : undefined,
+            example: financials.realIncomeMonth ? <><Money>{brl(financials.grossMonthlyRevenue)}</Money> − <Money>{brl(financials.totalExpenses)}</Money> = <Money>{brl(financials.noi)}</Money> · margem {financials.margin.toFixed(0)}%</> : undefined,
         },
         occupancy: {
             what: propertyType === 'multi'
@@ -431,7 +432,7 @@ export default function PropertyCostCenterDashboard({
         energy: {
             what: 'Resultado da energia no mês mais recente: o que o inquilino pagou de energia menos a conta de luz que você pagou. Com geração solar, essa diferença é a economia que o sistema gera.',
             formula: 'Energia líquida = energia recebida − custo de energia',
-            example: financials.energyNet !== null ? <>{brl(financials.energyIncome)} − {brl(financials.energyCost)} = {brl(financials.energyNet)}</> : undefined,
+            example: financials.energyNet !== null ? <><Money>{brl(financials.energyIncome)}</Money> − <Money>{brl(financials.energyCost)}</Money> = <Money>{brl(financials.energyNet)}</Money></> : undefined,
             note: 'O investimento no sistema solar e quanto dele já voltou estão no card Energia solar de Investimento no imóvel.',
         },
     };
@@ -439,6 +440,9 @@ export default function PropertyCostCenterDashboard({
 
     const propertyTitle = details.propertyName?.trim()
         || (address.street ? `${address.street}${address.number ? `, ${address.number}` : ''}` : `Propriedade ${propertyIndex + 1}`);
+    // without a name the title is the street address: the eye toggle hides it too
+    const titleIsAddress = !details.propertyName?.trim() && Boolean(address.street);
+    const headerAddress = [address.street, address.number, address.neighborhood, address.city, address.state, address.cep].filter(Boolean).join(', ');
 
     return (
         <div className="space-y-6 pb-6 border-b border-border/80">
@@ -494,7 +498,7 @@ export default function PropertyCostCenterDashboard({
             <div className="bg-card border border-border rounded-2xl p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="space-y-1">
                     <div className="flex items-center gap-2.5 flex-wrap">
-                        <h2 className="text-2xl font-bold text-foreground tracking-tight">
+                        <h2 className={cn('text-2xl font-bold text-foreground tracking-tight', titleIsAddress && 'privacy-sensitive')}>
                             {propertyTitle}
                         </h2>
                         {propertyType === 'multi' ? (
@@ -516,7 +520,7 @@ export default function PropertyCostCenterDashboard({
                         )}
                     </div>
                     <p className="text-sm text-muted-foreground">
-                        {[address.street, address.number, address.neighborhood, address.city, address.state, address.cep].filter(Boolean).join(', ') || 'Endereço não cadastrado'}
+                        {headerAddress ? <Sensitive>{headerAddress}</Sensitive> : 'Endereço não cadastrado'}
                     </p>
                 </div>
 
@@ -567,17 +571,17 @@ export default function PropertyCostCenterDashboard({
                         <CardInfoIcon label="Receita Bruta" info={kpiInfo.revenue} className="p-2 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600" icon={<TrendingUp className="w-4 h-4" />} />
                     </div>
                     <div>
-                        <span className="text-xl sm:text-2xl font-bold text-foreground block">
+                        <Money as="span" className="text-xl sm:text-2xl font-bold text-foreground block">
                             {formatBRL(financials.grossMonthlyRevenue)}
-                        </span>
+                        </Money>
                         <span className="text-xs text-muted-foreground block leading-snug">
                             {financials.realIncomeMonth ? <>
                                 {financials.realIncomeMonth}: aluguel + energia
-                                <br />Aluguel bruto: {formatBRL2(financials.currentGrossRent ?? 0)}
-                                <br />Valor m²: {areaM2 && financials.currentGrossRent ? formatBRL2(financials.currentGrossRent / areaM2) : <span title="Informe a área construída em Aquisição & financiamento">informe a área</span>}
-                                <br />Anual: {formatBRL(financials.annualRevenue)}
+                                <br />Aluguel bruto: <Money>{formatBRL2(financials.currentGrossRent ?? 0)}</Money>
+                                <br />Valor m²: {areaM2 && financials.currentGrossRent ? <Money>{formatBRL2(financials.currentGrossRent / areaM2)}</Money> : <span title="Informe a área construída em Aquisição & financiamento">informe a área</span>}
+                                <br />Anual: <Money>{formatBRL(financials.annualRevenue)}</Money>
                                 <span className="mt-1 flex items-center gap-1 font-semibold text-emerald-700 dark:text-emerald-400"><TrendingUp className="w-3 h-3" /> Ver histórico</span>
-                            </> : `Projeção anual: ${formatBRL(financials.annualRevenue)}`}
+                            </> : <>Projeção anual: <Money>{formatBRL(financials.annualRevenue)}</Money></>}
                         </span>
                     </div>
                 </div>
@@ -589,9 +593,9 @@ export default function PropertyCostCenterDashboard({
                         <CardInfoIcon label="Despesas (OPEX)" info={kpiInfo.opex} className="p-2 bg-rose-50 dark:bg-rose-950/40 text-rose-600" icon={<DollarSign className="w-4 h-4" />} />
                     </div>
                     <div>
-                        <span className="text-xl sm:text-2xl font-bold text-rose-600 dark:text-rose-400 block">
+                        <Money as="span" className="text-xl sm:text-2xl font-bold text-rose-600 dark:text-rose-400 block">
                             {formatBRL(financials.totalExpenses)}
-                        </span>
+                        </Money>
                         <span className="text-xs text-muted-foreground block leading-snug">
                             {financials.realIncomeMonth && financials.opexLabel && <>{financials.opexLabel}<br /></>}
                             {((financials.totalExpenses / (financials.grossMonthlyRevenue || 1)) * 100).toFixed(0)}% da receita bruta
@@ -608,9 +612,9 @@ export default function PropertyCostCenterDashboard({
                         <CardInfoIcon label="Resultado Líquido (NOI)" info={kpiInfo.noi} className="p-2 bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700" icon={<Percent className="w-4 h-4" />} />
                     </div>
                     <div>
-                        <span className="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400 block">
+                        <Money as="span" className="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400 block">
                             {formatBRL(financials.noi)}
-                        </span>
+                        </Money>
                         <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
                             Margem Líquida: {financials.margin.toFixed(0)}%
                         </span>
@@ -645,13 +649,13 @@ export default function PropertyCostCenterDashboard({
                         <CardInfoIcon label="Condomínio" info={kpiInfo.condo} className="p-2 bg-amber-50 dark:bg-amber-950/40 text-amber-600" icon={<Building className="w-4 h-4" />} />
                     </div>
                     <div>
-                        <span className="text-xl sm:text-2xl font-bold text-foreground block">
+                        <Money as="span" className="text-xl sm:text-2xl font-bold text-foreground block">
                             {formatBRL(condoCard.revenue)}
-                        </span>
+                        </Money>
                         <span className="text-xs text-muted-foreground block leading-snug">
-                            Condomínio {formatBRL(condoCard.revenue)}{condoCard.month ? ` · ${formatMonthKey(condoCard.month)}` : ''}<br />
-                            Custo {formatBRL(condoCard.cost)}{!condoCard.hasCosts && ' (não lançado)'}<br />
-                            Resultado <span className={cn('text-sm', condoCard.result < 0 ? 'text-rose-600' : 'text-foreground')}>{formatBRL(condoCard.result)}</span>
+                            Condomínio <Money>{formatBRL(condoCard.revenue)}</Money>{condoCard.month ? ` · ${formatMonthKey(condoCard.month)}` : ''}<br />
+                            Custo <Money>{formatBRL(condoCard.cost)}</Money>{!condoCard.hasCosts && ' (não lançado)'}<br />
+                            Resultado <Money className={cn('text-sm', condoCard.result < 0 ? 'text-rose-600' : 'text-foreground')}>{formatBRL(condoCard.result)}</Money>
                         </span>
                         <span className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
                             <Building className="w-3.5 h-3.5" /> Ver condomínio
@@ -667,14 +671,14 @@ export default function PropertyCostCenterDashboard({
                     <div>
                         <span className="text-xl sm:text-2xl font-bold text-foreground block">
                             {financials.energyNet !== null
-                                ? formatBRL(financials.energyNet)
+                                ? <Money>{formatBRL(financials.energyNet)}</Money>
                                 : details.solarEnergy ? (details.solarKwp ? `${details.solarKwp} kWp` : 'Ativa') : 'Rede Padrão'}
                         </span>
                         <span className="text-xs text-muted-foreground block leading-snug">
                             {financials.energyNet !== null ? (
                                 <>
-                                    Energia recebida {formatBRL(financials.energyIncome ?? 0)}<br />
-                                    Custo de energia {formatBRL(financials.energyCost ?? 0)}<br />
+                                    Energia recebida <Money>{formatBRL(financials.energyIncome ?? 0)}</Money><br />
+                                    Custo de energia <Money>{formatBRL(financials.energyCost ?? 0)}</Money><br />
                                     <span className="text-sm text-foreground">{details.solarEnergy ? (details.solarKwp ? `${details.solarKwp} kWp` : 'Solar GD ativa') : 'Sem geração local'}</span>
                                 </>
                             ) : details.solarEnergy ? 'Compensação GD ativa' : 'Sem geração local'}
@@ -717,7 +721,7 @@ export default function PropertyCostCenterDashboard({
                         </div>
                     </div>
 
-                    <div className="h-[280px] w-full pt-2">
+                    <Money as="div" className="h-[280px] w-full pt-2">
                         <ResponsiveContainer width="100%" height="100%">
                             <ComposedChart data={financials.dreData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
@@ -758,7 +762,7 @@ export default function PropertyCostCenterDashboard({
                                 />
                             </ComposedChart>
                         </ResponsiveContainer>
-                    </div>
+                    </Money>
                 </div>
 
                 {/* Chart 2: Composição do Centro de Custos (Donut) */}
@@ -775,7 +779,7 @@ export default function PropertyCostCenterDashboard({
                         </p>
                     </div>
 
-                    <div className="h-[200px] w-full flex items-center justify-center">
+                    <Money as="div" className="h-[200px] w-full flex items-center justify-center">
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Pie
@@ -802,7 +806,7 @@ export default function PropertyCostCenterDashboard({
                                 />
                             </PieChart>
                         </ResponsiveContainer>
-                    </div>
+                    </Money>
 
                     <div className="space-y-1.5 pt-2 border-t border-border/60 text-xs">
                         {financials.expenseBreakdown.map((item, idx) => (
@@ -811,7 +815,7 @@ export default function PropertyCostCenterDashboard({
                                     <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
                                     {item.name}
                                 </span>
-                                <span className="font-semibold text-foreground">{formatBRL(item.value)}</span>
+                                <Money className="font-semibold text-foreground">{formatBRL(item.value)}</Money>
                             </div>
                         ))}
                     </div>
@@ -894,9 +898,9 @@ export default function PropertyCostCenterDashboard({
                                     <div className="text-xs text-muted-foreground space-y-0.5">
                                         <p>
                                             Aluguel:{' '}
-                                            <span className="font-bold text-foreground">
+                                            <Money className="font-bold text-foreground">
                                                 {rentVal ? formatBRL(rentVal) : 'R$ 1.100 (Est.)'}
-                                            </span>
+                                            </Money>
                                             /mês
                                         </p>
                                         <p className="text-[11px] truncate">

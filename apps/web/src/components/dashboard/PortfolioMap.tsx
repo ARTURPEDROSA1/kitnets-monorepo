@@ -11,6 +11,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AdvancedMarker, APIProvider, ControlPosition, InfoWindow, Map, MapControl, Pin, useMap } from "@vis.gl/react-google-maps";
 import { AlertCircle, ExternalLink, Loader2, MapPin as MapPinIcon } from "lucide-react";
+import { Sensitive } from "@/components/privacy";
 import { PIN_KIND_META, pinBounds, spreadOverlapping, type MapPin, type MapPinKind } from "@/lib/geocode";
 import { cn } from "@/lib/utils";
 
@@ -83,7 +84,7 @@ function PinList({ pins, base }: { pins: MapPin[]; base: string }) {
                     <span className="min-w-0 flex-1">
                         <Link href={`${base}${p.href}`} className="font-semibold text-foreground underline-offset-2 hover:underline">{p.label}</Link>
                         {p.subtitle && <span className="text-muted-foreground"> · {p.subtitle}</span>}
-                        <span className="block text-xs text-muted-foreground">{p.addressText || "endereço incompleto"}{p.lat === null ? " · sem localização" : ""}</span>
+                        <Sensitive className="block text-xs text-muted-foreground">{p.addressText || "endereço incompleto"}{p.lat === null ? " · sem localização" : ""}</Sensitive>
                     </span>
                 </li>
             ))}
@@ -152,7 +153,8 @@ export default function PortfolioMap({ pins, pending, status, apiKey, mapId, bas
     return (
         <div>
             {header}
-            <div className="h-[420px] w-full">
+            {/* the eye toggle covers the whole map: pins and popups reveal the addresses */}
+            <Sensitive as="div" cover className="h-[420px] w-full">
                 <APIProvider apiKey={apiKey} language="pt-BR" region="BR" version="quarterly">
                     <Map
                         mapId={mapId ?? "DEMO_MAP_ID"}
@@ -179,7 +181,7 @@ export default function PortfolioMap({ pins, pending, status, apiKey, mapId, bas
                                     <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: PIN_KIND_META[openPin.kind].color }}>{PIN_KIND_META[openPin.kind].label}</p>
                                     <p className="font-semibold leading-tight">{openPin.label}</p>
                                     {openPin.subtitle && <p className="text-xs text-slate-600">{openPin.subtitle}</p>}
-                                    <p className="text-xs text-slate-600">{openPin.addressText}{openPin.precision === "CEP" ? " · posição aproximada (CEP)" : ""}</p>
+                                    <Sensitive as="p" className="text-xs text-slate-600">{openPin.addressText}{openPin.precision === "CEP" ? " · posição aproximada (CEP)" : ""}</Sensitive>
                                     <Link href={`${base}${openPin.href}`} className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 underline-offset-2 hover:underline">
                                         Abrir <ExternalLink className="h-3 w-3" />
                                     </Link>
@@ -188,7 +190,7 @@ export default function PortfolioMap({ pins, pending, status, apiKey, mapId, bas
                         )}
                     </Map>
                 </APIProvider>
-            </div>
+            </Sensitive>
             {notes.length > 0 && (
                 <p className="border-t border-border/60 px-4 py-2 text-[11px] leading-snug text-muted-foreground">{notes.join(" ")}</p>
             )}

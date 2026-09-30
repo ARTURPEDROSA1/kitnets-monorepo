@@ -12,6 +12,7 @@
 import React, { useMemo } from 'react';
 import { Building2, Droplets, Flame, Home, PiggyBank, Sun, Trash2, TrendingUp, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Money, Sensitive } from '@/components/privacy';
 import { CoverCarousel, useCoverCarousel } from '@/components/ui/CoverCarousel';
 import type { PropertyDetails, SubUnit } from '@/components/profile/PropertyDetailsCard';
 
@@ -173,6 +174,8 @@ export default function PropertySquareCard({ property, onSelect, onDelete, isDel
 
     const title = details.propertyName?.trim()
         || (address.street ? `${address.street}${address.number ? `, ${address.number}` : ''}` : `Propriedade ${property.index + 1}`);
+    // without a name the title is the street address: the eye toggle hides it too
+    const titleIsAddress = !details.propertyName?.trim() && Boolean(address.street);
 
     const fullAddress = useMemo(() => {
         const parts = [
@@ -235,15 +238,15 @@ export default function PropertySquareCard({ property, onSelect, onDelete, isDel
 
             <div className="flex flex-col gap-3 p-4 flex-1">
                 <div className="space-y-0.5">
-                    <h3 className="font-semibold text-foreground leading-tight line-clamp-1" title={title}>{title}</h3>
-                    <p className="text-xs text-muted-foreground line-clamp-1" title={fullAddress}>{fullAddress}</p>
+                    <h3 className={cn('font-semibold text-foreground leading-tight line-clamp-1', titleIsAddress && 'privacy-sensitive')} title={title}>{title}</h3>
+                    <Sensitive as="p" className="text-xs text-muted-foreground line-clamp-1" title={fullAddress}>{fullAddress}</Sensitive>
                 </div>
 
                 {payback !== null && investment ? (
                     <div className="space-y-1.5">
                         <div className="flex items-baseline justify-between gap-2 text-xs">
                             <span className="font-semibold tabular-nums text-foreground inline-flex items-center gap-1"><PiggyBank className="w-3 h-3 text-emerald-500" /> Payback {payback.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%</span>
-                            <span className="text-muted-foreground tabular-nums">investido {formatCurrencyBRL(investment.invested)}</span>
+                            <span className="text-muted-foreground tabular-nums">investido <Money>{formatCurrencyBRL(investment.invested)}</Money></span>
                         </div>
                         <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
                             <div className={cn('h-full rounded-full transition-all', payback >= 100 ? 'bg-emerald-500' : 'bg-emerald-500/80')} style={{ width: `${payback}%` }} />
@@ -268,14 +271,14 @@ export default function PropertySquareCard({ property, onSelect, onDelete, isDel
                 <dl className="grid grid-cols-2 gap-2 text-[11px] mt-auto">
                     <div className={cn('rounded-lg bg-muted/40 px-2 py-1.5', loadingIncome && 'animate-pulse')} aria-busy={loadingIncome}>
                         <dt className="text-muted-foreground">Receita mensal</dt>
-                        <dd className="font-semibold text-foreground tabular-nums">{loadingIncome ? '…' : formatCurrencyBRL(financials.monthlyRevenue)}</dd>
+                        <Money as="dd" className="font-semibold text-foreground tabular-nums">{loadingIncome ? '…' : formatCurrencyBRL(financials.monthlyRevenue)}</Money>
                         <dd className={cn('line-clamp-1', financials.realMonth ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground')}>
                             {loadingIncome ? 'carregando' : financials.realMonth ? `real · ${financials.realMonth}` : financials.isEstimate ? 'estimativa base' : 'do cadastro'}
                         </dd>
                     </div>
                     <div className={cn('rounded-lg bg-muted/40 px-2 py-1.5', loadingIncome && 'animate-pulse')}>
                         <dt className="text-muted-foreground">Resultado líquido (NOI)</dt>
-                        <dd className="font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">{loadingIncome ? '…' : formatCurrencyBRL(financials.noi)}</dd>
+                        <Money as="dd" className="font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">{loadingIncome ? '…' : formatCurrencyBRL(financials.noi)}</Money>
                         <dd className="text-muted-foreground tabular-nums">{loadingIncome ? '' : `margem ${financials.margin.toFixed(0)}%`}</dd>
                     </div>
                 </dl>

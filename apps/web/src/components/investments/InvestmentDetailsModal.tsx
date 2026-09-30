@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DateInput } from "@/components/ui/DateInput";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Money } from "@/components/privacy";
 import {
     EXIT_PLAN_LABELS, INVESTMENT_KIND_LABELS, STRATEGY_LABELS, formatBRL,
     type InvestmentExitPlan, type InvestmentKind, type InvestmentStrategy, type NewInvestment,
@@ -229,7 +230,7 @@ function DetailsForm({ investment, onSave, onClose }: Omit<Props, "open">) {
                             />
                             <p className="text-[11px] text-muted-foreground">
                                 {byArea
-                                    ? `Em branco, vale área × R$/m² = ${formatBRL(byArea, 0)}.`
+                                    ? <>Em branco, vale área × R$/m² = <Money>{formatBRL(byArea, 0)}</Money>.</>
                                     : "Em branco, vale área × R$/m² quando os dois estiverem preenchidos."}
                             </p>
                         </div>

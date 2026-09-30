@@ -14,6 +14,7 @@ import Link from "next/link";
 import { AlertCircle, ArrowRight, CheckCircle2, Circle, FileSpreadsheet, KeyRound, Landmark, Loader2, ShieldCheck, Trash2, Upload } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
+import { Money } from "@/components/privacy";
 import { cn } from "@/lib/utils";
 import { DESTINATION_LABELS, routingProblem, type BankDestination, type BankTransaction, type RoutedRow } from "@/lib/bank-ledger";
 import { ACTIVE_TRANSACTION_KINDS, formatDateBR, KIND_LABELS, type TransactionKind } from "@/lib/property-investment";
@@ -24,6 +25,8 @@ type ReviewRow = RoutedRow & { include: boolean };
 
 const formatBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const SELECT = "bg-transparent border rounded-md px-1.5 py-1 outline-none text-xs max-w-[180px]";
+/** A statement memo that carries the counterparty's CPF/CNPJ, PIX key or e-mail is hidden whole by the eye toggle (components/privacy): the identifier sits inside the free text. */
+const IDENTIFIER = /\d{3}\.?\d{3}\.?\d{3}-?\d{2}|\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}|@|\+55|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
 const STEPS: Array<{ title: string; detail: string; done: boolean }> = [
     { title: "Importação do extrato (OFX, CSV, TXT ou PDF)", detail: "O extrato que o Inter envia por e-mail entra aqui: cada lançamento é classificado, casado com o imóvel e revisado antes de gravar.", done: true },
@@ -164,13 +167,13 @@ export default function ContasBancariasContent({ lang }: Props) {
                                             <tr key={r.reference + i} className={cn("border-t border-border/60 align-middle", r.duplicate && "opacity-50")}>
                                                 <td className="px-2 py-1"><input type="checkbox" className="accent-emerald-600" checked={r.include} disabled={r.duplicate || (r.destination !== "IGNORED" && problem !== null)} onChange={e => patch(i, { include: e.target.checked })} /></td>
                                                 <td className="px-2 py-1 whitespace-nowrap">{formatDateBR(r.date)}</td>
-                                                <td className="px-2 py-1 max-w-[320px] truncate" title={r.memo}>
+                                                <td className={cn("px-2 py-1 max-w-[320px] truncate", IDENTIFIER.test(r.memo) && "privacy-sensitive")} title={r.memo}>
                                                     {r.memo}
                                                     {r.duplicate && <span className="ml-1 text-[10px] text-muted-foreground">(já importado)</span>}
                                                     {r.reason === "history" && !r.duplicate && <span className="ml-1 text-[10px] text-emerald-700">(como da última vez)</span>}
                                                     {r.reason === "income-exists" && !r.duplicate && <span className="ml-1 text-[10px] text-amber-700" title="O mês já tem receita lançada em Receitas de Aluguel; o depósito fica só na contabilidade para não contar em dobro">(mês já lançado em Receitas)</span>}
                                                 </td>
-                                                <td className={cn("px-2 py-1 text-right tabular-nums whitespace-nowrap font-semibold", r.amount > 0 ? "text-emerald-700 dark:text-emerald-400" : "text-foreground")}>{formatBRL(r.amount)}</td>
+                                                <Money as="td" className={cn("px-2 py-1 text-right tabular-nums whitespace-nowrap font-semibold", r.amount > 0 ? "text-emerald-700 dark:text-emerald-400" : "text-foreground")}>{formatBRL(r.amount)}</Money>
                                                 <td className="px-2 py-1">
                                                     <select value={r.destination} disabled={r.duplicate} onChange={e => patch(i, { destination: e.target.value as BankDestination })} className={SELECT}>
                                                         {(Object.keys(DESTINATION_LABELS) as BankDestination[]).map(d => <option key={d} value={d}>{DESTINATION_LABELS[d]}</option>)}
@@ -235,8 +238,8 @@ export default function ContasBancariasContent({ lang }: Props) {
                                 {ledger.map(r => (
                                     <tr key={r.id} className="border-t border-border/60">
                                         <td className="px-2 py-1 whitespace-nowrap">{formatDateBR(r.occurred_on)}</td>
-                                        <td className="px-2 py-1 max-w-[320px] truncate" title={r.memo}>{r.memo}</td>
-                                        <td className={cn("px-2 py-1 text-right tabular-nums whitespace-nowrap font-semibold", r.amount > 0 ? "text-emerald-700 dark:text-emerald-400" : "")}>{formatBRL(r.amount)}</td>
+                                        <td className={cn("px-2 py-1 max-w-[320px] truncate", IDENTIFIER.test(r.memo) && "privacy-sensitive")} title={r.memo}>{r.memo}</td>
+                                        <Money as="td" className={cn("px-2 py-1 text-right tabular-nums whitespace-nowrap font-semibold", r.amount > 0 ? "text-emerald-700 dark:text-emerald-400" : "")}>{formatBRL(r.amount)}</Money>
                                         <td className="px-2 py-1">{DESTINATION_LABELS[r.destination]}</td>
                                         <td className="px-2 py-1">{propertyName(r.property_id)}</td>
                                         <td className="px-2 py-1">{r.kind ? KIND_LABELS[r.kind] : "—"}</td>

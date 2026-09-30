@@ -16,6 +16,7 @@ import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/DateInput";
 import { ContabilNav } from "@/components/contabil/ContabilNav";
+import { Money, Sensitive } from "@/components/privacy";
 import { cn } from "@/lib/utils";
 import { compareCodes, type AccountingAccount } from "@/lib/accounting-chart";
 import {
@@ -41,6 +42,13 @@ const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const dateBR = (iso: string) => iso.split("-").reverse().join("/");
 let lineKey = 0;
 const emptyLine = (): DraftLine => ({ key: ++lineKey, account_id: "", debit: "", credit: "", property_id: "", memo: "" });
+/**
+ * Statement descriptions ("Extrato: …") and automatic memos are free text: one that carries a
+ * CPF/CNPJ, PIX key or e-mail is hidden by the eye toggle, one that carries an amount ("R$ …",
+ * the depreciation and financing memos) by the dollar toggle (components/privacy).
+ */
+const IDENTIFIER = /\d{3}\.?\d{3}\.?\d{3}-?\d{2}|\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}|@|\+55|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+const privacyOf = (text: string) => cn(text.includes("R$") && "privacy-money", IDENTIFIER.test(text) && "privacy-sensitive") || undefined;
 
 export default function LancamentosContent({ lang }: Props) {
     const [month, setMonth] = useState(currentMonth());
@@ -241,12 +249,12 @@ export default function LancamentosContent({ lang }: Props) {
                                     <td className="pt-2">
                                         <button type="button" onClick={() => setLines(prev => [...prev, emptyLine()])} className="text-xs text-emerald-700 hover:underline flex items-center gap-1"><Plus className="w-3 h-3" /> linha</button>
                                     </td>
-                                    <td className="pt-2 text-right font-semibold">{formatMoney(totals.debit)}</td>
-                                    <td className="pt-2 text-right font-semibold">{formatMoney(totals.credit)}</td>
+                                    <Money as="td" className="pt-2 text-right font-semibold">{formatMoney(totals.debit)}</Money>
+                                    <Money as="td" className="pt-2 text-right font-semibold">{formatMoney(totals.credit)}</Money>
                                     <td className="pt-2 pl-2 text-xs" colSpan={3}>
                                         {totals.balanced
                                             ? <span className="text-emerald-700">Balanceado</span>
-                                            : <span className="text-amber-700">Diferença: {formatMoney(Math.abs(totals.debit - totals.credit))}</span>}
+                                            : <span className="text-amber-700">Diferença: <Money>{formatMoney(Math.abs(totals.debit - totals.credit))}</Money></span>}
                                     </td>
                                 </tr>
                             </tfoot>
@@ -271,7 +279,7 @@ export default function LancamentosContent({ lang }: Props) {
                 <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">Nenhum lançamento em {monthLabel(month)}.</div>
             ) : (
                 <div className="space-y-3">
-                    <p className="text-xs text-muted-foreground">{entries.length} lançamento(s) · débitos {formatMoney(monthTotals.debit)} · créditos {formatMoney(monthTotals.credit)}</p>
+                    <p className="text-xs text-muted-foreground">{entries.length} lançamento(s) · débitos <Money>{formatMoney(monthTotals.debit)}</Money> · créditos <Money>{formatMoney(monthTotals.credit)}</Money></p>
                     {entries.map(e => {
                         const canDelete = !closed && (e.source === "MANUAL" || e.source === "OPENING" || e.source === "REVERSAL") && !e.reversed_by;
                         const reversible = canReverse(e);
@@ -279,11 +287,11 @@ export default function LancamentosContent({ lang }: Props) {
                             <div key={e.id} className={cn("bg-card border border-border rounded-xl p-4 space-y-2", e.reversed_by && "opacity-70")}>
                                 <div className="flex flex-wrap items-center gap-2">
                                     <span className="text-sm font-semibold">{dateBR(e.entry_date)}</span>
-                                    <span className="text-sm">{e.description}</span>
+                                    <span className={cn("text-sm", privacyOf(e.description))}>{e.description}</span>
                                     <span className="text-[10px] uppercase tracking-wide rounded bg-muted px-1.5 py-0.5 text-muted-foreground">{ENTRY_SOURCE_LABELS[e.source]}</span>
                                     {e.reversed_by && <span className="text-[10px] uppercase tracking-wide rounded bg-amber-100 dark:bg-amber-950/40 px-1.5 py-0.5 text-amber-800 dark:text-amber-200">estornado</span>}
                                     <div className="ml-auto flex items-center gap-1">
-                                        {e.created_by && <span className="text-[11px] text-muted-foreground mr-2">por {e.created_by}</span>}
+                                        {e.created_by && <span className="text-[11px] text-muted-foreground mr-2">por {e.created_by.includes("@") ? <Sensitive>{e.created_by}</Sensitive> : e.created_by}</span>}
                                         {reversible && (
                                             <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" disabled={busy === e.id} onClick={() => reverse(e)}><RotateCcw className="w-3.5 h-3.5" /> Estornar</Button>
                                         )}
@@ -297,12 +305,15 @@ export default function LancamentosContent({ lang }: Props) {
                                     <tbody>
                                         {e.lines.map(l => {
                                             const a = accountById.get(l.account_id);
+                                            const property = propertyName(l.property_id);
                                             return (
                                                 <tr key={l.id} className="border-t border-border/50">
                                                     <td className={cn("py-1 pr-2", l.credit > 0 && "pl-6")}>{a ? `${a.code} ${a.name}` : "—"}</td>
-                                                    <td className="py-1 px-2 text-muted-foreground hidden sm:table-cell">{[propertyName(l.property_id), l.memo].filter(Boolean).join(" · ")}</td>
-                                                    <td className="py-1 px-2 text-right w-32">{l.debit > 0 ? formatMoney(l.debit) : ""}</td>
-                                                    <td className="py-1 pl-2 text-right w-32">{l.credit > 0 ? formatMoney(l.credit) : ""}</td>
+                                                    <td className="py-1 px-2 text-muted-foreground hidden sm:table-cell">
+                                                        {property}{property && l.memo ? " · " : ""}{l.memo && <span className={privacyOf(l.memo)}>{l.memo}</span>}
+                                                    </td>
+                                                    <Money as="td" className="py-1 px-2 text-right w-32">{l.debit > 0 ? formatMoney(l.debit) : ""}</Money>
+                                                    <Money as="td" className="py-1 pl-2 text-right w-32">{l.credit > 0 ? formatMoney(l.credit) : ""}</Money>
                                                 </tr>
                                             );
                                         })}

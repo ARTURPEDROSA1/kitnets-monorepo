@@ -12,6 +12,7 @@ import { AlertCircle, ArrowRight, Building, Building2, CheckCircle2, ChevronDown
 import { Button } from "@kitnets/ui";
 import GatewaysSection from "@/components/dashboard/GatewaysSection";
 import PortfolioMap, { type GeocodeStatus } from "@/components/dashboard/PortfolioMap";
+import { Money } from "@/components/privacy";
 import Tile, { TILE_TONES, type TileTone } from "@/components/properties/Tile";
 import { monthLabel } from "@/lib/condominium-hub";
 import { MODULE_META, isEmptyPortfolio, type DashboardAttentionItem, type DashboardTone, type DashboardTotals } from "@/lib/dashboard-hub";
@@ -42,6 +43,8 @@ const plural = (n: number, one: string, many: string) => `${n.toLocaleString("pt
 const pct1 = (v: number | null) => (v === null ? "—" : `${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`);
 const kwh = (v: number) => `${Math.round(v).toLocaleString("pt-BR")} kWh`;
 const m3 = (v: number) => `${v.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} m³`;
+/** An attention sentence that quotes an amount (the modules build them in lib/*): the dollar toggle hides the whole sentence. */
+const hasAmount = (text: string) => /R\$\s?\d/.test(text);
 const DOT: Record<DashboardTone, string> = { rose: "bg-rose-500", amber: "bg-amber-500", sky: "bg-sky-500", emerald: "bg-emerald-500", slate: "bg-slate-400" };
 const LOADER_LABELS: Record<DashboardLoader, string> = {
     properties: "imóveis", income: "receitas", leases: "contratos", tenants: "inquilinos", agents: "corretores", agencies: "imobiliárias",
@@ -53,6 +56,8 @@ interface Figure {
     value: React.ReactNode;
     hint?: React.ReactNode;
     title?: string;
+    /** the figure is an amount in R$ (hidden by the dollar toggle); amounts inside `hint` are wrapped in <Money> by the caller */
+    money?: boolean;
 }
 
 function ModuleCard({ icon, tone, title, href, base, figures, note, unavailable }: { icon: React.ReactNode; tone: TileTone; title: string; href: string; base: string; figures: Figure[]; note?: React.ReactNode; unavailable?: boolean }) {
@@ -74,7 +79,7 @@ function ModuleCard({ icon, tone, title, href, base, figures, note, unavailable 
                     {figures.map(f => (
                         <div key={f.label} className="min-w-0" title={f.title}>
                             <dt className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{f.label}</dt>
-                            <dd className="break-words text-base font-bold leading-tight tabular-nums text-foreground">{f.value}</dd>
+                            <dd className={cn("break-words text-base font-bold leading-tight tabular-nums text-foreground", f.money && "privacy-money")}>{f.value}</dd>
                             {f.hint && <dd className="break-words text-[11px] leading-snug text-muted-foreground">{f.hint}</dd>}
                         </div>
                     ))}
@@ -109,7 +114,7 @@ function AttentionPanel({ items, base }: { items: DashboardAttentionItem[]; base
                             <span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", DOT[item.tone])} />
                             <span className="min-w-0 flex-1">
                                 <Link href={`${base}${item.href}`} className="font-semibold text-foreground underline-offset-2 hover:underline">{item.name}</Link>
-                                <span className="text-muted-foreground"> — {item.text}</span>
+                                <span className="text-muted-foreground"> — {hasAmount(item.text) ? <Money>{item.text}</Money> : item.text}</span>
                                 <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 align-middle text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{MODULE_META[item.module].label}</span>
                             </span>
                             {item.date && <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{formatDateBR(item.date)}</span>}
@@ -188,7 +193,7 @@ export default function DashboardHub({ base, view, totals, attention, loading, e
                             }}
                         />
                         <Tile
-                            label="Receita do mês" tone="emerald" icon={<Wallet className="h-4 w-4" />}
+                            label="Receita do mês" tone="emerald" icon={<Wallet className="h-4 w-4" />} money
                             value={!down.income && totals.income.withLedger > 0 ? brl(totals.income.revenue, 0) : "—"}
                             hint={down.income
                                 ? unavailable("receitas")
@@ -203,11 +208,11 @@ export default function DashboardHub({ base, view, totals, attention, loading, e
                             }}
                         />
                         <Tile
-                            label="Aluguel contratado" tone="emerald" icon={<FileSignature className="h-4 w-4" />}
+                            label="Aluguel contratado" tone="emerald" icon={<FileSignature className="h-4 w-4" />} money
                             value={down.leases ? "—" : `${brl(totals.contracts.contractedRent, 0)}/mês`}
                             hint={down.leases ? unavailable("contratos") : `${plural(totals.contracts.inForce, "contrato em vigor", "contratos em vigor")}${totals.contracts.nextEnd ? ` · próximo término ${formatDateBR(totals.contracts.nextEnd.date)}` : ""}`}
                             onClick={() => onOpen("/contratos")}
-                            info={{ what: "O valor de contrato dos contratos em vigor (ativos ou vencendo), antes da taxa da imobiliária.", formula: "Σ aluguel mensal dos contratos com status ativo ou vencendo", note: down.leases ? undefined : `${brl(totals.contracts.contractedRent * 12, 0)} por ano.` }}
+                            info={{ what: "O valor de contrato dos contratos em vigor (ativos ou vencendo), antes da taxa da imobiliária.", formula: "Σ aluguel mensal dos contratos com status ativo ou vencendo", note: down.leases ? undefined : <><Money>{brl(totals.contracts.contractedRent * 12, 0)}</Money> por ano.</> }}
                         />
                         <Tile
                             label="Pessoas abrigadas" tone="violet" icon={<Users className="h-4 w-4" />}
@@ -221,10 +226,10 @@ export default function DashboardHub({ base, view, totals, attention, loading, e
                             value={down.agents ? "—" : totals.jobs.agents.active.toLocaleString("pt-BR")}
                             hint={down.agents ? unavailable("corretores") : `${plural(totals.jobs.agents.active - totals.jobs.agents.idle, "corretor com contrato", "corretores com contrato")}${down.agencies ? "" : ` · ${plural(totals.jobs.agenciesWithLeases, "imobiliária com contrato", "imobiliárias com contrato")}`}`}
                             onClick={() => onOpen("/corretores")}
-                            info={{ what: "Os corretores ativos que a carteira sustenta, e as imobiliárias que administram contratos em vigor.", formula: "corretores com status ativo; com contrato = com pelo menos um contrato em vigor ou inquilino atual", note: !down.agencies && totals.jobs.agencies.monthlyFees > 0 ? `${brl(totals.jobs.agencies.monthlyFees, 0)}/mês em taxas de administração.` : undefined }}
+                            info={{ what: "Os corretores ativos que a carteira sustenta, e as imobiliárias que administram contratos em vigor.", formula: "corretores com status ativo; com contrato = com pelo menos um contrato em vigor ou inquilino atual", note: !down.agencies && totals.jobs.agencies.monthlyFees > 0 ? <><Money>{brl(totals.jobs.agencies.monthlyFees, 0)}</Money>/mês em taxas de administração.</> : undefined }}
                         />
                         <Tile
-                            label={`Impostos pagos em ${totals.taxes?.year ?? new Date().getFullYear()}`} tone="amber" icon={<Landmark className="h-4 w-4" />}
+                            label={`Impostos pagos em ${totals.taxes?.year ?? new Date().getFullYear()}`} tone="amber" icon={<Landmark className="h-4 w-4" />} money
                             value={totals.taxes ? brl(totals.taxes.iptuLandlordYtd + totals.taxes.itbiOtherYtd, 0) : "—"}
                             hint={totals.taxes ? `IPTU ${brl(totals.taxes.iptuLandlordYtd, 0)} · ITBI e outros ${brl(totals.taxes.itbiOtherYtd, 0)} · federais em breve` : unavailable("tributos")}
                             onClick={() => onOpen("/imoveis")}
@@ -246,16 +251,16 @@ export default function DashboardHub({ base, view, totals, attention, loading, e
                                 { label: "Imóveis", value: totals.properties.count, hint: `${totals.properties.single} unifamiliar · ${totals.properties.multi} multifamiliar` },
                                 { label: "Unidades", value: totals.occupancy.units, hint: down.leases ? "contratos indisponíveis" : `${totals.occupancy.occupied} com contrato em vigor` },
                                 { label: "Ocupação", value: down.leases ? "—" : pct1(totals.occupancy.pct), hint: down.leases ? "contratos indisponíveis" : `${plural(totals.occupancy.propertiesWithLease, "imóvel alugado", "imóveis alugados")}` },
-                                { label: "Economia potencial", value: down.income ? "—" : brl(totals.income.feeAllTime, 0), hint: down.income ? "receitas indisponíveis" : "taxa de imobiliária acumulada · autogestão", title: "Σ da taxa da imobiliária retida antes do crédito, desde o início, pela razão de receitas" },
+                                { label: "Economia potencial", value: down.income ? "—" : brl(totals.income.feeAllTime, 0), money: true, hint: down.income ? "receitas indisponíveis" : "taxa de imobiliária acumulada · autogestão", title: "Σ da taxa da imobiliária retida antes do crédito, desde o início, pela razão de receitas" },
                             ]}
                             note={totals.properties.unlinked > 0 ? `${plural(totals.properties.unlinked, "imóvel ainda não foi salvo", "imóveis ainda não foram salvos")} até o fim: complete o cadastro em Imóveis.` : undefined}
                         />
                         <ModuleCard icon={<FileSignature className="h-4 w-4" />} tone="emerald" title="Contratos" href="/contratos" base={base} unavailable={down.leases}
                             figures={[
                                 { label: "Em vigor", value: totals.contracts.inForce, hint: totals.contracts.overdueTerm > 0 ? <span className="text-rose-600">{plural(totals.contracts.overdueTerm, "com prazo vencido", "com prazo vencido")}</span> : `${totals.contracts.total} no total` },
-                                { label: "Aluguel contratado", value: `${brl(totals.contracts.contractedRent, 0)}/mês`, hint: `${brl(totals.contracts.contractedRent * 12, 0)} por ano` },
+                                { label: "Aluguel contratado", value: `${brl(totals.contracts.contractedRent, 0)}/mês`, money: true, hint: <><Money>{brl(totals.contracts.contractedRent * 12, 0)}</Money> por ano</> },
                                 { label: "Próximo término", value: totals.contracts.nextEnd ? formatDateBR(totals.contracts.nextEnd.date) : "—", hint: totals.contracts.nextEnd ? `em ${plural(totals.contracts.nextEnd.days, "dia", "dias")} · ${totals.contracts.ending90} nos próximos 90 dias` : "nenhum término à vista" },
-                                { label: "Caução em mãos", value: brl(totals.contracts.deposits, 0), hint: `${plural(totals.contracts.depositsCount, "contrato com caução", "contratos com caução")}` },
+                                { label: "Caução em mãos", value: brl(totals.contracts.deposits, 0), money: true, hint: `${plural(totals.contracts.depositsCount, "contrato com caução", "contratos com caução")}` },
                             ]}
                         />
                         <ModuleCard icon={<Users className="h-4 w-4" />} tone="violet" title="Inquilinos" href="/inquilinos" base={base} unavailable={down.tenants}
@@ -270,15 +275,15 @@ export default function DashboardHub({ base, view, totals, attention, loading, e
                             figures={[
                                 { label: "Ativos", value: totals.jobs.agents.active, hint: `${totals.jobs.agents.inactive} inativos` },
                                 { label: "Contratos em vigor", value: totals.jobs.agents.leasesInForce, hint: `${totals.jobs.agents.leasesTotal} no total` },
-                                { label: "Aluguel sob gestão", value: `${brl(totals.jobs.agents.rentManaged, 0)}/mês`, hint: `${plural(totals.jobs.agents.tenantsServed, "inquilino atendido", "inquilinos atendidos")}` },
+                                { label: "Aluguel sob gestão", value: `${brl(totals.jobs.agents.rentManaged, 0)}/mês`, money: true, hint: `${plural(totals.jobs.agents.tenantsServed, "inquilino atendido", "inquilinos atendidos")}` },
                                 { label: "Autônomos", value: totals.jobs.agents.autonomous, hint: `${plural(totals.jobs.agents.agencies, "imobiliária", "imobiliárias")} com corretores` },
                             ]}
                         />
                         <ModuleCard icon={<Building className="h-4 w-4" />} tone="blue" title="Imobiliárias" href="/imobiliaria" base={base} unavailable={down.agencies}
                             figures={[
                                 { label: "Ativas", value: totals.jobs.agencies.active, hint: `${totals.jobs.agenciesWithLeases} com contrato em vigor` },
-                                { label: "Contratos em vigor", value: totals.jobs.agencies.leasesInForce, hint: `${brl(totals.jobs.agencies.rentManaged, 0)}/mês sob gestão` },
-                                { label: "Taxas de administração", value: `${brl(totals.jobs.agencies.monthlyFees, 0)}/mês`, hint: `${brl(totals.jobs.agencies.monthlyFees * 12, 0)} por ano: a economia potencial com autogestão` },
+                                { label: "Contratos em vigor", value: totals.jobs.agencies.leasesInForce, hint: <><Money>{brl(totals.jobs.agencies.rentManaged, 0)}</Money>/mês sob gestão</> },
+                                { label: "Taxas de administração", value: `${brl(totals.jobs.agencies.monthlyFees, 0)}/mês`, money: true, hint: <><Money>{brl(totals.jobs.agencies.monthlyFees * 12, 0)}</Money> por ano: a economia potencial com autogestão</> },
                                 { label: "Inquilinos atendidos", value: totals.jobs.agencies.tenantsServed, hint: `${plural(totals.jobs.agencies.agentsLinked, "corretor vinculado", "corretores vinculados")}` },
                             ]}
                         />
@@ -286,8 +291,8 @@ export default function DashboardHub({ base, view, totals, attention, loading, e
                             figures={totals.energy ? [
                                 { label: "Unidades de aluguel", value: totals.energy.units, hint: `${totals.energy.withBills} com faturas` },
                                 { label: "Consumo mais recente", value: kwh(totals.energy.consumptionLatest), hint: `${kwh(totals.energy.consumption12)} em 12 meses` },
-                                { label: "Faturas mais recentes", value: brl(totals.energy.billsLatest, 0), hint: totals.energy.overdue > 0 ? <span className="text-rose-600">{plural(totals.energy.overdue, "vencida", "vencidas")}</span> : totals.energy.dueSoon > 0 ? `${plural(totals.energy.dueSoon, "vence em 7 dias", "vencem em 7 dias")}` : `${brl(totals.energy.paid12, 0)} em 12 meses` },
-                                { label: "Economia solar", value: brl(totals.energy.savingsLatest, 0), hint: `${brl(totals.energy.savings12, 0)} em 12 meses · ${plural(totals.energy.solarUnits, "unidade gerando", "unidades gerando")}` },
+                                { label: "Faturas mais recentes", value: brl(totals.energy.billsLatest, 0), money: true, hint: totals.energy.overdue > 0 ? <span className="text-rose-600">{plural(totals.energy.overdue, "vencida", "vencidas")}</span> : totals.energy.dueSoon > 0 ? `${plural(totals.energy.dueSoon, "vence em 7 dias", "vencem em 7 dias")}` : <><Money>{brl(totals.energy.paid12, 0)}</Money> em 12 meses</> },
+                                { label: "Economia solar", value: brl(totals.energy.savingsLatest, 0), money: true, hint: <><Money>{brl(totals.energy.savings12, 0)}</Money> em 12 meses · {plural(totals.energy.solarUnits, "unidade gerando", "unidades gerando")}</> },
                             ] : []}
                             note="Só os imóveis de aluguel; as unidades avulsas ficam no hub de Energia."
                         />
@@ -295,32 +300,32 @@ export default function DashboardHub({ base, view, totals, attention, loading, e
                             figures={totals.water ? [
                                 { label: "Imóveis com água", value: totals.water.units, hint: `${totals.water.withBills} com contas` },
                                 { label: "Consumo mais recente", value: m3(totals.water.consumptionLatest), hint: `${m3(totals.water.consumption12)} em 12 meses` },
-                                { label: "Contas mais recentes", value: brl(totals.water.billsLatest, 0), hint: totals.water.overdue > 0 ? <span className="text-rose-600">{plural(totals.water.overdue, "vencida", "vencidas")}</span> : `${brl(totals.water.paid12, 0)} em 12 meses` },
-                                { label: "Custo por m³", value: totals.water.rateLatest === null ? "—" : brl(totals.water.rateLatest), hint: totals.water.spikes > 0 ? <span className="text-amber-700 dark:text-amber-400">{plural(totals.water.spikes, "pico de consumo", "picos de consumo")}</span> : "sem picos de consumo" },
+                                { label: "Contas mais recentes", value: brl(totals.water.billsLatest, 0), money: true, hint: totals.water.overdue > 0 ? <span className="text-rose-600">{plural(totals.water.overdue, "vencida", "vencidas")}</span> : <><Money>{brl(totals.water.paid12, 0)}</Money> em 12 meses</> },
+                                { label: "Custo por m³", value: totals.water.rateLatest === null ? "—" : brl(totals.water.rateLatest), money: true, hint: totals.water.spikes > 0 ? <span className="text-amber-700 dark:text-amber-400">{plural(totals.water.spikes, "pico de consumo", "picos de consumo")}</span> : "sem picos de consumo" },
                             ] : []}
                         />
                         <ModuleCard icon={<Building className="h-4 w-4" />} tone="emerald" title="Condomínio" href="/condominio" base={base} unavailable={failed.has("condominiums")}
                             figures={totals.condo ? [
                                 { label: "Condomínios", value: totals.condo.condos, hint: `${plural(totals.condo.units, "unidade", "unidades")}` },
-                                { label: "Receita do mês", value: brl(totals.condo.revenueLatest, 0), hint: `custos ${brl(totals.condo.costLatest, 0)}` },
-                                { label: "Resultado do mês", value: <span className={totals.condo.resultLatest < 0 ? "text-rose-600" : undefined}>{brl(totals.condo.resultLatest, 0)}</span>, hint: totals.condo.negativeCondos > 0 ? <span className="text-rose-600">{plural(totals.condo.negativeCondos, "condomínio no vermelho", "condomínios no vermelho")}</span> : "todos no azul" },
-                                { label: `Resultado ${totals.condo.year}`, value: <span className={totals.condo.resultYtd < 0 ? "text-rose-600" : undefined}>{brl(totals.condo.resultYtd, 0)}</span>, hint: totals.condo.monthsWithoutCosts > 0 ? <span className="text-amber-700 dark:text-amber-400">{plural(totals.condo.monthsWithoutCosts, "mês sem custos lançados", "meses sem custos lançados")}</span> : `margem ${pct1(totals.condo.marginYtd)}` },
+                                { label: "Receita do mês", value: brl(totals.condo.revenueLatest, 0), money: true, hint: <>custos <Money>{brl(totals.condo.costLatest, 0)}</Money></> },
+                                { label: "Resultado do mês", value: <span className={totals.condo.resultLatest < 0 ? "text-rose-600" : undefined}>{brl(totals.condo.resultLatest, 0)}</span>, money: true, hint: totals.condo.negativeCondos > 0 ? <span className="text-rose-600">{plural(totals.condo.negativeCondos, "condomínio no vermelho", "condomínios no vermelho")}</span> : "todos no azul" },
+                                { label: `Resultado ${totals.condo.year}`, value: <span className={totals.condo.resultYtd < 0 ? "text-rose-600" : undefined}>{brl(totals.condo.resultYtd, 0)}</span>, money: true, hint: totals.condo.monthsWithoutCosts > 0 ? <span className="text-amber-700 dark:text-amber-400">{plural(totals.condo.monthsWithoutCosts, "mês sem custos lançados", "meses sem custos lançados")}</span> : `margem ${pct1(totals.condo.marginYtd)}` },
                             ] : []}
                         />
                         <ModuleCard icon={<HardHat className="h-4 w-4" />} tone="amber" title="Projetos" href="/projetos" base={base} unavailable={failed.has("projects")}
                             figures={totals.projects ? [
                                 { label: "Em andamento", value: totals.projects.all.active, hint: `${totals.projects.all.completed} em Imóveis · ${totals.projects.all.sold} vendidos` },
-                                { label: "Investido até agora", value: brl(totals.projects.inProgress.paid, 0), hint: `${pct1(totals.projects.inProgress.paidPct)} do custo de ${brl(totals.projects.inProgress.committed, 0)}` },
-                                { label: "Falta pagar", value: brl(totals.projects.inProgress.remaining, 0), hint: totals.projects.inProgress.nextDueOn ? `próxima parcela ${formatDateBR(totals.projects.inProgress.nextDueOn)} · ${brl(totals.projects.inProgress.nextDueAmount, 0)}` : "nenhuma parcela à vista" },
-                                { label: "Parcelas em atraso", value: <span className={totals.projects.inProgress.overdue > 0 ? "text-rose-600" : undefined}>{totals.projects.inProgress.overdue}</span>, hint: totals.projects.sold.count > 0 ? `ganho realizado nas vendas ${brl(totals.projects.sold.realizedGain, 0)}` : "nenhuma venda registrada" },
+                                { label: "Investido até agora", value: brl(totals.projects.inProgress.paid, 0), money: true, hint: <>{pct1(totals.projects.inProgress.paidPct)} do custo de <Money>{brl(totals.projects.inProgress.committed, 0)}</Money></> },
+                                { label: "Falta pagar", value: brl(totals.projects.inProgress.remaining, 0), money: true, hint: totals.projects.inProgress.nextDueOn ? <>próxima parcela {formatDateBR(totals.projects.inProgress.nextDueOn)} · <Money>{brl(totals.projects.inProgress.nextDueAmount, 0)}</Money></> : "nenhuma parcela à vista" },
+                                { label: "Parcelas em atraso", value: <span className={totals.projects.inProgress.overdue > 0 ? "text-rose-600" : undefined}>{totals.projects.inProgress.overdue}</span>, hint: totals.projects.sold.count > 0 ? <>ganho realizado nas vendas <Money>{brl(totals.projects.sold.realizedGain, 0)}</Money></> : "nenhuma venda registrada" },
                             ] : []}
                             note="Valores dos projetos em andamento, como no hub; os vendidos entram só no ganho realizado."
                         />
                         <ModuleCard icon={<Landmark className="h-4 w-4" />} tone="amber" title="Tributos" href="/imoveis" base={base} unavailable={failed.has("taxes")}
                             figures={totals.taxes ? [
-                                { label: `IPTU pago por você (${totals.taxes.year})`, value: brl(totals.taxes.iptuLandlordYtd, 0), hint: `${brl(totals.taxes.iptuLandlordAllTime, 0)} desde o início · ${plural(totals.taxes.propertiesWithIptu, "imóvel no registro", "imóveis no registro")}` },
-                                { label: `IPTU pago por inquilinos (${totals.taxes.year})`, value: brl(totals.taxes.iptuTenantYtd, 0), hint: "não é custo seu" },
-                                { label: `ITBI e outros (${totals.taxes.year})`, value: brl(totals.taxes.itbiOtherYtd, 0), hint: `${brl(totals.taxes.itbiAllTime + totals.taxes.otherAllTime, 0)} desde o início` },
+                                { label: `IPTU pago por você (${totals.taxes.year})`, value: brl(totals.taxes.iptuLandlordYtd, 0), money: true, hint: <><Money>{brl(totals.taxes.iptuLandlordAllTime, 0)}</Money> desde o início · {plural(totals.taxes.propertiesWithIptu, "imóvel no registro", "imóveis no registro")}</> },
+                                { label: `IPTU pago por inquilinos (${totals.taxes.year})`, value: brl(totals.taxes.iptuTenantYtd, 0), money: true, hint: "não é custo seu" },
+                                { label: `ITBI e outros (${totals.taxes.year})`, value: brl(totals.taxes.itbiOtherYtd, 0), money: true, hint: <><Money>{brl(totals.taxes.itbiAllTime + totals.taxes.otherAllTime, 0)}</Money> desde o início</> },
                                 { label: "Impostos federais", value: "—", hint: "em breve, via Contábil & Fiscal" },
                             ] : []}
                             note="IPTU no mês do pagamento, até este mês, como na DRE; o registro fica em cada imóvel, em Tributos do imóvel."

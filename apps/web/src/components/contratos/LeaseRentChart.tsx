@@ -7,6 +7,7 @@
  */
 import React from "react";
 import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Money } from "@/components/privacy";
 import { formatMonthKey } from "@/lib/property-income";
 import type { LeaseIncomePoint } from "@/lib/lease-dashboard";
 
@@ -31,8 +32,8 @@ function ChartTooltip({ active, payload, agencyManaged }: { active?: boolean; pa
     return (
         <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs shadow-lg">
             <p className="font-semibold text-foreground">{formatMonthKey(d.key)}{d.status === "EXPECTED" ? " · previsto" : ""}</p>
-            <p className="tabular-nums text-muted-foreground">Aluguel bruto: <span className="text-foreground">{brl2(d.gross)}</span></p>
-            <p className="tabular-nums text-muted-foreground">{agencyManaged ? "Recebido (líquido)" : "Recebido"}: <span className="text-foreground">{brl2(d.received)}</span></p>
+            <p className="tabular-nums text-muted-foreground">Aluguel bruto: <Money className="text-foreground">{brl2(d.gross)}</Money></p>
+            <p className="tabular-nums text-muted-foreground">{agencyManaged ? "Recebido (líquido)" : "Recebido"}: <Money className="text-foreground">{brl2(d.received)}</Money></p>
         </div>
     );
 }
@@ -48,7 +49,8 @@ export default function LeaseRentChart({ points, agencyManaged }: Props) {
                 <span className="inline-flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-sm border" style={{ background: RECEIVED_EXPECTED, borderColor: RECEIVED }} /> Previsto, ainda não confirmado</span>
                 <span className="inline-flex items-center gap-1.5"><span className="inline-block h-0.5 w-4" style={{ background: GROSS }} /> Aluguel bruto (valor de contrato)</span>
             </div>
-            <div className="h-60 w-full">
+            {/* the whole chart is amounts (axis, bars, line, tooltip): the dollar toggle blurs the container */}
+            <Money as="div" className="h-60 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} barCategoryGap="22%">
                         <CartesianGrid vertical={false} stroke="hsl(var(--border))" />
@@ -66,7 +68,7 @@ export default function LeaseRentChart({ points, agencyManaged }: Props) {
                         <Line type="stepAfter" dataKey="gross" name="Aluguel bruto" stroke={GROSS} strokeWidth={2} dot={false} activeDot={{ r: 4 }} isAnimationActive={false} />
                     </ComposedChart>
                 </ResponsiveContainer>
-            </div>
+            </Money>
         </div>
     );
 }

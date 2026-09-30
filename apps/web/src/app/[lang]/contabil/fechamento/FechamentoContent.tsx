@@ -18,6 +18,7 @@ import {
 import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
 import { ContabilNav } from "@/components/contabil/ContabilNav";
+import { Money } from "@/components/privacy";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/accounting-journal";
 import type { CheckItem, CheckLevel } from "@/lib/accounting-accruals";
@@ -219,20 +220,20 @@ export default function FechamentoContent({ lang, initialMonth }: Props) {
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                         <div className="rounded-2xl border border-border bg-card p-4 space-y-1 min-w-0">
                             <p className="text-xs text-muted-foreground">Aluguéis por competência</p>
-                            <p className="text-xl font-bold tabular-nums whitespace-nowrap">{formatMoney(status.automated.grossRent)}</p>
+                            <Money as="p" className="text-xl font-bold tabular-nums whitespace-nowrap">{formatMoney(status.automated.grossRent)}</Money>
                             <p className="text-xs text-muted-foreground">{status.automated.rentEntries} lançamento(s) de Receitas</p>
                         </div>
                         <div className="rounded-2xl border border-border bg-card p-4 space-y-1 min-w-0">
                             <p className="text-xs text-muted-foreground">{status.automated.fairValue ? "Ajuste a valor justo" : "Depreciação"}</p>
-                            <p className="text-xl font-bold tabular-nums whitespace-nowrap">
+                            <Money as="p" className="text-xl font-bold tabular-nums whitespace-nowrap">
                                 {status.automated.fairValue ? formatMoney(status.automated.fairValue.gain - status.automated.fairValue.loss) : status.automated.depreciation === null ? "—" : formatMoney(status.automated.depreciation)}
-                            </p>
+                            </Money>
                             <p className="text-xs text-muted-foreground">{status.automated.depreciation === null && !status.automated.fairValue ? "modelo a definir, ou valor justo" : status.automated.financing ? `${status.automated.financing} parcela(s) com juros separados` : "imóveis alugados"}</p>
                         </div>
                         <div className="rounded-2xl border border-border bg-card p-4 space-y-1 min-w-0">
                             <p className="text-xs text-muted-foreground">Resultado do mês nos livros</p>
-                            <p className={cn("text-xl font-bold tabular-nums whitespace-nowrap", status.result.net < 0 && "text-rose-700")}>{formatMoney(status.result.net)}</p>
-                            <p className="text-xs text-muted-foreground">receitas {formatMoney(status.result.revenue)} · despesas {formatMoney(status.result.expenses)}</p>
+                            <Money as="p" className={cn("text-xl font-bold tabular-nums whitespace-nowrap", status.result.net < 0 && "text-rose-700")}>{formatMoney(status.result.net)}</Money>
+                            <p className="text-xs text-muted-foreground">receitas <Money>{formatMoney(status.result.revenue)}</Money> · despesas <Money>{formatMoney(status.result.expenses)}</Money></p>
                         </div>
                         <div className="rounded-2xl border border-border bg-card p-4 space-y-1 min-w-0">
                             <p className="text-xs text-muted-foreground">Conferência</p>
@@ -257,8 +258,9 @@ export default function FechamentoContent({ lang, initialMonth }: Props) {
                                             <li key={item.id} className="flex gap-3 text-sm">
                                                 <L.icon className={cn("w-4 h-4 mt-0.5 shrink-0", L.className)} />
                                                 <div className="min-w-0 flex-1">
-                                                    <p className="font-medium">{item.title}</p>
-                                                    {item.detail && <p className="text-xs text-muted-foreground">{item.detail}</p>}
+                                                    {/* the checks are sentences from lib/accounting-accruals; the ones that quote an amount are hidden whole by the dollar toggle */}
+                                                    <p className={cn("font-medium", item.title.includes("R$") && "privacy-money")}>{item.title}</p>
+                                                    {item.detail && <p className={cn("text-xs text-muted-foreground", item.detail.includes("R$") && "privacy-money")}>{item.detail}</p>}
                                                 </div>
                                                 {item.href && level !== "ok" && (
                                                     <Link href={`${base}${item.href}`} className="shrink-0 text-xs text-emerald-700 hover:underline flex items-center gap-0.5 self-start mt-0.5">Resolver <ArrowRight className="w-3 h-3" /></Link>

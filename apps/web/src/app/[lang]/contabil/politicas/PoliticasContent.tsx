@@ -16,6 +16,7 @@ import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/DateInput";
 import { ContabilNav } from "@/components/contabil/ContabilNav";
+import { Money, Sensitive } from "@/components/privacy";
 import { cn } from "@/lib/utils";
 import {
     BRAZIL_UFS, COMPANY_SIZE_LABELS, LEGAL_NATURE_LABELS, REIMBURSEMENTS_LABELS, STANDARD_LABELS, TAX_BASIS_LABELS, TAX_REGIME_LABELS,
@@ -178,7 +179,7 @@ export default function PoliticasContent({ lang }: Props) {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="space-y-1">
                                 <span className={LABEL}>CNPJ</span>
-                                <p className="text-sm font-medium">{formatCnpj(identity?.cnpj ?? null)}</p>
+                                <Sensitive as="p" className="text-sm font-medium">{formatCnpj(identity?.cnpj ?? null)}</Sensitive>
                             </div>
                             <div className="space-y-1 md:col-span-2">
                                 <span className={LABEL}>Razão social</span>
@@ -343,21 +344,21 @@ export default function PoliticasContent({ lang }: Props) {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div className="rounded-xl border border-border p-4 space-y-1">
                             <p className={LABEL}>Distribuível com isenção em {sim.horizonYears} anos</p>
-                            <p className="text-sm">A: <strong>{formatMoney(result.totals.distributableA)}</strong></p>
-                            <p className="text-sm">B: <strong>{formatMoney(result.totals.distributableB)}</strong></p>
-                            <p className="text-xs text-muted-foreground">Diferença: {formatMoney(result.totals.distributableB - result.totals.distributableA)}</p>
+                            <p className="text-sm">A: <Money as="strong">{formatMoney(result.totals.distributableA)}</Money></p>
+                            <p className="text-sm">B: <Money as="strong">{formatMoney(result.totals.distributableB)}</Money></p>
+                            <p className="text-xs text-muted-foreground">Diferença: <Money>{formatMoney(result.totals.distributableB - result.totals.distributableA)}</Money></p>
                         </div>
                         <div className="rounded-xl border border-border p-4 space-y-1">
-                            <p className={LABEL}>Venda ao fim do horizonte por {formatMoney(result.sale.saleValue)}</p>
-                            <p className="text-sm">Ganho tributável A: <strong>{formatMoney(result.sale.gainA)}</strong> · imposto {formatMoney(result.sale.taxA)}</p>
-                            <p className="text-sm">Ganho tributável B: <strong>{formatMoney(result.sale.gainB)}</strong> · imposto {formatMoney(result.sale.taxB)}</p>
-                            <p className="text-xs text-muted-foreground">Diferença no imposto: {formatMoney(result.sale.taxA - result.sale.taxB)}</p>
+                            <p className={LABEL}>Venda ao fim do horizonte por <Money>{formatMoney(result.sale.saleValue)}</Money></p>
+                            <p className="text-sm">Ganho tributável A: <Money as="strong">{formatMoney(result.sale.gainA)}</Money> · imposto <Money>{formatMoney(result.sale.taxA)}</Money></p>
+                            <p className="text-sm">Ganho tributável B: <Money as="strong">{formatMoney(result.sale.gainB)}</Money> · imposto <Money>{formatMoney(result.sale.taxB)}</Money></p>
+                            <p className="text-xs text-muted-foreground">Diferença no imposto: <Money>{formatMoney(result.sale.taxA - result.sale.taxB)}</Money></p>
                         </div>
                         <div className="rounded-xl border border-border p-4 space-y-1">
                             <p className={LABEL}>No período</p>
-                            <p className="text-sm">Depreciação (A): {formatMoney(result.totals.depreciation)}</p>
-                            <p className="text-sm">Reserva de valor justo (B): {formatMoney(result.totals.fairValueReserve)}</p>
-                            <p className="text-sm">Custo das avaliações (B): {formatMoney(result.totals.valuationCost)}</p>
+                            <p className="text-sm">Depreciação (A): <Money>{formatMoney(result.totals.depreciation)}</Money></p>
+                            <p className="text-sm">Reserva de valor justo (B): <Money>{formatMoney(result.totals.fairValueReserve)}</Money></p>
+                            <p className="text-sm">Custo das avaliações (B): <Money>{formatMoney(result.totals.valuationCost)}</Money></p>
                         </div>
                     </div>
 
@@ -379,13 +380,13 @@ export default function PoliticasContent({ lang }: Props) {
                                 {result.years.map(y => (
                                     <tr key={y.year} className="border-b border-border/60">
                                         <td className="py-1.5 pr-2">{y.year}</td>
-                                        <td className="text-right px-2">{formatMoney(y.grossRent)}</td>
-                                        <td className="text-right px-2">{formatMoney(y.taxes)}</td>
-                                        <td className="text-right px-2">{formatMoney(y.presumedDistributable)}</td>
-                                        <td className="text-right px-2">{formatMoney(y.depreciation)}</td>
-                                        <td className="text-right px-2">{formatMoney(y.profitA)}</td>
-                                        <td className="text-right px-2">{formatMoney(y.profitB)}</td>
-                                        <td className="text-right px-2">{formatMoney(y.fairValue)}</td>
+                                        <Money as="td" className="text-right px-2">{formatMoney(y.grossRent)}</Money>
+                                        <Money as="td" className="text-right px-2">{formatMoney(y.taxes)}</Money>
+                                        <Money as="td" className="text-right px-2">{formatMoney(y.presumedDistributable)}</Money>
+                                        <Money as="td" className="text-right px-2">{formatMoney(y.depreciation)}</Money>
+                                        <Money as="td" className="text-right px-2">{formatMoney(y.profitA)}</Money>
+                                        <Money as="td" className="text-right px-2">{formatMoney(y.profitB)}</Money>
+                                        <Money as="td" className="text-right px-2">{formatMoney(y.fairValue)}</Money>
                                     </tr>
                                 ))}
                             </tbody>

@@ -10,6 +10,7 @@ import React from "react";
 import Link from "next/link";
 import { Droplets, FileText, MapPin, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Money, Sensitive } from "@/components/privacy";
 import { CoverCarousel, useCoverCarousel } from "@/components/ui/CoverCarousel";
 import { monthLabel, type WaterUnitRow } from "@/lib/water-hub";
 
@@ -60,25 +61,25 @@ export default function WaterUnitCard({ row, lang, onSelect, onViewPdf }: Props)
                 <div className="space-y-0.5">
                     <h3 className="break-words font-semibold leading-tight text-foreground">{unit.name}</h3>
                     <p className="break-words text-xs text-muted-foreground">
-                        {unit.connectionCode ? <span className="font-mono">Ligação {unit.connectionCode}</span> : "ligação não informada"}
-                        {unit.meterNumber ? <> · <span className="font-mono">{unit.meterNumber}</span></> : null}
+                        {unit.connectionCode ? <span className="font-mono">Ligação <Sensitive>{unit.connectionCode}</Sensitive></span> : "ligação não informada"}
+                        {unit.meterNumber ? <> · <Sensitive className="font-mono">{unit.meterNumber}</Sensitive></> : null}
                     </p>
                 </div>
 
                 <p className="flex items-start gap-1.5 text-xs text-foreground">
                     <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    <span className="break-words">{[unit.address, unit.city].filter(Boolean).join(", ") || "endereço não informado"}</span>
+                    <Sensitive className="break-words">{[unit.address, unit.city].filter(Boolean).join(", ") || "endereço não informado"}</Sensitive>
                 </p>
 
                 <dl className="mt-auto grid grid-cols-2 gap-2 text-[11px]">
                     <div className="rounded-lg bg-muted/40 px-2 py-1.5">
                         <dt className="flex items-center gap-1 text-muted-foreground"><Droplets className="h-3 w-3" /> Consumo</dt>
                         <dd className={cn("font-semibold tabular-nums", row.spike ? "text-amber-600" : "text-foreground")}>{latest ? m3(latest.consumptionM3, 1) : "—"}</dd>
-                        <dd className="leading-snug text-muted-foreground">{latest ? `${latest.ratePerM3 != null ? `R$ ${latest.ratePerM3.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/m³ · ` : ""}${label}` : "sem contas"}</dd>
+                        <dd className="leading-snug text-muted-foreground">{latest ? <>{latest.ratePerM3 != null ? <><Money>{`R$ ${latest.ratePerM3.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Money>/m³ · </> : null}{label}</> : "sem contas"}</dd>
                     </div>
                     <div className="rounded-lg bg-muted/40 px-2 py-1.5">
                         <dt className="flex items-center gap-1 text-muted-foreground"><FileText className="h-3 w-3" /> Conta</dt>
-                        <dd className={cn("font-semibold tabular-nums", row.dueState === "overdue" ? "text-rose-600" : "text-foreground")}>{latest ? brl(latest.total, 0) : "—"}</dd>
+                        <dd className={cn("font-semibold tabular-nums", row.dueState === "overdue" ? "text-rose-600" : "text-foreground")}><Money>{latest ? brl(latest.total, 0) : "—"}</Money></dd>
                         <dd className={cn("leading-snug", row.dueState === "overdue" ? "text-rose-600" : row.dueState === "due_soon" ? "text-amber-600" : "text-muted-foreground")}>{latest ? dueHint : "importe a conta"}</dd>
                     </div>
                 </dl>
@@ -96,7 +97,7 @@ export default function WaterUnitCard({ row, lang, onSelect, onViewPdf }: Props)
                     </div>
                     <span className="min-w-0 break-words text-right text-[11px] leading-snug text-muted-foreground">
                         {row.last12.months > 1
-                            ? `média ${brl(row.last12.avgAmount, 0)}/mês · ${m3(row.last12.avgConsumptionM3)}`
+                            ? <>média <Money>{brl(row.last12.avgAmount, 0)}</Money>/mês · {m3(row.last12.avgConsumptionM3)}</>
                             : unit.billsCount > 0
                                 ? `${unit.billsCount} ${unit.billsCount === 1 ? "conta" : "contas"}`
                                 : "pronto para importar"}

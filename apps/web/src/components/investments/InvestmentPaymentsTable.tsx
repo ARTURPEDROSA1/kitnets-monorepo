@@ -23,6 +23,7 @@ import { Button } from "@kitnets/ui";
 import { cn } from "@/lib/utils";
 import { formatDateBR } from "@/lib/dates";
 import MoneyInput, { parseMoneyText } from "@/components/properties/MoneyInput";
+import { Money } from "@/components/privacy";
 import {
     ColumnHeaders,
     ColumnMenu,
@@ -632,7 +633,7 @@ export default function InvestmentPaymentsTable({
                     {showUpcoming && selectedSummary && (
                         <p className="mt-2 text-[11px] text-muted-foreground">
                             {selectedSummary.count} em aberto, somando{" "}
-                            <strong className="text-foreground tabular-nums">{formatBRL(selectedSummary.total)}</strong>,
+                            <Money as="strong" className="text-foreground tabular-nums">{formatBRL(selectedSummary.total)}</Money>,
                             pelo último valor pago deste tipo. Antecipar uma parcela a lança por esse valor, sem a correção
                             que ela ainda acumularia até o vencimento.
                         </p>
@@ -650,7 +651,7 @@ export default function InvestmentPaymentsTable({
                                     >
                                         <CalendarPlus className="w-3.5 h-3.5 text-emerald-600" />
                                         <span className="tabular-nums">{formatDateBR(inst.dueOn)}</span>
-                                        <span className="font-semibold tabular-nums">{formatBRL(inst.amount, 0)}</span>
+                                        <Money className="font-semibold tabular-nums">{formatBRL(inst.amount, 0)}</Money>
                                     </button>
                                 </li>
                             ))}
@@ -785,7 +786,7 @@ export default function InvestmentPaymentsTable({
                                                 {...sel.cellProps("correction_amount", row.id, row.correction_amount, cn("px-2 py-1 text-right tabular-nums", row.correction_amount < 0 ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"))}
                                                 title={row.correction_amount < 0 ? "Desconto: pagou menos que o valor da parcela" : "Correção: pagou mais que o valor da parcela"}
                                             >
-                                                {formatBRL(row.correction_amount)}
+                                                <Money>{formatBRL(row.correction_amount)}</Money>
                                             </td>
                                         )}
                                         {show("total") && (
@@ -914,7 +915,7 @@ export default function InvestmentPaymentsTable({
                                     )}
                                     {show("correction_amount") && (
                                         <td className={cn("px-2 py-1 text-right tabular-nums", draft.correction_amount < 0 ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground")}>
-                                            {formatBRL(draft.correction_amount)}
+                                            <Money>{formatBRL(draft.correction_amount)}</Money>
                                         </td>
                                     )}
                                     {show("total") && (
@@ -1011,16 +1012,16 @@ export default function InvestmentPaymentsTable({
                                     <td colSpan={labelSpan} className="px-2 py-2 text-right text-[10px] uppercase tracking-wider text-muted-foreground">
                                         Total pago
                                     </td>
-                                    {show("amount") && <td className="px-2 py-2 text-right tabular-nums">{formatBRL(totals.paid - totals.corrections)}</td>}
-                                    {show("correction_amount") && <td className="px-2 py-2 text-right tabular-nums">{formatBRL(totals.corrections)}</td>}
-                                    {show("total") && <td className="px-2 py-2 text-right tabular-nums text-emerald-700 dark:text-emerald-400">{formatBRL(totals.paid)}</td>}
+                                    {show("amount") && <Money as="td" className="px-2 py-2 text-right tabular-nums">{formatBRL(totals.paid - totals.corrections)}</Money>}
+                                    {show("correction_amount") && <Money as="td" className="px-2 py-2 text-right tabular-nums">{formatBRL(totals.corrections)}</Money>}
+                                    {show("total") && <Money as="td" className="px-2 py-2 text-right tabular-nums text-emerald-700 dark:text-emerald-400">{formatBRL(totals.paid)}</Money>}
                                     <td colSpan={tailSpan} className="px-2 py-2 text-[11px] font-normal text-muted-foreground whitespace-normal">
                                         {[
-                                            totals.pf > 0 || totals.pj > 0 ? `PF ${formatBRL(totals.pf)} · PJ ${formatBRL(totals.pj)}` : null,
-                                            totals.unknown > 0 ? `${formatBRL(totals.unknown)} sem pagador informado` : null,
-                                            totals.planned > 0 ? `${formatBRL(totals.planned)} lançados como previstos` : null,
+                                            totals.pf > 0 || totals.pj > 0 ? <>PF <Money>{formatBRL(totals.pf)}</Money> · PJ <Money>{formatBRL(totals.pj)}</Money></> : null,
+                                            totals.unknown > 0 ? <><Money>{formatBRL(totals.unknown)}</Money> sem pagador informado</> : null,
+                                            totals.planned > 0 ? <><Money>{formatBRL(totals.planned)}</Money> lançados como previstos</> : null,
                                             show("index_pct") && rows.some(r => indexOf.get(r.id)?.sinceContract) ? "* índice acumulado desde o contrato" : null,
-                                        ].filter(Boolean).join(" · ")}
+                                        ].filter(Boolean).map((part, i) => <React.Fragment key={i}>{i > 0 && " · "}{part}</React.Fragment>)}
                                     </td>
                                 </tr>
                             </tfoot>

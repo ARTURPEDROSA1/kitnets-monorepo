@@ -43,6 +43,7 @@ import { EditEnergyBillModal } from "@/components/energy/EditEnergyBillModal";
 import { PdfViewerModal } from "@/components/ui/PdfViewerModal";
 import { solarSavings } from "@/lib/energy-savings";
 import type { OwnerPropertySummary } from "@/app/api/energy-bills/properties/route";
+import { Money, Sensitive } from "@/components/privacy";
 import { cn } from "@/lib/utils";
 import { columnTableKey, recordTableKey } from "@/lib/ui-preferences";
 import { CellSumBar, useCellSum } from "@/components/properties/TableCellSum";
@@ -137,7 +138,7 @@ function UnitInput({ value, draft, onDraft, onCommit, decimals, prefix = "", suf
             onChange={ev => onDraft(ev.target.value)}
             onBlur={() => { setEditing(false); onCommit(); }}
             onKeyDown={ev => { if (ev.key === "Enter") (ev.target as HTMLInputElement).blur(); }}
-            className={cn(CELL_INPUT, className)}
+            className={cn(CELL_INPUT, prefix.includes("R$") && "privacy-money-input", className)}   // R$ cells blur at rest under the sidebar dollar toggle
         />
     );
 }
@@ -507,12 +508,12 @@ export default function EnergyDashboardPage() {
                                 {currentProperty?.address && (
                                     <span className="text-xs text-muted-foreground flex items-center gap-1 mr-1">
                                         <MapPin className="w-3 h-3 text-muted-foreground" />
-                                        {currentProperty.address}
+                                        <Sensitive>{currentProperty.address}</Sensitive>
                                     </span>
                                 )}
                                 {latestFullBill?.consumer_unit && (
                                     <span className="text-xs bg-muted text-muted-foreground px-2.5 py-0.5 rounded-full font-mono">
-                                        UC: {latestFullBill.consumer_unit}
+                                        UC: <Sensitive>{latestFullBill.consumer_unit}</Sensitive>
                                     </span>
                                 )}
 
@@ -765,11 +766,11 @@ export default function EnergyDashboardPage() {
                                     </span>
                                     <DollarSign className="w-4 h-4 text-muted-foreground" />
                                 </div>
-                                <p className="text-2xl font-bold text-foreground">
+                                <Money as="p" className="text-2xl font-bold text-foreground">
                                     {formatCurrency(summary.currentTotal)}
-                                </p>
+                                </Money>
                                 <p className="text-[11px] text-muted-foreground">
-                                    Custo Disp.: {formatCurrency(summary.currentAvailability)}
+                                    Custo Disp.: <Money>{formatCurrency(summary.currentAvailability)}</Money>
                                 </p>
                             </div>
 
@@ -785,9 +786,9 @@ export default function EnergyDashboardPage() {
                                     </span>
                                     <LineChart className="w-4 h-4 text-muted-foreground group-hover:text-sky-600 transition-colors" />
                                 </div>
-                                <p className="text-xl font-bold text-foreground font-mono">
+                                <Money as="p" className="text-xl font-bold text-foreground font-mono">
                                     R$ {formatNumber(summary.currentUnitPrice, 4)}
-                                </p>
+                                </Money>
                                 <p className="text-[11px] text-sky-600 dark:text-sky-400 flex items-center gap-1 font-medium">
                                     Ver histórico <ExternalLink className="w-3 h-3 inline" />
                                 </p>
@@ -801,9 +802,9 @@ export default function EnergyDashboardPage() {
                                     </span>
                                     <Sparkles className="w-4 h-4 text-amber-500" />
                                 </div>
-                                <p className="text-2xl font-black text-amber-700 dark:text-amber-300">
+                                <Money as="p" className="text-2xl font-black text-amber-700 dark:text-amber-300">
                                     {formatCurrency(summary.currentSavings)}
-                                </p>
+                                </Money>
                                 <p className="text-[11px] text-amber-700/80 dark:text-amber-400">
                                     {summary.missingCompensatedKwh
                                         ? "kWh compensados não informados: edite a fatura"

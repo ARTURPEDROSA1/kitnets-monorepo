@@ -31,6 +31,7 @@ import {
 import { IptuHistoryModal } from "./IptuHistoryModal";
 import PeriodFilter from "./PeriodFilter";
 import Tile, { type TileInfo } from "./Tile";
+import { Money } from "@/components/privacy";
 import { periodLabel, periodRange, type PeriodFilterValue } from "@/lib/period-filter";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "./TableColumnFilters";
 import { columnTableKey, recordTableKey } from "@/lib/ui-preferences";
@@ -348,7 +349,7 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
         payer: {
             what: "Como o IPTU se dividiu entre inquilino e proprietário, parcela a parcela. Só a parte do proprietário entra nos custos do imóvel, no mês do pagamento.",
             formula: "% inquilino = IPTU pago pelo inquilino ÷ IPTU total",
-            example: summary.iptuTotal > 0 ? <>{formatBRL(summary.iptuByTenant)} ÷ {formatBRL(summary.iptuTotal)} = {Math.round((summary.iptuByTenant / summary.iptuTotal) * 100)}% inquilino · proprietário {formatBRL(summary.iptuByLandlord)}</> : undefined,
+            example: summary.iptuTotal > 0 ? <><Money>{formatBRL(summary.iptuByTenant)}</Money> ÷ <Money>{formatBRL(summary.iptuTotal)}</Money> = {Math.round((summary.iptuByTenant / summary.iptuTotal) * 100)}% inquilino · proprietário <Money>{formatBRL(summary.iptuByLandlord)}</Money></> : undefined,
         },
         current: {
             what: "O IPTU do exercício mais recente do registro e a variação contra o exercício anterior. Não segue o período: é o valor vigente.",
@@ -404,11 +405,11 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
 
             {/* Tiles */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-                <Tile label="IPTU acumulado" value={formatBRL(summary.iptuTotal)} tone="rose" icon={<Receipt className="w-4 h-4" />} info={taxInfo.total}
+                <Tile label="IPTU acumulado" value={formatBRL(summary.iptuTotal)} tone="rose" icon={<Receipt className="w-4 h-4" />} info={taxInfo.total} money
                     hint={<>{summary.iptuYears} {summary.iptuYears === 1 ? "ano" : "anos"}{summary.firstYear ? ` · ${summary.firstYear}–${summary.lastYear}` : ""}<br />Média {formatBRL(summary.iptuAvgPerYear)}/ano</>} />
                 <Tile label="Quem pagou o IPTU" value={summary.iptuTotal > 0 ? `${Math.round((summary.iptuByTenant / summary.iptuTotal) * 100)}% inquilino` : "—"} tone="violet" icon={<Landmark className="w-4 h-4" />} info={taxInfo.payer}
-                    hint={<>Inquilino {formatBRL(summary.iptuByTenant)}<br />Proprietário {formatBRL(summary.iptuByLandlord)}</>} />
-                <Tile label="IPTU atual" value={summaryAll.iptuLatest ? formatBRL(summaryAll.iptuLatest.amount) : "—"} tone="amber" icon={<TrendingUp className="w-4 h-4" />} info={taxInfo.current}
+                    hint={<>Inquilino <Money>{formatBRL(summary.iptuByTenant)}</Money><br />Proprietário <Money>{formatBRL(summary.iptuByLandlord)}</Money></>} />
+                <Tile label="IPTU atual" value={summaryAll.iptuLatest ? formatBRL(summaryAll.iptuLatest.amount) : "—"} tone="amber" icon={<TrendingUp className="w-4 h-4" />} info={taxInfo.current} money
                     hint={summaryAll.iptuLatest
                         ? <>Exercício {summaryAll.iptuLatest.year} · {formatBRL(summaryAll.iptuLatest.amount / 12)}/mês
                             {summaryAll.iptuGrowthPct !== null && <> · <span className={summaryAll.iptuGrowthPct > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}>{summaryAll.iptuGrowthPct > 0 ? "+" : ""}{summaryAll.iptuGrowthPct}% vs {summaryAll.iptuLatest.year - 1}</span></>}
@@ -421,7 +422,7 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
                             <LineChart className="w-3.5 h-3.5" /> Ver histórico
                         </span>
                     ) : null} />
-                <Tile label="ITBI e outros" value={formatBRL(summary.itbi + summary.other)} tone="blue" icon={<Scale className="w-4 h-4" />} info={taxInfo.other}
+                <Tile label="ITBI e outros" value={formatBRL(summary.itbi + summary.other)} tone="blue" icon={<Scale className="w-4 h-4" />} info={taxInfo.other} money
                     hint={<>ITBI {formatBRL(summary.itbi)}<br />Outros {formatBRL(summary.other)}</>}
                     action={currentDoc ? (
                         <button type="button" onClick={() => setViewer({ url: currentDoc.document_url!, title: `IPTU ${currentDoc.year}` })} className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 dark:text-blue-400 hover:underline underline-offset-2">

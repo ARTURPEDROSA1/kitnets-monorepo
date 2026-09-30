@@ -29,7 +29,7 @@ interface Props {
 
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString("pt-BR")} ${n === 1 ? one : many}`;
 
-function Item({ icon, label, value, hint, tone, valueTone, onClick, title }: { icon: React.ReactNode; label: string; value: string; hint: React.ReactNode; tone: string; valueTone?: string; onClick?: () => void; title?: string }) {
+function Item({ icon, label, value, hint, tone, valueTone, onClick, title, money }: { icon: React.ReactNode; label: string; value: string; hint: React.ReactNode; tone: string; valueTone?: string; onClick?: () => void; title?: string; /** the figure is an amount in R$: value and hint get the class the dollar toggle blurs (components/privacy) */ money?: boolean }) {
     const Tag = onClick ? "button" : "div";
     return (
         <Tag
@@ -41,8 +41,8 @@ function Item({ icon, label, value, hint, tone, valueTone, onClick, title }: { i
             <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 <span className={tone}>{icon}</span>{label}
             </span>
-            <span className={cn("block break-words text-xl font-bold leading-tight", valueTone ?? "text-foreground")}>{value}</span>
-            <span className="block break-words text-xs leading-snug text-muted-foreground">{hint}</span>
+            <span className={cn("block break-words text-xl font-bold leading-tight", valueTone ?? "text-foreground", money && "privacy-money")}>{value}</span>
+            <span className={cn("block break-words text-xs leading-snug text-muted-foreground", money && "privacy-money")}>{hint}</span>
         </Tag>
     );
 }
@@ -116,6 +116,7 @@ export default function CorretoresHub({ rows, loading, error, view, onViewChange
                         value={totals.leasesInForce > 0 ? `${brl(totals.rentManaged, 0)}/mês` : "—"}
                         hint={totals.leasesInForce > 0 ? `${brl(totals.rentManaged * 12, 0)} por ano` : "soma dos contratos em vigor com corretor"}
                         title="Soma do aluguel de contrato (bruto) dos contratos em vigor que nomeiam um corretor"
+                        money
                     />
                     <Item
                         icon={<Users className="h-3.5 w-3.5" />} tone="text-violet-600" label="Inquilinos atendidos"

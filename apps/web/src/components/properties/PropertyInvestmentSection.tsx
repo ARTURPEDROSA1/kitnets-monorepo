@@ -28,6 +28,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { cn } from "@/lib/utils";
 import PeriodFilter from "./PeriodFilter";
 import Tile, { type TileInfo } from "./Tile";
+import { Money } from "@/components/privacy";
 import { CellSumBar, useCellSum } from "./TableCellSum";
 import MoneyInput, { parseMoneyText } from "./MoneyInput";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "./TableColumnFilters";
@@ -75,6 +76,8 @@ const parseInput = (s: string): number | null => {
     return n !== null && n >= 0 ? Math.round(n * 100) / 100 : null;
 };
 const todayIso = () => new Date().toISOString().slice(0, 10);
+/** Joins the truthy parts with " · " (like `.filter(Boolean).join(" · ")`), keeping nodes such as <Money> intact. */
+const dots = (parts: React.ReactNode[]) => parts.filter(Boolean).map((p, i) => <React.Fragment key={i}>{i > 0 ? " · " : null}{p}</React.Fragment>);
 const COLLAPSED_ROWS = 24;
 /** Excel-style sort/filter columns for the transactions table. */
 const INVESTMENT_COLUMNS: ColumnDef<PropertyTransaction>[] = [
@@ -506,7 +509,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
         financing: {
             what: "Os dados do contrato informados em Aquisição & financiamento e, quando quitado, em quantos meses a dívida foi paga contra o prazo contratado.",
             formula: "Quitado em = meses entre o contrato (ou a 1ª prestação) e a quitação",
-            example: investment && investment.financing_status !== "NONE" ? <>{[investment.lender, investment.financing_system, investment.principal ? formatBRL(investment.principal) : null].filter(Boolean).join(" · ")}{paidOffMonths !== null ? ` · quitado em ${paidOffMonths} meses${investment.term_months ? ` de ${investment.term_months}` : ""}` : ""}</> : undefined,
+            example: investment && investment.financing_status !== "NONE" ? <>{dots([investment.lender, investment.financing_system, investment.principal ? <Money>{formatBRL(investment.principal)}</Money> : null])}{paidOffMonths !== null ? ` · quitado em ${paidOffMonths} meses${investment.term_months ? ` de ${investment.term_months}` : ""}` : ""}</> : undefined,
         },
         solar: {
             what: solarExtra
@@ -520,7 +523,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
     };
     const financingHint = investment && investment.financing_status !== "NONE"
         ? <>
-            {[investment.lender, investment.financing_system, investment.principal ? formatBRL(investment.principal) : null, investment.term_months ? `${investment.term_months} meses` : null, investment.annual_rate ? `${investment.annual_rate}% a.a.` : null].filter(Boolean).join(" · ")}
+            {dots([investment.lender, investment.financing_system, investment.principal ? <Money>{formatBRL(investment.principal)}</Money> : null, investment.term_months ? `${investment.term_months} meses` : null, investment.annual_rate ? `${investment.annual_rate}% a.a.` : null])}
             {paidOffMonths !== null && <><br />Quitado em {paidOffMonths} {paidOffMonths === 1 ? "mês" : "meses"}{investment.term_months ? ` (de ${investment.term_months})` : ""}</>}
         </>
         : "Configure a aquisição e o financiamento";
@@ -535,7 +538,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                     </h3>
                     <p className="text-xs text-muted-foreground">
                         Tudo o que você pagou: entrada, custos de aquisição, prestações, amortizações e tarifas do financiamento, reformas, custos do imóvel, tributos e energia solar.
-                        {investment?.purchase_price ? ` Valor de compra ${formatBRL(investment.purchase_price)}${investment.acquired_on ? ` em ${formatDateBR(investment.acquired_on)}` : ""}.` : ""}
+                        {investment?.purchase_price ? <>{" "}Valor de compra <Money>{formatBRL(investment.purchase_price)}</Money>{investment.acquired_on ? ` em ${formatDateBR(investment.acquired_on)}` : ""}.</> : ""}
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -577,16 +580,16 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
 
             {/* Tiles */}
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-                <Tile label="Total investido no imóvel" value={formatBRL(summary.invested + taxes.total)} tone="emerald" icon={<PiggyBank className="w-4 h-4" />} info={investInfo.total}
+                <Tile label="Total investido no imóvel" value={formatBRL(summary.invested + taxes.total)} tone="emerald" icon={<PiggyBank className="w-4 h-4" />} info={investInfo.total} money
                     hint={<>Entrada: {formatBRL(summary.downPayment + summary.closingCosts)}<br />Banco: {formatBRL(summary.bankPaid + summary.bankFees)}<br />Reformas: {formatBRL(summary.capex)}<br />Custos do imóvel: {formatBRL(summary.runningCosts + taxes.total)}<br />Energia solar: {formatBRL(summary.solarInvested)}</>} />
-                <Tile label="Pago ao banco" value={formatBRL(summary.bankPaid + summary.bankFees)} tone="blue" icon={<Landmark className="w-4 h-4" />} info={investInfo.bank}
+                <Tile label="Pago ao banco" value={formatBRL(summary.bankPaid + summary.bankFees)} tone="blue" icon={<Landmark className="w-4 h-4" />} info={investInfo.bank} money
                     hint={<>Prestações: {summary.installments}<br />Juros + seguros: {summary.interestAndInsurance === null ? "—" : formatBRL(summary.interestAndInsurance)}<br />Tarifas: {formatBRL(summary.bankFees)}</>} />
-                <Tile label="Reformas (capex)" value={formatBRL(summary.capex)} tone="violet" icon={<Hammer className="w-4 h-4" />} info={investInfo.capex}
+                <Tile label="Reformas (capex)" value={formatBRL(summary.capex)} tone="violet" icon={<Hammer className="w-4 h-4" />} info={investInfo.capex} money
                     hint={`${txs.filter(t => t.kind === "REFORMA").length} lançamentos`} />
-                <Tile label="Custos do imóvel" value={formatBRL(summary.runningCosts + taxes.total)} tone="rose" icon={<Receipt className="w-4 h-4" />} info={investInfo.costs}
+                <Tile label="Custos do imóvel" value={formatBRL(summary.runningCosts + taxes.total)} tone="rose" icon={<Receipt className="w-4 h-4" />} info={investInfo.costs} money
                     hint={<>Utilidades: {formatBRL(summary.byKind.UTILIDADES)}<br />Outros: {formatBRL(summary.byKind.OUTROS)}<br />IPTU: {formatBRL(taxes.iptu)}<br />ITBI: {formatBRL(taxes.itbi)}{taxes.other > 0 && <><br />Outros tributos: {formatBRL(taxes.other)}</>}</>} />
                 <Tile label="Financiamento" value={financingLabel} tone="blue" icon={<Banknote className="w-4 h-4" />} hint={financingHint} info={investInfo.financing} />
-                <Tile label="Energia solar" value={formatBRL(solar.invested)} tone="amber" icon={<Sun className="w-4 h-4" />} info={investInfo.solar}
+                <Tile label="Energia solar" value={formatBRL(solar.invested)} tone="amber" icon={<Sun className="w-4 h-4" />} info={investInfo.solar} money
                     hint={
                         <>
                             Recuperado {formatBRL(solar.recovered)} ({solar.pct}%){solarExtra && <> · condomínio {formatBRL(solar.extraRecovered)}</>}<br />
@@ -603,8 +606,8 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
             {/* Period + table */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2">
                 <span className="text-xs text-muted-foreground">
-                    Lançamentos · <span className="font-semibold text-foreground">{periodLabel(period)}</span> · {filtered.length} {filtered.length === 1 ? "lançamento" : "lançamentos"}{cf.anyFilter && inPeriod.length !== filtered.length ? ` de ${inPeriod.length}` : ""} · total {formatBRL(filteredTotal)}
-                    {summary.totalOutlay > 0 && <> · desembolso total {formatBRL(summary.totalOutlay)}</>}
+                    Lançamentos · <span className="font-semibold text-foreground">{periodLabel(period)}</span> · {filtered.length} {filtered.length === 1 ? "lançamento" : "lançamentos"}{cf.anyFilter && inPeriod.length !== filtered.length ? ` de ${inPeriod.length}` : ""} · total <Money>{formatBRL(filteredTotal)}</Money>
+                    {summary.totalOutlay > 0 && <> · desembolso total <Money>{formatBRL(summary.totalOutlay)}</Money></>}
                 </span>
                 <div className="flex flex-wrap items-center gap-2 shrink-0">
                     <PeriodFilter value={period} onChange={setPeriod} variant="compact" />
@@ -731,13 +734,13 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                                     ].map(([label, value, cls]) => (
                                         <div key={String(label)} className="bg-muted/40 border border-border rounded-xl p-3 space-y-0.5">
                                             <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
-                                            <p className={cn("text-base font-bold tabular-nums", String(cls))}>{formatBRL(Number(value))}</p>
+                                            <Money as="p" className={cn("text-base font-bold tabular-nums", String(cls))}>{formatBRL(Number(value))}</Money>
                                         </div>
                                     ))}
                                 </div>
                                 <p className="text-xs text-muted-foreground">
-                                    {estimate.splits.length} lançamentos do financiamento · {estimate.updates.length} a atualizar · saldo estimado ao final {formatBRL(estimate.endingBalance)}
-                                    {investment?.principal ? <> · juros + seguros estimados {formatBRL(estimate.totals.interest + estimate.totals.insurance)} vs. pago − financiado {formatBRL(estimate.totals.paid - Number(investment.principal))}</> : null}
+                                    {estimate.splits.length} lançamentos do financiamento · {estimate.updates.length} a atualizar · saldo estimado ao final <Money>{formatBRL(estimate.endingBalance)}</Money>
+                                    {investment?.principal ? <> · juros + seguros estimados <Money>{formatBRL(estimate.totals.interest + estimate.totals.insurance)}</Money> vs. pago − financiado <Money>{formatBRL(estimate.totals.paid - Number(investment.principal))}</Money></> : null}
                                 </p>
                                 {estimate.notes.length > 0 && (
                                     <div className="text-xs text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg px-3 py-2 space-y-0.5">
@@ -757,11 +760,11 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                                                     <tr key={s.id} className={cn("border-t border-border/60", s.kept && "opacity-60")}>
                                                         <td className="px-2 py-1">{formatDateBR(s.occurred_on)}</td>
                                                         <td className="px-2 py-1">{KIND_LABELS[s.kind]}{s.kept ? " (mantido)" : ""}</td>
-                                                        <td className="px-2 py-1 text-right tabular-nums">{formatBRL(s.amount)}</td>
-                                                        <td className="px-2 py-1 text-right tabular-nums">{formatBRL(s.interest_part)}</td>
-                                                        <td className="px-2 py-1 text-right tabular-nums">{formatBRL(s.principal_part)}</td>
-                                                        <td className="px-2 py-1 text-right tabular-nums">{formatBRL(s.insurance_part)}</td>
-                                                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{formatBRL(s.balance_after)}</td>
+                                                        <Money as="td" className="px-2 py-1 text-right tabular-nums">{formatBRL(s.amount)}</Money>
+                                                        <Money as="td" className="px-2 py-1 text-right tabular-nums">{formatBRL(s.interest_part)}</Money>
+                                                        <Money as="td" className="px-2 py-1 text-right tabular-nums">{formatBRL(s.principal_part)}</Money>
+                                                        <Money as="td" className="px-2 py-1 text-right tabular-nums">{formatBRL(s.insurance_part)}</Money>
+                                                        <Money as="td" className="px-2 py-1 text-right tabular-nums text-muted-foreground">{formatBRL(s.balance_after)}</Money>
                                                     </tr>
                                                 ))}
                                                 {estimate.splits.length > 8 && <tr className="border-t border-border/60"><td colSpan={7} className="px-2 py-1 text-muted-foreground">… e mais {estimate.splits.length - 8} lançamentos</td></tr>}
@@ -896,7 +899,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                         {importRows.length > 0 && (
                             <div className="space-y-2">
                                 <p className="text-xs text-muted-foreground">
-                                    <span className="font-semibold text-foreground">{importRows.length} lançamentos</span> reconhecidos ({formatDateBR(importRows[0].occurred_on)} → {formatDateBR(importRows[importRows.length - 1].occurred_on)}) · total {formatBRL(importRows.reduce((a, r) => a + r.amount, 0))}
+                                    <span className="font-semibold text-foreground">{importRows.length} lançamentos</span> reconhecidos ({formatDateBR(importRows[0].occurred_on)} → {formatDateBR(importRows[importRows.length - 1].occurred_on)}) · total <Money>{formatBRL(importRows.reduce((a, r) => a + r.amount, 0))}</Money>
                                 </p>
                                 <div className="overflow-x-auto border border-border rounded-lg">
                                     <table className="w-full text-xs">
@@ -908,7 +911,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                                                 <tr key={i} className="border-t border-border/60">
                                                     <td className="px-2 py-1 font-semibold">{formatDateBR(r.occurred_on)}</td>
                                                     <td className="px-2 py-1">{KIND_LABELS[r.kind]}</td>
-                                                    <td className="px-2 py-1 text-right tabular-nums">{formatBRL(r.amount)}</td>
+                                                    <Money as="td" className="px-2 py-1 text-right tabular-nums">{formatBRL(r.amount)}</Money>
                                                     <td className="px-2 py-1 truncate max-w-[220px]">{r.comment ?? ""}</td>
                                                 </tr>
                                             ))}
@@ -963,7 +966,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                                                     <td className="px-2 py-1"><input type="checkbox" className="accent-emerald-600" checked={r.include} disabled={r.inflow || r.duplicate || !r.kind} onChange={e => setStmt(i, { include: e.target.checked })} /></td>
                                                     <td className="px-2 py-1 whitespace-nowrap">{formatDateBR(r.date)}</td>
                                                     <td className="px-2 py-1 max-w-[280px] truncate" title={r.memo}>{r.memo}{r.duplicate && <span className="ml-1 text-[10px] text-muted-foreground">(já importado)</span>}</td>
-                                                    <td className={cn("px-2 py-1 text-right tabular-nums whitespace-nowrap", r.inflow ? "text-emerald-700" : "")}>{formatBRL(r.amount)}</td>
+                                                    <Money as="td" className={cn("px-2 py-1 text-right tabular-nums whitespace-nowrap", r.inflow ? "text-emerald-700" : "")}>{formatBRL(r.amount)}</Money>
                                                     <td className="px-2 py-1">
                                                         {r.inflow ? <span className="text-muted-foreground">entrada</span> : (
                                                             <select value={r.kind ?? ""} disabled={r.duplicate} onChange={e => setStmt(i, { kind: (e.target.value || null) as TransactionKind | null, include: Boolean(e.target.value) })} className={cn("bg-transparent border rounded-md px-1.5 py-1 outline-none", r.kind ? "border-transparent" : "border-amber-400")}>

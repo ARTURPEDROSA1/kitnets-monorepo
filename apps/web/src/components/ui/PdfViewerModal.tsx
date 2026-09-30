@@ -256,7 +256,7 @@ export function PdfViewerModal({
                 {/* PDF iframe — fills entire screen */}
                 <iframe
                     src={renderUrl}
-                    className="w-full flex-1 border-0"
+                    className="w-full flex-1 border-0 privacy-money privacy-sensitive privacy-cover"   // the document itself carries amounts and identifiers: blurred while either sidebar privacy toggle is on
                     title={title}
                     onLoad={() => setLoading(false)}
                     style={{
@@ -312,7 +312,7 @@ export function PdfViewerModal({
                             K
                         </div>
                         <div className="min-w-0">
-                            <h3 className="text-sm font-bold text-foreground truncate max-w-xs md:max-w-md">
+                            <h3 className="text-sm font-bold text-foreground truncate max-w-xs md:max-w-md privacy-sensitive">   {/* bill titles carry the UC / meter number */}
                                 {title}
                             </h3>
                             <p className="text-[11px] text-muted-foreground truncate">
@@ -378,7 +378,7 @@ export function PdfViewerModal({
 
                     <iframe
                         src={renderUrl}
-                        className="w-full h-full border-0"
+                        className="w-full h-full border-0 privacy-money privacy-sensitive privacy-cover"
                         title={title}
                         onLoad={() => setLoading(false)}
                     />

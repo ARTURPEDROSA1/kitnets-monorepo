@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCNPJ, formatCPF, maskCEP, maskCNPJ, maskCPF, maskPhone } from '@/lib/validators';
+import { Money, Sensitive } from '@/components/privacy';
 import type { ExtractedLease, ExtractedTenantRole, MatchResult } from '@/lib/lease-extract';
 import type { AdditionalTenantFormItem, LeaseAgencyOption, LeasePropertyOption } from '@/types/lease';
 import { ROUTE_BODY_SAFE_SIZE, stageLeaseFile } from '@/lib/lease-upload-client';
@@ -662,7 +663,7 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                         <div className="flex-1 space-y-4 overflow-y-auto px-6 pb-2 sm:px-7">
                             {/* What was read */}
                             <div className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-xl border border-border bg-muted/30 p-3 text-xs sm:grid-cols-4">
-                                <div><p className="text-muted-foreground">Aluguel</p><p className="font-semibold text-foreground">{formatMoney(data.lease.monthly_rent)}</p></div>
+                                <div><p className="text-muted-foreground">Aluguel</p><Money as="p" className="font-semibold text-foreground">{formatMoney(data.lease.monthly_rent)}</Money></div>
                                 <div><p className="text-muted-foreground">Início</p><p className="font-semibold text-foreground">{formatDate(data.lease.start_date)}</p></div>
                                 <div><p className="text-muted-foreground">Término</p><p className="font-semibold text-foreground">{formatDate(data.lease.end_date)}</p></div>
                                 <div><p className="text-muted-foreground">Vencimento</p><p className="font-semibold text-foreground">{data.lease.rent_due_day ? `Dia ${data.lease.rent_due_day}` : '—'}</p></div>
@@ -777,7 +778,7 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                                             <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950/30">
                                                 <p className="font-medium text-foreground">A imobiliária deste contrato não está no seu cadastro.</p>
                                                 <p className="mt-0.5 text-xs text-muted-foreground">
-                                                    {[data.agency.name, data.agency.cnpj ? `CNPJ ${formatCNPJ(data.agency.cnpj)}` : null].filter(Boolean).join(' · ')}
+                                                    {data.agency.name}{data.agency.cnpj ? <> · CNPJ <Sensitive>{formatCNPJ(data.agency.cnpj)}</Sensitive></> : null}
                                                 </p>
                                                 <p className="mt-2 text-sm text-foreground">Deseja criar esta imobiliária com os dados do contrato?</p>
                                             </div>

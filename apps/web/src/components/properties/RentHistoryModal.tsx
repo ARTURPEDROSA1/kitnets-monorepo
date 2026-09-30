@@ -7,6 +7,7 @@ import { rentHistory, type PropertyIncomeRow } from "@/lib/property-income";
 import { historicalRentGrowth } from "@/lib/investment-metrics";
 import { inPeriod, monthLabel, periodLabel, periodRange, shiftMonthKey, type PeriodFilterValue } from "@/lib/period-filter";
 import PeriodFilter from "./PeriodFilter";
+import { Money } from "@/components/privacy";
 
 interface RentHistoryModalProps {
     isOpen: boolean;
@@ -90,13 +91,13 @@ export function RentHistoryModal({ isOpen, onClose, rows, areaM2 }: RentHistoryM
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <div className="bg-muted/40 border border-border rounded-xl p-3 space-y-1">
                             <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Aluguel bruto atual</span>
-                            <p className="text-lg font-black font-mono text-foreground">{stats ? formatCurrency(stats.latest.bruto) : "—"}</p>
+                            <Money as="p" className="text-lg font-black font-mono text-foreground">{stats ? formatCurrency(stats.latest.bruto) : "—"}</Money>
                             <span className="text-[10px] text-muted-foreground">{stats ? `${stats.latest.month} · ${pct(stats.vsYearAgo)} em 12 meses` : "Sem dados"}</span>
                         </div>
                         <div className="bg-muted/40 border border-border rounded-xl p-3 space-y-1">
                             <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Crescimento total</span>
                             <p className="text-lg font-bold font-mono text-emerald-700 dark:text-emerald-300">{stats ? pct(stats.total) : "—"}</p>
-                            <span className="text-[10px] text-muted-foreground">{stats ? `Desde ${stats.first.month} (${formatCurrency(stats.first.bruto)})` : ""}</span>
+                            <span className="text-[10px] text-muted-foreground">{stats ? <>Desde {stats.first.month} (<Money>{formatCurrency(stats.first.bruto)}</Money>)</> : ""}</span>
                         </div>
                         <div className="bg-muted/40 border border-border rounded-xl p-3 space-y-1">
                             <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Crescimento ao ano</span>
@@ -105,7 +106,7 @@ export function RentHistoryModal({ isOpen, onClose, rows, areaM2 }: RentHistoryM
                         </div>
                         <div className="bg-muted/40 border border-border rounded-xl p-3 space-y-1">
                             <span className="text-[11px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">Valor m²</span>
-                            <p className="text-lg font-bold font-mono text-amber-700 dark:text-amber-300">{stats?.perM2 ? formatCurrency(stats.perM2) : "—"}</p>
+                            <Money as="p" className="text-lg font-bold font-mono text-amber-700 dark:text-amber-300">{stats?.perM2 ? formatCurrency(stats.perM2) : "—"}</Money>
                             <span className="text-[10px] text-muted-foreground">{areaM2 ? `Aluguel bruto ÷ ${areaM2.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} m²` : "Informe a área em Aquisição & financiamento"}</span>
                         </div>
                     </div>
@@ -128,7 +129,7 @@ export function RentHistoryModal({ isOpen, onClose, rows, areaM2 }: RentHistoryM
                                 <PeriodFilter value={period} onChange={setPeriod} variant="compact" />
                             </div>
                         </div>
-                        <div className={isMaximized ? "h-[380px]" : "h-[260px]"}>
+                        <Money as="div" className={isMaximized ? "h-[380px]" : "h-[260px]"}>
                             <ResponsiveContainer width="100%" height="100%">
                                 <ComposedChart data={points} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
@@ -143,7 +144,7 @@ export function RentHistoryModal({ isOpen, onClose, rows, areaM2 }: RentHistoryM
                                     <Line type="stepAfter" dataKey="liquido" stroke="#3b82f6" strokeWidth={1.5} strokeDasharray="4 3" dot={false} />
                                 </ComposedChart>
                             </ResponsiveContainer>
-                        </div>
+                        </Money>
                     </div>
 
                     {/* Adjustments */}
@@ -167,10 +168,10 @@ export function RentHistoryModal({ isOpen, onClose, rows, areaM2 }: RentHistoryM
                                         {[...adjustments].reverse().map(a => (
                                             <tr key={a.month} className="border-t border-border/60">
                                                 <td className="px-3 py-2 font-semibold">{monthLabel(a.month)}</td>
-                                                <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{formatCurrency(a.from)}</td>
-                                                <td className="px-3 py-2 text-right tabular-nums font-semibold">{formatCurrency(a.to)}</td>
+                                                <Money as="td" className="px-3 py-2 text-right tabular-nums text-muted-foreground">{formatCurrency(a.from)}</Money>
+                                                <Money as="td" className="px-3 py-2 text-right tabular-nums font-semibold">{formatCurrency(a.to)}</Money>
                                                 <td className={`px-3 py-2 text-right tabular-nums font-semibold ${a.pct > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>{pct(a.pct)}</td>
-                                                <td className="px-3 py-2 text-right tabular-nums">{a.to - a.from > 0 ? "+" : ""}{formatCurrency(a.to - a.from)}</td>
+                                                <Money as="td" className="px-3 py-2 text-right tabular-nums">{a.to - a.from > 0 ? "+" : ""}{formatCurrency(a.to - a.from)}</Money>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -198,10 +199,10 @@ export function RentHistoryModal({ isOpen, onClose, rows, areaM2 }: RentHistoryM
                                     {[...years].reverse().map(y => (
                                         <tr key={y.year} className="border-t border-border/60">
                                             <td className="px-3 py-2 font-semibold">{y.year}</td>
-                                            <td className="px-3 py-2 text-right tabular-nums font-semibold">{formatCurrency(y.lastGross)}</td>
+                                            <Money as="td" className="px-3 py-2 text-right tabular-nums font-semibold">{formatCurrency(y.lastGross)}</Money>
                                             <td className={`px-3 py-2 text-right tabular-nums ${y.growthPct === null || y.growthPct === 0 ? "text-muted-foreground" : y.growthPct > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>{pct(y.growthPct)}</td>
-                                            <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(y.avgGross)}</td>
-                                            <td className="px-3 py-2 text-right tabular-nums">{areaM2 && areaM2 > 0 ? formatCurrency(y.lastGross / areaM2) : "—"}</td>
+                                            <Money as="td" className="px-3 py-2 text-right tabular-nums">{formatCurrency(y.avgGross)}</Money>
+                                            <Money as="td" className="px-3 py-2 text-right tabular-nums">{areaM2 && areaM2 > 0 ? formatCurrency(y.lastGross / areaM2) : "—"}</Money>
                                             <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{y.months}</td>
                                         </tr>
                                     ))}

@@ -16,6 +16,8 @@ export interface KPICardProps {
     };
     icon?: 'water' | 'money' | 'calendar' | 'chart' | 'activity';
     loading?: boolean;
+    /** the figure is an amount in R$: the value and the description are hidden by the sidebar's dollar toggle (components/privacy) */
+    money?: boolean;
 }
 
 const getIcon = (type: string) => {
@@ -28,7 +30,7 @@ const getIcon = (type: string) => {
     }
 };
 
-export function KPICard({ title, value, unit, description, trend, icon = 'activity', loading = false }: KPICardProps) {
+export function KPICard({ title, value, unit, description, trend, icon = 'activity', loading = false, money = false }: KPICardProps) {
     if (loading) {
         return (
             <div className="rounded-xl border bg-card text-card-foreground shadow-sm p-6 animate-pulse">
@@ -49,7 +51,7 @@ export function KPICard({ title, value, unit, description, trend, icon = 'activi
                 {getIcon(icon)}
             </div>
             <div className="p-6 pt-0">
-                <div className="text-2xl font-bold">
+                <div className={money ? "text-2xl font-bold privacy-money" : "text-2xl font-bold"}>
                     {value}
                     {unit && <span className="text-sm font-normal text-muted-foreground ml-1">{unit}</span>}
                 </div>
@@ -63,7 +65,7 @@ export function KPICard({ title, value, unit, description, trend, icon = 'activi
                             {trend.value}
                         </span>
                     ) : null}
-                    {description && <span>{description}</span>}
+                    {description && <span className={money ? "privacy-money" : undefined}>{description}</span>}
                 </div>
             </div>
         </div>

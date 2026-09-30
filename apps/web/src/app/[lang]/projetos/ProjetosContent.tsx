@@ -15,6 +15,7 @@ import { Button } from "@kitnets/ui";
 import InvestmentSquareCard from "@/components/investments/InvestmentSquareCard";
 import InvestmentDashboard from "@/components/investments/InvestmentDashboard";
 import InvestmentFormModal, { type InvestmentFormValues } from "@/components/investments/InvestmentFormModal";
+import { Money } from "@/components/privacy";
 import { cn } from "@/lib/utils";
 import { formatBRL, type InvestmentStatus, type NewInvestment } from "@/lib/new-investments";
 import type { InvestmentCardSummary } from "@/lib/new-investment-metrics";
@@ -253,26 +254,26 @@ export default function ProjetosContent({ lang, initial = null, initialDashboard
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                     <div className="rounded-xl border border-border/80 bg-card px-4 py-3">
                         <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Pago até a venda</span>
-                        <span className="block text-xl font-bold tabular-nums text-foreground">{formatBRL(totals.paid, 0)}</span>
+                        <Money className="block text-xl font-bold tabular-nums text-foreground">{formatBRL(totals.paid, 0)}</Money>
                         <span className="text-xs text-muted-foreground">em {totals.count} projeto{totals.count === 1 ? "" : "s"} vendido{totals.count === 1 ? "" : "s"}</span>
                     </div>
                     <div className="rounded-xl border border-border/80 bg-card px-4 py-3">
                         <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Vendas líquidas</span>
-                        <span className="block text-xl font-bold tabular-nums text-emerald-600">{formatBRL(totals.saleNet, 0)}</span>
+                        <Money className="block text-xl font-bold tabular-nums text-emerald-600">{formatBRL(totals.saleNet, 0)}</Money>
                         <span className="text-xs text-muted-foreground">após os custos de venda</span>
                     </div>
                     <div className="rounded-xl border border-border/80 bg-card px-4 py-3">
                         <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Ganho realizado</span>
-                        <span className={`block text-xl font-bold tabular-nums ${totals.realizedGain >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                        <Money className={`block text-xl font-bold tabular-nums ${totals.realizedGain >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
                             {totals.realizedGain > 0 ? "+" : ""}{formatBRL(totals.realizedGain, 0)}
-                        </span>
+                        </Money>
                         <span className="text-xs text-muted-foreground">
                             {totals.paid > 0 ? `${((totals.realizedGain / totals.paid) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% sobre o pago` : "—"}
                         </span>
                     </div>
                     <div className="rounded-xl border border-border/80 bg-card px-4 py-3">
                         <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Custo total</span>
-                        <span className="block text-xl font-bold tabular-nums text-foreground">{formatBRL(totals.committed, 0)}</span>
+                        <Money className="block text-xl font-bold tabular-nums text-foreground">{formatBRL(totals.committed, 0)}</Money>
                         <span className="text-xs text-muted-foreground">o que foi pago; o resto passou ao comprador</span>
                     </div>
                 </div>
@@ -280,17 +281,17 @@ export default function ProjetosContent({ lang, initial = null, initialDashboard
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                     <div className="rounded-xl border border-border/80 bg-card px-4 py-3">
                         <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Investido até agora</span>
-                        <span className="block text-xl font-bold tabular-nums text-foreground">{formatBRL(totals.paid, 0)}</span>
+                        <Money className="block text-xl font-bold tabular-nums text-foreground">{formatBRL(totals.paid, 0)}</Money>
                         <span className="text-xs text-muted-foreground">em {totals.count} unidade{totals.count === 1 ? "" : "s"}</span>
                     </div>
                     <div className="rounded-xl border border-border/80 bg-card px-4 py-3">
                         <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Falta pagar</span>
-                        <span className="block text-xl font-bold tabular-nums text-amber-600">{formatBRL(totals.remaining, 0)}</span>
+                        <Money className="block text-xl font-bold tabular-nums text-amber-600">{formatBRL(totals.remaining, 0)}</Money>
                         <span className="text-xs text-muted-foreground">parcelas previstas em contrato</span>
                     </div>
                     <div className="rounded-xl border border-border/80 bg-card px-4 py-3">
                         <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">Custo total</span>
-                        <span className="block text-xl font-bold tabular-nums text-foreground">{formatBRL(totals.committed, 0)}</span>
+                        <Money className="block text-xl font-bold tabular-nums text-foreground">{formatBRL(totals.committed, 0)}</Money>
                         <span className="text-xs text-muted-foreground">
                             {totals.committed > 0 ? `${((totals.paid / totals.committed) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% quitado` : "—"}
                         </span>

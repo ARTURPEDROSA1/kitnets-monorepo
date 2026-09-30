@@ -15,6 +15,7 @@ import { Building2, CalendarClock, CheckCircle2, FileText, Handshake, KeyRound, 
 import { cn } from "@/lib/utils";
 import { formatDateBR } from "@/lib/dates";
 import { CoverCarousel, useCoverCarousel } from "@/components/ui/CoverCarousel";
+import { Money, Sensitive } from "@/components/privacy";
 import { INVESTMENT_KIND_LABELS, STRATEGY_LABELS, formatBRL, investmentTitle, type NewInvestment } from "@/lib/new-investments";
 import type { InvestmentCardSummary } from "@/lib/new-investment-metrics";
 
@@ -95,14 +96,14 @@ export default function InvestmentSquareCard({ investment, summary, photoUrls = 
                 <div className="space-y-0.5">
                     <h3 className="font-semibold text-foreground leading-tight line-clamp-1" title={title}>{title}</h3>
                     <p className="text-xs text-muted-foreground line-clamp-1">
-                        {investment.developer || investment.address || "Construtora não informada"}
+                        {investment.developer || (investment.address ? <Sensitive>{investment.address}</Sensitive> : "Construtora não informada")}
                     </p>
                 </div>
 
                 <div className="space-y-1.5">
                     <div className="flex items-baseline justify-between gap-2 text-xs">
-                        <span className="font-semibold tabular-nums text-foreground">{compactBRL(summary?.paidToDate ?? 0)}</span>
-                        <span className="text-muted-foreground tabular-nums">de {compactBRL(summary?.committed ?? investment.total_price)}</span>
+                        <Money className="font-semibold tabular-nums text-foreground">{compactBRL(summary?.paidToDate ?? 0)}</Money>
+                        <span className="text-muted-foreground tabular-nums">de <Money>{compactBRL(summary?.committed ?? investment.total_price)}</Money></span>
                     </div>
                     <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
                         <div
@@ -121,9 +122,9 @@ export default function InvestmentSquareCard({ investment, summary, photoUrls = 
                 <dl className="grid grid-cols-2 gap-2 text-[11px] mt-auto">
                     <div className="rounded-lg bg-muted/40 px-2 py-1.5">
                         <dt className="flex items-center gap-1 text-muted-foreground"><CalendarClock className="w-3 h-3" /> Próxima</dt>
-                        <dd className="font-semibold text-foreground tabular-nums">
+                        <Money as="dd" className="font-semibold text-foreground tabular-nums">
                             {summary?.nextDueOn ? formatBRL(summary.nextDueAmount, 0) : "—"}
-                        </dd>
+                        </Money>
                         <dd className="text-muted-foreground tabular-nums">{summary?.nextDueOn ? formatDateBR(summary.nextDueOn) : "sem parcelas"}</dd>
                     </div>
                     <div className="rounded-lg bg-muted/40 px-2 py-1.5">
@@ -137,7 +138,7 @@ export default function InvestmentSquareCard({ investment, summary, photoUrls = 
                     <span className="inline-flex items-center gap-1"><FileText className="w-3 h-3" /> {summary?.documents ?? 0} arquivo{(summary?.documents ?? 0) === 1 ? "" : "s"}</span>
                     {summary?.realizedGain != null ? (
                         <span className={cn("inline-flex items-center gap-1 font-medium", summary.realizedGain >= 0 ? "text-emerald-600" : "text-rose-600")} title="Ganho realizado na venda, sobre o que foi pago">
-                            <Handshake className="w-3 h-3" /> {summary.realizedGain > 0 ? "+" : ""}{formatBRL(summary.realizedGain, 0)}
+                            <Handshake className="w-3 h-3" /> <Money>{summary.realizedGain > 0 ? "+" : ""}{formatBRL(summary.realizedGain, 0)}</Money>
                             {summary.paidToDate > 0 ? ` (${((summary.realizedGain / summary.paidToDate) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}%)` : ""}
                         </span>
                     ) : summary?.netYieldPct != null && (

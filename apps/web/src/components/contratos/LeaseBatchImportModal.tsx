@@ -17,6 +17,7 @@ import { formatDateBR } from "@/lib/dates";
 import { checkLeaseFile, LEASE_UPLOAD_ACCEPT } from "@/lib/lease-upload-client";
 import { createLeaseFromImport, type ImportedLeaseOutcome } from "@/lib/lease-import-client";
 import { brl, guessUnit, referenceNameFor, todayBRT } from "@/lib/lease-dashboard";
+import { Money } from "@/components/privacy";
 import type { LeaseStatus } from "@/types/lease";
 import LeaseImportModal, { type LeaseImportResult } from "./LeaseImportModal";
 import type { LeaseFormDropdowns } from "./LeaseForm";
@@ -240,7 +241,7 @@ export default function LeaseBatchImportModal({ dropdowns, refreshDropdowns, onC
                     {step === "settle" && pending && (
                         <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-xl border border-border bg-muted/30 p-3 text-xs sm:grid-cols-4">
-                                <div><p className="text-muted-foreground">Aluguel</p><p className="font-semibold text-foreground">{pending.data.lease.monthly_rent != null ? brl(pending.data.lease.monthly_rent) : "—"}</p></div>
+                                <div><p className="text-muted-foreground">Aluguel</p><Money as="p" className="font-semibold text-foreground">{pending.data.lease.monthly_rent != null ? brl(pending.data.lease.monthly_rent) : "—"}</Money></div>
                                 <div><p className="text-muted-foreground">Início</p><p className="font-semibold text-foreground">{formatDateBR(pending.data.lease.start_date)}</p></div>
                                 <div><p className="text-muted-foreground">Término</p><p className="font-semibold text-foreground">{formatDateBR(pending.data.lease.end_date)}</p></div>
                                 <div><p className="text-muted-foreground">Inquilino</p><p className="break-words font-semibold text-foreground">{tenant?.full_name ?? "—"}</p></div>

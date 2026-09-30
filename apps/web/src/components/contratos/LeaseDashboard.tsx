@@ -35,6 +35,7 @@ import {
 import dynamic from "next/dynamic";
 import { Button } from "@kitnets/ui";
 import Tile from "@/components/properties/Tile";
+import { Money, Sensitive } from "@/components/privacy";
 import { PdfViewerModal } from "@/components/ui/PdfViewerModal";
 import { cn } from "@/lib/utils";
 import { formatDateBR } from "@/lib/dates";
@@ -235,6 +236,7 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                         formula: "aluguel de contrato · vencimento = dia do mês combinado (o último dia do mês quando ele não existe)",
                         example: agencyManaged ? `${brl(rent)} brutos; o que chega ao proprietário é o líquido, na razão de receitas do imóvel` : undefined,
                     }}
+                    money
                 />
                 <Tile
                     label="Prazo"
@@ -295,6 +297,7 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                         example: summary.accumulatedPct !== null && summary.adjustedRent !== null ? `${brl(rent)} × (1 ${summary.accumulatedPct >= 0 ? "+" : "−"} ${Math.abs(summary.accumulatedPct).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}%) = ${brl(summary.adjustedRent)}` : undefined,
                         note: "Com índice negativo a maioria dos contratos mantém o aluguel.",
                     }}
+                    money
                 />
                 <Tile
                     label={agencyManaged ? "Recebido (líquido)" : "Recebido"}
@@ -312,6 +315,7 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                         example: income.confirmedMonths > 0 ? `${income.confirmedMonths} meses · bruto ${brl(income.gross)} · recebido ${brl(income.received)}` : undefined,
                         note: "Lance os meses na razão de receitas do imóvel para este número acompanhar.",
                     }}
+                    money
                 />
                 <Tile
                     label="Caução"
@@ -323,6 +327,7 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                         what: "A garantia em dinheiro que o inquilino deixou: até três aluguéis por lei, devolvida corrigida no fim do contrato, descontado o que ficar devendo.",
                         formula: "caução = até 3 × aluguel (Lei 8.245/91, art. 38 §2º)",
                     }}
+                    money
                 />
             </div>
 
@@ -334,7 +339,7 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                             <h2 className="text-sm font-semibold text-foreground">Aluguel mês a mês</h2>
                             <p className="text-xs text-muted-foreground">
                                 {income.points.length > 0
-                                    ? `${formatMonthKey(income.firstMonth!)} a ${formatMonthKey(income.lastMonth!)} na razão de receitas do imóvel${income.currentGross !== null && Math.abs(income.currentGross - rent) >= 1 ? ` · último mês bruto ${brl(income.currentGross)} (contrato: ${brl(rent)})` : ""}`
+                                    ? <>{formatMonthKey(income.firstMonth!)} a {formatMonthKey(income.lastMonth!)} na razão de receitas do imóvel{income.currentGross !== null && Math.abs(income.currentGross - rent) >= 1 ? <> · último mês bruto <Money>{brl(income.currentGross)}</Money> (contrato: <Money>{brl(rent)}</Money>)</> : ""}</>
                                     : "O que a razão de receitas do imóvel registrou nos meses deste contrato"}
                             </p>
                         </div>
@@ -372,11 +377,11 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                                 </Link>
                                 {phone && (
                                     <a href={waLink ?? undefined} target="_blank" rel="noopener noreferrer" className={chip} title="Conversar no WhatsApp">
-                                        <MessageCircle className="h-3.5 w-3.5 text-emerald-600" /> {formatPhone(phone)}
+                                        <MessageCircle className="h-3.5 w-3.5 text-emerald-600" /> <Sensitive>{formatPhone(phone)}</Sensitive>
                                     </a>
                                 )}
                                 {!phone && tenant?.email && (
-                                    <a href={`mailto:${tenant.email}`} className={chip}><Mail className="h-3.5 w-3.5" /> {tenant.email}</a>
+                                    <a href={`mailto:${tenant.email}`} className={chip}><Mail className="h-3.5 w-3.5" /> <Sensitive>{tenant.email}</Sensitive></a>
                                 )}
                             </div>
                             {lease.additional_tenants.length > 0 && (
@@ -386,7 +391,7 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                                     ))}
                                 </ul>
                             )}
-                            {phone && tenant?.email && <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"><Mail className="h-3 w-3" /> {tenant.email}</p>}
+                            {phone && tenant?.email && <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"><Mail className="h-3 w-3" /> <Sensitive>{tenant.email}</Sensitive></p>}
                         </Field>
                         <Field label="Gestão" className="col-span-2">
                             {agencyManaged && lease.agency_id ? (
@@ -402,7 +407,7 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                         <Field label="Término">{lease.end_date ? formatDateBR(lease.end_date) : "Indeterminado"}</Field>
                         <Field label="Vencimento">Dia {lease.rent_due_day}</Field>
                         <Field label="Reajuste">{row.indexLabel}{lease.adjustment_index && lease.adjustment_index !== "NONE" ? ` · ${summary.frequencyMonths} meses` : ""}</Field>
-                        <Field label="Caução">{lease.security_deposit ? `${brl(Number(lease.security_deposit))}${lease.deposit_months ? ` (${lease.deposit_months} ${lease.deposit_months === 1 ? "aluguel" : "aluguéis"})` : ""}` : "—"}</Field>
+                        <Field label="Caução">{lease.security_deposit ? <><Money>{brl(Number(lease.security_deposit))}</Money>{lease.deposit_months ? ` (${lease.deposit_months} ${lease.deposit_months === 1 ? "aluguel" : "aluguéis"})` : ""}</> : "—"}</Field>
                         <Field label="Registro">
                             <span className="text-xs text-muted-foreground">criado {formatDateBR(lease.created_at)}{lease.updated_at && lease.updated_at.slice(0, 10) !== lease.created_at.slice(0, 10) ? ` · alterado ${formatDateBR(lease.updated_at)}` : ""}</span>
                         </Field>
@@ -420,7 +425,7 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                                             <tr key={c.id} className="border-t border-border/40 first:border-0">
                                                 <td className="py-1 pr-2 text-foreground">{c.charge_type === "OTHER" && c.label ? c.label : CHARGE_LABELS[c.charge_type] ?? c.charge_type}</td>
                                                 <td className="py-1 pr-2 text-muted-foreground">{RESPONSIBILITY_LABELS[c.responsibility] ?? c.responsibility}</td>
-                                                <td className="py-1 text-right tabular-nums text-foreground">{c.amount ? brl(Number(c.amount)) : "—"}</td>
+                                                <td className="py-1 text-right tabular-nums text-foreground">{c.amount ? <Money>{brl(Number(c.amount))}</Money> : "—"}</td>
                                                 <td className="py-1 pl-2 text-right text-muted-foreground" title={c.adjustment_notes ?? undefined}>{c.adjustment_index ? CHARGE_INDEX_LABELS[c.adjustment_index] ?? c.adjustment_index : ""}</td>
                                             </tr>
                                         ))}

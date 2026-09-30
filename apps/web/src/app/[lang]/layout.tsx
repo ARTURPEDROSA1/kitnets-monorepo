@@ -151,10 +151,11 @@ export default async function RootLayout({
                     <link rel="dns-prefetch" href="https://kqhfzcxqmjkqekozhlng.supabase.co" />
                     <link rel="preconnect" href="https://kqhfzcxqmjkqekozhlng.supabase.co" crossOrigin="anonymous" />
                     <link rel="preconnect" href="https://clerk.kitnets.com" crossOrigin="anonymous" />
-                    {/* Apply the persisted sidebar preference before first paint (key shared with components/Sidebar.tsx) */}
+                    {/* Apply the persisted sidebar and privacy preferences before first paint
+                        (keys shared with lib/sidebar-preferences.ts and lib/privacy.ts; CSS in globals.css) */}
                     <script
                         dangerouslySetInnerHTML={{
-                            __html: "try{if(localStorage.getItem('kitnets_sidebar_collapsed')==='1'){document.documentElement.setAttribute('data-sidebar','collapsed')}}catch(e){}",
+                            __html: "try{var d=document.documentElement,s=localStorage;if(s.getItem('kitnets_sidebar_collapsed')==='1'){d.setAttribute('data-sidebar','collapsed')}var g=s.getItem('kitnets_sidebar_groups');if(g){d.setAttribute('data-nav-collapsed',g)}var p=s.getItem('kitnets_privacy')||'';if(p.indexOf('sensitive')>-1){d.setAttribute('data-hide-sensitive','1')}if(p.indexOf('money')>-1){d.setAttribute('data-hide-money','1')}}catch(e){}",
                         }}
                     />
                 </head>

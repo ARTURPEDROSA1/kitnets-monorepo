@@ -12,6 +12,7 @@ import Link from "next/link";
 import { AlertCircle, BatteryCharging, Building2, ChevronDown, ChevronUp, DollarSign, Loader2, Plus, Search, Sparkles, Sun, Zap, X } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
+import { Money } from "@/components/privacy";
 import { cn } from "@/lib/utils";
 import { normalizeText } from "@/lib/lease-extract";
 import { ENERGY_VIEWS, energyAttention, energyHubTotals, inEnergyView, type EnergyUnitRow, type EnergyView } from "@/lib/energy-hub";
@@ -34,8 +35,11 @@ interface Props {
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString("pt-BR")} ${n === 1 ? one : many}`;
 const brl = (v: number, digits = 0) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: digits, maximumFractionDigits: digits });
 const kwh = (v: number) => `${Math.round(v).toLocaleString("pt-BR")} kWh`;
+/** An attention sentence that quotes an amount (lib/energy-hub builds them): the dollar toggle hides the whole sentence. */
+const hasAmount = (text: string) => /R\$\s?\d/.test(text);
 
-function Item({ icon, label, value, hint, tone, valueTone, onClick, title }: { icon: React.ReactNode; label: string; value: string; hint: React.ReactNode; tone: string; valueTone?: string; onClick?: () => void; title?: string }) {
+/** `money`: the value is an amount in R$, hidden by the sidebar's dollar toggle (components/privacy); amounts in `hint` are wrapped in <Money> by the caller. */
+function Item({ icon, label, value, hint, tone, valueTone, onClick, title, money }: { icon: React.ReactNode; label: string; value: string; hint: React.ReactNode; tone: string; valueTone?: string; onClick?: () => void; title?: string; money?: boolean }) {
     const Tag = onClick ? "button" : "div";
     return (
         <Tag
@@ -47,7 +51,7 @@ function Item({ icon, label, value, hint, tone, valueTone, onClick, title }: { i
             <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 <span className={tone}>{icon}</span>{label}
             </span>
-            <span className={cn("block break-words text-xl font-bold leading-tight", valueTone ?? "text-foreground")}>{value}</span>
+            <span className={cn("block break-words text-xl font-bold leading-tight", valueTone ?? "text-foreground", money && "privacy-money")}>{value}</span>
             <span className="block break-words text-xs leading-snug text-muted-foreground">{hint}</span>
         </Tag>
     );
@@ -82,7 +86,7 @@ export default function EnergyHub({ lang, rows, loading, error, view, onViewChan
         ? `${plural(totals.overdue, "vencida", "vencidas")}${totals.dueSoon > 0 ? ` · ${plural(totals.dueSoon, "vence", "vencem")} em 7 dias` : ""}`
         : totals.dueSoon > 0
             ? `${plural(totals.dueSoon, "vence", "vencem")} em até 7 dias`
-            : totals.paid12 > 0 ? `12 meses: ${brl(totals.paid12)}` : "faturas mais recentes de cada unidade";
+            : totals.paid12 > 0 ? <>12 meses: <Money>{brl(totals.paid12)}</Money></> : "faturas mais recentes de cada unidade";
 
     return (
         <div className="mx-auto max-w-[1600px] space-y-5 p-4 sm:p-6">
@@ -120,16 +124,16 @@ export default function EnergyHub({ lang, rows, loading, error, view, onViewChan
                         title="Consumo da rede na fatura mais recente de cada unidade"
                     />
                     <Item
-                        icon={<DollarSign className="h-3.5 w-3.5" />} tone={totals.overdue > 0 ? "text-rose-600" : totals.dueSoon > 0 ? "text-amber-600" : "text-emerald-600"} label="Faturas do mês"
+                        icon={<DollarSign className="h-3.5 w-3.5" />} tone={totals.overdue > 0 ? "text-rose-600" : totals.dueSoon > 0 ? "text-amber-600" : "text-emerald-600"} label="Faturas do mês" money
                         value={totals.withBills > 0 ? brl(totals.billsLatest) : "—"}
                         hint={billsHint}
                         valueTone={totals.overdue > 0 ? "text-rose-600" : undefined}
                         title="Valor a pagar na fatura mais recente de cada unidade"
                     />
                     <Item
-                        icon={<Sparkles className="h-3.5 w-3.5" />} tone="text-amber-600" label="Economia solar"
+                        icon={<Sparkles className="h-3.5 w-3.5" />} tone="text-amber-600" label="Economia solar" money
                         value={totals.savingsLatest > 0 ? brl(totals.savingsLatest) : "—"}
-                        hint={totals.savings12 > 0 ? `12 meses: ${brl(totals.savings12)}` : "o que a compensação abateu das faturas"}
+                        hint={totals.savings12 > 0 ? <>12 meses: <Money>{brl(totals.savings12)}</Money></> : "o que a compensação abateu das faturas"}
                         valueTone={totals.savingsLatest > 0 ? "text-amber-700 dark:text-amber-400" : undefined}
                         title="Energia compensada creditada na fatura mais recente de cada unidade"
                     />
@@ -168,7 +172,7 @@ export default function EnergyHub({ lang, rows, loading, error, view, onViewChan
                                 <span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", DOT[item.tone])} />
                                 <span className="min-w-0 flex-1">
                                     <button type="button" onClick={() => onOpen(item.row)} className="font-semibold text-foreground underline-offset-2 hover:underline">{item.row.unit.name}</button>
-                                    <span className="text-muted-foreground"> — {item.text}</span>
+                                    <span className="text-muted-foreground"> — {hasAmount(item.text) ? <Money>{item.text}</Money> : item.text}</span>
                                 </span>
                             </li>
                         ))}
