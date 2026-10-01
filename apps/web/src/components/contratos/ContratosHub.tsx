@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatDateBR } from "@/lib/dates";
 import { LEASE_VIEWS, MANAGEMENT_LABELS, attentionItems, brl, hubTotals, inView, type LeaseRow, type LeaseView } from "@/lib/lease-dashboard";
+import type { PropertyKind } from "@/lib/lease-charges";
 import LeaseTable, { type LeaseTableActions } from "./LeaseTable";
 import LeaseTimeline from "./LeaseTimeline";
 import { LeaseTitle } from "./LeaseTitle";
@@ -20,6 +21,8 @@ import { LeaseTitle } from "./LeaseTitle";
 interface Props {
     rows: LeaseRow[];
     today: string;
+    /** `properties.id` → single/multi: the table's charge column names the energy bill or the condominium (lib/lease-charges.ts) */
+    propertyKinds?: Record<string, PropertyKind>;
     loading: boolean;
     error: string | null;
     view: LeaseView;
@@ -55,7 +58,7 @@ function Item({ icon, label, value, hint, tone, valueTone, onClick, title, money
 
 const DOT: Record<string, string> = { rose: "bg-rose-500", amber: "bg-amber-500", sky: "bg-sky-500", slate: "bg-slate-400" };
 
-export default function ContratosHub({ rows, today, loading, error, view, onViewChange, actions, onNew, onImportOld }: Props) {
+export default function ContratosHub({ rows, today, propertyKinds = {}, loading, error, view, onViewChange, actions, onNew, onImportOld }: Props) {
     const [mode, setMode] = useState<Mode>("lista");
     const [search, setSearch] = useState("");
     const [property, setProperty] = useState("");
@@ -284,7 +287,7 @@ export default function ContratosHub({ rows, today, loading, error, view, onView
                     )}
                 </div>
             ) : mode === "lista" ? (
-                <LeaseTable rows={visible} actions={actions} />
+                <LeaseTable rows={visible} actions={actions} propertyKinds={propertyKinds} />
             ) : (
                 <LeaseTimeline rows={visible} today={today} onOpen={actions.onOpen} />
             )}

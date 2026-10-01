@@ -17,6 +17,11 @@ export const KIND_CHARGE: Record<PropertyKind, { type: LeaseCharge["charge_type"
 };
 
 export const RESPONSIBILITY_LABELS: Record<string, string> = { TENANT: "Pago pelo inquilino", LANDLORD: "Pago pelo proprietário", INCLUDED: "Incluso no aluguel" };
+export const CHARGE_LABELS: Record<string, string> = { CONDOMINIUM: "Condomínio", IPTU: "IPTU", WATER: "Água", ELECTRICITY: "Energia elétrica", GAS: "Gás", INTERNET: "Internet", OTHER: "Outro" };
+export const CHARGE_INDEX_LABELS: Record<string, string> = { IPCA: "IPCA", IGP_M: "IGP-M", INPC: "INPC", IVAR: "IVAR", CUSTOM: "Outra regra", NONE: "Valor fixo" };
+
+/** "Condomínio", "Energia elétrica", or the label typed for an "Outro". */
+export const chargeName = (c: Pick<LeaseCharge, "charge_type" | "label">): string => (c.charge_type === "OTHER" && c.label ? c.label : CHARGE_LABELS[c.charge_type] ?? c.charge_type);
 
 export const amountOf = (c: Pick<LeaseCharge, "amount">): number => Number(c.amount) || 0;
 
@@ -46,3 +51,18 @@ export const monthlyTotal = (rent: number, charges: readonly LeaseCharge[]): num
 /** The monthly total over the term's whole months; null when the lease is open-ended. */
 export const contractTotal = (monthly: number, termMonths: number | null): number | null =>
     termMonths === null || termMonths <= 0 ? null : monthly * termMonths;
+
+export interface LeaseTotals {
+    featured: ReturnType<typeof featuredCharge>;
+    tenantFixed: ReturnType<typeof tenantCharges>;
+    monthly: number;
+    /** null when the lease is open-ended */
+    total: number | null;
+}
+
+/** Everything the card's charge/total figures need, in one call; charges may be missing on a list row. */
+export function leaseTotals(rent: number, charges: readonly LeaseCharge[] | null | undefined, termMonths: number | null, kind: PropertyKind | null): LeaseTotals {
+    const list = charges ?? [];
+    const monthly = monthlyTotal(rent, list);
+    return { featured: featuredCharge(list, kind), tenantFixed: tenantCharges(list), monthly, total: contractTotal(monthly, termMonths) };
+}
