@@ -2,11 +2,12 @@
  * Interface preferences kept in the user's account (`user_ui_preferences`), so they follow the user to any
  * device. Pure helpers shared by the API route and the client.
  *
- * Four kinds today, three per table (and per kind of property where the table differs by it):
+ * Five kinds today, three per table (and per kind of property where the table differs by it):
  *   hidden-columns:<table>[:<variant>]   string[] of column keys           e.g. ["energy", "received"]
  *   sort:<table>[:<variant>]             { key, dir }                      e.g. { key: "due_on", dir: "asc" }
  *   filters:<table>:<record id>          { <column>: { text | min/max | values[] } }
  *   sidebar:collapsed-groups             string[] of menu group keys       e.g. ["contabil"]  (lib/sidebar-groups.ts)
+ *   notifications:owner                  { marketing, security }           what the owner wants to receive (/proprietario)
  *
  * Hidden columns and sort are how the user wants a kind of table to look, so they are per table. Filters
  * are a question asked of one property's (or one investment's) rows, so they are per record: a filter on
@@ -17,6 +18,7 @@ export const HIDDEN_COLUMNS_PREFIX = "hidden-columns:";
 export const SORT_PREFIX = "sort:";
 export const FILTERS_PREFIX = "filters:";
 export const SIDEBAR_PREFIX = "sidebar:";
+export const NOTIFICATIONS_PREFIX = "notifications:";
 /** the one sidebar setting today: the menu groups the user collapsed */
 export const SIDEBAR_GROUPS_KEY = "collapsed-groups";
 
@@ -69,6 +71,10 @@ export const tableKeyFromSidebarPrefKey = (prefKey: string) => tableKeyOf(SIDEBA
 export const filtersPrefKey = (tableKey: string) => prefKeyOf(FILTERS_PREFIX, tableKey);
 /** `filters:investment-payments` → `investment-payments`; null for any other key. */
 export const tableKeyFromFiltersPrefKey = (prefKey: string) => tableKeyOf(FILTERS_PREFIX, prefKey);
+/** Preference key of a notification setting (`notifications:owner`), or null when the name is not acceptable. */
+export const notificationsPrefKey = (name: string) => prefKeyOf(NOTIFICATIONS_PREFIX, name);
+/** `notifications:owner` → `owner`; null for any other key. */
+export const tableKeyFromNotificationsPrefKey = (prefKey: string) => tableKeyOf(NOTIFICATIONS_PREFIX, prefKey);
 
 /** A clean list of column keys (no duplicates, no junk), or null when the value is not a list of them. */
 export function sanitizeHiddenColumns(value: unknown): string[] | null {
@@ -127,4 +133,16 @@ export function sanitizeFilters(value: unknown): TableFilters | null {
         if (Object.keys(clean).length > 0) out[column] = clean;
     }
     return out;
+}
+
+/** What the owner wants to receive (/proprietario): e-mails de marketing, alertas de segurança. */
+export interface NotificationPrefs { marketing: boolean; security: boolean }
+/** The one entry under `notifications:` today. */
+export const NOTIFICATIONS_KEY = "owner";
+/** A clean pair of booleans, or null when the value is not one. */
+export function sanitizeNotificationPrefs(value: unknown): NotificationPrefs | null {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const v = value as Record<string, unknown>;
+    if (typeof v.marketing !== "boolean" || typeof v.security !== "boolean") return null;
+    return { marketing: v.marketing, security: v.security };
 }

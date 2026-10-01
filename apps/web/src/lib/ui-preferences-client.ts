@@ -10,7 +10,7 @@
  */
 import {
     filtersPrefKey, hiddenColumnsPrefKey, sanitizeFilters, sanitizeHiddenColumns, sanitizeSort, sidebarPrefKey, sortPrefKey,
-    type TableFilters, type TableSort,
+    notificationsPrefKey, sanitizeNotificationPrefs, type NotificationPrefs, type TableFilters, type TableSort,
 } from "@/lib/ui-preferences";
 import { sanitizeCollapsedGroups } from "@/lib/sidebar-groups";
 
@@ -20,19 +20,21 @@ export interface AccountPreferences {
     filters: Record<string, TableFilters>;
     /** "collapsed-groups" → the sidebar menu groups the user collapsed */
     sidebar: Record<string, string[]>;
+    /** "owner" → what the owner wants to receive (/proprietario) */
+    notifications: Record<string, NotificationPrefs>;
 }
 type Section = keyof AccountPreferences;
 
-const EMPTY: AccountPreferences = { hiddenColumns: {}, sort: {}, filters: {}, sidebar: {} };
+const EMPTY: AccountPreferences = { hiddenColumns: {}, sort: {}, filters: {}, sidebar: {}, notifications: {} };
 const ACCOUNT_TTL_MS = 60_000;
 const SAVE_DEBOUNCE_MS = 600;
 
 let account: { at: number; load: Promise<AccountPreferences> } | null = null;
 const pendingSaves = new Map<string, ReturnType<typeof setTimeout>>();
 
-const PREF_KEY: Record<Section, (tableKey: string) => string | null> = { hiddenColumns: hiddenColumnsPrefKey, sort: sortPrefKey, filters: filtersPrefKey, sidebar: sidebarPrefKey };
-const SANITIZE: Record<Section, (value: unknown) => unknown> = { hiddenColumns: sanitizeHiddenColumns, sort: sanitizeSort, filters: sanitizeFilters, sidebar: sanitizeCollapsedGroups };
-const LOCAL_NAME: Record<Section, string> = { hiddenColumns: "hidden-columns", sort: "sort", filters: "filters", sidebar: "sidebar" };
+const PREF_KEY: Record<Section, (tableKey: string) => string | null> = { hiddenColumns: hiddenColumnsPrefKey, sort: sortPrefKey, filters: filtersPrefKey, sidebar: sidebarPrefKey, notifications: notificationsPrefKey };
+const SANITIZE: Record<Section, (value: unknown) => unknown> = { hiddenColumns: sanitizeHiddenColumns, sort: sanitizeSort, filters: sanitizeFilters, sidebar: sanitizeCollapsedGroups, notifications: sanitizeNotificationPrefs };
+const LOCAL_NAME: Record<Section, string> = { hiddenColumns: "hidden-columns", sort: "sort", filters: "filters", sidebar: "sidebar", notifications: "notifications" };
 
 // ── This device's copy ─────────────────────────────────────────────────────
 
@@ -59,7 +61,7 @@ export function loadAccountPreferences(): Promise<AccountPreferences> {
     if (!account || Date.now() - account.at > ACCOUNT_TTL_MS) {
         const load = fetch("/api/profiles/preferences")
             .then(res => (res.ok ? res.json() : EMPTY))
-            .then((data: Partial<AccountPreferences>) => ({ hiddenColumns: data.hiddenColumns ?? {}, sort: data.sort ?? {}, filters: data.filters ?? {}, sidebar: data.sidebar ?? {} }))
+            .then((data: Partial<AccountPreferences>) => ({ hiddenColumns: data.hiddenColumns ?? {}, sort: data.sort ?? {}, filters: data.filters ?? {}, sidebar: data.sidebar ?? {}, notifications: data.notifications ?? {} }))
             .catch(() => EMPTY);   // signed out or offline: this device's copy still works
         account = { at: Date.now(), load };
     }
