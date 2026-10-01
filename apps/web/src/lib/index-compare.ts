@@ -37,6 +37,41 @@ export const COMPARE_COLORS: Record<string, string> = {
     IGPM: "hsl(var(--index-chart-igpm))",
 };
 
+export interface PanoramaSeriesSpec {
+    /** the key the Panorama page maps its data to */
+    key: string;
+    label: string;
+    color: string;
+}
+
+/**
+ * The lines the Panorama chart can draw, in legend order: neighbours in this order were checked
+ * for colour-vision separation, and the line ends carry the index name so identity never rests
+ * on colour alone. The salário mínimo is not here: it is an amount in R$, not a monthly rate.
+ */
+export const PANORAMA_SERIES: PanoramaSeriesSpec[] = [
+    { key: "CDI", label: "CDI", color: COMPARE_COLORS.CDI },
+    { key: "IPCA", label: "IPCA", color: COMPARE_COLORS.IPCA },
+    { key: "SELIC", label: "Selic", color: COMPARE_COLORS.SELIC },
+    { key: "IGPM", label: "IGP-M", color: COMPARE_COLORS.IGPM },
+    { key: "INPC", label: "INPC", color: "hsl(var(--index-chart-inpc))" },
+    { key: "IVAR", label: "IVAR", color: "hsl(var(--index-chart-ivar))" },
+    { key: "FIPEZAPLOCACAO", label: "FipeZAP Locação", color: "hsl(var(--index-chart-fipezap-locacao))" },
+    { key: "FIPEZAPVENDA", label: "FipeZAP Venda", color: "hsl(var(--index-chart-fipezap-venda))" },
+    { key: "FIPEZAPYIELD", label: "FipeZAP Yield", color: "hsl(var(--index-chart-fipezap-yield))" },
+];
+
+/** drawn when the Panorama opens; the others wait for their checkbox, so the chart starts readable */
+export const PANORAMA_DEFAULT_ON: string[] = ["CDI", "IPCA", "IGPM", "FIPEZAPLOCACAO"];
+
+/** the key of the salário mínimo amounts in the Panorama data (a level in R$, used by the calculator only) */
+export const PANORAMA_MIN_WAGE_KEY = "REAJUSTESALARIOMINIMO";
+
+/** "IGP-M" → "IGPM", "FIPEZAP Locação" → "FIPEZAPLOCACAO": the Panorama's series key for an index code. */
+export function panoramaKey(code: string): string {
+    return code.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/[^A-Z0-9]+/g, "");
+}
+
 /** The two indexes the page of `code` can overlay, in button order. */
 export function compareCodesFor(code: string): string[] {
     switch (code.toUpperCase()) {

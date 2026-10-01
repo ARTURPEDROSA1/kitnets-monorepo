@@ -9,7 +9,7 @@
 import { useMemo, useState } from "react";
 import type { IndexValue } from "@/lib/indexes";
 import { MAIN_SERIES_COLOR, type ComparisonSeries } from "@/lib/index-compare";
-import { DEFAULT_MONTHLY_PERIOD, MONTHLY_PRESETS, filterByRange, formatRangeLabel, summarizeSeries } from "@/lib/index-period";
+import { MONTHLY_PRESETS, defaultMonthlyPeriod, filterByRange, formatRangeLabel, summarizeSeries } from "@/lib/index-period";
 import { CompareToggle } from "./CompareToggle";
 import { IndexHeatmap } from "./IndexHeatmap";
 import { IndexHistoryTable } from "./IndexHistoryTable";
@@ -47,7 +47,7 @@ export function IndexHistoryDashboard({ data, indexCode, labels, compare = [] }:
     const sorted = useMemo(() => [...data].sort(byDate), [data]);
     const earliest = sorted[0]?.reference_date ?? "";
     const latest = sorted[sorted.length - 1]?.reference_date ?? "";
-    const { period, custom, range, redundant, select, setCustom } = useIndexPeriod(earliest, latest, MONTHLY_PRESETS, DEFAULT_MONTHLY_PERIOD);
+    const { period, custom, range, redundant, select, setCustom } = useIndexPeriod(earliest, latest, MONTHLY_PRESETS, defaultMonthlyPeriod(latest));
 
     const slice = useMemo(() => filterByRange(sorted, range), [sorted, range]);
     const points = useMemo<TrendPoint[]>(() => slice.map((v) => ({

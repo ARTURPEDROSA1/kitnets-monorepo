@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { MONTHLY_PRESETS, YEARLY_PRESETS, addMonths, clampRange, filterByRange, formatMonthYear, formatRangeLabel, presetIsRedundant, presetRange, summarizeSeries } from "./index-period";
+import { MONTHLY_PRESETS, YEARLY_PRESETS, addMonths, clampRange, defaultMonthlyPeriod, filterByRange, formatMonthYear, formatRangeLabel, presetIsRedundant, presetRange, summarizeSeries } from "./index-period";
+
+describe("defaultMonthlyPeriod", () => {
+    it("opens on the year to date once it has two months, on six months before that", () => {
+        expect(defaultMonthlyPeriod("2026-09-01")).toBe("ytd");
+        expect(defaultMonthlyPeriod("2026-02-01")).toBe("ytd");
+        expect(defaultMonthlyPeriod("2026-01-01")).toBe("6m");
+        expect(defaultMonthlyPeriod("")).toBe("6m");
+        expect(defaultMonthlyPeriod(undefined)).toBe("6m");
+    });
+});
 
 const preset = (key: string, list = MONTHLY_PRESETS) => list.find((p) => p.key === key)!;
 
