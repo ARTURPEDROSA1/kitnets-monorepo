@@ -67,7 +67,7 @@ jobs:
       RCLONE_CONFIG_DEST_REGION: ${{ vars.BACKUP_S3_REGION || 'auto' }}
       RCLONE_CONFIG_DEST_NO_CHECK_BUCKET: "true"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check secrets
         run: |
