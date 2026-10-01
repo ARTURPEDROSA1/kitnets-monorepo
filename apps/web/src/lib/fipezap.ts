@@ -1,6 +1,8 @@
 
 import { createStaticClient } from "@/utils/supabase/static";
+import { sliceByDateRange } from "@/lib/date-range-rows";
 import { FIPEZAP_NATIONAL_SLUG } from "@/lib/fipezap-cities";
+import { cachedRead } from "@/lib/indexes";
 
 export type FipeZapDataPoint = {
     date: string; // YYYY-MM-DD
@@ -37,8 +39,12 @@ export type FipeZapContext = {
 
 type SeriesRow = Pick<FipeZapDatabaseRow, 'reference_date' | 'index_type' | 'metric' | 'value'>;
 
-/** PostgREST answers at most 1000 rows per request: page through the whole range. */
-async function fetchSeriesRows(citySlug: string, dbBedrooms: string, fetchStartDate: string, endDate: string): Promise<SeriesRow[] | null> {
+/**
+ * Every stored month of one place and bedroom bucket (≤ ~220 months × 5 series, about 100 KB).
+ * PostgREST answers at most 1000 rows per request: page through the whole series. A failed page
+ * throws, so `cachedRead` never stores the failure.
+ */
+async function _allSeriesRows(citySlug: string, dbBedrooms: string): Promise<SeriesRow[]> {
     const supabase = createStaticClient();
     const PAGE = 1000;
     const out: SeriesRow[] = [];
@@ -49,17 +55,26 @@ async function fetchSeriesRows(citySlug: string, dbBedrooms: string, fetchStartD
             .eq('city_slug', citySlug)
             .eq('dormitorios', dbBedrooms)
             .in('metric', ['var_mensal', 'var_12m', 'yield_mensal'])
-            .gte('reference_date', fetchStartDate)
-            .lte('reference_date', endDate)
             .order('reference_date', { ascending: true })
             .order('index_type', { ascending: true })
             .order('metric', { ascending: true })
             .range(offset, offset + PAGE - 1);
-        if (error) { console.error("Error fetching FipeZap data:", error); return null; }
+        if (error) throw new Error(`fipezap_series ${citySlug}/${dbBedrooms}: ${error.message}`);
         out.push(...((data ?? []) as SeriesRow[]));
         if (!data || data.length < PAGE) break;
     }
     return out;
+}
+
+/**
+ * The rows between two dates, sliced in memory from the cached whole series. The /indices/fipezap
+ * page is rendered per request (it reads `?bedrooms=`) and used to send this query to Supabase on
+ * every view; the cache (`indices` tag, an hour, expired by the FipeZAP cron) keeps that to one read
+ * per place and bucket. Null when the read failed and nothing is cached.
+ */
+async function fetchSeriesRows(citySlug: string, dbBedrooms: string, fetchStartDate: string, endDate: string): Promise<SeriesRow[] | null> {
+    const all = await cachedRead<SeriesRow[] | null>(() => _allSeriesRows(citySlug, dbBedrooms), ['fipezap-series-rows', citySlug, dbBedrooms], null);
+    return all ? sliceByDateRange(all, fetchStartDate, endDate) : null;
 }
 
 /**
