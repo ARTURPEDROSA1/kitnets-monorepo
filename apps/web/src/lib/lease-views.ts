@@ -8,9 +8,12 @@ import type { IndexPoint } from "@/lib/lease-summary";
 import type { PropertyIncomeRow } from "@/lib/property-income";
 
 export interface LeaseListView {
+    /** with their charges (the hub's cards name the condominium or the energy and add up the tenant's total) */
     leases: LeaseWithDetails[];
     /** monthly series of every index the leases use, by calculator code (`ipca`, `igpm`…); null = unavailable */
     series: Record<string, IndexPoint[] | null>;
+    /** `properties.id` → single (house/apartment) or multi (kitnets), from the profile's cadastro */
+    propertyKinds: Record<string, "single" | "multi">;
 }
 
 export interface LeaseTenantContact {

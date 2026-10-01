@@ -61,6 +61,8 @@ export default function ContratosContent({ lang, initial = null, initialDashboar
     // ── List ──────────────────────────────────────────────────────
     const [leases, setLeases] = useState<LeaseWithDetails[] | null>(initial?.leases ?? null);
     const [series, setSeries] = useState<Record<string, IndexPoint[] | null>>(initial?.series ?? {});
+    /** `properties.id` → single/multi: the hub's cards name the energy bill or the condominium accordingly */
+    const [propertyKinds, setPropertyKinds] = useState<LeaseListView["propertyKinds"]>(initial?.propertyKinds ?? {});
     const seriesRef = useRef(series);
     seriesRef.current = series;
     /** Seeded from the server: no first fetch. Read once — later prop changes must not reset the list. */
@@ -88,6 +90,7 @@ export default function ContratosContent({ lang, initial = null, initialDashboar
         if (!res.ok) throw new Error(json.error || "Erro ao carregar os contratos");
         const list = (json.leases ?? []) as LeaseWithDetails[];
         setLeases(list);
+        if (json.propertyKinds && typeof json.propertyKinds === "object") setPropertyKinds(json.propertyKinds as LeaseListView["propertyKinds"]);
         void loadSeries(list, seriesRef.current);
     }, [loadSeries]);
 
@@ -431,6 +434,7 @@ export default function ContratosContent({ lang, initial = null, initialDashboar
             <ContratosHub
                 rows={rows}
                 today={today}
+                propertyKinds={propertyKinds}
                 loading={leases === null}
                 error={listError}
                 view={view}

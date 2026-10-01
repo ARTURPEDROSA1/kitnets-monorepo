@@ -32,15 +32,32 @@ export async function loadLeaseRows(supabase: AdminSupabase, profileId: string):
 
     const ids = leases.map(l => String(l.id));
     const counts = new Map<string, number>();
+    const charges = new Map<string, LeaseWithDetails["charges"]>();
     if (ids.length > 0) {
-        const { data: docs } = await supabase.from("lease_documents").select("lease_id").in("lease_id", ids);
+        const [{ data: docs }, { data: chargeRows }] = await Promise.all([
+            supabase.from("lease_documents").select("lease_id").in("lease_id", ids),
+            // the hub's cards name the condominium or the energy and add up what the tenant pays
+            supabase.from("lease_charges").select("*").in("lease_id", ids),
+        ]);
         for (const d of docs || []) counts.set(d.lease_id, (counts.get(d.lease_id) ?? 0) + 1);
+        for (const c of (chargeRows || []) as unknown as LeaseWithDetails["charges"]) charges.set(c.lease_id, [...(charges.get(c.lease_id) ?? []), c]);
     }
 
     return leases.map(l => {
         const flat = flattenLease(l);
-        return { ...flat, document_count: counts.get(String(flat.id)) ?? 0 } as unknown as LeaseWithDetails;
+        return { ...flat, document_count: counts.get(String(flat.id)) ?? 0, charges: charges.get(String(flat.id)) ?? [] } as unknown as LeaseWithDetails;
     });
+}
+
+/** `properties.id` → single or multi, from the profile's cadastro; empty when it cannot be read (the cards then show whichever charge the contract has). */
+export async function loadPropertyKinds(supabase: AdminSupabase, profileId: string): Promise<LeaseListView["propertyKinds"]> {
+    try {
+        const { entries } = await loadPropertyEntries(supabase, profileId);
+        return Object.fromEntries(entries.filter(e => e.id).map(e => [e.id as string, e.propertyType]));
+    } catch (err) {
+        console.error("[Lease views] property kinds failed:", (err as Error).message);
+        return {};
+    }
 }
 
 /** The monthly series of each calculator code (`ipca`, `igpm`…); null for a code that could not be read. */
@@ -62,10 +79,10 @@ export async function loadLeaseIndexSeries(codes: string[]): Promise<Record<stri
 }
 
 export async function loadLeaseList(supabase: AdminSupabase, profileId: string): Promise<LeaseListView> {
-    const leases = await loadLeaseRows(supabase, profileId);
+    const [leases, propertyKinds] = await Promise.all([loadLeaseRows(supabase, profileId), loadPropertyKinds(supabase, profileId)]);
     const codes = leases.map(l => leaseIndexSeriesCode(l.adjustment_index)).filter((c): c is string => Boolean(c));
     const series = await loadLeaseIndexSeries(codes);
-    return { leases, series };
+    return { leases, series, propertyKinds };
 }
 
 const INCOME_COLUMNS =
