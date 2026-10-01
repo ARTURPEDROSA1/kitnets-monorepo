@@ -2,10 +2,11 @@
  * Interface preferences kept in the user's account (`user_ui_preferences`), so they follow the user to any
  * device. Pure helpers shared by the API route and the client.
  *
- * Three kinds today, all per table (and per kind of property where the table differs by it):
+ * Four kinds today, three per table (and per kind of property where the table differs by it):
  *   hidden-columns:<table>[:<variant>]   string[] of column keys           e.g. ["energy", "received"]
  *   sort:<table>[:<variant>]             { key, dir }                      e.g. { key: "due_on", dir: "asc" }
  *   filters:<table>:<record id>          { <column>: { text | min/max | values[] } }
+ *   sidebar:collapsed-groups             string[] of menu group keys       e.g. ["contabil"]  (lib/sidebar-groups.ts)
  *
  * Hidden columns and sort are how the user wants a kind of table to look, so they are per table. Filters
  * are a question asked of one property's (or one investment's) rows, so they are per record: a filter on
@@ -15,6 +16,9 @@
 export const HIDDEN_COLUMNS_PREFIX = "hidden-columns:";
 export const SORT_PREFIX = "sort:";
 export const FILTERS_PREFIX = "filters:";
+export const SIDEBAR_PREFIX = "sidebar:";
+/** the one sidebar setting today: the menu groups the user collapsed */
+export const SIDEBAR_GROUPS_KEY = "collapsed-groups";
 
 const TABLE_KEY = /^[a-z0-9][a-z0-9-]{0,39}(:[a-z0-9][a-z0-9-]{0,39})?$/;
 const COLUMN_KEY = /^[A-Za-z0-9_-]{1,40}$/;
@@ -57,6 +61,10 @@ export const tableKeyFromPrefKey = (prefKey: string) => tableKeyOf(HIDDEN_COLUMN
 export const sortPrefKey = (tableKey: string) => prefKeyOf(SORT_PREFIX, tableKey);
 /** `sort:investment-payments` → `investment-payments`; null for any other key. */
 export const tableKeyFromSortPrefKey = (prefKey: string) => tableKeyOf(SORT_PREFIX, prefKey);
+/** Preference key of a sidebar setting (`sidebar:collapsed-groups`), or null when the name is not acceptable. */
+export const sidebarPrefKey = (name: string) => prefKeyOf(SIDEBAR_PREFIX, name);
+/** `sidebar:collapsed-groups` → `collapsed-groups`; null for any other key. */
+export const tableKeyFromSidebarPrefKey = (prefKey: string) => tableKeyOf(SIDEBAR_PREFIX, prefKey);
 /** Preference key of a table's filters, or null when the table key is not acceptable. */
 export const filtersPrefKey = (tableKey: string) => prefKeyOf(FILTERS_PREFIX, tableKey);
 /** `filters:investment-payments` → `investment-payments`; null for any other key. */
