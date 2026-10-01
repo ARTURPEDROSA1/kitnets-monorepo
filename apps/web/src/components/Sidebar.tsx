@@ -109,13 +109,14 @@ const SIGNED_IN_GROUPS: NavGroup[] = [
 export function Sidebar({ lang, dict }: { lang: string; dict: any }) {
     const pathname = usePathname();
     const { setTheme, theme } = useTheme();
-    const { isSignedIn } = useAuth();
+    const { isSignedIn, userId } = useAuth();
     const [sidebarView, setSidebarView] = React.useState<SidebarView>('main');
     const [expandedSections, setExpandedSections] = React.useState<Record<string, boolean>>({});
     const [isMobileOpen, setIsMobileOpen] = React.useState(false);
     // Server renders expanded; the client snapshot takes over after hydration.
     const collapsed = useSidebarCollapsed();
-    const { collapsed: collapsedGroups, toggle: toggleGroup } = useCollapsedGroups();
+    // the collapsed groups follow the signed-in user across devices (lib/sidebar-preferences.ts)
+    const { collapsed: collapsedGroups, toggle: toggleGroup } = useCollapsedGroups(isSignedIn ? userId : null);
     const { hideSensitive, hideMoney, toggleSensitive, toggleMoney } = usePrivacy();
 
     // The compact rail applies to the main menu and to the calculators / indicators sub-menus
