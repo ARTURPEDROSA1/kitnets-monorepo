@@ -11,6 +11,7 @@ import Image from "next/image";
 import { Camera, FileText, Image as ImageIcon, Loader2, Play, Star, Trash2, Upload, Video, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDateBR } from "@/lib/dates";
+import { canOptimizeImage } from "@/lib/image-url";
 import { PdfViewerModal } from "@/components/ui/PdfViewerModal";
 import PhotoLightbox, { type LightboxPhoto } from "@/components/investments/PhotoLightbox";
 import { DOCUMENT_CATEGORIES, formatDocumentDisplayName, formatFileSize, getProofCategory, getProofYear, type DocCategory } from "@/components/profile/PropertyDocumentsCard";
@@ -251,7 +252,7 @@ export default function PropertyFilesSection({ proofs, pendingFiles, fileAnalysi
                                 return (
                                     <li key={url} className={cn("group relative aspect-square overflow-hidden rounded-lg border bg-muted/20", isCover ? "border-amber-400" : "border-border/70")}>
                                         <button type="button" onClick={() => setPhotoIndex(i)} className="block h-full w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500" title="Abrir a galeria">
-                                            <Image src={url} alt={`Foto ${i + 1}`} fill sizes="200px" className="object-cover" unoptimized />
+                                            <Image src={url} alt={`Foto ${i + 1}`} fill sizes="200px" className="object-cover" unoptimized={!canOptimizeImage(url)} />
                                         </button>
                                         {isCover ? (
                                             <span className="absolute left-1 top-1 inline-flex items-center gap-1 rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-semibold text-amber-950" title="Foto do card"><Star className="h-3 w-3 fill-current" /> Capa</span>

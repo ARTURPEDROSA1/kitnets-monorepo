@@ -23,6 +23,7 @@ import PortfolioStrip, { type PortfolioIncomeData, type PortfolioTotalsData } fr
 import PhotoLightbox from '@/components/investments/PhotoLightbox';
 import PropertyCostCenterDashboard from '@/components/properties/PropertyCostCenterDashboard';
 import { cn } from '@/lib/utils';
+import { uploadPropertyPhoto, uploadPropertyVideo } from '@/lib/property-media-upload';
 import { Sensitive } from '@/components/privacy';
 import { useUser, useAuth } from '@clerk/nextjs';
 import { useSearchParams, useParams, useRouter } from 'next/navigation';
@@ -1865,20 +1866,8 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                     const updatedPhotoUrls = [...prop.savedPhotos];
                     if (prop.photos.length > 0) {
                         for (const file of prop.photos) {
-                            const fileExt = file.name.split('.').pop();
-                            const fileName = `photos/${propStoragePrefix}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-
-                            const { error: uploadError } = await sbUpload.storage
-                                .from('property-media')
-                                .upload(fileName, file);
-
-                            if (uploadError) {
-                                console.error('Photo upload error:', uploadError);
-                                continue;
-                            }
-
-                            const { data: { publicUrl } } = sbUpload.storage.from('property-media').getPublicUrl(fileName);
-                            updatedPhotoUrls.push(publicUrl);
+                            const publicUrl = await uploadPropertyPhoto(sbUpload, propStoragePrefix, file);
+                            if (publicUrl) updatedPhotoUrls.push(publicUrl);
                         }
                     }
 
@@ -1886,20 +1875,8 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                     const updatedVideoUrls = [...prop.savedVideos];
                     if (prop.videos.length > 0) {
                         for (const file of prop.videos) {
-                            const fileExt = file.name.split('.').pop();
-                            const fileName = `videos/${propStoragePrefix}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-
-                            const { error: uploadError } = await sbUpload.storage
-                                .from('property-media')
-                                .upload(fileName, file);
-
-                            if (uploadError) {
-                                console.error('Video upload error:', uploadError);
-                                continue;
-                            }
-
-                            const { data: { publicUrl } } = sbUpload.storage.from('property-media').getPublicUrl(fileName);
-                            updatedVideoUrls.push(publicUrl);
+                            const publicUrl = await uploadPropertyVideo(sbUpload, propStoragePrefix, file);
+                            if (publicUrl) updatedVideoUrls.push(publicUrl);
                         }
                     }
 
@@ -1910,24 +1887,16 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                         if (unit.newPhotos && unit.newPhotos.length > 0) {
                             const unitPhotos = [...(unit.photos || [])];
                             for (const file of unit.newPhotos) {
-                                const fileExt = file.name.split('.').pop();
-                                const fileName = `photos/${propStoragePrefix}/unit-${si}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-                                const { error: uploadError } = await sbUpload.storage.from('property-media').upload(fileName, file);
-                                if (uploadError) { console.error('Unit photo upload error:', uploadError); continue; }
-                                const { data: { publicUrl } } = sbUpload.storage.from('property-media').getPublicUrl(fileName);
-                                unitPhotos.push(publicUrl);
+                                const publicUrl = await uploadPropertyPhoto(sbUpload, `${propStoragePrefix}/unit-${si}`, file);
+                                if (publicUrl) unitPhotos.push(publicUrl);
                             }
                             updatedSubUnits[si] = { ...unit, photos: unitPhotos, newPhotos: [] };
                         }
                         if (unit.newVideos && unit.newVideos.length > 0) {
                             const unitVideos = [...(unit.videos || [])];
                             for (const file of unit.newVideos) {
-                                const fileExt = file.name.split('.').pop();
-                                const fileName = `videos/${propStoragePrefix}/unit-${si}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-                                const { error: uploadError } = await sbUpload.storage.from('property-media').upload(fileName, file);
-                                if (uploadError) { console.error('Unit video upload error:', uploadError); continue; }
-                                const { data: { publicUrl } } = sbUpload.storage.from('property-media').getPublicUrl(fileName);
-                                unitVideos.push(publicUrl);
+                                const publicUrl = await uploadPropertyVideo(sbUpload, `${propStoragePrefix}/unit-${si}`, file);
+                                if (publicUrl) unitVideos.push(publicUrl);
                             }
                             updatedSubUnits[si] = { ...updatedSubUnits[si], videos: unitVideos, newVideos: [] };
                         }
@@ -2472,12 +2441,8 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                         const propStoragePrefix = propIdx === 0 ? profileId : `${profileId}/prop-${propIdx}`;
                         const uploadedUrls: string[] = [];
                         for (const file of newPhotos) {
-                            const fileExt = file.name.split('.').pop();
-                            const fileName = `photos/${propStoragePrefix}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-                            const { error: uploadError } = await sbUpload.storage.from('property-media').upload(fileName, file);
-                            if (uploadError) { console.error('Photo upload error:', uploadError); continue; }
-                            const { data: { publicUrl } } = sbUpload.storage.from('property-media').getPublicUrl(fileName);
-                            uploadedUrls.push(publicUrl);
+                            const publicUrl = await uploadPropertyPhoto(sbUpload, propStoragePrefix, file);
+                            if (publicUrl) uploadedUrls.push(publicUrl);
                         }
                         if (uploadedUrls.length > 0) {
                             const allPhotos = [...pSavedPhotos, ...uploadedUrls];
@@ -2536,11 +2501,8 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                     try {
                         const sbUpload = await getSupabase();
                         const propStoragePrefix = propIdx === 0 ? profileId : `${profileId}/prop-${propIdx}`;
-                        const fileExt = videoFile.name.split('.').pop();
-                        const fileName = `videos/${propStoragePrefix}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-                        const { error: uploadError } = await sbUpload.storage.from('property-media').upload(fileName, videoFile);
-                        if (uploadError) { console.error('Video upload error:', uploadError); setPVideos(prev => [...prev, videoFile]); return; }
-                        const { data: { publicUrl } } = sbUpload.storage.from('property-media').getPublicUrl(fileName);
+                        const publicUrl = await uploadPropertyVideo(sbUpload, propStoragePrefix, videoFile);
+                        if (!publicUrl) { setPVideos(prev => [...prev, videoFile]); return; }
                         const allVideos = [...pSavedVideos, publicUrl];
                         setPSavedVideos(allVideos);
                         if (propIdx === 0) {
@@ -3189,7 +3151,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                     <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                                         {pSavedVideos.map((url, idx) => (
                                             <div key={`saved-v-${idx}`} className="aspect-square rounded-lg border border-border relative group overflow-hidden">
-                                                <video src={url} className="w-full h-full object-cover" muted />
+                                                <video src={url} className="w-full h-full object-cover" muted preload="metadata" />
                                                 <div className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <Button size="icon" variant="destructive" className="h-6 w-6" onClick={() => removePropSavedVideo(url)}>
                                                         <Trash2 className="w-3 h-3" />

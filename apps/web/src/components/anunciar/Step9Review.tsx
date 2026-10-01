@@ -7,6 +7,7 @@ import { Button } from "@kitnets/ui";
 import { MapPin, Image as ImageIcon, Loader2 } from "lucide-react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { createBrowserClient } from "@supabase/ssr";
+import { uploadPropertyPhoto } from "@/lib/property-media-upload";
 
 export function Step9Review() {
     const { state, nextStep, dispatch } = useAnunciar();
@@ -40,20 +41,9 @@ export function Step9Review() {
                 if (typeof file === 'string') {
                     photoUrls.push(file);
                 } else {
-                    const fileExt = file.name.split('.').pop();
-                    // Listing photos are public marketing media → public property-media bucket
-                    const fileName = `listings/${profile.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-                    const { error: uploadError } = await sb.storage
-                        .from('property-media')
-                        .upload(fileName, file);
-
-                    if (uploadError) {
-                        console.error("Upload error", uploadError);
-                        continue;
-                    }
-
-                    const { data: { publicUrl } } = sb.storage.from('property-media').getPublicUrl(fileName);
-                    photoUrls.push(publicUrl);
+                    // Listing photos are public marketing media → public property-media bucket, shrunk for the web
+                    const publicUrl = await uploadPropertyPhoto(sb, profile.id, file, "listings");
+                    if (publicUrl) photoUrls.push(publicUrl);
                 }
             }
 
