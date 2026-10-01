@@ -10,7 +10,10 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 import { Calculator, CalendarRange, DollarSign, Info, RotateCcw } from "lucide-react";
 import { DateInput } from "@/components/ui/DateInput";
-import { addMonths, firstDayOfMonth, formatDateBR, lastDayOfMonth, type IndexMonthValue } from "@/lib/index-correction";
+import { cn } from "@/lib/utils";
+import { PANORAMA_MIN_WAGE_KEY, PANORAMA_SERIES } from "@/lib/index-compare";
+import { addMonths, correctByIndex, firstDayOfMonth, formatDateBR, lastDayOfMonth, monthOf, type IndexMonthValue } from "@/lib/index-correction";
+import { formatMonthYear } from "@/lib/index-period";
 
 export interface PanoramaData {
     /** monthly rates in %, by Panorama key (lib/index-compare.ts) */
@@ -36,29 +39,122 @@ export const useCorrection = () => useContext(CorrectionContext);
 export const formatBRL = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const parseBRLInput = (raw: string) => parseFloat(raw.replace(/[^\d,]/g, "").replace(",", ".")) || 0;
 
+export type CorrectionKind = "variation" | "level" | "none";
+export type CorrectionResult =
+    /** `through`: the index stops before the end date, so the correction runs up to that month */
+    | { corrected: number; percent: number; through?: string }
+    | { note: string };
+
+/**
+ * The amount of `ctx` corrected by one index: monthly rates compound (lib/index-correction.ts), a
+ * level (the salário mínimo) scales by the ratio of the values in force at the two dates. An index
+ * whose last published month is before the end date is applied up to that month (`through` says so).
+ * Null when the index has no data or is not a correction index (the FipeZAP yield).
+ */
+export function computeCorrection(ctx: Correction, seriesKey: string, kind: CorrectionKind): CorrectionResult | null {
+    if (kind === "none" || ctx.value <= 0) return null;
+    if (kind === "variation") {
+        const rates = ctx.data.rates[seriesKey];
+        if (!rates || rates.length === 0) return null;
+        const latestMonth = rates.reduce((m, v) => (v.month > m ? v.month : m), "");
+        const seriesEnd = lastDayOfMonth(latestMonth);
+        const end = ctx.end > seriesEnd ? seriesEnd : ctx.end;
+        const res = correctByIndex(ctx.value, ctx.start, end, rates);
+        if ("error" in res) return { note: res.error };
+        return { corrected: res.correctedValue, percent: res.accumulatedPercent, through: end !== ctx.end ? formatMonthYear(latestMonth) : undefined };
+    }
+    const levels = ctx.data.levels[seriesKey];
+    if (!levels || levels.length === 0) return null;
+    const sorted = [...levels].sort((a, b) => (a.month < b.month ? -1 : a.month > b.month ? 1 : 0));
+    // the value in force at a date: the last adjustment up to that month
+    const at = (date: string) => {
+        const m = monthOf(date);
+        let last: number | null = null;
+        for (const l of sorted) {
+            if (l.month <= m) last = l.value;
+            else break;
+        }
+        return last;
+    };
+    const a = at(ctx.start);
+    const b = at(ctx.end);
+    if (a === null || b === null || a === 0) return { note: "Sem salário mínimo vigente nas datas escolhidas." };
+    return { corrected: ctx.value * (b / a), percent: (b / a - 1) * 100 };
+}
+
+/** "+3,35%" in green, "-0,20%" in red */
+export function PercentBadge({ percent, className }: { percent: number; className?: string }) {
+    return (
+        <span className={cn("tabular-nums", percent >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400", className)}>
+            {percent >= 0 ? "+" : ""}{percent.toFixed(2).replace(".", ",")}%
+        </span>
+    );
+}
+
+/** Every index's answer, right under the calculator, so the reader need not scroll to the cards. */
+function ResultsList({ applied }: { applied: Correction }) {
+    const rows = [
+        ...PANORAMA_SERIES.filter((s) => s.key !== "FIPEZAPYIELD").map((s) => ({ key: s.key, label: s.label, result: computeCorrection(applied, s.key, "variation") })),
+        { key: PANORAMA_MIN_WAGE_KEY, label: "Salário Mínimo", result: computeCorrection(applied, PANORAMA_MIN_WAGE_KEY, "level") },
+    ].filter((r) => r.result !== null);
+    if (rows.length === 0) return null;
+    return (
+        <div className="rounded-lg border border-border bg-muted/20 p-3 md:p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                R$ {formatBRL(applied.value)} de {formatDateBR(applied.start)} a {formatDateBR(applied.end)}, corrigido por cada índice
+            </p>
+            <dl className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                {rows.map((r) => (
+                    <div key={r.key} className="rounded-md border border-border/70 bg-card px-3 py-2">
+                        <dt className="text-[11px] text-muted-foreground">{r.label}</dt>
+                        {r.result && "corrected" in r.result ? (
+                            <>
+                                <dd className="text-sm font-bold tabular-nums text-foreground">R$ {formatBRL(r.result.corrected)}</dd>
+                                <dd className="text-[11px]">
+                                    <PercentBadge percent={r.result.percent} />
+                                    {r.result.through && <span className="text-muted-foreground"> · até {r.result.through}</span>}
+                                </dd>
+                            </>
+                        ) : (
+                            <dd className="text-[11px] text-muted-foreground">{r.result?.note}</dd>
+                        )}
+                    </div>
+                ))}
+            </dl>
+        </div>
+    );
+}
+
 const FIELD = "w-full h-11 rounded-lg border border-input bg-background px-3 text-sm ring-offset-background transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500";
 const DEFAULT_VALUE = "1.000,00";
 
 export function PanoramaProvider({ data, children }: { data: PanoramaData; children: ReactNode }) {
-    const { earliestMonth, latestMonth } = useMemo(() => {
+    const { earliestMonth, latestMonth, commonMonth } = useMemo(() => {
         let lo = "";
         let hi = "";
-        for (const list of Object.values(data.rates)) {
+        let common = ""; // the newest month every index on the page has published (they close their months on different days)
+        for (const spec of PANORAMA_SERIES) {
+            const list = data.rates[spec.key];
+            if (!list || list.length === 0) continue;
+            let seriesLast = "";
             for (const v of list) {
                 if (!lo || v.month < lo) lo = v.month;
                 if (!hi || v.month > hi) hi = v.month;
+                if (v.month > seriesLast) seriesLast = v.month;
             }
+            if (!common || seriesLast < common) common = seriesLast;
         }
-        return { earliestMonth: lo, latestMonth: hi };
+        return { earliestMonth: lo, latestMonth: hi, commonMonth: common };
     }, [data]);
     const minDate = earliestMonth ? firstDayOfMonth(earliestMonth) : "";
     const maxDate = latestMonth ? lastDayOfMonth(latestMonth) : "";
-    // the last twelve published months: a month's last day to the latest month's last day
-    const defaultStart = latestMonth ? lastDayOfMonth(addMonths(latestMonth, -12)) : "";
+    // defaults: the last twelve months every index has published, a month's last day to another's
+    const defaultEnd = commonMonth ? lastDayOfMonth(commonMonth) : maxDate;
+    const defaultStart = commonMonth ? lastDayOfMonth(addMonths(commonMonth, -12)) : "";
 
     const [rawValue, setRawValue] = useState(DEFAULT_VALUE);
     const [start, setStart] = useState(defaultStart);
-    const [end, setEnd] = useState(maxDate);
+    const [end, setEnd] = useState(defaultEnd);
     const [error, setError] = useState<string | null>(null);
     const [applied, setApplied] = useState<Correction | null>(null);
 
@@ -87,7 +183,7 @@ export function PanoramaProvider({ data, children }: { data: PanoramaData; child
     const reset = () => {
         setRawValue(DEFAULT_VALUE);
         setStart(defaultStart);
-        setEnd(maxDate);
+        setEnd(defaultEnd);
         setError(null);
         setApplied(null);
     };
@@ -166,9 +262,9 @@ export function PanoramaProvider({ data, children }: { data: PanoramaData; child
                         <Info className="mt-0.5 h-3 w-3 shrink-0" />
                         <span>
                             Datas de {minDate ? formatDateBR(minDate) : "—"} a {maxDate ? formatDateBR(maxDate) : "—"} (últimos 10 anos). Conta os dias corridos; meses parciais entram pro rata die, como na calculadora de cada índice. O salário mínimo corrige pela razão entre os valores vigentes nas duas datas.
-                            {applied && <> Resultado de <strong className="text-foreground">R$ {formatBRL(applied.value)}</strong> entre {formatDateBR(applied.start)} e {formatDateBR(applied.end)} nos cards abaixo.</>}
                         </span>
                     </p>
+                    {applied && <ResultsList applied={applied} />}
                 </div>
             </section>
             <CorrectionContext.Provider value={applied}>{children}</CorrectionContext.Provider>
