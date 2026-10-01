@@ -25,10 +25,11 @@ import {
 import { simulateMeasurementModels, type MeasurementSimulationInput } from "@/lib/accounting-simulation";
 import { formatMoney } from "@/lib/accounting-journal";
 import type { PropertyMeasurement } from "@/lib/accounting-chart";
+import type { CompanyRegistry } from "@/lib/cnpj-card-extract";
 
 interface Props { lang: "en" | "pt" | "es" }
 
-interface Identity { person_type: string | null; cnpj: string | null; business_name: string | null; trade_name: string | null }
+interface Identity { person_type: string | null; cnpj: string | null; business_name: string | null; trade_name: string | null; registry: CompanyRegistry | null }
 interface Defaults { properties: number; purchaseTotal: number; marketValueTotal: number; grossRent12m: number; expenses12m: number; monthsWithIncome: number }
 
 const SELECT = "h-10 w-full rounded-lg border border-input bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -183,15 +184,29 @@ export default function PoliticasContent({ lang }: Props) {
                             </div>
                             <div className="space-y-1 md:col-span-2">
                                 <span className={LABEL}>Razão social</span>
-                                <p className="text-sm font-medium">{identity?.business_name || "—"} <Link href={lang === "pt" ? "/profile" : `/${lang}/profile`} className="ml-2 text-xs text-emerald-700 hover:underline">editar no perfil</Link></p>
+                                <p className="text-sm font-medium">{identity?.business_name || "—"} <Link href={lang === "pt" ? "/proprietario" : `/${lang}/proprietario`} className="ml-2 text-xs text-emerald-700 hover:underline">editar em Proprietário</Link></p>
                             </div>
-                            <Field label="Natureza jurídica">
+                            {identity?.registry?.cnae_principal && (
+                                <div className="space-y-1 md:col-span-3">
+                                    <span className={LABEL}>Atividades econômicas (CNAE) · do Cartão CNPJ</span>
+                                    <ul className="space-y-0.5 text-sm">
+                                        <li>
+                                            <span className="font-mono text-xs text-muted-foreground">{identity.registry.cnae_principal.codigo}</span> {identity.registry.cnae_principal.descricao}
+                                            <span className="ml-2 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">principal</span>
+                                        </li>
+                                        {identity.registry.cnaes_secundarios.map(c => (
+                                            <li key={c.codigo}><span className="font-mono text-xs text-muted-foreground">{c.codigo}</span> {c.descricao}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                            <Field label="Natureza jurídica" hint={identity?.registry?.natureza_juridica ? `Cartão CNPJ: ${identity.registry.natureza_juridica.codigo ?? ""} ${identity.registry.natureza_juridica.descricao}`.trim() : undefined}>
                                 <select className={SELECT} value={form.legal_nature ?? ""} onChange={e => patch({ legal_nature: (e.target.value || null) as AccountingSettings["legal_nature"] })}>
                                     <option value="">—</option>
                                     {Object.entries(LEGAL_NATURE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                                 </select>
                             </Field>
-                            <Field label="Porte">
+                            <Field label="Porte" hint={identity?.registry?.porte ? `Cartão CNPJ: ${identity.registry.porte}` : undefined}>
                                 <select className={SELECT} value={form.company_size ?? ""} onChange={e => patch({ company_size: (e.target.value || null) as AccountingSettings["company_size"] })}>
                                     <option value="">—</option>
                                     {Object.entries(COMPANY_SIZE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireProfile } from "@/lib/api-auth";
 import {
-    FILTERS_PREFIX, HIDDEN_COLUMNS_PREFIX, SIDEBAR_PREFIX, SORT_PREFIX,
-    sanitizeFilters, sanitizeHiddenColumns, sanitizeSort, tableKeyFromFiltersPrefKey, tableKeyFromPrefKey, tableKeyFromSidebarPrefKey, tableKeyFromSortPrefKey,
+    FILTERS_PREFIX, HIDDEN_COLUMNS_PREFIX, NOTIFICATIONS_PREFIX, SIDEBAR_PREFIX, SORT_PREFIX,
+    sanitizeFilters, sanitizeHiddenColumns, sanitizeNotificationPrefs, sanitizeSort, tableKeyFromFiltersPrefKey, tableKeyFromNotificationsPrefKey, tableKeyFromPrefKey, tableKeyFromSidebarPrefKey, tableKeyFromSortPrefKey,
 } from "@/lib/ui-preferences";
 import { sanitizeCollapsedGroups } from "@/lib/sidebar-groups";
 
@@ -18,6 +18,8 @@ const SECTIONS = {
     filters: { prefix: FILTERS_PREFIX, tableKey: tableKeyFromFiltersPrefKey, sanitize: sanitizeFilters },
     // the sidebar's collapsed menu groups (lib/sidebar-groups.ts), one entry: "collapsed-groups"
     sidebar: { prefix: SIDEBAR_PREFIX, tableKey: tableKeyFromSidebarPrefKey, sanitize: sanitizeCollapsedGroups },
+    // what the owner wants to receive (/proprietario), one entry: "owner"
+    notifications: { prefix: NOTIFICATIONS_PREFIX, tableKey: tableKeyFromNotificationsPrefKey, sanitize: sanitizeNotificationPrefs },
 } as const;
 type Section = keyof typeof SECTIONS;
 const SECTION_NAMES = Object.keys(SECTIONS) as Section[];
@@ -44,7 +46,7 @@ export async function GET() {
         return NextResponse.json({ error: "Erro ao carregar as preferências" }, { status: 500 });
     }
 
-    const out: Record<Section, Record<string, unknown>> = { hiddenColumns: {}, sort: {}, filters: {}, sidebar: {} };
+    const out: Record<Section, Record<string, unknown>> = { hiddenColumns: {}, sort: {}, filters: {}, sidebar: {}, notifications: {} };
     for (const row of data ?? []) {
         for (const name of SECTION_NAMES) {
             const tableKey = SECTIONS[name].tableKey(row.key);

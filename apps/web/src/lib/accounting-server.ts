@@ -8,6 +8,8 @@ import type { AdminSupabase } from "./api-auth";
 import { chartTemplate, compareCodes, modelAccountActivation, type AccountingAccount, type PropertyMeasurement } from "./accounting-chart";
 import type { AccountingPeriod, JournalEntry, JournalLine } from "./accounting-journal";
 import { DEFAULT_SETTINGS, type AccountingSettings } from "./accounting-policies";
+import type { CompanyRegistry } from "./cnpj-card-extract";
+import { registryFromRow } from "./profile-holding";
 import { breakdown, round2, type PropertyIncomeRow } from "./property-income";
 import { landlordTaxesByMonth, type PropertyTax } from "./property-taxes";
 
@@ -43,6 +45,8 @@ export interface HoldingIdentity {
     cnpj: string | null;
     business_name: string | null;
     trade_name: string | null;
+    /** what the Cartão CNPJ says (CNAEs, natureza jurídica, porte…); null before the owner imports it */
+    registry: CompanyRegistry | null;
 }
 
 export async function loadSettings(supabase: AdminSupabase, ownerId: string): Promise<{ settings: AccountingSettings; saved: boolean }> {
@@ -59,9 +63,9 @@ export async function saveSettings(supabase: AdminSupabase, ownerId: string, set
 }
 
 export async function loadIdentity(supabase: AdminSupabase, ownerId: string): Promise<HoldingIdentity> {
-    const { data } = await supabase.from("profiles").select("person_type, cnpj, business_name, trade_name").eq("id", ownerId).maybeSingle();
-    const p = (data ?? {}) as Partial<HoldingIdentity>;
-    return { person_type: p.person_type ?? null, cnpj: p.cnpj ?? null, business_name: p.business_name ?? null, trade_name: p.trade_name ?? null };
+    const { data } = await supabase.from("profiles").select("person_type, cnpj, business_name, trade_name, company_registry").eq("id", ownerId).maybeSingle();
+    const p = (data ?? {}) as Partial<Omit<HoldingIdentity, "registry">> & { company_registry?: unknown };
+    return { person_type: p.person_type ?? null, cnpj: p.cnpj ?? null, business_name: p.business_name ?? null, trade_name: p.trade_name ?? null, registry: registryFromRow(p.company_registry) };
 }
 
 /** Name recorded as the author of entries and period changes. */

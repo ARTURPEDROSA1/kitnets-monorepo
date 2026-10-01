@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
     columnTableKey, filtersPrefKey, hiddenColumnsPrefKey, recordTableKey, sanitizeFilters, sanitizeHiddenColumns, sanitizeSort, sortPrefKey,
-    tableKeyFromFiltersPrefKey, tableKeyFromPrefKey, tableKeyFromSortPrefKey,
+    notificationsPrefKey, sanitizeNotificationPrefs, tableKeyFromFiltersPrefKey, tableKeyFromNotificationsPrefKey, tableKeyFromPrefKey, tableKeyFromSortPrefKey,
 } from "./ui-preferences";
 
 describe("hidden-column preferences", () => {
@@ -94,5 +94,21 @@ describe("filter preferences", () => {
         expect(sanitizeFilters({ tenant: { text: 3 } })).toBeNull();
         expect(sanitizeFilters({ tenant: { text: "x".repeat(201) } })).toBeNull();
         expect(sanitizeFilters(Object.fromEntries(Array.from({ length: 61 }, (_, i) => [`c${i}`, { text: "a" }])))).toBeNull();
+    });
+});
+
+describe("notification preferences", () => {
+    it("names the owner's entry and reads it back", () => {
+        expect(notificationsPrefKey("owner")).toBe("notifications:owner");
+        expect(tableKeyFromNotificationsPrefKey("notifications:owner")).toBe("owner");
+        expect(tableKeyFromNotificationsPrefKey("sidebar:owner")).toBeNull();
+    });
+
+    it("keeps a clean pair of booleans and refuses junk", () => {
+        expect(sanitizeNotificationPrefs({ marketing: false, security: true, extra: 1 })).toEqual({ marketing: false, security: true });
+        expect(sanitizeNotificationPrefs({ marketing: "yes", security: true })).toBeNull();
+        expect(sanitizeNotificationPrefs({ marketing: true })).toBeNull();
+        expect(sanitizeNotificationPrefs([])).toBeNull();
+        expect(sanitizeNotificationPrefs(null)).toBeNull();
     });
 });
