@@ -2,85 +2,28 @@
 
 /**
  * The Panorama's "quanto vale hoje?" calculator: one amount and two dates at the top of the page;
- * "Calcular" applies them and every index card below answers with the amount corrected by its own
- * series (CardCorrection reads the same context). The maths is the one of each index page
- * (lib/index-correction.ts): calendar days, partial months pro rata die; the salário mínimo, a
- * level in R$, scales the amount by the ratio of the wages in force at the two dates.
+ * "Calcular" applies them, a spreadsheet-style table under the fields lists the amount corrected by
+ * each index (PanoramaResultsTable), and every index card below answers too (CardCorrection reads
+ * the same context). The maths lives in panorama-correction.ts.
  */
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 import { Calculator, CalendarRange, DollarSign, Info, RotateCcw } from "lucide-react";
 import { DateInput } from "@/components/ui/DateInput";
 import { cn } from "@/lib/utils";
-import { PANORAMA_MIN_WAGE_KEY, PANORAMA_SERIES } from "@/lib/index-compare";
-import { addMonths, correctByIndex, firstDayOfMonth, formatDateBR, lastDayOfMonth, monthOf, type IndexMonthValue } from "@/lib/index-correction";
-import { formatMonthYear } from "@/lib/index-period";
+import { PANORAMA_SERIES } from "@/lib/index-compare";
+import { addMonths, firstDayOfMonth, formatDateBR, lastDayOfMonth } from "@/lib/index-correction";
+import { formatBRL, type Correction, type PanoramaData } from "./panorama-correction";
+import { PanoramaResultsTable } from "./PanoramaResultsTable";
 
-export interface PanoramaData {
-    /** monthly rates in %, by Panorama key (lib/index-compare.ts) */
-    rates: Record<string, IndexMonthValue[]>;
-    /** levels in R$ (the salário mínimo), by key */
-    levels: Record<string, IndexMonthValue[]>;
-}
-
-export interface Correction {
-    /** the amount typed, in R$ */
-    value: number;
-    /** ISO dates */
-    start: string;
-    end: string;
-    data: PanoramaData;
-}
+export type { Correction, CorrectionKind, CorrectionResult, PanoramaData } from "./panorama-correction";
+export { computeCorrection, formatBRL } from "./panorama-correction";
 
 const CorrectionContext = createContext<Correction | null>(null);
 
 /** The amount and dates applied with "Calcular"; null before the first calculation (and outside the provider). */
 export const useCorrection = () => useContext(CorrectionContext);
 
-export const formatBRL = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const parseBRLInput = (raw: string) => parseFloat(raw.replace(/[^\d,]/g, "").replace(",", ".")) || 0;
-
-export type CorrectionKind = "variation" | "level" | "none";
-export type CorrectionResult =
-    /** `through`: the index stops before the end date, so the correction runs up to that month */
-    | { corrected: number; percent: number; through?: string }
-    | { note: string };
-
-/**
- * The amount of `ctx` corrected by one index: monthly rates compound (lib/index-correction.ts), a
- * level (the salário mínimo) scales by the ratio of the values in force at the two dates. An index
- * whose last published month is before the end date is applied up to that month (`through` says so).
- * Null when the index has no data or is not a correction index (the FipeZAP yield).
- */
-export function computeCorrection(ctx: Correction, seriesKey: string, kind: CorrectionKind): CorrectionResult | null {
-    if (kind === "none" || ctx.value <= 0) return null;
-    if (kind === "variation") {
-        const rates = ctx.data.rates[seriesKey];
-        if (!rates || rates.length === 0) return null;
-        const latestMonth = rates.reduce((m, v) => (v.month > m ? v.month : m), "");
-        const seriesEnd = lastDayOfMonth(latestMonth);
-        const end = ctx.end > seriesEnd ? seriesEnd : ctx.end;
-        const res = correctByIndex(ctx.value, ctx.start, end, rates);
-        if ("error" in res) return { note: res.error };
-        return { corrected: res.correctedValue, percent: res.accumulatedPercent, through: end !== ctx.end ? formatMonthYear(latestMonth) : undefined };
-    }
-    const levels = ctx.data.levels[seriesKey];
-    if (!levels || levels.length === 0) return null;
-    const sorted = [...levels].sort((a, b) => (a.month < b.month ? -1 : a.month > b.month ? 1 : 0));
-    // the value in force at a date: the last adjustment up to that month
-    const at = (date: string) => {
-        const m = monthOf(date);
-        let last: number | null = null;
-        for (const l of sorted) {
-            if (l.month <= m) last = l.value;
-            else break;
-        }
-        return last;
-    };
-    const a = at(ctx.start);
-    const b = at(ctx.end);
-    if (a === null || b === null || a === 0) return { note: "Sem salário mínimo vigente nas datas escolhidas." };
-    return { corrected: ctx.value * (b / a), percent: (b / a - 1) * 100 };
-}
 
 /** "+3,35%" in green, "-0,20%" in red */
 export function PercentBadge({ percent, className }: { percent: number; className?: string }) {
@@ -88,40 +31,6 @@ export function PercentBadge({ percent, className }: { percent: number; classNam
         <span className={cn("tabular-nums", percent >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400", className)}>
             {percent >= 0 ? "+" : ""}{percent.toFixed(2).replace(".", ",")}%
         </span>
-    );
-}
-
-/** Every index's answer, right under the calculator, so the reader need not scroll to the cards. */
-function ResultsList({ applied }: { applied: Correction }) {
-    const rows = [
-        ...PANORAMA_SERIES.filter((s) => s.key !== "FIPEZAPYIELD").map((s) => ({ key: s.key, label: s.label, result: computeCorrection(applied, s.key, "variation") })),
-        { key: PANORAMA_MIN_WAGE_KEY, label: "Salário Mínimo", result: computeCorrection(applied, PANORAMA_MIN_WAGE_KEY, "level") },
-    ].filter((r) => r.result !== null);
-    if (rows.length === 0) return null;
-    return (
-        <div className="rounded-lg border border-border bg-muted/20 p-3 md:p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                R$ {formatBRL(applied.value)} de {formatDateBR(applied.start)} a {formatDateBR(applied.end)}, corrigido por cada índice
-            </p>
-            <dl className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-                {rows.map((r) => (
-                    <div key={r.key} className="rounded-md border border-border/70 bg-card px-3 py-2">
-                        <dt className="text-[11px] text-muted-foreground">{r.label}</dt>
-                        {r.result && "corrected" in r.result ? (
-                            <>
-                                <dd className="text-sm font-bold tabular-nums text-foreground">R$ {formatBRL(r.result.corrected)}</dd>
-                                <dd className="text-[11px]">
-                                    <PercentBadge percent={r.result.percent} />
-                                    {r.result.through && <span className="text-muted-foreground"> · até {r.result.through}</span>}
-                                </dd>
-                            </>
-                        ) : (
-                            <dd className="text-[11px] text-muted-foreground">{r.result?.note}</dd>
-                        )}
-                    </div>
-                ))}
-            </dl>
-        </div>
     );
 }
 
@@ -197,7 +106,7 @@ export function PanoramaProvider({ data, children }: { data: PanoramaData; child
                     </div>
                     <div>
                         <h2 className="text-lg md:text-xl font-bold tracking-tight">Quanto vale hoje?</h2>
-                        <p className="text-xs md:text-sm text-muted-foreground">Digite um valor e as datas, clique em Calcular: cada card abaixo mostra o valor corrigido pelo seu índice.</p>
+                        <p className="text-xs md:text-sm text-muted-foreground">Digite um valor e as datas, clique em Calcular: a tabela mostra o valor corrigido por cada índice, e cada card abaixo também.</p>
                     </div>
                 </div>
                 <div className="space-y-3 p-4 md:p-6">
@@ -261,10 +170,10 @@ export function PanoramaProvider({ data, children }: { data: PanoramaData; child
                     <p className="flex items-start gap-1 text-xs text-muted-foreground">
                         <Info className="mt-0.5 h-3 w-3 shrink-0" />
                         <span>
-                            Datas de {minDate ? formatDateBR(minDate) : "—"} a {maxDate ? formatDateBR(maxDate) : "—"} (últimos 10 anos). Conta os dias corridos; meses parciais entram pro rata die, como na calculadora de cada índice. O salário mínimo corrige pela razão entre os valores vigentes nas duas datas.
+                            Datas de {minDate ? formatDateBR(minDate) : "—"} a {maxDate ? formatDateBR(maxDate) : "—"}. Conta os dias corridos; meses parciais entram pro rata die, como na calculadora de cada índice. Um índice mais curto que o período (o FipeZAP começa em 2008, o IVAR em 2019) entra do seu primeiro mês, ou até o seu último. O salário mínimo corrige pela razão entre os valores vigentes nas duas datas.
                         </span>
                     </p>
-                    {applied && <ResultsList applied={applied} />}
+                    {applied && <PanoramaResultsTable applied={applied} />}
                 </div>
             </section>
             <CorrectionContext.Provider value={applied}>{children}</CorrectionContext.Provider>
