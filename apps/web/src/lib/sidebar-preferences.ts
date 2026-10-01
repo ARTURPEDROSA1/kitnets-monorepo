@@ -13,11 +13,13 @@
  * the attributes in sync afterwards.
  *
  * The collapsed groups also follow the user across devices: once signed in, useCollapsedGroups loads
- * the list saved for the profile (app/api/user-preferences) and takes it over the local copy, and
- * every toggle is saved back there.
+ * the list saved in the account (`user_ui_preferences`, key `sidebar:collapsed-groups`, through the
+ * shared lib/ui-preferences-client.ts) and takes it over the local copy, and every toggle is saved
+ * back there.
  */
 import * as React from "react";
-import { sanitizeCollapsedGroups } from "./sidebar-groups";
+import { SIDEBAR_GROUPS_KEY as ACCOUNT_GROUPS_NAME } from "./ui-preferences";
+import { loadAccountPreferences, saveAccountPreference } from "./ui-preferences-client";
 
 export const SIDEBAR_COLLAPSED_KEY = "kitnets_sidebar_collapsed";
 export const SIDEBAR_GROUPS_KEY = "kitnets_sidebar_groups";
@@ -92,42 +94,17 @@ export function writeCollapsedGroups(keys: Iterable<string>) {
     applyCollapsedGroupsAttribute(raw);
 }
 
-/* ---------- the server copy: the list follows the user across devices ---------- */
+/* ---------- the account's copy: the list follows the user across devices ---------- */
 
-const PREFERENCES_ENDPOINT = "/api/user-preferences";
 /** the user whose saved list was already applied in this page load */
 let syncedFor: string | null = null;
-/** bumps on every local toggle, so a late server answer never undoes a click made meanwhile */
+/** bumps on every local toggle, so a late answer from the account never undoes a click made meanwhile */
 let localVersion = 0;
-let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
-function saveCollapsedGroupsToServer(keys: string[]) {
-    if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => {
-        saveTimer = null;
-        fetch(PREFERENCES_ENDPOINT, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ sidebarCollapsedGroups: keys }),
-            keepalive: true,
-        }).catch(() => {
-            // offline or signed out: the local copy still works, the next toggle tries again
-        });
-    }, 400);
-}
+const saveCollapsedGroupsToAccount = (keys: string[]) => saveAccountPreference("sidebar", ACCOUNT_GROUPS_NAME, keys);
 
-/** The saved list: null when the user never saved one, undefined when the server could not answer. */
-async function loadCollapsedGroupsFromServer(): Promise<string[] | null | undefined> {
-    try {
-        const res = await fetch(PREFERENCES_ENDPOINT, { cache: "no-store" });
-        if (!res.ok) return undefined;
-        const json = (await res.json()) as { sidebarCollapsedGroups?: unknown };
-        if (json.sidebarCollapsedGroups === null) return null;
-        return sanitizeCollapsedGroups(json.sidebarCollapsedGroups) ?? undefined;
-    } catch {
-        return undefined;
-    }
-}
+/** The saved list; undefined when the account has none (never saved, signed out or offline). */
+const loadCollapsedGroupsFromAccount = () => loadAccountPreferences().then((all) => all.sidebar[ACCOUNT_GROUPS_NAME]);
 
 const currentKeys = () => readCollapsedGroups().split(/\s+/).filter(Boolean);
 
@@ -150,17 +127,12 @@ export function useCollapsedGroups(userId?: string | null) {
         syncedFor = userId;
         const version = localVersion;
         let cancelled = false;
-        loadCollapsedGroupsFromServer().then((saved) => {
+        loadCollapsedGroupsFromAccount().then((saved) => {
             if (cancelled) return;
-            if (saved === undefined) {
-                syncedFor = null; // could not reach the server: try again on the next mount
-                return;
-            }
             if (version !== localVersion) return; // the user clicked meanwhile: their choice is already being saved
-            if (saved === null) {
-                saveCollapsedGroupsToServer(currentKeys()); // first device: seed the server with the local copy
-                return;
-            }
+            // nothing saved (or no answer): this device's copy stays, and the next toggle saves it;
+            // a stale local copy must never overwrite what the user chose on another device
+            if (saved === undefined) return;
             writeCollapsedGroups(saved);
         });
         return () => {
@@ -174,7 +146,7 @@ export function useCollapsedGroups(userId?: string | null) {
         else next.add(key);
         localVersion += 1;
         writeCollapsedGroups(next);
-        if (userId) saveCollapsedGroupsToServer([...next]);
+        if (userId) saveCollapsedGroupsToAccount([...next]);
     }, [userId]);
 
     return { collapsed, toggle };

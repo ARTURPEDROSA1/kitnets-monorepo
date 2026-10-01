@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { requireProfile } from "@/lib/api-auth";
 import {
-    FILTERS_PREFIX, HIDDEN_COLUMNS_PREFIX, SORT_PREFIX,
-    sanitizeFilters, sanitizeHiddenColumns, sanitizeSort, tableKeyFromFiltersPrefKey, tableKeyFromPrefKey, tableKeyFromSortPrefKey,
+    FILTERS_PREFIX, HIDDEN_COLUMNS_PREFIX, SIDEBAR_PREFIX, SORT_PREFIX,
+    sanitizeFilters, sanitizeHiddenColumns, sanitizeSort, tableKeyFromFiltersPrefKey, tableKeyFromPrefKey, tableKeyFromSidebarPrefKey, tableKeyFromSortPrefKey,
 } from "@/lib/ui-preferences";
+import { sanitizeCollapsedGroups } from "@/lib/sidebar-groups";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,8 @@ const SECTIONS = {
     hiddenColumns: { prefix: HIDDEN_COLUMNS_PREFIX, tableKey: tableKeyFromPrefKey, sanitize: sanitizeHiddenColumns },
     sort: { prefix: SORT_PREFIX, tableKey: tableKeyFromSortPrefKey, sanitize: sanitizeSort },
     filters: { prefix: FILTERS_PREFIX, tableKey: tableKeyFromFiltersPrefKey, sanitize: sanitizeFilters },
+    // the sidebar's collapsed menu groups (lib/sidebar-groups.ts), one entry: "collapsed-groups"
+    sidebar: { prefix: SIDEBAR_PREFIX, tableKey: tableKeyFromSidebarPrefKey, sanitize: sanitizeCollapsedGroups },
 } as const;
 type Section = keyof typeof SECTIONS;
 const SECTION_NAMES = Object.keys(SECTIONS) as Section[];
@@ -41,7 +44,7 @@ export async function GET() {
         return NextResponse.json({ error: "Erro ao carregar as preferências" }, { status: 500 });
     }
 
-    const out: Record<Section, Record<string, unknown>> = { hiddenColumns: {}, sort: {}, filters: {} };
+    const out: Record<Section, Record<string, unknown>> = { hiddenColumns: {}, sort: {}, filters: {}, sidebar: {} };
     for (const row of data ?? []) {
         for (const name of SECTION_NAMES) {
             const tableKey = SECTIONS[name].tableKey(row.key);
