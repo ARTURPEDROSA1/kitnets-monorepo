@@ -15,6 +15,10 @@ const nextConfig: NextConfig = {
     },
   },
   images: {
+    // Property photos live in a public Supabase bucket under names that never change: keep each
+    // optimized size on Vercel for 30 days, so an original is fetched (storage egress) once a month,
+    // not once an hour (Supabase's default Cache-Control on the older uploads).
+    minimumCacheTTL: 60 * 60 * 24 * 30,
     remotePatterns: [
       {
         protocol: "https",

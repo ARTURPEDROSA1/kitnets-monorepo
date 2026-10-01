@@ -17,6 +17,7 @@ import Image from "next/image";
 import { ChevronLeft, ChevronRight, Loader2, Star, ZoomIn, ZoomOut } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { canOptimizeImage } from "@/lib/image-url";
 
 export interface LightboxPhoto {
     id: string;
@@ -186,7 +187,8 @@ function Viewer({
                     alt={photo.name}
                     width={1600}
                     height={1200}
-                    unoptimized
+                    sizes="100vw"
+                    unoptimized={!canOptimizeImage(photo.url)}
                     priority
                     onLoad={() => setLoaded(true)}
                     draggable={false}
@@ -248,7 +250,7 @@ function Thumbnails({ photos, index, coverId, onPick }: { photos: LightboxPhoto[
                         i === index ? "border-emerald-400" : "border-transparent opacity-70 hover:opacity-100"
                     )}
                 >
-                    <Image src={p.url} alt="" fill sizes="80px" unoptimized className="object-cover" />
+                    <Image src={p.url} alt="" fill sizes="80px" unoptimized={!canOptimizeImage(p.url)} className="object-cover" />
                     {coverId === p.id && <Star className="absolute right-0.5 top-0.5 w-3 h-3 fill-amber-300 text-amber-300" />}
                 </button>
             ))}

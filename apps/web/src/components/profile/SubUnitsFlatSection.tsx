@@ -10,6 +10,7 @@ import Image from "next/image";
 import { Camera, Check, CheckCircle2, Copy, FileSignature, Home, Loader2, PenLine, Play, Plus, Sparkles, Trash2, Video, Wand2, X } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { cn } from "@/lib/utils";
+import { canOptimizeImage } from "@/lib/image-url";
 import { Money } from "@/components/privacy";
 import { PdfViewerModal } from "@/components/ui/PdfViewerModal";
 import PhotoLightbox, { type LightboxPhoto } from "@/components/investments/PhotoLightbox";
@@ -225,7 +226,7 @@ export default function SubUnitsFlatSection({
                                         {(unit.photos || []).map((url, pi) => (
                                             <li key={url} className="group relative aspect-square overflow-hidden rounded-lg border border-border/70 bg-muted/20">
                                                 <button type="button" onClick={() => setLightbox({ unit: idx, index: pi })} className="block h-full w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500" title="Abrir a galeria">
-                                                    <Image src={url} alt={`${name} · foto ${pi + 1}`} fill sizes="160px" className="object-cover" unoptimized />
+                                                    <Image src={url} alt={`${name} · foto ${pi + 1}`} fill sizes="160px" className="object-cover" unoptimized={!canOptimizeImage(url)} />
                                                 </button>
                                                 <button type="button" onClick={() => { if (window.confirm("Remover esta foto?")) actions.removeUnitSavedPhoto(idx, url); }} title="Excluir foto" aria-label={`Excluir a foto ${pi + 1}`} className="absolute right-1 top-1 rounded bg-background/90 p-1 text-muted-foreground opacity-0 hover:text-rose-600 focus-visible:opacity-100 group-hover:opacity-100"><Trash2 className="h-3.5 w-3.5" /></button>
                                             </li>

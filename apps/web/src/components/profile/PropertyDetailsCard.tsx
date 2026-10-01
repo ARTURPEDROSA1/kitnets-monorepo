@@ -1300,7 +1300,7 @@ export function SubUnitsSection({
                                     ))}
                                     {(unit.videos || []).map((url, vi) => (
                                         <div key={`sv-${vi}`} className="aspect-square rounded-lg border border-border relative group overflow-hidden">
-                                            <video src={url} className="w-full h-full object-cover" muted />
+                                            <video src={url} className="w-full h-full object-cover" muted preload="metadata" />
                                             <div className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <Button size="icon" variant="destructive" className="h-5 w-5" onClick={() => removeUnitSavedVideo(idx, url)}>
                                                     <Trash2 className="w-2.5 h-2.5" />
