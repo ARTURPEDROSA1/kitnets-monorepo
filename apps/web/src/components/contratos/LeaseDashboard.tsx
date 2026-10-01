@@ -8,33 +8,11 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import {
-    ArrowLeft,
-    Ban,
-    Building2,
-    CalendarClock,
-    CalendarDays,
-    CheckCircle2,
-    Clock,
-    DollarSign,
-    ExternalLink,
-    FileText,
-    Home,
-    Loader2,
-    Mail,
-    MessageCircle,
-    PenLine,
-    PiggyBank,
-    Trash2,
-    TrendingUp,
-    User,
-    Users,
-    Wallet,
-    X,
-} from "lucide-react";
+import { ArrowLeft, Ban, Building2, CalendarClock, CheckCircle2, Clock, ExternalLink, FileSignature, FileText, Home, Loader2, Mail, MessageCircle, PenLine, Trash2, TrendingUp, User, Users, Wallet, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import { Button } from "@kitnets/ui";
-import Tile from "@/components/properties/Tile";
+import { CardInfoIcon, TILE_TONES, type TileInfo } from "@/components/properties/Tile";
+import { Pair, TermProgress, type PairTone } from "@/components/properties/LeasePairCard";
 import { Money, Sensitive } from "@/components/privacy";
 import { PdfViewerModal } from "@/components/ui/PdfViewerModal";
 import { cn } from "@/lib/utils";
@@ -52,7 +30,9 @@ import {
 } from "@/lib/lease-dashboard";
 import type { LeaseDashboardView } from "@/lib/lease-views";
 import type { LeaseWithDetails } from "@/types/lease";
+import { RESPONSIBILITY_LABELS as CHARGE_RESPONSIBILITY, amountOf, contractTotal, featuredCharge, monthlyTotal, tenantCharges } from "@/lib/lease-charges";
 import LeaseDocuments from "./LeaseDocuments";
+import { LeaseTitle } from "./LeaseTitle";
 
 const LeaseRentChart = dynamic(() => import("./LeaseRentChart"), {
     ssr: false,
@@ -143,9 +123,20 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
     const contractFile = lease.documents.find(d => d.document_type === "CONTRACT") ?? lease.documents[0] ?? null;
     const rent = Number(lease.monthly_rent) || 0;
     const agencyManaged = lease.management_type === "AGENCY";
-    const tenantCharges = lease.charges.filter(c => c.responsibility === "TENANT" && c.amount);
-    const tenantChargesTotal = tenantCharges.reduce((s, c) => s + (Number(c.amount) || 0), 0);
-    const endTone = summary.daysLeft !== null && summary.daysLeft < 0 ? "rose" : summary.daysLeft !== null && summary.daysLeft <= 90 ? "amber" : "emerald";
+    // the property's own charge (condomínio for kitnets, energia for a house) and what the tenant pays in all
+    const featured = featuredCharge(lease.charges, bundle.propertyKind ?? (lease.unit_id ? "multi" : null));
+    const tenantFixed = tenantCharges(lease.charges);
+    const monthly = monthlyTotal(rent, lease.charges);
+    const total = contractTotal(monthly, row.termMonths);
+    const chargeName = (c: LeaseWithDetails["charges"][number]) => (c.charge_type === "OTHER" && c.label ? c.label : CHARGE_LABELS[c.charge_type] ?? c.charge_type);
+    const endTone: PairTone | undefined = !row.inForce ? undefined : summary.daysLeft !== null && summary.daysLeft < 0 ? "bad" : summary.daysLeft !== null && summary.daysLeft <= 90 ? "warn" : undefined;
+    const cycleKnown = summary.accumulatedPct !== null && summary.monthsCounted > 0;
+    const cardInfo: TileInfo = {
+        what: `O contrato lido como na ficha do imóvel: prazo, vencimento, reajuste pelo índice acumulado no ciclo (a cada aniversário o aluguel é corrigido pelo acumulado do ciclo que terminou, a prática dos contratos brasileiros), ${featured.label.toLowerCase()} e o total que sai do bolso do inquilino; o que a razão de receitas registrou e a caução.`,
+        formula: <>Acumulado no ciclo = Π (1 + variação mensal) − 1, dos meses já divulgados<br />Aluguel reajustado até hoje = aluguel × (1 + acumulado)<br />Total mensal = aluguel + encargos com valor fixo pagos pelo inquilino<br />Valor total do contrato = total mensal × meses do prazo</>,
+        example: cycleKnown && summary.adjustedRent !== null ? `${brl(rent)} × (1 ${summary.accumulatedPct! >= 0 ? "+" : "−"} ${Math.abs(summary.accumulatedPct!).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}%) = ${brl(summary.adjustedRent)}` : undefined,
+        note: "O valor reajustado é uma prévia: o percentual definitivo só fecha quando o último mês do ciclo é divulgado. O recebido vem da razão de receitas do imóvel, líquido da taxa da imobiliária quando há.",
+    };
     const phone = tenant?.main_phone ?? null;
     const waLink = phone ? `https://wa.me/${phone.replace(/\D/g, "")}` : null;
     const openPdf = (url: string, name: string) => (/\.pdf$/i.test(name) ? setViewing({ url, name }) : window.open(url, "_blank", "noopener,noreferrer"));
@@ -159,7 +150,7 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                         <ArrowLeft className="mr-1 h-4 w-4" /> Contratos
                     </Button>
                     <div className="flex flex-wrap items-center gap-2">
-                        <h1 className="text-2xl font-bold text-foreground">{row.title}</h1>
+                        <h1 className="text-2xl font-bold text-foreground"><LeaseTitle title={row.title} tenant={lease.primary_tenant_name} /></h1>
                         <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", meta.pill)}>{meta.label}</span>
                         <button
                             type="button"
@@ -172,16 +163,12 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                         </button>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                        {[row.place, lease.primary_tenant_name, agencyManaged ? lease.agency_name ?? "Imobiliária" : lease.management_type === "AGENT" ? `Corretor ${lease.agent_name ?? ""}`.trim() : "Gestão própria"].filter(Boolean).join(" · ")}
+                        {row.place}
+                        {lease.primary_tenant_name && <> · <Sensitive>{lease.primary_tenant_name}</Sensitive></>}
+                        {" · "}{agencyManaged ? lease.agency_name ?? "Imobiliária" : lease.management_type === "AGENT" ? `Corretor ${lease.agent_name ?? ""}`.trim() : "Gestão própria"}
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                    {contractFile && (
-                        <Button variant="outline" onClick={() => openPdf(contractFile.file_url, contractFile.file_name)} title={contractFile.file_name}>
-                            <FileText className="h-4 w-4 text-rose-600 sm:mr-1" />
-                            <span className="hidden sm:inline">Ver PDF</span>
-                        </Button>
-                    )}
                     <Button variant="outline" onClick={() => onEdit(bundle)}>
                         <PenLine className="h-4 w-4 sm:mr-1" />
                         <span className="hidden sm:inline">Editar</span>
@@ -217,119 +204,115 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                 </div>
             )}
 
-            {/* KPIs */}
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
-                <Tile
-                    label="Aluguel"
-                    tone="emerald"
-                    icon={<DollarSign className="h-4 w-4" />}
-                    value={brl(rent, 0)}
-                    hint={
-                        <span className="block space-y-0.5 pt-0.5">
-                            <span className="block">Vence todo dia {lease.rent_due_day}</span>
-                            {row.inForce && <span className="block">Próximo: {formatDateBR(summary.nextDueDate)} · {summary.daysToDue === 0 ? "hoje" : `em ${plural(summary.daysToDue, "dia", "dias")}`}</span>}
-                            {tenantChargesTotal > 0 && <span className="block">+ {brl(tenantChargesTotal, 0)} de encargos do inquilino</span>}
-                        </span>
-                    }
-                    info={{
-                        what: "O aluguel de contrato: o valor bruto combinado, antes da taxa da imobiliária. Os encargos que o inquilino paga por fora (condomínio, energia) estão na ficha.",
-                        formula: "aluguel de contrato · vencimento = dia do mês combinado (o último dia do mês quando ele não existe)",
-                        example: agencyManaged ? `${brl(rent)} brutos; o que chega ao proprietário é o líquido, na razão de receitas do imóvel` : undefined,
-                    }}
-                    money
-                />
-                <Tile
-                    label="Prazo"
-                    tone={endTone}
-                    icon={<CalendarDays className="h-4 w-4" />}
-                    value={row.termMonths !== null ? `${row.termMonths} meses` : "Indeterminado"}
-                    hint={
-                        <span className="block space-y-0.5 pt-0.5">
-                            <span className="block">{formatDateBR(lease.start_date)} → {summary.effectiveEnd ? formatDateBR(summary.effectiveEnd) : "sem data de término"}</span>
-                            <span className="block">
-                                {summary.daysLeft === null ? `Há ${plural(summary.daysElapsed, "dia", "dias")} em vigor`
-                                    : !row.inForce ? (lease.status === "TERMINATED" ? `Rescindido em ${formatDateBR(lease.termination_date)}` : "Encerrado")
-                                    : summary.daysLeft < 0 ? `Vencido há ${plural(-summary.daysLeft, "dia", "dias")}`
-                                    : summary.daysLeft === 0 ? "Termina hoje" : `Faltam ${plural(summary.daysLeft, "dia", "dias")}`}
-                            </span>
-                            {summary.progressPct !== null && (
-                                <span className="block h-1.5 w-full overflow-hidden rounded-full bg-muted" title={`${summary.progressPct}% do prazo`}>
-                                    <span className={cn("block h-full", endTone === "rose" ? "bg-rose-500" : endTone === "amber" ? "bg-amber-500" : "bg-emerald-500")} style={{ width: `${summary.progressPct}%` }} />
-                                </span>
-                            )}
-                        </span>
-                    }
-                    info={{
-                        what: "A duração combinada e quanto dela já passou. Um contrato residencial com 30 meses ou mais pode ser retomado no fim do prazo sem justificativa (denúncia vazia); abaixo disso, só nas hipóteses da lei.",
-                        formula: "meses inteiros entre o início e o término · % = dias corridos ÷ dias do prazo",
-                        note: "Terminado o prazo, se o inquilino fica e o proprietário não se opõe, o contrato segue por prazo indeterminado com as mesmas condições.",
-                    }}
-                />
-                <Tile
-                    label="Próximo reajuste"
-                    tone={summary.daysToAdjustment !== null && summary.daysToAdjustment <= 30 && row.inForce ? "amber" : "violet"}
-                    icon={<TrendingUp className="h-4 w-4" />}
-                    value={row.inForce && summary.nextAdjustmentDate ? formatDateBR(summary.nextAdjustmentDate) : "—"}
-                    hint={
-                        !row.inForce ? "Contrato encerrado"
-                            : !summary.nextAdjustmentDate ? row.indexLabel === "Não informado" ? "Índice não informado no contrato" : "Contrato sem reajuste"
-                            : `${row.indexLabel} · a cada ${summary.frequencyMonths} meses · em ${plural(summary.daysToAdjustment ?? 0, "dia", "dias")}`
-                    }
-                    info={{
-                        what: "Quando o aluguel é corrigido: a cada aniversário do contrato, pelo índice acumulado no ciclo que terminou (a prática dos contratos brasileiros).",
-                        formula: "próximo reajuste = próximo aniversário do início, na periodicidade do contrato",
-                        note: "A data fica no contrato; se ela passou sem ninguém rolar, o painel avança para o aniversário seguinte.",
-                    }}
-                />
-                <Tile
-                    label="Reajuste previsto"
-                    tone="violet"
-                    icon={<TrendingUp className="h-4 w-4" />}
-                    value={row.inForce && summary.adjustedRent !== null && summary.monthsCounted > 0 ? brl(summary.adjustedRent, 0) : "—"}
-                    hint={
-                        row.inForce && summary.accumulatedPct !== null && summary.monthsCounted > 0
-                            ? <>{row.indexLabel} {pctText(summary.accumulatedPct)} · {summary.monthsCounted} de {summary.frequencyMonths} meses{summary.indexThrough ? ` · até ${formatMonthKey(summary.indexThrough)}` : ""}</>
-                            : !row.inForce ? "—" : !summary.nextAdjustmentDate ? "Sem reajuste" : !row.seriesCode ? `${row.indexLabel}: informe o percentual no reajuste` : summary.accumulatedPct !== null ? "Nenhum mês do ciclo divulgado ainda" : "Série do índice indisponível"
-                    }
-                    info={{
-                        what: "Prévia do aluguel após o próximo reajuste, com os meses do ciclo já divulgados pelo índice. O percentual definitivo só fecha quando o último mês do ciclo sai.",
-                        formula: <>acumulado = Π (1 + variação mensal) − 1<br />aluguel reajustado = aluguel × (1 + acumulado)</>,
-                        example: summary.accumulatedPct !== null && summary.adjustedRent !== null ? `${brl(rent)} × (1 ${summary.accumulatedPct >= 0 ? "+" : "−"} ${Math.abs(summary.accumulatedPct).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}%) = ${brl(summary.adjustedRent)}` : undefined,
-                        note: "Com índice negativo a maioria dos contratos mantém o aluguel.",
-                    }}
-                    money
-                />
-                <Tile
-                    label={agencyManaged ? "Recebido (líquido)" : "Recebido"}
-                    tone="blue"
-                    icon={<Wallet className="h-4 w-4" />}
-                    value={income.confirmedMonths > 0 ? brl(income.received, 0) : "—"}
-                    hint={
-                        income.confirmedMonths > 0
-                            ? <>{plural(income.confirmedMonths, "mês confirmado", "meses confirmados")}{income.expectedMonths > 0 ? ` · ${income.expectedMonths} previsto${income.expectedMonths === 1 ? "" : "s"}` : ""}{income.missingMonths > 0 ? ` · ${income.missingMonths} sem lançamento` : ""}</>
-                            : "Sem lançamentos na razão de receitas do imóvel"
-                    }
-                    info={{
-                        what: "O que chegou ao proprietário nos meses deste contrato, segundo a razão de receitas do imóvel (líquido da taxa da imobiliária, quando há). É o elo entre o contrato e o dinheiro.",
-                        formula: "Σ recebido dos meses confirmados entre o início e o fim do contrato (a unidade do contrato, ou o imóvel inteiro)",
-                        example: income.confirmedMonths > 0 ? `${income.confirmedMonths} meses · bruto ${brl(income.gross)} · recebido ${brl(income.received)}` : undefined,
-                        note: "Lance os meses na razão de receitas do imóvel para este número acompanhar.",
-                    }}
-                    money
-                />
-                <Tile
-                    label="Caução"
-                    tone="slate"
-                    icon={<PiggyBank className="h-4 w-4" />}
-                    value={lease.security_deposit ? brl(Number(lease.security_deposit), 0) : "—"}
-                    hint={lease.security_deposit ? `${lease.deposit_months ? `${plural(lease.deposit_months, "aluguel", "aluguéis")} · ` : ""}devolvida no fim do contrato` : "Sem caução informada"}
-                    info={{
-                        what: "A garantia em dinheiro que o inquilino deixou: até três aluguéis por lei, devolvida corrigida no fim do contrato, descontado o que ficar devendo.",
-                        formula: "caução = até 3 × aluguel (Lei 8.245/91, art. 38 §2º)",
-                    }}
-                    money
-                />
-            </div>
+            {/* The contract at a glance: the cards of the property page's "Contrato de Aluguel", plus the charges and the totals */}
+            <section className="space-y-4 rounded-2xl border border-border bg-card p-4 shadow-xs sm:p-6">
+                <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 space-y-0.5">
+                        <h2 className="inline-flex items-center gap-2 text-base font-bold text-foreground"><FileSignature className="h-4 w-4 text-emerald-600" /> Contrato de aluguel</h2>
+                        <p className="text-xs text-muted-foreground">Prazo, vencimento, reajuste pelo índice do contrato e o aluguel corrigido até hoje; {featured.label.toLowerCase()} e o total mensal do inquilino; o recebido e a caução.</p>
+                    </div>
+                    <CardInfoIcon label="Contrato de aluguel" icon={<CalendarClock className="h-4 w-4" />} info={cardInfo} className={cn("p-2", TILE_TONES.emerald)} />
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    <Pair
+                        left={{ label: "Início do contrato", value: formatDateBR(lease.start_date), hint: `Há ${plural(summary.daysElapsed, "dia", "dias")}` }}
+                        right={{
+                            label: "Fim do contrato", value: summary.effectiveEnd ? formatDateBR(summary.effectiveEnd) : "Indeterminado", tone: endTone,
+                            hint: summary.daysLeft === null ? "Prazo indeterminado"
+                                : !row.inForce ? (lease.status === "TERMINATED" ? `Rescindido em ${formatDateBR(lease.termination_date)}` : "Encerrado")
+                                : summary.daysLeft < 0 ? `Vencido há ${plural(-summary.daysLeft, "dia", "dias")}`
+                                : summary.daysLeft === 0 ? "Termina hoje" : `Faltam ${plural(summary.daysLeft, "dia", "dias")}${row.termMonths !== null ? ` · ${row.termMonths} meses` : ""}`,
+                        }}
+                        footer={summary.progressPct !== null ? <TermProgress pct={summary.progressPct} tone={endTone} /> : undefined}
+                    />
+                    <Pair
+                        left={{
+                            label: "Vencimento do aluguel", value: `Todo dia ${lease.rent_due_day}`,
+                            hint: row.inForce ? <>Próximo: {formatDateBR(summary.nextDueDate)}<br />{summary.daysToDue === 0 ? "Vence hoje" : `Em ${plural(summary.daysToDue, "dia", "dias")}`}</> : "Contrato encerrado",
+                        }}
+                        right={{ label: "Aluguel atual", value: <Money>{brl(rent)}</Money>, hint: agencyManaged ? "Valor do contrato, antes da taxa da imobiliária" : "Valor do contrato" }}
+                    />
+                    <Pair
+                        left={{ label: "Índice de reajuste", value: row.indexLabel, hint: summary.nextAdjustmentDate ? `A cada ${summary.frequencyMonths} meses` : "Contrato sem reajuste" }}
+                        right={{
+                            label: "Acumulado no ciclo",
+                            tone: !cycleKnown ? undefined : summary.accumulatedPct! < 0 ? "bad" : "good",
+                            value: cycleKnown ? pctText(summary.accumulatedPct!) : "—",
+                            hint: cycleKnown
+                                ? <>{summary.monthsCounted} de {summary.frequencyMonths} meses<br />{summary.cycleStart ? formatMonthKey(summary.cycleStart.slice(0, 7)) : "—"} a {summary.indexThrough ? formatMonthKey(summary.indexThrough) : "—"}</>
+                                : !summary.nextAdjustmentDate ? "—" : !row.seriesCode ? "Índice sem série no Kitnets: informe o percentual no reajuste" : summary.accumulatedPct !== null ? "Nenhum mês do ciclo divulgado ainda" : "Série do índice indisponível no momento",
+                        }}
+                    />
+                    <Pair
+                        left={{
+                            label: "Próximo reajuste", value: row.inForce && summary.nextAdjustmentDate ? formatDateBR(summary.nextAdjustmentDate) : "—",
+                            tone: row.inForce && summary.daysToAdjustment !== null && summary.daysToAdjustment <= 30 ? "warn" : undefined,
+                            hint: !row.inForce ? "Contrato encerrado" : summary.daysToAdjustment === null ? "—" : `Em ${plural(summary.daysToAdjustment, "dia", "dias")}`,
+                        }}
+                        right={{
+                            label: "Aluguel reajustado até hoje", value: row.inForce && cycleKnown && summary.adjustedRent !== null ? <Money>{brl(summary.adjustedRent)}</Money> : "—",
+                            hint: row.inForce && cycleKnown && summary.adjustedRent !== null
+                                ? <><Money>{summary.adjustedRent >= rent ? "+" : "−"}{brl(Math.abs(summary.adjustedRent - rent))}</Money> sobre o atual<br />Prévia com os meses já divulgados</>
+                                : "—",
+                        }}
+                    />
+                    <Pair
+                        left={{
+                            label: featured.label,
+                            value: featured.charge && amountOf(featured.charge) > 0 ? <Money>{brl(amountOf(featured.charge))}</Money> : featured.charge ? "Sem valor" : "—",
+                            hint: featured.charge
+                                ? `${CHARGE_RESPONSIBILITY[featured.charge.responsibility] ?? featured.charge.responsibility}${featured.charge.adjustment_index ? ` · ${CHARGE_INDEX_LABELS[featured.charge.adjustment_index] ?? featured.charge.adjustment_index}` : ""}`
+                                : "Não informado no contrato",
+                        }}
+                        right={{
+                            label: "Total mensal", value: <Money>{brl(monthly)}</Money>,
+                            hint: tenantFixed.items.length > 0
+                                ? <>Aluguel + {tenantFixed.items.map(chargeName).join(" + ")}<br /><Money>{brl(tenantFixed.total)}</Money> de encargos do inquilino</>
+                                : "Só o aluguel: sem encargos fixos do inquilino",
+                        }}
+                        footer={(
+                            <div className="flex items-baseline justify-between gap-2 border-t border-border/60 px-3 py-2 text-[11px] text-muted-foreground">
+                                <span>Valor total do contrato{row.termMonths !== null ? ` · ${row.termMonths} meses` : ""}</span>
+                                <span className="font-semibold tabular-nums text-foreground">{total !== null ? <Money>{brl(total)}</Money> : "Prazo indeterminado"}</span>
+                            </div>
+                        )}
+                    />
+                    <Pair
+                        left={{
+                            label: agencyManaged ? "Recebido (líquido)" : "Recebido", value: income.confirmedMonths > 0 ? <Money>{brl(income.received)}</Money> : "—",
+                            hint: income.confirmedMonths > 0
+                                ? <>{plural(income.confirmedMonths, "mês confirmado", "meses confirmados")}{income.expectedMonths > 0 ? ` · ${income.expectedMonths} previsto${income.expectedMonths === 1 ? "" : "s"}` : ""}{income.missingMonths > 0 ? ` · ${income.missingMonths} sem lançamento` : ""}</>
+                                : "Sem lançamentos na razão de receitas do imóvel",
+                        }}
+                        right={{
+                            label: "Caução", value: lease.security_deposit ? <Money>{brl(Number(lease.security_deposit))}</Money> : "—",
+                            hint: lease.security_deposit ? `${lease.deposit_months ? `${plural(lease.deposit_months, "aluguel", "aluguéis")} · ` : ""}devolvida no fim do contrato` : "Sem caução informada",
+                        }}
+                    />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                    <Link href={`${base}/inquilinos?tenant=${lease.primary_tenant_id}&property=${lease.property_id}`} className={chip} title="Abrir o inquilino principal">
+                        <User className="h-3.5 w-3.5 shrink-0" /> <Sensitive className="truncate">{lease.primary_tenant_name ?? "Inquilino principal"}</Sensitive>
+                    </Link>
+                    {agencyManaged && lease.agency_id ? (
+                        <Link href={`${base}/imobiliaria?agency=${lease.agency_id}&property=${lease.property_id}`} className={chip} title="Abrir a imobiliária do contrato">
+                            <Building2 className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{lease.agency_name ?? "Imobiliária"}</span>
+                        </Link>
+                    ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground"><Building2 className="h-3.5 w-3.5" /> {lease.management_type === "AGENT" ? `Corretor ${lease.agent_name ?? ""}`.trim() : MANAGEMENT_LABELS[lease.management_type]}</span>
+                    )}
+                    <Link href={`${base}/imoveis?id=${lease.property_id}`} className={chip} title="Abrir o imóvel">
+                        <Home className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{row.place}</span>
+                    </Link>
+                    {contractFile && (
+                        <button type="button" onClick={() => openPdf(contractFile.file_url, contractFile.file_name)} className={chip} title={contractFile.file_name}>
+                            <FileText className="h-3.5 w-3.5 shrink-0 text-rose-600" /> {/\.pdf$/i.test(contractFile.file_name) ? "Ver PDF do contrato" : "Ver arquivo do contrato"}
+                        </button>
+                    )}
+                </div>
+            </section>
 
             {/* Rent chart + contract card */}
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -373,7 +356,7 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                         <Field label="Inquilino principal" className="col-span-2">
                             <div className="flex flex-wrap items-center gap-1.5">
                                 <Link href={`${base}/inquilinos?tenant=${lease.primary_tenant_id}&property=${lease.property_id}`} className={chip} title="Abrir o inquilino">
-                                    <User className="h-3.5 w-3.5 shrink-0" /> <span className="break-words">{lease.primary_tenant_name ?? "Inquilino"}</span>
+                                    <User className="h-3.5 w-3.5 shrink-0" /> <Sensitive className="break-words">{lease.primary_tenant_name ?? "Inquilino"}</Sensitive>
                                 </Link>
                                 {phone && (
                                     <a href={waLink ?? undefined} target="_blank" rel="noopener noreferrer" className={chip} title="Conversar no WhatsApp">
@@ -387,7 +370,7 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                             {lease.additional_tenants.length > 0 && (
                                 <ul className="mt-1.5 space-y-0.5 text-xs text-muted-foreground">
                                     {lease.additional_tenants.map(t => (
-                                        <li key={t.id} className="flex items-center gap-1.5"><Users className="h-3 w-3" /> {t.tenant_name ?? "Inquilino"} · {t.role === "OCCUPANT" ? "ocupante" : "co-inquilino"}</li>
+                                        <li key={t.id} className="flex items-center gap-1.5"><Users className="h-3 w-3" /> <Sensitive>{t.tenant_name ?? "Inquilino"}</Sensitive> · {t.role === "OCCUPANT" ? "ocupante" : "co-inquilino"}</li>
                                     ))}
                                 </ul>
                             )}

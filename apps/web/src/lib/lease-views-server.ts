@@ -13,6 +13,7 @@ import { signStorageUrls } from "@/lib/storage";
 import { getAllIndexValuesForCalculator, getIndexMetadata } from "@/lib/indexes";
 import { resolveCalculatorIndex } from "@/lib/index-calculator";
 import { addMonths, leaseIndexSeriesCode, type IndexPoint } from "@/lib/lease-summary";
+import { loadPropertyEntries } from "@/lib/property-entries-server";
 import type { PropertyIncomeRow } from "@/lib/property-income";
 import type { LeaseWithDetails } from "@/types/lease";
 import type { LeaseDashboardView, LeaseListView, LeaseTenantContact } from "@/lib/lease-views";
@@ -110,19 +111,23 @@ export async function loadLeaseDashboard(supabase: AdminSupabase, leaseId: strin
     const toMonth = addMonths(`${(lastMonth > today.slice(0, 7) ? today.slice(0, 7) : lastMonth)}-01`, 1).slice(0, 7);
     const seriesCode = leaseIndexSeriesCode(lease.adjustment_index);
 
-    const [tenantsRes, chargesRes, docsRes, contactRes, income, series] = await Promise.all([
+    const [tenantsRes, chargesRes, docsRes, contactRes, income, series, entries] = await Promise.all([
         supabase.from("lease_tenants").select("*, tenant:tenants!tenant_id(full_name)").eq("lease_id", leaseId),
         supabase.from("lease_charges").select("*").eq("lease_id", leaseId),
         supabase.from("lease_documents").select("*").eq("lease_id", leaseId).order("uploaded_at", { ascending: false }),
         supabase.from("tenants").select("id, full_name, main_phone, email").eq("id", lease.primary_tenant_id).maybeSingle(),
         loadIncomeRows(supabase, lease.property_id, fromMonth, toMonth),
         seriesCode ? loadLeaseIndexSeries([seriesCode]).then(s => s[seriesCode] ?? null) : Promise.resolve(null),
+        // single (house/apartment) or multi (kitnets): decides whether the card names the energy bill or the condominium
+        loadPropertyEntries(supabase, profileId).then(r => r.entries).catch(err => { console.error("[Lease views] property entries failed:", (err as Error).message); return []; }),
     ]);
 
     const docs = (docsRes.data ?? []) as Array<Record<string, unknown> & { file_url: string }>;
     const signed = await signStorageUrls(supabase, LEASE_DOCUMENTS_BUCKET, docs.map(d => d.file_url));
+    const propertyKind = entries.find(e => e.id === lease.property_id)?.propertyType ?? (lease.unit_id ? "multi" : null);
 
     return {
+        propertyKind,
         lease: {
             ...lease,
             additional_tenants: (tenantsRes.data || []).map((t: Record<string, unknown>) => ({

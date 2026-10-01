@@ -9,8 +9,9 @@ import React, { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, Ban, FileText, Loader2, PenLine, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDateBR } from "@/lib/dates";
-import { Money } from "@/components/privacy";
+import { Money, Sensitive } from "@/components/privacy";
 import { MANAGEMENT_LABELS, brl, statusMeta, type LeaseRow } from "@/lib/lease-dashboard";
+import { LeaseTitle } from "./LeaseTitle";
 
 export interface LeaseTableActions {
     onOpen: (row: LeaseRow) => void;
@@ -49,14 +50,14 @@ const plural = (n: number, one: string, many: string) => `${n.toLocaleString("pt
  * suggestion ("SANTO ANTONIO · Kitnet 35 - Robson Mesquita - 2024") names both the place and the
  * tenant, so it gets no subtitle; a bare place gets the tenant; a custom name gets both.
  */
-function subtitleOf(row: LeaseRow): string | null {
+function subtitleOf(row: LeaseRow): { place: string | null; tenant: string | null; noTenant: boolean } {
     const title = row.title.toLowerCase();
     const tenant = row.lease.primary_tenant_name;
-    const parts = [
-        title.includes(row.place.toLowerCase()) ? null : row.place,
-        tenant ? (title.includes(tenant.toLowerCase()) ? null : tenant) : "Sem inquilino",
-    ].filter(Boolean);
-    return parts.length > 0 ? parts.join(" · ") : null;
+    return {
+        place: title.includes(row.place.toLowerCase()) ? null : row.place,
+        tenant: tenant && !title.includes(tenant.toLowerCase()) ? tenant : null,
+        noTenant: !tenant,
+    };
 }
 const pct = (v: number) => `${v > 0 ? "+" : ""}${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 
@@ -136,8 +137,14 @@ export default function LeaseTable({ rows, actions }: Props) {
                                     tabIndex={0}
                                 >
                                     <td className="min-w-[220px] max-w-[420px] px-3 py-2.5">
-                                        <span className="block break-words text-sm font-semibold leading-snug text-foreground">{row.title}</span>
-                                        {subtitle && <span className="block break-words text-[11px] leading-snug text-muted-foreground">{subtitle}</span>}
+                                        <span className="block break-words text-sm font-semibold leading-snug text-foreground"><LeaseTitle title={row.title} tenant={lease.primary_tenant_name} /></span>
+                                        {(subtitle.place || subtitle.tenant || subtitle.noTenant) && (
+                                            <span className="block break-words text-[11px] leading-snug text-muted-foreground">
+                                                {subtitle.place}
+                                                {subtitle.place && (subtitle.tenant || subtitle.noTenant) ? " · " : ""}
+                                                {subtitle.tenant ? <Sensitive>{subtitle.tenant}</Sensitive> : subtitle.noTenant ? "Sem inquilino" : null}
+                                            </span>
+                                        )}
                                     </td>
                                     <td className="whitespace-nowrap px-3 py-2.5">
                                         <span className={cn("inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", meta.pill)}>{meta.label}</span>

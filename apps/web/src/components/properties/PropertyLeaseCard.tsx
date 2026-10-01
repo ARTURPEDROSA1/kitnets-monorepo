@@ -12,8 +12,9 @@ import Link from "next/link";
 import { Building2, CalendarClock, ExternalLink, FileSignature, FileText, Loader2, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PdfViewerModal } from "@/components/ui/PdfViewerModal";
-import { Money } from "@/components/privacy";
+import { Money, Sensitive } from "@/components/privacy";
 import { CardInfoIcon, TILE_TONES, type TileInfo } from "./Tile";
+import { Pair, TermProgress, type PairTone } from "./LeasePairCard";
 import { LEASE_INDEX_LABELS, leaseIndexSeriesCode, leaseSummary, type IndexPoint, type LeaseForSummary } from "@/lib/lease-summary";
 
 interface LeaseDocument { id: string; document_type: string; file_name: string; file_url: string }
@@ -51,31 +52,7 @@ const pct = (v: number) => `${v > 0 ? "+" : ""}${v.toLocaleString("pt-BR", { min
 /** Today in Brasília, `YYYY-MM-DD`. */
 const todayBRT = () => new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
 
-type Tone = "good" | "warn" | "bad";
-interface HalfProps { label: string; value: React.ReactNode; hint?: React.ReactNode; tone?: Tone }
-
-function Half({ label, value, hint, tone }: HalfProps) {
-    return (
-        <div className="p-3 space-y-1 min-w-0">
-            <span className="text-[10px] font-semibold uppercase tracking-wider leading-tight text-muted-foreground block min-h-[25px]">{label}</span>
-            <span className={cn("text-base font-bold block tabular-nums leading-tight", tone === "good" ? "text-emerald-600 dark:text-emerald-400" : tone === "warn" ? "text-amber-600 dark:text-amber-400" : tone === "bad" ? "text-rose-600 dark:text-rose-400" : "text-foreground")}>{value}</span>
-            {hint && <span className="text-[11px] text-muted-foreground block leading-snug">{hint}</span>}
-        </div>
-    );
-}
-
-/** Two related figures in one card; `footer` spans both. */
-function Pair({ left, right, footer }: { left: HalfProps; right: HalfProps; footer?: React.ReactNode }) {
-    return (
-        <div className="rounded-xl border border-border/80 bg-muted/20 flex flex-col">
-            <div className="grid grid-cols-2 divide-x divide-border/70 flex-1">
-                <Half {...left} />
-                <Half {...right} />
-            </div>
-            {footer}
-        </div>
-    );
-}
+type Tone = PairTone;
 
 const linkCls = "inline-flex items-center gap-1.5 h-8 rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-muted transition-colors max-w-full";
 
@@ -103,7 +80,7 @@ function LeaseRow({ lease, series, seriesLoaded, propertyId, lang, today, showHe
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     <span className="text-sm font-semibold text-foreground">{lease.unit_label ?? "Imóvel inteiro"}</span>
                     <span className={cn("text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full", status.cls)}>{status.label}</span>
-                    {lease.primary_tenant_name && <span className="text-xs text-muted-foreground truncate">{lease.primary_tenant_name}</span>}
+                    {lease.primary_tenant_name && <Sensitive className="text-xs text-muted-foreground truncate">{lease.primary_tenant_name}</Sensitive>}
                 </div>
             )}
 
@@ -114,14 +91,7 @@ function LeaseRow({ lease, series, seriesLoaded, propertyId, lang, today, showHe
                         label: "Fim do contrato", value: formatDate(s.effectiveEnd), tone: endTone,
                         hint: s.daysLeft === null ? "Prazo indeterminado" : s.daysLeft < 0 ? `Vencido há ${days(s.daysLeft)}` : s.daysLeft === 0 ? "Termina hoje" : `Faltam ${days(s.daysLeft)}`,
                     }}
-                    footer={s.progressPct !== null ? (
-                        <div className="px-3 pb-3 space-y-1">
-                            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                                <div className={cn("h-full", endTone === "bad" ? "bg-rose-500" : endTone === "warn" ? "bg-amber-500" : "bg-emerald-500")} style={{ width: `${s.progressPct}%` }} />
-                            </div>
-                            <span className="text-[10px] text-muted-foreground block">{s.progressPct}% do prazo</span>
-                        </div>
-                    ) : undefined}
+                    footer={s.progressPct !== null ? <TermProgress pct={s.progressPct} tone={endTone} /> : undefined}
                 />
                 <Pair
                     left={{
@@ -159,7 +129,7 @@ function LeaseRow({ lease, series, seriesLoaded, propertyId, lang, today, showHe
             {/* Links */}
             <div className="flex flex-wrap items-center gap-2">
                 <Link href={`/${lang}/inquilinos?tenant=${lease.primary_tenant_id}&property=${propertyId}`} className={linkCls} title="Abrir o inquilino principal">
-                    <User className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">{lease.primary_tenant_name ?? "Inquilino principal"}</span>
+                    <User className="w-3.5 h-3.5 shrink-0" /> <Sensitive className="truncate">{lease.primary_tenant_name ?? "Inquilino principal"}</Sensitive>
                 </Link>
                 {lease.agency_id ? (
                     <Link href={`/${lang}/imobiliaria?agency=${lease.agency_id}&property=${propertyId}`} className={linkCls} title="Abrir a imobiliária do contrato">
