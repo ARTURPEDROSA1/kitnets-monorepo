@@ -7,7 +7,6 @@ import { MinimumWageHeatmap } from "./MinimumWageHeatmap";
 import { MinimumWageChart } from "./MinimumWageChart";
 import { PeriodSelector } from "../PeriodSelector";
 import { useIndexPeriod } from "../useIndexPeriod";
-import { useLeadGate } from "../useLeadGate";
 import { DEFAULT_YEARLY_PERIOD, YEARLY_PRESETS, filterByRange, formatRangeLabel } from "@/lib/index-period";
 
 interface Props {
@@ -27,7 +26,6 @@ export function MinimumWageDashboardWrapper({ data: allData, latest, nextAdjustm
         return { earliest: dates[0] ?? "", newest: dates[dates.length - 1] ?? "" };
     }, [allData]);
     const { period, custom, range, redundant, select, setCustom } = useIndexPeriod(earliest, newest, YEARLY_PRESETS, DEFAULT_YEARLY_PERIOD);
-    const { guard, modal } = useLeadGate();
     const data = useMemo(() => filterByRange(allData, range), [allData, range]); // still newest first
 
     // 1. Calculate Accumulated in Period
@@ -170,7 +168,7 @@ export function MinimumWageDashboardWrapper({ data: allData, latest, nextAdjustm
                             <PeriodSelector
                                 presets={YEARLY_PRESETS}
                                 value={period}
-                                onSelect={(key) => guard(() => select(key))}
+                                onSelect={select}
                                 custom={custom}
                                 onCustomChange={setCustom}
                                 redundant={redundant}
@@ -183,7 +181,6 @@ export function MinimumWageDashboardWrapper({ data: allData, latest, nextAdjustm
                     </div>
                 </div>
             </div>
-            {modal}
 
             {/* Heatmap */}
             <div className="md:col-span-3 min-w-0">

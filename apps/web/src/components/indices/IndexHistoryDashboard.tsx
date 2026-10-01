@@ -4,19 +4,19 @@
  * The history of a standard index page (CDI, Selic, IPCA, IGP-M, INPC, IVAR): the trend chart with
  * the period buttons, the monthly heatmap and the detailed table, all showing the same slice of the
  * series. The page loads the whole history once; the buttons only slice it in the browser, so the
- * URL never changes (these public pages stay free of query-string variants). The first period
- * change asks the visitor for a contact (useLeadGate), as the old filter form did.
+ * URL never changes (these public pages stay free of query-string variants).
  */
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { IndexValue } from "@/lib/indexes";
+import { MAIN_SERIES_COLOR, type ComparisonSeries } from "@/lib/index-compare";
 import { DEFAULT_MONTHLY_PERIOD, MONTHLY_PRESETS, filterByRange, formatRangeLabel, summarizeSeries } from "@/lib/index-period";
+import { CompareToggle } from "./CompareToggle";
 import { IndexHeatmap } from "./IndexHeatmap";
 import { IndexHistoryTable } from "./IndexHistoryTable";
 import { IndexTrendChart, formatPercent, type TrendPoint } from "./IndexTrendChart";
 import { PeriodSelector } from "./PeriodSelector";
 import { PeriodStats } from "./PeriodStats";
 import { useIndexPeriod } from "./useIndexPeriod";
-import { useLeadGate } from "./useLeadGate";
 
 export interface HistoryLabels {
     chartTitle: string;
@@ -33,8 +33,8 @@ interface Props {
     data: IndexValue[];
     indexCode: string;
     labels: HistoryLabels;
-    /** ask for a contact before the first period change (default true) */
-    leadGate?: boolean;
+    /** the indexes the chart can overlay ("Comparar com") */
+    compare?: ComparisonSeries[];
 }
 
 const CARD = "rounded-xl border bg-card text-card-foreground shadow-sm";
@@ -43,12 +43,11 @@ const SUBTITLE = "text-xs md:text-sm text-muted-foreground";
 
 const byDate = (a: { reference_date: string }, b: { reference_date: string }) => (a.reference_date < b.reference_date ? -1 : a.reference_date > b.reference_date ? 1 : 0);
 
-export function IndexHistoryDashboard({ data, indexCode, labels, leadGate = true }: Props) {
+export function IndexHistoryDashboard({ data, indexCode, labels, compare = [] }: Props) {
     const sorted = useMemo(() => [...data].sort(byDate), [data]);
     const earliest = sorted[0]?.reference_date ?? "";
     const latest = sorted[sorted.length - 1]?.reference_date ?? "";
     const { period, custom, range, redundant, select, setCustom } = useIndexPeriod(earliest, latest, MONTHLY_PRESETS, DEFAULT_MONTHLY_PERIOD);
-    const { guard, modal } = useLeadGate(leadGate);
 
     const slice = useMemo(() => filterByRange(sorted, range), [sorted, range]);
     const points = useMemo<TrendPoint[]>(() => slice.map((v) => ({
@@ -60,6 +59,19 @@ export function IndexHistoryDashboard({ data, indexCode, labels, leadGate = true
         ],
     })), [slice]);
     const summary = useMemo(() => summarizeSeries(points.map((p) => ({ date: p.date, value: p.value }))), [points]);
+
+    // "Comparar com": the chosen indexes, cut to the same period as the chart
+    const [comparing, setComparing] = useState<ReadonlySet<string>>(() => new Set());
+    const toggleCompare = (code: string) => setComparing((prev) => {
+        const next = new Set(prev);
+        if (next.has(code)) next.delete(code);
+        else next.add(code);
+        return next;
+    });
+    const overlays = useMemo(
+        () => compare.filter((c) => comparing.has(c.code)).map((c) => ({ ...c, points: c.points.filter((p) => p.date >= range.start && p.date <= range.end) })),
+        [compare, comparing, range],
+    );
 
     if (sorted.length === 0) return null;
 
@@ -76,19 +88,22 @@ export function IndexHistoryDashboard({ data, indexCode, labels, leadGate = true
                                 {formatRangeLabel(range)} · {slice.length} {slice.length === 1 ? "mês" : "meses"}
                             </p>
                         </div>
-                        <PeriodSelector
-                            presets={MONTHLY_PRESETS}
-                            value={period}
-                            onSelect={(key) => guard(() => select(key))}
-                            custom={custom}
-                            onCustomChange={setCustom}
-                            redundant={redundant}
-                            bounds={{ start: earliest, end: latest }}
-                        />
+                        <div className="flex flex-col items-start gap-2 sm:items-end">
+                            <PeriodSelector
+                                presets={MONTHLY_PRESETS}
+                                value={period}
+                                onSelect={select}
+                                custom={custom}
+                                onCustomChange={setCustom}
+                                redundant={redundant}
+                                bounds={{ start: earliest, end: latest }}
+                            />
+                            <CompareToggle options={compare} active={comparing} onToggle={toggleCompare} mainLabel={indexCode} mainColor={MAIN_SERIES_COLOR} />
+                        </div>
                     </div>
                     <div className="space-y-4 p-3 pt-0 md:p-6 md:pt-0">
                         <PeriodStats summary={summary} format={formatPercent} kind="variation" />
-                        <IndexTrendChart points={points} name={indexCode} />
+                        <IndexTrendChart points={points} name={indexCode} compare={overlays} />
                     </div>
                 </div>
             </div>
@@ -117,8 +132,6 @@ export function IndexHistoryDashboard({ data, indexCode, labels, leadGate = true
                     <p className="pb-3 text-center text-xs text-muted-foreground md:hidden">{labels.swipeHint}</p>
                 </div>
             </div>
-
-            {modal}
         </>
     );
 }

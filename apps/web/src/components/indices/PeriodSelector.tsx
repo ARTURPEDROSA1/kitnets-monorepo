@@ -54,26 +54,29 @@ export function PeriodSelector({ presets, value, onSelect, custom, onCustomChang
                 })}
             </div>
             {value === "custom" && (
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <span>De</span>
-                    <DateInput
-                        value={custom.start}
-                        onChange={(iso) => { if (iso) onCustomChange({ ...custom, start: iso }); }}
-                        variant="bare"
-                        className={FIELD}
-                        wrapperClassName="w-[8.75rem]"
-                        aria-label="Início do período"
-                    />
-                    <span>até</span>
-                    <DateInput
-                        value={custom.end}
-                        onChange={(iso) => { if (iso) onCustomChange({ ...custom, end: iso }); }}
-                        variant="bare"
-                        className={FIELD}
-                        wrapperClassName="w-[8.75rem]"
-                        aria-label="Fim do período"
-                    />
-                    <span className="hidden sm:inline">· série de {formatMonthYear(bounds.start)} a {formatMonthYear(bounds.end)}</span>
+                <div className="flex flex-col items-start gap-1 sm:items-end">
+                    {/* the fields sit under the right end of the buttons, like the buttons themselves */}
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground sm:justify-end">
+                        <span>De</span>
+                        <DateInput
+                            value={custom.start}
+                            onChange={(iso) => { if (iso) onCustomChange({ ...custom, start: iso }); }}
+                            variant="bare"
+                            className={FIELD}
+                            wrapperClassName="w-[8.75rem]"
+                            aria-label="Início do período"
+                        />
+                        <span>até</span>
+                        <DateInput
+                            value={custom.end}
+                            onChange={(iso) => { if (iso) onCustomChange({ ...custom, end: iso }); }}
+                            variant="bare"
+                            className={FIELD}
+                            wrapperClassName="w-[8.75rem]"
+                            aria-label="Fim do período"
+                        />
+                    </div>
+                    <span className="text-[11px] text-muted-foreground sm:text-right">Série de {formatMonthYear(bounds.start)} a {formatMonthYear(bounds.end)}</span>
                 </div>
             )}
         </div>

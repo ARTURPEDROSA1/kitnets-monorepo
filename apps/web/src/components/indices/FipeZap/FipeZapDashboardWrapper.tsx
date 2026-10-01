@@ -1,6 +1,7 @@
 import { FipeZapKPIs } from "@/components/indices/FipeZap/FipeZapKPIs";
 import { FipeZapHistoryDashboard } from "@/components/indices/FipeZap/FipeZapHistoryDashboard";
 import { FipeZapContext } from "@/lib/fipezap";
+import type { ComparisonSeries } from "@/lib/index-compare";
 import { FipezapCitiesCta } from "@/components/indices/FipeZap/cities/FipezapCitiesCta";
 import type { ReactNode } from "react";
 
@@ -11,13 +12,15 @@ interface Props {
     bedrooms: string;
     /** every series of that bucket, the whole history */
     data: FipeZapContext;
+    /** the indexes the chart can overlay (CDI, IPCA) */
+    compare?: ComparisonSeries[];
     /** correction calculator, rendered between the cards and the history */
     calculator?: ReactNode;
     /** locale, for the link to the city dashboard */
     lang?: string;
 }
 
-export function FipeZapDashboardWrapper({ type, bedrooms, data, calculator, lang = "pt" }: Props) {
+export function FipeZapDashboardWrapper({ type, bedrooms, data, compare, calculator, lang = "pt" }: Props) {
     if (!data) {
         return <div className="p-10 text-center text-muted-foreground">Dados indísponíveis no momento.</div>;
     }
@@ -35,7 +38,7 @@ export function FipeZapDashboardWrapper({ type, bedrooms, data, calculator, lang
 
             {calculator}
 
-            <FipeZapHistoryDashboard data={data} initialType={type} bedrooms={bedrooms} />
+            <FipeZapHistoryDashboard data={data} initialType={type} bedrooms={bedrooms} compare={compare} />
         </div>
     );
 }

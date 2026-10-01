@@ -224,32 +224,16 @@ export default async function PanoramaPage({ params }: { params: Promise<{ lang:
                             {key === 'rent' && <div className="mb-6"><FipezapCitiesCta lang={lang} /></div>}
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {items.map(({ meta, history, latest }) => {
-                                    // const previous = history[1]?.value_percent || 0;
-                                    const current = latest?.value_percent || 0;
-                                    // const trend = getTrend(current, previous);
-                                    // const ChartIcon = trend.icon;
-
                                     const isMinWage = meta.id === 'reajuste-salario-minimo';
 
-                                    let displayValue = latest ? `${latest.value_percent.toFixed(2)}%` : '-';
-                                    let displayAccumulated = latest?.accumulated_12m != null ? `${latest.accumulated_12m.toFixed(2)}%` : '-';
-                                    let chartColor = '#10b981'; // Default emerald
-
-                                    if (isMinWage) {
-                                        // Minimum Wage Special Display
-                                        displayValue = latest ? latest.value_percent.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-';
-                                        displayAccumulated = latest?.accumulated_12m != null ? `${latest.accumulated_12m.toFixed(2)}%` : '-';
-                                        chartColor = '#10b981'; // Always green for salary growth
-                                    } else {
-                                        // Standard Logic
-                                        const getChartColor = (val: number) => {
-                                            if (val > 0.5) return '#ef4444'; // Red (High Inflation/Value)
-                                            if (val > 0.1) return '#f59e0b'; // Amber (Moderate)
-                                            if (val >= -0.1) return '#6b7280'; // Gray (Neutral)
-                                            return '#10b981'; // Emerald (Low/Negative)
-                                        };
-                                        chartColor = getChartColor(current);
-                                    }
+                                    // The card's figures; the sparkline keeps one colour for every index — it shows the
+                                    // trend, the figures under it say whether the value is high or low
+                                    const displayValue = latest
+                                        ? isMinWage
+                                            ? latest.value_percent.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                                            : `${latest.value_percent.toFixed(2)}%`
+                                        : '-';
+                                    const displayAccumulated = latest?.accumulated_12m != null ? `${latest.accumulated_12m.toFixed(2)}%` : '-';
 
                                     // Determine link: Special case for FipeZap sub-types -> go to main FipeZap page
                                     let href = lang === 'pt' ? `/indices/${meta.code.toLowerCase().replace(/\s+/g, '-')}` : `/${lang}/indices/${meta.code.toLowerCase().replace(/\s+/g, '-')}`;
@@ -292,7 +276,7 @@ export default async function PanoramaPage({ params }: { params: Promise<{ lang:
 
                                                 {/* Chart Area */}
                                                 <div className="mb-4">
-                                                    <MiniIndexChart data={history} color={chartColor} />
+                                                    <MiniIndexChart data={history} unit={isMinWage ? 'BRL' : '%'} />
                                                 </div>
 
                                                 <div className="grid grid-cols-2 gap-4 pt-4 border-t">
