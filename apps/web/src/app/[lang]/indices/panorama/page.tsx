@@ -134,14 +134,13 @@ export default async function PanoramaPage({ params }: { params: Promise<{ lang:
         latest: minWageHistory[0]
     };
 
-    // The calculator and the all-indexes chart: monthly rates of the last ten years by Panorama key,
-    // plus the salário mínimo amounts (lib/index-compare.ts, components/indices/PanoramaCalculator.tsx)
-    const tenYearsAgo = `${now.getFullYear() - 10}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const lastTenYears = (list: { month: string; value: number }[]) =>
-        [...list].sort((a, b) => a.month.localeCompare(b.month)).filter(v => v.month >= tenYearsAgo);
+    // The calculator and the all-indexes chart: every published month of each index by Panorama key
+    // (the series start in 1995, FipeZAP in 2008), plus the salário mínimo amounts
+    // (lib/index-compare.ts, components/indices/PanoramaCalculator.tsx)
+    const byMonth = (list: { month: string; value: number }[]) => [...list].sort((a, b) => a.month.localeCompare(b.month));
     const rates: PanoramaData['rates'] = {};
-    indexesData.forEach((d, i) => { rates[panoramaKey(d.meta.code)] = lastTenYears(rateLists[i]); });
-    const fipeRates = (series: FipeZapDataPoint[]) => lastTenYears(series.map(p => ({ month: p.date.slice(0, 7), value: p.value_percent })));
+    indexesData.forEach((d, i) => { rates[panoramaKey(d.meta.code)] = byMonth(rateLists[i]); });
+    const fipeRates = (series: FipeZapDataPoint[]) => byMonth(series.map(p => ({ month: p.date.slice(0, 7), value: p.value_percent })));
     rates.FIPEZAPLOCACAO = fipeRates(fipeData.locacao);
     rates.FIPEZAPVENDA = fipeRates(fipeData.venda);
     rates.FIPEZAPYIELD = fipeRates(fipeData.yield);
