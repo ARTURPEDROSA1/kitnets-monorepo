@@ -189,6 +189,8 @@ export function IndexTrendChart({ points, name, format = formatPercent, color = 
                         axisLine={false}
                         width={64}
                         domain={["auto", "auto"]}
+                        // room under the lowest point for its label, so it never sits on the date axis
+                        padding={{ top: 6, bottom: 18 }}
                     />
                     {crossesZero && <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeOpacity={0.6} />}
                     <Tooltip

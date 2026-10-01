@@ -1,8 +1,12 @@
 import { Metadata } from 'next';
-import { getAllIndexes, getIndexValues, IndexMetadata, IndexValue } from '@/lib/indexes';
+import { getAllIndexes, getAllIndexValuesForCalculator, getIndexValues, IndexMetadata, IndexValue } from '@/lib/indexes';
 import { getFipeZapData, FipeZapDataPoint } from '@/lib/fipezap';
 import { getMinimumWageData, MinimumWageData } from '@/lib/minimum-wage';
+import { PANORAMA_MIN_WAGE_KEY, panoramaKey } from '@/lib/index-compare';
 import { LazyMiniIndexChart as MiniIndexChart } from '@/components/indices/LazyMiniIndexChart';
+import { PanoramaProvider, type PanoramaData } from '@/components/indices/PanoramaCalculator';
+import { PanoramaChart } from '@/components/indices/PanoramaChart';
+import { CardCorrection } from '@/components/indices/CardCorrection';
 import { FipezapCitiesCta } from '@/components/indices/FipeZap/cities/FipezapCitiesCta';
 
 import Link from 'next/link';
@@ -56,16 +60,16 @@ export default async function PanoramaPage({ params }: { params: Promise<{ lang:
         })
     );
 
-    // Fetch FipeZap Data (Dynamic)
+    // FipeZap: the whole national history (the chart and the calculator take the last ten years,
+    // the cards the last twelve months)
     const now = new Date();
     const endDate = now.toISOString().split('T')[0];
-    const startDateDate = new Date();
-    startDateDate.setMonth(now.getMonth() - 13); // Go back ~13 months to ensure full chart context
-    const startDate = startDateDate.toISOString().split('T')[0];
 
-    const [fipeData, minWageData] = await Promise.all([
-        getFipeZapData(startDate, endDate, 'todos'),
-        getMinimumWageData() // Fetch all history including future confirmed
+    const [fipeData, minWageData, rateLists] = await Promise.all([
+        getFipeZapData('2000-01-01', endDate, 'todos'),
+        getMinimumWageData(), // Fetch all history including future confirmed
+        // every published month of each index, for the calculator and the all-indexes chart
+        Promise.all(indexesData.map(d => getAllIndexValuesForCalculator(d.meta.id))),
     ]);
 
     // Helper to map FipeZap to IndexData
@@ -98,9 +102,9 @@ export default async function PanoramaPage({ params }: { params: Promise<{ lang:
         };
     };
 
-    const fipeLocacao = mapFipeToData(fipeData.locacao, 'FIPEZAP Locação', 'Índice FipeZAP de Locação Residencial');
-    const fipeVenda = mapFipeToData(fipeData.venda, 'FIPEZAP Venda', 'Índice FipeZAP de Venda Residencial');
-    const fipeYield = mapFipeToData(fipeData.yield, 'FIPEZAP Yield', 'Índice FipeZAP de Yield (Rentabilidade)');
+    const fipeLocacao = mapFipeToData(fipeData.locacao.slice(-12), 'FIPEZAP Locação', 'Índice FipeZAP de Locação Residencial');
+    const fipeVenda = mapFipeToData(fipeData.venda.slice(-12), 'FIPEZAP Venda', 'Índice FipeZAP de Venda Residencial');
+    const fipeYield = mapFipeToData(fipeData.yield.slice(-12), 'FIPEZAP Yield', 'Índice FipeZAP de Yield (Rentabilidade)');
 
 
     // Prepare Minimum Wage Data
@@ -128,6 +132,22 @@ export default async function PanoramaPage({ params }: { params: Promise<{ lang:
         },
         history: minWageHistory.slice(0, 12), // Pass last 12 records
         latest: minWageHistory[0]
+    };
+
+    // The calculator and the all-indexes chart: monthly rates of the last ten years by Panorama key,
+    // plus the salário mínimo amounts (lib/index-compare.ts, components/indices/PanoramaCalculator.tsx)
+    const tenYearsAgo = `${now.getFullYear() - 10}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const lastTenYears = (list: { month: string; value: number }[]) =>
+        [...list].sort((a, b) => a.month.localeCompare(b.month)).filter(v => v.month >= tenYearsAgo);
+    const rates: PanoramaData['rates'] = {};
+    indexesData.forEach((d, i) => { rates[panoramaKey(d.meta.code)] = lastTenYears(rateLists[i]); });
+    const fipeRates = (series: FipeZapDataPoint[]) => lastTenYears(series.map(p => ({ month: p.date.slice(0, 7), value: p.value_percent })));
+    rates.FIPEZAPLOCACAO = fipeRates(fipeData.locacao);
+    rates.FIPEZAPVENDA = fipeRates(fipeData.venda);
+    rates.FIPEZAPYIELD = fipeRates(fipeData.yield);
+    const panoramaData: PanoramaData = {
+        rates,
+        levels: { [PANORAMA_MIN_WAGE_KEY]: minWageData.map((mw: MinimumWageData) => ({ month: mw.reference_date.slice(0, 7), value: mw.amount_brl })) },
     };
 
 
@@ -209,7 +229,9 @@ export default async function PanoramaPage({ params }: { params: Promise<{ lang:
                 Resumo dos principais indicadores econômicos e suas variações nos últimos 12 meses.
             </p>
 
+            <PanoramaProvider data={panoramaData}>
             <div className="space-y-12">
+                <PanoramaChart series={panoramaData.rates} />
                 {(['inflation', 'rent', 'interest', 'other'] as const).map((key) => {
                     const items = categories[key];
                     if (items.length === 0) return null;
@@ -297,6 +319,9 @@ export default async function PanoramaPage({ params }: { params: Promise<{ lang:
                                                         </span>
                                                     </div>
                                                 </div>
+
+                                                {/* the calculator's answer for this index */}
+                                                <CardCorrection seriesKey={panoramaKey(meta.code)} kind={isMinWage ? 'level' : meta.code.includes('Yield') ? 'none' : 'variation'} />
                                             </div>
                                         </div>
                                     );
@@ -306,6 +331,7 @@ export default async function PanoramaPage({ params }: { params: Promise<{ lang:
                     );
                 })}
             </div>
+            </PanoramaProvider>
 
             {/* SEO Content */}
             <div className="mt-16 max-w-4xl mx-auto space-y-12 text-muted-foreground">

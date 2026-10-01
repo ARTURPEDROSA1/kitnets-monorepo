@@ -12,7 +12,7 @@ import type { FipeZapContext, FipeZapDataPoint } from "@/lib/fipezap";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { MAIN_SERIES_COLOR, type ComparisonSeries } from "@/lib/index-compare";
-import { DEFAULT_MONTHLY_PERIOD, MONTHLY_PRESETS, filterByRange, formatRangeLabel, summarizeSeries } from "@/lib/index-period";
+import { MONTHLY_PRESETS, defaultMonthlyPeriod, filterByRange, formatRangeLabel, summarizeSeries } from "@/lib/index-period";
 import { CompareToggle } from "../CompareToggle";
 import { IndexTrendChart, formatPercent, type TrendPoint } from "../IndexTrendChart";
 import { PeriodSelector } from "../PeriodSelector";
@@ -64,7 +64,7 @@ export function FipeZapHistoryDashboard({ data, initialType, bedrooms, compare =
     );
     const earliest = rows[0]?.date ?? "";
     const latest = rows[rows.length - 1]?.date ?? "";
-    const { period, custom, range, redundant, select, setCustom } = useIndexPeriod(earliest, latest, MONTHLY_PRESETS, DEFAULT_MONTHLY_PERIOD);
+    const { period, custom, range, redundant, select, setCustom } = useIndexPeriod(earliest, latest, MONTHLY_PRESETS, defaultMonthlyPeriod(latest));
 
     const slice: FipeZapDataPoint[] = useMemo(() => filterByRange(rows, range), [rows, range]);
     const kind = series === "yield" ? "level" : "variation";

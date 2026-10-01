@@ -47,8 +47,17 @@ export const YEARLY_PRESETS: PeriodPreset[] = [
     { key: "custom", label: "Personalizar", title: "Escolher as datas" },
 ];
 
-export const DEFAULT_MONTHLY_PERIOD: PeriodKey = "5y";
+export const DEFAULT_MONTHLY_PERIOD: PeriodKey = "6m";
 export const DEFAULT_YEARLY_PERIOD: PeriodKey = "10y";
+
+/**
+ * The period a monthly chart opens with: the year to date once it holds at least two published
+ * months (the latest point is February or later), otherwise the last six months.
+ */
+export function defaultMonthlyPeriod(latest: string | null | undefined): PeriodKey {
+    if (!latest) return DEFAULT_MONTHLY_PERIOD;
+    return Number(latest.slice(5, 7)) >= 2 ? "ytd" : "6m";
+}
 
 const MONTHS_PT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 

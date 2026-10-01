@@ -35,6 +35,11 @@
     --index-chart-ipca: 25 95% 53%;
     --index-chart-selic: 258 90% 66%;
     --index-chart-igpm: 350 89% 60%;
+    --index-chart-inpc: 173 80% 40%;
+    --index-chart-ivar: 32 95% 44%;
+    --index-chart-fipezap-locacao: 160 84% 39%;
+    --index-chart-fipezap-venda: 199 89% 48%;
+    --index-chart-fipezap-yield: 330 81% 60%;
   }
 
   .dark {
@@ -68,6 +73,11 @@
     --index-chart-ipca: 21 90% 48%;
     --index-chart-selic: 258 90% 66%;
     --index-chart-igpm: 347 77% 50%;
+    --index-chart-inpc: 175 84% 32%;
+    --index-chart-ivar: 32 95% 44%;
+    --index-chart-fipezap-locacao: 161 94% 30%;
+    --index-chart-fipezap-venda: 200 98% 39%;
+    --index-chart-fipezap-yield: 333 71% 51%;
   }
 }
 
