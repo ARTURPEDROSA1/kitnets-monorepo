@@ -15,6 +15,7 @@ import { formatDateBR } from "@/lib/dates";
 import { LEASE_VIEWS, MANAGEMENT_LABELS, attentionItems, brl, hubTotals, inView, type LeaseRow, type LeaseView } from "@/lib/lease-dashboard";
 import LeaseTable, { type LeaseTableActions } from "./LeaseTable";
 import LeaseTimeline from "./LeaseTimeline";
+import { LeaseTitle } from "./LeaseTitle";
 
 interface Props {
     rows: LeaseRow[];
@@ -137,7 +138,7 @@ export default function ContratosHub({ rows, today, loading, error, view, onView
                             : totals.overdueTerm > 0 ? "só contratos com o prazo vencido" : "nenhum prazo a vencer"}
                         valueTone={totals.nextEnd && totals.nextEnd.days <= 90 ? "text-amber-600" : undefined}
                         onClick={totals.nextEnd ? () => actions.onOpen(totals.nextEnd!.row) : undefined}
-                        title={totals.nextEnd ? `Abrir ${totals.nextEnd.row.title}` : undefined}
+                        title={totals.nextEnd ? `Abrir o contrato de ${totals.nextEnd.row.place}` : undefined}
                     />
                     <Item
                         icon={<TrendingUp className="h-3.5 w-3.5" />} tone="text-violet-600" label="Próximo reajuste"
@@ -146,7 +147,7 @@ export default function ContratosHub({ rows, today, loading, error, view, onView
                             ? <>{totals.nextAdjustment.row.indexLabel}{totals.nextAdjustment.accumulatedPct !== null ? ` ${pctText(totals.nextAdjustment.accumulatedPct)} até agora` : ""}<br />{totals.nextAdjustment.row.place}</>
                             : "nenhum reajuste previsto"}
                         onClick={totals.nextAdjustment ? () => actions.onOpen(totals.nextAdjustment!.row) : undefined}
-                        title={totals.nextAdjustment ? `Abrir ${totals.nextAdjustment.row.title}` : undefined}
+                        title={totals.nextAdjustment ? `Abrir o contrato de ${totals.nextAdjustment.row.place}` : undefined}
                     />
                     <Item
                         icon={<PiggyBank className="h-3.5 w-3.5" />} tone="text-blue-600" label="Caução em mãos"
@@ -183,7 +184,7 @@ export default function ContratosHub({ rows, today, loading, error, view, onView
                             <li key={`${item.kind}-${item.row.lease.id}-${i}`} className="flex items-start gap-3 px-4 py-2 text-sm">
                                 <span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", DOT[item.tone])} />
                                 <span className="min-w-0 flex-1">
-                                    <button type="button" onClick={() => actions.onOpen(item.row)} className="font-semibold text-foreground hover:underline underline-offset-2">{item.row.title}</button>
+                                    <button type="button" onClick={() => actions.onOpen(item.row)} className="font-semibold text-foreground hover:underline underline-offset-2"><LeaseTitle title={item.row.title} tenant={item.row.lease.primary_tenant_name} /></button>
                                     {/* the adjustment line carries the projected rent ("→ R$ …") once a month of the cycle is out */}
                                     <span className={cn("text-muted-foreground", item.kind === "adjustment" && item.row.summary.monthsCounted > 0 && item.row.summary.adjustedRent !== null && "privacy-money")}> — {item.text}</span>
                                 </span>

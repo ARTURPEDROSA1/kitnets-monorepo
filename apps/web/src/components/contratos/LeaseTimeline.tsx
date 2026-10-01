@@ -10,8 +10,9 @@
 import React, { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { formatDateBR } from "@/lib/dates";
-import { Money } from "@/components/privacy";
+import { Money, Sensitive } from "@/components/privacy";
 import { adjustmentDates, brl, positionPct, statusMeta, timelineBounds, timelineTicks, type LeaseRow } from "@/lib/lease-dashboard";
+import { LeaseTitle } from "./LeaseTitle";
 
 interface Props {
     rows: LeaseRow[];
@@ -69,7 +70,8 @@ export default function LeaseTimeline({ rows, today, onOpen }: Props) {
                             const tail = row.inForce && end && end < today ? { left: right, width: Math.max(0.4, todayPct - right) } : null;
                             const adj = adjustmentDates(lease, today);
                             const rent = brl(Number(lease.monthly_rent) || 0, 0);
-                            const title = `${row.title}\n${formatDateBR(start)} → ${end ? formatDateBR(end) : "prazo indeterminado"} · ${rent}/mês · ${meta.label}`;
+                            // the tooltip names the place, never the tenant: a native tooltip escapes the eye toggle
+                            const title = `${row.place}\n${formatDateBR(start)} → ${end ? formatDateBR(end) : "prazo indeterminado"} · ${rent}/mês · ${meta.label}`;
                             return (
                                 <li key={lease.id} className="flex border-b border-border/40 last:border-0 hover:bg-muted/30">
                                     <button
@@ -78,9 +80,11 @@ export default function LeaseTimeline({ rows, today, onOpen }: Props) {
                                         className={cn(LABEL_WIDTH, "shrink-0 px-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500")}
                                         title={title}
                                     >
-                                        <span className="block break-words text-xs font-semibold leading-snug text-foreground">{row.title}</span>
+                                        <span className="block break-words text-xs font-semibold leading-snug text-foreground"><LeaseTitle title={row.title} tenant={lease.primary_tenant_name} /></span>
                                         <span className="block break-words text-[11px] leading-snug text-muted-foreground">
-                                            {row.title.toLowerCase().includes((lease.primary_tenant_name ?? "\u0000").toLowerCase()) ? <Money>{rent}</Money> : <>{lease.primary_tenant_name ?? "Sem inquilino"} · <Money>{rent}</Money></>}
+                                            {row.title.toLowerCase().includes((lease.primary_tenant_name ?? "\u0000").toLowerCase())
+                                                ? <Money>{rent}</Money>
+                                                : <>{lease.primary_tenant_name ? <Sensitive>{lease.primary_tenant_name}</Sensitive> : "Sem inquilino"} · <Money>{rent}</Money></>}
                                         </span>
                                     </button>
                                     <div className="relative flex-1 cursor-pointer" onClick={() => onOpen(row)} title={title} role="presentation">

@@ -29,4 +29,10 @@ export interface LeaseDashboardView {
     income: PropertyIncomeRow[];
     /** the lease's index series; null when it has none or the series could not be read */
     series: IndexPoint[] | null;
+    /**
+     * `single` (a house or apartment rented whole: the contract's card names the energy bill) or
+     * `multi` (a property rented unit by unit: it names the condominium); null when the property is
+     * not registered in the profile.
+     */
+    propertyKind: "single" | "multi" | null;
 }
