@@ -101,12 +101,12 @@ export default function FaturasContent({ lang, initial = null, initialDetail = n
     const [payTarget, setPayTarget] = useState<ActionTarget | null>(null);
     const [cancelTarget, setCancelTarget] = useState<ActionTarget | null>(null);
 
-    const afterAction = async (fresh: InvoiceDetailView, message: string) => {
+    const afterAction = async (fresh: InvoiceDetailView, message: string | null) => {
         setPayTarget(null);
         setCancelTarget(null);
         setDetail(fresh);
         setDetailNotice(message);
-        setNotice(message);
+        if (message) setNotice(message);
         await load().catch(() => {});
     };
 
@@ -168,8 +168,11 @@ export default function FaturasContent({ lang, initial = null, initialDetail = n
                     initial={detail}
                     notice={detail?.invoice.id === selectedId ? detailNotice : null}
                     onBack={() => { setDetailNotice(null); select(null); }}
+                    bankUsable={Boolean(connections.inter?.usable)}
+                    sandbox={connections.inter?.environment === "SANDBOX" && connections.sandboxAllowed}
                     onPay={d => setPayTarget(d.invoice)}
                     onCancel={d => setCancelTarget(d.invoice)}
+                    onChanged={(fresh, message) => { void afterAction(fresh, message); }}
                 />
                 {modals}
             </div>

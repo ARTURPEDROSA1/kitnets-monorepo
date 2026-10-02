@@ -81,3 +81,13 @@ export const billingSettingsSchema = z.object({
 });
 
 export type BillingSettingsInput = z.output<typeof billingSettingsSchema>;
+
+/** POST /api/faturas/[id]/emitir — issue the boleto; a new due date only when the invoice's has passed. */
+export const invoiceIssueSchema = z.object({
+    due_date: optionalText(10).refine((v) => v == null || ISO_DATE.test(v), "Data de vencimento inválida."),
+});
+
+/** POST /api/faturas/[id]/pagar-sandbox — the bank's sandbox pays the boleto as the tenant would. */
+export const invoiceSandboxPaySchema = z.object({
+    via: z.preprocess((v) => (v == null || v === "" ? "PIX" : v), z.enum(["BOLETO", "PIX"], { errorMap: () => ({ message: "Forma inválida." }) })),
+});

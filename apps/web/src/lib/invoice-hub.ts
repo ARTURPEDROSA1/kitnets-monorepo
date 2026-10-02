@@ -17,7 +17,7 @@ export { brl };
 
 // ── Status ───────────────────────────────────────────────────────────
 
-export type InvoiceDisplay = "a_emitir" | "emitida" | "em_atraso" | "paga" | "cancelada";
+export type InvoiceDisplay = "a_emitir" | "emitida" | "em_atraso" | "expirada" | "paga" | "cancelada";
 
 export interface InvoiceStatusMeta { label: string; pill: string }
 
@@ -25,6 +25,7 @@ export const INVOICE_STATUS_META: Record<InvoiceDisplay, InvoiceStatusMeta> = {
     a_emitir: { label: "A emitir", pill: "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
     emitida: { label: "Emitida", pill: "bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-300" },
     em_atraso: { label: "Em atraso", pill: "bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300" },
+    expirada: { label: "Boleto expirado", pill: "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300" },
     paga: { label: "Paga", pill: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300" },
     cancelada: { label: "Cancelada", pill: "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300" },
 };
@@ -32,11 +33,20 @@ export const INVOICE_STATUS_META: Record<InvoiceDisplay, InvoiceStatusMeta> = {
 /** Still waiting for the money. */
 export const isOpen = (status: InvoiceStatus) => status === "DRAFT" || status === "ISSUED";
 
-export function invoiceDisplay(invoice: Pick<InvoiceView, "status" | "due_date">, today: string): InvoiceDisplay {
+/** The boleto the tenant can still pay with. */
+export const hasLiveCharge = (invoice: Pick<InvoiceView, "charge">) => invoice.charge?.status === "REQUESTED" || invoice.charge?.status === "OPEN";
+
+/**
+ * What the invoice reads as. Stored: DRAFT, ISSUED, PAID, CANCELLED. Read from the due date and the
+ * boleto: late while unpaid past the date; expired when its boleto stopped taking payment; issued only
+ * while a boleto is alive (a cancelled or failed one leaves the invoice to be issued again).
+ */
+export function invoiceDisplay(invoice: Pick<InvoiceView, "status" | "due_date" | "charge">, today: string): InvoiceDisplay {
     if (invoice.status === "PAID") return "paga";
     if (invoice.status === "CANCELLED") return "cancelada";
+    if (invoice.charge?.status === "EXPIRED") return "expirada";
     if (invoice.due_date < today) return "em_atraso";
-    return invoice.status === "ISSUED" ? "emitida" : "a_emitir";
+    return hasLiveCharge(invoice) ? "emitida" : "a_emitir";
 }
 
 export const PAID_VIA_LABELS: Record<string, string> = { BOLETO: "Boleto", PIX: "PIX", CARD: "Cartão", MANUAL: "Baixa manual" };
@@ -169,7 +179,7 @@ export function invoiceHubTotals(rows: readonly InvoiceRow[], recurring: readonl
 
 // ── Attention ────────────────────────────────────────────────────────
 
-export type InvoiceAttentionKind = "overdue" | "blocked" | "to_generate" | "undecided" | "settings" | "connection";
+export type InvoiceAttentionKind = "overdue" | "blocked" | "to_generate" | "undecided" | "settings" | "connection" | "expired" | "issue_failed";
 export type AttentionTone = "rose" | "amber" | "slate";
 
 export interface InvoiceAttentionItem {
@@ -210,6 +220,20 @@ export function invoiceAttention(rows: readonly InvoiceRow[], recurring: readonl
     }
     // a connection that fails or a certificate about to expire stops every invoice: right after the late money
     for (const c of bank.filter(x => x.tone !== "slate")) items.push(bankItem(c));
+    for (const r of rows.filter(x => x.display === "expirada")) {
+        items.push({
+            kind: "expired", tone: "amber", subject: `Fatura nº ${r.invoice.number} · ${r.place}`,
+            text: "o boleto expirou sem pagamento: emita de novo com uma nova data de vencimento",
+            target: { type: "invoice", id: r.invoice.id },
+        });
+    }
+    for (const r of rows.filter(x => isOpen(x.invoice.status) && x.invoice.charge?.status === "FAILED")) {
+        items.push({
+            kind: "issue_failed", tone: "rose", subject: `Fatura nº ${r.invoice.number} · ${r.place}`,
+            text: `a emissão no banco falhou: ${r.invoice.charge?.last_error ?? "motivo não informado"}`,
+            target: { type: "invoice", id: r.invoice.id },
+        });
+    }
     for (const r of rows.filter(x => isOpen(x.invoice.status) && x.invoice.blockers.length > 0)) {
         items.push({
             kind: "blocked", tone: "amber", subject: `Fatura nº ${r.invoice.number} · ${r.place}`,

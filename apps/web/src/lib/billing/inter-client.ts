@@ -11,7 +11,7 @@
 import https from "node:https";
 import { INTER_BASE_URLS, normalizePem, parseScopes, type InterCredentials, type InterEnvironment } from "./inter-credentials";
 
-export type InterErrorCode = "TLS" | "UNAUTHORIZED" | "SCOPE" | "RATE_LIMIT" | "UNAVAILABLE" | "TIMEOUT" | "NETWORK" | "UNEXPECTED";
+export type InterErrorCode = "TLS" | "UNAUTHORIZED" | "SCOPE" | "RATE_LIMIT" | "UNAVAILABLE" | "TIMEOUT" | "NETWORK" | "UNEXPECTED" | "INVALID" | "NOT_FOUND";
 
 /** What went wrong, in words the owner can act on. The message never carries a credential. */
 export class InterError extends Error {
@@ -121,4 +121,95 @@ export async function requestInterToken(credentials: InterCredentials, scopes: r
     if (response.status === 429) throw new InterError("RATE_LIMIT", "Muitas tentativas em pouco tempo. O Banco Inter aceita cinco pedidos de token por minuto: aguarde um minuto.", 429);
     if (response.status >= 500) throw new InterError("UNAVAILABLE", "O Banco Inter está indisponível no momento. Tente de novo mais tarde.", response.status);
     throw new InterError("UNEXPECTED", `Resposta inesperada do Banco Inter (HTTP ${response.status})${detail}.`, response.status);
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// The API, with a token (API Cobrança v3)
+// ───────────────────────────────────────────────────────────────────────────
+
+export interface InterSessionLike {
+    credentials: InterCredentials;
+    environment: InterEnvironment;
+    accessToken: string;
+}
+
+interface ApiResponse { status: number; json: Record<string, unknown>; body: string }
+
+/** One authenticated call. Throws an InterError for anything but a 2xx. */
+async function call(session: InterSessionLike, method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH", path: string, body: unknown, opts: Partial<InterRequestOptions>): Promise<ApiResponse> {
+    const url = new URL(path, opts.baseUrl ?? INTER_BASE_URLS[session.environment]);
+    const headers: Record<string, string> = { Authorization: `Bearer ${session.accessToken}`, Accept: "application/json" };
+    const account = session.credentials.account.replace(/\D/g, "").replace(/^0+/, "");
+    if (account) headers["x-conta-corrente"] = account;
+    let payload: string | undefined;
+    if (body !== undefined) {
+        payload = JSON.stringify(body);
+        headers["Content-Type"] = "application/json";
+        headers["Content-Length"] = String(Buffer.byteLength(payload));
+    }
+    const response = await send(url, { method, headers, body: payload }, session.credentials, { ...opts, environment: session.environment });
+    const json = parseJson(response.body);
+    if (response.status >= 200 && response.status < 300) return { status: response.status, json, body: response.body };
+
+    const detail = bankDetail(json);
+    const violations = Array.isArray(json.violacoes)
+        ? (json.violacoes as Array<Record<string, unknown>>).map(v => [v.propriedade ?? v.campo, v.razao ?? v.mensagem ?? v.motivo].filter(Boolean).join(": ")).filter(Boolean).slice(0, 4).join("; ")
+        : "";
+    if (response.status === 401) throw new InterError("UNAUTHORIZED", "O Banco Inter não aceitou o token de acesso.", 401);
+    if (response.status === 403) throw new InterError("SCOPE", `O Banco Inter não autorizou a operação${detail}. Confira as permissões da integração.`, 403);
+    if (response.status === 404) throw new InterError("NOT_FOUND", `O Banco Inter não encontrou a cobrança${detail}.`, 404);
+    if (response.status === 400 || response.status === 422) throw new InterError("INVALID", `O Banco Inter recusou os dados${detail}${violations ? ` — ${violations}` : ""}.`, response.status);
+    if (response.status === 429) throw new InterError("RATE_LIMIT", "Muitas chamadas ao Banco Inter em pouco tempo. Aguarde um minuto.", 429);
+    if (response.status >= 500) throw new InterError("UNAVAILABLE", "O Banco Inter está indisponível no momento. Tente de novo mais tarde.", response.status);
+    throw new InterError("UNEXPECTED", `Resposta inesperada do Banco Inter (HTTP ${response.status})${detail}.`, response.status);
+}
+
+const CHARGES = "/cobranca/v3/cobrancas";
+
+/** POST /cobranca/v3/cobrancas → the bank's reference (codigoSolicitacao). The charge itself is made asynchronously. */
+export async function createInterCharge(session: InterSessionLike, payload: Record<string, unknown>, opts: Partial<InterRequestOptions> = {}): Promise<string> {
+    const { json } = await call(session, "POST", CHARGES, payload, opts);
+    const codigo = typeof json.codigoSolicitacao === "string" ? json.codigoSolicitacao.trim() : "";
+    if (!codigo) throw new InterError("UNEXPECTED", "O Banco Inter aceitou a cobrança mas não devolveu o seu código.", 200);
+    return codigo;
+}
+
+/** GET /cobranca/v3/cobrancas/{codigoSolicitacao}: the charge as the bank has it (raw; see parseChargeState). */
+export async function getInterCharge(session: InterSessionLike, codigoSolicitacao: string, opts: Partial<InterRequestOptions> = {}): Promise<Record<string, unknown>> {
+    return (await call(session, "GET", `${CHARGES}/${encodeURIComponent(codigoSolicitacao)}`, undefined, opts)).json;
+}
+
+/** GET …/pdf → the boleto as bytes. */
+export async function getInterChargePdf(session: InterSessionLike, codigoSolicitacao: string, opts: Partial<InterRequestOptions> = {}): Promise<Buffer> {
+    const { json } = await call(session, "GET", `${CHARGES}/${encodeURIComponent(codigoSolicitacao)}/pdf`, undefined, opts);
+    const pdf = typeof json.pdf === "string" ? json.pdf : "";
+    const bytes = Buffer.from(pdf, "base64");
+    if (!bytes.length || bytes.subarray(0, 4).toString() !== "%PDF") throw new InterError("UNEXPECTED", "O Banco Inter não devolveu o PDF do boleto.", 200);
+    return bytes;
+}
+
+/** POST …/cancelar (202). */
+export async function cancelInterCharge(session: InterSessionLike, codigoSolicitacao: string, reason: string, opts: Partial<InterRequestOptions> = {}): Promise<void> {
+    await call(session, "POST", `${CHARGES}/${encodeURIComponent(codigoSolicitacao)}/cancelar`, { motivoCancelamento: reason.slice(0, 50) }, opts);
+}
+
+/** PUT /cobranca/v3/cobrancas/webhook (204): where the bank reports paid, cancelled and expired charges. */
+export async function putInterWebhook(session: InterSessionLike, webhookUrl: string, opts: Partial<InterRequestOptions> = {}): Promise<void> {
+    await call(session, "PUT", `${CHARGES}/webhook`, { webhookUrl }, opts);
+}
+
+/** GET /cobranca/v3/cobrancas/webhook: the URL registered, or null. */
+export async function getInterWebhook(session: InterSessionLike, opts: Partial<InterRequestOptions> = {}): Promise<string | null> {
+    try {
+        const { json } = await call(session, "GET", `${CHARGES}/webhook`, undefined, opts);
+        return typeof json.webhookUrl === "string" ? json.webhookUrl : null;
+    } catch (err) {
+        if (err instanceof InterError && err.code === "NOT_FOUND") return null;
+        throw err;
+    }
+}
+
+/** Sandbox only: POST …/pagar pays the charge as if the tenant had (204). */
+export async function payInterChargeSandbox(session: InterSessionLike, codigoSolicitacao: string, via: "BOLETO" | "PIX", opts: Partial<InterRequestOptions> = {}): Promise<void> {
+    await call(session, "POST", `${CHARGES}/${encodeURIComponent(codigoSolicitacao)}/pagar`, { pagarCom: via }, opts);
 }
