@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { requireProfile, getOwnedProperty } from "@/lib/api-auth";
 import { computeInvestmentMetrics } from "@/lib/investment-metrics";
-import { breakdown, formatMonthKey, monthKey, type PropertyIncomeRow } from "@/lib/property-income";
+import { INCOME_DIRECT_COLUMNS, breakdown, formatMonthKey, monthKey, type PropertyIncomeRow } from "@/lib/property-income";
 import { KIND_LABELS, type PropertyInvestment, type PropertyTransaction } from "@/lib/property-investment";
 import { effectiveTax, taxScopeForProperty, TAX_KINDS } from "@/lib/property-taxes";
 import { loadPropertyUnits } from "@/lib/property-units-server";
@@ -38,7 +38,7 @@ export async function GET(_request: Request, context: RouteContext) {
         const [inv, txs, income, taxes, valuations, ipca, units] = await Promise.all([
             supabase.from("property_investments").select("*").eq("property_id", id).maybeSingle(),
             supabase.from("property_transactions").select("id, property_id, occurred_on, kind, amount, interest_part, principal_part, insurance_part, comment, source, bank_reference").eq("property_id", id).order("occurred_on", { ascending: true }),
-            supabase.from("property_income_months").select("id, property_id, month, unit_id, unit_name, received_on, received_amount, energy_portion, other_income, other_expenses, condo_amount, fee_on_condo, iptu_amount, agency_fee_pct, status, source, bank_reference, notes").eq("property_id", id).order("month", { ascending: true }),
+            supabase.from("property_income_months").select(`id, property_id, month, unit_id, unit_name, received_on, received_amount, energy_portion, other_income, other_expenses, condo_amount, fee_on_condo, iptu_amount, agency_fee_pct, status, source, bank_reference, notes, ${INCOME_DIRECT_COLUMNS}`).eq("property_id", id).order("month", { ascending: true }),
             loadTaxRows(supabase, id),
             loadValuations(supabase, id),
             loadIpcaSeries(supabase).catch(() => []),

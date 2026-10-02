@@ -1,5 +1,5 @@
 import type { AdminSupabase } from "@/lib/api-auth";
-import type { PropertyIncomeRow } from "@/lib/property-income";
+import { INCOME_DIRECT_COLUMNS, type PropertyIncomeRow } from "@/lib/property-income";
 import { buildCondominiumMonths, type CondominiumAutoCosts, type CondominiumCostRow, type CondominiumMonth } from "@/lib/condominium";
 import { condominiumIptuByMonth } from "@/lib/property-taxes";
 import { loadTaxRows } from "@/lib/property-taxes-server";
@@ -62,7 +62,7 @@ export async function loadAutoCosts(supabase: AdminSupabase, propertyId: string)
 /** One property's condominium months (revenue from the income ledger, energy and IPTU from their registers, its cost rows), newest first. */
 export async function loadMonths(supabase: AdminSupabase, propertyId: string): Promise<{ months: CondominiumMonth[]; costs: CondominiumCostRow[] }> {
     const [{ data: income, error }, costs, auto] = await Promise.all([
-        supabase.from("property_income_months").select("month, condo_amount, received_amount, status").eq("property_id", propertyId),
+        supabase.from("property_income_months").select(`month, condo_amount, received_amount, status, ${INCOME_DIRECT_COLUMNS}`).eq("property_id", propertyId),
         loadCosts(supabase, propertyId),
         loadAutoCosts(supabase, propertyId),
     ]);
@@ -75,7 +75,7 @@ export async function loadMonthsByProperty(supabase: AdminSupabase, profileId: s
     const out = new Map<string, CondominiumMonth[]>();
     if (propertyIds.length === 0) return out;
     const [{ data: income, error: e1 }, { data: costs, error: e2 }, { data: energy, error: e3 }, { data: water, error: e4 }, taxes] = await Promise.all([
-        supabase.from("property_income_months").select("property_id, month, condo_amount, received_amount, status").in("property_id", propertyIds),
+        supabase.from("property_income_months").select(`property_id, month, condo_amount, received_amount, status, ${INCOME_DIRECT_COLUMNS}`).in("property_id", propertyIds),
         supabase.from(CONDO_COSTS_TABLE).select(COST_COLUMNS).eq("owner_id", profileId).in("property_id", propertyIds),
         supabase.from("energy_bills").select(BILL_COLUMNS).in("property_id", propertyIds).eq("is_historical_only", false),
         supabase.from("water_bills").select(BILL_COLUMNS).in("property_id", propertyIds),

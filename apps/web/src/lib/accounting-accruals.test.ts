@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-    checklistSummary, closeChecklist, depreciationEntry, diffEntries, fairValueEntry, financingEntry, monthEnd, monthRange, rentAccrual, rentRef,
+    checklistSummary, closeChecklist, depreciationEntry, diffEntries, fairValueEntry, financingEntry, lateFeeEntry, lateFeeRef, monthEnd, monthRange, rentAccrual, rentRef,
     resolveEntries, shiftMonth, type AutoLine, type CloseFacts, type IncomeRowForAccrual, type PostableEntry, type StoredEntry,
 } from "./accounting-accruals";
 
@@ -80,6 +80,87 @@ describe("rentAccrual", () => {
         const bad = rentAccrual(row({ received_amount: 100, energy_portion: 350 }), { propertyName: "X", policy: "RECEITA" });
         expect(bad.invalid).toBe(true);
         expect(bad.entry).toBeNull();
+    });
+
+    // Kitnet 35C: rent 1.000 through the agency (10 %), condominium 150 collected by the owner by invoice
+    const kitnet35C = { received_amount: 900, energy_portion: 0, other_income: 0, other_expenses: 0, condo_amount: 150, condo_direct: true, unit_id: "u35c", unit_name: "Kitnet 35C" };
+
+    it("adds what the tenant paid by invoice to the receivable, the condominium the owner collects included", () => {
+        const r = rentAccrual(row({ ...kitnet35C, direct_condo: 150 }), { propertyName: "Santo Antônio", policy: "REPASSE" });
+        const lines = r.entry!.lines;
+        expect(balanced(lines)).toBe(true);
+        expect(amount(lines, "ALUGUEIS_A_RECEBER", "debit")).toBe(1050);     // 900 from the agency + 150 by invoice
+        expect(amount(lines, "DESP_TAXA_ADM", "debit")).toBe(100);
+        expect(amount(lines, "RECEITA_ALUGUEL", "credit")).toBe(1000);
+        expect(amount(lines, "DESP_CONDOMINIO", "credit")).toBe(150);
+        expect(lines.find(l => l.key === "ALUGUEIS_A_RECEBER")!.memo).toBe("repasse da imobiliária e faturas pagas pelo inquilino");
+        expect(r.reimbursements).toBe(150);
+    });
+
+    it("while the invoice is open the rent is posted in full and the condominium waits for the payment", () => {
+        const r = rentAccrual(row(kitnet35C), { propertyName: "Santo Antônio", policy: "REPASSE" });
+        const lines = r.entry!.lines;
+        expect(balanced(lines)).toBe(true);
+        expect(amount(lines, "ALUGUEIS_A_RECEBER", "debit")).toBe(900);
+        expect(amount(lines, "RECEITA_ALUGUEL", "credit")).toBe(1000);
+        expect(lines.some(l => l.key === "DESP_CONDOMINIO")).toBe(false);
+        expect(r.waitingPolicy).toBe(false);
+    });
+
+    it("a self-managed month paid by invoice: no agency, every charge against its own expense under REPASSE", () => {
+        const paid = row({
+            received_amount: 0, energy_portion: 0, other_income: 0, other_expenses: 0, agency_fee_pct: 0, condo_amount: 150, condo_direct: true,
+            direct_rent: 1200, direct_condo: 150, direct_energy: 60, direct_other: 130,
+            direct_other_items: [{ kind: "IPTU", amount: 80 }, { kind: "WATER", amount: 30 }, { kind: "INTERNET", amount: 20 }],
+        });
+        const r = rentAccrual(paid, { propertyName: "Casa", policy: "REPASSE" });
+        const lines = r.entry!.lines;
+        expect(balanced(lines)).toBe(true);
+        expect(amount(lines, "ALUGUEIS_A_RECEBER", "debit")).toBe(1540);
+        expect(lines.some(l => l.key === "DESP_TAXA_ADM")).toBe(false);
+        expect(amount(lines, "RECEITA_ALUGUEL", "credit")).toBe(1200);
+        expect(amount(lines, "DESP_CONDOMINIO", "credit")).toBe(150);
+        expect(amount(lines, "DESP_UTILIDADES", "credit")).toBe(90);          // energy 60 + water 30
+        expect(amount(lines, "DESP_IPTU", "credit")).toBe(80);
+        expect(amount(lines, "DESP_OUTRAS_IMOVEIS", "credit")).toBe(20);
+        expect(lines.find(l => l.key === "ALUGUEIS_A_RECEBER")!.memo).toBe("faturas pagas pelo inquilino");
+        expect(r.reimbursements).toBe(340);
+
+        // the same month under RECEITA: one line of reimbursements
+        const asRevenue = rentAccrual(paid, { propertyName: "Casa", policy: "RECEITA" }).entry!.lines;
+        expect(balanced(asRevenue)).toBe(true);
+        expect(amount(asRevenue, "RECEITA_REEMBOLSOS", "credit")).toBe(340);
+        // and with the policy still open: only the rent
+        const waiting = rentAccrual(paid, { propertyName: "Casa", policy: null });
+        expect(waiting.waitingPolicy).toBe(true);
+        expect(balanced(waiting.entry!.lines)).toBe(true);
+        expect(amount(waiting.entry!.lines, "ALUGUEIS_A_RECEBER", "debit")).toBe(1200);
+    });
+
+    it("never posts more or less than the ledger says came in when the invoice items do not explain it", () => {
+        const r = rentAccrual(row({ received_amount: 0, energy_portion: 0, agency_fee_pct: 0, direct_rent: 1000, direct_other: 100, direct_other_items: [{ kind: "IPTU", amount: 80 }] }), { propertyName: "Casa", policy: "REPASSE" });
+        const lines = r.entry!.lines;
+        expect(balanced(lines)).toBe(true);
+        expect(amount(lines, "DESP_IPTU", "credit")).toBe(80);
+        expect(amount(lines, "DESP_OUTRAS_IMOVEIS", "credit")).toBe(20);
+    });
+});
+
+describe("lateFeeEntry", () => {
+    const invoice = { id: "inv-1", number: 12, property_id: "p1", unit_id: "u35c", paid_on: "2026-10-19", late_fee_amount: 12.5 };
+
+    it("posts the late fee as financial revenue on the day it was paid", () => {
+        const e = lateFeeEntry(invoice, "Santo Antônio")!;
+        expect(e).toMatchObject({ source: "ACCRUAL", source_ref: "fatura:inv-1:encargos", entry_date: "2026-10-19", description: "Multa e juros da fatura nº 12 — Santo Antônio" });
+        expect(lateFeeRef("inv-1")).toBe(e.source_ref);
+        expect(balanced(e.lines)).toBe(true);
+        expect(amount(e.lines, "ALUGUEIS_A_RECEBER", "debit")).toBe(12.5);
+        expect(amount(e.lines, "RECEITA_JUROS_MULTAS", "credit")).toBe(12.5);
+        expect(e.lines.every(l => l.property_id === "p1" && l.unit_id === "u35c")).toBe(true);
+    });
+
+    it("posts nothing for an invoice paid on time", () => {
+        expect(lateFeeEntry({ ...invoice, late_fee_amount: 0 }, "X")).toBeNull();
     });
 });
 

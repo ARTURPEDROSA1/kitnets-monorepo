@@ -96,7 +96,9 @@ export function buildCondominiumMonths(incomeRows: PropertyIncomeRow[], costRows
     const confirmed = new Set<string>(), withIncome = new Set<string>();
     for (const r of incomeRows) {
         const condo = num(r.condo_amount);
-        if (condo <= 0 && num(r.received_amount) <= 0) continue;   // a vacant unit with no condominium adds nothing
+        // a vacant unit with no condominium adds nothing; rent paid straight to the owner (by invoice) is income too
+        const cameIn = num(r.received_amount) + num(r.direct_rent) + num(r.direct_condo) + num(r.direct_energy) + num(r.direct_other);
+        if (condo <= 0 && cameIn <= 0) continue;
         const m = monthKey(r.month);
         const cur = months.get(m) ?? blank(m);
         if (condo > 0) {

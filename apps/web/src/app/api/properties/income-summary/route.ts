@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireProfile } from "@/lib/api-auth";
-import { aggregateIncomeByMonth, breakdown, currentMonthKey, monthKey, type PropertyIncomeRow } from "@/lib/property-income";
+import { INCOME_DIRECT_COLUMNS, aggregateIncomeByMonth, breakdown, currentMonthKey, monthKey, type PropertyIncomeRow } from "@/lib/property-income";
 import { landlordIptuForMonth, normalizeInstallments, taxScopeForProperty, type PropertyTax } from "@/lib/property-taxes";
 import { loadPropertyUnits } from "@/lib/property-units-server";
 
@@ -36,7 +36,7 @@ export async function GET() {
 
     const { data, error } = await supabase
         .from("property_income_months")
-        .select("id, property_id, month, unit_id, received_on, received_amount, energy_portion, other_income, other_expenses, condo_amount, fee_on_condo, iptu_amount, agency_fee_pct, status, source, bank_reference, notes")
+        .select(`id, property_id, month, unit_id, received_on, received_amount, energy_portion, other_income, other_expenses, condo_amount, fee_on_condo, iptu_amount, agency_fee_pct, status, source, bank_reference, notes, ${INCOME_DIRECT_COLUMNS}`)
         .eq("owner_id", profileId)
         .eq("status", "CONFIRMED")
         .lte("month", `${currentMonthKey()}-01`)

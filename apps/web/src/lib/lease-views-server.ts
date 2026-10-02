@@ -15,6 +15,7 @@ import { resolveCalculatorIndex } from "@/lib/index-calculator";
 import { addMonths, leaseIndexSeriesCode, type IndexPoint } from "@/lib/lease-summary";
 import { loadPropertyEntries } from "@/lib/property-entries-server";
 import type { PropertyIncomeRow } from "@/lib/property-income";
+import { INCOME_DIRECT_COLUMNS, normalizeIncomeRow } from "@/lib/property-income";
 import type { LeaseWithDetails } from "@/types/lease";
 import type { LeaseDashboardView, LeaseListView, LeaseTenantContact } from "@/lib/lease-views";
 
@@ -86,7 +87,7 @@ export async function loadLeaseList(supabase: AdminSupabase, profileId: string):
 }
 
 const INCOME_COLUMNS =
-    "id, property_id, month, unit_id, unit_name, received_on, received_amount, energy_portion, other_income, other_expenses, condo_amount, fee_on_condo, iptu_amount, agency_fee_pct, status, source, bank_reference, notes";
+    `id, property_id, month, unit_id, unit_name, received_on, received_amount, energy_portion, other_income, other_expenses, condo_amount, fee_on_condo, iptu_amount, agency_fee_pct, status, source, bank_reference, notes, ${INCOME_DIRECT_COLUMNS}`;
 
 /** The property's ledger rows between two months (inclusive), numbers normalised like the income route does. */
 export async function loadIncomeRows(supabase: AdminSupabase, propertyId: string, fromMonth: string, toMonth: string): Promise<PropertyIncomeRow[]> {
@@ -101,19 +102,7 @@ export async function loadIncomeRows(supabase: AdminSupabase, propertyId: string
         console.error("[Lease views] income rows failed:", error.message);
         return [];
     }
-    return ((data ?? []) as unknown as PropertyIncomeRow[]).map(r => ({
-        ...r,
-        received_amount: Number(r.received_amount) || 0,
-        energy_portion: Number(r.energy_portion) || 0,
-        other_income: Number(r.other_income) || 0,
-        other_expenses: Number(r.other_expenses) || 0,
-        condo_amount: Number(r.condo_amount) || 0,
-        fee_on_condo: r.fee_on_condo === true,
-        unit_id: r.unit_id ?? null,
-        unit_name: r.unit_name ?? null,
-        iptu_amount: Number(r.iptu_amount) || 0,
-        agency_fee_pct: Number(r.agency_fee_pct) || 0,
-    }));
+    return ((data ?? []) as unknown as PropertyIncomeRow[]).map(normalizeIncomeRow);
 }
 
 /** One contract with everything its dashboard shows. Throws the 404 of `loadOwnedLease` when it is not the account's. */

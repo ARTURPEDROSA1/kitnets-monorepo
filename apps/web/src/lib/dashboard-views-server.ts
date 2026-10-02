@@ -22,7 +22,7 @@ import { STRATEGY_LABELS, investmentTitle, type NewInvestment } from "@/lib/new-
 import { loadInvestmentList } from "@/lib/new-investments-server";
 import { mappableProjects } from "@/lib/project-hub";
 import { loadPropertyEntries, type PropertyEntry } from "@/lib/property-entries-server";
-import { aggregateIncomeByMonth, breakdown, currentMonthKey, monthKey, summarize, type PropertyIncomeRow } from "@/lib/property-income";
+import { INCOME_DIRECT_COLUMNS, aggregateIncomeByMonth, breakdown, currentMonthKey, monthKey, summarize, type PropertyIncomeRow } from "@/lib/property-income";
 import { landlordIptuForMonth, normalizeInstallments, taxScopeForProperty, type PropertyTax } from "@/lib/property-taxes";
 import { loadTenantList } from "@/lib/tenant-views-server";
 import { getOwnerWaterPropertiesSummary } from "@/lib/water-properties-server";
@@ -30,7 +30,7 @@ import type { AgencyLeaseSummary } from "@/lib/agency-views";
 import type { AgencyWithRole } from "@/types/agency";
 
 const TAX_COLUMNS = "id, property_id, year, kind, amount, paid_by, paid_on, installments";
-const INCOME_COLUMNS = "id, property_id, month, unit_id, received_on, received_amount, energy_portion, other_income, other_expenses, condo_amount, fee_on_condo, iptu_amount, agency_fee_pct, status, source, bank_reference, notes";
+const INCOME_COLUMNS = `id, property_id, month, unit_id, received_on, received_amount, energy_portion, other_income, other_expenses, condo_amount, fee_on_condo, iptu_amount, agency_fee_pct, status, source, bank_reference, notes, ${INCOME_DIRECT_COLUMNS}`;
 /** A gateway is online when it reported in the last ten minutes. */
 const ONLINE_WINDOW_MS = 10 * 60 * 1000;
 
