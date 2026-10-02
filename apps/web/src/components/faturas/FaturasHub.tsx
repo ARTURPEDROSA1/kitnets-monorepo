@@ -3,11 +3,12 @@
 /**
  * The Fatura hub: what the owner charges tenants directly — rent, condominium and the charges that do
  * not go through an agency — at a glance (what falls due this month, what came in, what is late, what
- * is charged every month), then what deserves a look, then three sections: the invoices as a
- * spreadsheet, who collects what on each lease ("Cobranças recorrentes") and the billing conditions.
+ * is charged every month), then what deserves a look, then four sections: the invoices as a
+ * spreadsheet, who collects what on each lease ("Cobranças recorrentes"), the billing conditions and the
+ * owner's connection to the bank.
  */
 import React, { useMemo, useState } from "react";
-import { AlertCircle, CalendarClock, CheckCircle2, ChevronDown, ChevronUp, Clock, FilePlus2, Info, Loader2, Receipt, Repeat, Search, Settings2, X } from "lucide-react";
+import { AlertCircle, CalendarClock, CheckCircle2, ChevronDown, ChevronUp, Clock, FilePlus2, Info, Landmark, Loader2, Receipt, Repeat, Search, Settings2, X } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -17,15 +18,18 @@ import { INVOICE_VIEWS, brl, inInvoiceView, invoiceAttention, invoiceHubTotals, 
 import type { Collector } from "@/lib/invoice-collection";
 import { monthLabel, shiftMonth } from "@/lib/invoice-schedule";
 import type { BillingSettingsView } from "@/lib/invoice-views";
+import type { ConnectionsView } from "@/lib/billing/connections";
 import InvoiceTable, { type InvoiceTableActions } from "./InvoiceTable";
 import RecurringChargesTable from "./RecurringChargesTable";
 import BillingSettingsPanel from "./BillingSettingsPanel";
+import ConnectionsPanel from "./ConnectionsPanel";
 
-export type FaturasSection = "faturas" | "cobrancas" | "config";
+export type FaturasSection = "faturas" | "cobrancas" | "config" | "conexoes";
 export const FATURAS_SECTIONS: Array<{ key: FaturasSection; label: string; icon: React.ReactNode }> = [
     { key: "faturas", label: "Faturas", icon: <Receipt className="h-3.5 w-3.5" /> },
     { key: "cobrancas", label: "Cobranças recorrentes", icon: <Repeat className="h-3.5 w-3.5" /> },
     { key: "config", label: "Configuração", icon: <Settings2 className="h-3.5 w-3.5" /> },
+    { key: "conexoes", label: "Conexões", icon: <Landmark className="h-3.5 w-3.5" /> },
 ];
 export const sectionFromParam = (v: string | null): FaturasSection => (FATURAS_SECTIONS.some(s => s.key === v) ? (v as FaturasSection) : "faturas");
 
@@ -33,6 +37,7 @@ interface Props {
     rows: InvoiceRow[];
     recurring: RecurringRow[];
     settings: BillingSettingsView;
+    connections: ConnectionsView;
     today: string;
     loading: boolean;
     error: string | null;
@@ -51,6 +56,7 @@ interface Props {
     onPause: (leaseId: string, paused: boolean) => void;
     onOpenLease: (leaseId: string) => void;
     onSettingsSaved: (settings: BillingSettingsView) => void;
+    onConnectionsChange: (connections: ConnectionsView) => void;
 }
 
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString("pt-BR")} ${n === 1 ? one : many}`;
@@ -76,14 +82,14 @@ function Item({ icon, label, value, hint, tone, valueTone, onClick, title, money
 const DOT: Record<string, string> = { rose: "bg-rose-500", amber: "bg-amber-500", slate: "bg-slate-400" };
 
 export default function FaturasHub(props: Props) {
-    const { rows, recurring, settings, today, loading, error, notice, onDismissNotice, section, onSectionChange, view, onViewChange, actions, generating, onGenerate } = props;
+    const { rows, recurring, settings, connections, today, loading, error, notice, onDismissNotice, section, onSectionChange, view, onViewChange, actions, generating, onGenerate } = props;
     const [search, setSearch] = useState("");
     const [allAttention, setAllAttention] = useState(false);
     const thisMonth = today.slice(0, 7);
     const [month, setMonth] = useState(thisMonth);
 
     const totals = useMemo(() => invoiceHubTotals(rows, recurring, today), [rows, recurring, today]);
-    const attention = useMemo(() => invoiceAttention(rows, recurring, settings, today), [rows, recurring, settings, today]);
+    const attention = useMemo(() => invoiceAttention(rows, recurring, settings, today, connections), [rows, recurring, settings, today, connections]);
     const counts = useMemo(() => Object.fromEntries(INVOICE_VIEWS.map(v => [v.key, rows.filter(r => inInvoiceView(r, v.key)).length])) as Record<InvoiceViewKey, number>, [rows]);
     const visible = useMemo(() => {
         const q = normalizeText(search);
@@ -99,7 +105,7 @@ export default function FaturasHub(props: Props) {
         if (item.target.type === "invoice") {
             const row = rows.find(r => r.invoice.id === (item.target as { id: string }).id);
             if (row) actions.onOpen(row);
-        } else onSectionChange(item.target.type === "recurring" ? "cobrancas" : "config");
+        } else onSectionChange(item.target.type === "recurring" ? "cobrancas" : item.target.type === "connections" ? "conexoes" : "config");
     };
 
     return (
@@ -237,6 +243,8 @@ export default function FaturasHub(props: Props) {
                 <RecurringChargesTable rows={recurring} savingKey={props.savingKey} onCollector={props.onCollector} onPause={props.onPause} onOpenLease={props.onOpenLease} />
             ) : section === "config" ? (
                 <BillingSettingsPanel settings={settings} onSaved={props.onSettingsSaved} />
+            ) : section === "conexoes" ? (
+                <ConnectionsPanel connections={connections} today={today} onChange={props.onConnectionsChange} />
             ) : rows.length === 0 ? (
                 <div className="space-y-3 rounded-2xl border border-dashed border-border px-6 py-12 text-center">
                     <Receipt className="mx-auto h-10 w-10 text-muted-foreground/60" />
@@ -296,7 +304,7 @@ export default function FaturasHub(props: Props) {
 
             <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
                 <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500" />
-                Nesta etapa as faturas são geradas e baixadas aqui. A emissão do boleto e do PIX pelo Banco Inter, o link de cartão e o envio automático por e-mail ao inquilino entram nas próximas etapas do módulo. O pagamento registrado aqui já entra nas Receitas do imóvel, sem taxa de imobiliária.
+                Nesta etapa as faturas são geradas e baixadas aqui. A conexão com o Banco Inter já pode ser feita em Conexões; a emissão do boleto e do PIX por ela, o link de cartão e o envio automático por e-mail ao inquilino entram nas próximas etapas do módulo. O pagamento registrado aqui já entra nas Receitas do imóvel, sem taxa de imobiliária.
             </p>
         </div>
     );

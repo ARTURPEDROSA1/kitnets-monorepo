@@ -1,6 +1,6 @@
 # Fatura (Tenant Invoicing) Module
 
-**Version:** 0.2 (steps 1 and 2 of 7)  
+**Version:** 0.3 (steps 1 to 3 of 7)  
 **Last updated:** 2026-10-02  
 **Author:** Kitnets Engineering
 
@@ -15,14 +15,14 @@ The end state is automatic: every month the module issues a boleto + PIX through
 | Step | Delivers | State |
 |---|---|---|
 | 1 | Schema, who collects each component, the hub, invoices generated and settled by hand | live (PR #232) |
-| 2 | Income ledger and books: what comes in directly from the tenant (`direct_*`), the condominium the owner collects (`condo_direct`), late fees | **this document, §6** |
-| 3 | Per-owner encrypted credentials, Banco Inter connection screen | pending |
+| 2 | Income ledger and books: what comes in directly from the tenant (`direct_*`), the condominium the owner collects (`condo_direct`), late fees | live (PR #233), §6 |
+| 3 | The owner's own Banco Inter integration: sealed credentials, connection screen and test | **this document, §7** |
 | 4 | Boleto + PIX issued through Banco Inter, webhook, reconciliation | pending |
 | 5 | E-mail to the tenant, public payment page, daily cron | pending |
 | 6 | Stripe Connect, card link with the fee passed on to the tenant | pending |
 | 7 | Dashboard card, overdue reminders, receipt | pending |
 
-- **Hub** `/faturas` — KPI strip, "Atenção", then three sections: the invoices as a spreadsheet, "Cobranças recorrentes" (who collects each component of each lease in force) and the billing conditions.
+- **Hub** `/faturas` — KPI strip, "Atenção", then four sections: the invoices as a spreadsheet, "Cobranças recorrentes" (who collects each component of each lease in force), the billing conditions and "Conexões" (the owner's bank integration).
 - **Invoice panel** `/faturas?id=<invoice>` — items, payer, the terms it states, payment, timeline; record a payment or cancel.
 - **Sidebar** — "Fatura", between "Água" and "Imobiliária".
 
@@ -85,12 +85,14 @@ apps/web/src/
 │   ├── [id]/pagar/route.ts           # POST (baixa manual)
 │   ├── [id]/cancelar/route.ts        # POST
 │   ├── cobrancas/route.ts            # PUT (who collects a component · pause a lease)
-│   └── configuracoes/route.ts        # PUT (billing conditions)
+│   ├── configuracoes/route.ts        # PUT (billing conditions)
+│   └── conexoes/                     # GET (status) · inter: PUT (save + test) · DELETE · inter/testar: POST
 ├── components/faturas/
 │   ├── FaturasHub.tsx                # KPI strip, "Atenção", sections, view pills, search
 │   ├── InvoiceTable.tsx              # The invoices as a spreadsheet (table key `invoices`)
 │   ├── RecurringChargesTable.tsx     # Lease × component, the "quem cobra" select (table key `invoice-recurring`)
 │   ├── BillingSettingsPanel.tsx      # The owner's decisions
+│   ├── ConnectionsPanel.tsx          # The owner's Banco Inter integration: credentials in, status and test out
 │   ├── InvoiceDetail.tsx             # One invoice's panel
 │   └── InvoiceActionModals.tsx       # Record a payment · cancel
 ├── components/contratos/LeaseForm.tsx  # "Emissor da fatura" on each charge; "Incluso no condomínio"
@@ -104,13 +106,22 @@ apps/web/src/
     ├── invoice-views-server.ts        # loaders shared by the page and the API
     ├── invoices-server.ts             # generate, cancel, pay, who collects, settings
     ├── schemas/invoice.ts (+ test)    # zod schemas of the routes
+    ├── schemas/billing-connection.ts (+ test)
+    ├── secret-box.ts (+ test)         # AES-256-GCM sealing with the server's master key, bound to owner and provider
+    └── billing/
+        ├── connections.ts (+ test)        # the connections as the screens see them, certificate standing, attention
+        ├── connections-server.ts          # save (sealed), test, delete, and the session the bank calls use
+        ├── inter-credentials.ts (+ test)  # certificate/key check, scopes, the bank's hosts
+        ├── inter-client.ts (+ test)       # mutual TLS to the bank's API (node:https); the token endpoint
+        └── inter-test-certs.ts            # throwaway certificates for the tests (openssl at test time)
     ├── property-income.ts (+ test)    # the ledger's money model: deposit + what was paid by invoice
     └── property-income-readers.test.ts # every reader of the ledger selects the invoice columns
 
 supabase/
 ├── migrations/20261002120000_invoices_core.sql
 ├── migrations/20261002200000_invoice_ledger.sql
-└── checks/invoices.sql, invoice_ledger.sql
+├── migrations/20261002230000_billing_connections.sql
+└── checks/invoices.sql, invoice_ledger.sql, billing_connections.sql
 ```
 
 ## 5. Database
@@ -164,9 +175,25 @@ A ledger row (`property_income_months`: one per property, month and unit) used t
 
 **The bank statement.** A credit in a month that already has ledger rows not made by the bank stays "só contábil" (existing rule), so the PIX or transfer of a paid invoice is not routed into Receitas a second time. Matching a statement credit to its invoice automatically arrives with the Banco Inter step.
 
-## 7. Not in these steps
+## 7. The owner's Banco Inter connection (step 3)
 
-- Nothing is issued or sent: no boleto, no PIX, no card link, no e-mail. The hub says so.
+Invoices are issued through the owner's **own** integration with the bank — the one the owner creates in the Internet Banking PJ (Integrar → Nova integração, with the *API Cobrança (Boleto com Pix)* permissions; once approved, *Minhas integrações → Download chave e certificado* gives the `.crt`, the `.key`, and shows the Client ID and Client Secret once). The screen `/faturas?aba=conexoes` walks the owner through it.
+
+**Storage** (`billing_connections`, one row per owner and provider): the four secrets go in as one JSON sealed by `lib/secret-box.ts` — AES-256-GCM with the server's master key (`BILLING_ENCRYPTION_KEY`, 32 random bytes: `openssl rand -base64 32`), bound to `owner:provider` so a ciphertext copied onto another row does not open. Without the key the screen says the connection is unavailable and nothing is stored. Rotation: new key in `BILLING_ENCRYPTION_KEY`, old one in `BILLING_ENCRYPTION_KEY_PREVIOUS`; old secrets still open and are re-sealed on the next save. **Losing the key makes every stored credential unreadable**; the owner would have to enter them again.
+
+**Never out**: the API returns only `metadata` (account, the tail of the client id, the certificate's subject), the certificate's expiry, the scopes the bank granted on the last test, and the last error. Fields are write-only; a later save may bring only what changed (a renewed integration keeps its client id and secret; the new `.crt` and `.key` must come together).
+
+**Checks before storing** (`lib/billing/inter-credentials.ts`): the certificate parses, the key is its own (`X509Certificate.checkPrivateKey`), it is within its validity; the subject and the expiry are kept. A fingerprint of the client id (unkeyed SHA-256) keeps the same integration from being registered by two accounts.
+
+**The test** (`lib/billing/inter-client.ts`): `POST /oauth/v2/token` with client credentials over mutual TLS (`node:https`, the certificate on the socket, a fresh socket per call so a certificate is never shared through a pool), asking for `boleto-cobranca.read boleto-cobranca.write`. The bank's answer is recorded as the connection's status: CONNECTED with the granted scopes (and the token, sealed, for the calls that follow — the bank gives out five tokens a minute, each lasting an hour), or ERROR with a reason in words: the certificate refused at the handshake, client id/secret rejected, a permission missing, rate limit, outage. Saves and tests are limited to four per user per minute. The bank's sandbox host can be chosen only outside the production site; a sandbox connection on the production site counts as not usable.
+
+**Attention**: a failing connection or a certificate about to expire (the bank allows renewal from 90 days before) is listed right after the late invoices; an account that collects something and has no connection is reminded, after the open decisions.
+
+**Not yet**: nothing is issued through the connection (step 4); the Stripe connection (step 6).
+
+## 8. Not in these steps
+
+- Nothing is issued or sent: no boleto, no PIX, no card link, no e-mail. The hub says so. The bank connection can already be made and tested.
 - A partial payment is not accepted: a payment recorded by hand must cover the invoice.
 - No automatic generation: "Gerar faturas" creates the month's invoices on demand; running it again only fills what is missing.
 - Out of scope for the module as planned: automatic rent adjustment on the invoice, pro rata of the first and last month, company tenants (CNPJ), variable-amount charges (metered energy).

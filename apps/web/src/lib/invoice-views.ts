@@ -6,6 +6,7 @@
 import type { LeaseManagementType, LeaseStatus } from "@/types/lease";
 import type { CollectionComponent, InvoiceItemKind } from "@/lib/invoice-collection";
 import type { PayerAddress } from "@/lib/invoice-payer";
+import type { ConnectionsView } from "@/lib/billing/connections";
 
 export type InvoiceStatus = "DRAFT" | "ISSUED" | "PAID" | "CANCELLED";
 export type InvoiceOrigin = "AUTO" | "MANUAL";
@@ -88,6 +89,8 @@ export interface InvoiceListView {
     invoices: InvoiceView[];
     recurring: RecurringLease[];
     settings: BillingSettingsView;
+    /** the owner's connections to the payment providers (status only, never a secret) */
+    connections: ConnectionsView;
 }
 
 export interface InvoiceEventView {

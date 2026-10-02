@@ -11,6 +11,7 @@ import { billableTotal } from "@/lib/invoice-collection";
 import { blockersText } from "@/lib/invoice-payer";
 import { daysBetween, dueDateIn, monthLabel, chargeable } from "@/lib/invoice-schedule";
 import type { BillingSettingsView, InvoiceStatus, InvoiceView, RecurringLease } from "@/lib/invoice-views";
+import { connectionAttention, type ConnectionsView } from "@/lib/billing/connections";
 
 export { brl };
 
@@ -168,7 +169,7 @@ export function invoiceHubTotals(rows: readonly InvoiceRow[], recurring: readonl
 
 // ── Attention ────────────────────────────────────────────────────────
 
-export type InvoiceAttentionKind = "overdue" | "blocked" | "to_generate" | "undecided" | "settings";
+export type InvoiceAttentionKind = "overdue" | "blocked" | "to_generate" | "undecided" | "settings" | "connection";
 export type AttentionTone = "rose" | "amber" | "slate";
 
 export interface InvoiceAttentionItem {
@@ -180,7 +181,7 @@ export interface InvoiceAttentionItem {
     /** the sentence states an amount (the dollar toggle blurs it) */
     money?: boolean;
     /** where the item leads */
-    target: { type: "invoice"; id: string } | { type: "recurring" } | { type: "settings" };
+    target: { type: "invoice"; id: string } | { type: "recurring" } | { type: "settings" } | { type: "connections" };
 }
 
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString("pt-BR")} ${n === 1 ? one : many}`;
@@ -193,9 +194,12 @@ export const settingsPending = (s: BillingSettingsView): string[] => [
     s.days_in_advance === null ? "antecedência da emissão" : null,
 ].filter((v): v is string => v !== null);
 
-/** Most urgent first: late money, then what cannot be issued, then what is still to do or to decide. */
-export function invoiceAttention(rows: readonly InvoiceRow[], recurring: readonly RecurringRow[], settings: BillingSettingsView, today: string): InvoiceAttentionItem[] {
+/** Most urgent first: late money, a bank connection that stopped working, what cannot be issued, then what is still to do or to decide. */
+export function invoiceAttention(rows: readonly InvoiceRow[], recurring: readonly RecurringRow[], settings: BillingSettingsView, today: string, connections?: ConnectionsView): InvoiceAttentionItem[] {
     const items: InvoiceAttentionItem[] = [];
+    const collects = recurring.some(r => r.monthly > 0);
+    const bank = connections ? connectionAttention(connections, today, collects) : [];
+    const bankItem = (c: (typeof bank)[number]): InvoiceAttentionItem => ({ kind: "connection", tone: c.tone, subject: "Banco Inter", text: c.text, target: { type: "connections" } });
 
     for (const r of [...rows].filter(x => x.display === "em_atraso").sort((a, b) => b.daysLate - a.daysLate)) {
         items.push({
@@ -204,6 +208,8 @@ export function invoiceAttention(rows: readonly InvoiceRow[], recurring: readonl
             target: { type: "invoice", id: r.invoice.id },
         });
     }
+    // a connection that fails or a certificate about to expire stops every invoice: right after the late money
+    for (const c of bank.filter(x => x.tone !== "slate")) items.push(bankItem(c));
     for (const r of rows.filter(x => isOpen(x.invoice.status) && x.invoice.blockers.length > 0)) {
         items.push({
             kind: "blocked", tone: "amber", subject: `Fatura nº ${r.invoice.number} · ${r.place}`,
@@ -225,8 +231,9 @@ export function invoiceAttention(rows: readonly InvoiceRow[], recurring: readonl
             target: { type: "recurring" },
         });
     }
+    for (const c of bank.filter(x => x.tone === "slate")) items.push(bankItem(c));
     const pending = settingsPending(settings);
-    if (pending.length > 0 && recurring.some(r => r.monthly > 0)) {
+    if (pending.length > 0 && collects) {
         items.push({
             kind: "settings", tone: "slate", subject: "Configuração",
             text: `a decidir: ${pending.join(", ")}`,

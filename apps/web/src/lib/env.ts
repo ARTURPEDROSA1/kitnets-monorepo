@@ -19,6 +19,8 @@ import { z } from "zod";
 
 const url = z.string().url();
 const nonEmpty = z.string().min(1, "must not be empty");
+/** 32 bytes as base64 (44 characters) or hex (64). */
+const secretKey = z.string().regex(/^(?:[0-9a-fA-F]{64}|[A-Za-z0-9+/_-]{43}=?)$/, "must be 32 random bytes in base64 or hex (openssl rand -base64 32)");
 
 /** Server-only. Never exposed to the browser. */
 export const serverSchema = z.object({
@@ -42,6 +44,11 @@ export const serverSchema = z.object({
     GOOGLE_MAPS_SERVER_KEY: nonEmpty.optional(),
     // Accounts that see the IoT gateways block on the dashboard, comma-separated. Defaults to the founder's e-mail.
     GATEWAY_PILOT_EMAILS: nonEmpty.optional(),
+    // Seals each owner's bank credentials (Fatura → Conexões): 32 random bytes, base64 or hex (lib/secret-box.ts).
+    // Without it nothing can be connected and the screen says so. Losing it makes every stored credential unreadable.
+    BILLING_ENCRYPTION_KEY: secretKey.optional(),
+    // Only during a rotation: the key being replaced, so what it sealed still opens.
+    BILLING_ENCRYPTION_KEY_PREVIOUS: secretKey.optional(),
     // Source-map upload at build time only.
     SENTRY_ORG: nonEmpty.optional(),
     SENTRY_PROJECT: nonEmpty.optional(),

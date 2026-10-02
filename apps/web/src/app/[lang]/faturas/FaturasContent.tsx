@@ -15,6 +15,7 @@ import { DEFAULT_INVOICE_VIEW, invoiceRows, invoiceViewFromParam, recurringRows,
 import type { Collector } from "@/lib/invoice-collection";
 import { monthLabel } from "@/lib/invoice-schedule";
 import type { BillingSettingsView, GenerateResult, InvoiceDetailView, InvoiceListView, InvoiceView, RecurringLease } from "@/lib/invoice-views";
+import { NO_CONNECTIONS, type ConnectionsView } from "@/lib/billing/connections";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const NO_SETTINGS: BillingSettingsView = { days_in_advance: null, fine_pct: null, interest_pct_month: null, days_payable_after_due: null };
@@ -54,6 +55,7 @@ export default function FaturasContent({ lang, initial = null, initialDetail = n
     const [invoices, setInvoices] = useState<InvoiceView[] | null>(initial?.invoices ?? null);
     const [recurring, setRecurring] = useState<RecurringLease[]>(initial?.recurring ?? []);
     const [settings, setSettings] = useState<BillingSettingsView>(initial?.settings ?? NO_SETTINGS);
+    const [connections, setConnections] = useState<ConnectionsView>(initial?.connections ?? NO_CONNECTIONS);
     const [seeded] = useState(initial !== null);
     const [listError, setListError] = useState<string | null>(null);
 
@@ -61,6 +63,7 @@ export default function FaturasContent({ lang, initial = null, initialDetail = n
         setInvoices(list.invoices);
         setRecurring(list.recurring);
         setSettings(list.settings);
+        setConnections(list.connections ?? NO_CONNECTIONS);
     }, []);
 
     const load = useCallback(async () => {
@@ -179,6 +182,7 @@ export default function FaturasContent({ lang, initial = null, initialDetail = n
                 rows={rows}
                 recurring={recurringList}
                 settings={settings}
+                connections={connections}
                 today={today}
                 loading={invoices === null}
                 error={listError}
@@ -200,6 +204,7 @@ export default function FaturasContent({ lang, initial = null, initialDetail = n
                 onPause={onPause}
                 onOpenLease={id => router.push(`${contratosBase}?id=${id}`)}
                 onSettingsSaved={setSettings}
+                onConnectionsChange={setConnections}
             />
             {modals}
         </>

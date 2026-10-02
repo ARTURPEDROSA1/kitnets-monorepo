@@ -13,6 +13,8 @@ import { IN_FORCE, placeOf, titleOf } from "@/lib/lease-dashboard";
 import { leaseComponents } from "@/lib/invoice-collection";
 import { leaseDueDay } from "@/lib/invoice-schedule";
 import type { PayerAddress } from "@/lib/invoice-payer";
+import { NO_CONNECTIONS } from "@/lib/billing/connections";
+import { loadConnections } from "@/lib/billing/connections-server";
 import type { LeaseWithDetails } from "@/types/lease";
 import type { BillingSettingsView, InvoiceDetailView, InvoiceEventView, InvoiceItemView, InvoiceListView, InvoiceView, RecurringLease } from "@/lib/invoice-views";
 
@@ -144,12 +146,14 @@ export async function loadRecurringLeases(supabase: AdminSupabase, profileId: st
 }
 
 export async function loadInvoiceList(supabase: AdminSupabase, profileId: string): Promise<InvoiceListView> {
-    const [invoices, recurring, settings] = await Promise.all([
+    const [invoices, recurring, settings, connections] = await Promise.all([
         loadInvoiceRows(supabase, profileId),
         loadRecurringLeases(supabase, profileId),
         loadBillingSettings(supabase, profileId),
+        // the invoices are worth showing even when the connections cannot be read
+        loadConnections(supabase, profileId).catch(err => { console.error("[Faturas] connections failed:", (err as Error).message); return NO_CONNECTIONS; }),
     ]);
-    return { invoices, recurring, settings };
+    return { invoices, recurring, settings, connections };
 }
 
 /** One invoice with its items, payer and timeline. 404 when it is not the account's. */
