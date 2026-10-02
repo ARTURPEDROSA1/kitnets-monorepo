@@ -6,7 +6,7 @@
  * PDF). The page preloads it; every action here answers with the fresh invoice, handed up to the parent.
  */
 import React, { useEffect, useState } from "react";
-import { AlertCircle, ArrowLeft, Ban, Check, CheckCircle2, Copy, FileDown, FileText, FlaskConical, Landmark, Loader2, Receipt, RefreshCw, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, Ban, Check, CheckCircle2, Copy, FileDown, FileText, FlaskConical, Landmark, Loader2, Mail, Receipt, RefreshCw, X } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { cn } from "@/lib/utils";
 import { formatDateBR } from "@/lib/dates";
@@ -31,6 +31,8 @@ interface Props {
     bankUsable: boolean;
     /** the connection is the bank's sandbox and this site allows it: payments can be simulated */
     sandbox: boolean;
+    /** the server can e-mail tenants */
+    emailAvailable?: boolean;
     onBack: () => void;
     onPay: (detail: InvoiceDetailView) => void;
     onCancel: (detail: InvoiceDetailView) => void;
@@ -48,6 +50,8 @@ const EVENT_LABELS: Record<string, string> = {
     CHARGE_CANCELLED: "Boleto cancelado no banco",
     WEBHOOK: "Aviso do banco recebido",
     DUE_DATE_MOVED: "Vencimento alterado",
+    EMAIL_SENT: "E-mail enviado ao inquilino",
+    EMAIL_FAILED: "O e-mail ao inquilino não foi enviado",
     PAID: "Pagamento registrado",
     CANCELLED: "Fatura cancelada",
     DUPLICATE_PAYMENT: "Pagamento recebido em duplicidade",
@@ -60,7 +64,8 @@ const plural = (n: number, one: string, many: string) => `${n.toLocaleString("pt
 
 function eventText(e: InvoiceEventView): string | null {
     const amount = typeof e.detail.amount === "number" ? e.detail.amount : null;
-    if (e.type === "CANCELLED" || e.type === "ISSUE_FAILED") return typeof e.detail.reason === "string" ? e.detail.reason : typeof e.detail.error === "string" ? e.detail.error : null;
+    if (e.type === "CANCELLED" || e.type === "ISSUE_FAILED" || e.type === "EMAIL_FAILED") return typeof e.detail.reason === "string" ? e.detail.reason : typeof e.detail.error === "string" ? e.detail.error : null;
+    if (e.type === "EMAIL_SENT") return e.detail.kind === "RESEND" ? "reenvio" : e.detail.kind === "REMINDER" ? "lembrete" : null;
     if (e.type === "DUE_DATE_MOVED") return typeof e.detail.from === "string" && typeof e.detail.to === "string" ? `de ${formatDateBR(e.detail.from)} para ${formatDateBR(e.detail.to)}` : null;
     if (e.type === "WEBHOOK") return typeof e.detail.situacao === "string" ? e.detail.situacao : null;
     if (e.type === "PAID" || e.type === "DUPLICATE_PAYMENT" || e.type === "CHARGE_PAID") {
@@ -118,11 +123,13 @@ async function post(url: string, body?: Record<string, unknown>): Promise<{ deta
     }
 }
 
-export default function InvoiceDetail({ invoiceId, lang, today, initial, notice, bankUsable, sandbox, onBack, onPay, onCancel, onChanged }: Props) {
+const DELIVERY_KIND_LABELS: Record<string, string> = { ISSUE: "fatura", REMINDER: "lembrete", RECEIPT: "recibo", RESEND: "reenvio" };
+
+export default function InvoiceDetail({ invoiceId, lang, today, initial, notice, bankUsable, sandbox, emailAvailable = true, onBack, onPay, onCancel, onChanged }: Props) {
     const preloaded = initial && initial.invoice.id === invoiceId ? initial : null;
     const [fetched, setFetched] = useState<InvoiceDetailView | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [busy, setBusy] = useState<"issue" | "refresh" | "pdf" | "sandbox" | null>(null);
+    const [busy, setBusy] = useState<"issue" | "refresh" | "pdf" | "sandbox" | "email" | null>(null);
     const [actionError, setActionError] = useState<string | null>(null);
     const [issueModal, setIssueModal] = useState<{ dueDate: string } | null>(null);
     const detail = preloaded ?? (fetched && fetched.invoice.id === invoiceId ? fetched : null);
@@ -149,6 +156,22 @@ export default function InvoiceDetail({ invoiceId, lang, today, initial, notice,
             setIssueModal(null);
             onChanged(out.detail, message);
         } else setActionError(out.error ?? null);
+    };
+    const resend = async () => {
+        setBusy("email");
+        setActionError(null);
+        try {
+            const res = await fetch(`/api/faturas/${invoiceId}/reenviar`, { method: "POST" });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Não foi possível enviar o e-mail.");
+            const email = (json.email ?? {}) as { sent?: boolean; error?: string | null };
+            onChanged(json as InvoiceDetailView, email.sent ? "E-mail enviado ao inquilino." : null);
+            if (!email.sent) setActionError(`O e-mail não foi enviado: ${email.error ?? "motivo não informado"}.`);
+        } catch (err) {
+            setActionError(err instanceof Error ? err.message : "Não foi possível enviar o e-mail.");
+        } finally {
+            setBusy(null);
+        }
     };
     const openPdf = async () => {
         setBusy("pdf");
@@ -184,6 +207,8 @@ export default function InvoiceDetail({ invoiceId, lang, today, initial, notice,
 
     const { invoice, events } = detail;
     const charge = invoice.charge ?? null;
+    const delivery = invoice.delivery ?? null;
+    const deliveries = detail.deliveries ?? [];
     const display = invoiceDisplay(invoice, today);
     const meta = INVOICE_STATUS_META[display];
     const open = isOpen(invoice.status);
@@ -294,6 +319,33 @@ export default function InvoiceDetail({ invoiceId, lang, today, initial, notice,
                             )}
                             {charge.due_date && <span className="text-xs text-muted-foreground">vencimento no banco: {formatDateBR(charge.due_date)}{charge.paid_via ? ` · pago por ${PAID_VIA_LABELS[charge.paid_via] ?? charge.paid_via}` : ""}</span>}
                         </div>
+                    </div>
+                </section>
+            )}
+
+            {(charge || delivery) && (
+                <section className="rounded-xl border border-border/80 bg-card">
+                    <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-2.5">
+                        <span className="inline-flex items-center gap-2 text-sm font-semibold text-foreground"><Mail className="h-4 w-4 text-sky-600" /> E-mail ao inquilino</span>
+                        {open && charge?.status === "OPEN" && (
+                            <Button variant="outline" size="sm" onClick={resend} disabled={busy !== null || !emailAvailable} title={emailAvailable ? "Envia de novo o boleto, o PIX e o link da fatura" : "Envio de e-mail não configurado neste servidor"}>
+                                {busy === "email" ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Mail className="mr-1 h-4 w-4" />} {deliveries.some(d => d.status === "SENT") ? "Reenviar e-mail" : "Enviar e-mail"}
+                            </Button>
+                        )}
+                    </header>
+                    <div className="space-y-3 p-4">
+                        {!delivery && <p className="text-sm text-muted-foreground">{charge?.status === "OPEN" ? "Ainda não enviado." : "Enviado assim que o banco deixar o boleto pronto."}</p>}
+                        {delivery?.status === "SENT" && delivery.sent_at && (
+                            <p className="text-sm text-foreground">Enviado em {stamp(delivery.sent_at)} para <Sensitive>{delivery.recipient}</Sensitive>{delivery.kind !== "ISSUE" ? ` (${DELIVERY_KIND_LABELS[delivery.kind] ?? delivery.kind})` : ""}.</p>
+                        )}
+                        {(delivery?.status === "FAILED" || delivery?.status === "BOUNCED") && (
+                            <p role="alert" className="text-sm text-rose-600">Não enviado: {delivery.last_error ?? "motivo não informado"}.{delivery.attempts > 1 ? ` (${plural(delivery.attempts, "tentativa", "tentativas")})` : ""}</p>
+                        )}
+                        {(delivery?.status === "PENDING" || delivery?.status === "SENDING") && <p className="text-sm text-muted-foreground">Em envio…</p>}
+                        {deliveries.filter(d => d.status === "SENT").length > 1 && (
+                            <p className="text-xs text-muted-foreground">{plural(deliveries.filter(d => d.status === "SENT").length, "e-mail enviado", "e-mails enviados")} ao todo.</p>
+                        )}
+                        <dl><CopyField label="Link da fatura para o inquilino" value={invoice.public_url} hint="Copiar o link (serve para mandar por WhatsApp)" /></dl>
                     </div>
                 </section>
             )}

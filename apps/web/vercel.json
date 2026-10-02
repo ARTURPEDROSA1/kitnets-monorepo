@@ -19,6 +19,10 @@
         {
             "path": "/api/cron/update-bcb",
             "schedule": "30 12 * * *"
+        },
+        {
+            "path": "/api/cron/faturas",
+            "schedule": "0 11 * * *"
         }
     ]
 }

@@ -179,7 +179,7 @@ export function invoiceHubTotals(rows: readonly InvoiceRow[], recurring: readonl
 
 // ── Attention ────────────────────────────────────────────────────────
 
-export type InvoiceAttentionKind = "overdue" | "blocked" | "to_generate" | "undecided" | "settings" | "connection" | "expired" | "issue_failed";
+export type InvoiceAttentionKind = "overdue" | "blocked" | "to_generate" | "undecided" | "settings" | "connection" | "expired" | "issue_failed" | "email_failed";
 export type AttentionTone = "rose" | "amber" | "slate";
 
 export interface InvoiceAttentionItem {
@@ -196,13 +196,22 @@ export interface InvoiceAttentionItem {
 
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString("pt-BR")} ${n === 1 ? one : many}`;
 
-/** The decisions an owner has to make before an invoice can state its late terms. */
+/** The decisions an owner has to make before an invoice can state its late terms and the daily run can be switched on. */
 export const settingsPending = (s: BillingSettingsView): string[] => [
     s.fine_pct === null ? "multa por atraso" : null,
     s.interest_pct_month === null ? "juros de mora" : null,
     s.days_payable_after_due === null ? "prazo de pagamento após o vencimento" : null,
     s.days_in_advance === null ? "antecedência da emissão" : null,
+    s.automation_from_month === null ? "mês inicial da emissão automática" : null,
 ].filter((v): v is string => v !== null);
+
+/** The e-mail did not reach the tenant, or has been "sending" for longer than a run lasts. */
+export const deliveryStuck = (invoice: Pick<InvoiceView, "delivery">, now: number): boolean => {
+    const d = invoice.delivery;
+    if (!d) return false;
+    if (d.status === "FAILED" || d.status === "BOUNCED") return true;
+    return d.status === "SENDING" && now - new Date(d.created_at).getTime() > 15 * 60_000;
+};
 
 /** Most urgent first: late money, a bank connection that stopped working, what cannot be issued, then what is still to do or to decide. */
 export function invoiceAttention(rows: readonly InvoiceRow[], recurring: readonly RecurringRow[], settings: BillingSettingsView, today: string, connections?: ConnectionsView): InvoiceAttentionItem[] {
@@ -234,6 +243,14 @@ export function invoiceAttention(rows: readonly InvoiceRow[], recurring: readonl
             target: { type: "invoice", id: r.invoice.id },
         });
     }
+    for (const r of rows.filter(x => isOpen(x.invoice.status) && deliveryStuck(x.invoice, Date.parse(`${today}T23:59:59-03:00`)))) {
+        const d = r.invoice.delivery as NonNullable<InvoiceView["delivery"]>;
+        items.push({
+            kind: "email_failed", tone: "amber", subject: `Fatura nº ${r.invoice.number} · ${r.place}`,
+            text: d.status === "SENDING" ? "o e-mail ao inquilino está preso em envio: reenvie" : `o e-mail ao inquilino não foi enviado: ${d.last_error ?? "motivo não informado"}`,
+            target: { type: "invoice", id: r.invoice.id },
+        });
+    }
     for (const r of rows.filter(x => isOpen(x.invoice.status) && x.invoice.blockers.length > 0)) {
         items.push({
             kind: "blocked", tone: "amber", subject: `Fatura nº ${r.invoice.number} · ${r.place}`,
@@ -261,6 +278,12 @@ export function invoiceAttention(rows: readonly InvoiceRow[], recurring: readonl
         items.push({
             kind: "settings", tone: "slate", subject: "Configuração",
             text: `a decidir: ${pending.join(", ")}`,
+            target: { type: "settings" },
+        });
+    } else if (collects && !settings.automation_enabled) {
+        items.push({
+            kind: "settings", tone: "slate", subject: "Configuração",
+            text: "emissão automática desligada: as faturas só saem quando você gera, emite e envia à mão",
             target: { type: "settings" },
         });
     }

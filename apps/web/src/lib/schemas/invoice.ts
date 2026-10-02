@@ -73,12 +73,31 @@ export const collectionUpdateSchema = z
  * PUT /api/faturas/configuracoes — the owner's billing decisions. Blank means "not decided": it is
  * stored as NULL and nothing is assumed in its place.
  */
-export const billingSettingsSchema = z.object({
-    days_in_advance: intOrNull.refine((v) => v === null || (v >= 1 && v <= 25), "Antecedência entre 1 e 25 dias."),
-    fine_pct: percentOrNull.refine((v) => v === null || (v >= 0 && v <= 20), "Multa entre 0 e 20%."),
-    interest_pct_month: percentOrNull.refine((v) => v === null || (v >= 0 && v <= 20), "Juros entre 0 e 20% ao mês."),
-    days_payable_after_due: intOrNull.refine((v) => v === null || (v >= 0 && v <= 60), "Prazo entre 0 e 60 dias."),
-});
+export const billingSettingsSchema = z
+    .object({
+        days_in_advance: intOrNull.refine((v) => v === null || (v >= 1 && v <= 25), "Antecedência entre 1 e 25 dias."),
+        fine_pct: percentOrNull.refine((v) => v === null || (v >= 0 && v <= 20), "Multa entre 0 e 20%."),
+        interest_pct_month: percentOrNull.refine((v) => v === null || (v >= 0 && v <= 20), "Juros entre 0 e 20% ao mês."),
+        days_payable_after_due: intOrNull.refine((v) => v === null || (v >= 0 && v <= 60), "Prazo entre 0 e 60 dias."),
+        /** how the tenant sees the sender ("<name> via Kitnets"); blank = the holding's name */
+        sender_name: optionalText(80),
+        reply_to_email: optionalText(120).refine((v) => v === null || /^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+$/.test(v), "E-mail de resposta inválido."),
+        /** the daily run: generate, issue and e-mail on its own */
+        automation_enabled: z.preprocess((v) => v === true || v === "true" || v === "on", z.boolean()).optional().default(false),
+        /** `YYYY-MM`: the first month the run bills; earlier months are never created on their own */
+        automation_from_month: optionalText(7).refine((v) => v === null || MONTH_REGEX.test(v), "Mês inválido."),
+    })
+    .superRefine((d, ctx) => {
+        if (!d.automation_enabled) return;
+        // mirrors the table's CHECK: the run only acts on decisions the owner has made
+        const missing: Array<keyof typeof d> = [];
+        if (d.days_in_advance === null) missing.push("days_in_advance");
+        if (d.fine_pct === null) missing.push("fine_pct");
+        if (d.interest_pct_month === null) missing.push("interest_pct_month");
+        if (d.days_payable_after_due === null) missing.push("days_payable_after_due");
+        if (d.automation_from_month === null) missing.push("automation_from_month");
+        for (const key of missing) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [key], message: "Decida este campo antes de ligar a emissão automática." });
+    });
 
 export type BillingSettingsInput = z.output<typeof billingSettingsSchema>;
 

@@ -39,6 +39,18 @@ export interface InvoiceChargeView {
     created_at: string;
 }
 
+/** One e-mail of an invoice to its tenant (lib/billing/deliveries-server.ts). */
+export interface InvoiceDeliveryView {
+    id: string;
+    kind: "ISSUE" | "REMINDER" | "RECEIPT" | "RESEND";
+    status: "PENDING" | "SENDING" | "SENT" | "FAILED" | "BOUNCED";
+    recipient: string;
+    attempts: number;
+    sent_at: string | null;
+    last_error: string | null;
+    created_at: string;
+}
+
 export interface InvoiceView {
     id: string;
     /** counts within the account: "Fatura nº 12" */
@@ -74,6 +86,8 @@ export interface InvoiceView {
     items: InvoiceItemView[];
     /** the latest boleto issued for it; null before the first issue */
     charge?: InvoiceChargeView | null;
+    /** the latest e-mail to the tenant; null before any */
+    delivery?: InvoiceDeliveryView | null;
 }
 
 /** A lease in force with who collects each of its components: one block of "Cobranças recorrentes". */
@@ -104,6 +118,13 @@ export interface BillingSettingsView {
     fine_pct: number | null;
     interest_pct_month: number | null;
     days_payable_after_due: number | null;
+    /** how the tenant sees the sender of the e-mails; null = the holding's name */
+    sender_name: string | null;
+    reply_to_email: string | null;
+    /** the daily run generates, issues and e-mails on its own (only with every decision above made) */
+    automation_enabled: boolean;
+    /** `YYYY-MM`: the first month the run bills */
+    automation_from_month: string | null;
 }
 
 export interface InvoiceListView {
@@ -112,6 +133,8 @@ export interface InvoiceListView {
     settings: BillingSettingsView;
     /** the owner's connections to the payment providers (status only, never a secret) */
     connections: ConnectionsView;
+    /** the server can e-mail tenants (RESEND_API_KEY and BILLING_EMAIL_FROM are set) */
+    emailAvailable?: boolean;
 }
 
 export interface InvoiceEventView {
@@ -129,8 +152,12 @@ export interface InvoiceDetailView {
         fine_pct: number | null;
         interest_pct_month: number | null;
         days_payable_after_due: number | null;
+        /** the tenant's page for this invoice (the link every e-mail carries) */
+        public_url: string;
     };
     events: InvoiceEventView[];
+    /** every e-mail of the invoice, newest first */
+    deliveries?: InvoiceDeliveryView[];
 }
 
 /** What generating a month's invoices did, lease by lease that got none. */

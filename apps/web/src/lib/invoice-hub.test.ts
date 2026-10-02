@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { leaseComponents } from "./invoice-collection";
-import { inInvoiceView, invoiceAttention, invoiceDisplay, invoiceHubTotals, invoiceRows, invoiceViewFromParam, recurringRows, settingsPending } from "./invoice-hub";
-import type { BillingSettingsView, InvoiceView, RecurringLease } from "./invoice-views";
+import { deliveryStuck, inInvoiceView, invoiceAttention, invoiceDisplay, invoiceHubTotals, invoiceRows, invoiceViewFromParam, recurringRows, settingsPending } from "./invoice-hub";
+import type { BillingSettingsView, InvoiceDeliveryView, InvoiceView, RecurringLease } from "./invoice-views";
 
 const TODAY = "2026-10-15";
-const UNDECIDED: BillingSettingsView = { days_in_advance: null, fine_pct: null, interest_pct_month: null, days_payable_after_due: null };
-const DECIDED: BillingSettingsView = { days_in_advance: 10, fine_pct: 10, interest_pct_month: 1, days_payable_after_due: 30 };
+const UNDECIDED: BillingSettingsView = { days_in_advance: null, fine_pct: null, interest_pct_month: null, days_payable_after_due: null, sender_name: null, reply_to_email: null, automation_enabled: false, automation_from_month: null };
+const DECIDED: BillingSettingsView = { days_in_advance: 10, fine_pct: 10, interest_pct_month: 1, days_payable_after_due: 30, sender_name: null, reply_to_email: null, automation_enabled: true, automation_from_month: "2026-10" };
+
+const delivery = (status: InvoiceDeliveryView["status"], over: Partial<InvoiceDeliveryView> = {}): InvoiceDeliveryView => ({
+    id: "d1", kind: "ISSUE", status, recipient: "ana@example.com", attempts: 1, sent_at: status === "SENT" ? "2026-10-10T11:00:00Z" : null, last_error: null, created_at: "2026-10-10T11:00:00Z", ...over,
+});
 
 function invoice(over: Partial<InvoiceView> = {}): InvoiceView {
     return {
@@ -153,7 +157,33 @@ describe("invoiceAttention", () => {
     it("does not nag about settings while the owner collects nothing", () => {
         const rec = recurringRows([recurring({ components: leaseComponents({ management_type: "AGENCY", monthly_rent: 900 }) })], [], TODAY);
         expect(invoiceAttention([], rec, UNDECIDED, TODAY)).toEqual([]);
-        expect(settingsPending(UNDECIDED)).toHaveLength(4);
+        expect(settingsPending(UNDECIDED)).toHaveLength(5);
         expect(settingsPending(DECIDED)).toEqual([]);
+    });
+
+    it("says the automation is off once everything is decided", () => {
+        const invoices = [invoice()];
+        const rec = recurringRows([recurring()], invoices, TODAY);
+        const items = invoiceAttention(invoiceRows(invoices, TODAY), rec, { ...DECIDED, automation_enabled: false }, TODAY);
+        expect(items.map(i => i.kind)).toEqual(["settings"]);
+        expect(items[0].text).toContain("emissão automática desligada");
+        // nothing collected by the owner: nothing to automate, nothing to say
+        expect(invoiceAttention([], recurringRows([recurring({ components: leaseComponents({ management_type: "AGENCY", monthly_rent: 900 }) })], [], TODAY), { ...DECIDED, automation_enabled: false }, TODAY)).toEqual([]);
+    });
+
+    it("reports an e-mail that did not reach the tenant", () => {
+        const now = Date.parse(`${TODAY}T23:59:59-03:00`);
+        expect(deliveryStuck(invoice({ delivery: delivery("SENT") }), now)).toBe(false);
+        expect(deliveryStuck(invoice({ delivery: delivery("FAILED", { last_error: "o inquilino não tem e-mail cadastrado" }) }), now)).toBe(true);
+        expect(deliveryStuck(invoice({ delivery: delivery("SENDING") }), now)).toBe(true);                 // days ago
+        expect(deliveryStuck(invoice({ delivery: delivery("SENDING", { created_at: new Date(now - 60_000).toISOString() }) }), now)).toBe(false);
+        expect(deliveryStuck(invoice(), now)).toBe(false);
+
+        const failed = invoice({ status: "ISSUED", delivery: delivery("FAILED", { last_error: "o inquilino não tem e-mail cadastrado" }) });
+        const items = invoiceAttention(invoiceRows([failed], TODAY), [], DECIDED, TODAY);
+        expect(items.map(i => i.kind)).toEqual(["email_failed"]);
+        expect(items[0].text).toBe("o e-mail ao inquilino não foi enviado: o inquilino não tem e-mail cadastrado");
+        // a paid invoice's old failure is history
+        expect(invoiceAttention(invoiceRows([{ ...failed, status: "PAID", paid_on: TODAY }], TODAY), [], DECIDED, TODAY)).toEqual([]);
     });
 });

@@ -30,7 +30,13 @@ export async function generateInvoices(
     supabase: AdminSupabase,
     profileId: string,
     month: string,
-    opts: { leaseId?: string | null; origin: InvoiceOrigin }
+    opts: {
+        leaseId?: string | null;
+        origin: InvoiceOrigin;
+        /** only invoices falling due within `[dueFrom, dueTo]` (the daily run's window); the others are left for later, silently */
+        dueFrom?: string;
+        dueTo?: string;
+    }
 ): Promise<GenerateResult> {
     const all = await loadLeaseRows(supabase, profileId);
     const leases = opts.leaseId ? all.filter(l => l.id === opts.leaseId) : all.filter(l => IN_FORCE.has(l.status));
@@ -67,6 +73,8 @@ export async function generateInvoices(
             if (opts.leaseId || REPORTED.has(planned.skip)) result.skipped.push({ lease_id: lease.id, title: titleOf(lease), reason: SKIP_LABELS[planned.skip] });
             continue;
         }
+        const due = planned.plan.head.due_date;
+        if ((opts.dueFrom && due < opts.dueFrom) || (opts.dueTo && due > opts.dueTo)) continue;
         const { data, error } = await supabase.rpc("invoice_create", { p_owner: profileId, p_invoice: planned.plan.head, p_items: planned.plan.items });
         if (error) {
             console.error("[Invoices] invoice_create failed for lease", lease.id, error.message);
@@ -174,6 +182,11 @@ export async function updateCollection(
 }
 
 export async function saveBillingSettings(supabase: AdminSupabase, profileId: string, input: BillingSettingsInput): Promise<void> {
-    const { error } = await supabase.from("billing_settings").upsert({ owner_id: profileId, ...input }, { onConflict: "owner_id" });
-    if (error) throw new Error(`billing_settings: ${error.message}`);
+    const row = { owner_id: profileId, ...input, automation_from_month: input.automation_from_month ? `${input.automation_from_month}-01` : null };
+    const { error } = await supabase.from("billing_settings").upsert(row, { onConflict: "owner_id" });
+    if (error) {
+        // the table refuses the automation without every decision (the schema checks the same; this is the backstop)
+        if (error.code === "23514" && error.message.includes("automation_needs_decisions")) throw badRequest({ automation_enabled: "Decida antecedência, multa, juros, prazo e o mês inicial antes de ligar a emissão automática." });
+        throw new Error(`billing_settings: ${error.message}`);
+    }
 }

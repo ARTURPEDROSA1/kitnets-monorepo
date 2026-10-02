@@ -9,6 +9,8 @@ export default function robots(): MetadataRoute.Robots {
             allow: '/',
             disallow: [
                 '/dashboard/', '/api/', '/onboarding/',
+                // the tenant's invoice pages: reached by a private link, never listed
+                '/pagar/', '/*/pagar/',
                 // FipeZAP city pages: only the canonical URL, never the reader-state variants (src/lib/crawler-guard.ts)
                 '/*indices/fipezap/cidades*?',
             ],

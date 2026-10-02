@@ -64,12 +64,31 @@ describe("collectionUpdateSchema", () => {
 
 describe("billingSettingsSchema", () => {
     it("blank is not decided, never a default", () => {
-        expect(billingSettingsSchema.parse({ days_in_advance: "", fine_pct: "", interest_pct_month: null })).toEqual({ days_in_advance: null, fine_pct: null, interest_pct_month: null, days_payable_after_due: null });
+        expect(billingSettingsSchema.parse({ days_in_advance: "", fine_pct: "", interest_pct_month: null })).toEqual({ days_in_advance: null, fine_pct: null, interest_pct_month: null, days_payable_after_due: null, sender_name: null, reply_to_email: null, automation_enabled: false, automation_from_month: null });
     });
 
     it("reads numbers as typed in Brazil", () => {
-        expect(billingSettingsSchema.parse({ days_in_advance: "10", fine_pct: "2,5", interest_pct_month: "1", days_payable_after_due: 30 })).toEqual({ days_in_advance: 10, fine_pct: 2.5, interest_pct_month: 1, days_payable_after_due: 30 });
+        expect(billingSettingsSchema.parse({ days_in_advance: "10", fine_pct: "2,5", interest_pct_month: "1", days_payable_after_due: 30 })).toMatchObject({ days_in_advance: 10, fine_pct: 2.5, interest_pct_month: 1, days_payable_after_due: 30 });
         expect(billingSettingsSchema.parse({ fine_pct: "10 %", days_payable_after_due: "0" })).toMatchObject({ fine_pct: 10, days_payable_after_due: 0 });
+    });
+
+    it("the automation needs every decision made", () => {
+        const decided = { days_in_advance: "10", fine_pct: "2", interest_pct_month: "1", days_payable_after_due: "30", automation_from_month: "2026-11" };
+        expect(billingSettingsSchema.parse({ ...decided, automation_enabled: true })).toMatchObject({ automation_enabled: true, automation_from_month: "2026-11" });
+        expect(billingSettingsSchema.parse({ ...decided, automation_enabled: "true" })).toMatchObject({ automation_enabled: true });
+        expect(errorsOf(billingSettingsSchema, { ...decided, fine_pct: "", automation_from_month: "", automation_enabled: true })).toEqual({
+            fine_pct: "Decida este campo antes de ligar a emissão automática.",
+            automation_from_month: "Decida este campo antes de ligar a emissão automática.",
+        });
+        // off: nothing is required
+        expect(billingSettingsSchema.parse({ ...decided, fine_pct: "", automation_enabled: false })).toMatchObject({ automation_enabled: false, fine_pct: null });
+        expect(errorsOf(billingSettingsSchema, { automation_from_month: "11/2026" })).toEqual({ automation_from_month: "Mês inválido." });
+    });
+
+    it("sender and reply-to", () => {
+        expect(billingSettingsSchema.parse({ sender_name: "  Holding X  ", reply_to_email: "dono@exemplo.com" })).toMatchObject({ sender_name: "Holding X", reply_to_email: "dono@exemplo.com" });
+        expect(billingSettingsSchema.parse({ sender_name: "", reply_to_email: "" })).toMatchObject({ sender_name: null, reply_to_email: null });
+        expect(errorsOf(billingSettingsSchema, { reply_to_email: "dono" })).toEqual({ reply_to_email: "E-mail de resposta inválido." });
     });
 
     it("keeps each decision within its range", () => {

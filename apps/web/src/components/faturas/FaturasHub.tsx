@@ -38,6 +38,8 @@ interface Props {
     recurring: RecurringRow[];
     settings: BillingSettingsView;
     connections: ConnectionsView;
+    /** the server can e-mail tenants */
+    emailAvailable?: boolean;
     today: string;
     loading: boolean;
     error: string | null;
@@ -242,7 +244,7 @@ export default function FaturasHub(props: Props) {
             ) : section === "cobrancas" ? (
                 <RecurringChargesTable rows={recurring} savingKey={props.savingKey} onCollector={props.onCollector} onPause={props.onPause} onOpenLease={props.onOpenLease} />
             ) : section === "config" ? (
-                <BillingSettingsPanel settings={settings} onSaved={props.onSettingsSaved} />
+                <BillingSettingsPanel settings={settings} emailAvailable={props.emailAvailable ?? true} onSaved={props.onSettingsSaved} />
             ) : section === "conexoes" ? (
                 <ConnectionsPanel connections={connections} today={today} onChange={props.onConnectionsChange} />
             ) : rows.length === 0 ? (

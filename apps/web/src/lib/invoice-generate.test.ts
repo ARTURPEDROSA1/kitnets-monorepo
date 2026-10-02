@@ -4,7 +4,7 @@ import { planInvoice, type PlanInput, type PlanLease } from "./invoice-generate"
 import type { PayerTenant } from "./invoice-payer";
 import type { BillingSettingsView } from "./invoice-views";
 
-const UNDECIDED: BillingSettingsView = { days_in_advance: null, fine_pct: null, interest_pct_month: null, days_payable_after_due: null };
+const UNDECIDED: BillingSettingsView = { days_in_advance: null, fine_pct: null, interest_pct_month: null, days_payable_after_due: null, sender_name: null, reply_to_email: null, automation_enabled: false, automation_from_month: null };
 
 const lease = (over: Partial<PlanLease> = {}): PlanLease => ({
     id: "l1", property_id: "p1", unit_id: "u35c", unit_name: "Kitnet 35C", primary_tenant_id: "t1",
@@ -46,7 +46,7 @@ describe("planInvoice", () => {
 
     it("states the owner's terms as decided, and none while undecided", () => {
         const undecided = planInvoice(input());
-        const decided = planInvoice(input({ settings: { days_in_advance: 10, fine_pct: 10, interest_pct_month: 1, days_payable_after_due: 30 } }));
+        const decided = planInvoice(input({ settings: { ...UNDECIDED, days_in_advance: 10, fine_pct: 10, interest_pct_month: 1, days_payable_after_due: 30 } }));
         if (!("plan" in undecided) || !("plan" in decided)) throw new Error("expected plans");
         expect(undecided.plan.head).toMatchObject({ fine_pct: null, interest_pct_month: null, days_payable_after_due: null });
         expect(decided.plan.head).toMatchObject({ fine_pct: 10, interest_pct_month: 1, days_payable_after_due: 30 });
