@@ -43,6 +43,17 @@ describe("leaseInputSchema", () => {
         expect(out.charges).toEqual([{ charge_type: "WATER", label: "Água", responsibility: "TENANT", amount: 80, adjustment_index: "IPCA", adjustment_notes: "Anual" }]);
     });
 
+    it("keeps who bills a charge when the form sends it, and says nothing when an import does not", () => {
+        const charge = (over: Record<string, unknown>) => ({ charge_type: "CONDOMINIUM", responsibility: "TENANT", amount: "250,00", ...over });
+        const out = leaseInputSchema.parse({ ...valid, charges: [charge({ collected_by: "THIRD_PARTY" }), charge({ collected_by: "" }), charge({ collected_by: "SOMEONE" }), charge({})] });
+        expect(out.charges.map(c => ("collected_by" in c ? c.collected_by : "absent"))).toEqual(["THIRD_PARTY", null, null, "absent"]);
+    });
+
+    it("accepts a utility included in the condominium fee", () => {
+        const out = leaseInputSchema.parse({ ...valid, charges: [{ charge_type: "WATER", responsibility: "INCLUDED_IN_CONDO" }] });
+        expect(out.charges[0]).toMatchObject({ charge_type: "WATER", responsibility: "INCLUDED_IN_CONDO", amount: null });
+    });
+
     it("reports the form's messages for missing required fields", () => {
         const r = leaseInputSchema.safeParse({});
         expect(r.success).toBe(false);

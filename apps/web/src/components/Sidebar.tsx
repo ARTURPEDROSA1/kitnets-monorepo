@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@kitnets/ui";
 import { SignOutButton, useAuth } from "@clerk/nextjs";
-import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Rocket, HardHat, Briefcase, Building2, User, Users, UserCheck, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart, ArrowLeftRight, FileText, AlertCircle, Plus, Minus, Gem, X, Zap, Building, ChevronsLeft, ChevronsRight, Landmark, Droplets, MapPinned, BookOpenCheck, BookText, NotebookPen, CalendarCheck, Eye, EyeOff, DollarSign, ArrowLeft, LogOut, LogIn, type LucideIcon } from "lucide-react";
+import { Moon, Sun, Home, Megaphone, Key, Calculator, Link as LinkIcon, HelpCircle, Rocket, HardHat, Briefcase, Building2, User, Users, UserCheck, KeyRound, Menu, TrendingUp, PiggyBank, Coins, LayoutDashboard, LineChart, ArrowLeftRight, FileText, AlertCircle, Plus, Minus, Gem, X, Zap, Building, ChevronsLeft, ChevronsRight, Landmark, Droplets, MapPinned, BookOpenCheck, BookText, NotebookPen, CalendarCheck, Eye, EyeOff, DollarSign, ArrowLeft, LogOut, LogIn, Receipt, type LucideIcon } from "lucide-react";
 import { PropertyFilters } from "./PropertyFilters";
 
 import { useTheme } from "next-themes";
@@ -70,6 +70,7 @@ const SIGNED_IN_GROUPS: NavGroup[] = [
             { label: "Condomínio", path: '/condominio', icon: Building },
             { label: "Energia", path: '/dashboard/energy', icon: Zap, iconClassName: "text-amber-500 group-hover:text-amber-600" },
             { label: "Água", path: '/dashboard/water', icon: Droplets, iconClassName: "text-blue-500 group-hover:text-blue-600", alsoActive: ['/dashboard/billing'] },
+            { label: "Fatura", path: '/faturas', icon: Receipt },
             { label: "Imobiliária", path: '/imobiliaria', icon: Building2 },
             { label: "Corretores", path: '/corretores', icon: Users },
             { label: "Inquilinos", path: '/inquilinos', icon: UserCheck },

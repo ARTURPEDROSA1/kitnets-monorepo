@@ -11,7 +11,9 @@ export const LEASE_STATUSES = ["DRAFT", "ACTIVE", "EXPIRING_SOON", "EXPIRED", "T
 export const LEASE_MANAGEMENT = ["SELF_MANAGED", "AGENCY", "AGENT"] as const;
 export const LEASE_ADJUSTMENT = ["IPCA", "IGP_M", "INPC", "IVAR", "CUSTOM", "NONE"] as const;
 export const LEASE_CHARGE_TYPES = ["CONDOMINIUM", "IPTU", "WATER", "ELECTRICITY", "GAS", "INTERNET", "OTHER"] as const;
-export const LEASE_RESPONSIBILITIES = ["TENANT", "LANDLORD", "INCLUDED"] as const;
+export const LEASE_RESPONSIBILITIES = ["TENANT", "LANDLORD", "INCLUDED", "INCLUDED_IN_CONDO"] as const;
+/** Who bills the tenant for a charge (lib/invoice-collection.ts) */
+export const LEASE_COLLECTORS = ["OWNER", "AGENCY", "THIRD_PARTY"] as const;
 export const LEASE_TENANT_ROLES = ["CO_TENANT", "OCCUPANT"] as const;
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -55,7 +57,7 @@ const additionalTenants = z.unknown().transform((v) =>
 
 const charges = z.unknown().transform((v) =>
     (Array.isArray(v) ? v : [])
-        .filter((c): c is { charge_type: string; responsibility: string; label?: unknown; amount?: unknown; adjustment_index?: unknown; adjustment_notes?: unknown } =>
+        .filter((c): c is { charge_type: string; responsibility: string; label?: unknown; amount?: unknown; adjustment_index?: unknown; adjustment_notes?: unknown; collected_by?: unknown } =>
             !!c && typeof c === "object" &&
             includes(LEASE_CHARGE_TYPES, (c as { charge_type?: unknown }).charge_type) &&
             includes(LEASE_RESPONSIBILITIES, (c as { responsibility?: unknown }).responsibility))
@@ -66,6 +68,9 @@ const charges = z.unknown().transform((v) =>
             amount: c.amount == null || c.amount === "" ? null : parseCurrencyBR(c.amount as string | number),
             adjustment_index: includes(LEASE_ADJUSTMENT, c.adjustment_index) ? c.adjustment_index : null,
             adjustment_notes: typeof c.adjustment_notes === "string" && c.adjustment_notes.trim() ? c.adjustment_notes.trim().slice(0, 300) : null,
+            // The form sends who bills the charge (blank = cleared); an import sends nothing, and the
+            // charge then keeps the answer it had (inheritCollectors, lib/invoice-collection.ts)
+            ...("collected_by" in c ? { collected_by: includes(LEASE_COLLECTORS, c.collected_by) ? c.collected_by : null } : {}),
         }))
 );
 

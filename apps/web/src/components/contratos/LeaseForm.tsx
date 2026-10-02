@@ -187,6 +187,7 @@ export function leaseToInitial(full: LeaseWithDetails): LeaseFormInitial {
             amount: moneyToMask(c.amount),
             adjustment_index: c.adjustment_index || "",
             adjustment_notes: c.adjustment_notes || "",
+            collected_by: c.collected_by || "",
         })),
         openSections: { adjustment: !!full.adjustment_index, charges: (full.charges || []).length > 0, notes: !!full.notes },
     };
@@ -206,7 +207,27 @@ const RESPONSIBILITY_OPTIONS: { value: ChargeResponsibility; label: string }[] =
     { value: "TENANT", label: "Inquilino" },
     { value: "LANDLORD", label: "Proprietário" },
     { value: "INCLUDED", label: "Incluso no aluguel" },
+    { value: "INCLUDED_IN_CONDO", label: "Incluso no condomínio" },
 ];
+/** A charge can be part of the condominium fee — except the condominium itself. */
+const responsibilityOptionsFor = (type: ChargeType) => RESPONSIBILITY_OPTIONS.filter(r => r.value !== "INCLUDED_IN_CONDO" || type !== "CONDOMINIUM");
+
+/**
+ * "Emissor da fatura": who bills the tenant for a charge the tenant pays. "Proprietário" puts it in the
+ * owner's invoice (módulo Fatura); "Terceiros" is someone else's bill — the building's own condominium
+ * for a studio in a building, the utility. Blank: the condominium follows how the contract is managed.
+ */
+const COLLECTOR_OPTIONS: { value: string; label: string }[] = [
+    { value: "AGENCY", label: "Imobiliária" },
+    { value: "OWNER", label: "Proprietário" },
+    { value: "THIRD_PARTY", label: "Terceiros" },
+];
+const COLLECTOR_HINT: Record<string, string> = {
+    "": "Sem resposta, o condomínio segue a gestão do contrato e os demais encargos ficam fora da fatura.",
+    AGENCY: "A imobiliária cobra junto com o aluguel e repassa.",
+    OWNER: "Entra na fatura que você emite ao inquilino (módulo Fatura).",
+    THIRD_PARTY: "Outro emissor cobra o inquilino: o condomínio do prédio, a concessionária.",
+};
 
 const ADJUSTMENT_OPTIONS = [
     { value: "", label: "Selecionar..." },
@@ -749,7 +770,15 @@ export default function LeaseForm({ editingId, initial, dropdowns, aiImported = 
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
                                 <div className="flex-1">
                                     <Label className="text-xs">Tipo</Label>
-                                    <select className="flex h-9 w-full rounded-md border bg-background px-2 py-1 text-sm" value={charge.charge_type} onChange={e => patch({ charge_type: e.target.value as ChargeType })}>
+                                    <select
+                                        className="flex h-9 w-full rounded-md border bg-background px-2 py-1 text-sm"
+                                        value={charge.charge_type}
+                                        onChange={e => {
+                                            const type = e.target.value as ChargeType;
+                                            // the condominium cannot be included in itself
+                                            patch({ charge_type: type, ...(type === "CONDOMINIUM" && charge.responsibility === "INCLUDED_IN_CONDO" ? { responsibility: "TENANT" as ChargeResponsibility } : {}) });
+                                        }}
+                                    >
                                         {CHARGE_TYPES.map(ct => <option key={ct.value} value={ct.value}>{ct.label}</option>)}
                                     </select>
                                 </div>
@@ -759,10 +788,10 @@ export default function LeaseForm({ editingId, initial, dropdowns, aiImported = 
                                         <Input value={charge.label} onChange={e => patch({ label: e.target.value })} placeholder="Descreva..." className="h-9" />
                                     </div>
                                 )}
-                                <div className="w-full sm:w-44">
+                                <div className="w-full sm:w-52">
                                     <Label className="text-xs">Responsabilidade</Label>
                                     <select className="flex h-9 w-full rounded-md border bg-background px-2 py-1 text-sm" value={charge.responsibility} onChange={e => patch({ responsibility: e.target.value as ChargeResponsibility })}>
-                                        {RESPONSIBILITY_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                                        {responsibilityOptionsFor(charge.charge_type).map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                                     </select>
                                 </div>
                                 <div className="w-full sm:w-32">
@@ -786,10 +815,31 @@ export default function LeaseForm({ editingId, initial, dropdowns, aiImported = 
                                     <Input value={charge.adjustment_notes} onChange={e => patch({ adjustment_notes: e.target.value })} placeholder="Ex: Fixo por 12 meses; revisto conforme o consumo" maxLength={300} className="h-9" />
                                 </div>
                             </div>
+                            {/* Who bills the tenant for it: only a charge the tenant pays has an issuer */}
+                            {charge.responsibility === "TENANT" && (
+                                <div>
+                                    <Label className="text-xs">Emissor da fatura</Label>
+                                    <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1.5" role="group" aria-label="Emissor da fatura">
+                                        {COLLECTOR_OPTIONS.map(o => (
+                                            <label key={o.value} className="inline-flex cursor-pointer items-center gap-1.5 text-sm text-foreground">
+                                                <input
+                                                    type="checkbox"
+                                                    className="h-4 w-4 rounded border-input accent-emerald-600"
+                                                    checked={(charge.collected_by ?? "") === o.value}
+                                                    // one issuer at a time; unticking it leaves the charge without an answer
+                                                    onChange={e => patch({ collected_by: e.target.checked ? o.value : "" })}
+                                                />
+                                                {o.label}
+                                            </label>
+                                        ))}
+                                    </div>
+                                    <p className="mt-1 text-xs text-muted-foreground">{COLLECTOR_HINT[charge.collected_by ?? ""] ?? COLLECTOR_HINT[""]}</p>
+                                </div>
+                            )}
                         </div>
                     );
                 })}
-                <Button variant="outline" size="sm" onClick={() => setCharges(prev => [...prev, { charge_type: "CONDOMINIUM", label: "", responsibility: "TENANT", amount: "", adjustment_index: "", adjustment_notes: "" }])}>
+                <Button variant="outline" size="sm" onClick={() => setCharges(prev => [...prev, { charge_type: "CONDOMINIUM", label: "", responsibility: "TENANT", amount: "", adjustment_index: "", adjustment_notes: "", collected_by: "" }])}>
                     <Plus className="mr-1 h-4 w-4" /> Adicionar Encargo
                 </Button>
             </FormSection>

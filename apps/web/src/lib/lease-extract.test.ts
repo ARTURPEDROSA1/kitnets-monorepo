@@ -41,6 +41,7 @@ describe("normalizeLeaseExtraction", () => {
                 { charge_type: "LIXO" },
                 { charge_type: "OTHER", label: "Taxa de energia elétrica", responsibility: "locatário", amount: "300,00", adjustment_index: "IPCA/IBGE", adjustment_notes: "Reajuste anual pelo IPCA." },
                 { charge_type: "OTHER", label: "Taxa de lixo", responsibility: "INCLUSO" },
+                { charge_type: "GAS", responsibility: "Incluso no condomínio" },
             ],
             tenants: [
                 { full_name: "Maria Souza", cpf: "111.444.777-35", role: "CO_TENANT" },
@@ -70,6 +71,7 @@ describe("normalizeLeaseExtraction", () => {
             { charge_type: "CONDOMINIUM", label: "", responsibility: "TENANT", amount: 350, adjustment_index: null, adjustment_notes: null },
             { charge_type: "ELECTRICITY", label: "", responsibility: "TENANT", amount: 300, adjustment_index: "IPCA", adjustment_notes: "Reajuste anual pelo IPCA." },
             { charge_type: "OTHER", label: "Taxa de lixo", responsibility: "INCLUDED", amount: null, adjustment_index: null, adjustment_notes: null },
+            { charge_type: "GAS", label: "", responsibility: "INCLUDED_IN_CONDO", amount: null, adjustment_index: null, adjustment_notes: null },
         ]);
 
         // The primary comes first, the duplicate CPF and the nameless entry are dropped.

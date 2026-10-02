@@ -3,6 +3,7 @@ import { badRequest, notFound } from "@/lib/api-route";
 import type { LeaseInput } from "@/lib/schemas/lease";
 import { findPropertyUnit, loadPropertyUnits } from "@/lib/property-units-server";
 import { refreshedLeaseUnitNames } from "@/lib/lease-unit-names";
+import { inheritCollectors } from "@/lib/invoice-collection";
 
 /**
  * Shared server-side pieces for the leases (contratos) routes.
@@ -175,7 +176,11 @@ export async function writeLeaseChildren(
     input: Pick<LeaseInput, "additional_tenants" | "charges">,
     opts: { replace?: boolean; tag: string }
 ): Promise<void> {
+    // Who bills each charge ("Emissor da fatura") survives a save that does not mention it (the imports)
+    let previousCharges: Array<{ charge_type: string; label: string | null; collected_by: string | null }> = [];
     if (opts.replace) {
+        const { data } = await supabase.from("lease_charges").select("charge_type, label, collected_by").eq("lease_id", leaseId);
+        previousCharges = (data ?? []) as typeof previousCharges;
         await supabase.from("lease_tenants").delete().eq("lease_id", leaseId);
         await supabase.from("lease_charges").delete().eq("lease_id", leaseId);
     }
@@ -199,9 +204,17 @@ export async function writeLeaseChildren(
     }
 
     if (input.charges.length > 0) {
-        const { error } = await supabase
-            .from("lease_charges")
-            .insert(input.charges.map((c) => ({ lease_id: leaseId, ...c })));
+        const rows = inheritCollectors(input.charges, previousCharges).map((c) => ({ lease_id: leaseId, ...c }));
+        let { error } = await supabase.from("lease_charges").insert(rows);
+        // `collected_by` arrives with the Fatura migration: a deploy that got ahead of it must not lose the charges just deleted
+        if (error && /collected_by/.test(error.message ?? "")) {
+            const withoutCollector = rows.map((row) => {
+                const copy: Record<string, unknown> = { ...row };
+                delete copy.collected_by;
+                return copy;
+            });
+            ({ error } = await supabase.from("lease_charges").insert(withoutCollector));
+        }
         if (error) console.error(`[${opts.tag}] Charges insert error:`, error);
     }
 }
