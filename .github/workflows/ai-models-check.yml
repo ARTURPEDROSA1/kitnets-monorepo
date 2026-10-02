@@ -38,7 +38,7 @@ jobs:
       OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
       OPENAI_MINI_MODEL: ${{ vars.OPENAI_MINI_MODEL }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v7
         with:
