@@ -10,6 +10,7 @@ const defaultLocale = "pt";
 // and left the whole authenticated area unprotected at the edge.
 const PROTECTED_SEGMENTS = [
     "dashboard",
+    "faturas",
     "imobiliaria",
     "corretores",
     "profile",

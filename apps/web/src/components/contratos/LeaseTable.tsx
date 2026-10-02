@@ -40,7 +40,7 @@ interface Props {
 }
 
 const TABLE_KEY = columnTableKey("leases");
-const RESPONSIBILITY_SHORT: Record<string, string> = { TENANT: "inquilino", LANDLORD: "proprietário", INCLUDED: "incluso no aluguel" };
+const RESPONSIBILITY_SHORT: Record<string, string> = { TENANT: "inquilino", LANDLORD: "proprietário", INCLUDED: "incluso no aluguel", INCLUDED_IN_CONDO: "incluso no condomínio" };
 
 /** "faltam 25 dias", "vencido há 3 dias", "termina hoje", "prazo indeterminado" */
 function termHint(row: LeaseRow): { text: string; tone?: string } {

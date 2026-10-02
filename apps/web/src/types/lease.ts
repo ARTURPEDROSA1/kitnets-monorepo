@@ -4,7 +4,10 @@ export type LeaseStatus = 'DRAFT' | 'ACTIVE' | 'EXPIRING_SOON' | 'EXPIRED' | 'TE
 export type LeaseManagementType = 'SELF_MANAGED' | 'AGENCY' | 'AGENT';
 export type AdjustmentIndex = 'IPCA' | 'IGP_M' | 'INPC' | 'IVAR' | 'CUSTOM' | 'NONE';
 export type ChargeType = 'CONDOMINIUM' | 'IPTU' | 'WATER' | 'ELECTRICITY' | 'GAS' | 'INTERNET' | 'OTHER';
-export type ChargeResponsibility = 'TENANT' | 'LANDLORD' | 'INCLUDED';
+/** Who pays a charge: the tenant, the owner, nobody apart (it is in the rent, or in the condominium fee) */
+export type ChargeResponsibility = 'TENANT' | 'LANDLORD' | 'INCLUDED' | 'INCLUDED_IN_CONDO';
+/** Who bills the tenant for the rent or a charge (lib/invoice-collection.ts) */
+export type ChargeCollector = 'OWNER' | 'AGENCY' | 'THIRD_PARTY';
 export type DocumentType = 'CONTRACT' | 'ADDENDUM' | 'INSPECTION' | 'TENANT_DOC' | 'DEPOSIT_RECEIPT' | 'OTHER';
 export type LeaseTenantRole = 'CO_TENANT' | 'OCCUPANT';
 
@@ -52,6 +55,12 @@ export interface Lease {
     // Notes
     notes: string | null;
 
+    // Invoicing (Fatura): who collects the rent (null = follows the management) and how this lease is billed
+    rent_collected_by?: ChargeCollector | null;
+    billing_due_day?: number | null;
+    billing_email?: string | null;
+    billing_paused?: boolean;
+
     // Timestamps
     created_at: string;
     updated_at: string;
@@ -94,6 +103,8 @@ export interface LeaseCharge {
     /** Index that readjusts the amount (same values as the rent's), when the lease says. */
     adjustment_index: string | null;
     adjustment_notes: string | null;
+    /** Who bills the tenant for it ("Emissor da fatura"); null = not answered. Only for a charge the tenant pays. */
+    collected_by?: ChargeCollector | null;
 }
 
 export interface LeaseDocument {
@@ -154,6 +165,8 @@ export interface ChargeFormItem {
     amount: string;                 // String for currency input
     adjustment_index: string;
     adjustment_notes: string;
+    /** "Emissor da fatura": OWNER, AGENCY, THIRD_PARTY or '' (not answered); absent on a charge an import prefilled */
+    collected_by?: string;
 }
 
 // ── Dropdown option types ────────────────────────────────────────────

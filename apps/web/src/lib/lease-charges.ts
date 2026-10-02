@@ -16,7 +16,7 @@ export const KIND_CHARGE: Record<PropertyKind, { type: LeaseCharge["charge_type"
     single: { type: "ELECTRICITY", label: "Energia" },
 };
 
-export const RESPONSIBILITY_LABELS: Record<string, string> = { TENANT: "Pago pelo inquilino", LANDLORD: "Pago pelo proprietário", INCLUDED: "Incluso no aluguel" };
+export const RESPONSIBILITY_LABELS: Record<string, string> = { TENANT: "Pago pelo inquilino", LANDLORD: "Pago pelo proprietário", INCLUDED: "Incluso no aluguel", INCLUDED_IN_CONDO: "Incluso no condomínio" };
 export const CHARGE_LABELS: Record<string, string> = { CONDOMINIUM: "Condomínio", IPTU: "IPTU", WATER: "Água", ELECTRICITY: "Energia elétrica", GAS: "Gás", INTERNET: "Internet", OTHER: "Outro" };
 export const CHARGE_INDEX_LABELS: Record<string, string> = { IPCA: "IPCA", IGP_M: "IGP-M", INPC: "INPC", IVAR: "IVAR", CUSTOM: "Outra regra", NONE: "Valor fixo" };
 

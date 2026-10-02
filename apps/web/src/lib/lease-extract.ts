@@ -287,6 +287,7 @@ function responsibility(v: unknown): (typeof LEASE_RESPONSIBILITIES)[number] {
     const exact = oneOf(LEASE_RESPONSIBILITIES, v);
     if (exact) return exact;
     const key = normalizeText(text(v, 60));
+    if (/inclus.*condom/.test(key)) return "INCLUDED_IN_CONDO";
     if (/inclus|included/.test(key)) return "INCLUDED";
     if (/proprietari|locador|landlord/.test(key)) return "LANDLORD";
     return "TENANT";

@@ -57,7 +57,9 @@ interface Props {
 }
 
 const CHARGE_LABELS: Record<string, string> = { CONDOMINIUM: "Condomínio", IPTU: "IPTU", WATER: "Água", ELECTRICITY: "Energia elétrica", GAS: "Gás", INTERNET: "Internet", OTHER: "Outro" };
-const RESPONSIBILITY_LABELS: Record<string, string> = { TENANT: "Inquilino", LANDLORD: "Proprietário", INCLUDED: "Incluso no aluguel" };
+const RESPONSIBILITY_LABELS: Record<string, string> = { TENANT: "Inquilino", LANDLORD: "Proprietário", INCLUDED: "Incluso no aluguel", INCLUDED_IN_CONDO: "Incluso no condomínio" };
+/** who bills the tenant for a charge ("Emissor da fatura" in the form) */
+const COLLECTOR_SHORT: Record<string, string> = { OWNER: "proprietário", AGENCY: "imobiliária", THIRD_PARTY: "terceiros" };
 const CHARGE_INDEX_LABELS: Record<string, string> = { IPCA: "IPCA", IGP_M: "IGP-M", INPC: "INPC", IVAR: "IVAR", CUSTOM: "Outra regra", NONE: "Valor fixo" };
 
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString("pt-BR")} ${n === 1 ? one : many}`;
@@ -407,7 +409,10 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                                         {lease.charges.map(c => (
                                             <tr key={c.id} className="border-t border-border/40 first:border-0">
                                                 <td className="py-1 pr-2 text-foreground">{c.charge_type === "OTHER" && c.label ? c.label : CHARGE_LABELS[c.charge_type] ?? c.charge_type}</td>
-                                                <td className="py-1 pr-2 text-muted-foreground">{RESPONSIBILITY_LABELS[c.responsibility] ?? c.responsibility}</td>
+                                                <td className="py-1 pr-2 text-muted-foreground">
+                                                    {RESPONSIBILITY_LABELS[c.responsibility] ?? c.responsibility}
+                                                    {c.responsibility === "TENANT" && c.collected_by && <span title="Quem emite a fatura deste encargo"> · fatura: {COLLECTOR_SHORT[c.collected_by] ?? c.collected_by}</span>}
+                                                </td>
                                                 <td className="py-1 text-right tabular-nums text-foreground">{c.amount ? <Money>{brl(Number(c.amount))}</Money> : "—"}</td>
                                                 <td className="py-1 pl-2 text-right text-muted-foreground" title={c.adjustment_notes ?? undefined}>{c.adjustment_index ? CHARGE_INDEX_LABELS[c.adjustment_index] ?? c.adjustment_index : ""}</td>
                                             </tr>
