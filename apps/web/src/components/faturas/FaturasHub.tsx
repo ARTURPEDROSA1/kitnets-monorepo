@@ -296,7 +296,7 @@ export default function FaturasHub(props: Props) {
 
             <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
                 <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500" />
-                Nesta etapa as faturas são geradas e baixadas aqui. A emissão do boleto e do PIX pelo Banco Inter, o link de cartão e o envio automático por e-mail ao inquilino entram nas próximas etapas do módulo. O pagamento registrado aqui ainda não é lançado nas Receitas do imóvel: continue lançando lá por enquanto.
+                Nesta etapa as faturas são geradas e baixadas aqui. A emissão do boleto e do PIX pelo Banco Inter, o link de cartão e o envio automático por e-mail ao inquilino entram nas próximas etapas do módulo. O pagamento registrado aqui já entra nas Receitas do imóvel, sem taxa de imobiliária.
             </p>
         </div>
     );

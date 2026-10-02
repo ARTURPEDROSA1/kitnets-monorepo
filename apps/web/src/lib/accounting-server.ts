@@ -10,7 +10,7 @@ import type { AccountingPeriod, JournalEntry, JournalLine } from "./accounting-j
 import { DEFAULT_SETTINGS, type AccountingSettings } from "./accounting-policies";
 import type { CompanyRegistry } from "./cnpj-card-extract";
 import { registryFromRow } from "./profile-holding";
-import { breakdown, round2, type PropertyIncomeRow } from "./property-income";
+import { INCOME_DIRECT_COLUMNS, breakdown, round2, type PropertyIncomeRow } from "./property-income";
 import { landlordTaxesByMonth, type PropertyTax } from "./property-taxes";
 
 export const ACCOUNT_COLUMNS = "id, code, name, account_type, nature, analytic, system_key, referential_code, active";
@@ -189,7 +189,7 @@ export async function simulationDefaults(supabase: AdminSupabase, ownerId: strin
         supabase.from("property_investments").select("property_id, purchase_price").eq("owner_id", ownerId),
         supabase.from("property_valuations").select("property_id, valued_on, amount").eq("owner_id", ownerId).order("valued_on", { ascending: false }),
         supabase.from("property_income_months")
-            .select("month, received_amount, energy_portion, other_income, other_expenses, condo_amount, fee_on_condo, agency_fee_pct")
+            .select(`month, received_amount, energy_portion, other_income, other_expenses, condo_amount, fee_on_condo, agency_fee_pct, ${INCOME_DIRECT_COLUMNS}`)
             .eq("owner_id", ownerId).gte("month", iso(start)).lt("month", iso(end)),
         supabase.from("property_taxes").select("id, property_id, year, kind, amount, paid_by, paid_on, installments").eq("owner_id", ownerId),
     ]);
@@ -203,7 +203,7 @@ export async function simulationDefaults(supabase: AdminSupabase, ownerId: strin
 
     let gross = 0, expenses = 0;
     const months = new Set<string>();
-    for (const row of (income.data ?? []) as Array<Pick<PropertyIncomeRow, "month" | "received_amount" | "energy_portion" | "other_income" | "agency_fee_pct" | "other_expenses" | "condo_amount" | "fee_on_condo">>) {
+    for (const row of (income.data ?? []) as Array<Pick<PropertyIncomeRow, "month" | "received_amount" | "energy_portion" | "other_income" | "agency_fee_pct" | "other_expenses" | "condo_amount" | "fee_on_condo" | "condo_direct" | "direct_rent" | "direct_condo" | "direct_energy" | "direct_other">>) {
         const b = breakdown(row);
         gross += b.grossRent;
         expenses += b.grossRent - b.noi;

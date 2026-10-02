@@ -29,6 +29,19 @@ describe("income Excel template", () => {
         expect(rows[2].fee_on_condo).toBeUndefined();   // no condominium: the cell stays blank
     });
 
+    it("exports the deposit's side only: what was paid by invoice is not typed back in by an import", async () => {
+        const ledger = [
+            // Kitnet 35C: the agency deposits the rent, the owner collected the condominium by invoice
+            row("2026-09", "Kitnet 35C", 900, { condo_amount: 150, condo_direct: true, direct_condo: 150 }),
+            // rent partly through the agency, partly by invoice, energy both ways
+            row("2026-09", "Kitnet 35B", 1250, { energy_portion: 350, direct_rent: 200, direct_energy: 40, direct_other: 80 }),
+        ];
+        const { rows } = await roundTrip(await buildIncomeTemplate({ propertyName: "Santo Antônio", feePct: 10, rows: ledger, units: ["Kitnet 35B", "Kitnet 35C"], now: new Date(2026, 8, 20) }));
+        expect(rows.map(r => r.unit_name)).toEqual(["Kitnet 35B", "Kitnet 35C"]);
+        expect(rows[0]).toMatchObject({ gross_rent: 1000, received_amount: 1250, energy_portion: 350 });
+        expect(rows[1]).toMatchObject({ gross_rent: 1000, received_amount: 900, condo_amount: 150 });
+    });
+
     it("the empty template of a multi-unit property has one row per month and unit, and imports nothing until it is filled", async () => {
         const buffer = await buildIncomeTemplate({ propertyName: "Kitnets", feePct: 10, months: 2, units: ["Kitnet 1", "Kitnet 2", "Kitnet 3"], now: new Date(2026, 8, 20) });
         const tsv = await xlsxToTsv(buffer);

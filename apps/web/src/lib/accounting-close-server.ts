@@ -12,14 +12,14 @@ import type { AccountingAccount } from "./accounting-chart";
 import { AUTO_SOURCES, formatMoney, monthStart, postingErrorMessage, type AccountingPeriod } from "./accounting-journal";
 import type { AccountingSettings } from "./accounting-policies";
 import {
-    checklistSummary, closeChecklist, depreciationEntry, diffEntries, fairValueEntry, financingEntry, monthEnd, monthRange,
+    checklistSummary, closeChecklist, depreciationEntry, diffEntries, fairValueEntry, financingEntry, lateFeeEntry, monthEnd, monthRange,
     pendingChanges, rentAccrual, resolveEntries, shiftMonth, sortChecklist,
-    type AutoEntry, type CheckItem, type CloseFacts, type EntryDiff, type FinancingPayment, type IncomeRowForAccrual, type PostableEntry, type StoredEntry,
+    type AutoEntry, type CheckItem, type CloseFacts, type EntryDiff, type FinancingPayment, type IncomeRowForAccrual, type PaidInvoiceLateFee, type PostableEntry, type StoredEntry,
 } from "./accounting-accruals";
 import { bankBookBalance, bankContext, loadBankRowsForPosting, postBankRows, postedBankEntries, viewRows } from "./accounting-bank-server";
 import { buildTrialBalance, type AccountSums, type TrialBalanceRow } from "./accounting-reports";
 import { chunk, closedMonths, ensureChart, fetchAllPages, loadPeriods, loadSettings } from "./accounting-server";
-import { round2 } from "./property-income";
+import { INCOME_DIRECT_COLUMNS, round2 } from "./property-income";
 import { estimateFinancingSplits, type PropertyInvestment, type PropertyTransaction } from "./property-investment";
 
 const AUTO_AUTHOR = "Automação (competência)";
@@ -63,13 +63,52 @@ export async function closeContext(supabase: AdminSupabase, ownerId: string): Pr
 // Loaders
 // ───────────────────────────────────────────────────────────────────────────
 
-const INCOME_COLUMNS = "property_id, month, unit_id, unit_name, received_amount, energy_portion, other_income, other_expenses, condo_amount, fee_on_condo, agency_fee_pct, status";
+const INCOME_COLUMNS = `property_id, month, unit_id, unit_name, received_amount, energy_portion, other_income, other_expenses, condo_amount, fee_on_condo, agency_fee_pct, status, ${INCOME_DIRECT_COLUMNS}`;
+
+/** Charges paid by invoice that are neither rent, condominium nor energy: the ledger adds them into one figure, the books want them by kind. */
+const OWN_COLUMN_KINDS = new Set(["RENT", "CONDOMINIUM", "ELECTRICITY"]);
+
+/** `property|unit` → the other charges (IPTU, water, gas, internet…) on the invoices of the month that were paid. */
+async function loadOtherChargeItems(supabase: AdminSupabase, ownerId: string, month: string): Promise<Map<string, Array<{ kind: string; amount: number }>>> {
+    const invoices = await fetchAllPages<{ property_id: string; unit_id: string | null; invoice_items: Array<{ kind: string; amount: number | string }> | null }>((a, b) =>
+        supabase.from("invoices").select("property_id, unit_id, invoice_items(kind, amount)")
+            .eq("owner_id", ownerId).eq("reference_month", monthStart(month)).eq("status", "PAID").order("id").range(a, b));
+    const out = new Map<string, Array<{ kind: string; amount: number }>>();
+    for (const invoice of invoices) {
+        const key = `${invoice.property_id}|${invoice.unit_id ?? ""}`;
+        for (const item of invoice.invoice_items ?? []) {
+            if (OWN_COLUMN_KINDS.has(item.kind)) continue;
+            out.set(key, [...(out.get(key) ?? []), { kind: item.kind, amount: Number(item.amount) || 0 }]);
+        }
+    }
+    return out;
+}
+
+/** Invoices paid in [from, to] with a late fee: financial revenue of the day they were paid. */
+async function loadLateFees(supabase: AdminSupabase, ownerId: string, from: string, to: string): Promise<PaidInvoiceLateFee[]> {
+    const rows = await fetchAllPages<Record<string, unknown>>((a, b) =>
+        supabase.from("invoices").select("id, number, property_id, unit_id, paid_on, late_fee_amount")
+            .eq("owner_id", ownerId).eq("status", "PAID").gt("late_fee_amount", 0).gte("paid_on", from).lte("paid_on", to).order("number").range(a, b));
+    return rows.map(r => ({
+        id: String(r.id), number: Number(r.number) || 0, property_id: String(r.property_id), unit_id: (r.unit_id as string | null) ?? null,
+        paid_on: String(r.paid_on).slice(0, 10), late_fee_amount: Number(r.late_fee_amount) || 0,
+    }));
+}
 
 async function loadIncomeRows(supabase: AdminSupabase, ownerId: string, month: string): Promise<IncomeRowForAccrual[]> {
-    const rows = await fetchAllPages<Record<string, unknown>>((a, b) => supabase.from("property_income_months").select(INCOME_COLUMNS)
-        .eq("owner_id", ownerId).eq("month", monthStart(month)).order("property_id").order("unit_id", { nullsFirst: true }).range(a, b));
+    const [rows, otherCharges] = await Promise.all([
+        fetchAllPages<Record<string, unknown>>((a, b) => supabase.from("property_income_months").select(INCOME_COLUMNS)
+            .eq("owner_id", ownerId).eq("month", monthStart(month)).order("property_id").order("unit_id", { nullsFirst: true }).range(a, b)),
+        loadOtherChargeItems(supabase, ownerId, month),
+    ]);
     const n = (v: unknown) => Number(v) || 0;
     return rows.map(r => ({
+        condo_direct: r.condo_direct === true,
+        direct_rent: n(r.direct_rent),
+        direct_condo: n(r.direct_condo),
+        direct_energy: n(r.direct_energy),
+        direct_other: n(r.direct_other),
+        direct_other_items: otherCharges.get(`${String(r.property_id)}|${(r.unit_id as string | null) ?? ""}`) ?? [],
         property_id: String(r.property_id),
         month: String(r.month),
         unit_id: (r.unit_id as string | null) ?? null,
@@ -224,11 +263,12 @@ export async function computeMonth(supabase: AdminSupabase, ctx: CloseContext, m
     const ppiIds = idsOf(ctx, PPI_KEYS);
     const auto: AutoEntry[] = [];
 
-    const [incomeRows, stored, atStart, fin] = await Promise.all([
+    const [incomeRows, stored, atStart, fin, lateFees] = await Promise.all([
         loadIncomeRows(supabase, ctx.ownerId, month),
         loadStoredAuto(supabase, ctx.ownerId, from, to),
         balancesByProperty(supabase, ctx.ownerId, from, ppiIds),
         financingPayments(supabase, ctx, from, to),
+        loadLateFees(supabase, ctx.ownerId, from, to),
     ]);
 
     // rent by competência
@@ -243,6 +283,12 @@ export async function computeMonth(supabase: AdminSupabase, ctx: CloseContext, m
         rent.entries++;
         rent.grossRent = round2(rent.grossRent + r.grossRent);
         if (row.status === "EXPECTED") rent.expected++;
+    }
+
+    // the late fee and interest tenants paid on their invoices (the ledger never carries them)
+    for (const invoice of lateFees) {
+        const e = lateFeeEntry(invoice, ctx.propertyNames.get(invoice.property_id) ?? "Imóvel");
+        if (e) auto.push(e);
     }
 
     // the rented properties on the first day of the month

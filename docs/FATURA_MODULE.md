@@ -1,6 +1,6 @@
 # Fatura (Tenant Invoicing) Module
 
-**Version:** 0.1 (step 1 of 7)  
+**Version:** 0.2 (steps 1 and 2 of 7)  
 **Last updated:** 2026-10-02  
 **Author:** Kitnets Engineering
 
@@ -10,12 +10,12 @@
 
 The **Fatura module** charges the tenant, month by month, for what is **not** collected by an agency: the rent of a self-managed lease, the condominium the owner collects on an agency-managed one (pilot: Kitnet 35C), and any fixed charge the tenant pays that the owner marked as theirs (IPTU, internet…).
 
-The end state is automatic: every month the module issues a boleto + PIX through the Banco Inter API and a card link through Stripe, and e-mails them to the tenant. It ships in seven steps; **this step delivers the core**:
+The end state is automatic: every month the module issues a boleto + PIX through the Banco Inter API and a card link through Stripe, and e-mails them to the tenant. It ships in seven steps:
 
 | Step | Delivers | State |
 |---|---|---|
-| 1 | Schema, who collects each component, the hub, invoices generated and settled by hand | **this document** |
-| 2 | Income ledger: what comes in directly from the tenant (`direct_*`), no double counting with the agency deposit and the bank statement | pending |
+| 1 | Schema, who collects each component, the hub, invoices generated and settled by hand | live (PR #232) |
+| 2 | Income ledger and books: what comes in directly from the tenant (`direct_*`), the condominium the owner collects (`condo_direct`), late fees | **this document, §6** |
 | 3 | Per-owner encrypted credentials, Banco Inter connection screen | pending |
 | 4 | Boleto + PIX issued through Banco Inter, webhook, reconciliation | pending |
 | 5 | E-mail to the tenant, public payment page, daily cron | pending |
@@ -103,11 +103,14 @@ apps/web/src/
     ├── invoice-views.ts               # the shapes the pages render (types only)
     ├── invoice-views-server.ts        # loaders shared by the page and the API
     ├── invoices-server.ts             # generate, cancel, pay, who collects, settings
-    └── schemas/invoice.ts (+ test)    # zod schemas of the routes
+    ├── schemas/invoice.ts (+ test)    # zod schemas of the routes
+    ├── property-income.ts (+ test)    # the ledger's money model: deposit + what was paid by invoice
+    └── property-income-readers.test.ts # every reader of the ledger selects the invoice columns
 
 supabase/
 ├── migrations/20261002120000_invoices_core.sql
-└── checks/invoices.sql
+├── migrations/20261002200000_invoice_ledger.sql
+└── checks/invoices.sql, invoice_ledger.sql
 ```
 
 ## 5. Database
@@ -123,13 +126,47 @@ Migration `20261002120000_invoices_core.sql` (service role only: RLS on, nothing
 | `invoice_items` | snapshot lines (`RENT`, `CONDOMINIUM`, `IPTU`…) |
 | `invoice_events` | timeline (`CREATED`, `PAID`, `CANCELLED`, `DUPLICATE_PAYMENT`) |
 | `invoice_create(owner, invoice, items)` | creates invoice + items atomically; NULL when the month already has a live invoice |
+| `invoice_cancel(owner, invoice, reason)` | cancels an open invoice, records the event, re-syncs the ledger (step 2) |
 | `invoice_mark_paid(…)` | the only way to `PAID`: `PAID`, `ALREADY` (same payment again) or `DUPLICATE` (another payment, or a cancelled invoice — recorded, never applied) |
 
 `supabase/checks/invoices.sql` exercises all of it in one rolled-back transaction.
 
-## 6. Not in this step
+## 6. The income ledger and the books (step 2)
+
+A ledger row (`property_income_months`: one per property, month and unit) used to know one way for money to arrive: the agency's deposit (`received_amount`), with the tenant's condominium assumed to be inside it. An invoice is a second way in, and it carries no agency fee (migration `20261002200000_invoice_ledger.sql`):
+
+| Column | Meaning |
+|---|---|
+| `direct_rent`, `direct_condo`, `direct_energy`, `direct_other` | paid by the tenant by invoice. **Never typed**: recomputed from the PAID invoices of the row's property, month and unit |
+| `condo_direct` | the owner collects the unit's condominium this month: it is **not** inside the agency's deposit, so the deposit is all rent |
+| `source = 'INVOICE'` | a row the sync had to create (no deposit recorded for the month yet) |
+
+`received_amount` keeps its meaning, so everything that edits or imports the deposit works as before, and rows without invoices compute exactly as they did.
+
+**The money model** (`lib/property-income.ts`, `breakdown`): `received = deposit + direct_*`; the agency's fee applies to the deposit's rent only; `gross rent = deposit's rent ÷ (1 − fee) + direct_rent`; `condo_direct` takes the condominium out of the deposit. Kitnet 35C — rent 1.000 through the agency at 10 %, condominium 150 by invoice — reads: deposit 900, gross 1.000, fee 100, received 1.050, NOI 900 (before `condo_direct` the model took 150 out of the 900 and showed a gross rent of 833,33).
+
+**The sync** (`invoice_sync_ledger`, called by `invoice_create`, `invoice_mark_paid` and `invoice_cancel`):
+
+- An open invoice leaves an **expected** month (created if missing: `source INVOICE`, the agency's terms of the unit's previous month) and marks `condo_direct` when it bills the condominium.
+- A paid invoice puts each item in its column: rent, condominium, energy; IPTU, water, gas, internet and others add into `direct_other`. A row the invoice made becomes confirmed on the payment date; a row the owner or the bank wrote keeps its own status, date and deposit.
+- It recomputes, never adds: running it twice changes nothing. Late fees and the card surcharge never enter the ledger.
+- A cancelled open invoice takes away the month it had made, when nothing else is on it.
+- `invoice_sync_property` re-syncs every key of a property; the ledger route calls it after a spreadsheet import that replaces the ledger and after a month is deleted by hand, so invoice money is never lost with the row.
+
+**Readers.** Every query that selects the deposit also selects `INCOME_DIRECT_COLUMNS` (`lib/property-income-readers.test.ts` is the fence: a reader that forgets them would silently compute the month without its invoices).
+
+**The Receitas table** (`PropertyIncomeLedger`): "Recebido", "Aluguel bruto" and "Energia" show the totals; typing in them changes the deposit's part only. Two columns appear when they apply: "Cond. por fatura" (the `condo_direct` tick — also the way to correct months before the module existed) and "Por fatura" (read-only: what the invoices brought). The Excel export carries the deposit's side only, so a re-import never types invoice money back in; a replace-import keeps each month's `condo_direct`.
+
+**The books** (`lib/accounting-accruals.ts`):
+
+- The month's rent accrual debits Aluguéis a receber for everything that came in (deposit + invoices) and credits the charges the tenant paid according to the owner's **existing** reimbursements policy: RECEITA → Receita de reembolsos; REPASSE → back against the expense, by the kind of charge on the invoice (condomínio → Condomínio; energia, água, gás → Energia, água e gás; IPTU → IPTU e taxas municipais; internet and others → Outras despesas com os imóveis). While the policy is undecided only the rent is posted, as before.
+- Late fee and interest paid on an invoice: one entry per invoice on the payment date (`fatura:{id}:encargos`), D Aluguéis a receber, C Juros e multas recebidos.
+
+**The bank statement.** A credit in a month that already has ledger rows not made by the bank stays "só contábil" (existing rule), so the PIX or transfer of a paid invoice is not routed into Receitas a second time. Matching a statement credit to its invoice automatically arrives with the Banco Inter step.
+
+## 7. Not in these steps
 
 - Nothing is issued or sent: no boleto, no PIX, no card link, no e-mail. The hub says so.
-- A paid invoice does **not** reach the income ledger yet (step 2). Until then, keep recording the receipt in the property's Receitas as today.
+- A partial payment is not accepted: a payment recorded by hand must cover the invoice.
 - No automatic generation: "Gerar faturas" creates the month's invoices on demand; running it again only fills what is missing.
 - Out of scope for the module as planned: automatic rent adjustment on the invoice, pro rata of the first and last month, company tenants (CNPJ), variable-amount charges (metered energy).

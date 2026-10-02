@@ -6,6 +6,7 @@ import {
     incomeRowKey,
     isIncomeTemplate,
     INCOME_TEMPLATE_HEADERS,
+    normalizeIncomeRow,
     parseMoney,
     parseSheet,
     parseYesNo,
@@ -243,5 +244,86 @@ describe("condominium and per-unit rows", () => {
         const h = rentHistory([row("2026-08", "u1", 900), row("2026-08", "u2", 900), row("2026-09", "u1", 900), row("2026-09", "u2", 990)]);
         expect(h.points.map(p => p.bruto)).toEqual([2000, 2100]);
         expect(h.adjustments).toEqual([{ month: "2026-09", from: 2000, to: 2100, pct: 5 }]);
+    });
+});
+
+describe("paid directly by invoice", () => {
+    const row = (m: string, unit: string | null, received: number, over: Partial<PropertyIncomeRow> = {}): PropertyIncomeRow => ({
+        id: `${m}-${unit ?? "all"}`, property_id: "p", month: `${m}-01`, received_on: null, received_amount: received, energy_portion: 0,
+        other_income: 0, other_expenses: 0, condo_amount: 0, unit_id: unit, unit_name: unit, iptu_amount: 0, agency_fee_pct: 10,
+        status: "CONFIRMED", source: "MANUAL", bank_reference: null, notes: null, ...over,
+    });
+
+    // Kitnet 35C: rent 1.000 through the agency (10 %), condominium 150 collected by the owner
+    const kitnet35C = { received_amount: 900, energy_portion: 0, other_income: 0, agency_fee_pct: 10, condo_amount: 150 };
+
+    it("the owner collects the condominium: the deposit is all rent, the invoice brings the condominium", () => {
+        const b = breakdown({ ...kitnet35C, condo_direct: true, direct_condo: 150 });
+        expect(b).toMatchObject({ deposit: 900, direct: 150, received: 1050, grossRent: 1000, netRent: 900, rentFee: 100, feeAmount: 100, condoIn: 0, condoFee: 0, condoPaid: 150, condoDirect: true });
+        expect(b.revenue).toBe(1150);     // 1000 + 150
+        expect(b.opex).toBe(250);         // fee 100 + condominium 150
+        expect(b.noi).toBe(900);          // the condominium comes in and goes out; the agency kept 100
+        expect(b.noi).toBe(b.revenue - b.opex);
+    });
+
+    it("while the invoice is open the rent is already right and the condominium is only a cost", () => {
+        const b = breakdown({ ...kitnet35C, condo_direct: true });
+        expect(b).toMatchObject({ received: 900, grossRent: 1000, netRent: 900, condoPaid: 0, revenue: 1000, opex: 250, noi: 750 });
+        // without the flag the model takes the condominium out of the deposit and understates the rent
+        expect(breakdown(kitnet35C).grossRent).toBe(833.33);
+    });
+
+    it("a self-managed lease paid by invoice: no deposit, no fee, each charge in its place", () => {
+        const b = breakdown({ received_amount: 0, energy_portion: 0, other_income: 0, agency_fee_pct: 0, condo_amount: 150, condo_direct: true, direct_rent: 1200, direct_condo: 150, direct_energy: 60, direct_other: 80 });
+        expect(b).toMatchObject({ deposit: 0, direct: 1490, received: 1490, grossRent: 1200, netRent: 1200, feeAmount: 0, energy: 60, depositEnergy: 0, condoPaid: 150, directOther: 80 });
+        expect(b.revenue).toBe(1490);     // 1200 + 60 + 150 + 80
+        expect(b.noi).toBe(1340);         // 1490 − 150 of condominium
+        expect(b.noi).toBe(b.revenue - b.opex);
+    });
+
+    it("rent through the agency and rent by invoice add up; the fee is the agency's, on its own part", () => {
+        const b = breakdown({ received_amount: 900, energy_portion: 0, other_income: 0, agency_fee_pct: 10, direct_rent: 200 });
+        expect(b).toMatchObject({ agencyGrossRent: 1000, grossRent: 1200, netRent: 1100, rentFee: 100, feePct: 10, received: 1100 });
+    });
+
+    it("energy inside the deposit and energy by invoice are one figure for the tenant, two for the deposit", () => {
+        const b = breakdown({ received_amount: 1250, energy_portion: 350, other_income: 0, agency_fee_pct: 10, direct_energy: 40 });
+        expect(b).toMatchObject({ energy: 390, depositEnergy: 350, netRent: 900, grossRent: 1000, received: 1290 });
+    });
+
+    it("a row without the new columns computes exactly as before", () => {
+        const old = { received_amount: 4200, energy_portion: 350, other_income: 109.8, other_expenses: 50, condo_amount: 250, agency_fee_pct: 10, fee_on_condo: false };
+        expect(breakdown({ ...old, condo_direct: false, direct_rent: 0, direct_condo: 0, direct_energy: 0, direct_other: 0 })).toEqual(breakdown(old));
+        expect(breakdown(old)).toMatchObject({ received: 4200, deposit: 4200, direct: 0, netRent: 3600, grossRent: 4000, agencyGrossRent: 4000, noi: 3790.2 });
+    });
+
+    it("a month's unit rows add up with what each unit paid directly", () => {
+        const rows = [
+            row("2026-10", "u35c", 900, { condo_amount: 150, condo_direct: true, direct_condo: 150 }),   // gross 1000, fee 100, noi 900
+            row("2026-10", "u35b", 990, { condo_amount: 100, fee_on_condo: true }),                        // (1000 + 100) × 0,9: fee 100 + 10, noi 890
+        ];
+        const [month] = aggregateIncomeByMonth(rows);
+        expect(month).toMatchObject({ received_amount: 1890, direct_condo: 150, direct_rent: 0, condo_amount: 250, condo_split: { in: 90, fee: 10 } });
+        const b = breakdown(month);
+        expect(b).toMatchObject({ received: 2040, grossRent: 2000, rentFee: 200, feeAmount: 210, condoPaid: 250, revenue: 2250, opex: 460, noi: 1790 });
+        const parts = rows.map(r => breakdown(r));
+        expect(b.noi).toBe(parts.reduce((a, p) => a + p.noi, 0));
+        expect(b.revenue).toBe(parts.reduce((a, p) => a + p.revenue, 0));
+        expect(aggregateIncomeByMonth([month])).toEqual([month]);
+    });
+
+    it("summarize and the rent history see the rent paid by invoice", () => {
+        const rows = [
+            row("2026-09", null, 0, { agency_fee_pct: 0, direct_rent: 1200, source: "INVOICE" }),
+            row("2026-10", null, 0, { agency_fee_pct: 0, direct_rent: 1260, direct_other: 80, source: "INVOICE" }),
+        ];
+        const s = summarize(rows);
+        expect(s).toMatchObject({ confirmedMonths: 2, totalReceived: 2540, totalGross: 2460, totalFee: 0, totalRevenue: 2540 });
+        expect(rentHistory(rows).points.map(p => p.bruto)).toEqual([1200, 1260]);
+    });
+
+    it("normalises what the database returns", () => {
+        const raw = { received_amount: "900.00", direct_condo: "150.00", condo_direct: true, direct_rent: null, agency_fee_pct: "10.00" } as unknown as Partial<PropertyIncomeRow>;
+        expect(normalizeIncomeRow(raw)).toMatchObject({ received_amount: 900, direct_condo: 150, direct_rent: 0, direct_energy: 0, direct_other: 0, condo_direct: true, fee_on_condo: false, agency_fee_pct: 10, unit_id: null });
     });
 });

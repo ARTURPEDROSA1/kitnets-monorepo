@@ -65,6 +65,7 @@ import {
     aggregateIncomeByMonth,
     incomeRowKey,
     receivedFromGross,
+    round2,
     suggestMapping,
     summarize,
     type IncomeField,
@@ -282,7 +283,7 @@ export default function PropertyIncomeLedger({
                     method: "PUT", headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ rows: [{
                         ...target, received_amount: row.received_amount, energy_portion: row.energy_portion, other_income: row.other_income,
-                        other_expenses: row.other_expenses, condo_amount: row.condo_amount ?? 0, fee_on_condo: row.fee_on_condo ?? false, agency_fee_pct: row.agency_fee_pct, status: row.status, source: row.source,
+                        other_expenses: row.other_expenses, condo_amount: row.condo_amount ?? 0, fee_on_condo: row.fee_on_condo ?? false, condo_direct: row.condo_direct ?? false, agency_fee_pct: row.agency_fee_pct, status: row.status, source: row.source,
                         received_on: row.received_on, notes: row.notes, bank_reference: row.bank_reference,
                     }] }),
                 });
@@ -330,9 +331,11 @@ export default function PropertyIncomeLedger({
         const value = parseInput(raw);
         if (value === null) return clear();
 
+        // What the tenant paid by invoice is part of the figures shown but is never typed (the database computes
+        // it from the paid invoices): an edit changes the deposit's part and leaves the invoice's alone.
         if (field === "gross") {
-            const received = receivedFromGross(value, b.feePct, b.energy, b.condo, b.feeOnCondo);
-            if (received === b.received) return clear();
+            const received = receivedFromGross(Math.max(0, round2(value - b.directRent)), b.feePct, b.depositEnergy, b.condoDirect ? 0 : b.condo, b.feeOnCondo);
+            if (received === b.deposit) return clear();
             return void putRows([{ ...ident, received_amount: received }]);
         }
         if (field === "condo") {
@@ -347,8 +350,11 @@ export default function PropertyIncomeLedger({
                         : field === "otherExp" ? "other_expenses"
                             : "agency_fee_pct";
         if (field === "pct" && value >= 100) return clear();
-        if (value === (Number(row[key]) || 0)) return clear();
-        putRows([{ ...ident, [key]: value }]);
+        const stored = field === "received" ? Math.max(0, round2(value - b.direct))
+            : field === "energy" ? Math.max(0, round2(value - b.directEnergy))
+                : value;
+        if (stored === (Number(row[key]) || 0)) return clear();
+        putRows([{ ...ident, [key]: stored }]);
     };
 
     /**
@@ -356,10 +362,14 @@ export default function PropertyIncomeLedger({
      * recalculate the deposit. A deposit read from the bank is a fact, so there the rent follows instead.
      */
     const keepRent = (row: PropertyIncomeRow): Pick<IncomeRowInput, "gross_rent"> =>
-        row.source === "BANK" ? {} : { gross_rent: breakdown(row).grossRent };
+        row.source === "BANK" ? {} : { gross_rent: breakdown(row).agencyGrossRent };   // the rent that comes through the deposit
 
     const toggleFeeOnCondo = (row: PropertyIncomeRow) =>
         putRows([{ month: monthKey(row.month), unit_id: row.unit_id ?? null, fee_on_condo: !row.fee_on_condo, ...keepRent(row) }]);
+
+    /** The owner collects this unit's condominium (by invoice): it is not inside the agency's deposit, which is then all rent. */
+    const toggleCondoDirect = (row: PropertyIncomeRow) =>
+        putRows([{ month: monthKey(row.month), unit_id: row.unit_id ?? null, condo_direct: !row.condo_direct, ...keepRent(row) }]);
 
     const toggleStatus = (row: PropertyIncomeRow) =>
         putRows([{ month: monthKey(row.month), unit_id: row.unit_id ?? null, status: row.status === "CONFIRMED" ? "EXPECTED" : "CONFIRMED" }]);
@@ -367,6 +377,8 @@ export default function PropertyIncomeLedger({
     // ── Derived ─────────────────────────────────────────────────────────
     /** Only a ledger with a condominium shows the "fee on the condominium" column. */
     const hasCondo = useMemo(() => rows.some(r => (Number(r.condo_amount) || 0) > 0), [rows]);
+    /** Only a ledger with money paid by invoice shows the "Por fatura" column. */
+    const hasDirect = useMemo(() => rows.some(r => breakdown(r).direct > 0), [rows]);
     const sorted = useMemo(() => [...rows].sort((a, b) => (a.month !== b.month ? (a.month < b.month ? 1 : -1) : (a.unit_name ?? "").localeCompare(b.unit_name ?? "", "pt-BR", { numeric: true }))), [rows]);
     /** Rows inside the selected period (newest first) — drives the chart and the table. */
     const filtered = useMemo(() => filterRowsByPeriod(sorted, range), [sorted, range]);
@@ -382,7 +394,7 @@ export default function PropertyIncomeLedger({
         { key: "pct", label: "Taxa %", kind: "number", align: "right", sum: false, get: r => Number(r.agency_fee_pct) || 0 },
         { key: "net", label: "Aluguel líquido", kind: "number", align: "right", title: "Recebido − energia − condomínio que veio no depósito (aluguel após a taxa)", get: r => breakdown(r).netRent },
         { key: "energy", label: "Energia", kind: "number", align: "right", title: "Parcela de energia paga pelo inquilino (centro solar)", get: r => breakdown(r).energy },
-        { key: "received", label: "Recebido", kind: "number", align: "right", title: "O que entrou na conta", get: r => breakdown(r).received },
+        { key: "received", label: "Recebido", kind: "number", align: "right", title: "O que entrou na conta: o depósito da imobiliária mais o que o inquilino pagou por fatura", get: r => breakdown(r).received },
         { key: "other", label: "Custo de energia", kind: "number", align: "right", title: "Conta de luz paga no mês (custo à parte; não altera o recebido)", get: r => breakdown(r).other },
         { key: "otherExp", label: "Outras despesas", kind: "number", align: "right", title: "Outros custos pagos à parte no mês (reparos, taxas); não alteram o recebido", get: r => breakdown(r).otherExpenses },
         { key: "condo", label: "Condomínio", kind: "number", align: "right", title: "Condomínio da unidade no mês: despesa do imóvel, devida mesmo com a unidade vaga. Com a unidade alugada, o inquilino paga e o valor vem dentro do depósito da imobiliária.", get: r => breakdown(r).condo },
@@ -391,10 +403,20 @@ export default function PropertyIncomeLedger({
             title: "A taxa da imobiliária incide também sobre o condomínio? Marcado = sobre aluguel + condomínio; desmarcado = só sobre o aluguel (condomínio repassado integralmente).",
             get: (r: PropertyIncomeRow) => (r.fee_on_condo ? "yes" : "no"),
             options: [{ value: "yes", label: "Aluguel + condomínio" }, { value: "no", label: "Só o aluguel" }],
+        }, {
+            key: "condoDirect", label: "Cond. por fatura", kind: "enum" as const, align: "center" as const,
+            title: "Quem cobra o condomínio desta unidade? Marcado = você cobra o inquilino (fatura): o condomínio não vem no depósito da imobiliária, que é todo aluguel. Desmarcado = vem dentro do depósito.",
+            get: (r: PropertyIncomeRow) => (r.condo_direct ? "yes" : "no"),
+            options: [{ value: "yes", label: "Cobrado por você" }, { value: "no", label: "No depósito da imobiliária" }],
+        }] : []),
+        ...(hasDirect ? [{
+            key: "direct", label: "Por fatura", kind: "number" as const, align: "right" as const,
+            title: "Recebido direto do inquilino por fatura (aluguel, condomínio e encargos), sem taxa de imobiliária. Já está somado em Recebido; vem das faturas pagas e não é digitado aqui.",
+            get: (r: PropertyIncomeRow) => breakdown(r).direct,
         }] : []),
         { key: "status", label: "Status", kind: "enum", align: "center", get: r => r.status, options: [{ value: "CONFIRMED", label: "Confirmado" }, { value: "EXPECTED", label: "Previsto" }] },
         { key: "notes", label: "Comentários", kind: "text", get: r => r.notes ?? "" },
-    ], [multiUnit, units, hasCondo]);
+    ], [multiUnit, units, hasCondo, hasDirect]);
     const cf = useColumnFilters(filtered, columns, { key: "month", dir: "desc" }, {
         storageKey: columnTableKey("income-ledger", multiUnit ? "multi" : "single"),
         filtersKey: propertyId ? recordTableKey("income-ledger", propertyId) : undefined,
@@ -999,13 +1021,36 @@ export default function PropertyIncomeLedger({
                                             <input
                                                 type="checkbox"
                                                 className="accent-emerald-600 align-middle"
-                                                disabled={busy || b.condo <= 0}
-                                                checked={b.condo > 0 && b.feeOnCondo}
+                                                disabled={busy || b.condo <= 0 || b.condoDirect}
+                                                checked={b.condo > 0 && b.feeOnCondo && !b.condoDirect}
                                                 onChange={() => toggleFeeOnCondo(row)}
                                                 title={b.condo <= 0 ? "Sem condomínio neste lançamento"
+                                                    : b.condoDirect ? "O condomínio é cobrado por você: a imobiliária não o recebe, então não há taxa sobre ele"
                                                     : b.feeOnCondo ? `Taxa sobre aluguel + condomínio: ${formatBRL(b.condoFee)} de taxa sobre o condomínio, ${formatBRL(b.condoIn)} repassados`
                                                         : `Taxa só sobre o aluguel: condomínio repassado integralmente (${formatBRL(b.condoIn)})`}
                                             />
+                                        </td>}
+                                        {hasCondo && show("condoDirect") && <td {...sel.cellProps("condoDirect", rk, null, "px-2 py-1 text-center")}>
+                                            <input
+                                                type="checkbox"
+                                                className="accent-emerald-600 align-middle"
+                                                disabled={busy || b.condo <= 0}
+                                                checked={b.condo > 0 && b.condoDirect}
+                                                onChange={() => toggleCondoDirect(row)}
+                                                title={b.condo <= 0 ? "Sem condomínio neste lançamento"
+                                                    : b.condoDirect ? `Condomínio cobrado por você (${b.directCondo > 0 ? "já recebido por fatura" : "ainda não recebido por fatura"}): o depósito da imobiliária é todo aluguel`
+                                                        : "Condomínio dentro do depósito da imobiliária"}
+                                            />
+                                        </td>}
+                                        {hasDirect && show("direct") && <td {...sel.cellProps("direct", rk, b.direct, "px-2 py-1 text-right tabular-nums text-foreground")}>
+                                            {b.direct > 0 ? (
+                                                <>
+                                                    <Money>{formatBRL(b.direct)}</Money>
+                                                    <span className="block text-[9px] text-muted-foreground">
+                                                        {[b.directRent > 0 ? "aluguel" : null, b.directCondo > 0 ? "condomínio" : null, b.directEnergy > 0 ? "energia" : null, b.directOther > 0 ? "encargos" : null].filter(Boolean).join(" + ")}
+                                                    </span>
+                                                </>
+                                            ) : <span className="text-muted-foreground">—</span>}
                                         </td>}
                                         {show("status") && <td {...sel.cellProps("status", rk, null, "px-2 py-1 text-center")}>
                                             <span
@@ -1027,7 +1072,7 @@ export default function PropertyIncomeLedger({
                                             </span>
                                             {row.source !== "MANUAL" && (
                                                 <span className="block text-[9px] text-muted-foreground mt-0.5">
-                                                    {row.source === "BANK" ? "banco" : "planilha"}
+                                                    {row.source === "BANK" ? "banco" : row.source === "INVOICE" ? "fatura" : "planilha"}
                                                 </span>
                                             )}
                                         </td>}

@@ -1,8 +1,9 @@
 /**
  * Server-side writes of the Fatura routes: generating a month's invoices, cancelling one, recording a
  * payment, and saying who collects a lease's components. Every write is scoped to the account
- * (`profileId`); the invoice itself is created and settled by database functions, so a month is never
- * invoiced twice and an invoice is never paid twice (migration 20261002120000).
+ * (`profileId`); the invoice itself is created, settled and cancelled by database functions, so a month is
+ * never invoiced twice, an invoice is never paid twice, and the income ledger follows every one of those
+ * steps (migrations 20261002120000 and 20261002200000).
  */
 import type { AdminSupabase } from "@/lib/api-auth";
 import { HttpError, badRequest, notFound } from "@/lib/api-route";
@@ -93,21 +94,11 @@ export async function cancelInvoice(supabase: AdminSupabase, profileId: string, 
     const invoice = await ownedInvoice(supabase, profileId, invoiceId);
     if (invoice.status !== "DRAFT" && invoice.status !== "ISSUED") throw settled(invoice.status);
 
-    const { data, error } = await supabase
-        .from("invoices")
-        .update({ status: "CANCELLED", cancelled_at: new Date().toISOString(), cancel_reason: reason })
-        .eq("id", invoiceId)
-        .eq("owner_id", profileId)
-        .in("status", ["DRAFT", "ISSUED"])
-        .select("id");
-    if (error) throw new Error(`invoice cancel: ${error.message}`);
+    // the database cancels it, records the event and takes it out of the income ledger in one go
+    const { data, error } = await supabase.rpc("invoice_cancel", { p_owner: profileId, p_invoice: invoiceId, p_reason: reason, p_actor: "OWNER" });
+    if (error) throw new Error(`invoice_cancel: ${error.message}`);
     // paid (or cancelled) between the read and the write
-    if (!data || data.length === 0) throw settled((await ownedInvoice(supabase, profileId, invoiceId)).status);
-
-    const { error: eventError } = await supabase
-        .from("invoice_events")
-        .insert({ invoice_id: invoiceId, owner_id: profileId, type: "CANCELLED", actor: "OWNER", detail: reason ? { reason } : {} });
-    if (eventError) console.error("[Invoices] cancel event failed:", eventError.message);
+    if (data !== "CANCELLED") throw settled(String(data));
 }
 
 /**

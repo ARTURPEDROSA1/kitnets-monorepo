@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireProfile, getOwnedProperty, type AdminSupabase } from "@/lib/api-auth";
 import {
+    INCOME_DIRECT_COLUMNS,
     INCOME_SOURCES,
     INCOME_STATUSES,
     MONTH_KEY_REGEX,
@@ -10,6 +11,7 @@ import {
     type IncomeStatus,
     type PropertyIncomeRow,
     incomeRowKey,
+    normalizeIncomeRow,
 } from "@/lib/property-income";
 import { loadPropertyUnits } from "@/lib/property-units-server";
 
@@ -22,6 +24,10 @@ export const dynamic = "force-dynamic";
  *   PUT    /api/properties/[id]/income  { rows, replace? } → { rows }   merge-upsert by month;
  *                                       replace: true wipes the property's months first
  *   DELETE /api/properties/[id]/income?month=YYYY-MM[&unit=<unit id>] → { ok }
+ *
+ * What the tenant paid directly by invoice (direct_*) is never written here: the database recomputes it from
+ * the paid invoices. After the ledger is replaced or a month is deleted, the property's invoices are synced
+ * again so that money is not lost with the row (invoice_sync_property).
  *
  * A row is a month + a unit (`unit_id`, NULL = the whole property): a multi-unit property holds one row per
  * unit and month. PUT rows carry `unit_id`, or `unit_name` from spreadsheets (matched to the property's units).
@@ -39,7 +45,7 @@ const MAX_ROWS = 600;
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 const SELECT_COLUMNS =
-    "id, property_id, month, unit_id, unit_name, received_on, received_amount, energy_portion, other_income, other_expenses, condo_amount, fee_on_condo, iptu_amount, agency_fee_pct, status, source, bank_reference, notes, created_at, updated_at";
+    `id, property_id, month, unit_id, unit_name, received_on, received_amount, energy_portion, other_income, other_expenses, condo_amount, fee_on_condo, iptu_amount, agency_fee_pct, status, source, bank_reference, notes, created_at, updated_at, ${INCOME_DIRECT_COLUMNS}`;
 
 function money(value: unknown): number | null | undefined {
     if (value === undefined) return undefined;
@@ -56,22 +62,6 @@ function text(value: unknown, max = 500): string | null | undefined {
     return t ? t.slice(0, max) : null;
 }
 
-function normalizeRow(r: PropertyIncomeRow): PropertyIncomeRow {
-    return {
-        ...r,
-        received_amount: Number(r.received_amount) || 0,
-        energy_portion: Number(r.energy_portion) || 0,
-        other_income: Number(r.other_income) || 0,
-        other_expenses: Number(r.other_expenses) || 0,
-        condo_amount: Number(r.condo_amount) || 0,
-        fee_on_condo: r.fee_on_condo === true,
-        unit_id: r.unit_id ?? null,
-        unit_name: r.unit_name ?? null,
-        iptu_amount: Number(r.iptu_amount) || 0,
-        agency_fee_pct: Number(r.agency_fee_pct) || 0,
-    };
-}
-
 async function loadRows(supabase: AdminSupabase, propertyId: string) {
     const { data, error } = await supabase
         .from(TABLE)
@@ -80,7 +70,13 @@ async function loadRows(supabase: AdminSupabase, propertyId: string) {
         .order("month", { ascending: false })
         .order("unit_name", { ascending: true, nullsFirst: true });
     if (error) throw new Error(error.message);
-    return ((data ?? []) as unknown as PropertyIncomeRow[]).map(normalizeRow);
+    return ((data ?? []) as unknown as PropertyIncomeRow[]).map(normalizeIncomeRow);
+}
+
+/** Puts back into the ledger what the property's invoices say (paid amounts, the condominium the owner collects). */
+async function syncInvoices(supabase: AdminSupabase, profileId: string, propertyId: string) {
+    const { error } = await supabase.rpc("invoice_sync_property", { p_owner: profileId, p_property: propertyId });
+    if (error) console.error("[Income] invoice sync failed:", error.message);
 }
 
 async function resolveProperty(context: RouteContext) {
@@ -122,6 +118,8 @@ interface ValidatedInput {
     condo_amount?: number;
     /** the agency's % applies to rent + condominium (true) or to the rent only (false) */
     fee_on_condo?: boolean;
+    /** the owner collects the unit's condominium: it is not inside the deposit */
+    condo_direct?: boolean;
     received_amount?: number;
     gross_rent?: number;   // derived into received_amount at merge time, never stored
     energy_portion?: number;
@@ -163,6 +161,10 @@ function validateInput(raw: unknown, index: number): { row: ValidatedInput } | {
     if (r.fee_on_condo !== undefined) {
         if (typeof r.fee_on_condo !== "boolean") return { error: `Linha ${index + 1} (${r.month}): fee_on_condo deve ser verdadeiro ou falso` };
         row.fee_on_condo = r.fee_on_condo;
+    }
+    if (r.condo_direct !== undefined) {
+        if (typeof r.condo_direct !== "boolean") return { error: `Linha ${index + 1} (${r.month}): condo_direct deve ser verdadeiro ou falso` };
+        row.condo_direct = r.condo_direct;
     }
 
     if (r.status !== undefined) {
@@ -239,6 +241,8 @@ export async function PUT(request: Request, context: RouteContext) {
     }
 
     try {
+        // A spreadsheet has no column for who collects the condominium: the answer each month had survives the replace.
+        const condoDirectKeys = new Set(replaceAll ? (await loadRows(supabase, propertyId)).filter(r => r.condo_direct).map(r => incomeRowKey(r)) : []);
         if (replaceAll) {
             const { error: delError } = await supabase.from(TABLE).delete().eq("property_id", propertyId);
             if (delError) throw new Error(delError.message);
@@ -261,6 +265,7 @@ export async function PUT(request: Request, context: RouteContext) {
                     other_expenses: 0,
                     condo_amount: 0,
                     fee_on_condo: false,
+                    condo_direct: condoDirectKeys.has(key),
                     iptu_amount: 0,
                     agency_fee_pct: 0,
                     status: "CONFIRMED",
@@ -271,6 +276,11 @@ export async function PUT(request: Request, context: RouteContext) {
             delete base.id;
             delete base.created_at;
             delete base.updated_at;
+            // paid by invoice: the database's to compute, never this route's to write
+            delete base.direct_rent;
+            delete base.direct_condo;
+            delete base.direct_energy;
+            delete base.direct_other;
             const { month, gross_rent, ...fields } = input;
             const record: Record<string, unknown> = {
                 ...base,
@@ -283,13 +293,14 @@ export async function PUT(request: Request, context: RouteContext) {
             // and condominium values for that month (the condominium comes inside the deposit,
             // less the fee when the agency charges it on the condominium too; the energy
             // cost is paid separately and does not affect it).
+            // A condominium the owner collects is not inside the deposit at all.
             // An explicit received_amount in the same row always wins (bank truth).
             if (gross_rent !== undefined && fields.received_amount === undefined) {
                 record.received_amount = receivedFromGross(
                     gross_rent,
                     Number(record.agency_fee_pct) || 0,
                     Number(record.energy_portion) || 0,
-                    Number(record.condo_amount) || 0,
+                    record.condo_direct === true ? 0 : Number(record.condo_amount) || 0,
                     record.fee_on_condo === true
                 );
             }
@@ -300,6 +311,8 @@ export async function PUT(request: Request, context: RouteContext) {
             .from(TABLE)
             .upsert(Array.from(merged.values()), { onConflict: "property_id,month,unit_id" });
         if (error) throw new Error(error.message);
+        // the months were wiped: what the invoices had put in them goes back
+        if (replaceAll) await syncInvoices(supabase, profileId, propertyId);
 
         const rows = await loadRows(supabase, propertyId);
         return NextResponse.json({ rows, upserted: merged.size, replaced: replaceAll });
@@ -314,7 +327,7 @@ export async function PUT(request: Request, context: RouteContext) {
 export async function DELETE(request: Request, context: RouteContext) {
     const resolved = await resolveProperty(context);
     if ("response" in resolved) return resolved.response;
-    const { supabase, propertyId } = resolved.ctx;
+    const { profileId, supabase, propertyId } = resolved.ctx;
 
     const { searchParams } = new URL(request.url);
     const month = searchParams.get("month") ?? "";
@@ -330,5 +343,7 @@ export async function DELETE(request: Request, context: RouteContext) {
         console.error("[Income DELETE]", error.message);
         return NextResponse.json({ error: "Erro ao excluir mês" }, { status: 500 });
     }
+    // a month with a paid invoice comes back with what the invoice brought
+    await syncInvoices(supabase, profileId, propertyId);
     return NextResponse.json({ ok: true });
 }

@@ -22,15 +22,30 @@
  *                    the whole property); a month can hold one row per unit
  *   agency_fee_pct   % the agency kept before crediting the owner
  *
+ * What the tenant pays the owner directly, by invoice (módulo Fatura), is a second way in and carries no
+ * agency fee. These are never typed: the database recomputes them from the paid invoices of the row's
+ * month and unit (invoice_sync_ledger), so `received_amount` keeps meaning "the deposit" and everything
+ * that edits or imports it works as before:
+ *   direct_rent      rent paid by invoice
+ *   direct_condo     condominium paid by invoice
+ *   direct_energy    energy paid by invoice
+ *   direct_other     any other charge paid by invoice (IPTU, water, gas, internet, other)
+ *   condo_direct     the owner collects the unit's condominium this month (the agency collects only the
+ *                    rent): the condominium is NOT inside the deposit, so the deposit is all rent
+ *
  * Derived:
+ *   deposit    = received_amount                  (what the agency credited, or what was typed)
  *   condo_in   = the condominium inside the deposit: condominium × (1 − pct/100) when the fee applies to it,
- *                else the condominium in full; never more than received − energy (a vacant unit, with nothing
- *                received, has no tenant paying it)
- *   condo_paid = what the tenant paid as condominium = condo_in ÷ (1 − pct/100) when the fee applies, else condo_in
- *   net_rent   = received − energy − condo_in     (rent after the agency fee)
- *   gross_rent = net_rent ÷ (1 − pct/100)         (contract value)
- *   fee        = (gross_rent − net_rent) + (condo_paid − condo_in)   (everything the agency kept)
- *   revenue    = gross_rent + energy + condo_paid (everything the tenant pays)
+ *                else the condominium in full; never more than deposit − energy (a vacant unit, with nothing
+ *                received, has no tenant paying it); 0 when the owner collects it (condo_direct)
+ *   condo_paid = what the tenant paid as condominium = condo_in ÷ (1 − pct/100) when the fee applies, else
+ *                condo_in; plus direct_condo
+ *   net_rent   = deposit − energy_portion − condo_in + direct_rent      (rent after the agency fee)
+ *   gross_rent = (deposit − energy_portion − condo_in) ÷ (1 − pct/100) + direct_rent   (contract value)
+ *   fee        = (gross_rent − net_rent) + the agency's cut of the condominium   (everything the agency kept)
+ *   energy     = energy_portion + direct_energy   (everything the tenant paid for energy)
+ *   received   = deposit + direct_rent + direct_condo + direct_energy + direct_other   (everything that came in)
+ *   revenue    = gross_rent + energy + condo_paid + direct_other   (everything the tenant pays)
  *   opex       = fee + energy cost + other expenses + condominium   (IPTU is added per month from the taxes register)
  *   noi        = revenue − opex = received − energy cost − other expenses − condominium
  *
@@ -45,13 +60,21 @@
  * With a condominium of 250, paid by the tenant: fee on the rent only → received 4.200, fee 400, noi 3.790,20
  * (the condominium comes in and goes out); fee on rent + condominium → received 4.175, fee 425, noi 3.765,20.
  * The same unit vacant: received 0, noi −250.
+ * The owner collects that condominium (agency on the rent only): deposit 3.950, an invoice of 250 paid →
+ * received 4.200, gross 4.000, fee 400, noi 3.790,20; while the invoice is open: received 3.950, noi 3.540,20.
  */
 
 export type IncomeStatus = "EXPECTED" | "CONFIRMED";
-export type IncomeSource = "MANUAL" | "IMPORT" | "BANK";
+export type IncomeSource = "MANUAL" | "IMPORT" | "BANK" | "INVOICE";
 
 export const INCOME_STATUSES: IncomeStatus[] = ["EXPECTED", "CONFIRMED"];
-export const INCOME_SOURCES: IncomeSource[] = ["MANUAL", "IMPORT", "BANK"];
+export const INCOME_SOURCES: IncomeSource[] = ["MANUAL", "IMPORT", "BANK", "INVOICE"];
+
+/**
+ * The columns of what the tenant paid directly. Every query that feeds `breakdown` selects them next to
+ * its own columns — a reader without them would compute the month as if no invoice had been paid.
+ */
+export const INCOME_DIRECT_COLUMNS = "direct_rent, direct_condo, direct_energy, direct_other, condo_direct";
 
 /** Row as stored / returned by the API. `month` is ISO `YYYY-MM-DD` (first day). */
 export interface PropertyIncomeRow {
@@ -68,6 +91,13 @@ export interface PropertyIncomeRow {
     condo_amount?: number;
     /** the agency's % applies to rent + condominium (true) or to the rent only (false) */
     fee_on_condo?: boolean;
+    /** the owner collects the unit's condominium this month: it is not inside the deposit */
+    condo_direct?: boolean;
+    /** paid by the tenant directly, by invoice (no agency fee); recomputed by the database from the paid invoices */
+    direct_rent?: number;
+    direct_condo?: number;
+    direct_energy?: number;
+    direct_other?: number;
     /**
      * Only on rows built by `aggregateIncomeByMonth`: the month's condominium inside the deposits and the
      * agency's cut of it, added unit by unit (units differ: one may be vacant, agreements may differ).
@@ -97,9 +127,11 @@ export interface IncomeRowInput {
     unit_name?: string | null;
     condo_amount?: number;
     fee_on_condo?: boolean;
+    /** the owner collects the unit's condominium (it is not inside the deposit) */
+    condo_direct?: boolean;
     received_amount?: number;
     /**
-     * Not stored. When present and `received_amount` is absent, the server
+     * Not stored: the rent that comes through the deposit. When present and `received_amount` is absent, the server
      * derives `received_amount` from it using the (merged) fee, energy and
      * condominium values (`receivedFromGross`).
      * When both are sent, `received_amount` wins.
@@ -118,7 +150,24 @@ export interface IncomeRowInput {
 }
 
 export interface IncomeBreakdown {
+    /** everything that came in: the deposit plus what the tenant paid directly */
     received: number;
+    /** `received_amount`: what the agency credited (or what was typed) */
+    deposit: number;
+    /** paid by the tenant directly, by invoice: rent + condominium + energy + other charges */
+    direct: number;
+    directRent: number;
+    directCondo: number;
+    directEnergy: number;
+    /** other charges paid by invoice (IPTU, water, gas, internet…): revenue that is neither rent, energy nor condominium */
+    directOther: number;
+    /** the part of the deposit that pays for energy (`energy_portion`) */
+    depositEnergy: number;
+    /** the rent that comes through the deposit, before the agency's fee */
+    agencyGrossRent: number;
+    /** the owner collects the condominium: none of it is inside the deposit */
+    condoDirect: boolean;
+    /** everything the tenant paid for energy: inside the deposit and by invoice */
     energy: number;
     /** energy cost paid by the owner for the month (≥ 0) */
     other: number;
@@ -130,7 +179,7 @@ export interface IncomeBreakdown {
     feeOnCondo: boolean;
     /** condominium inside the deposit, after the agency's cut (0 when the unit is vacant) */
     condoIn: number;
-    /** condominium the tenant paid (= condoIn + condoFee) */
+    /** condominium the tenant paid (= condoIn + condoFee + what was paid by invoice) */
     condoPaid: number;
     /** the agency's cut of the condominium (0 when the fee applies to the rent only) */
     condoFee: number;
@@ -141,7 +190,7 @@ export interface IncomeBreakdown {
     /** everything the agency kept: rentFee + condoFee */
     feeAmount: number;
     feePct: number;
-    /** gross rent + energy income + condominium paid by the tenant (everything the tenant pays for the month) */
+    /** gross rent + energy income + condominium paid by the tenant + other charges paid by invoice (everything the tenant pays for the month) */
     revenue: number;
     /** agency fee + energy cost + other expenses + condominium */
     opex: number;
@@ -160,11 +209,19 @@ function clampPct(pct: number): number {
     return Math.min(pct, 99.99);
 }
 
-export function breakdown(
-    row: Pick<PropertyIncomeRow, "received_amount" | "energy_portion" | "other_income" | "agency_fee_pct"> & { other_expenses?: number; condo_amount?: number; fee_on_condo?: boolean; condo_split?: { in: number; fee: number } }
-): IncomeBreakdown {
-    const received = Number(row.received_amount) || 0;
-    const energy = Number(row.energy_portion) || 0;
+export type BreakdownRow = Pick<PropertyIncomeRow, "received_amount" | "energy_portion" | "other_income" | "agency_fee_pct">
+    & { other_expenses?: number; condo_amount?: number; fee_on_condo?: boolean; condo_split?: { in: number; fee: number } }
+    & Partial<Pick<PropertyIncomeRow, "condo_direct" | "direct_rent" | "direct_condo" | "direct_energy" | "direct_other">>;
+
+export function breakdown(row: BreakdownRow): IncomeBreakdown {
+    const deposit = Number(row.received_amount) || 0;
+    const depositEnergy = Number(row.energy_portion) || 0;
+    const directRent = Number(row.direct_rent) || 0;
+    const directCondo = Number(row.direct_condo) || 0;
+    const directEnergy = Number(row.direct_energy) || 0;
+    const directOther = Number(row.direct_other) || 0;
+    const direct = round2(directRent + directCondo + directEnergy + directOther);
+    const condoDirect = row.condo_direct === true;
     const other = Number(row.other_income) || 0;
     const otherExpenses = Number(row.other_expenses) || 0;
     const condo = Number(row.condo_amount) || 0;
@@ -175,18 +232,36 @@ export function breakdown(
     if (row.condo_split) {
         condoIn = row.condo_split.in;
         condoFee = row.condo_split.fee;
+    } else if (condoDirect) {
+        // the owner collects the condominium: the deposit is all rent (and energy)
+        condoIn = 0;
+        condoFee = 0;
     } else {
         // the deposit carries the condominium only while a tenant pays it: never more than what came in
-        condoIn = Math.min(feeOnCondo ? round2(condo * keep) : condo, Math.max(0, round2(received - energy)));
+        condoIn = Math.min(feeOnCondo ? round2(condo * keep) : condo, Math.max(0, round2(deposit - depositEnergy)));
         condoFee = feeOnCondo && feePct > 0 ? round2(condoIn / keep - condoIn) : 0;
     }
-    const condoPaid = round2(condoIn + condoFee);
-    const netRent = round2(received - energy - condoIn);
-    const grossRent = feePct > 0 ? round2(netRent / keep) : netRent;
-    const rentFee = round2(grossRent - netRent);
+    const condoPaid = round2(condoIn + condoFee + directCondo);
+    // through the agency: what is left of the deposit is the rent after its fee
+    const agencyNetRent = round2(deposit - depositEnergy - condoIn);
+    const agencyGrossRent = feePct > 0 ? round2(agencyNetRent / keep) : agencyNetRent;
+    const rentFee = round2(agencyGrossRent - agencyNetRent);
+    const netRent = round2(agencyNetRent + directRent);
+    const grossRent = round2(agencyGrossRent + directRent);
     const feeAmount = round2(rentFee + condoFee);
+    const received = round2(deposit + direct);
+    const energy = round2(depositEnergy + directEnergy);
     return {
         received,
+        deposit,
+        direct,
+        directRent,
+        directCondo,
+        directEnergy,
+        directOther,
+        depositEnergy,
+        agencyGrossRent,
+        condoDirect,
         energy,
         other,
         otherExpenses,
@@ -200,9 +275,31 @@ export function breakdown(
         rentFee,
         feeAmount,
         feePct,
-        revenue: round2(grossRent + energy + condoPaid),
+        revenue: round2(grossRent + energy + condoPaid + directOther),
         opex: round2(feeAmount + other + otherExpenses + condo),
         noi: round2(received - other - otherExpenses - condo),
+    };
+}
+
+/** A ledger row as the database returns it, with its numbers as numbers (numeric columns may arrive as text). */
+export function normalizeIncomeRow<T extends Partial<PropertyIncomeRow>>(r: T): T {
+    return {
+        ...r,
+        received_amount: Number(r.received_amount) || 0,
+        energy_portion: Number(r.energy_portion) || 0,
+        other_income: Number(r.other_income) || 0,
+        other_expenses: Number(r.other_expenses) || 0,
+        condo_amount: Number(r.condo_amount) || 0,
+        fee_on_condo: r.fee_on_condo === true,
+        condo_direct: r.condo_direct === true,
+        direct_rent: Number(r.direct_rent) || 0,
+        direct_condo: Number(r.direct_condo) || 0,
+        direct_energy: Number(r.direct_energy) || 0,
+        direct_other: Number(r.direct_other) || 0,
+        unit_id: r.unit_id ?? null,
+        unit_name: r.unit_name ?? null,
+        iptu_amount: Number(r.iptu_amount) || 0,
+        agency_fee_pct: Number(r.agency_fee_pct) || 0,
     };
 }
 
@@ -251,12 +348,15 @@ export function aggregateIncomeByMonth(rows: PropertyIncomeRow[]): PropertyIncom
         if (all.length === 1) { out.push(all[0]); continue; }
         const confirmed = all.filter(r => r.status === "CONFIRMED");
         const list = confirmed.length > 0 ? confirmed : all;
-        let received = 0, energy = 0, other = 0, otherExpenses = 0, condo = 0, condoIn = 0, condoFee = 0, gross = 0, fee = 0;
+        let deposit = 0, energy = 0, other = 0, otherExpenses = 0, condo = 0, condoIn = 0, condoFee = 0, gross = 0, fee = 0;
+        let directRent = 0, directCondo = 0, directEnergy = 0, directOther = 0;
         for (const r of list) {
             const b = breakdown(r);
-            received += b.received; energy += b.energy; other += b.other; otherExpenses += b.otherExpenses;
+            // the deposit side and what was paid by invoice are added apart: the fee % is the agency's, on its own rent
+            deposit += b.deposit; energy += b.depositEnergy; other += b.other; otherExpenses += b.otherExpenses;
             condo += b.condo; condoIn += b.condoIn; condoFee += b.condoFee;
-            gross += b.grossRent; fee += b.rentFee;
+            gross += b.agencyGrossRent; fee += b.rentFee;
+            directRent += b.directRent; directCondo += b.directCondo; directEnergy += b.directEnergy; directOther += b.directOther;
         }
         const dates = list.map(r => r.received_on).filter((d): d is string => Boolean(d)).sort();
         const sources = new Set(list.map(r => r.source));
@@ -265,8 +365,12 @@ export function aggregateIncomeByMonth(rows: PropertyIncomeRow[]): PropertyIncom
             property_id: list[0].property_id,
             month: `${k}-01`,
             received_on: dates.length ? dates[dates.length - 1] : null,
-            received_amount: round2(received),
+            received_amount: round2(deposit),
             energy_portion: round2(energy),
+            direct_rent: round2(directRent),
+            direct_condo: round2(directCondo),
+            direct_energy: round2(directEnergy),
+            direct_other: round2(directOther),
             other_income: round2(other),
             other_expenses: round2(otherExpenses),
             condo_amount: round2(condo),

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireProfile, getOwnedProperty } from "@/lib/api-auth";
 import { buildIncomeTemplate } from "@/lib/income-template";
 import type { PropertyIncomeRow } from "@/lib/property-income";
+import { INCOME_DIRECT_COLUMNS } from "@/lib/property-income";
 import { loadPropertyUnits } from "@/lib/property-units-server";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +37,7 @@ export async function GET(request: Request, context: RouteContext) {
         if (fillLedger) {
             const { data, error } = await supabase
                 .from("property_income_months")
-                .select("id, property_id, month, unit_id, unit_name, received_on, received_amount, energy_portion, other_income, other_expenses, condo_amount, fee_on_condo, iptu_amount, agency_fee_pct, status, source, bank_reference, notes")
+                .select(`id, property_id, month, unit_id, unit_name, received_on, received_amount, energy_portion, other_income, other_expenses, condo_amount, fee_on_condo, iptu_amount, agency_fee_pct, status, source, bank_reference, notes, ${INCOME_DIRECT_COLUMNS}`)
                 .eq("property_id", id)
                 .order("month", { ascending: false });
             if (error) throw new Error(error.message);

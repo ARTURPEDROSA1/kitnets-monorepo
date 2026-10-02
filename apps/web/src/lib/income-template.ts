@@ -151,10 +151,13 @@ export async function buildIncomeTemplate(opts: IncomeTemplateOptions): Promise<
 
         if (ledger) {
             const b = breakdown(ledger);
-            row.getCell(3).value = b.grossRent;
+            // The sheet is the deposit's side of the month — what an import reads back. What the tenant paid by
+            // invoice is not typed anywhere: the invoices put it back after an import, so exporting it here would
+            // count it twice.
+            row.getCell(3).value = b.agencyGrossRent;
             row.getCell(4).value = b.feePct;
-            row.getCell(5).value = b.received;           // real value, not the formula
-            row.getCell(6).value = b.energy;
+            row.getCell(5).value = b.deposit;            // real value, not the formula
+            row.getCell(6).value = b.depositEnergy;
             row.getCell(7).value = b.other;
             row.getCell(8).value = b.otherExpenses;
             row.getCell(9).value = b.condo;
