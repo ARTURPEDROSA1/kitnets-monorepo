@@ -31,7 +31,8 @@ function recurring(over: Partial<RecurringLease> = {}): RecurringLease {
 describe("invoiceDisplay", () => {
     it("reads the lateness from the due date, never from a stored flag", () => {
         expect(invoiceDisplay(invoice(), TODAY)).toBe("a_emitir");
-        expect(invoiceDisplay(invoice({ status: "ISSUED" }), TODAY)).toBe("emitida");
+        // issued but with no boleto alive (it was cancelled at the bank, or failed): to be issued again
+        expect(invoiceDisplay(invoice({ status: "ISSUED" }), TODAY)).toBe("a_emitir");
         expect(invoiceDisplay(invoice({ due_date: "2026-10-15" }), TODAY)).toBe("a_emitir");
         expect(invoiceDisplay(invoice({ due_date: "2026-10-14" }), TODAY)).toBe("em_atraso");
         expect(invoiceDisplay(invoice({ status: "PAID", due_date: "2026-10-01" }), TODAY)).toBe("paga");
@@ -128,6 +129,20 @@ describe("invoiceAttention", () => {
         const missing = invoiceAttention(invoiceRows(invoices, TODAY), rec, UNDECIDED, TODAY, { available: true, sandboxAllowed: false, inter: null });
         expect(missing.map(i => i.kind)).toEqual(["overdue", "connection", "settings"]);
         expect(missing[1].tone).toBe("slate");
+    });
+
+    it("reads the boleto: issued while it lives, expired when it stopped taking payment, to issue again after a failure", () => {
+        const charge = (status: "REQUESTED" | "OPEN" | "PAID" | "CANCELLED" | "EXPIRED" | "FAILED", last_error: string | null = null) => ({ id: "c1", status, provider_status: null, due_date: "2026-10-20", digitable_line: null, barcode: null, pix_copy_paste: null, has_pdf: false, paid_via: null, paid_amount: null, last_checked_at: null, last_error, created_at: "2026-10-01T12:00:00Z" });
+        expect(invoiceDisplay(invoice({ status: "ISSUED", charge: charge("OPEN") }), TODAY)).toBe("emitida");
+        expect(invoiceDisplay(invoice({ status: "ISSUED", charge: charge("REQUESTED") }), TODAY)).toBe("emitida");
+        expect(invoiceDisplay(invoice({ status: "ISSUED", charge: charge("EXPIRED"), due_date: "2026-09-20" }), TODAY)).toBe("expirada");
+        expect(invoiceDisplay(invoice({ status: "ISSUED", charge: charge("CANCELLED") }), TODAY)).toBe("a_emitir");
+        expect(invoiceDisplay(invoice({ status: "ISSUED", charge: charge("FAILED", "O Banco Inter recusou os dados") }), TODAY)).toBe("a_emitir");
+        expect(invoiceDisplay(invoice({ status: "ISSUED", charge: charge("OPEN"), due_date: "2026-10-01" }), TODAY)).toBe("em_atraso");
+        const rows = invoiceRows([invoice({ id: "x", status: "ISSUED", charge: charge("EXPIRED"), due_date: "2026-09-20" }), invoice({ id: "f", number: 2, charge: charge("FAILED", "CEP inválido") })], TODAY);
+        const items = invoiceAttention(rows, [], DECIDED, TODAY);
+        expect(items.map(i => i.kind)).toEqual(["expired", "issue_failed"]);
+        expect(items[1].text).toBe("a emissão no banco falhou: CEP inválido");
     });
 
     it("is silent when everything is in order", () => {

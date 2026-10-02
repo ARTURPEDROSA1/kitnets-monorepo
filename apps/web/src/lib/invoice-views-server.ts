@@ -15,8 +15,9 @@ import { leaseDueDay } from "@/lib/invoice-schedule";
 import type { PayerAddress } from "@/lib/invoice-payer";
 import { NO_CONNECTIONS } from "@/lib/billing/connections";
 import { loadConnections } from "@/lib/billing/connections-server";
+import { loadCharges, loadLatestCharges, type ChargeRow } from "@/lib/billing/charges-server";
 import type { LeaseWithDetails } from "@/types/lease";
-import type { BillingSettingsView, InvoiceDetailView, InvoiceEventView, InvoiceItemView, InvoiceListView, InvoiceView, RecurringLease } from "@/lib/invoice-views";
+import type { BillingSettingsView, InvoiceChargeView, InvoiceDetailView, InvoiceEventView, InvoiceItemView, InvoiceListView, InvoiceView, RecurringLease } from "@/lib/invoice-views";
 
 const INVOICE_COLUMNS =
     "id, number, lease_id, property_id, unit_id, unit_name, tenant_id, reference_month, due_date, amount, status, origin, blockers, payer_name, payer_email, issued_at, paid_on, paid_amount, late_fee_amount, surcharge_amount, paid_via, cancelled_at, cancel_reason, notes, created_at";
@@ -26,7 +27,13 @@ const PAGE = 1000;
 const num = (v: unknown) => Number(v) || 0;
 const numOrNull = (v: unknown) => (v == null ? null : Number(v));
 
-function toInvoiceView(row: Record<string, unknown>, items: InvoiceItemView[]): InvoiceView {
+/** What the screens get of a boleto: never the bank's reference. */
+export const toChargeView = (c: ChargeRow | null | undefined): InvoiceChargeView | null => c ? ({
+    id: c.id, status: c.status, provider_status: c.provider_status, due_date: c.due_date, digitable_line: c.digitable_line, barcode: c.barcode,
+    pix_copy_paste: c.pix_copy_paste, has_pdf: Boolean(c.pdf_path), paid_via: c.paid_via, paid_amount: c.paid_amount, last_checked_at: c.last_checked_at, last_error: c.last_error, created_at: c.created_at,
+}) : null;
+
+function toInvoiceView(row: Record<string, unknown>, items: InvoiceItemView[], charge: ChargeRow | null = null): InvoiceView {
     const joined = (key: string, field: string) => ((row[key] as Record<string, unknown> | null)?.[field] as string | null | undefined) ?? null;
     return {
         id: String(row.id),
@@ -58,6 +65,7 @@ function toInvoiceView(row: Record<string, unknown>, items: InvoiceItemView[]): 
         tenant_name: joined("tenant", "full_name"),
         lease_reference: joined("lease", "reference_name"),
         items,
+        charge: toChargeView(charge),
     };
 }
 
@@ -82,13 +90,14 @@ async function allRows(fetchPage: (from: number, to: number) => PromiseLike<{ da
 
 /** The account's invoices, newest due date first, each with its items. */
 export async function loadInvoiceRows(supabase: AdminSupabase, profileId: string): Promise<InvoiceView[]> {
-    const [invoices, items] = await Promise.all([
+    const [invoices, items, charges] = await Promise.all([
         allRows((from, to) => supabase.from("invoices").select(INVOICE_SELECT).eq("owner_id", profileId).order("due_date", { ascending: false }).order("number", { ascending: false }).range(from, to), "invoices"),
         allRows((from, to) => supabase.from("invoice_items").select("id, invoice_id, kind, description, amount, position").eq("owner_id", profileId).order("position", { ascending: true }).order("id", { ascending: true }).range(from, to), "invoice_items"),
+        loadLatestCharges(supabase, profileId),
     ]);
     const byInvoice = new Map<string, InvoiceItemView[]>();
     for (const item of items) byInvoice.set(String(item.invoice_id), [...(byInvoice.get(String(item.invoice_id)) ?? []), toItemView(item)]);
-    return invoices.map(row => toInvoiceView(row, byInvoice.get(String(row.id)) ?? []));
+    return invoices.map(row => toInvoiceView(row, byInvoice.get(String(row.id)) ?? [], charges.get(String(row.id)) ?? null));
 }
 
 export const EMPTY_BILLING_SETTINGS: BillingSettingsView = { days_in_advance: null, fine_pct: null, interest_pct_month: null, days_payable_after_due: null };
@@ -167,9 +176,10 @@ export async function loadInvoiceDetail(supabase: AdminSupabase, invoiceId: stri
     if (error) throw new Error(`invoice: ${error.message}`);
     if (!row) throw notFound("Fatura não encontrada.");
 
-    const [itemsRes, eventsRes] = await Promise.all([
+    const [itemsRes, eventsRes, charges] = await Promise.all([
         supabase.from("invoice_items").select("id, invoice_id, kind, description, amount, position").eq("invoice_id", invoiceId).eq("owner_id", profileId).order("position", { ascending: true }),
         supabase.from("invoice_events").select("id, type, actor, detail, created_at").eq("invoice_id", invoiceId).eq("owner_id", profileId).order("created_at", { ascending: true }),
+        loadCharges(supabase, profileId, invoiceId),
     ]);
     if (itemsRes.error) throw new Error(`invoice_items: ${itemsRes.error.message}`);
     if (eventsRes.error) throw new Error(`invoice_events: ${eventsRes.error.message}`);
@@ -177,7 +187,7 @@ export async function loadInvoiceDetail(supabase: AdminSupabase, invoiceId: stri
     const record = row as unknown as Record<string, unknown>;
     return {
         invoice: {
-            ...toInvoiceView(record, ((itemsRes.data ?? []) as Record<string, unknown>[]).map(toItemView)),
+            ...toInvoiceView(record, ((itemsRes.data ?? []) as Record<string, unknown>[]).map(toItemView), charges.find(c => c.kind === "BOLEPIX") ?? null),
             payer_cpf: (record.payer_cpf as string | null) ?? null,
             payer_address: (record.payer_address as PayerAddress | null) ?? null,
             fine_pct: numOrNull(record.fine_pct),

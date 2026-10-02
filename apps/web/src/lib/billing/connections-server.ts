@@ -6,20 +6,21 @@
  * to the owner and the provider), and what the screens show is built from `metadata`. Every function is
  * scoped to the account (`profileId`).
  */
+import { createHash, randomBytes } from "node:crypto";
 import type { AdminSupabase } from "@/lib/api-auth";
 import { HttpError, badRequest, conflict, notFound } from "@/lib/api-route";
 import { SecretBoxError, fingerprint, openSecret, sealSecret, secretBoxAvailable } from "@/lib/secret-box";
 import { todayBRT } from "@/lib/lease-dashboard";
 import type { InterConnectionInput } from "@/lib/schemas/billing-connection";
 import { certificateStanding, type ConnectionStatus, type ConnectionsView, type InterConnectionView } from "./connections";
-import { InterError, requestInterToken, type InterRequestOptions } from "./inter-client";
+import { InterError, putInterWebhook, requestInterToken, type InterRequestOptions } from "./inter-client";
 import {
     CERTIFICATE_PROBLEMS, INTER_REQUIRED_SCOPES, inspectCertificate, missingScopes, normalizePem, tail,
     type InterCredentials, type InterEnvironment,
 } from "./inter-credentials";
 
 const TABLE = "billing_connections";
-const COLUMNS = "id, owner_id, provider, status, environment, metadata, secret_ciphertext, token_ciphertext, token_expires_at, cert_expires_at, configured_at, last_checked_at, last_error";
+const COLUMNS = "id, owner_id, provider, status, environment, metadata, secret_ciphertext, token_ciphertext, token_expires_at, cert_expires_at, configured_at, last_checked_at, last_error, webhook_key_hash, webhook_registered_at";
 
 /** What a sealed secret is bound to: opened anywhere else, it fails. */
 const context = (ownerId: string, provider: string) => `${ownerId}:${provider}`;
@@ -41,6 +42,8 @@ interface ConnectionRow {
     configured_at: string | null;
     last_checked_at: string | null;
     last_error: string | null;
+    webhook_key_hash: string | null;
+    webhook_registered_at: string | null;
 }
 
 async function loadRow(supabase: AdminSupabase, profileId: string): Promise<ConnectionRow | null> {
@@ -201,24 +204,27 @@ export async function deleteInterConnection(supabase: AdminSupabase, profileId: 
 const TOKEN_MARGIN_MS = 60_000;
 
 export interface InterSession {
+    connectionId: string;
     credentials: InterCredentials;
     environment: InterEnvironment;
     accessToken: string;
+    webhookRegistered: boolean;
 }
 
 /**
  * What a call to the bank needs: the owner's credentials (the certificate goes on every request) and a
  * token — the kept one while it lasts, a new one otherwise. Throws when the owner has no usable connection.
  */
-export async function interSession(supabase: AdminSupabase, profileId: string, request: Partial<InterRequestOptions> = {}): Promise<InterSession> {
+export async function interSession(supabase: AdminSupabase, profileId: string, request: Partial<InterRequestOptions> = {}, opts: { fresh?: boolean } = {}): Promise<InterSession> {
     const row = await loadRow(supabase, profileId);
-    if (!row || row.status !== "CONNECTED") throw new HttpError(409, { error: "O Banco Inter não está conectado." });
+    if (!row || row.status !== "CONNECTED") throw new HttpError(409, { error: "O Banco Inter não está conectado. Conecte a sua integração em Faturas → Conexões." });
     if (row.environment === "SANDBOX" && !sandboxAllowed()) throw new HttpError(409, { error: "A conexão cadastrada é do ambiente de testes do banco." });
     const credentials = openCredentials(row);
+    const base = { connectionId: row.id, credentials, environment: row.environment, webhookRegistered: Boolean(row.webhook_registered_at) };
 
-    if (row.token_ciphertext && row.token_expires_at && Date.parse(row.token_expires_at) - Date.now() > TOKEN_MARGIN_MS) {
+    if (!opts.fresh && row.token_ciphertext && row.token_expires_at && Date.parse(row.token_expires_at) - Date.now() > TOKEN_MARGIN_MS) {
         try {
-            return { credentials, environment: row.environment, accessToken: openSecret(row.token_ciphertext, context(profileId, "INTER:token")) };
+            return { ...base, accessToken: openSecret(row.token_ciphertext, context(profileId, "INTER:token")) };
         } catch {
             // sealed with a key this server no longer has: ask for a new one
         }
@@ -228,5 +234,44 @@ export async function interSession(supabase: AdminSupabase, profileId: string, r
         .update({ token_ciphertext: sealSecret(token.accessToken, context(profileId, "INTER:token")).sealed, token_expires_at: new Date(Date.now() + token.expiresIn * 1000).toISOString() })
         .eq("id", row.id).eq("owner_id", profileId);
     if (error) console.error("[Inter] could not keep the token:", error.message);
-    return { credentials, environment: row.environment, accessToken: token.accessToken };
+    return { ...base, accessToken: token.accessToken };
+}
+
+/**
+ * Runs a call to the bank with the owner's session; a token the bank no longer accepts is replaced
+ * once and the call repeated.
+ */
+export async function withInterSession<T>(supabase: AdminSupabase, profileId: string, fn: (session: InterSession) => Promise<T>, request: Partial<InterRequestOptions> = {}): Promise<T> {
+    try {
+        return await fn(await interSession(supabase, profileId, request));
+    } catch (err) {
+        if (!(err instanceof InterError) || err.code !== "UNAUTHORIZED") throw err;
+        return fn(await interSession(supabase, profileId, request, { fresh: true }));
+    }
+}
+
+const webhookKeyHash = (key: string) => createHash("sha256").update(key).digest("hex");
+
+/**
+ * Registers, once per connection, where the bank reports paid, cancelled and expired charges: a URL
+ * with a secret only this connection knows (its hash is kept; the webhook route looks the connection
+ * up by it and then reads the charge back from the bank — the payload is a hint, never the truth).
+ */
+export async function ensureInterWebhook(supabase: AdminSupabase, profileId: string, session: InterSession, baseUrl: string, request: Partial<InterRequestOptions> = {}): Promise<void> {
+    if (session.webhookRegistered) return;
+    const key = randomBytes(24).toString("base64url");
+    await putInterWebhook(session, `${baseUrl.replace(/\/+$/, "")}/api/webhooks/inter/${key}`, request);
+    const { error } = await supabase.from(TABLE)
+        .update({ webhook_key_hash: webhookKeyHash(key), webhook_registered_at: new Date().toISOString() })
+        .eq("id", session.connectionId).eq("owner_id", profileId);
+    if (error) throw new Error(`billing_connections: ${error.message}`);
+    session.webhookRegistered = true;
+}
+
+/** The owner behind a webhook key, or null when the key leads nowhere. */
+export async function ownerOfWebhookKey(supabase: AdminSupabase, key: string): Promise<string | null> {
+    if (!/^[A-Za-z0-9_-]{20,64}$/.test(key)) return null;
+    const { data, error } = await supabase.from(TABLE).select("owner_id").eq("provider", "INTER").eq("webhook_key_hash", webhookKeyHash(key)).maybeSingle();
+    if (error) throw new Error(`billing_connections: ${error.message}`);
+    return data ? String(data.owner_id) : null;
 }

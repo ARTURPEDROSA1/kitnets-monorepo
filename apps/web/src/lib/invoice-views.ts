@@ -7,6 +7,7 @@ import type { LeaseManagementType, LeaseStatus } from "@/types/lease";
 import type { CollectionComponent, InvoiceItemKind } from "@/lib/invoice-collection";
 import type { PayerAddress } from "@/lib/invoice-payer";
 import type { ConnectionsView } from "@/lib/billing/connections";
+import type { ChargeStatus } from "@/lib/billing/inter-payload";
 
 export type InvoiceStatus = "DRAFT" | "ISSUED" | "PAID" | "CANCELLED";
 export type InvoiceOrigin = "AUTO" | "MANUAL";
@@ -18,6 +19,24 @@ export interface InvoiceItemView {
     description: string;
     amount: number;
     position: number;
+}
+
+/** The invoice's latest boleto at the bank, as far as the screens need it (lib/billing/charges-server.ts). */
+export interface InvoiceChargeView {
+    id: string;
+    status: ChargeStatus;
+    /** the bank's own word (A_RECEBER, RECEBIDO, EXPIRADO…) */
+    provider_status: string | null;
+    due_date: string | null;
+    digitable_line: string | null;
+    barcode: string | null;
+    pix_copy_paste: string | null;
+    has_pdf: boolean;
+    paid_via: "BOLETO" | "PIX" | "CARD" | null;
+    paid_amount: number | null;
+    last_checked_at: string | null;
+    last_error: string | null;
+    created_at: string;
 }
 
 export interface InvoiceView {
@@ -53,6 +72,8 @@ export interface InvoiceView {
     tenant_name: string | null;
     lease_reference: string | null;
     items: InvoiceItemView[];
+    /** the latest boleto issued for it; null before the first issue */
+    charge?: InvoiceChargeView | null;
 }
 
 /** A lease in force with who collects each of its components: one block of "Cobranças recorrentes". */

@@ -1,6 +1,6 @@
 # Fatura (Tenant Invoicing) Module
 
-**Version:** 0.3 (steps 1 to 3 of 7)  
+**Version:** 0.4 (steps 1 to 4 of 7)  
 **Last updated:** 2026-10-02  
 **Author:** Kitnets Engineering
 
@@ -16,14 +16,14 @@ The end state is automatic: every month the module issues a boleto + PIX through
 |---|---|---|
 | 1 | Schema, who collects each component, the hub, invoices generated and settled by hand | live (PR #232) |
 | 2 | Income ledger and books: what comes in directly from the tenant (`direct_*`), the condominium the owner collects (`condo_direct`), late fees | live (PR #233), §6 |
-| 3 | The owner's own Banco Inter integration: sealed credentials, connection screen and test | **this document, §7** |
-| 4 | Boleto + PIX issued through Banco Inter, webhook, reconciliation | pending |
+| 3 | The owner's own Banco Inter integration: sealed credentials, connection screen and test | live (PR #234), §7 |
+| 4 | Boleto + PIX issued through Banco Inter, PDF, webhook, refresh from the bank | **this document, §8** |
 | 5 | E-mail to the tenant, public payment page, daily cron | pending |
 | 6 | Stripe Connect, card link with the fee passed on to the tenant | pending |
 | 7 | Dashboard card, overdue reminders, receipt | pending |
 
 - **Hub** `/faturas` — KPI strip, "Atenção", then four sections: the invoices as a spreadsheet, "Cobranças recorrentes" (who collects each component of each lease in force), the billing conditions and "Conexões" (the owner's bank integration).
-- **Invoice panel** `/faturas?id=<invoice>` — items, payer, the terms it states, payment, timeline; record a payment or cancel.
+- **Invoice panel** `/faturas?id=<invoice>` — items, payer, the terms it states, payment, timeline; issue the boleto + Pix at the bank, copy the digitable line and the Pix code, open the PDF, refresh from the bank, record a payment by hand or cancel.
 - **Sidebar** — "Fatura", between "Água" and "Imobiliária".
 
 `/dashboard/billing` is the water bills page and has nothing to do with this module.
@@ -83,10 +83,15 @@ apps/web/src/
 │   ├── route.ts                      # GET (invoices + recurring + settings) · POST (generate a month)
 │   ├── [id]/route.ts                 # GET (one invoice with payer and timeline)
 │   ├── [id]/pagar/route.ts           # POST (baixa manual)
-│   ├── [id]/cancelar/route.ts        # POST
+│   ├── [id]/emitir/route.ts          # POST (boleto + Pix at the bank; due_date moves a passed date first)
+│   ├── [id]/atualizar/route.ts       # POST (read the boleto back from the bank)
+│   ├── [id]/pdf/route.ts             # GET (signed URL of the boleto's PDF)
+│   ├── [id]/pagar-sandbox/route.ts   # POST (the bank's sandbox pays; outside production only)
+│   ├── [id]/cancelar/route.ts        # POST (cancels the boleto at the bank first)
 │   ├── cobrancas/route.ts            # PUT (who collects a component · pause a lease)
 │   ├── configuracoes/route.ts        # PUT (billing conditions)
 │   └── conexoes/                     # GET (status) · inter: PUT (save + test) · DELETE · inter/testar: POST
+├── app/api/webhooks/inter/[key]/route.ts # POST: the bank's callbacks (no Clerk; the key leads to one connection)
 ├── components/faturas/
 │   ├── FaturasHub.tsx                # KPI strip, "Atenção", sections, view pills, search
 │   ├── InvoiceTable.tsx              # The invoices as a spreadsheet (table key `invoices`)
@@ -112,7 +117,9 @@ apps/web/src/
         ├── connections.ts (+ test)        # the connections as the screens see them, certificate standing, attention
         ├── connections-server.ts          # save (sealed), test, delete, and the session the bank calls use
         ├── inter-credentials.ts (+ test)  # certificate/key check, scopes, the bank's hosts
-        ├── inter-client.ts (+ test)       # mutual TLS to the bank's API (node:https); the token endpoint
+        ├── inter-client.ts (+ test)       # mutual TLS to the bank's API (node:https): token, charges, PDF, cancel, webhook
+        ├── inter-payload.ts (+ test)      # the charge's body, the bank's states, what the webhook is trusted for
+        ├── charges-server.ts              # issue, refresh, cancel at the bank, PDF, the webhook's handling
         └── inter-test-certs.ts            # throwaway certificates for the tests (openssl at test time)
     ├── property-income.ts (+ test)    # the ledger's money model: deposit + what was paid by invoice
     └── property-income-readers.test.ts # every reader of the ledger selects the invoice columns
@@ -121,7 +128,8 @@ supabase/
 ├── migrations/20261002120000_invoices_core.sql
 ├── migrations/20261002200000_invoice_ledger.sql
 ├── migrations/20261002230000_billing_connections.sql
-└── checks/invoices.sql, invoice_ledger.sql, billing_connections.sql
+├── migrations/20261003000000_invoice_charges.sql
+└── checks/invoices.sql, invoice_ledger.sql, billing_connections.sql, invoice_charges.sql
 ```
 
 ## 5. Database
@@ -189,11 +197,27 @@ Invoices are issued through the owner's **own** integration with the bank — th
 
 **Attention**: a failing connection or a certificate about to expire (the bank allows renewal from 90 days before) is listed right after the late invoices; an account that collects something and has no connection is reminded, after the open decisions.
 
-**Not yet**: nothing is issued through the connection (step 4); the Stripe connection (step 6).
+**Not yet**: the Stripe connection (step 6).
 
-## 8. Not in these steps
+## 8. Boleto + Pix at Banco Inter (step 4)
 
-- Nothing is issued or sent: no boleto, no PIX, no card link, no e-mail. The hub says so. The bank connection can already be made and tested.
+An invoice becomes a charge at the owner's bank — the API Cobrança v3 "boleto com Pix": one charge gives the boleto (digitable line, barcode, PDF) and the Pix copy-and-paste code, the Pix key being the one registered on the owner's account. The rows live in `invoice_charges` (migration `20261003000000`): one live boleto per invoice (a unique partial index is the lock), the bank's reference (`codigoSolicitacao`), its own state verbatim (`provider_status`) and the module's reading of it (`status`: REQUESTED, OPEN, PAID, CANCELLED, EXPIRED, FAILED). The boleto PDF goes to the private bucket `invoice-documents`.
+
+**Issuing** (`issueInvoice`): the invoice must be open with no live boleto; the bank needs a CPF/CNPJ, a full address with CEP, at least R$ 2,50 and a due date today or later; the owner's terms (multa, juros, prazo) must be decided — nothing is invented in their place. A passed due date is moved first (the owner picks the new one; no late fee for the delay before it). Then: the charge row is inserted REQUESTED (the lock), the webhook is registered once per connection, `POST /cobranca/v3/cobrancas` is sent with `seuNumero` = `F<number>` (`-2`, `-3` on a reissue), the invoice becomes ISSUED, and the charge is read back at once — the bank makes the boleto asynchronously, so a REQUESTED charge just needs "Atualizar status" a moment later. A refusal by the bank leaves the charge FAILED with the bank's words, and the invoice to be issued again.
+
+**Refreshing** (`refreshCharge`): `GET /cobranca/v3/cobrancas/{id}` is the truth. A paid charge settles the invoice through `invoice_mark_paid` (payment date, amount received, BOLETO or PIX; what came above the invoice is the late fee), an expired one reads as "Boleto expirado" and asks for a reissue, a cancelled or failed one leaves the invoice to be issued again; an OPEN charge without its PDF fetches it.
+
+**Webhook** (`POST /api/webhooks/inter/[key]`): the bank reports paid, cancelled and expired charges to a URL with a secret only the owner's connection knows (its hash in `billing_connections.webhook_key_hash`; registered with `PUT /cobranca/v3/cobrancas/webhook` on the first issue). The payload is a hint: each charge it names is read back from the bank before anything changes; a payload seen before (same charge, state and time) is ignored through `invoice_events.dedupe_key`. Always 200 once the key is known; the bank retries four times on an error.
+
+**Cancelling** an invoice cancels its live boleto at the bank first (`POST …/cancelar`); a boleto already gone at the bank is fine.
+
+**Sandbox**: outside the production site, a connection to the bank's sandbox can simulate the tenant's payment (`POST …/pagar`) from the invoice panel.
+
+**Not yet**: the e-mail to the tenant and the public payment page with the Pix QR code (step 5); the daily automation (step 5); matching a statement credit to its invoice (the existing rule keeps the credit "só contábil").
+
+## 9. Not in these steps
+
+- Nothing is sent to the tenant yet: no e-mail, no public page; the owner copies the digitable line or the Pix code from the invoice panel. No card link.
 - A partial payment is not accepted: a payment recorded by hand must cover the invoice.
 - No automatic generation: "Gerar faturas" creates the month's invoices on demand; running it again only fills what is missing.
 - Out of scope for the module as planned: automatic rent adjustment on the invoice, pro rata of the first and last month, company tenants (CNPJ), variable-amount charges (metered energy).

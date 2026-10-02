@@ -1,19 +1,23 @@
 "use client";
 
 /**
- * One invoice: what it charges, who pays, the terms it states, how it stands and what happened to it.
- * The page preloads it; after a payment or a cancellation the parent hands the fresh one back.
+ * One invoice: what it charges, who pays, the terms it states, how it stands and what happened to it —
+ * and, once issued at the bank, how the tenant pays it (the boleto's digitable line, the Pix code, the
+ * PDF). The page preloads it; every action here answers with the fresh invoice, handed up to the parent.
  */
 import React, { useEffect, useState } from "react";
-import { AlertCircle, ArrowLeft, Ban, CheckCircle2, FileText, Loader2, Receipt } from "lucide-react";
+import { AlertCircle, ArrowLeft, Ban, Check, CheckCircle2, Copy, FileDown, FileText, FlaskConical, Landmark, Loader2, Receipt, RefreshCw, X } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { cn } from "@/lib/utils";
 import { formatDateBR } from "@/lib/dates";
 import { formatCPF } from "@/lib/validators";
 import { Money, Sensitive } from "@/components/privacy";
-import { INVOICE_STATUS_META, PAID_VIA_LABELS, brl, invoiceDisplay, isOpen } from "@/lib/invoice-hub";
+import { DateInput } from "@/components/ui/DateInput";
+import { Label } from "@/components/ui/label";
+import { INVOICE_STATUS_META, PAID_VIA_LABELS, brl, hasLiveCharge, invoiceDisplay, isOpen } from "@/lib/invoice-hub";
 import { blockersText } from "@/lib/invoice-payer";
 import { daysBetween, monthLabel } from "@/lib/invoice-schedule";
+import { CHARGE_STATUS_LABELS } from "@/lib/billing/inter-payload";
 import type { InvoiceDetailView, InvoiceEventView } from "@/lib/invoice-views";
 
 interface Props {
@@ -23,13 +27,27 @@ interface Props {
     /** preloaded by the page, or handed back after an action */
     initial: InvoiceDetailView | null;
     notice: string | null;
+    /** the owner's bank connection can issue (connected, certificate in date) */
+    bankUsable: boolean;
+    /** the connection is the bank's sandbox and this site allows it: payments can be simulated */
+    sandbox: boolean;
     onBack: () => void;
     onPay: (detail: InvoiceDetailView) => void;
     onCancel: (detail: InvoiceDetailView) => void;
+    /** an action here changed the invoice */
+    onChanged: (detail: InvoiceDetailView, message: string | null) => void;
 }
 
 const EVENT_LABELS: Record<string, string> = {
     CREATED: "Fatura criada",
+    ISSUED: "Boleto e PIX emitidos no banco",
+    ISSUE_FAILED: "A emissão no banco falhou",
+    CHARGE_OPEN: "Boleto pronto no banco",
+    CHARGE_PAID: "Pagamento confirmado pelo banco",
+    CHARGE_EXPIRED: "O boleto expirou",
+    CHARGE_CANCELLED: "Boleto cancelado no banco",
+    WEBHOOK: "Aviso do banco recebido",
+    DUE_DATE_MOVED: "Vencimento alterado",
     PAID: "Pagamento registrado",
     CANCELLED: "Fatura cancelada",
     DUPLICATE_PAYMENT: "Pagamento recebido em duplicidade",
@@ -42,13 +60,16 @@ const plural = (n: number, one: string, many: string) => `${n.toLocaleString("pt
 
 function eventText(e: InvoiceEventView): string | null {
     const amount = typeof e.detail.amount === "number" ? e.detail.amount : null;
-    if (e.type === "CANCELLED") return typeof e.detail.reason === "string" ? e.detail.reason : null;
-    if (e.type === "PAID" || e.type === "DUPLICATE_PAYMENT") {
+    if (e.type === "CANCELLED" || e.type === "ISSUE_FAILED") return typeof e.detail.reason === "string" ? e.detail.reason : typeof e.detail.error === "string" ? e.detail.error : null;
+    if (e.type === "DUE_DATE_MOVED") return typeof e.detail.from === "string" && typeof e.detail.to === "string" ? `de ${formatDateBR(e.detail.from)} para ${formatDateBR(e.detail.to)}` : null;
+    if (e.type === "WEBHOOK") return typeof e.detail.situacao === "string" ? e.detail.situacao : null;
+    if (e.type === "PAID" || e.type === "DUPLICATE_PAYMENT" || e.type === "CHARGE_PAID") {
         const via = typeof e.detail.via === "string" ? PAID_VIA_LABELS[e.detail.via] ?? e.detail.via : null;
         return [amount !== null ? brl(amount) : null, via, typeof e.detail.paid_on === "string" ? `em ${formatDateBR(e.detail.paid_on)}` : null].filter(Boolean).join(" · ") || null;
     }
     return amount !== null ? brl(amount) : null;
 }
+const MONEY_EVENTS = new Set(["CREATED", "PAID", "DUPLICATE_PAYMENT", "CHARGE_PAID", "ISSUED"]);
 
 function Field({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
     return (
@@ -59,12 +80,51 @@ function Field({ label, children, className }: { label: string; children: React.
     );
 }
 
+/** A code the tenant pays with, and a button that copies it. */
+function CopyField({ label, value, hint }: { label: string; value: string; hint: string }) {
+    const [copied, setCopied] = useState(false);
+    const copy = async () => {
+        try {
+            await navigator.clipboard.writeText(value);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch {
+            // the browser refused the clipboard: the text is selectable anyway
+        }
+    };
+    return (
+        <div>
+            <dt className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</dt>
+            <dd className="mt-1 flex items-start gap-2">
+                <Sensitive className="min-w-0 flex-1 break-all rounded-md border border-border/70 bg-muted/30 px-2 py-1.5 font-mono text-xs text-foreground">{value}</Sensitive>
+                <button type="button" onClick={copy} className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground" title={hint}>
+                    {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />} {copied ? "copiado" : "copiar"}
+                </button>
+            </dd>
+        </div>
+    );
+}
+
 const undecided = <span className="text-muted-foreground">a decidir</span>;
 
-export default function InvoiceDetail({ invoiceId, lang, today, initial, notice, onBack, onPay, onCancel }: Props) {
+async function post(url: string, body?: Record<string, unknown>): Promise<{ detail?: InvoiceDetailView; error?: string }> {
+    try {
+        const res = await fetch(url, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : { method: "POST" });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) return { error: typeof json.error === "string" ? json.error : json.errors ? Object.values(json.errors as Record<string, string>).join(" ") : "Não foi possível concluir." };
+        return { detail: json as InvoiceDetailView };
+    } catch {
+        return { error: "Erro de conexão. Tente novamente." };
+    }
+}
+
+export default function InvoiceDetail({ invoiceId, lang, today, initial, notice, bankUsable, sandbox, onBack, onPay, onCancel, onChanged }: Props) {
     const preloaded = initial && initial.invoice.id === invoiceId ? initial : null;
     const [fetched, setFetched] = useState<InvoiceDetailView | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [busy, setBusy] = useState<"issue" | "refresh" | "pdf" | "sandbox" | null>(null);
+    const [actionError, setActionError] = useState<string | null>(null);
+    const [issueModal, setIssueModal] = useState<{ dueDate: string } | null>(null);
     const detail = preloaded ?? (fetched && fetched.invoice.id === invoiceId ? fetched : null);
 
     useEffect(() => {
@@ -79,6 +139,31 @@ export default function InvoiceDetail({ invoiceId, lang, today, initial, notice,
             .catch(err => { if (alive) setError(err instanceof Error ? err.message : "Erro ao carregar"); });
         return () => { alive = false; };
     }, [invoiceId, preloaded]);
+
+    const run = async (kind: "issue" | "refresh" | "sandbox", url: string, body: Record<string, unknown> | undefined, message: string | null) => {
+        setBusy(kind);
+        setActionError(null);
+        const out = await post(url, body);
+        setBusy(null);
+        if (out.detail) {
+            setIssueModal(null);
+            onChanged(out.detail, message);
+        } else setActionError(out.error ?? null);
+    };
+    const openPdf = async () => {
+        setBusy("pdf");
+        setActionError(null);
+        try {
+            const res = await fetch(`/api/faturas/${invoiceId}/pdf`);
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || !json.url) throw new Error(json.error || "PDF indisponível.");
+            window.open(json.url as string, "_blank", "noopener");
+        } catch (err) {
+            setActionError(err instanceof Error ? err.message : "PDF indisponível.");
+        } finally {
+            setBusy(null);
+        }
+    };
 
     const back = (
         <Button variant="ghost" size="sm" onClick={onBack} className="-ml-2">
@@ -98,9 +183,11 @@ export default function InvoiceDetail({ invoiceId, lang, today, initial, notice,
     }
 
     const { invoice, events } = detail;
+    const charge = invoice.charge ?? null;
     const display = invoiceDisplay(invoice, today);
     const meta = INVOICE_STATUS_META[display];
     const open = isOpen(invoice.status);
+    const live = hasLiveCharge(invoice);
     const place = [invoice.property_name, invoice.unit_name].filter(Boolean).join(" · ") || "Imóvel";
     const gap = daysBetween(today, invoice.due_date);
     const missing = open ? blockersText(invoice.blockers) : "";
@@ -109,6 +196,13 @@ export default function InvoiceDetail({ invoiceId, lang, today, initial, notice,
         ? [[address.street, address.number].filter(Boolean).join(", "), address.complement, address.neighborhood, [address.city, address.state].filter(Boolean).join("/"), address.cep ? `CEP ${address.cep.replace(/^(\d{5})(\d{3})$/, "$1-$2")}` : null].filter(Boolean).join(" · ")
         : null;
     const contratosHref = `${lang === "pt" ? "" : `/${lang}`}/contratos?id=${invoice.lease_id}`;
+    const termsUndecided = invoice.fine_pct === null || invoice.interest_pct_month === null || invoice.days_payable_after_due === null;
+    const cannotIssue = !bankUsable ? "Conecte o Banco Inter em Conexões para emitir" : termsUndecided ? "Defina multa, juros e prazo em Configuração antes de emitir" : null;
+
+    const startIssue = () => {
+        if (invoice.due_date < today) setIssueModal({ dueDate: today });
+        else void run("issue", `/api/faturas/${invoiceId}/emitir`, {}, "Boleto e PIX emitidos no banco.");
+    };
 
     return (
         <div className="space-y-5">
@@ -126,10 +220,20 @@ export default function InvoiceDetail({ invoiceId, lang, today, initial, notice,
                     </div>
                     {open && (
                         <div className="flex flex-wrap items-center gap-2">
-                            <Button onClick={() => onPay(detail)}>
+                            {!live && (
+                                <Button onClick={startIssue} disabled={busy !== null || Boolean(cannotIssue)} title={cannotIssue ?? "Emite o boleto com QR code PIX pela sua conta no Banco Inter"}>
+                                    {busy === "issue" ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Landmark className="mr-1 h-4 w-4" />} {charge ? "Emitir de novo" : "Emitir boleto e PIX"}
+                                </Button>
+                            )}
+                            {live && (
+                                <Button variant="outline" onClick={() => void run("refresh", `/api/faturas/${invoiceId}/atualizar`, undefined, null)} disabled={busy !== null} title="Consulta o banco: pagamento, expiração, cancelamento">
+                                    {busy === "refresh" ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1 h-4 w-4" />} Atualizar status
+                                </Button>
+                            )}
+                            <Button variant="outline" onClick={() => onPay(detail)} disabled={busy !== null} title="Pagamento recebido por fora (transferência, dinheiro)">
                                 <CheckCircle2 className="mr-1 h-4 w-4" /> Registrar pagamento
                             </Button>
-                            <Button variant="outline" onClick={() => onCancel(detail)}>
+                            <Button variant="outline" onClick={() => onCancel(detail)} disabled={busy !== null}>
                                 <Ban className="mr-1 h-4 w-4" /> Cancelar
                             </Button>
                         </div>
@@ -140,11 +244,58 @@ export default function InvoiceDetail({ invoiceId, lang, today, initial, notice,
             {notice && (
                 <div role="status" className="rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-200">{notice}</div>
             )}
+            {actionError && (
+                <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-300">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span className="flex-1">{actionError}</span>
+                    <button type="button" onClick={() => setActionError(null)} className="rounded p-0.5" aria-label="Fechar"><X className="h-4 w-4" /></button>
+                </div>
+            )}
             {missing && (
                 <div role="note" className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200">
                     <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                    <span>Falta para emitir o boleto e enviar o e-mail: {missing}. Complete o cadastro do inquilino; a fatura pode ser baixada manualmente mesmo assim.</span>
+                    <span>Falta para o boleto e o e-mail: {missing}. Complete o cadastro do inquilino; a fatura pode ser baixada manualmente mesmo assim.</span>
                 </div>
+            )}
+
+            {charge && (
+                <section className="rounded-xl border border-border/80 bg-card">
+                    <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-2.5">
+                        <span className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
+                            <Landmark className="h-4 w-4 text-orange-500" /> Boleto e PIX
+                            <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", charge.status === "OPEN" ? "bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-300" : charge.status === "PAID" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300" : charge.status === "REQUESTED" ? "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300" : "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300")}>
+                                {CHARGE_STATUS_LABELS[charge.status]}
+                            </span>
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                            {charge.last_checked_at ? `conferido no banco em ${stamp(charge.last_checked_at)}` : "ainda não conferido no banco"}
+                        </span>
+                    </header>
+                    <div className="space-y-3 p-4">
+                        {charge.status === "REQUESTED" && <p className="text-sm text-muted-foreground">O banco ainda está gerando o boleto. Clique em &ldquo;Atualizar status&rdquo; daqui a instantes.</p>}
+                        {charge.status === "EXPIRED" && <p className="text-sm text-amber-700 dark:text-amber-400">Este boleto deixou de aceitar pagamento. Emita de novo com uma nova data de vencimento.</p>}
+                        {charge.status === "FAILED" && charge.last_error && <p role="alert" className="text-sm text-rose-600">{charge.last_error}</p>}
+                        {charge.last_error && charge.status !== "FAILED" && <p className="text-xs text-rose-600">Última consulta ao banco falhou: {charge.last_error}</p>}
+                        {(charge.digitable_line || charge.pix_copy_paste) && (
+                            <dl className="grid gap-3 lg:grid-cols-2">
+                                {charge.digitable_line && <CopyField label="Linha digitável do boleto" value={charge.digitable_line} hint="Copiar a linha digitável" />}
+                                {charge.pix_copy_paste && <CopyField label="PIX copia e cola" value={charge.pix_copy_paste} hint="Copiar o código PIX" />}
+                            </dl>
+                        )}
+                        <div className="flex flex-wrap items-center gap-2">
+                            {charge.has_pdf && (
+                                <Button variant="outline" size="sm" onClick={openPdf} disabled={busy !== null}>
+                                    {busy === "pdf" ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <FileDown className="mr-1 h-4 w-4" />} Boleto em PDF
+                                </Button>
+                            )}
+                            {sandbox && live && (
+                                <Button variant="outline" size="sm" onClick={() => void run("sandbox", `/api/faturas/${invoiceId}/pagar-sandbox`, { via: "PIX" }, "Pagamento simulado no sandbox do banco.")} disabled={busy !== null} title="Só no ambiente de testes do banco">
+                                    {busy === "sandbox" ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <FlaskConical className="mr-1 h-4 w-4" />} Simular pagamento
+                                </Button>
+                            )}
+                            {charge.due_date && <span className="text-xs text-muted-foreground">vencimento no banco: {formatDateBR(charge.due_date)}{charge.paid_via ? ` · pago por ${PAID_VIA_LABELS[charge.paid_via] ?? charge.paid_via}` : ""}</span>}
+                        </div>
+                    </div>
+                </section>
             )}
 
             <div className="grid gap-5 lg:grid-cols-2">
@@ -214,10 +365,10 @@ export default function InvoiceDetail({ invoiceId, lang, today, initial, notice,
                                 const text = eventText(e);
                                 return (
                                     <li key={e.id} className="flex items-start gap-3 px-4 py-2 text-sm">
-                                        <span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", e.type === "PAID" ? "bg-emerald-500" : e.type === "CANCELLED" ? "bg-amber-500" : e.type === "DUPLICATE_PAYMENT" ? "bg-rose-500" : "bg-slate-400")} />
+                                        <span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", e.type === "PAID" || e.type === "CHARGE_PAID" ? "bg-emerald-500" : e.type === "CANCELLED" || e.type === "CHARGE_EXPIRED" || e.type === "CHARGE_CANCELLED" ? "bg-amber-500" : e.type === "DUPLICATE_PAYMENT" || e.type === "ISSUE_FAILED" ? "bg-rose-500" : e.type === "ISSUED" || e.type === "CHARGE_OPEN" ? "bg-sky-500" : "bg-slate-400")} />
                                         <span className="min-w-0 flex-1">
                                             <span className="font-medium text-foreground">{EVENT_LABELS[e.type] ?? e.type}</span>
-                                            {text && <span className="text-muted-foreground"> — {e.type === "CANCELLED" ? text : <Money>{text}</Money>}</span>}
+                                            {text && <span className="text-muted-foreground"> — {MONEY_EVENTS.has(e.type) ? <Money>{text}</Money> : text}</span>}
                                             <span className="block text-[11px] text-muted-foreground">{stamp(e.created_at)} · {ACTOR_LABELS[e.actor] ?? e.actor}</span>
                                         </span>
                                     </li>
@@ -228,6 +379,27 @@ export default function InvoiceDetail({ invoiceId, lang, today, initial, notice,
                     </section>
                 </div>
             </div>
+
+            {issueModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Emitir com nova data de vencimento">
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => busy === null && setIssueModal(null)} />
+                    <div className="relative w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">
+                        <button type="button" onClick={() => setIssueModal(null)} disabled={busy !== null} className="absolute right-4 top-4 text-muted-foreground hover:text-foreground" aria-label="Fechar"><X className="h-5 w-5" /></button>
+                        <h2 className="mb-2 flex items-center gap-2 text-lg font-bold text-foreground"><Landmark className="h-5 w-5 text-orange-500" /> Nova data de vencimento</h2>
+                        <p className="mb-4 text-sm text-muted-foreground">
+                            O vencimento desta fatura ({formatDateBR(invoice.due_date)}) já passou e o banco não emite boleto com data passada. Escolha a nova data: a fatura passa a vencer nela, sem multa ou juros pelo atraso anterior.
+                        </p>
+                        <Label className="text-xs">Vencimento</Label>
+                        <DateInput value={issueModal.dueDate} onChange={iso => setIssueModal({ dueDate: iso })} className="h-9 text-sm" wrapperClassName="mt-1 w-44" />
+                        <div className="mt-5 flex gap-3">
+                            <Button variant="outline" className="flex-1" onClick={() => setIssueModal(null)} disabled={busy !== null}>Voltar</Button>
+                            <Button className="flex-1" onClick={() => void run("issue", `/api/faturas/${invoiceId}/emitir`, { due_date: issueModal.dueDate }, "Boleto e PIX emitidos no banco.")} disabled={busy !== null || !issueModal.dueDate || issueModal.dueDate < today}>
+                                {busy === "issue" ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Emitindo…</> : "Emitir"}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
