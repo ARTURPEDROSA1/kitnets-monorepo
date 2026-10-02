@@ -12,7 +12,9 @@
         "GEMINI_API_KEY",
         "BIGDATACORP_TOKEN",
         "GOOGLE_MAPS_SERVER_KEY",
-        "GATEWAY_PILOT_EMAILS"
+        "GATEWAY_PILOT_EMAILS",
+        "BILLING_ENCRYPTION_KEY",
+        "BILLING_ENCRYPTION_KEY_PREVIOUS"
     ],
     "tasks": {
         "build": {

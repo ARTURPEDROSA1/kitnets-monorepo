@@ -118,6 +118,18 @@ describe("invoiceAttention", () => {
         expect(items[4].text).toContain("multa por atraso");
     });
 
+    it("puts a failing bank connection right after the late money, and a missing one before the decisions", () => {
+        const invoices = [invoice({ id: "late", due_date: "2026-10-05" })];
+        const rec = recurringRows([recurring()], invoices, TODAY);
+        const failing = { available: true, sandboxAllowed: false, inter: { status: "ERROR" as const, environment: "PRODUCTION" as const, account: null, clientIdTail: "…1234", certificateSubject: null, certificateExpiresAt: null, scopes: [], configuredAt: null, lastCheckedAt: "2026-10-02T10:00:00.000Z", lastError: "O Banco Inter recusou o certificado.", usable: false } };
+        const withFailing = invoiceAttention(invoiceRows(invoices, TODAY), rec, UNDECIDED, TODAY, failing);
+        expect(withFailing.map(i => i.kind)).toEqual(["overdue", "connection", "settings"]);
+        expect(withFailing[1]).toMatchObject({ subject: "Banco Inter", tone: "rose", target: { type: "connections" } });
+        const missing = invoiceAttention(invoiceRows(invoices, TODAY), rec, UNDECIDED, TODAY, { available: true, sandboxAllowed: false, inter: null });
+        expect(missing.map(i => i.kind)).toEqual(["overdue", "connection", "settings"]);
+        expect(missing[1].tone).toBe("slate");
+    });
+
     it("is silent when everything is in order", () => {
         const invoices = [invoice()];
         expect(invoiceAttention(invoiceRows(invoices, TODAY), recurringRows([recurring()], invoices, TODAY), DECIDED, TODAY)).toEqual([]);
