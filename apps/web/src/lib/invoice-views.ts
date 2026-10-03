@@ -137,6 +137,12 @@ export interface BillingSettingsView {
     /** the card fee passed on to the tenant: % of the amount charged + fixed part, as the owner's processor charges; both or neither */
     card_fee_pct?: number | null;
     card_fee_fixed?: number | null;
+    /** days before the due date the tenant is reminded; null = no reminder (not decided) */
+    reminder_days_before?: number | null;
+    /** days after the due date an unpaid invoice gets the overdue notice; null = none */
+    overdue_notice_days?: number | null;
+    /** a receipt is e-mailed when an invoice is paid */
+    send_receipts?: boolean;
 }
 
 export interface InvoiceListView {

@@ -16,6 +16,7 @@ import { todayBRT } from "@/lib/lease-dashboard";
 import { toBillingSettingsView } from "@/lib/invoice-views-server";
 import { cardOffer, type CardOffer } from "./card-offer";
 import { CHARGE_COLUMNS, cancelChargeAtBank, isLiveBoleto, loadCharges, normalizeCharge, refreshCharge, type ChargeRow } from "./charges-server";
+import { sendReceipt } from "./deliveries-server";
 import { rowByToken, type TokenRow } from "./invoice-token-server";
 import { StripeError, createCheckoutSession, expireCheckoutSession, getCheckoutSession, type CheckoutSessionState, type StripeEvent, type StripeRequestOptions } from "./stripe-client";
 import { syncStripeAccount, usableStripeAccount } from "./stripe-connection-server";
@@ -100,6 +101,7 @@ async function settleCard(supabase: AdminSupabase, profileId: string, charge: Ch
     });
     if (payError) throw new Error(`invoice_mark_paid: ${payError.message}`);
     if (result === "DUPLICATE") console.warn("[Card] duplicate payment on", charge.invoice_id);
+    if (result === "PAID") await sendReceipt(supabase, profileId, charge.invoice_id);
     // the boleto must not stay payable
     try {
         await cancelChargeAtBank(supabase, profileId, charge.invoice_id, "Pago por cartao");

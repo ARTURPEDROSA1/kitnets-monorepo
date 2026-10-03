@@ -113,9 +113,10 @@ export async function loadInvoiceRows(supabase: AdminSupabase, profileId: string
 export const EMPTY_BILLING_SETTINGS: BillingSettingsView = {
     days_in_advance: null, fine_pct: null, interest_pct_month: null, days_payable_after_due: null,
     sender_name: null, reply_to_email: null, automation_enabled: false, automation_from_month: null, card_fee_pct: null, card_fee_fixed: null,
+    reminder_days_before: null, overdue_notice_days: null, send_receipts: true,
 };
 
-export const BILLING_SETTINGS_COLUMNS = "days_in_advance, fine_pct, interest_pct_month, days_payable_after_due, sender_name, reply_to_email, automation_enabled, automation_from_month, card_fee_pct, card_fee_fixed";
+export const BILLING_SETTINGS_COLUMNS = "days_in_advance, fine_pct, interest_pct_month, days_payable_after_due, sender_name, reply_to_email, automation_enabled, automation_from_month, card_fee_pct, card_fee_fixed, reminder_days_before, overdue_notice_days, send_receipts";
 
 export function toBillingSettingsView(data: Record<string, unknown>): BillingSettingsView {
     return {
@@ -129,6 +130,9 @@ export function toBillingSettingsView(data: Record<string, unknown>): BillingSet
         automation_from_month: data.automation_from_month ? String(data.automation_from_month).slice(0, 7) : null,
         card_fee_pct: numOrNull(data.card_fee_pct),
         card_fee_fixed: numOrNull(data.card_fee_fixed),
+        reminder_days_before: numOrNull(data.reminder_days_before),
+        overdue_notice_days: numOrNull(data.overdue_notice_days),
+        send_receipts: data.send_receipts !== false,
     };
 }
 

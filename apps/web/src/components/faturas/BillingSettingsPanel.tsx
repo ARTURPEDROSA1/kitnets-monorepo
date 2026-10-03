@@ -23,7 +23,7 @@ interface Props {
 }
 
 type NumberField = "days_in_advance" | "fine_pct" | "interest_pct_month" | "days_payable_after_due";
-type Form = Record<NumberField | "sender_name" | "reply_to_email" | "automation_from_month" | "card_fee_pct" | "card_fee_fixed", string> & { automation_enabled: boolean };
+type Form = Record<NumberField | "sender_name" | "reply_to_email" | "automation_from_month" | "card_fee_pct" | "card_fee_fixed" | "reminder_days_before" | "overdue_notice_days", string> & { automation_enabled: boolean; send_receipts: boolean };
 
 const FIELDS: Array<{ key: NumberField; label: string; suffix: string; placeholder: string; help: string; decimal: boolean }> = [
     { key: "days_in_advance", label: "Antecedência da emissão", suffix: "dias antes do vencimento", placeholder: "a decidir", decimal: false, help: "Quantos dias antes do vencimento a fatura sai para o inquilino, quando a emissão automática estiver ligada. De 1 a 25." },
@@ -46,6 +46,9 @@ export default function BillingSettingsPanel({ settings, emailAvailable = true, 
         automation_from_month: settings.automation_from_month ?? "",
         card_fee_pct: show(settings.card_fee_pct ?? null),
         card_fee_fixed: show(settings.card_fee_fixed ?? null),
+        reminder_days_before: show(settings.reminder_days_before ?? null),
+        overdue_notice_days: show(settings.overdue_notice_days ?? null),
+        send_receipts: settings.send_receipts !== false,
     }));
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [saving, setSaving] = useState(false);
@@ -122,6 +125,35 @@ export default function BillingSettingsPanel({ settings, emailAvailable = true, 
                         <Label htmlFor="billing-reply_to_email" className="text-xs">E-mail para respostas</Label>
                         <Input id="billing-reply_to_email" type="email" value={form.reply_to_email} onChange={e => set("reply_to_email", e.target.value)} placeholder="o e-mail do seu cadastro" className="mt-1 h-9" maxLength={120} aria-invalid={Boolean(errors.reply_to_email)} />
                         {error("reply_to_email", "Para onde vai a resposta do inquilino. Em branco, o e-mail do seu cadastro.")}
+                    </div>
+                </div>
+            </div>
+
+            <div className="border-t border-border/60 px-4 py-3">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Lembretes e recibo</h3>
+                <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                    <div>
+                        <Label htmlFor="billing-reminder_days_before" className="text-xs">Lembrete antes do vencimento</Label>
+                        <div className="mt-1 flex items-center gap-2">
+                            <Input id="billing-reminder_days_before" value={form.reminder_days_before} onChange={e => set("reminder_days_before", e.target.value.replace(/\D/g, ""))} inputMode="numeric" placeholder="a decidir" className="h-9 w-28" aria-invalid={Boolean(errors.reminder_days_before)} />
+                            <span className="text-xs text-muted-foreground">dias antes</span>
+                        </div>
+                        {error("reminder_days_before", "Um e-mail lembrando a fatura ainda não paga, uma vez, tantos dias antes do vencimento. Em branco, nenhum lembrete. De 1 a 15.")}
+                    </div>
+                    <div>
+                        <Label htmlFor="billing-overdue_notice_days" className="text-xs">Aviso de atraso</Label>
+                        <div className="mt-1 flex items-center gap-2">
+                            <Input id="billing-overdue_notice_days" value={form.overdue_notice_days} onChange={e => set("overdue_notice_days", e.target.value.replace(/\D/g, ""))} inputMode="numeric" placeholder="a decidir" className="h-9 w-28" aria-invalid={Boolean(errors.overdue_notice_days)} />
+                            <span className="text-xs text-muted-foreground">dias depois do vencimento</span>
+                        </div>
+                        {error("overdue_notice_days", "Um e-mail avisando que a fatura venceu, com multa e juros do dia, uma vez, tantos dias depois. Em branco, nenhum aviso. De 1 a 30.")}
+                    </div>
+                    <div className="sm:col-span-2">
+                        <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-foreground">
+                            <input type="checkbox" className="h-4 w-4 rounded border-border accent-emerald-600" checked={form.send_receipts} onChange={e => set("send_receipts", e.target.checked)} />
+                            Enviar recibo por e-mail quando a fatura for paga
+                        </label>
+                        {error("send_receipts", "Vale para pagamento por boleto, PIX, cartão e para a baixa manual.")}
                     </div>
                 </div>
             </div>

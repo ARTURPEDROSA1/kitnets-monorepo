@@ -20,7 +20,7 @@ The end state is automatic: every month the module issues a boleto + PIX through
 | 4 | Boleto + PIX issued through Banco Inter, PDF, webhook, refresh from the bank | **this document, §8** |
 | 5 | E-mail to the tenant, public payment page, daily cron | pending |
 | 6 | Stripe Connect, card link with the fee passed on to the tenant | done |
-| 7 | Dashboard card, overdue reminders, receipt | pending |
+| 7 | Dashboard card, reminder before the due date, overdue notice, receipt | done |
 
 - **Hub** `/faturas` — KPI strip, "Atenção", then four sections: the invoices as a spreadsheet, "Cobranças recorrentes" (who collects each component of each lease in force), the billing conditions and "Conexões" (the owner's bank integration).
 - **Invoice panel** `/faturas?id=<invoice>` — items, payer, the terms it states, payment, timeline; issue the boleto + Pix at the bank, copy the digitable line and the Pix code, open the PDF, refresh from the bank, record a payment by hand or cancel.
@@ -128,12 +128,13 @@ apps/web/src/
         ├── inter-client.ts (+ test)       # mutual TLS to the bank's API (node:https): token, charges, PDF, cancel, webhook
         ├── inter-payload.ts (+ test)      # the charge's body, the bank's states, what the webhook is trusted for
         ├── charges-server.ts              # issue, refresh, cancel at the bank, PDF, the webhook's handling; a boleto turning OPEN e-mails the tenant
-        ├── invoice-email.ts (+ test)      # the e-mail's subject, text and HTML; the sender's display name
+        ├── invoice-email.ts (+ test)      # the e-mails: invoice, reminder, overdue notice, receipt; the sender's display name
         ├── email-provider.ts (+ test)     # Resend over fetch, idempotency key = delivery id
         ├── deliveries-server.ts           # queue, claim, send; resend by the owner
         ├── public-invoice.ts (+ test)     # what the tenant's page shows, the token's shape, the masked CPF
         ├── public-invoice-server.ts       # the invoice behind a token (refreshes a stale boleto first)
-        ├── automation-server.ts (+ test)  # the daily run: reconcile, generate, issue, send — per owner, within a time budget
+        ├── automation-server.ts (+ test)  # the daily run: reconcile, generate, issue, remind, send — per owner, within a time budget
+        ├── reminder-schedule.ts (+ test)  # which reminder an open invoice is due today (before / overdue), from the owner's days
         ├── stripe-client.ts (+ test)      # Stripe over fetch: Connect OAuth, the account, Checkout Sessions on the connected account, the webhook's signature
         ├── stripe-connection-server.ts    # connect (state + OAuth code → account id), re-read, disconnect, the account's owner
         ├── card-offer.ts (+ test)         # whether and for how much the card is offered today (late charges + fee)
@@ -152,7 +153,8 @@ supabase/
 ├── migrations/20261003000000_invoice_charges.sql
 ├── migrations/20261003100000_invoice_deliveries.sql
 ├── migrations/20261003200000_card_checkout.sql
-└── checks/invoices.sql, invoice_ledger.sql, billing_connections.sql, invoice_charges.sql, invoice_deliveries.sql, card_checkout.sql
+├── migrations/20261003300000_invoice_reminders.sql
+└── checks/invoices.sql, invoice_ledger.sql, billing_connections.sql, invoice_charges.sql, invoice_deliveries.sql, card_checkout.sql, invoice_reminders.sql
 ```
 
 ## 5. Database
@@ -264,9 +266,19 @@ An invoice becomes a charge at the owner's bank — the API Cobrança v3 "boleto
 
 **Sandbox**: with a test platform key, the OAuth connects test accounts and the sessions take Stripe's test cards; the connection's environment follows `livemode`.
 
-## 11. Not in these steps
+## 11. Reminders, the receipt and the Dashboard card (step 7)
 
-- No reminders of a due date nor receipts (step 7); no refunds from the module (a refund made in the Stripe dashboard is not read back yet).
+**Two more decisions** in `billing_settings` (migration `20261003300000`), NULL until the owner makes them — nothing is sent in their place: `reminder_days_before` (1–15) and `overdue_notice_days` (1–30). And a switch, on by default: `send_receipts`.
+
+**Reminders** (`lib/billing/reminder-schedule.ts`, step 4 of the daily run): for every open invoice the tenant can pay — a live boleto, or the card on offer — the run queues a REMINDER delivery: sequence 0 when today is within `reminder_days_before` days before the due date (a run that missed a day still sends it; the due day itself is not a reminder), sequence 1 when today is `overdue_notice_days` or more past it and the invoice still pays (`days_payable_after_due`). Each goes out once per invoice (the unique key); step 5 sends them with everything else. The reminder repeats the invoice's codes; the overdue notice says it is late, what multa and juros add up to today (`lib/invoice-late-fees.ts`, the same figures the card charges) and until when the boleto still takes the payment, and asks the tenant to disregard it if already paid. Both mention the card when the page offers it.
+
+**The receipt** (`sendReceipt`): the moment `invoice_mark_paid` returns PAID — the boleto or Pix read back from the bank, the card session read back from Stripe, or the owner's "Registrar pagamento" — a RECEIPT delivery is queued and sent: paid when, how (boleto, PIX, cartão, or "pagamento recebido pelo proprietário"), the items, the late charges and the card fee as their own lines, the total; "este e-mail comprova o recebimento". The payment is recorded whatever happens to the e-mail; a failed receipt is retried by the daily run (step 5 now includes receipts of paid invoices). A manual payment also cancels the boleto at the bank and closes any card session, so the tenant cannot pay twice.
+
+**The Dashboard** (`lib/dashboard-hub.ts`, `components/dashboard/DashboardHub.tsx`): the Faturas card — a receber no mês, recebido no mês, em atraso, próximo vencimento — from the same maths as the hub (`invoiceHubTotals`); its attention items (late money, an expired boleto, a failed issue or e-mail) join the merged list; the loader is one more `settle()` in `loadDashboard`, so a failure shows the card as unavailable, never as zero.
+
+## 12. Not in these steps
+
+- No refunds from the module (a refund made in the Stripe dashboard is not read back yet); no repeated overdue notices (one per invoice); no bounce handling from the e-mail provider.
 - A partial payment is not accepted: a payment recorded by hand must cover the invoice.
 - Nothing retroactive: the daily run never creates an invoice whose due date has passed; "Gerar faturas" does, on demand.
 - Out of scope for the module as planned: automatic rent adjustment on the invoice, pro rata of the first and last month, company tenants (CNPJ), variable-amount charges (metered energy), bounce handling from the e-mail provider (a bounce is read as a failed delivery only when the provider refuses the address).

@@ -19,7 +19,7 @@ import { env } from "@/lib/env";
 import { signStorageUrl } from "@/lib/storage";
 import type { PayerAddress } from "@/lib/invoice-payer";
 import { ensureInterWebhook, ownerOfWebhookKey, sandboxAllowed, withInterSession } from "./connections-server";
-import { sendInvoiceEmail } from "./deliveries-server";
+import { sendInvoiceEmail, sendReceipt } from "./deliveries-server";
 import { InterError, cancelInterCharge, createInterCharge, getInterCharge, getInterChargePdf, payInterChargeSandbox } from "./inter-client";
 import { ISSUE_BLOCKER_LABELS, buildChargePayload, issueBlockers, parseChargeState, parseCallbackEntry, seuNumeroFor, type ChargeInvoice, type ChargeStatus, type InterChargeState } from "./inter-payload";
 
@@ -227,6 +227,7 @@ export async function refreshCharge(supabase: AdminSupabase, profileId: string, 
             });
             if (payError) throw new Error(`invoice_mark_paid: ${payError.message}`);
             if (result === "DUPLICATE") console.warn("[Invoices] duplicate payment on", charge.invoice_id);
+            if (result === "PAID") await sendReceipt(supabase, profileId, charge.invoice_id);
         }
     } else if (next.status === "OPEN" && !next.pdf_path) {
         try {
