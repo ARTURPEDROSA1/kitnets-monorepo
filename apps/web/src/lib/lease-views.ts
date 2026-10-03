@@ -32,6 +32,8 @@ export interface LeaseDashboardView {
     income: PropertyIncomeRow[];
     /** the lease's index series; null when it has none or the series could not be read */
     series: IndexPoint[] | null;
+    /** series of the indexes the charges name for themselves when not the lease's, by calculator code */
+    chargeSeries?: Record<string, IndexPoint[] | null>;
     /**
      * `single` (a house or apartment rented whole: the contract's card names the energy bill) or
      * `multi` (a property rented unit by unit: it names the condominium); null when the property is

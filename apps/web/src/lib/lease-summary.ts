@@ -1,14 +1,18 @@
 /**
  * Lease summary — pure date and index maths for the "Contrato de Aluguel" card on the property page.
  *
- * Rent adjustment, as Brazilian leases do it: on each anniversary (every `adjustment_frequency` months,
- * 12 by default) the rent is corrected by the index accumulated over the cycle that just ended. A cycle
- * that starts in April counts the monthly figures of April … March, and the new rent applies from April.
- * So "accumulated to date" compounds the months of the current cycle already published, and
- * "rent adjusted to date" is what the rent would become if the adjustment happened today.
+ * Rent adjustment: on each anniversary (every `adjustment_frequency` months, 12 by default) the rent is
+ * corrected by the index accumulated over the cycle that just ended. The cycle runs from its first day
+ * (the lease's start, or the previous adjustment) and is counted day by day, with the /indices
+ * calculator's own math (lib/index-correction.ts): a lease that started on the 16th takes only the rest
+ * of that month's index, pro rata die. So "accumulated to date" is what that calculator answers from
+ * the cycle's first day to today — or to the last day of the last month published — and "rent adjusted
+ * to date" is what the rent would become if the adjustment happened today.
  *
  * Dates are `YYYY-MM-DD` strings handled in UTC, so a user's time zone never shifts a day.
  */
+import { addMonths as addMonthKey, correctByIndex, lastDayOfMonth } from "@/lib/index-correction";
+
 export interface LeaseForSummary {
     start_date: string;
     end_date: string | null;
@@ -40,12 +44,19 @@ export interface LeaseSummary {
     daysToAdjustment: number | null;
     /** first day of the current cycle (the previous adjustment, or the lease start) */
     cycleStart: string | null;
-    /** compound index of the cycle's months already published, in %; null without a series */
+    /** index accumulated from the cycle's first day to `indexThroughDate`, day by day, in %; null without a series */
     accumulatedPct: number | null;
+    /** the exact factor behind `accumulatedPct` (1 while nothing counts); null without a series */
+    accumulatedFactor: number | null;
+    /** months of index applied, a month cut by the cycle's start or by today counting as its fraction; 0 = nothing published for the cycle yet */
     monthsCounted: number;
+    /** calendar days of index applied */
+    daysCounted: number;
     /** last month included, `YYYY-MM` */
     indexThrough: string | null;
-    /** rent × (1 + accumulated); null without a series */
+    /** `YYYY-MM-DD` the accumulated figure runs to: today, or the last day of the last month published */
+    indexThroughDate: string | null;
+    /** rent × accumulated factor; null without a series */
     adjustedRent: number | null;
 }
 
@@ -88,16 +99,45 @@ export function nextAdjustment(lease: Pick<LeaseForSummary, "start_date" | "next
     return next;
 }
 
-/** Compound variation of the series' months inside `[fromMonth, toMonth]`, in %. */
-export function accumulate(series: IndexPoint[], fromMonth: string, toMonth: string): { pct: number; months: number; through: string | null } {
-    let factor = 1, months = 0, through: string | null = null;
-    for (const p of [...series].sort((a, b) => (a.month < b.month ? -1 : 1))) {
-        if (p.month < fromMonth || p.month > toMonth || !Number.isFinite(p.value)) continue;
-        factor *= 1 + p.value / 100;
-        months++;
-        through = p.month;
-    }
-    return { pct: Math.round((factor - 1) * 10000) / 100, months, through };
+export interface Accumulated {
+    /** what an amount is multiplied by */
+    factor: number;
+    /** the same, in %, two decimals */
+    pct: number;
+    /** months of index applied (a partial month counts as its fraction) */
+    months: number;
+    /** calendar days of index applied */
+    days: number;
+    /** last month included, `YYYY-MM` */
+    through: string | null;
+    /** `YYYY-MM-DD` the figure runs to */
+    throughDate: string | null;
+}
+
+/**
+ * The index accumulated from `from` to `to`, counted day by day exactly as the /indices calculator
+ * does (the start day is not counted, the end day is; a partial month enters pro rata die, compounded).
+ * A month not published yet ends the count at the last day of the month before it.
+ */
+export function accumulate(series: IndexPoint[], from: string, to: string): Accumulated {
+    const none: Accumulated = { factor: 1, pct: 0, months: 0, days: 0, through: null, throughDate: null };
+    const published = series.filter(p => Number.isFinite(p.value));
+    const months = new Set(published.map(p => p.month));
+    // the last month published in a row from the period's first one
+    let last: string | null = null;
+    for (let m = from.slice(0, 7); m <= to.slice(0, 7) && months.has(m); m = addMonthKey(m, 1)) last = m;
+    if (!last) return none;
+    const end = to.slice(0, 10) < lastDayOfMonth(last) ? to.slice(0, 10) : lastDayOfMonth(last);
+    const result = correctByIndex(1, from.slice(0, 10), end, published);
+    if ("error" in result || result.rows.length === 0) return none;
+    return {
+        factor: result.correctedValue,
+        pct: Math.round(result.accumulatedPercent * 100) / 100,
+        months: result.months,
+        days: result.days,
+        through: result.rows[result.rows.length - 1].month,
+        throughDate: end,
+    };
 }
 
 /** Code of the calculator series (`/api/indices/{code}/calculator-data`) for a lease's index; null when there is none. */
@@ -127,20 +167,24 @@ export function leaseSummary(lease: LeaseForSummary, series: IndexPoint[] | null
     const nextAdj = adjusts ? nextAdjustment(lease, today) : null;
     const cycleStart = nextAdj ? (() => { const s = addMonths(nextAdj, -frequencyMonths); return s < start ? start : s; })() : null;
 
-    let accumulatedPct: number | null = null, monthsCounted = 0, indexThrough: string | null = null, adjustedRent: number | null = null;
+    let accumulatedPct: number | null = null, accumulatedFactor: number | null = null, monthsCounted = 0, daysCounted = 0;
+    let indexThrough: string | null = null, indexThroughDate: string | null = null, adjustedRent: number | null = null;
     if (series && series.length > 0 && nextAdj && cycleStart) {
-        // the cycle's months: from the cycle's first month to the month before the adjustment
-        const acc = accumulate(series, cycleStart.slice(0, 7), addMonths(nextAdj.slice(0, 7) + "-01", -1).slice(0, 7));
+        // from the cycle's first day to today (never past the adjustment that closes it)
+        const acc = accumulate(series, cycleStart, today < nextAdj ? today : nextAdj);
         accumulatedPct = acc.pct;
+        accumulatedFactor = acc.factor;
         monthsCounted = acc.months;
+        daysCounted = acc.days;
         indexThrough = acc.through;
-        adjustedRent = Math.round(lease.monthly_rent * (1 + acc.pct / 100) * 100) / 100;
+        indexThroughDate = acc.throughDate;
+        adjustedRent = Math.round(lease.monthly_rent * acc.factor * 100) / 100;
     }
     return {
         daysElapsed, daysLeft, progressPct, effectiveEnd,
         nextDueDate: due, daysToDue: daysBetween(today, due),
         frequencyMonths,
         nextAdjustmentDate: nextAdj, daysToAdjustment: nextAdj ? daysBetween(today, nextAdj) : null,
-        cycleStart, accumulatedPct, monthsCounted, indexThrough, adjustedRent,
+        cycleStart, accumulatedPct, accumulatedFactor, monthsCounted, daysCounted, indexThrough, indexThroughDate, adjustedRent,
     };
 }

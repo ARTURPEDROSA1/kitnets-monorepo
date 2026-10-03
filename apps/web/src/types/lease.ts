@@ -103,6 +103,8 @@ export interface LeaseCharge {
     /** Index that readjusts the amount (same values as the rent's), when the lease says. */
     adjustment_index: string | null;
     adjustment_notes: string | null;
+    /** "Reajusta com o aluguel": the condominium follows the rent's index and adjustment date. */
+    adjusts_with_rent?: boolean;
     /** Who bills the tenant for it ("Emissor da fatura"); null = not answered. Only for a charge the tenant pays. */
     collected_by?: ChargeCollector | null;
 }
@@ -165,6 +167,8 @@ export interface ChargeFormItem {
     amount: string;                 // String for currency input
     adjustment_index: string;
     adjustment_notes: string;
+    /** "Reajusta com o aluguel" (the condominium only); absent on a charge an import prefilled */
+    adjusts_with_rent?: boolean;
     /** "Emissor da fatura": OWNER, AGENCY, THIRD_PARTY or '' (not answered); absent on a charge an import prefilled */
     collected_by?: string;
 }

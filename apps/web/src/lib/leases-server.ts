@@ -4,6 +4,7 @@ import type { LeaseInput } from "@/lib/schemas/lease";
 import { findPropertyUnit, loadPropertyUnits } from "@/lib/property-units-server";
 import { refreshedLeaseUnitNames } from "@/lib/lease-unit-names";
 import { inheritCollectors } from "@/lib/invoice-collection";
+import { inheritRentAdjustment } from "@/lib/lease-charges";
 
 /**
  * Shared server-side pieces for the leases (contratos) routes.
@@ -177,9 +178,11 @@ export async function writeLeaseChildren(
     opts: { replace?: boolean; tag: string }
 ): Promise<void> {
     // Who bills each charge ("Emissor da fatura") survives a save that does not mention it (the imports)
-    let previousCharges: Array<{ charge_type: string; label: string | null; collected_by: string | null }> = [];
+    // …and so does "Reajusta com o aluguel"
+    let previousCharges: Array<{ charge_type: string; label: string | null; collected_by: string | null; adjusts_with_rent?: boolean | null }> = [];
     if (opts.replace) {
-        const { data } = await supabase.from("lease_charges").select("charge_type, label, collected_by").eq("lease_id", leaseId);
+        // `*`: a column this database does not have yet (adjusts_with_rent before its migration) must not fail the read
+        const { data } = await supabase.from("lease_charges").select("*").eq("lease_id", leaseId);
         previousCharges = (data ?? []) as typeof previousCharges;
         await supabase.from("lease_tenants").delete().eq("lease_id", leaseId);
         await supabase.from("lease_charges").delete().eq("lease_id", leaseId);
@@ -204,8 +207,17 @@ export async function writeLeaseChildren(
     }
 
     if (input.charges.length > 0) {
-        const rows = inheritCollectors(input.charges, previousCharges).map((c) => ({ lease_id: leaseId, ...c }));
+        let rows: Array<Record<string, unknown>> = inheritRentAdjustment(inheritCollectors(input.charges, previousCharges), previousCharges).map((c) => ({ lease_id: leaseId, ...c }));
         let { error } = await supabase.from("lease_charges").insert(rows);
+        // `adjusts_with_rent` arrives with its own migration: a deploy that got ahead of it must not lose the charges just deleted
+        if (error && /adjusts_with_rent/.test(error.message ?? "")) {
+            rows = rows.map((row) => {
+                const copy = { ...row };
+                delete copy.adjusts_with_rent;
+                return copy;
+            });
+            ({ error } = await supabase.from("lease_charges").insert(rows));
+        }
         // `collected_by` arrives with the Fatura migration: a deploy that got ahead of it must not lose the charges just deleted
         if (error && /collected_by/.test(error.message ?? "")) {
             const withoutCollector = rows.map((row) => {

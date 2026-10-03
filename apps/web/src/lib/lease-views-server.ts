@@ -134,6 +134,11 @@ export async function loadLeaseDashboard(supabase: AdminSupabase, leaseId: strin
         loadPropertyEntries(supabase, profileId).then(r => r.entries).catch(err => { console.error("[Lease views] property entries failed:", (err as Error).message); return []; }),
     ]);
 
+    // a charge readjusted by an index of its own (not the rent's) needs that series too
+    const charges = (chargesRes.data || []) as unknown as LeaseWithDetails["charges"];
+    const chargeCodes = [...new Set(charges.map(c => (c.adjusts_with_rent ? null : leaseIndexSeriesCode(c.adjustment_index))).filter((c): c is string => !!c && c !== seriesCode))];
+    const chargeSeries = chargeCodes.length > 0 ? await loadLeaseIndexSeries(chargeCodes) : {};
+
     const docs = (docsRes.data ?? []) as Array<Record<string, unknown> & { file_url: string }>;
     const signed = await signStorageUrls(supabase, LEASE_DOCUMENTS_BUCKET, docs.map(d => d.file_url));
     const entry = entries.find(e => e.id === lease.property_id);
@@ -148,13 +153,14 @@ export async function loadLeaseDashboard(supabase: AdminSupabase, leaseId: strin
                 tenant_name: (t.tenant as Record<string, unknown> | null)?.full_name || null,
                 tenant: undefined,
             })) as unknown as LeaseWithDetails["additional_tenants"],
-            charges: (chargesRes.data || []) as unknown as LeaseWithDetails["charges"],
+            charges,
             documents: docs.map(doc => ({ ...doc, file_url: signed.get(storagePathOf(doc.file_url)) ?? doc.file_url })) as unknown as LeaseWithDetails["documents"],
             document_count: docs.length,
         },
         tenant: (contactRes.data as LeaseTenantContact | null) ?? null,
         income,
         series,
+        chargeSeries,
     };
 }
 

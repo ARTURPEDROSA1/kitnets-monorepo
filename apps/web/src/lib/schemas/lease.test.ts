@@ -49,6 +49,19 @@ describe("leaseInputSchema", () => {
         expect(out.charges.map(c => ("collected_by" in c ? c.collected_by : "absent"))).toEqual(["THIRD_PARTY", null, null, "absent"]);
     });
 
+    it("keeps 'Reajusta com o aluguel' on the condominium only, and says nothing when an import does not", () => {
+        const out = leaseInputSchema.parse({
+            ...valid,
+            charges: [
+                { charge_type: "CONDOMINIUM", responsibility: "TENANT", amount: "250,00", adjusts_with_rent: true },
+                { charge_type: "CONDOMINIUM", responsibility: "TENANT", amount: "250,00", adjusts_with_rent: "yes" },
+                { charge_type: "IPTU", responsibility: "TENANT", amount: "90,00", adjusts_with_rent: true },
+                { charge_type: "CONDOMINIUM", responsibility: "TENANT", amount: "250,00" },
+            ],
+        });
+        expect(out.charges.map(c => ("adjusts_with_rent" in c ? c.adjusts_with_rent : "absent"))).toEqual([true, false, false, "absent"]);
+    });
+
     it("accepts a utility included in the condominium fee", () => {
         const out = leaseInputSchema.parse({ ...valid, charges: [{ charge_type: "WATER", responsibility: "INCLUDED_IN_CONDO" }] });
         expect(out.charges[0]).toMatchObject({ charge_type: "WATER", responsibility: "INCLUDED_IN_CONDO", amount: null });

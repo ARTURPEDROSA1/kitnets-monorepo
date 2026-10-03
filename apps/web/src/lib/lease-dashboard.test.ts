@@ -62,6 +62,7 @@ function lease(over: Partial<LeaseWithDetails> = {}): LeaseWithDetails {
 }
 
 const IPCA = [
+    { month: "2025-10", value: 0 }, { month: "2025-11", value: 0 }, { month: "2025-12", value: 0 },
     { month: "2026-01", value: 0.5 }, { month: "2026-02", value: 0.4 }, { month: "2026-03", value: 0.3 },
     { month: "2026-04", value: 0.2 }, { month: "2026-05", value: 0.1 }, { month: "2026-06", value: 0.2 },
     { month: "2026-07", value: 0.3 }, { month: "2026-08", value: 0.1 },
@@ -151,11 +152,12 @@ describe("summarizeLeases + hubTotals", () => {
     });
     it("finds the next adjustment with the index accumulated so far", () => {
         // a: anniversaries on 06/01 → next 06/01/2027; b passed its 15/09 anniversary ten days ago → 15/09/2027;
-        // c has no adjustment; d is past its term. Cycle of a: jan–dec 2026, eight months published.
+        // c has no adjustment; d is past its term. Cycle of a: from 06/01/2026, counted by the day — 25 of
+        // January's 31 days, then February … August, the last month published.
         expect(totals.nextAdjustment?.row.lease.id).toBe("a");
         expect(totals.nextAdjustment?.date).toBe("2027-01-06");
-        expect(totals.nextAdjustment?.monthsCounted).toBe(8);
-        expect(totals.nextAdjustment?.accumulatedPct).toBeCloseTo(2.12, 1);
+        expect(totals.nextAdjustment?.monthsCounted).toBeCloseTo(25 / 31 + 7, 10);
+        expect(totals.nextAdjustment?.accumulatedPct).toBe(2.02);
         expect(totals.adjustments90).toBe(0);
     });
     it("summarises places, titles and the index label", () => {
@@ -185,8 +187,8 @@ describe("hubTotals next adjustment", () => {
         expect(totals.nextAdjustment?.date).toBe("2026-10-15");
         expect(totals.nextAdjustment?.days).toBe(20);
         expect(totals.adjustments90).toBe(1);
-        // cycle oct/2025 → sep/2026: the months of 2026 published so far
-        expect(totals.nextAdjustment?.monthsCounted).toBe(8);
+        // cycle from 15/10/2025: 16 of October's 31 days, then November … August, the last month published
+        expect(totals.nextAdjustment?.monthsCounted).toBeCloseTo(16 / 31 + 10, 10);
         expect(totals.nextAdjustment?.accumulatedPct).toBeCloseTo(2.12, 1);
     });
 });

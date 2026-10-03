@@ -102,7 +102,7 @@ export default function LeaseTable({ rows, actions, propertyKinds = {} }: Props)
         // eslint-disable-next-line react-hooks/exhaustive-deps
     ], [totals]);
 
-    const cf = useColumnFilters(rows, columns, { key: "end", dir: "asc" }, { storageKey: TABLE_KEY });
+    const cf = useColumnFilters(rows, columns, { key: "end", dir: "asc" }, { storageKey: TABLE_KEY, filtersKey: TABLE_KEY });
     const vis = useColumnVisibility(TABLE_KEY, { locked: ["title"] });
     const sel = useCellSum();
     const show = (key: string) => !vis.isHidden(key);

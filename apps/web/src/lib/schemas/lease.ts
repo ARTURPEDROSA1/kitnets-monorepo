@@ -57,7 +57,7 @@ const additionalTenants = z.unknown().transform((v) =>
 
 const charges = z.unknown().transform((v) =>
     (Array.isArray(v) ? v : [])
-        .filter((c): c is { charge_type: string; responsibility: string; label?: unknown; amount?: unknown; adjustment_index?: unknown; adjustment_notes?: unknown; collected_by?: unknown } =>
+        .filter((c): c is { charge_type: string; responsibility: string; label?: unknown; amount?: unknown; adjustment_index?: unknown; adjustment_notes?: unknown; collected_by?: unknown; adjusts_with_rent?: unknown } =>
             !!c && typeof c === "object" &&
             includes(LEASE_CHARGE_TYPES, (c as { charge_type?: unknown }).charge_type) &&
             includes(LEASE_RESPONSIBILITIES, (c as { responsibility?: unknown }).responsibility))
@@ -71,6 +71,9 @@ const charges = z.unknown().transform((v) =>
             // The form sends who bills the charge (blank = cleared); an import sends nothing, and the
             // charge then keeps the answer it had (inheritCollectors, lib/invoice-collection.ts)
             ...("collected_by" in c ? { collected_by: includes(LEASE_COLLECTORS, c.collected_by) ? c.collected_by : null } : {}),
+            // "Reajusta com o aluguel" is the condominium's; like the issuer, an import says nothing and the
+            // charge keeps the answer it had (inheritRentAdjustment, lib/lease-charges.ts)
+            ...("adjusts_with_rent" in c ? { adjusts_with_rent: c.adjusts_with_rent === true && c.charge_type === "CONDOMINIUM" } : {}),
         }))
 );
 

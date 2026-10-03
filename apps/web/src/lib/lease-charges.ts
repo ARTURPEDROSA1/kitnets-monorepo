@@ -8,6 +8,7 @@
  */
 import type { PropertyType } from "@/lib/property-type";
 import type { LeaseCharge } from "@/types/lease";
+import { LEASE_INDEX_LABELS, leaseIndexSeriesCode, leaseSummary, type IndexPoint, type LeaseForSummary } from "@/lib/lease-summary";
 
 export type PropertyKind = "single" | "multi";
 
@@ -72,4 +73,86 @@ export function leaseTotals(rent: number, charges: readonly LeaseCharge[] | null
     const list = charges ?? [];
     const monthly = monthlyTotal(rent, list);
     return { featured: featuredCharge(list, kind), tenantFixed: tenantCharges(list), monthly, total: contractTotal(monthly, termMonths) };
+}
+
+// ── A charge's adjustment ────────────────────────────────────────────
+
+/**
+ * "Reajusta com o aluguel" survives a save that does not mention it (the imports send no such answer),
+ * matched like the issuers are: same type, same label. Only the condominium carries it.
+ */
+export function inheritRentAdjustment<T extends { charge_type: string; label?: string | null; adjusts_with_rent?: boolean }>(
+    incoming: readonly T[],
+    previous: ReadonlyArray<{ charge_type: string; label?: string | null; adjusts_with_rent?: boolean | null }>
+): Array<T & { adjusts_with_rent: boolean }> {
+    const keyOf = (c: { charge_type: string; label?: string | null }) => `${c.charge_type}|${(c.label ?? "").trim().toLowerCase()}`;
+    const pool = new Map<string, boolean[]>();
+    for (const p of previous) pool.set(keyOf(p), [...(pool.get(keyOf(p)) ?? []), p.adjusts_with_rent === true]);
+    return incoming.map(c => {
+        const inherited = pool.get(keyOf(c))?.shift() ?? false;
+        const value = c.adjusts_with_rent !== undefined ? c.adjusts_with_rent : inherited;
+        return { ...c, adjusts_with_rent: c.charge_type === "CONDOMINIUM" && value === true };
+    });
+}
+
+type AdjustableCharge = Pick<LeaseCharge, "amount" | "adjustment_index" | "adjusts_with_rent">;
+
+/**
+ * The index a charge is readjusted by on the lease's adjustment date: the rent's own when it is marked
+ * "Reajusta com o aluguel", else the published index the charge names (a charge has no date of its own,
+ * so it follows the lease's). Null = a fixed amount, a rule in words, or nothing said.
+ */
+export function chargeAdjustmentRule(charge: Pick<AdjustableCharge, "adjustment_index" | "adjusts_with_rent">, leaseIndex: string | null | undefined): { index: string | null; withRent: boolean } | null {
+    if (charge.adjusts_with_rent) return leaseIndex === "NONE" ? null : { index: leaseIndex ?? null, withRent: true };
+    return leaseIndexSeriesCode(charge.adjustment_index) ? { index: charge.adjustment_index, withRent: false } : null;
+}
+
+/** What the screens show about a charge readjusted on the lease's adjustment date. */
+export interface ChargeAdjustment {
+    /** true: "Reajusta com o aluguel" (the lease's index); false: the charge's own index, on the lease's dates */
+    withRent: boolean;
+    /** IPCA, IGP_M…; null when the lease names none */
+    index: string | null;
+    indexLabel: string;
+    /** `YYYY-MM-DD` */
+    nextDate: string;
+    cycleStart: string | null;
+    /** accumulated in the cycle, in %; null when the index has no series here or nothing of the cycle is published yet */
+    accumulatedPct: number | null;
+    daysCounted: number;
+    /** `YYYY-MM-DD` the accumulated figure runs to */
+    indexThroughDate: string | null;
+    /** amount × accumulated factor: what the charge would be if adjusted today; null without a figure or an amount */
+    adjustedAmount: number | null;
+}
+
+/**
+ * The adjustment of a charge on the lease's cycle — the rent's own maths (lib/lease-summary.ts) with
+ * the charge's amount in the rent's place. Null when the charge has no index to follow.
+ */
+export function chargeAdjustment(
+    charge: AdjustableCharge | null | undefined,
+    lease: LeaseForSummary,
+    seriesByCode: Record<string, IndexPoint[] | null | undefined>,
+    today: string
+): ChargeAdjustment | null {
+    if (!charge) return null;
+    const rule = chargeAdjustmentRule(charge, lease.adjustment_index);
+    if (!rule) return null;
+    const code = leaseIndexSeriesCode(rule.index);
+    const amount = amountOf(charge);
+    const s = leaseSummary({ ...lease, adjustment_index: rule.index, monthly_rent: amount }, code ? seriesByCode[code] ?? null : null, today);
+    if (!s.nextAdjustmentDate) return null;
+    const known = s.accumulatedPct !== null && s.monthsCounted > 0;
+    return {
+        withRent: rule.withRent,
+        index: rule.index,
+        indexLabel: rule.index ? LEASE_INDEX_LABELS[rule.index] ?? rule.index : "Índice não informado",
+        nextDate: s.nextAdjustmentDate,
+        cycleStart: s.cycleStart,
+        accumulatedPct: known ? s.accumulatedPct : null,
+        daysCounted: s.daysCounted,
+        indexThroughDate: s.indexThroughDate,
+        adjustedAmount: known && amount > 0 ? s.adjustedRent : null,
+    };
 }

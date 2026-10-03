@@ -33,7 +33,11 @@ import {
     Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Money } from "@/components/privacy";
 import { attachLeaseContract } from "@/lib/lease-upload-client";
+import { chargeAdjustment } from "@/lib/lease-charges";
+import { brl, todayBRT } from "@/lib/lease-dashboard";
+import { leaseIndexSeriesCode, type IndexPoint } from "@/lib/lease-summary";
 import { formatDateBR as formatDateOnlyBR, nextOccurrence, toISODate } from "@/lib/dates";
 import type {
     AdditionalTenantFormItem,
@@ -90,6 +94,8 @@ interface Props {
     onCancel: () => void;
     /** shown above the title (the "Voltar ao imóvel" link) */
     topSlot?: React.ReactNode;
+    /** index series the page already has, by calculator code (`ipca`, `igpm`…); the form fetches the ones it lacks */
+    indexSeries?: Record<string, IndexPoint[] | null>;
 }
 
 // ── Date helpers (DD/MM/YYYY ↔ ISO) ─────────────────────────────────
@@ -187,6 +193,7 @@ export function leaseToInitial(full: LeaseWithDetails): LeaseFormInitial {
             amount: moneyToMask(c.amount),
             adjustment_index: c.adjustment_index || "",
             adjustment_notes: c.adjustment_notes || "",
+            adjusts_with_rent: c.adjusts_with_rent === true,
             collected_by: c.collected_by || "",
         })),
         openSections: { adjustment: !!full.adjustment_index, charges: (full.charges || []).length > 0, notes: !!full.notes },
@@ -260,7 +267,10 @@ const DEFAULT_OPEN: Record<SectionKey, boolean> = {
 
 // ── Component ────────────────────────────────────────────────────────
 
-export default function LeaseForm({ editingId, initial, dropdowns, aiImported = false, importedFile = null, importedStoragePath = null, onSaved, onCancel, topSlot }: Props) {
+const pctText = (v: number) => `${v > 0 ? "+" : ""}${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+const amountFromMask = (masked: string) => (parseInt(masked.replace(/\D/g, ""), 10) || 0) / 100;
+
+export default function LeaseForm({ editingId, initial, dropdowns, aiImported = false, importedFile = null, importedStoragePath = null, onSaved, onCancel, topSlot, indexSeries }: Props) {
     const { properties, tenants, agencies, agents } = dropdowns;
     const [form, setForm] = useState<LeaseFormData>(() => ({ ...initial.form }));
     const [additionalTenants, setAdditionalTenants] = useState<AdditionalTenantFormItem[]>(() => initial.additionalTenants.map(t => ({ ...t })));
@@ -270,6 +280,46 @@ export default function LeaseForm({ editingId, initial, dropdowns, aiImported = 
     const [warning, setWarning] = useState<string | null>(null);
     const [openSections, setOpenSections] = useState<Record<SectionKey, boolean>>(() => ({ ...DEFAULT_OPEN, ...initial.openSections }));
     const savedUnitName = initial.savedUnitName ?? "";
+
+    // ── Index series: the preview of a charge readjusted on the lease's dates ──
+
+    const [series, setSeries] = useState<Record<string, IndexPoint[] | null>>(() => ({ ...(indexSeries ?? {}) }));
+    const neededCodes = useMemo(() => {
+        const codes = charges.map(c => leaseIndexSeriesCode(c.charge_type === "CONDOMINIUM" && c.adjusts_with_rent ? form.adjustment_index : c.adjustment_index));
+        return [...new Set(codes.filter((c): c is string => Boolean(c)))].sort().join(",");
+    }, [charges, form.adjustment_index]);
+    useEffect(() => {
+        const missing = neededCodes.split(",").filter(code => code && !(code in series));
+        if (missing.length === 0) return;
+        let alive = true;
+        void Promise.all(missing.map(async (code): Promise<[string, IndexPoint[] | null]> => {
+            try {
+                const res = await fetch(`/api/indices/${code}/calculator-data`);
+                const json = await res.json();
+                return [code, Array.isArray(json) ? json : null];
+            } catch {
+                return [code, null];
+            }
+        })).then(entries => { if (alive) setSeries(prev => ({ ...prev, ...Object.fromEntries(entries) })); });
+        return () => { alive = false; };
+    }, [neededCodes, series]);
+
+    /** When a charge is next readjusted and what it is worth by the index today, from the form's own values. */
+    const adjustmentOf = (charge: ChargeFormItem) => {
+        const start = parseDateBR(form.start_date);
+        if (!start) return null;
+        return chargeAdjustment(
+            { amount: amountFromMask(charge.amount), adjustment_index: charge.adjustment_index || null, adjusts_with_rent: charge.charge_type === "CONDOMINIUM" && charge.adjusts_with_rent === true },
+            {
+                start_date: start, end_date: null, rent_due_day: 1, monthly_rent: 0,
+                adjustment_index: form.adjustment_index || null,
+                adjustment_frequency: parseInt(form.adjustment_frequency, 10) || 12,
+                next_adjustment_date: (form.next_adjustment_date && parseDateBR(form.next_adjustment_date)) || null,
+            },
+            series,
+            todayBRT()
+        );
+    };
 
     // ── Auto-calculate next adjustment date ───────────────────────
 
@@ -389,7 +439,8 @@ export default function LeaseForm({ editingId, initial, dropdowns, aiImported = 
             status: forceDraft ? "DRAFT" : form.status,
             notes: form.notes || null,
             additional_tenants: additionalTenants.filter(t => t.tenant_id),
-            charges: charges.filter(c => c.charge_type),
+            // a charge inside the condominium has no adjustment rule of its own
+            charges: charges.filter(c => c.charge_type).map(c => (c.responsibility === "INCLUDED_IN_CONDO" ? { ...c, adjustment_notes: "" } : c)),
         };
 
         try {
@@ -765,6 +816,9 @@ export default function LeaseForm({ editingId, initial, dropdowns, aiImported = 
             >
                 {charges.map((charge, idx) => {
                     const patch = (p: Partial<ChargeFormItem>) => setCharges(prev => prev.map((c, i) => (i === idx ? { ...c, ...p } : c)));
+                    const followsRent = charge.charge_type === "CONDOMINIUM" && charge.adjusts_with_rent === true;
+                    // a charge inside the rent or the condominium has no amount of its own to readjust
+                    const adjustment = charge.responsibility === "TENANT" || charge.responsibility === "LANDLORD" ? adjustmentOf(charge) : null;
                     return (
                         <div key={idx} className="space-y-2 rounded-lg border border-border p-3">
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
@@ -802,19 +856,49 @@ export default function LeaseForm({ editingId, initial, dropdowns, aiImported = 
                                     <X className="h-4 w-4" />
                                 </Button>
                             </div>
-                            {/* How this charge's amount is readjusted (often not the rent's index) */}
-                            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
-                                <div className="w-full sm:w-52">
-                                    <Label className="text-xs">Reajuste do encargo</Label>
-                                    <select className="flex h-9 w-full rounded-md border bg-background px-2 py-1 text-sm" value={charge.adjustment_index} onChange={e => patch({ adjustment_index: e.target.value })}>
-                                        {CHARGE_ADJUSTMENT_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                                    </select>
+                            {/* How this charge's amount is readjusted: the condominium may follow the rent; otherwise its own index or rule */}
+                            {charge.charge_type === "CONDOMINIUM" && (
+                                <label className="inline-flex cursor-pointer items-center gap-1.5 text-sm text-foreground">
+                                    <input
+                                        type="checkbox"
+                                        className="h-4 w-4 rounded border-input accent-emerald-600"
+                                        checked={followsRent}
+                                        onChange={e => patch({ adjusts_with_rent: e.target.checked })}
+                                    />
+                                    Reajusta com o aluguel
+                                </label>
+                            )}
+                            {!followsRent && (
+                                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
+                                    <div className="w-full sm:w-52">
+                                        <Label className="text-xs">Reajuste do encargo</Label>
+                                        <select className="flex h-9 w-full rounded-md border bg-background px-2 py-1 text-sm" value={charge.adjustment_index} onChange={e => patch({ adjustment_index: e.target.value })}>
+                                            {CHARGE_ADJUSTMENT_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                        </select>
+                                    </div>
+                                    {/* inside the condominium the charge follows the condominium: no rule of its own */}
+                                    {charge.responsibility !== "INCLUDED_IN_CONDO" && (
+                                        <div className="flex-1">
+                                            <Label className="text-xs">Regra de reajuste (opcional)</Label>
+                                            <Input value={charge.adjustment_notes} onChange={e => patch({ adjustment_notes: e.target.value })} placeholder="Ex: Fixo por 12 meses; revisto conforme o consumo" maxLength={300} className="h-9" />
+                                        </div>
+                                    )}
                                 </div>
-                                <div className="flex-1">
-                                    <Label className="text-xs">Regra de reajuste (opcional)</Label>
-                                    <Input value={charge.adjustment_notes} onChange={e => patch({ adjustment_notes: e.target.value })} placeholder="Ex: Fixo por 12 meses; revisto conforme o consumo" maxLength={300} className="h-9" />
-                                </div>
-                            </div>
+                            )}
+                            {/* The next adjustment date and the amount corrected by the index to date */}
+                            {followsRent && !form.adjustment_index ? (
+                                <p className="text-xs text-amber-700 dark:text-amber-400">Escolha o índice de reajuste do aluguel, na seção Reajuste, para calcular a data e o valor reajustado.</p>
+                            ) : followsRent && form.adjustment_index === "NONE" ? (
+                                <p className="text-xs text-amber-700 dark:text-amber-400">O aluguel deste contrato está sem reajuste: o condomínio também fica sem.</p>
+                            ) : adjustment && (
+                                <p className="text-xs text-muted-foreground">
+                                    Próximo reajuste em <strong className="font-semibold text-foreground">{formatDateOnlyBR(adjustment.nextDate)}</strong>
+                                    {adjustment.withRent ? `, com o aluguel (${adjustment.indexLabel}).` : `, pelo ${adjustment.indexLabel}.`}
+                                    {adjustment.adjustedAmount !== null && adjustment.accumulatedPct !== null
+                                        ? <> Valor reajustado até hoje: <strong className="font-semibold text-foreground"><Money>{brl(adjustment.adjustedAmount)}</Money></strong> ({pctText(adjustment.accumulatedPct)} de {formatDateOnlyBR(adjustment.cycleStart)} a {formatDateOnlyBR(adjustment.indexThroughDate)}).</>
+                                        : leaseIndexSeriesCode(adjustment.index) && amountFromMask(charge.amount) > 0 ? " O valor reajustado aparece quando houver índice divulgado para o ciclo." : ""}
+                                </p>
+                            )}
                             {/* Who bills the tenant for it: only a charge the tenant pays has an issuer */}
                             {charge.responsibility === "TENANT" && (
                                 <div>
@@ -839,7 +923,7 @@ export default function LeaseForm({ editingId, initial, dropdowns, aiImported = 
                         </div>
                     );
                 })}
-                <Button variant="outline" size="sm" onClick={() => setCharges(prev => [...prev, { charge_type: "CONDOMINIUM", label: "", responsibility: "TENANT", amount: "", adjustment_index: "", adjustment_notes: "", collected_by: "" }])}>
+                <Button variant="outline" size="sm" onClick={() => setCharges(prev => [...prev, { charge_type: "CONDOMINIUM", label: "", responsibility: "TENANT", amount: "", adjustment_index: "", adjustment_notes: "", adjusts_with_rent: false, collected_by: "" }])}>
                     <Plus className="mr-1 h-4 w-4" /> Adicionar Encargo
                 </Button>
             </FormSection>
