@@ -32,7 +32,8 @@ import type { LeaseDashboardView } from "@/lib/lease-views";
 import type { IndexPoint } from "@/lib/lease-summary";
 import type { LeaseWithDetails } from "@/types/lease";
 import { RESPONSIBILITY_LABELS as CHARGE_RESPONSIBILITY, amountOf, chargeAdjustment, featuredCharge, monthlyTotal, tenantCharges } from "@/lib/lease-charges";
-import { contractTotals, pastAdjustmentDates } from "@/lib/lease-adjustments";
+import { pastAdjustmentDates } from "@/lib/lease-adjustments";
+import { leaseTermTotals, type TermSplit } from "@/lib/lease-term";
 import LeaseAdjustmentTable from "./LeaseAdjustmentTable";
 import LeaseAddendumModal from "./LeaseAddendumModal";
 import LeaseDocuments from "./LeaseDocuments";
@@ -147,19 +148,32 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
     const condoCode = condoAdjustment ? seriesKey(condoAdjustment.index) : "";
     // what the adjustments already made of the contract's original rent
     const history = bundle.adjustments ?? null;
-    const lastAdjustment = history && history.rows.length > 0 ? history.rows[history.rows.length - 1] : null;
-    // what the contract adds up to over its term, each month at the amount in force then
-    const totals = contractTotals(lease, row.termMonths, history?.rows ?? [], today);
-    const featuredTotal = !totals || row.termMonths === null || !featured.charge || featured.charge.responsibility !== "TENANT" || amountOf(featured.charge) <= 0 ? null
-        : featured.charge.charge_type === "CONDOMINIUM" ? totals.condo : Math.round(amountOf(featured.charge) * row.termMonths * 100) / 100;
-    const totalLine = (value: number | null) => (value !== null ? <>Total no contrato: <Money>{brl(value)}</Money></> : "Prazo indeterminado: sem total");
+    // what the contract adds up to over its term: what the ledger confirmed, and what is still to come by the contract
+    const term = leaseTermTotals(
+        { ...lease, monthly_rent: rent },
+        history?.rows ?? [],
+        income.points.filter(p => p.status === "CONFIRMED").map(p => ({ month: p.key, rent: p.gross, condo: p.condo })),
+        today
+    );
+    /** "Total no contrato" and under it the two halves it is made of. */
+    const splitLines = (split: TermSplit, months = false) => (
+        <>
+            {term.forecastKnown
+                ? <>Total no contrato: <Money>{brl(split.total)}</Money>{months && row.termMonths !== null ? ` · ${row.termMonths} meses` : ""}</>
+                : "Prazo indeterminado: sem previsto"}
+            <br />
+            <span className="font-medium text-emerald-700 dark:text-emerald-400">Realizado: <Money>{brl(split.realized)}</Money></span>
+            {term.forecastKnown && <><br /><span className="italic">Previsto: <Money>{brl(split.forecast)}</Money></span></>}
+        </>
+    );
+    const featuredSplit = featured.charge?.charge_type === "CONDOMINIUM" ? term.condo : null;
     const monthly = monthlyTotal(rent, lease.charges);
     const chargeName = (c: LeaseWithDetails["charges"][number]) => (c.charge_type === "OTHER" && c.label ? c.label : CHARGE_LABELS[c.charge_type] ?? c.charge_type);
     const endTone: PairTone | undefined = !row.inForce ? undefined : summary.daysLeft !== null && summary.daysLeft < 0 ? "bad" : summary.daysLeft !== null && summary.daysLeft <= 90 ? "warn" : undefined;
     const cycleKnown = summary.accumulatedPct !== null && summary.monthsCounted > 0;
     const cardInfo: TileInfo = {
         what: `O contrato lido como na ficha do imóvel: prazo, vencimento, reajuste pelo índice acumulado no ciclo (contado como o mercado conta: cada mês do contrato, do dia do início ao mesmo dia do mês seguinte, leva o índice cheio do mês em que começa; a cada aniversário o aluguel é corrigido pelo acumulado do ciclo que terminou), ${featured.label.toLowerCase()} e o total que sai do bolso do inquilino; o que a razão de receitas registrou e a caução.`,
-        formula: <>Acumulado no ciclo = Π (1 + índice do mês) dos meses do contrato já fechados; o mês em curso entra por dia: (1 + índice)^(dias decorridos ÷ dias do mês do contrato). Nada conta antes de fechar o primeiro mês<br />Prévia do próximo reajuste (no histórico) = valor atual × (1 + acumulado)<br />Total mensal = aluguel + encargos com valor fixo pagos pelo inquilino<br />Total no contrato = soma dos meses do prazo, cada um pelo valor que valia; os meses à frente, pelo valor de hoje</>,
+        formula: <>Acumulado no ciclo = Π (1 + índice do mês) dos meses do contrato já fechados; o mês em curso entra por dia: (1 + índice)^(dias decorridos ÷ dias do mês do contrato). Nada conta antes de fechar o primeiro mês<br />Prévia do próximo reajuste (no histórico) = valor atual × (1 + acumulado)<br />Total mensal = aluguel + encargos com valor fixo pagos pelo inquilino<br />Total no contrato = realizado + previsto<br />Realizado = o que a razão de receitas confirmou: o aluguel antes da taxa da imobiliária e o condomínio pago pelo inquilino<br />Previsto = os pagamentos do contrato sem lançamento confirmado: o primeiro pro rata do início ao primeiro vencimento, os seguintes inteiros e o resto do prazo pro rata (mês comercial de 30 dias), cada um pelo valor em vigor</>,
         example: cycleKnown && summary.adjustedRent !== null ? `${brl(rent)} × (1 ${summary.accumulatedPct! >= 0 ? "+" : "−"} ${Math.abs(summary.accumulatedPct!).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}%) = ${brl(summary.adjustedRent)}` : undefined,
         note: "O valor reajustado é uma prévia. No reajuste valem os índices cheios dos meses do ciclo (de setembro a agosto, num contrato iniciado em setembro), a conta que o mercado faz. O recebido vem da razão de receitas do imóvel, líquido da taxa da imobiliária quando há.",
     };
@@ -259,11 +273,7 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                             label: agencyManaged ? "Aluguel bruto" : "Aluguel", value: <Money>{brl(rent)}</Money>,
                             hint: (
                                 <>
-                                    {totalLine(totals ? totals.rent : null)}
-                                    <br />
-                                    {lastAdjustment && history
-                                        ? <>Reajustado em {formatDateBR(lastAdjustment.effective_date)} · no contrato <Money>{brl(history.initial.rent)}</Money></>
-                                        : agencyManaged ? "Valor do contrato, antes da taxa da imobiliária" : "Valor do contrato"}
+                                    {splitLines(term.rent)}
                                 </>
                             ),
                         }}
@@ -273,7 +283,7 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                             hint: featured.charge
                                 ? (
                                     <>
-                                        {featuredTotal !== null && <>{totalLine(featuredTotal)}<br /></>}
+                                        {featuredSplit && featured.charge.responsibility === "TENANT" && <>{splitLines(featuredSplit)}<br /></>}
                                         {CHARGE_RESPONSIBILITY[featured.charge.responsibility] ?? featured.charge.responsibility}
                                         {featured.charge.adjusts_with_rent ? " · reajusta com o aluguel" : featured.charge.adjustment_index ? ` · ${CHARGE_INDEX_LABELS[featured.charge.adjustment_index] ?? featured.charge.adjustment_index}` : ""}
                                     </>
@@ -286,7 +296,7 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                             label: "Total mensal", value: <Money>{brl(monthly)}</Money>,
                             hint: (
                                 <>
-                                    {totals ? <>Total no contrato: <Money>{brl(totals.total)}</Money>{row.termMonths !== null ? ` · ${row.termMonths} meses` : ""}</> : "Prazo indeterminado: sem total"}
+                                    {splitLines(term.total, true)}
                                     <br />
                                     {tenantFixed.items.length > 0 ? <>Aluguel + {tenantFixed.items.map(chargeName).join(" + ")}</> : "Só o aluguel: sem encargos fixos do inquilino"}
                                 </>

@@ -14,7 +14,7 @@
  * an addendum can say otherwise.
  */
 import { addMonths, cents, cycleFactor, daysBetween, leaseIndexSeriesCode, nextAdjustment, round2, type IndexPoint, type LeaseForSummary } from "@/lib/lease-summary";
-import { amountOf, chargeAdjustmentRule, tenantCharges } from "@/lib/lease-charges";
+import { amountOf, chargeAdjustmentRule } from "@/lib/lease-charges";
 import type { LeaseCharge } from "@/types/lease";
 
 export type AdjustmentSource = "CALCULATED" | "ADDENDUM";
@@ -243,57 +243,3 @@ export const rentChangePct = (row: Pick<AdjustmentRow, "previous_rent" | "new_re
 
 /** What one adjustment took and left: all the lists need of it. */
 export type AdjustmentBrief = Pick<AdjustmentRow, "effective_date" | "previous_rent" | "new_rent" | "previous_condo" | "new_condo">;
-
-export interface ContractTotals {
-    /** the rent over the term */
-    rent: number;
-    /** the condominium the tenant pays, over the term; null when the tenant pays none with an amount */
-    condo: number | null;
-    /** everything the tenant pays over the term: rent, condominium and the other fixed charges */
-    total: number;
-}
-
-/**
- * What the contract adds up to over its term. Each month already behind `today` counts at the amount
- * in force then — the adjustments tell it — and the months ahead at today's amounts; the tenant's other
- * fixed charges count at today's amount throughout. Null when the lease is open-ended.
- */
-export function contractTotals(
-    lease: Pick<AdjustableLease, "start_date" | "monthly_rent"> & { charges?: readonly LeaseCharge[] | null },
-    termMonths: number | null,
-    rows: readonly AdjustmentBrief[],
-    today: string
-): ContractTotals | null {
-    if (termMonths === null || termMonths <= 0) return null;
-    const tenant = tenantCharges(lease.charges ?? []);
-    const tenantCondo = tenant.items.find(c => c.charge_type === "CONDOMINIUM") ?? null;
-    const currentRent = Number(lease.monthly_rent) || 0;
-    const currentCondo = tenantCondo ? amountOf(tenantCondo) : null;
-    const others = tenant.total - (currentCondo ?? 0);
-
-    const sorted = byDate(rows);
-    const firstCondoChange = sorted.find(r => r.new_condo !== null);
-    // before any adjustment: what the first one started from
-    let rent = sorted.length > 0 ? Number(sorted[0].previous_rent) || 0 : currentRent;
-    let condo = currentCondo === null ? null : firstCondoChange && firstCondoChange.previous_condo !== null ? Number(firstCondoChange.previous_condo) : currentCondo;
-
-    const start = lease.start_date.slice(0, 10);
-    let rentSum = 0, condoSum = 0, i = 0;
-    for (let k = 0; k < termMonths; k++) {
-        const date = addMonths(start, k);
-        if (date > today) {
-            rentSum += currentRent;
-            condoSum += currentCondo ?? 0;
-            continue;
-        }
-        for (; i < sorted.length && sorted[i].effective_date.slice(0, 10) <= date; i++) {
-            rent = Number(sorted[i].new_rent) || 0;
-            if (condo !== null && sorted[i].new_condo !== null) condo = Number(sorted[i].new_condo);
-        }
-        rentSum += rent;
-        condoSum += condo ?? 0;
-    }
-    const rentTotal = cents(rentSum);
-    const condoTotal = currentCondo === null ? null : cents(condoSum);
-    return { rent: rentTotal, condo: condoTotal, total: cents(rentTotal + (condoTotal ?? 0) + others * termMonths) };
-}
