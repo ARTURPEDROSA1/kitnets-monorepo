@@ -406,6 +406,8 @@ export interface LeaseIncomePoint {
     received: number;
     /** the rent the ledger implies (received ÷ (1 − fee)), the contract value of that month */
     gross: number;
+    /** the condominium the tenant paid in the month (inside the deposit, or by invoice) */
+    condo: number;
     status: "EXPECTED" | "CONFIRMED";
 }
 
@@ -457,7 +459,7 @@ export function leaseIncome(lease: Pick<LeaseWithDetails, "start_date" | "end_da
         const row = byMonth.get(m);
         if (!row) { if (owed(m)) missing++; continue; }
         const b = breakdown(row);
-        points.push({ key: m, received: b.received, gross: b.grossRent, status: row.status });
+        points.push({ key: m, received: b.received, gross: b.grossRent, condo: b.condoPaid, status: row.status });
         if (row.status === "CONFIRMED") {
             received += b.received;
             gross += b.grossRent;
