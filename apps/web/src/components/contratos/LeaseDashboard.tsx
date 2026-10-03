@@ -64,6 +64,11 @@ const COLLECTOR_SHORT: Record<string, string> = { OWNER: "proprietário", AGENCY
 const CHARGE_INDEX_LABELS: Record<string, string> = { IPCA: "IPCA", IGP_M: "IGP-M", INPC: "INPC", IVAR: "IVAR", CUSTOM: "Outra regra", NONE: "Valor fixo" };
 
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString("pt-BR")} ${n === 1 ? one : many}`;
+/** "3 meses e 12 dias": the contract's months already counted, and the days of the one in course. */
+const countedText = (months: number, days: number) => `${plural(months, "mês", "meses")}${days > 0 ? ` e ${plural(days, "dia", "dias")}` : ""}`;
+/** Why the cycle has no figure yet: its first month has not closed, or that month's index is not out. */
+const waitingText = (firstClosing: string | null, today: string) =>
+    firstClosing && today < firstClosing ? `Começa a contar em ${formatDateBR(firstClosing)}, quando fecha o 1º mês do ciclo` : "Índice do 1º mês do ciclo ainda não divulgado";
 const pctText = (v: number) => `${v > 0 ? "+" : ""}${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 
 function Field({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
@@ -141,10 +146,10 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
     const endTone: PairTone | undefined = !row.inForce ? undefined : summary.daysLeft !== null && summary.daysLeft < 0 ? "bad" : summary.daysLeft !== null && summary.daysLeft <= 90 ? "warn" : undefined;
     const cycleKnown = summary.accumulatedPct !== null && summary.monthsCounted > 0;
     const cardInfo: TileInfo = {
-        what: `O contrato lido como na ficha do imóvel: prazo, vencimento, reajuste pelo índice acumulado no ciclo (do primeiro dia do ciclo até hoje, contado dia a dia como na calculadora de Índices; a cada aniversário o aluguel é corrigido pelo acumulado do ciclo que terminou), ${featured.label.toLowerCase()} e o total que sai do bolso do inquilino; o que a razão de receitas registrou e a caução.`,
-        formula: <>Acumulado no ciclo = índice do primeiro dia do ciclo até hoje, em dias corridos; no mês parcial entra pro rata die: (1 + índice do mês)^(dias ÷ dias do mês)<br />Aluguel reajustado até hoje = aluguel × (1 + acumulado)<br />Condomínio reajustado até hoje = condomínio × (1 + acumulado), quando ele reajusta com o aluguel ou tem índice próprio<br />Total mensal = aluguel + encargos com valor fixo pagos pelo inquilino<br />Valor total do contrato = total mensal × meses do prazo</>,
+        what: `O contrato lido como na ficha do imóvel: prazo, vencimento, reajuste pelo índice acumulado no ciclo (contado como o mercado conta: cada mês do contrato, do dia do início ao mesmo dia do mês seguinte, leva o índice cheio do mês em que começa; a cada aniversário o aluguel é corrigido pelo acumulado do ciclo que terminou), ${featured.label.toLowerCase()} e o total que sai do bolso do inquilino; o que a razão de receitas registrou e a caução.`,
+        formula: <>Acumulado no ciclo = Π (1 + índice do mês) dos meses do contrato já fechados; o mês em curso entra por dia: (1 + índice)^(dias decorridos ÷ dias do mês do contrato). Nada conta antes de fechar o primeiro mês<br />Aluguel reajustado até hoje = aluguel × (1 + acumulado)<br />Condomínio reajustado até hoje = condomínio × (1 + acumulado), quando ele reajusta com o aluguel ou tem índice próprio<br />Total mensal = aluguel + encargos com valor fixo pagos pelo inquilino<br />Valor total do contrato = total mensal × meses do prazo</>,
         example: cycleKnown && summary.adjustedRent !== null ? `${brl(rent)} × (1 ${summary.accumulatedPct! >= 0 ? "+" : "−"} ${Math.abs(summary.accumulatedPct!).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}%) = ${brl(summary.adjustedRent)}` : undefined,
-        note: "O valor reajustado é uma prévia: conta até o último mês do índice já divulgado e só fecha na data do reajuste. O recebido vem da razão de receitas do imóvel, líquido da taxa da imobiliária quando há.",
+        note: "O valor reajustado é uma prévia. No reajuste valem os índices cheios dos meses do ciclo (de setembro a agosto, num contrato iniciado em setembro), a conta que o mercado faz. O recebido vem da razão de receitas do imóvel, líquido da taxa da imobiliária quando há.",
     };
     const phone = tenant?.main_phone ?? null;
     const waLink = phone ? `https://wa.me/${phone.replace(/\D/g, "")}` : null;
@@ -249,15 +254,21 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                             tone: !cycleKnown ? undefined : summary.accumulatedPct! < 0 ? "bad" : "good",
                             value: cycleKnown ? pctText(summary.accumulatedPct!) : "—",
                             hint: cycleKnown
-                                ? <>{formatDateBR(summary.cycleStart)} a {formatDateBR(summary.indexThroughDate)}<br />{plural(summary.daysCounted, "dia", "dias")}, pro rata die</>
-                                : !summary.nextAdjustmentDate ? "—" : !row.seriesCode ? "Índice sem série no Kitnets: informe o percentual no reajuste" : summary.accumulatedPct !== null ? "Nenhum mês do ciclo divulgado ainda" : "Série do índice indisponível no momento",
+                                ? <>{countedText(summary.monthsCounted, summary.daysCounted)} de {summary.frequencyMonths} meses<br />{formatDateBR(summary.cycleStart)} a {formatDateBR(summary.indexThroughDate)}</>
+                                : !summary.nextAdjustmentDate ? "—" : !row.seriesCode ? "Índice sem série no Kitnets: informe o percentual no reajuste" : summary.accumulatedPct !== null ? waitingText(summary.firstClosingDate, today) : "Série do índice indisponível no momento",
                         }}
                     />
                     <Pair
                         left={{
                             label: "Próximo reajuste", value: row.inForce && summary.nextAdjustmentDate ? formatDateBR(summary.nextAdjustmentDate) : "—",
                             tone: row.inForce && summary.daysToAdjustment !== null && summary.daysToAdjustment <= 30 ? "warn" : undefined,
-                            hint: !row.inForce ? "Contrato encerrado" : summary.daysToAdjustment === null ? "—" : `Em ${plural(summary.daysToAdjustment, "dia", "dias")}`,
+                            hint: !row.inForce ? "Contrato encerrado" : summary.daysToAdjustment === null ? "—" : (
+                                <>
+                                    Em {plural(summary.daysToAdjustment, "dia", "dias")}
+                                    {/* every month of the cycle is published: the figure the adjustment is made by */}
+                                    {summary.closingPct !== null && summary.closingRent !== null && <><br />Índice do ciclo fechado: {pctText(summary.closingPct)} → <Money>{brl(summary.closingRent)}</Money></>}
+                                </>
+                            ),
                         }}
                         right={{
                             label: "Aluguel reajustado até hoje", value: row.inForce && cycleKnown && summary.adjustedRent !== null ? <Money>{brl(summary.adjustedRent)}</Money> : "—",
@@ -298,9 +309,9 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                                     <>
                                         {condoAdjustment.indexLabel} · {condoAdjustment.withRent ? "reajusta com o aluguel" : "índice do encargo"}<br />
                                         {condoAdjustment.accumulatedPct !== null
-                                            ? <>{formatDateBR(condoAdjustment.cycleStart)} a {formatDateBR(condoAdjustment.indexThroughDate)}</>
+                                            ? <>{countedText(condoAdjustment.monthsCounted, condoAdjustment.daysCounted)} de {condoAdjustment.frequencyMonths} meses, até {formatDateBR(condoAdjustment.indexThroughDate)}</>
                                             : !condoCode || !(condoCode in seriesByCode) ? "Índice sem série no Kitnets"
-                                            : seriesByCode[condoCode] ? "Nenhum mês do ciclo divulgado ainda" : "Série do índice indisponível no momento"}
+                                            : seriesByCode[condoCode] ? waitingText(condoAdjustment.firstClosingDate, today) : "Série do índice indisponível no momento"}
                                     </>
                                 ),
                             }}
@@ -313,6 +324,7 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                                             <><Money>{condoAdjustment.adjustedAmount >= amountOf(condo) ? "+" : "−"}{brl(Math.abs(condoAdjustment.adjustedAmount - amountOf(condo)))}</Money> sobre o atual<br /></>
                                         )}
                                         Próximo reajuste em {formatDateBR(condoAdjustment.nextDate)}
+                                        {condoAdjustment.closingAmount !== null && <>: <Money>{brl(condoAdjustment.closingAmount)}</Money></>}
                                     </>
                                 ),
                             }}

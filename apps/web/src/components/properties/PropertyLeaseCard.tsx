@@ -66,6 +66,8 @@ function LeaseRow({ lease, series, seriesLoaded, propertyId, lang, today, showHe
     onViewPdf: (doc: LeaseDocument) => void;
 }) {
     const s = useMemo(() => leaseSummary(lease, series, today), [lease, series, today]);
+    // a figure only once the cycle's first month closed and its index is out
+    const counted = s.accumulatedPct !== null && s.monthsCounted > 0;
     const seriesCode = leaseIndexSeriesCode(lease.adjustment_index);
     const indexLabel = lease.adjustment_index ? (LEASE_INDEX_LABELS[lease.adjustment_index] ?? lease.adjustment_index) : "Não informado";
     const status = STATUS[lease.status] ?? { label: lease.status, cls: STATUS.DRAFT.cls };
@@ -102,10 +104,12 @@ function LeaseRow({ lease, series, seriesLoaded, propertyId, lang, today, showHe
                     left={{ label: "Índice de reajuste", value: indexLabel, hint: s.nextAdjustmentDate ? `A cada ${s.frequencyMonths} meses` : "Contrato sem reajuste" }}
                     right={{
                         label: "Acumulado no ciclo",
-                        tone: s.accumulatedPct === null ? undefined : s.accumulatedPct < 0 ? "bad" : "good",
-                        value: s.accumulatedPct !== null ? pct(s.accumulatedPct) : "—",
+                        tone: !counted ? undefined : s.accumulatedPct! < 0 ? "bad" : "good",
+                        value: counted ? pct(s.accumulatedPct!) : "—",
                         hint: s.accumulatedPct !== null
-                            ? (s.monthsCounted > 0 ? <>{formatDate(s.cycleStart)} a {formatDate(s.indexThroughDate)}<br />{days(s.daysCounted)}, pro rata die</> : "Nenhum mês do ciclo divulgado ainda")
+                            ? (counted
+                                ? <>{s.monthsCounted} {s.monthsCounted === 1 ? "mês" : "meses"}{s.daysCounted > 0 ? ` e ${days(s.daysCounted)}` : ""} de {s.frequencyMonths} meses<br />{formatDate(s.cycleStart)} a {formatDate(s.indexThroughDate)}</>
+                                : s.firstClosingDate && today < s.firstClosingDate ? `Começa a contar em ${formatDate(s.firstClosingDate)}, quando fecha o 1º mês do ciclo` : "Índice do 1º mês do ciclo ainda não divulgado")
                             : !s.nextAdjustmentDate ? "—" : !seriesCode ? "Índice sem série no Kitnets: informe o percentual no reajuste" : seriesLoaded ? "Série do índice indisponível no momento" : "Carregando a série…",
                     }}
                 />
@@ -113,11 +117,16 @@ function LeaseRow({ lease, series, seriesLoaded, propertyId, lang, today, showHe
                     left={{
                         label: "Próximo reajuste", value: formatDate(s.nextAdjustmentDate),
                         tone: s.daysToAdjustment !== null && s.daysToAdjustment <= 30 ? "warn" : undefined,
-                        hint: s.daysToAdjustment === null ? "—" : `Em ${days(s.daysToAdjustment)}`,
+                        hint: s.daysToAdjustment === null ? "—" : (
+                            <>
+                                Em {days(s.daysToAdjustment)}
+                                {s.closingPct !== null && s.closingRent !== null && <><br />Índice do ciclo fechado: {pct(s.closingPct)} → <Money>{formatBRL(s.closingRent)}</Money></>}
+                            </>
+                        ),
                     }}
                     right={{
-                        label: "Aluguel reajustado até hoje", value: s.adjustedRent !== null ? <Money>{formatBRL(s.adjustedRent)}</Money> : "—",
-                        hint: s.adjustedRent !== null
+                        label: "Aluguel reajustado até hoje", value: counted && s.adjustedRent !== null ? <Money>{formatBRL(s.adjustedRent)}</Money> : "—",
+                        hint: counted && s.adjustedRent !== null
                             ? <><Money>{s.adjustedRent >= lease.monthly_rent ? "+" : "−"}{formatBRL(Math.abs(s.adjustedRent - lease.monthly_rent))}</Money> sobre o atual<br />Prévia com o índice até {formatDate(s.indexThroughDate ?? today)}</>
                             : "—",
                     }}
@@ -194,7 +203,7 @@ export default function PropertyLeaseCard({ propertyId, lang = "pt" }: { propert
     // The worked example in the info popover uses the first lease that already has an accumulated figure
     const example = leases
         .map(lease => ({ lease, s: leaseSummary(lease, seriesOf(lease), today) }))
-        .find(e => e.s.accumulatedPct !== null) ?? null;
+        .find(e => e.s.accumulatedPct !== null && e.s.monthsCounted > 0) ?? null;
 
     if (!propertyId) return null;
 
@@ -207,11 +216,11 @@ export default function PropertyLeaseCard({ propertyId, lang = "pt" }: { propert
 
     const info: TileInfo = {
         what: perUnit
-            ? "O contrato de locação em vigor em cada unidade deste imóvel, uma linha por unidade. A cada aniversário o aluguel é corrigido pelo índice acumulado no ciclo que terminou. O ciclo conta do seu primeiro dia até hoje, dia a dia, como na calculadora de Índices: um contrato iniciado no dia 16 leva só o resto daquele mês."
-            : "O contrato de locação em vigor neste imóvel. A cada aniversário o aluguel é corrigido pelo índice acumulado no ciclo que terminou. O ciclo conta do seu primeiro dia até hoje, dia a dia, como na calculadora de Índices: um contrato iniciado no dia 16 leva só o resto daquele mês.",
-        formula: <>Acumulado no ciclo = índice do primeiro dia do ciclo até hoje, em dias corridos; no mês parcial entra pro rata die: (1 + índice do mês)^(dias ÷ dias do mês)<br />Aluguel reajustado até hoje = aluguel atual × (1 + acumulado)<br />Próximo reajuste = próximo aniversário do início, na periodicidade do contrato</>,
-        example: example && example.s.accumulatedPct !== null ? <>{example.lease.unit_label ? <>{example.lease.unit_label}: </> : null}<Money>{formatBRL(example.lease.monthly_rent)}</Money> × (1 {example.s.accumulatedPct >= 0 ? "+" : "−"} {Math.abs(example.s.accumulatedPct).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}%) = <Money>{formatBRL(example.s.adjustedRent ?? 0)}</Money><br />{days(example.s.daysCounted)} do ciclo, até {formatDate(example.s.indexThroughDate)}</> : undefined,
-        note: "O valor reajustado é uma prévia: conta até o último mês do índice já divulgado e só fecha na data do reajuste. Com índice negativo, a maioria dos contratos mantém o aluguel.",
+            ? "O contrato de locação em vigor em cada unidade deste imóvel, uma linha por unidade. A cada aniversário o aluguel é corrigido pelo índice acumulado no ciclo que terminou. A conta segue o mercado: cada mês do contrato, do dia do início ao mesmo dia do mês seguinte, leva o índice cheio do mês em que começa; o primeiro só entra quando fecha, e o mês em curso entra por dia."
+            : "O contrato de locação em vigor neste imóvel. A cada aniversário o aluguel é corrigido pelo índice acumulado no ciclo que terminou. A conta segue o mercado: cada mês do contrato, do dia do início ao mesmo dia do mês seguinte, leva o índice cheio do mês em que começa; o primeiro só entra quando fecha, e o mês em curso entra por dia.",
+        formula: <>Acumulado no ciclo = Π (1 + índice do mês) dos meses do contrato já fechados; o mês em curso entra por dia: (1 + índice)^(dias decorridos ÷ dias do mês do contrato)<br />Aluguel reajustado até hoje = aluguel atual × (1 + acumulado)<br />Próximo reajuste = próximo aniversário do início, na periodicidade do contrato</>,
+        example: example && example.s.accumulatedPct !== null ? <>{example.lease.unit_label ? <>{example.lease.unit_label}: </> : null}<Money>{formatBRL(example.lease.monthly_rent)}</Money> × (1 {example.s.accumulatedPct >= 0 ? "+" : "−"} {Math.abs(example.s.accumulatedPct).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}%) = <Money>{formatBRL(example.s.adjustedRent ?? 0)}</Money><br />{example.s.monthsCounted} de {example.s.frequencyMonths} meses do ciclo, até {formatDate(example.s.indexThroughDate)}</> : undefined,
+        note: "O valor reajustado é uma prévia. No reajuste valem os índices cheios dos meses do ciclo (de setembro a agosto, num contrato iniciado em setembro), a conta que o mercado faz. Com índice negativo, a maioria dos contratos mantém o aluguel.",
     };
 
     return (

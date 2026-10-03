@@ -2,16 +2,17 @@
  * Lease summary — pure date and index maths for the "Contrato de Aluguel" card on the property page.
  *
  * Rent adjustment: on each anniversary (every `adjustment_frequency` months, 12 by default) the rent is
- * corrected by the index accumulated over the cycle that just ended. The cycle runs from its first day
- * (the lease's start, or the previous adjustment) and is counted day by day, with the /indices
- * calculator's own math (lib/index-correction.ts): a lease that started on the 16th takes only the rest
- * of that month's index, pro rata die. So "accumulated to date" is what that calculator answers from
- * the cycle's first day to today — or to the last day of the last month published — and "rent adjusted
- * to date" is what the rent would become if the adjustment happened today.
+ * corrected by the index accumulated over the cycle that just ended, counted the way the market counts
+ * it (calculoexato.com.br, the imobiliárias): the contract's months run from its day to the same day of
+ * the next month (16/09 → 16/10 → 16/11 …) and each takes the whole index of the calendar month it
+ * starts in, so a yearly cycle that starts in September compounds September … August. "Accumulated to
+ * date" counts nothing before the cycle's first month closes; from then on it is the closed months
+ * plus the month in course by the day, and "rent adjusted to date" is what the rent would become if
+ * the adjustment happened today.
  *
  * Dates are `YYYY-MM-DD` strings handled in UTC, so a user's time zone never shifts a day.
  */
-import { addMonths as addMonthKey, correctByIndex, lastDayOfMonth } from "@/lib/index-correction";
+import { addMonths as addMonthKey } from "@/lib/index-correction";
 
 export interface LeaseForSummary {
     start_date: string;
@@ -44,20 +45,26 @@ export interface LeaseSummary {
     daysToAdjustment: number | null;
     /** first day of the current cycle (the previous adjustment, or the lease start) */
     cycleStart: string | null;
-    /** index accumulated from the cycle's first day to `indexThroughDate`, day by day, in %; null without a series */
+    /** `YYYY-MM-DD` the cycle's first month closes: nothing is counted before it */
+    firstClosingDate: string | null;
+    /** index accumulated in the cycle to `indexThroughDate`, in % (see `accumulate`); null without a series */
     accumulatedPct: number | null;
     /** the exact factor behind `accumulatedPct` (1 while nothing counts); null without a series */
     accumulatedFactor: number | null;
-    /** months of index applied, a month cut by the cycle's start or by today counting as its fraction; 0 = nothing published for the cycle yet */
+    /** whole months of the contract counted; 0 = the first one has not closed, or its index is not published */
     monthsCounted: number;
-    /** calendar days of index applied */
+    /** days of the month in course counted on top of them (0 when its index is not published yet) */
     daysCounted: number;
-    /** last month included, `YYYY-MM` */
+    /** last index month used, `YYYY-MM` */
     indexThrough: string | null;
-    /** `YYYY-MM-DD` the accumulated figure runs to: today, or the last day of the last month published */
+    /** `YYYY-MM-DD` the accumulated figure runs to: today, or the last monthly anniversary counted */
     indexThroughDate: string | null;
     /** rent × accumulated factor; null without a series */
     adjustedRent: number | null;
+    /** the whole cycle's index, in % — what the adjustment is made by; null until every month of the cycle is published */
+    closingPct: number | null;
+    /** rent × the whole cycle's index; null until then */
+    closingRent: number | null;
 }
 
 const DAY = 86400000;
@@ -104,40 +111,77 @@ export interface Accumulated {
     factor: number;
     /** the same, in %, two decimals */
     pct: number;
-    /** months of index applied (a partial month counts as its fraction) */
+    /** whole months of the contract counted */
     months: number;
-    /** calendar days of index applied */
+    /** days of the month in course counted on top of them */
     days: number;
-    /** last month included, `YYYY-MM` */
+    /** last index month used, `YYYY-MM` */
     through: string | null;
-    /** `YYYY-MM-DD` the figure runs to */
+    /** `YYYY-MM-DD` the figure runs to: today, or the last monthly anniversary counted */
     throughDate: string | null;
 }
 
+const round2 = (v: number) => Math.round(v * 100) / 100;
+/** To the cent, without a binary tail (253.925 kept as 253.92499…) rounding the wrong way. */
+const cents = (v: number) => Math.round(Number((v * 100).toPrecision(12))) / 100;
+
+const ratesOf = (series: IndexPoint[]) => {
+    const rates = new Map<string, number>();
+    for (const p of series) if (Number.isFinite(p.value)) rates.set(p.month, p.value);
+    return rates;
+};
+
 /**
- * The index accumulated from `from` to `to`, counted day by day exactly as the /indices calculator
- * does (the start day is not counted, the end day is; a partial month enters pro rata die, compounded).
- * A month not published yet ends the count at the last day of the month before it.
+ * The index accumulated in a cycle that started on `cycleStart`, seen on `today`. The contract's
+ * months run from the cycle's day to the same day of the next month, and the n-th takes the whole
+ * index of the calendar month it starts in (16/09 → 16/10 takes September's): the market's count, so
+ * every monthly anniversary lands on the figure calculoexato.com.br gives for it. Nothing counts
+ * before the first of them closes. From then on the month in course enters by the day,
+ * (1 + index)^(days elapsed ÷ days of that month of the contract), once its index is published.
+ * A closed month whose index is not published yet stops the count where it stands. `periods` is the
+ * cycle's length in months.
  */
-export function accumulate(series: IndexPoint[], from: string, to: string): Accumulated {
-    const none: Accumulated = { factor: 1, pct: 0, months: 0, days: 0, through: null, throughDate: null };
-    const published = series.filter(p => Number.isFinite(p.value));
-    const months = new Set(published.map(p => p.month));
-    // the last month published in a row from the period's first one
-    let last: string | null = null;
-    for (let m = from.slice(0, 7); m <= to.slice(0, 7) && months.has(m); m = addMonthKey(m, 1)) last = m;
-    if (!last) return none;
-    const end = to.slice(0, 10) < lastDayOfMonth(last) ? to.slice(0, 10) : lastDayOfMonth(last);
-    const result = correctByIndex(1, from.slice(0, 10), end, published);
-    if ("error" in result || result.rows.length === 0) return none;
-    return {
-        factor: result.correctedValue,
-        pct: Math.round(result.accumulatedPercent * 100) / 100,
-        months: result.months,
-        days: result.days,
-        through: result.rows[result.rows.length - 1].month,
-        throughDate: end,
-    };
+export function accumulate(series: IndexPoint[], cycleStart: string, today: string, periods: number): Accumulated {
+    const start = cycleStart.slice(0, 10);
+    const rates = ratesOf(series);
+    const indexMonth = (n: number) => addMonthKey(start.slice(0, 7), n);   // of the contract's (n + 1)-th month
+
+    let factor = 1, months = 0;
+    while (months < periods && addMonths(start, months + 1) <= today) {
+        const rate = rates.get(indexMonth(months));
+        if (rate === undefined) break;
+        factor *= 1 + rate / 100;
+        months++;
+    }
+    if (months === 0) return { factor: 1, pct: 0, months: 0, days: 0, through: null, throughDate: null };
+
+    let days = 0, through = indexMonth(months - 1), throughDate = addMonths(start, months);
+    // the month in course, by the day: only on top of every closed month, and never past the cycle
+    const from = throughDate, to = addMonths(start, months + 1);
+    const rate = rates.get(indexMonth(months));
+    if (months < periods && today > from && today < to && rate !== undefined) {
+        days = daysBetween(from, today);
+        factor *= Math.pow(1 + rate / 100, days / daysBetween(from, to));
+        through = indexMonth(months);
+        throughDate = today;
+    }
+    return { factor, pct: round2((factor - 1) * 100), months, days, through, throughDate };
+}
+
+/**
+ * The whole cycle's index as a factor — its `periods` months, from the calendar month the cycle starts
+ * in — or null while one of them is not published. It is what the adjustment is made by: for a yearly
+ * cycle from 16/09/2026, September/2026 … August/2027.
+ */
+export function cycleFactor(series: IndexPoint[], cycleStart: string, periods: number): number | null {
+    const rates = ratesOf(series);
+    let factor = 1;
+    for (let n = 0; n < periods; n++) {
+        const rate = rates.get(addMonthKey(cycleStart.slice(0, 7), n));
+        if (rate === undefined) return null;
+        factor *= 1 + rate / 100;
+    }
+    return periods > 0 ? factor : null;
 }
 
 /** Code of the calculator series (`/api/indices/{code}/calculator-data`) for a lease's index; null when there is none. */
@@ -169,22 +213,31 @@ export function leaseSummary(lease: LeaseForSummary, series: IndexPoint[] | null
 
     let accumulatedPct: number | null = null, accumulatedFactor: number | null = null, monthsCounted = 0, daysCounted = 0;
     let indexThrough: string | null = null, indexThroughDate: string | null = null, adjustedRent: number | null = null;
+    let closingPct: number | null = null, closingRent: number | null = null;
     if (series && series.length > 0 && nextAdj && cycleStart) {
-        // from the cycle's first day to today (never past the adjustment that closes it)
-        const acc = accumulate(series, cycleStart, today < nextAdj ? today : nextAdj);
+        // the cycle's months: the frequency's, fewer when the stored adjustment date cuts the first cycle short
+        let periods = 0;
+        while (periods < frequencyMonths && addMonths(cycleStart, periods + 1) <= nextAdj) periods++;
+        const acc = accumulate(series, cycleStart, today, periods);
         accumulatedPct = acc.pct;
         accumulatedFactor = acc.factor;
         monthsCounted = acc.months;
         daysCounted = acc.days;
         indexThrough = acc.through;
         indexThroughDate = acc.throughDate;
-        adjustedRent = Math.round(lease.monthly_rent * acc.factor * 100) / 100;
+        adjustedRent = cents(lease.monthly_rent * acc.factor);
+        const closing = cycleFactor(series, cycleStart, periods);
+        if (closing !== null) {
+            closingPct = round2((closing - 1) * 100);
+            closingRent = cents(lease.monthly_rent * closing);
+        }
     }
     return {
         daysElapsed, daysLeft, progressPct, effectiveEnd,
         nextDueDate: due, daysToDue: daysBetween(today, due),
         frequencyMonths,
         nextAdjustmentDate: nextAdj, daysToAdjustment: nextAdj ? daysBetween(today, nextAdj) : null,
-        cycleStart, accumulatedPct, accumulatedFactor, monthsCounted, daysCounted, indexThrough, indexThroughDate, adjustedRent,
+        cycleStart, firstClosingDate: cycleStart ? addMonths(cycleStart, 1) : null,
+        accumulatedPct, accumulatedFactor, monthsCounted, daysCounted, indexThrough, indexThroughDate, adjustedRent, closingPct, closingRent,
     };
 }

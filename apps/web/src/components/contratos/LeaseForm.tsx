@@ -896,7 +896,11 @@ export default function LeaseForm({ editingId, initial, dropdowns, aiImported = 
                                     {adjustment.withRent ? `, com o aluguel (${adjustment.indexLabel}).` : `, pelo ${adjustment.indexLabel}.`}
                                     {adjustment.adjustedAmount !== null && adjustment.accumulatedPct !== null
                                         ? <> Valor reajustado até hoje: <strong className="font-semibold text-foreground"><Money>{brl(adjustment.adjustedAmount)}</Money></strong> ({pctText(adjustment.accumulatedPct)} de {formatDateOnlyBR(adjustment.cycleStart)} a {formatDateOnlyBR(adjustment.indexThroughDate)}).</>
-                                        : leaseIndexSeriesCode(adjustment.index) && amountFromMask(charge.amount) > 0 ? " O valor reajustado aparece quando houver índice divulgado para o ciclo." : ""}
+                                        : leaseIndexSeriesCode(adjustment.index) && amountFromMask(charge.amount) > 0
+                                            ? adjustment.firstClosingDate && todayBRT() < adjustment.firstClosingDate
+                                                ? ` O valor reajustado começa a contar em ${formatDateOnlyBR(adjustment.firstClosingDate)}, quando fecha o 1º mês do ciclo.`
+                                                : " O valor reajustado aparece quando o índice do 1º mês do ciclo for divulgado."
+                                            : ""}
                                 </p>
                             )}
                             {/* Who bills the tenant for it: only a charge the tenant pays has an issuer */}
