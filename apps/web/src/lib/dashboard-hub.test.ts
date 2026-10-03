@@ -110,6 +110,10 @@ describe("occupancyOf", () => {
         expect(occupancyOf(building, [lease("n"), unitless("b")])).toMatchObject({ occupied: 2 });
         expect(occupancyOf(building, [lease("n"), lease("n2"), unitless("b"), unitless("c"), unitless("d")])).toMatchObject({ occupied: 3 });
     });
+    it("counts a rented garage as one occupied unit, like a single-family property", () => {
+        const garage = [entry({ id: "g1", key: "g1", name: "Vaga 23", propertyType: "garage", units: 1, unitIds: [], subUnitCount: 0 })];
+        expect(occupancyOf(garage, [lease("g", { property_id: "g1", unit_id: null })])).toEqual({ units: 1, occupied: 1, pct: 100, propertiesWithLease: 1 });
+    });
 });
 
 describe("incomeFigures / taxFigures", () => {
@@ -131,7 +135,7 @@ describe("incomeFigures / taxFigures", () => {
 describe("dashboardTotals", () => {
     it("reads every module the way its hub does", () => {
         const t = dashboardTotals(view, TODAY);
-        expect(t.properties).toEqual({ count: 3, single: 2, multi: 1, solar: 1, unlinked: 1 });
+        expect(t.properties).toEqual({ count: 3, single: 2, multi: 1, garage: 0, solar: 1, unlinked: 1 });
         expect(t.occupancy.pct).toBe(60);
         expect(t.contracts).toMatchObject({ inForce: 3, contractedRent: 4200, deposits: 2000, depositsCount: 2 });
         expect(t.contracts.nextEnd?.date).toBe("2026-10-05");

@@ -88,6 +88,12 @@ describe("energyRows", () => {
         expect(rows[0].latest).toBeNull();
         expect(rows[0].last12.months).toBe(0);
     });
+    it("leaves out a garage without a meter of its own until a bill is imported", () => {
+        const garage = unit({ id: "g1", name: "Vaga 23", garageWithoutMeter: true, billsCount: 0, latest: null, last12: undefined });
+        expect(energyRows([unit(), garage], TODAY).map(r => r.unit.id)).toEqual(["u1"]);
+        expect(energyRows([{ ...garage, billsCount: 2 }], TODAY).map(r => r.unit.id)).toEqual(["g1"]);
+        expect(energyRows([{ ...garage, garageWithoutMeter: false }], TODAY).map(r => r.unit.id)).toEqual(["g1"]);
+    });
 });
 
 describe("energyHubTotals / energyAttention / views", () => {

@@ -65,7 +65,7 @@ Retorne SOMENTE um JSON válido (sem markdown, sem explicações) com esta estru
     ],
     "property": {
         "name": "identificação CURTA do imóvel/unidade, sem o endereço (ex: Apartamento 302, Kitnet 03, Casa, Loja 2) ou null",
-        "property_type": "casa | apartamento | kitnet | sala comercial | loja | outro",
+        "property_type": "casa | apartamento | kitnet | garagem (vaga ou box de garagem alugado sozinho, sem moradia) | sala comercial | loja | outro",
         "street": "logradouro",
         "street_number": "número",
         "address_complement": "complemento (apto, bloco, sala) ou null",

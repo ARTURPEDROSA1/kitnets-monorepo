@@ -10,15 +10,16 @@
  * investment has paid itself back.
  */
 import React, { useMemo } from 'react';
-import { Building2, Droplets, Flame, Home, PiggyBank, Sun, Trash2, TrendingUp, Zap } from 'lucide-react';
+import { Building2, Car, Droplets, Flame, Home, PiggyBank, Sun, Trash2, TrendingUp, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { GARAGE_BASELINE, garageSpaces, garageSummary, type PropertyType } from '@/lib/property-type';
 import { Money, Sensitive } from '@/components/privacy';
 import { CoverCarousel, useCoverCarousel } from '@/components/ui/CoverCarousel';
 import type { PropertyDetails, SubUnit } from '@/components/profile/PropertyDetailsCard';
 
 export interface PropertyCardData {
     index: number;
-    propertyType: 'single' | 'multi';
+    propertyType: PropertyType;
     details: PropertyDetails;
     subUnits: SubUnit[];
     address: {
@@ -131,6 +132,9 @@ export function cardFinancials(property: Pick<PropertyCardData, 'propertyType' |
         else { monthlyRevenue = totalUnits * 1100; isEstimate = true; }   // baseline: R$ 1.100 per kitnet
     } else if (details.monthlyRentEstimate) {
         monthlyRevenue = parseMoney(details.monthlyRentEstimate);
+    } else if (propertyType === 'garage') {
+        monthlyRevenue = garageSpaces(details) * GARAGE_BASELINE.rentPerSpace;
+        isEstimate = true;
     } else {
         const beds = parseInt(details.bedrooms || '2', 10);
         monthlyRevenue = (Number.isNaN(beds) ? 2 : beds) * 750 + 600;
@@ -138,7 +142,8 @@ export function cardFinancials(property: Pick<PropertyCardData, 'propertyType' |
     }
 
     // Operating expenses: IPTU, condomínio, a 5% maintenance reserve and the management fee
-    const iptuMonthly = details.iptuMonthly ? (parseMoney(details.iptuMonthly) || 120) : 120;
+    const iptuDefault = propertyType === 'garage' ? GARAGE_BASELINE.iptuMonthly : 120;
+    const iptuMonthly = details.iptuMonthly ? (parseMoney(details.iptuMonthly) || iptuDefault) : iptuDefault;
     const condoDefault = propertyType === 'multi' ? totalUnits * 60 : 0;
     const condoMonthly = details.condoMonthly ? (parseMoney(details.condoMonthly) || condoDefault) : condoDefault;
     const maintenanceReserve = details.maintenanceMonthly ? (parseMoney(details.maintenanceMonthly) || Math.round(monthlyRevenue * 0.05)) : Math.round(monthlyRevenue * 0.05);
@@ -212,12 +217,14 @@ export default function PropertySquareCard({ property, onSelect, onDelete, isDel
                 photos={photos}
                 alt={title}
                 state={carousel}
-                fallback={propertyType === 'multi' ? <Building2 className="w-10 h-10" /> : <Home className="w-10 h-10" />}
+                fallback={propertyType === 'multi' ? <Building2 className="w-10 h-10" /> : propertyType === 'garage' ? <Car className="w-10 h-10" /> : <Home className="w-10 h-10" />}
             >
                 <span className="absolute top-2 left-2 inline-flex items-center gap-1 rounded-full bg-background/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                     {propertyType === 'multi'
                         ? <><Building2 className="w-3 h-3 text-violet-500" /> Multifamiliar · {totalUnits} {totalUnits === 1 ? 'unidade' : 'unidades'}</>
-                        : <><Home className="w-3 h-3 text-blue-500" /> Unifamiliar</>}
+                        : propertyType === 'garage'
+                            ? <><Car className="w-3 h-3 text-slate-500" /> Garagem</>
+                            : <><Home className="w-3 h-3 text-blue-500" /> Unifamiliar</>}
                 </span>
                 {details.solarEnergy && (
                     <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-amber-400/95 px-2 py-0.5 text-[10px] font-semibold text-amber-950" title="Energia solar (geração distribuída)">
@@ -288,7 +295,9 @@ export default function PropertySquareCard({ property, onSelect, onDelete, isDel
                         <span className="truncate">
                             {propertyType === 'multi'
                                 ? `${totalUnits} ${totalUnits === 1 ? 'unidade' : 'unidades'}`
-                                : `${details.areaEdificada || details.totalSqMeters || '—'} m² · ${details.bedrooms || '2'} quartos`}
+                                : propertyType === 'garage'
+                                    ? garageSummary(details)
+                                    : `${details.areaEdificada || details.totalSqMeters || '—'} m² · ${details.bedrooms || '2'} quartos`}
                         </span>
                         {details.mainMeters?.energy && <Zap className="w-3 h-3 text-amber-500 shrink-0" aria-label="Medidor de energia" />}
                         {details.mainMeters?.water && <Droplets className="w-3 h-3 text-blue-500 shrink-0" aria-label="Medidor de água" />}

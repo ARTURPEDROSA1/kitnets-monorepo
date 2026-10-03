@@ -218,9 +218,10 @@ export interface EnergyUnitRow {
     haystack: string;
 }
 
+/** One row per consumer unit. A garage whose energy the owner does not pay has none: it only shows once a bill is imported. */
 export function energyRows(units: OwnerPropertySummary[], today: string): EnergyUnitRow[] {
     const thisMonth = today.slice(0, 7);
-    return units.map(unit => {
+    return units.filter(unit => !(unit.garageWithoutMeter && unit.billsCount === 0)).map(unit => {
         const kind = unitKind(unit);
         const categoryKey: EnergyCategoryKey = kind === "rental" ? "rental" : kind === "orphaned" ? "orphaned" : (unit.ucCategory ?? "outro");
         const latest = unit.latest ?? null;

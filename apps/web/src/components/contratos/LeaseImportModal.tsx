@@ -72,6 +72,8 @@ type FieldErrors = Record<string, string>;
 type EntityMode = 'create' | 'existing' | 'skip';
 
 interface PropertyDraft {
+    /** a lease of a parking space creates a garage; everything else a single-family property (units are added on Imóveis) */
+    property_type: 'single' | 'garage';
     name: string; postal_code: string; street: string; street_number: string;
     address_complement: string; neighborhood: string; city: string; state: string;
 }
@@ -242,6 +244,8 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
             setPropertyId(fixedProperty?.id ?? matches.property?.id ?? '');
             setPropertyMode(fixedProperty || matches.property ? 'existing' : p ? 'create' : 'skip');
             setPropertyDraft(p ? {
+                // only when the AI classed the leased property itself as one ("apartamento com vaga" stays single); the select below corrects it
+                property_type: /^\s*(garage[mn]|vaga|box)\b/i.test(p.property_type ?? '') ? 'garage' : 'single',
                 // "Apartamento 302" alone says little in a list of properties: add the street (unless the name has it).
                 name: (p.name && p.street && p.name.toLowerCase().includes(p.street.toLowerCase())
                     ? p.name
@@ -712,10 +716,17 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
 
                                 {propertyMode === 'create' && propertyDraft && (
                                     <div className="grid gap-3 sm:grid-cols-6">
-                                        <div className="sm:col-span-6">
+                                        <div className="sm:col-span-4">
                                             <Label className="text-xs">Nome do imóvel *</Label>
                                             <Input className="h-9" value={propertyDraft.name} onChange={e => setPropertyDraft({ ...propertyDraft, name: e.target.value })} />
                                             {fieldError(propertyErrors, 'name')}
+                                        </div>
+                                        <div className="sm:col-span-2">
+                                            <Label className="text-xs">Tipo</Label>
+                                            <select className={selectClass} value={propertyDraft.property_type} onChange={e => setPropertyDraft({ ...propertyDraft, property_type: e.target.value === 'garage' ? 'garage' : 'single' })} disabled={applying}>
+                                                <option value="single">Unifamiliar</option>
+                                                <option value="garage">Garagem</option>
+                                            </select>
                                         </div>
                                         <div className="sm:col-span-2">
                                             <Label className="text-xs">CEP</Label>

@@ -76,6 +76,7 @@ export async function createRentalProperty(
         description: "",
     };
 
+    const propertyType = input.property_type ?? "single";
     const primaryDetails = profile.property_details as Record<string, unknown> | null;
     const primaryAddress = profile.property_address as Record<string, unknown> | null;
     const primaryTaken =
@@ -88,7 +89,7 @@ export async function createRentalProperty(
                   ...(Array.isArray(profile.additional_properties) ? profile.additional_properties : []),
                   {
                       id: row.id,
-                      propertyType: "single",
+                      propertyType,
                       details: emptyPropertyDetails(input.name),
                       subUnits: [],
                       address,
@@ -101,7 +102,7 @@ export async function createRentalProperty(
               ],
           }
         : {
-              property_type: "single",
+              property_type: propertyType,
               property_details: { ...emptyPropertyDetails(input.name), isSavedProperty: true },
               property_address: address,
           };

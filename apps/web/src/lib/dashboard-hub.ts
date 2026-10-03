@@ -27,7 +27,7 @@ const r1 = (n: number) => Math.round(n * 10) / 10;
 // ── Occupancy ────────────────────────────────────────────────────────
 
 export interface Occupancy {
-    /** rentable units across the portfolio (a single-family property counts one) */
+    /** rentable units across the portfolio (a single-family property or a garage counts one) */
     units: number;
     /** units with a contract in force */
     occupied: number;
@@ -39,7 +39,7 @@ export interface Occupancy {
 
 /**
  * Units with a contract in force (stored ACTIVE / EXPIRING_SOON, the hubs' rule). A single-family property
- * counts one. A multi-unit property counts each unit named by a lease once, plus one per lease that names
+ * or a garage counts one. A multi-unit property counts each unit named by a lease once, plus one per lease that names
  * no unit (saved before leases pointed to units, or on the whole building), never more than its units. A
  * property without a row cannot have leases yet.
  */
@@ -54,7 +54,7 @@ export function occupancyOf(entries: PropertyEntry[], leases: Array<Pick<LeaseWi
         const mine = inForce.filter(l => l.property_id === e.id);
         if (mine.length === 0) continue;
         propertiesWithLease += 1;
-        if (e.propertyType === "single") {
+        if (e.propertyType !== "multi") {
             occupied += 1;
             continue;
         }
@@ -172,7 +172,7 @@ export function dashboardRows(view: DashboardView, today: string): DashboardRows
 // ── Totals ───────────────────────────────────────────────────────────
 
 export interface DashboardTotals {
-    properties: { count: number; single: number; multi: number; solar: number; /** entries the wizard never sent to the API */ unlinked: number };
+    properties: { count: number; single: number; multi: number; garage: number; solar: number; /** entries the wizard never sent to the API */ unlinked: number };
     occupancy: Occupancy;
     income: IncomeFigures;
     contracts: HubTotals;
@@ -204,6 +204,7 @@ export function dashboardTotals(view: DashboardView, today: string, rows: Dashbo
             count: view.properties.length,
             single: view.properties.filter(p => p.propertyType === "single").length,
             multi: view.properties.filter(p => p.propertyType === "multi").length,
+            garage: view.properties.filter(p => p.propertyType === "garage").length,
             solar: view.properties.filter(p => p.hasSolar).length,
             unlinked: view.properties.filter(p => !p.id).length,
         },

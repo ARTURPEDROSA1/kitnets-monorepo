@@ -74,7 +74,13 @@ export async function POST(request: NextRequest) {
         }
 
         if (propertyData) {
-            if (type === 'main') {
+            if (type === 'main' && propertyData.propertyType === 'garage') {
+                context = `Gere uma descrição para esta GARAGEM (vaga de estacionamento alugada sozinha, sem moradia) para ${purposeLabel}:\n`;
+                if (propertyData.garageLocation) context += `- Local: ${propertyData.garageLocation === 'house' ? 'garagem de casa de rua' : 'vaga em prédio / condomínio'}\n`;
+                if (propertyData.garageCover) context += `- Cobertura: ${propertyData.garageCover === 'covered' ? 'coberta' : 'descoberta'}\n`;
+                if (propertyData.garageSpotLabel) context += `- Identificação da vaga: ${propertyData.garageSpotLabel}\n`;
+                if (propertyData.garageElectricGate) context += `- Portão eletrônico: Sim\n`;
+            } else if (type === 'main') {
                 context = `Gere uma descrição para este IMÓVEL PRINCIPAL para ${purposeLabel} (área comum e fachada):\n`;
             } else {
                 context += `\nDados da propriedade principal:\n`;
@@ -86,7 +92,7 @@ export async function POST(request: NextRequest) {
             if (propertyData.rooms) context += `- Cômodos: ${propertyData.rooms}\n`;
             if (propertyData.bedrooms) context += `- Quartos: ${propertyData.bedrooms}\n`;
             if (propertyData.bathrooms) context += `- Banheiros: ${propertyData.bathrooms}\n`;
-            if (propertyData.parkingSpaces) context += `- Vagas de Garagem: ${propertyData.parkingSpaces}\n`;
+            if (propertyData.parkingSpaces) context += `- ${propertyData.propertyType === 'garage' ? 'Vagas' : 'Vagas de Garagem'}: ${propertyData.parkingSpaces}\n`;
             if (propertyData.kitchenCabinets) context += `- Armários de cozinha: Sim\n`;
             if (propertyData.laundry && propertyData.laundry !== 'none') context += `- Lavanderia: ${propertyData.laundry === 'individual' ? 'Individual' : 'Compartilhada'}\n`;
             if (propertyData.ac && propertyData.ac !== 'none') context += `- Ar-condicionado: ${propertyData.ac === 'cold' ? 'Frio' : 'Quente e Frio'}\n`;

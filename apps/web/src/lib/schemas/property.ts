@@ -31,6 +31,8 @@ export const propertyInputSchema = z.object({
     neighborhood: optionalText(100),
     city: optionalText(100),
     state: optionalText(2).transform((v) => (v ? v.toUpperCase() : null)),
+    /** a garage (a parking space rented on its own) or, when absent, a single-family property; units are added on Imóveis */
+    property_type: z.enum(["single", "garage"]).optional(),
 });
 
 export type PropertyInput = z.output<typeof propertyInputSchema>;

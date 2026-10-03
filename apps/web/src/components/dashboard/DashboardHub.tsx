@@ -138,6 +138,9 @@ export default function DashboardHub({ base, view, totals, attention, loading, e
         agencies: failed.has("agencies"),
     };
     const unavailable = (what: string) => <span className="text-rose-600">{what} indisponíveis</span>;
+    // "2 unifamiliar · 1 multifamiliar", plus the garages when there are any
+    const mix = totals?.properties;
+    const propertyMix = mix ? [`${mix.single} unifamiliar`, `${mix.multi} multifamiliar`, mix.garage > 0 ? `${mix.garage} ${mix.garage === 1 ? "garagem" : "garagens"}` : null].filter(Boolean).join(" · ") : "";
     return (
         <div className="mx-auto max-w-[1600px] space-y-5 p-4 sm:p-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -189,7 +192,7 @@ export default function DashboardHub({ base, view, totals, attention, loading, e
                             info={{
                                 what: "Os imóveis de aluguel cadastrados e as unidades que eles têm.",
                                 formula: <>Ocupação = unidades com contrato em vigor ÷ unidades × 100<br />Contrato sem unidade num multifamiliar = uma unidade</>,
-                                note: `${totals.properties.single} unifamiliar · ${totals.properties.multi} multifamiliar · ${totals.properties.solar} com energia solar.`,
+                                note: `${propertyMix} · ${totals.properties.solar} com energia solar.`,
                             }}
                         />
                         <Tile
@@ -248,7 +251,7 @@ export default function DashboardHub({ base, view, totals, attention, loading, e
                     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                         <ModuleCard icon={<Building2 className="h-4 w-4" />} tone="emerald" title="Imóveis" href="/imoveis" base={base} unavailable={down.properties}
                             figures={[
-                                { label: "Imóveis", value: totals.properties.count, hint: `${totals.properties.single} unifamiliar · ${totals.properties.multi} multifamiliar` },
+                                { label: "Imóveis", value: totals.properties.count, hint: propertyMix },
                                 { label: "Unidades", value: totals.occupancy.units, hint: down.leases ? "contratos indisponíveis" : `${totals.occupancy.occupied} com contrato em vigor` },
                                 { label: "Ocupação", value: down.leases ? "—" : pct1(totals.occupancy.pct), hint: down.leases ? "contratos indisponíveis" : `${plural(totals.occupancy.propertiesWithLease, "imóvel alugado", "imóveis alugados")}` },
                                 { label: "Economia potencial", value: down.income ? "—" : brl(totals.income.feeAllTime, 0), money: true, hint: down.income ? "receitas indisponíveis" : "taxa de imobiliária acumulada · autogestão", title: "Σ da taxa da imobiliária retida antes do crédito, desde o início, pela razão de receitas" },

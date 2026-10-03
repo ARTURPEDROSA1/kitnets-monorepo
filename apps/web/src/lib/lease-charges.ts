@@ -6,9 +6,16 @@
  * monthly total adds the charges the tenant pays with a fixed amount; the contract's total value is
  * that monthly figure over the whole term, at the contract's values (adjustments aside).
  */
+import type { PropertyType } from "@/lib/property-type";
 import type { LeaseCharge } from "@/types/lease";
 
 export type PropertyKind = "single" | "multi";
+
+/**
+ * The kind that names the card's charge. A garage has none of its own (a space in a building pays
+ * condominium, the garage of a house pays nothing), so the card shows whichever the contract has.
+ */
+export const chargeKindOf = (type: PropertyType): PropertyKind | null => (type === "garage" ? null : type);
 
 /** The charge the card names: condominium for a multi-unit property, energy for a single-family one. */
 export const KIND_CHARGE: Record<PropertyKind, { type: LeaseCharge["charge_type"]; label: string }> = {

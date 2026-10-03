@@ -35,6 +35,8 @@ export interface OwnerPropertySummary {
     latestBillPdfUrl?: string | null;
     /** "Água" checked under Medidores Principais do Imóvel: the landlord pays the main water meter (feeds /dashboard/water) */
     hasWaterMeter?: boolean;
+    /** a garage (Imóveis) whose energy the owner does not pay ("Energia" unchecked under Medidores): no consumer unit to follow, so the hub leaves it out until a bill is imported */
+    garageWithoutMeter?: boolean;
     /** the newest full bill's figures (the hub's tiles and KPIs); null without bills */
     latest?: EnergyLatestSnapshot | null;
     /** the twelve months up to the newest bill */
@@ -54,7 +56,7 @@ export async function getOwnerPropertiesSummary(userId: string): Promise<OwnerPr
         // 1. Get user profile
         const { data: profile } = await supabase
             .from("profiles")
-            .select("id, full_name, property_address, property_details, additional_properties")
+            .select("id, full_name, property_type, property_address, property_details, additional_properties")
             .eq("clerk_id", userId)
             .maybeSingle();
 
@@ -343,6 +345,8 @@ export async function getOwnerPropertiesSummary(userId: string): Promise<OwnerPr
             const hasSolar = effectiveStandaloneUc || solarEnergy || billStats.count > 0;
             const listingDetails = isPrimary && primaryDetails ? primaryDetails : matchingAp?.details ?? null;
             const hasWaterMeter = Boolean(listingDetails?.mainMeters?.water);
+            const listingType = isPrimary && primaryDetails ? profile.property_type : matchingAp?.propertyType;
+            const garageWithoutMeter = listingType === "garage" && !listingDetails?.mainMeters?.energy;
 
             return {
                 id: prop.id,
@@ -367,6 +371,7 @@ export async function getOwnerPropertiesSummary(userId: string): Promise<OwnerPr
                 notes: savedNotes || (isOrphaned ? "Imóvel desvinculado do portfólio de aluguel" : null),
                 latestBillPdfUrl: billStats.latestBillPdfUrl,
                 hasWaterMeter,
+                garageWithoutMeter,
                 latest: statsByPropId[prop.id]?.latest ?? null,
                 last12: statsByPropId[prop.id]?.last12 ?? EMPTY_PERIOD,
             };
