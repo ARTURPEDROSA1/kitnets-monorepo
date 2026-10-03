@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { correctByIndex } from "./index-correction";
-import { accumulate, addMonths, daysBetween, leaseIndexSeriesCode, leaseSummary, nextAdjustment, nextDueDate, type IndexPoint, type LeaseForSummary } from "./lease-summary";
+import { accumulate, addMonths, cycleFactor, daysBetween, leaseIndexSeriesCode, leaseSummary, nextAdjustment, nextDueDate, type IndexPoint, type LeaseForSummary } from "./lease-summary";
 
 const lease = (over: Partial<LeaseForSummary> = {}): LeaseForSummary => ({
     start_date: "2025-04-24", end_date: "2027-10-23", termination_date: null, rent_due_day: 10, monthly_rent: 4000,
@@ -46,37 +45,57 @@ describe("nextAdjustment", () => {
 });
 
 describe("accumulate", () => {
-    const s: IndexPoint[] = [{ month: "2026-03", value: 9 }, { month: "2026-04", value: 1 }, { month: "2026-05", value: 2 }, { month: "2026-06", value: -0.5 }, { month: "2026-07", value: 9 }];
+    // the pilot's lease: started on 16/09/2026, yearly, IGP-M
+    const s: IndexPoint[] = [{ month: "2026-08", value: 9 }, { month: "2026-09", value: 1.57 }, { month: "2026-10", value: 0.5 }, { month: "2026-11", value: -0.2 }];
     const none = { factor: 1, pct: 0, months: 0, days: 0, through: null, throughDate: null };
-    it("compounds whole months from a month's last day to another's", () => {
-        const a = accumulate(s, "2026-03-31", "2026-06-30");
-        expect(a.pct).toBe(2.5);                                  // 1.01 × 1.02 × 0.995 − 1 = 2.5049 %
-        expect(a.factor).toBeCloseTo(1.01 * 1.02 * 0.995, 10);
-        expect(a).toMatchObject({ months: 3, days: 91, through: "2026-06", throughDate: "2026-06-30" });
+    it("counts nothing before the cycle's first month closes", () => {
+        expect(accumulate(s, "2026-09-16", "2026-10-03", 12)).toEqual(none);
+        expect(accumulate(s, "2026-09-16", "2026-10-15", 12)).toEqual(none);
+        expect(accumulate(s, "2026-09-16", "2026-09-10", 12)).toEqual(none);
     });
-    it("takes a partial month pro rata die, the start day left out and the end day counted", () => {
-        // 16/04 → 10/05: 14 of April's 30 days, 10 of May's 31
-        const a = accumulate(s, "2026-04-16", "2026-05-10");
-        expect(a.factor).toBeCloseTo(Math.pow(1.01, 14 / 30) * Math.pow(1.02, 10 / 31), 10);
-        expect(a.days).toBe(24);
-        expect(a.months).toBeCloseTo(14 / 30 + 10 / 31, 10);
-        expect(a.throughDate).toBe("2026-05-10");
+    it("gives the first month the whole index of the month it starts in, on its monthly anniversary", () => {
+        // calculoexato.com.br, base mensal: reajuste em 16/10/2026 = 1,57 % (setembro)
+        const a = accumulate(s, "2026-09-16", "2026-10-16", 12);
+        expect(a).toMatchObject({ pct: 1.57, months: 1, days: 0, through: "2026-09", throughDate: "2026-10-16" });
+        expect(a.factor).toBeCloseTo(1.0157, 12);
+        expect(Math.round(1260 * a.factor * 100) / 100).toBe(1279.78);
     });
-    it("is the /indices calculator's own answer for the same dates", () => {
-        const calc = correctByIndex(1260, "2026-04-16", "2026-06-09", s);
-        if ("error" in calc) throw new Error(calc.error);
-        expect(accumulate(s, "2026-04-16", "2026-06-09").factor * 1260).toBeCloseTo(calc.correctedValue, 8);
+    it("then takes the month in course by the day, landing on the whole index at the next anniversary", () => {
+        // 16/10 → 05/11: 20 of the 31 days of the contract's second month, which takes October's index
+        const a = accumulate(s, "2026-09-16", "2026-11-05", 12);
+        expect(a.factor).toBeCloseTo(1.0157 * Math.pow(1.005, 20 / 31), 12);
+        expect(a).toMatchObject({ months: 1, days: 20, through: "2026-10", throughDate: "2026-11-05" });
+        const b = accumulate(s, "2026-09-16", "2026-11-16", 12);
+        expect(b.factor).toBeCloseTo(1.0157 * 1.005, 12);
+        expect(b).toMatchObject({ months: 2, days: 0, through: "2026-10", throughDate: "2026-11-16" });
     });
-    it("stops at the last day of the last month published", () => {
-        const a = accumulate(s, "2026-06-20", "2026-09-18");      // August is not out: July closes the count
-        expect(a).toMatchObject({ through: "2026-07", throughDate: "2026-07-31", days: 41 });
-        expect(a.factor).toBeCloseTo(Math.pow(0.995, 10 / 30) * 1.09, 10);
+    it("stands at the last anniversary while the month in course has no index yet", () => {
+        const a = accumulate(s.slice(0, 2), "2026-09-16", "2026-11-05", 12);
+        expect(a).toMatchObject({ pct: 1.57, months: 1, days: 0, through: "2026-09", throughDate: "2026-10-16" });
+        // a closed month without its index stops the count: December is missing
+        expect(accumulate(s, "2026-09-16", "2027-02-01", 12)).toMatchObject({ months: 3, days: 0, through: "2026-11", throughDate: "2026-12-16" });
     });
-    it("has nothing before the first month is published, or for a period that has not begun", () => {
-        expect(accumulate(s, "2030-01-10", "2030-12-10")).toEqual(none);
-        expect(accumulate(s, "2026-08-05", "2026-08-20")).toEqual(none);
-        expect(accumulate(s, "2026-05-10", "2026-05-10")).toEqual(none);
-        expect(accumulate(s, "2026-05-10", "2026-04-10")).toEqual(none);
+    it("never runs past the cycle", () => {
+        const flatSeries: IndexPoint[] = Array.from({ length: 24 }, (_, i) => ({ month: `${2026 + Math.floor((8 + i) / 12)}-${String(((8 + i) % 12) + 1).padStart(2, "0")}`, value: 1 }));
+        const a = accumulate(flatSeries, "2026-09-16", "2027-12-01", 12);
+        expect(a.months).toBe(12);
+        expect(a.days).toBe(0);
+        expect(a.factor).toBeCloseTo(Math.pow(1.01, 12), 12);
+        expect(a.through).toBe("2027-08");                        // September/2026 … August/2027
+    });
+    it("clamps a cycle that starts on the 31st to each month's last day", () => {
+        const jan: IndexPoint[] = [{ month: "2026-01", value: 1 }, { month: "2026-02", value: 2 }];
+        expect(accumulate(jan, "2026-01-31", "2026-02-27", 12).months).toBe(0);
+        expect(accumulate(jan, "2026-01-31", "2026-02-28", 12)).toMatchObject({ months: 1, through: "2026-01", throughDate: "2026-02-28" });
+    });
+});
+
+describe("cycleFactor", () => {
+    it("is the whole cycle's index, only once every month of it is published", () => {
+        const s: IndexPoint[] = [{ month: "2026-09", value: 1 }, { month: "2026-10", value: 2 }, { month: "2026-11", value: 3 }];
+        expect(cycleFactor(s, "2026-09-16", 3)).toBeCloseTo(1.01 * 1.02 * 1.03, 12);
+        expect(cycleFactor(s, "2026-09-16", 4)).toBeNull();
+        expect(cycleFactor(s, "2026-08-16", 3)).toBeNull();
     });
 });
 
@@ -91,45 +110,43 @@ describe("leaseSummary", () => {
         expect(s.nextDueDate).toBe("2026-10-10");
         expect(s.daysToDue).toBe(22);
     });
-    it("accumulates the current cycle day by day, to the last month published, and projects the rent", () => {
-        // cycle from 24/04/2026; the series is published through Aug/2026 → 6 of April's 30 days, then May … August whole
+    it("accumulates the cycle's closed months, then the month in course by the day, and projects the rent", () => {
+        // cycle from 24/04/2026: April … July closed on 24/08; 25 of the 31 days of the month from 24/08 (August's index)
         const s = leaseSummary(lease(), flat("2025-01", 20, 1), today);
         expect(s.nextAdjustmentDate).toBe("2027-04-24");
         expect(s.cycleStart).toBe("2026-04-24");
-        expect(s.monthsCounted).toBeCloseTo(4.2, 10);
-        expect(s.daysCounted).toBe(daysBetween("2026-04-24", "2026-08-31"));
+        expect(s.firstClosingDate).toBe("2026-05-24");
+        expect(s.monthsCounted).toBe(4);
+        expect(s.daysCounted).toBe(25);
         expect(s.indexThrough).toBe("2026-08");
-        expect(s.indexThroughDate).toBe("2026-08-31");
-        expect(s.accumulatedFactor).toBeCloseTo(Math.pow(1.01, 4.2), 10);
-        expect(s.accumulatedPct).toBe(4.27);                      // 1.01^4.2 − 1
-        expect(s.adjustedRent).toBe(Math.round(4000 * Math.pow(1.01, 4.2) * 100) / 100);
+        expect(s.indexThroughDate).toBe(today);
+        expect(s.accumulatedFactor).toBeCloseTo(Math.pow(1.01, 4 + 25 / 31), 12);
+        expect(s.accumulatedPct).toBe(4.9);
+        expect(s.adjustedRent).toBeCloseTo(4000 * Math.pow(1.01, 4 + 25 / 31), 1);
+        expect(s.closingPct).toBeNull();                          // the cycle's months run to March/2027
         expect(s.daysToAdjustment).toBe(daysBetween(today, "2027-04-24"));
     });
-    it("a lease that started on the 16th takes only the rest of that month's index", () => {
-        // 16/09/2026 → 03/10/2026 with September at 1.57 % and October not out: 14 of 30 days
-        const s = leaseSummary(lease({ start_date: "2026-09-16", end_date: "2029-03-16", monthly_rent: 1260 }), [{ month: "2026-08", value: 0.4 }, { month: "2026-09", value: 1.57 }], "2026-10-03");
-        expect(s.cycleStart).toBe("2026-09-16");
-        expect(s.nextAdjustmentDate).toBe("2027-09-16");
-        expect(s.daysCounted).toBe(14);
-        expect(s.indexThroughDate).toBe("2026-09-30");
-        expect(s.accumulatedPct).toBe(0.73);                      // 1.0157^(14/30) − 1
-        expect(s.adjustedRent).toBe(1269.19);
+    it("waits for the first month of the contract, then matches the market's figure on its anniversary", () => {
+        const pilot = lease({ start_date: "2026-09-16", end_date: "2029-03-16", monthly_rent: 1260 });
+        const igpm = [{ month: "2026-08", value: 0.4 }, { month: "2026-09", value: 1.57 }];
+        const early = leaseSummary(pilot, igpm, "2026-10-03");
+        expect(early).toMatchObject({ cycleStart: "2026-09-16", firstClosingDate: "2026-10-16", nextAdjustmentDate: "2027-09-16", monthsCounted: 0, accumulatedPct: 0, adjustedRent: 1260, indexThroughDate: null });
+        const first = leaseSummary(pilot, igpm, "2026-10-16");
+        expect(first).toMatchObject({ monthsCounted: 1, daysCounted: 0, accumulatedPct: 1.57, adjustedRent: 1279.78, indexThroughDate: "2026-10-16" });
     });
-    it("counts to today inside a published month, never before the lease started", () => {
-        // first cycle of a lease that started on 24/04/2025, seen on 01/03/2026 with every month published
-        const s = leaseSummary(lease(), flat("2024-01", 40, 1), "2026-03-01");
+    it("gives the whole cycle's index once its last month is published: what the adjustment is made by", () => {
+        // first cycle of a lease that started on 24/04/2025 (April/2025 … March/2026), seen on 10/04/2026 with March out
+        const s = leaseSummary(lease(), flat("2024-01", 27, 1), "2026-04-10");
         expect(s.cycleStart).toBe("2025-04-24");
-        expect(s.indexThrough).toBe("2026-03");
-        expect(s.indexThroughDate).toBe("2026-03-01");
-        expect(s.daysCounted).toBe(daysBetween("2025-04-24", "2026-03-01"));
-        expect(s.monthsCounted).toBeCloseTo(6 / 30 + 10 + 1 / 31, 10);   // rest of April, May … February, one day of March
+        expect(s.monthsCounted).toBe(11);
+        expect(s.daysCounted).toBe(17);                           // of the month from 24/03, which takes March's index
+        expect(s.closingPct).toBe(12.68);                         // 1.01^12 − 1
+        expect(s.closingRent).toBe(4507.3);
     });
-    it("has a series but nothing to count while the cycle's first month is not published", () => {
-        const s = leaseSummary(lease({ start_date: "2026-09-10", end_date: null }), flat("2025-01", 20, 1), today);
-        expect(s.accumulatedPct).toBe(0);
-        expect(s.monthsCounted).toBe(0);
-        expect(s.indexThroughDate).toBeNull();
-        expect(s.adjustedRent).toBe(4000);
+    it("rounds a half cent the way a decimal calculator does", () => {
+        // 250 × 1.0157 = 253.925, which binary floats hold as 253.92499…
+        const s = leaseSummary(lease({ start_date: "2026-09-16", end_date: null, monthly_rent: 250 }), [{ month: "2026-09", value: 1.57 }], "2026-10-16");
+        expect(s.adjustedRent).toBe(253.93);
     });
     it("handles leases without an end date, without adjustment and without a series", () => {
         const open = leaseSummary(lease({ end_date: null }), null, today);

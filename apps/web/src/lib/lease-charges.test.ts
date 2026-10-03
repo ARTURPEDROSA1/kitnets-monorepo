@@ -65,17 +65,18 @@ describe("inheritRentAdjustment", () => {
 });
 
 describe("chargeAdjustment", () => {
-    // the pilot's lease: started on 16/09/2026, IGP-M, seen on 03/10/2026 with September published
+    // the pilot's lease: started on 16/09/2026, IGP-M, seen on its first monthly anniversary with September published
     const lease: LeaseForSummary = { start_date: "2026-09-16", end_date: "2029-03-16", rent_due_day: 10, monthly_rent: 1260, adjustment_index: "IGP_M", adjustment_frequency: 12, next_adjustment_date: null };
     const series = { igpm: [{ month: "2026-09", value: 1.57 }], ipca: [{ month: "2026-09", value: 0.5 }] };
-    const today = "2026-10-03";
+    const today = "2026-10-16";
     const condominium = (over: Partial<LeaseCharge> = {}): LeaseCharge => ({ ...charge("CONDOMINIUM", "TENANT", 250), ...over });
 
-    it("follows the rent: same index, same date, the amount corrected day by day", () => {
+    it("follows the rent: same index, same date, the amount corrected like the rent", () => {
         const a = chargeAdjustment(condominium({ adjusts_with_rent: true }), lease, series, today)!;
-        expect(a).toMatchObject({ withRent: true, index: "IGP_M", indexLabel: "IGP-M", nextDate: "2027-09-16", cycleStart: "2026-09-16", indexThroughDate: "2026-09-30", daysCounted: 14 });
-        expect(a.accumulatedPct).toBe(0.73);          // 1.0157^(14/30) − 1
-        expect(a.adjustedAmount).toBe(251.82);
+        expect(a).toMatchObject({ withRent: true, index: "IGP_M", indexLabel: "IGP-M", nextDate: "2027-09-16", cycleStart: "2026-09-16", firstClosingDate: "2026-10-16", indexThroughDate: "2026-10-16", monthsCounted: 1, daysCounted: 0, frequencyMonths: 12 });
+        expect(a.accumulatedPct).toBe(1.57);
+        expect(a.adjustedAmount).toBe(253.93);
+        expect(a.closingAmount).toBeNull();
     });
     it("ignores the charge's own index while it follows the rent", () => {
         expect(chargeAdjustment(condominium({ adjusts_with_rent: true, adjustment_index: "IPCA" }), lease, series, today)!.index).toBe("IGP_M");
@@ -83,11 +84,12 @@ describe("chargeAdjustment", () => {
     it("uses the charge's own published index on the lease's dates", () => {
         const a = chargeAdjustment(condominium({ adjustment_index: "IPCA" }), lease, series, today)!;
         expect(a).toMatchObject({ withRent: false, index: "IPCA", nextDate: "2027-09-16" });
-        expect(a.accumulatedPct).toBe(0.23);          // 1.005^(14/30) − 1
-        expect(a.adjustedAmount).toBe(250.58);
+        expect(a.accumulatedPct).toBe(0.5);
+        expect(a.adjustedAmount).toBe(251.25);
     });
-    it("has a date but no figure without a series, or before the cycle's first month is out", () => {
+    it("has a date but no figure without a series, or before the cycle's first month closes", () => {
         expect(chargeAdjustment(condominium({ adjusts_with_rent: true }), lease, {}, today)).toMatchObject({ nextDate: "2027-09-16", accumulatedPct: null, adjustedAmount: null });
+        expect(chargeAdjustment(condominium({ adjusts_with_rent: true }), lease, series, "2026-10-03")).toMatchObject({ firstClosingDate: "2026-10-16", accumulatedPct: null, adjustedAmount: null });
         expect(chargeAdjustment(condominium({ adjusts_with_rent: true }), lease, { igpm: [{ month: "2026-08", value: 1 }] }, today)).toMatchObject({ accumulatedPct: null, adjustedAmount: null });
     });
     it("is nothing for a fixed amount, a rule in words, or a rent that is not readjusted", () => {

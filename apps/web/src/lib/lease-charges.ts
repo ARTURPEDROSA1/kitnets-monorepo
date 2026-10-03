@@ -117,13 +117,21 @@ export interface ChargeAdjustment {
     /** `YYYY-MM-DD` */
     nextDate: string;
     cycleStart: string | null;
-    /** accumulated in the cycle, in %; null when the index has no series here or nothing of the cycle is published yet */
+    /** `YYYY-MM-DD` the cycle's first month closes: nothing is counted before it */
+    firstClosingDate: string | null;
+    /** accumulated in the cycle, in %; null when the index has no series here or nothing of the cycle counts yet */
     accumulatedPct: number | null;
+    /** whole months of the contract counted, and the days of the month in course on top of them */
+    monthsCounted: number;
     daysCounted: number;
+    /** the cycle's length in months */
+    frequencyMonths: number;
     /** `YYYY-MM-DD` the accumulated figure runs to */
     indexThroughDate: string | null;
     /** amount × accumulated factor: what the charge would be if adjusted today; null without a figure or an amount */
     adjustedAmount: number | null;
+    /** amount × the whole cycle's index: what it becomes at the adjustment; null until every month of the cycle is published */
+    closingAmount: number | null;
 }
 
 /**
@@ -150,9 +158,13 @@ export function chargeAdjustment(
         indexLabel: rule.index ? LEASE_INDEX_LABELS[rule.index] ?? rule.index : "Índice não informado",
         nextDate: s.nextAdjustmentDate,
         cycleStart: s.cycleStart,
+        firstClosingDate: s.firstClosingDate,
         accumulatedPct: known ? s.accumulatedPct : null,
+        monthsCounted: s.monthsCounted,
         daysCounted: s.daysCounted,
+        frequencyMonths: s.frequencyMonths,
         indexThroughDate: s.indexThroughDate,
         adjustedAmount: known && amount > 0 ? s.adjustedRent : null,
+        closingAmount: amount > 0 ? s.closingRent : null,
     };
 }
