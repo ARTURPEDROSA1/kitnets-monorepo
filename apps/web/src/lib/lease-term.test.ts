@@ -97,6 +97,17 @@ describe("leaseTermTotals", () => {
         expect(t.condo).toBeNull();
         expect(t.total.forecast).toBe(Math.round((46898.05 + 30 * 40) * 100) / 100);
     });
+    it("gives a fixed energy charge its own line: what the ledger says, then today's amount", () => {
+        // a house with solar panels: 36 months from 10/12/2025, R$ 4.000 + R$ 350 of energy
+        const house: TermLease = { start_date: "2025-12-10", end_date: "2028-12-09", rent_due_day: 10, monthly_rent: 4000, charges: [charge("ELECTRICITY", 350)] };
+        const ledger: RealizedMonth[] = months("2026-01", 9).map(month => ({ month, rent: 4000, condo: 0, energy: 350 }));
+        const t = leaseTermTotals(house, [], ledger, TODAY);
+        expect(t.condo).toBeNull();
+        expect(t.energy).toEqual({ realized: 3150, forecast: 9450, total: 12600 });   // 9 months in, 27 to come
+        expect(t.total.realized).toBe(36000 + 3150);
+        expect(t.total.forecast).toBe(108000 + 9450);
+        expect(leaseTermTotals(kitnet, adjustments, [], TODAY).energy).toBeNull();
+    });
     it("has only the realized side for an open-ended lease", () => {
         const t = leaseTermTotals({ ...kitnet, end_date: null }, adjustments, [{ month: "2025-01", rent: 1000, condo: 166.67 }], TODAY);
         expect(t).toMatchObject({ forecastKnown: false, rent: { realized: 1000, forecast: 0, total: 1000 } });

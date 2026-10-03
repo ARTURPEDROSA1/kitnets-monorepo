@@ -75,6 +75,8 @@ export interface RealizedMonth {
     month: string;
     rent: number;
     condo: number;
+    /** what the tenant paid for energy (inside the deposit, or by invoice) */
+    energy?: number;
 }
 
 export interface TermSplit {
@@ -89,7 +91,9 @@ export interface LeaseTermTotals {
     rent: TermSplit;
     /** the condominium the tenant pays; null when the tenant pays none with an amount */
     condo: TermSplit | null;
-    /** rent + condominium + the tenant's other fixed charges (these only in the forecast: the ledger does not track them) */
+    /** the energy the tenant pays the owner at a fixed amount (a house with solar panels); null when there is none */
+    energy: TermSplit | null;
+    /** rent + condominium + energy + the tenant's other fixed charges (these only in the forecast: the ledger does not track them) */
     total: TermSplit;
     /** false for an open-ended lease: there is no term to forecast, only what was realized */
     forecastKnown: boolean;
@@ -116,7 +120,9 @@ export function leaseTermTotals(lease: TermLease, adjustments: readonly Adjustme
     const tenantCondo = tenant.items.find(c => c.charge_type === "CONDOMINIUM") ?? null;
     const currentRent = Number(lease.monthly_rent) || 0;
     const currentCondo = tenantCondo ? amountOf(tenantCondo) : null;
-    const others = tenant.total - (currentCondo ?? 0);
+    const tenantEnergy = tenant.items.find(c => c.charge_type === "ELECTRICITY") ?? null;
+    const currentEnergy = tenantEnergy ? amountOf(tenantEnergy) : null;
+    const others = tenant.total - (currentCondo ?? 0) - (currentEnergy ?? 0);
 
     const sorted = [...adjustments].sort((a, b) => (a.effective_date < b.effective_date ? -1 : 1));
     const firstCondoChange = sorted.find(r => r.new_condo !== null);
@@ -137,25 +143,30 @@ export function leaseTermTotals(lease: TermLease, adjustments: readonly Adjustme
     const confirmed = new Set(realized.map(r => r.month));
     const rentRealized = realized.reduce((sum, r) => sum + r.rent, 0);
     const condoRealized = realized.reduce((sum, r) => sum + r.condo, 0);
+    const energyRealized = realized.reduce((sum, r) => sum + (r.energy ?? 0), 0);
 
     const schedule = paymentSchedule(lease.start_date, lease.termination_date ?? lease.end_date, lease.rent_due_day);
-    let rentForecast = 0, condoForecast = 0, otherForecast = 0, months = 0;
+    let rentForecast = 0, condoForecast = 0, energyForecast = 0, otherForecast = 0, months = 0;
     for (const p of schedule) {
         months += p.fraction;
         if (confirmed.has(p.month)) continue;
         const amounts = inForce(p.due);
         rentForecast += amounts.rent * p.fraction;
         condoForecast += (amounts.condo ?? 0) * p.fraction;
+        // the energy has no history of its own: today's amount
+        energyForecast += (currentEnergy ?? 0) * p.fraction;
         otherForecast += others * p.fraction;
     }
 
     const split = (r: number, f: number): TermSplit => ({ realized: cents(r), forecast: cents(f), total: cents(cents(r) + cents(f)) });
     const rent = split(rentRealized, rentForecast);
     const condo = currentCondo === null ? null : split(condoRealized, condoForecast);
+    const energy = currentEnergy === null ? null : split(energyRealized, energyForecast);
     return {
         rent,
         condo,
-        total: split(rent.realized + (condo?.realized ?? 0), rent.forecast + (condo?.forecast ?? 0) + otherForecast),
+        energy,
+        total: split(rent.realized + (condo?.realized ?? 0) + (energy?.realized ?? 0), rent.forecast + (condo?.forecast ?? 0) + (energy?.forecast ?? 0) + otherForecast),
         forecastKnown: schedule.length > 0,
         months: Math.round(months * 100) / 100,
     };
