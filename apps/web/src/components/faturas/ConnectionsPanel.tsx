@@ -8,7 +8,7 @@
  * the connection was last tested.
  */
 import React, { useRef, useState } from "react";
-import { AlertCircle, CheckCircle2, ChevronDown, ChevronUp, CreditCard, FileKey2, Landmark, Loader2, PlugZap, RefreshCw, ShieldCheck, Trash2, Upload, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, ChevronDown, ChevronUp, FileKey2, Landmark, Loader2, PlugZap, RefreshCw, ShieldCheck, Trash2, Upload, X } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { formatDateBR } from "@/lib/dates";
 import { Sensitive } from "@/components/privacy";
 import { CONNECTION_STATUS_META, certificateStanding, type ConnectionsView, type InterConnectionView } from "@/lib/billing/connections";
+import StripeConnectionCard from "./StripeConnectionCard";
 
 interface Props {
     connections: ConnectionsView;
@@ -293,10 +294,7 @@ export default function ConnectionsPanel({ connections, today, onChange }: Props
                 </div>
             </section>
 
-            <section className="rounded-xl border border-dashed border-border/80 px-4 py-3">
-                <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><CreditCard className="h-4 w-4 text-violet-500" /> Stripe — cartão de crédito</h2>
-                <p className="mt-0.5 text-xs text-muted-foreground">A conexão da sua conta Stripe, para o link de pagamento por cartão, entra numa próxima etapa do módulo.</p>
-            </section>
+            <StripeConnectionCard connections={connections} onChange={onChange} />
 
             {confirmDelete && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Remover as credenciais do Banco Inter">

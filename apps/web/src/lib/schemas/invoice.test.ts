@@ -64,7 +64,7 @@ describe("collectionUpdateSchema", () => {
 
 describe("billingSettingsSchema", () => {
     it("blank is not decided, never a default", () => {
-        expect(billingSettingsSchema.parse({ days_in_advance: "", fine_pct: "", interest_pct_month: null })).toEqual({ days_in_advance: null, fine_pct: null, interest_pct_month: null, days_payable_after_due: null, sender_name: null, reply_to_email: null, automation_enabled: false, automation_from_month: null });
+        expect(billingSettingsSchema.parse({ days_in_advance: "", fine_pct: "", interest_pct_month: null })).toEqual({ days_in_advance: null, fine_pct: null, interest_pct_month: null, days_payable_after_due: null, sender_name: null, reply_to_email: null, automation_enabled: false, automation_from_month: null, card_fee_pct: null, card_fee_fixed: null });
     });
 
     it("reads numbers as typed in Brazil", () => {
@@ -83,6 +83,14 @@ describe("billingSettingsSchema", () => {
         // off: nothing is required
         expect(billingSettingsSchema.parse({ ...decided, fine_pct: "", automation_enabled: false })).toMatchObject({ automation_enabled: false, fine_pct: null });
         expect(errorsOf(billingSettingsSchema, { automation_from_month: "11/2026" })).toEqual({ automation_from_month: "Mês inválido." });
+    });
+
+    it("the card fee comes whole or not at all", () => {
+        expect(billingSettingsSchema.parse({ card_fee_pct: "3,99", card_fee_fixed: "0,39" })).toMatchObject({ card_fee_pct: 3.99, card_fee_fixed: 0.39 });
+        expect(billingSettingsSchema.parse({ card_fee_pct: "0", card_fee_fixed: "R$ 0,00" })).toMatchObject({ card_fee_pct: 0, card_fee_fixed: 0 });
+        expect(errorsOf(billingSettingsSchema, { card_fee_pct: "3,99" })).toEqual({ card_fee_fixed: "Informe as duas partes da taxa do cartão, ou deixe as duas em branco." });
+        expect(errorsOf(billingSettingsSchema, { card_fee_fixed: "0,39" })).toEqual({ card_fee_pct: "Informe as duas partes da taxa do cartão, ou deixe as duas em branco." });
+        expect(errorsOf(billingSettingsSchema, { card_fee_pct: "55", card_fee_fixed: "0,39" })).toEqual({ card_fee_pct: "Taxa entre 0 e 50%." });
     });
 
     it("sender and reply-to", () => {

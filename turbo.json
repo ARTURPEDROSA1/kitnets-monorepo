@@ -16,7 +16,10 @@
         "BILLING_ENCRYPTION_KEY",
         "BILLING_ENCRYPTION_KEY_PREVIOUS",
         "RESEND_API_KEY",
-        "BILLING_EMAIL_FROM"
+        "BILLING_EMAIL_FROM",
+        "STRIPE_SECRET_KEY",
+        "STRIPE_CLIENT_ID",
+        "STRIPE_WEBHOOK_SECRET"
     ],
     "tasks": {
         "build": {

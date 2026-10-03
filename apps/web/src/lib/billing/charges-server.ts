@@ -25,7 +25,8 @@ import { ISSUE_BLOCKER_LABELS, buildChargePayload, issueBlockers, parseChargeSta
 
 export const INVOICE_DOCUMENTS_BUCKET = "invoice-documents";
 const TABLE = "invoice_charges";
-const COLUMNS = "id, invoice_id, owner_id, provider, kind, status, seu_numero, provider_ref, provider_status, amount, due_date, days_payable_after_due, nosso_numero, barcode, digitable_line, pix_txid, pix_copy_paste, pdf_path, paid_at, paid_amount, paid_via, attempts, last_error, last_checked_at, created_at";
+export const CHARGE_COLUMNS = "id, invoice_id, owner_id, provider, kind, status, seu_numero, provider_ref, provider_status, amount, net_amount, surcharge_amount, due_date, days_payable_after_due, nosso_numero, barcode, digitable_line, pix_txid, pix_copy_paste, pdf_path, payment_intent_id, checkout_url, expires_at, paid_at, paid_amount, paid_via, attempts, last_error, last_checked_at, created_at";
+const COLUMNS = CHARGE_COLUMNS;
 
 export interface ChargeRow {
     id: string;
@@ -38,6 +39,10 @@ export interface ChargeRow {
     provider_ref: string | null;
     provider_status: string | null;
     amount: number;
+    /** the card: what the owner receives (the invoice plus any late charges) */
+    net_amount: number | null;
+    /** the card: the fee passed on to the tenant */
+    surcharge_amount: number | null;
     due_date: string | null;
     days_payable_after_due: number | null;
     nosso_numero: string | null;
@@ -46,6 +51,12 @@ export interface ChargeRow {
     pix_txid: string | null;
     pix_copy_paste: string | null;
     pdf_path: string | null;
+    /** the card: Stripe's payment intent */
+    payment_intent_id: string | null;
+    /** the card: where the tenant types it (while the session is open) */
+    checkout_url: string | null;
+    /** the card: when the session stops taking the payment */
+    expires_at: string | null;
     paid_at: string | null;
     paid_amount: number | null;
     paid_via: "BOLETO" | "PIX" | "CARD" | null;
@@ -58,13 +69,19 @@ export interface ChargeRow {
 const LIVE: ReadonlySet<ChargeStatus> = new Set<ChargeStatus>(["REQUESTED", "OPEN"]);
 export const isLiveCharge = (c: Pick<ChargeRow, "status">) => LIVE.has(c.status);
 
-const normalize = (r: Record<string, unknown>): ChargeRow => ({
+export const normalizeCharge = (r: Record<string, unknown>): ChargeRow => ({
     ...(r as unknown as ChargeRow),
     amount: Number(r.amount) || 0,
+    net_amount: r.net_amount == null ? null : Number(r.net_amount),
+    surcharge_amount: r.surcharge_amount == null ? null : Number(r.surcharge_amount),
     paid_amount: r.paid_amount == null ? null : Number(r.paid_amount),
     due_date: r.due_date ? String(r.due_date).slice(0, 10) : null,
     attempts: Number(r.attempts) || 0,
 });
+const normalize = normalizeCharge;
+
+/** The boleto still waiting at the bank (a card session is another matter: lib/billing/card-server.ts). */
+export const isLiveBoleto = (c: Pick<ChargeRow, "status" | "kind">) => c.kind === "BOLEPIX" && LIVE.has(c.status);
 
 /** The charges of one invoice, newest first. */
 export async function loadCharges(supabase: AdminSupabase, profileId: string, invoiceId: string): Promise<ChargeRow[]> {
@@ -235,7 +252,7 @@ export async function refreshCharge(supabase: AdminSupabase, profileId: string, 
 
 /** Refreshes an invoice's live charge, if it has one. */
 export async function refreshInvoice(supabase: AdminSupabase, profileId: string, invoiceId: string, actor: "OWNER" | "SYSTEM" | "INTER" = "OWNER"): Promise<ChargeRow | null> {
-    const live = (await loadCharges(supabase, profileId, invoiceId)).find(isLiveCharge);
+    const live = (await loadCharges(supabase, profileId, invoiceId)).find(isLiveBoleto);
     if (!live) return null;
     try {
         return await refreshCharge(supabase, profileId, live, { actor });
@@ -255,7 +272,7 @@ export async function issueInvoice(supabase: AdminSupabase, profileId: string, i
     if (invoice.status === "CANCELLED") throw new HttpError(409, { error: "Esta fatura foi cancelada." });
 
     const existing = await loadCharges(supabase, profileId, invoiceId);
-    if (existing.some(isLiveCharge)) throw new HttpError(409, { error: "Esta fatura já tem um boleto ativo. Atualize o status ou cancele-o antes de emitir outro." });
+    if (existing.some(isLiveBoleto)) throw new HttpError(409, { error: "Esta fatura já tem um boleto ativo. Atualize o status ou cancele-o antes de emitir outro." });
 
     const dueDate = opts.dueDate ?? invoice.due_date;
     if (opts.dueDate && opts.dueDate < today) throw badRequest({ due_date: "A nova data de vencimento não pode ser passada." });
@@ -312,7 +329,7 @@ export async function issueInvoice(supabase: AdminSupabase, profileId: string, i
 
 /** Cancels the invoice's live charge at the bank (nothing to do when there is none). The charge's reason is what the owner typed. */
 export async function cancelChargeAtBank(supabase: AdminSupabase, profileId: string, invoiceId: string, reason: string | null): Promise<void> {
-    const live = (await loadCharges(supabase, profileId, invoiceId)).find(isLiveCharge);
+    const live = (await loadCharges(supabase, profileId, invoiceId)).find(isLiveBoleto);
     if (!live) return;
     if (live.provider_ref) {
         try {
@@ -362,7 +379,7 @@ export async function handleInterCallback(supabase: AdminSupabase, key: string, 
 /** Sandbox only: pays the invoice's live charge as the tenant would, then reads it back. */
 export async function paySandboxCharge(supabase: AdminSupabase, profileId: string, invoiceId: string, via: "BOLETO" | "PIX"): Promise<ChargeRow> {
     if (!sandboxAllowed()) throw new HttpError(403, { error: "Só no ambiente de testes." });
-    const live = (await loadCharges(supabase, profileId, invoiceId)).find(isLiveCharge);
+    const live = (await loadCharges(supabase, profileId, invoiceId)).find(isLiveBoleto);
     if (!live?.provider_ref) throw notFound("Esta fatura não tem um boleto ativo.");
     try {
         await withInterSession(supabase, profileId, session => payInterChargeSandbox(session, live.provider_ref as string, via));

@@ -16,6 +16,7 @@ import { loadBillingSettings } from "@/lib/invoice-views-server";
 import type { GenerateResult, InvoiceOrigin } from "@/lib/invoice-views";
 import type { BillingSettingsInput } from "@/lib/schemas/invoice";
 import { cancelChargeAtBank } from "@/lib/billing/charges-server";
+import { closeCardSessions } from "@/lib/billing/card-server";
 
 const TENANT_COLUMNS = "id, full_name, cpf, email, postal_code, street, street_number, address_complement, neighborhood, city, state, use_property_address";
 
@@ -103,8 +104,9 @@ export async function cancelInvoice(supabase: AdminSupabase, profileId: string, 
     const invoice = await ownedInvoice(supabase, profileId, invoiceId);
     if (invoice.status !== "DRAFT" && invoice.status !== "ISSUED") throw settled(invoice.status);
 
-    // the bank first: a boleto that stays alive after the invoice is gone could still be paid
+    // the bank first: a boleto that stays alive after the invoice is gone could still be paid; the card session likewise
     await cancelChargeAtBank(supabase, profileId, invoiceId, reason);
+    await closeCardSessions(supabase, profileId, invoiceId);
     // the database cancels it, records the event and takes it out of the income ledger in one go
     const { data, error } = await supabase.rpc("invoice_cancel", { p_owner: profileId, p_invoice: invoiceId, p_reason: reason, p_actor: "OWNER" });
     if (error) throw new Error(`invoice_cancel: ${error.message}`);

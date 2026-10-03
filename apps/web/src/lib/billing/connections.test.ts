@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NO_CONNECTIONS, certificateStanding, connectionAttention, type ConnectionsView, type InterConnectionView } from "./connections";
+import { NO_CONNECTIONS, certificateStanding, connectionAttention, stripeAttention, type ConnectionsView, type InterConnectionView, type StripeConnectionView } from "./connections";
 
 const TODAY = "2026-10-02";
 
@@ -45,5 +45,32 @@ describe("connectionAttention", () => {
         expect(connectionAttention(view({ inter: inter({ certificateExpiresAt: "2026-10-10T00:00:00.000Z" }) }), TODAY, true)).toMatchObject([{ kind: "certificate", tone: "rose" }]);
         expect(connectionAttention(view({ inter: inter({ certificateExpiresAt: "2026-09-01T00:00:00.000Z", usable: false }) }), TODAY, true))
             .toMatchObject([{ kind: "certificate", tone: "rose", text: expect.stringContaining("venceu") }]);
+    });
+});
+
+describe("stripeAttention", () => {
+    const stripe = (over: Partial<StripeConnectionView> = {}): StripeConnectionView => ({
+        status: "CONNECTED", environment: "PRODUCTION", accountTail: "…4Xk2", name: "Holding Pedrosa", country: "BR", chargesEnabled: true, payoutsEnabled: true, detailsSubmitted: true,
+        requirementsDue: [], configuredAt: "2026-10-01T10:00:00.000Z", lastCheckedAt: "2026-10-01T10:00:05.000Z", lastError: null, usable: true, ...over,
+    });
+    const withStripe = (over: Partial<ConnectionsView> = {}) => view({ stripeAvailable: true, stripe: stripe(), ...over });
+
+    it("says nothing while the server has no Stripe platform", () => {
+        expect(stripeAttention(view({ stripeAvailable: false, stripe: null }), true, false)).toEqual([]);
+    });
+
+    it("quietly suggests the card to an owner who collects", () => {
+        expect(stripeAttention(view({ stripeAvailable: true, stripe: null }), true, true)).toMatchObject([{ kind: "card_not_connected", tone: "slate", provider: "STRIPE" }]);
+        expect(stripeAttention(view({ stripeAvailable: true, stripe: null }), false, true)).toEqual([]);
+    });
+
+    it("says what keeps a connected account from taking cards", () => {
+        expect(stripeAttention(withStripe(), true, true)).toEqual([]);
+        expect(stripeAttention(withStripe(), true, false)).toMatchObject([{ kind: "card_fee", tone: "slate" }]);
+        expect(stripeAttention(withStripe({ stripe: stripe({ chargesEnabled: false, usable: false, requirementsDue: ["external_account"] }) }), true, true)).toMatchObject([{ kind: "card_pending", tone: "amber", text: expect.stringContaining("complete o cadastro") }]);
+        expect(stripeAttention(withStripe({ stripe: stripe({ environment: "SANDBOX", usable: false }) }), true, true)).toMatchObject([{ kind: "sandbox", tone: "amber", text: expect.stringContaining("de teste") }]);
+        expect(stripeAttention(withStripe({ stripe: stripe({ status: "ERROR", lastError: "A Stripe recusou a chave da plataforma.", usable: false }) }), true, true)).toMatchObject([{ kind: "error", tone: "rose" }]);
+        // through connectionAttention, after the bank's items
+        expect(connectionAttention(withStripe({ inter: inter({ status: "PENDING" }) }), TODAY, true, { cardFeeDecided: false }).map(i => i.provider)).toEqual(["INTER", "STRIPE"]);
     });
 });

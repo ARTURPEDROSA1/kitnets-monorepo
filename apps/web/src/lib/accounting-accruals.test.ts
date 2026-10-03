@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-    checklistSummary, closeChecklist, depreciationEntry, diffEntries, fairValueEntry, financingEntry, lateFeeEntry, lateFeeRef, monthEnd, monthRange, rentAccrual, rentRef,
+    cardSurchargeEntry, checklistSummary, closeChecklist, depreciationEntry, diffEntries, fairValueEntry, financingEntry, lateFeeEntry, lateFeeRef, monthEnd, monthRange, rentAccrual, rentRef,
     resolveEntries, shiftMonth, type AutoLine, type CloseFacts, type IncomeRowForAccrual, type PostableEntry, type StoredEntry,
 } from "./accounting-accruals";
 
@@ -161,6 +161,16 @@ describe("lateFeeEntry", () => {
 
     it("posts nothing for an invoice paid on time", () => {
         expect(lateFeeEntry({ ...invoice, late_fee_amount: 0 }, "X")).toBeNull();
+    });
+
+    it("posts the card fee passed on as a reimbursement, apart from the late fee", () => {
+        const e = cardSurchargeEntry({ ...invoice, surcharge_amount: 10.8 }, "Santo Antônio")!;
+        expect(e).toMatchObject({ source: "ACCRUAL", source_ref: "fatura:inv-1:tarifa-cartao", entry_date: "2026-10-19", description: "Taxa do cartão repassada na fatura nº 12 — Santo Antônio" });
+        expect(balanced(e.lines)).toBe(true);
+        expect(amount(e.lines, "ALUGUEIS_A_RECEBER", "debit")).toBe(10.8);
+        expect(amount(e.lines, "RECEITA_REEMBOLSOS", "credit")).toBe(10.8);
+        expect(cardSurchargeEntry(invoice, "X")).toBeNull();
+        expect(cardSurchargeEntry({ ...invoice, surcharge_amount: 0 }, "X")).toBeNull();
     });
 });
 

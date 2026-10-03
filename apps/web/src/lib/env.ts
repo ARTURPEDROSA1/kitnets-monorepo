@@ -52,6 +52,11 @@ export const serverSchema = z.object({
     // Invoices e-mailed to tenants through Resend (lib/billing/email-provider.ts). Both or neither: without them
     // nothing is sent and each delivery says so. The address must be on a domain verified in Resend.
     RESEND_API_KEY: nonEmpty.optional(),
+    // The Kitnets Stripe platform (Connect): the platform's secret key, its Connect client id and the Connect
+    // webhook's signing secret (lib/billing/stripe-client.ts). All three or none; a test key is the sandbox.
+    STRIPE_SECRET_KEY: z.string().regex(/^(sk|rk)_(live|test)_[A-Za-z0-9]+$/, "must be a Stripe secret key (sk_live_… / sk_test_…)").optional(),
+    STRIPE_CLIENT_ID: z.string().regex(/^ca_[A-Za-z0-9]+$/, "must be a Stripe Connect client id (ca_…)").optional(),
+    STRIPE_WEBHOOK_SECRET: z.string().regex(/^whsec_[A-Za-z0-9]+$/, "must be a Stripe webhook signing secret (whsec_…)").optional(),
     BILLING_EMAIL_FROM: z.string().regex(/^(?:[^<>]+<)?[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+>?$/, "must be an e-mail address, optionally as \"Name <address>\"").optional(),
     // Source-map upload at build time only.
     SENTRY_ORG: nonEmpty.optional(),
@@ -119,6 +124,15 @@ export function parseEnv(
             path: [input.RESEND_API_KEY ? "BILLING_EMAIL_FROM" : "RESEND_API_KEY"],
             message: "set RESEND_API_KEY and BILLING_EMAIL_FROM together (invoices are e-mailed through Resend)",
         });
+    }
+
+    if (scope === "server") {
+        const stripe = [input.STRIPE_SECRET_KEY, input.STRIPE_CLIENT_ID, input.STRIPE_WEBHOOK_SECRET].filter(Boolean).length;
+        if (stripe > 0 && stripe < 3) {
+            for (const key of ["STRIPE_SECRET_KEY", "STRIPE_CLIENT_ID", "STRIPE_WEBHOOK_SECRET"] as const) {
+                if (!input[key]) issues.push({ code: z.ZodIssueCode.custom, path: [key], message: "set STRIPE_SECRET_KEY, STRIPE_CLIENT_ID and STRIPE_WEBHOOK_SECRET together (the card payment)" });
+            }
+        }
     }
 
     if (mode === "strict" && scope === "server" && !input.GEMINI_API_KEY && !input.OPENAI_API_KEY) {

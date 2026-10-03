@@ -4,7 +4,7 @@
  * digitable line and PDF. A server component; the page loads the invoice and makes the QR code.
  */
 import React from "react";
-import { AlertCircle, CheckCircle2, Clock, FileDown, Receipt } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, CreditCard, FileDown, Receipt } from "lucide-react";
 import { formatDateBR } from "@/lib/dates";
 import { monthLabel } from "@/lib/invoice-schedule";
 import { PUBLIC_STATE_META, publicInvoiceState, type PublicInvoice, type PublicInvoiceState } from "@/lib/billing/public-invoice";
@@ -61,11 +61,16 @@ interface Props {
     qrSvg: string | null;
     /** where the boleto's PDF is served */
     pdfHref: string;
+    /** where the card button posts to (`/api/pagar/[token]/cartao`) */
+    cardAction: string;
     /** `YYYY-MM-DD` in Brasília */
     today: string;
+    /** what the return from Stripe Checkout left in the URL */
+    cardOutcome?: "ok" | "cancelado" | "erro" | null;
+    cardError?: string | null;
 }
 
-export default function PublicInvoiceView({ invoice, qrSvg, pdfHref, today }: Props) {
+export default function PublicInvoiceView({ invoice, qrSvg, pdfHref, cardAction, today, cardOutcome = null, cardError = null }: Props) {
     const state = publicInvoiceState(invoice, today);
     const meta = PUBLIC_STATE_META[state];
     const charge = invoice.charge;
@@ -73,6 +78,8 @@ export default function PublicInvoiceView({ invoice, qrSvg, pdfHref, today }: Pr
     const greeting = invoice.payer_first_name ? `Olá, ${invoice.payer_first_name}.` : "Olá.";
     const terms = [invoice.fine_pct !== null ? `multa de ${pct(invoice.fine_pct)}` : null, invoice.interest_pct_month !== null ? `juros de ${pct(invoice.interest_pct_month)} ao mês` : null].filter(Boolean).join(" e ");
     const payableUntil = invoice.days_payable_after_due !== null && charge?.due_date ? plusDays(charge.due_date, invoice.days_payable_after_due) : null;
+    const card = invoice.card.available ? invoice.card : null;
+    const cardOpen = state !== "paid" && state !== "cancelled" && card !== null;
 
     return (
         <Shell>
@@ -100,6 +107,13 @@ export default function PublicInvoiceView({ invoice, qrSvg, pdfHref, today }: Pr
                     Vencida em {formatDateBR(invoice.due_date)}. O boleto e o PIX ainda aceitam o pagamento{payableUntil ? ` até ${payableUntil}` : ""}{terms ? `, com ${terms} calculados pelo banco` : ""}.
                 </Notice>
             )}
+            {state !== "paid" && cardOutcome === "ok" && (
+                <Notice tone="emerald" icon={<Clock className="mt-0.5 h-4 w-4 shrink-0" />}>
+                    {card?.processing ? "Pagamento por cartão em processamento. A confirmação da Stripe chega em instantes; recarregue a página." : "Obrigado! Assim que a Stripe confirmar o pagamento, a fatura aparece como paga aqui."}
+                </Notice>
+            )}
+            {cardOutcome === "cancelado" && <Notice tone="slate" icon={<AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />}>O pagamento por cartão não foi concluído. Você pode tentar de novo, ou pagar pelo PIX ou boleto.</Notice>}
+            {cardOutcome === "erro" && <Notice tone="rose" icon={<AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />}>{cardError || "Não foi possível abrir o pagamento por cartão."}</Notice>}
 
             <section className="rounded-2xl border border-border/80 bg-card">
                 <div className="p-5">
@@ -151,6 +165,29 @@ export default function PublicInvoiceView({ invoice, qrSvg, pdfHref, today }: Pr
                         {terms && state === "pay" && (
                             <p className="text-xs text-muted-foreground">Após o vencimento: {terms} (pro rata){payableUntil ? `; aceito até ${payableUntil}` : ""}.</p>
                         )}
+                    </div>
+                </section>
+            )}
+
+            {cardOpen && card && (
+                <section className="rounded-2xl border border-border/80 bg-card">
+                    <header className="flex items-center gap-2 border-b border-border/60 px-5 py-3 text-sm font-semibold text-foreground"><CreditCard className="h-4 w-4 text-violet-500" /> Cartão de crédito</header>
+                    <div className="space-y-3 p-5">
+                        <p className="text-sm text-foreground">Pague agora, em página segura da Stripe. {card.surcharge > 0 ? "A taxa de processamento do cartão é somada ao valor." : ""}</p>
+                        <table className="w-full text-sm">
+                            <tbody>
+                                <tr><td className="py-1 text-muted-foreground">Fatura</td><td className="py-1 text-right tabular-nums">{brl(invoice.amount)}</td></tr>
+                                {card.late_extra > 0 && <tr><td className="py-1 text-muted-foreground">Multa e juros ({card.days_late} {card.days_late === 1 ? "dia" : "dias"} de atraso)</td><td className="py-1 text-right tabular-nums">{brl(card.late_extra)}</td></tr>}
+                                {card.surcharge > 0 && <tr><td className="py-1 text-muted-foreground">Taxa de processamento do cartão</td><td className="py-1 text-right tabular-nums">{brl(card.surcharge)}</td></tr>}
+                                <tr><td className="pt-2 font-semibold text-foreground">Total no cartão</td><td className="pt-2 text-right text-lg font-bold tabular-nums text-foreground">{brl(card.gross)}</td></tr>
+                            </tbody>
+                        </table>
+                        <form method="post" action={cardAction}>
+                            <button type="submit" className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-violet-600 px-4 py-3 text-sm font-semibold text-white hover:bg-violet-700 sm:w-auto">
+                                <CreditCard className="h-4 w-4" /> Pagar {brl(card.gross)} com cartão
+                            </button>
+                        </form>
+                        <p className="text-xs text-muted-foreground">O valor é lançado na fatura do cartão como &ldquo;FATURA {invoice.number}&rdquo;. Pagou pelo cartão? O boleto e o PIX deixam de valer na hora.</p>
                     </div>
                 </section>
             )}

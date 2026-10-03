@@ -38,6 +38,8 @@ export interface PublicInvoice {
         has_pdf: boolean;
     } | null;
     paid: { on: string; via: string | null } | null;
+    /** the card, when the owner offers it: what it costs today (lib/billing/card-offer.ts) */
+    card: { available: true; gross: number; surcharge: number; net: number; late_extra: number; days_late: number; /** the tenant just came back from Checkout and Stripe has not confirmed yet */ processing: boolean } | { available: false };
 }
 
 export type PublicInvoiceState = "pay" | "preparing" | "expired" | "paid" | "cancelled" | "late_pay";

@@ -200,9 +200,33 @@ export interface PaidInvoiceLateFee {
     paid_on: string;
     /** multa + juros the tenant paid above the invoice's amount */
     late_fee_amount: number;
+    /** the card fee passed on to the tenant (paid by card) */
+    surcharge_amount?: number;
 }
 
 export const lateFeeRef = (invoiceId: string) => `fatura:${invoiceId}:encargos`;
+export const cardSurchargeRef = (invoiceId: string) => `fatura:${invoiceId}:tarifa-cartao`;
+
+/**
+ * The card fee the tenant paid on top of an invoice paid by card: the owner's processor keeps about
+ * the same from the payout, so this is the reimbursement of a charge, posted on the day of the
+ * payment (the fee itself reaches the books with the Stripe payout on the bank statement).
+ */
+export function cardSurchargeEntry(invoice: PaidInvoiceLateFee, propertyName: string): AutoEntry | null {
+    const amount = round2(Number(invoice.surcharge_amount) || 0);
+    if (amount <= 0) return null;
+    const tag = { property_id: invoice.property_id, unit_id: invoice.unit_id || null };
+    return {
+        source: "ACCRUAL",
+        source_ref: cardSurchargeRef(invoice.id),
+        entry_date: invoice.paid_on.slice(0, 10),
+        description: `Taxa do cartão repassada na fatura nº ${invoice.number} — ${propertyName}`.slice(0, 300),
+        lines: [
+            { key: "ALUGUEIS_A_RECEBER", debit: amount, credit: 0, ...tag, memo: "taxa do cartão paga pelo inquilino" },
+            { key: "RECEITA_REEMBOLSOS", debit: 0, credit: amount, ...tag, memo: null },
+        ],
+    };
+}
 
 /**
  * The late fee and interest a tenant paid on an invoice: financial revenue of the day it was paid.
