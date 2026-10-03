@@ -37,19 +37,33 @@ export async function loadLeaseRows(supabase: AdminSupabase, profileId: string):
     const ids = leases.map(l => String(l.id));
     const counts = new Map<string, number>();
     const charges = new Map<string, LeaseWithDetails["charges"]>();
+    const adjustments = new Map<string, NonNullable<LeaseWithDetails["adjustments"]>>();
     if (ids.length > 0) {
-        const [{ data: docs }, { data: chargeRows }] = await Promise.all([
+        const [{ data: docs }, { data: chargeRows }, { data: adjustmentRows, error: adjustmentError }] = await Promise.all([
             supabase.from("lease_documents").select("lease_id").in("lease_id", ids),
             // the hub's cards name the condominium or the energy and add up what the tenant pays
             supabase.from("lease_charges").select("*").in("lease_id", ids),
+            // what each adjustment took and left: the total over the term counts every month at its own amount
+            supabase.from("lease_adjustments").select("lease_id, effective_date, previous_rent, new_rent, previous_condo, new_condo").in("lease_id", ids).order("effective_date", { ascending: true }),
         ]);
+        if (adjustmentError) console.error("[Lease views] adjustments failed:", adjustmentError.message);
+        for (const a of (adjustmentRows || []) as Array<Record<string, unknown>>) {
+            const leaseId = String(a.lease_id);
+            adjustments.set(leaseId, [...(adjustments.get(leaseId) ?? []), {
+                effective_date: String(a.effective_date).slice(0, 10),
+                previous_rent: Number(a.previous_rent) || 0,
+                new_rent: Number(a.new_rent) || 0,
+                previous_condo: a.previous_condo === null ? null : Number(a.previous_condo),
+                new_condo: a.new_condo === null ? null : Number(a.new_condo),
+            }]);
+        }
         for (const d of docs || []) counts.set(d.lease_id, (counts.get(d.lease_id) ?? 0) + 1);
         for (const c of (chargeRows || []) as unknown as LeaseWithDetails["charges"]) charges.set(c.lease_id, [...(charges.get(c.lease_id) ?? []), c]);
     }
 
     return leases.map(l => {
         const flat = flattenLease(l);
-        return { ...flat, document_count: counts.get(String(flat.id)) ?? 0, charges: charges.get(String(flat.id)) ?? [] } as unknown as LeaseWithDetails;
+        return { ...flat, document_count: counts.get(String(flat.id)) ?? 0, charges: charges.get(String(flat.id)) ?? [], adjustments: adjustments.get(String(flat.id)) ?? [] } as unknown as LeaseWithDetails;
     });
 }
 

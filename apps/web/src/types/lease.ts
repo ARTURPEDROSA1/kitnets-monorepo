@@ -78,6 +78,17 @@ export interface LeaseWithDetails extends Lease {
     additional_tenants: LeaseTenantWithName[];
     charges: LeaseCharge[];
     documents: LeaseDocument[];
+    /** what each adjustment took and left (list endpoint only): the totals over the term follow them */
+    adjustments?: LeaseAdjustmentBrief[];
+}
+
+/** One row of the lease's adjustment history, cut to its amounts (lib/lease-adjustments.ts). */
+export interface LeaseAdjustmentBrief {
+    effective_date: string;
+    previous_rent: number;
+    new_rent: number;
+    previous_condo: number | null;
+    new_condo: number | null;
 }
 
 // ── Related table interfaces ─────────────────────────────────────────

@@ -31,8 +31,8 @@ import {
 import type { LeaseDashboardView } from "@/lib/lease-views";
 import type { IndexPoint } from "@/lib/lease-summary";
 import type { LeaseWithDetails } from "@/types/lease";
-import { RESPONSIBILITY_LABELS as CHARGE_RESPONSIBILITY, amountOf, chargeAdjustment, contractTotal, featuredCharge, monthlyTotal, tenantCharges } from "@/lib/lease-charges";
-import { pastAdjustmentDates } from "@/lib/lease-adjustments";
+import { RESPONSIBILITY_LABELS as CHARGE_RESPONSIBILITY, amountOf, chargeAdjustment, featuredCharge, monthlyTotal, tenantCharges } from "@/lib/lease-charges";
+import { contractTotals, pastAdjustmentDates } from "@/lib/lease-adjustments";
 import LeaseAdjustmentTable from "./LeaseAdjustmentTable";
 import LeaseAddendumModal from "./LeaseAddendumModal";
 import LeaseDocuments from "./LeaseDocuments";
@@ -148,14 +148,18 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
     // what the adjustments already made of the contract's original rent
     const history = bundle.adjustments ?? null;
     const lastAdjustment = history && history.rows.length > 0 ? history.rows[history.rows.length - 1] : null;
+    // what the contract adds up to over its term, each month at the amount in force then
+    const totals = contractTotals(lease, row.termMonths, history?.rows ?? [], today);
+    const featuredTotal = !totals || row.termMonths === null || !featured.charge || featured.charge.responsibility !== "TENANT" || amountOf(featured.charge) <= 0 ? null
+        : featured.charge.charge_type === "CONDOMINIUM" ? totals.condo : Math.round(amountOf(featured.charge) * row.termMonths * 100) / 100;
+    const totalLine = (value: number | null) => (value !== null ? <>Total no contrato: <Money>{brl(value)}</Money></> : "Prazo indeterminado: sem total");
     const monthly = monthlyTotal(rent, lease.charges);
-    const total = contractTotal(monthly, row.termMonths);
     const chargeName = (c: LeaseWithDetails["charges"][number]) => (c.charge_type === "OTHER" && c.label ? c.label : CHARGE_LABELS[c.charge_type] ?? c.charge_type);
     const endTone: PairTone | undefined = !row.inForce ? undefined : summary.daysLeft !== null && summary.daysLeft < 0 ? "bad" : summary.daysLeft !== null && summary.daysLeft <= 90 ? "warn" : undefined;
     const cycleKnown = summary.accumulatedPct !== null && summary.monthsCounted > 0;
     const cardInfo: TileInfo = {
         what: `O contrato lido como na ficha do imóvel: prazo, vencimento, reajuste pelo índice acumulado no ciclo (contado como o mercado conta: cada mês do contrato, do dia do início ao mesmo dia do mês seguinte, leva o índice cheio do mês em que começa; a cada aniversário o aluguel é corrigido pelo acumulado do ciclo que terminou), ${featured.label.toLowerCase()} e o total que sai do bolso do inquilino; o que a razão de receitas registrou e a caução.`,
-        formula: <>Acumulado no ciclo = Π (1 + índice do mês) dos meses do contrato já fechados; o mês em curso entra por dia: (1 + índice)^(dias decorridos ÷ dias do mês do contrato). Nada conta antes de fechar o primeiro mês<br />Aluguel reajustado até hoje = aluguel × (1 + acumulado)<br />Condomínio reajustado até hoje = condomínio × (1 + acumulado), quando ele reajusta com o aluguel ou tem índice próprio<br />Total mensal = aluguel + encargos com valor fixo pagos pelo inquilino<br />Valor total do contrato = total mensal × meses do prazo</>,
+        formula: <>Acumulado no ciclo = Π (1 + índice do mês) dos meses do contrato já fechados; o mês em curso entra por dia: (1 + índice)^(dias decorridos ÷ dias do mês do contrato). Nada conta antes de fechar o primeiro mês<br />Prévia do próximo reajuste (no histórico) = valor atual × (1 + acumulado)<br />Total mensal = aluguel + encargos com valor fixo pagos pelo inquilino<br />Total no contrato = soma dos meses do prazo, cada um pelo valor que valia; os meses à frente, pelo valor de hoje</>,
         example: cycleKnown && summary.adjustedRent !== null ? `${brl(rent)} × (1 ${summary.accumulatedPct! >= 0 ? "+" : "−"} ${Math.abs(summary.accumulatedPct!).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}%) = ${brl(summary.adjustedRent)}` : undefined,
         note: "O valor reajustado é uma prévia. No reajuste valem os índices cheios dos meses do ciclo (de setembro a agosto, num contrato iniciado em setembro), a conta que o mercado faz. O recebido vem da razão de receitas do imóvel, líquido da taxa da imobiliária quando há.",
     };
@@ -231,12 +235,13 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                 <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 space-y-0.5">
                         <h2 className="inline-flex items-center gap-2 text-base font-bold text-foreground"><FileSignature className="h-4 w-4 text-emerald-600" /> Contrato de aluguel</h2>
-                        <p className="text-xs text-muted-foreground">Prazo, vencimento, reajuste pelo índice do contrato e o aluguel corrigido até hoje; {featured.label.toLowerCase()} e o total mensal do inquilino; o recebido e a caução.</p>
+                        <p className="text-xs text-muted-foreground">Prazo; aluguel, {featured.label.toLowerCase()} e total do inquilino, por mês e no contrato inteiro; o reajuste pelo índice; o recebido e a caução.</p>
                     </div>
                     <CardInfoIcon label="Contrato de aluguel" icon={<CalendarClock className="h-4 w-4" />} info={cardInfo} className={cn("p-2", TILE_TONES.emerald)} />
                 </div>
 
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {/* The term */}
                     <Pair
                         left={{ label: "Início do contrato", value: formatDateBR(lease.start_date), hint: `Há ${plural(summary.daysElapsed, "dia", "dias")}` }}
                         right={{
@@ -248,31 +253,54 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                         }}
                         footer={summary.progressPct !== null ? <TermProgress pct={summary.progressPct} tone={endTone} /> : undefined}
                     />
+                    {/* What the tenant pays each month, and under it what it adds up to over the term */}
                     <Pair
                         left={{
+                            label: agencyManaged ? "Aluguel bruto" : "Aluguel", value: <Money>{brl(rent)}</Money>,
+                            hint: (
+                                <>
+                                    {totalLine(totals ? totals.rent : null)}
+                                    <br />
+                                    {lastAdjustment && history
+                                        ? <>Reajustado em {formatDateBR(lastAdjustment.effective_date)} · no contrato <Money>{brl(history.initial.rent)}</Money></>
+                                        : agencyManaged ? "Valor do contrato, antes da taxa da imobiliária" : "Valor do contrato"}
+                                </>
+                            ),
+                        }}
+                        right={{
+                            label: featured.label,
+                            value: featured.charge && amountOf(featured.charge) > 0 ? <Money>{brl(amountOf(featured.charge))}</Money> : featured.charge ? "Sem valor" : "—",
+                            hint: featured.charge
+                                ? (
+                                    <>
+                                        {featuredTotal !== null && <>{totalLine(featuredTotal)}<br /></>}
+                                        {CHARGE_RESPONSIBILITY[featured.charge.responsibility] ?? featured.charge.responsibility}
+                                        {featured.charge.adjusts_with_rent ? " · reajusta com o aluguel" : featured.charge.adjustment_index ? ` · ${CHARGE_INDEX_LABELS[featured.charge.adjustment_index] ?? featured.charge.adjustment_index}` : ""}
+                                    </>
+                                )
+                                : "Não informado no contrato",
+                        }}
+                    />
+                    <Pair
+                        left={{
+                            label: "Total mensal", value: <Money>{brl(monthly)}</Money>,
+                            hint: (
+                                <>
+                                    {totals ? <>Total no contrato: <Money>{brl(totals.total)}</Money>{row.termMonths !== null ? ` · ${row.termMonths} meses` : ""}</> : "Prazo indeterminado: sem total"}
+                                    <br />
+                                    {tenantFixed.items.length > 0 ? <>Aluguel + {tenantFixed.items.map(chargeName).join(" + ")}</> : "Só o aluguel: sem encargos fixos do inquilino"}
+                                </>
+                            ),
+                        }}
+                        right={{
                             label: "Vencimento do aluguel", value: `Todo dia ${lease.rent_due_day}`,
                             hint: row.inForce ? <>Próximo: {formatDateBR(summary.nextDueDate)}<br />{summary.daysToDue === 0 ? "Vence hoje" : `Em ${plural(summary.daysToDue, "dia", "dias")}`}</> : "Contrato encerrado",
                         }}
-                        right={{
-                            label: "Aluguel atual", value: <Money>{brl(rent)}</Money>,
-                            hint: lastAdjustment && history
-                                ? <>Reajustado em {formatDateBR(lastAdjustment.effective_date)}<br />No contrato: <Money>{brl(history.initial.rent)}</Money>{agencyManaged ? " · antes da taxa da imobiliária" : ""}</>
-                                : agencyManaged ? "Valor do contrato, antes da taxa da imobiliária" : "Valor do contrato",
-                        }}
                     />
+                    {/* The adjustment: by which index, when, and what the cycle has accumulated so far (the amounts are in the history below) */}
                     <Pair
                         left={{ label: "Índice de reajuste", value: row.indexLabel, hint: summary.nextAdjustmentDate ? `A cada ${summary.frequencyMonths} meses` : "Contrato sem reajuste" }}
                         right={{
-                            label: "Acumulado no ciclo",
-                            tone: !cycleKnown ? undefined : summary.accumulatedPct! < 0 ? "bad" : "good",
-                            value: cycleKnown ? pctText(summary.accumulatedPct!) : "—",
-                            hint: cycleKnown
-                                ? <>{countedText(summary.monthsCounted, summary.daysCounted)} de {summary.frequencyMonths} meses<br />{formatDateBR(summary.cycleStart)} a {formatDateBR(summary.indexThroughDate)}</>
-                                : !summary.nextAdjustmentDate ? "—" : !row.seriesCode ? "Índice sem série no Kitnets: informe o percentual no reajuste" : summary.accumulatedPct !== null ? waitingText(summary.firstClosingDate, today) : "Série do índice indisponível no momento",
-                        }}
-                    />
-                    <Pair
-                        left={{
                             label: "Próximo reajuste", value: row.inForce && summary.nextAdjustmentDate ? formatDateBR(summary.nextAdjustmentDate) : "—",
                             tone: row.inForce && summary.daysToAdjustment !== null && summary.daysToAdjustment <= 30 ? "warn" : undefined,
                             hint: !row.inForce ? "Contrato encerrado" : summary.daysToAdjustment === null ? "—" : (
@@ -283,76 +311,44 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                                 </>
                             ),
                         }}
-                        right={{
-                            label: "Aluguel reajustado até hoje", value: row.inForce && cycleKnown && summary.adjustedRent !== null ? <Money>{brl(summary.adjustedRent)}</Money> : "—",
-                            hint: row.inForce && cycleKnown && summary.adjustedRent !== null
-                                ? <><Money>{summary.adjustedRent >= rent ? "+" : "−"}{brl(Math.abs(summary.adjustedRent - rent))}</Money> sobre o atual<br />Prévia com o índice até {formatDateBR(summary.indexThroughDate)}</>
-                                : "—",
-                        }}
                     />
                     <Pair
                         left={{
-                            label: featured.label,
-                            value: featured.charge && amountOf(featured.charge) > 0 ? <Money>{brl(amountOf(featured.charge))}</Money> : featured.charge ? "Sem valor" : "—",
-                            hint: featured.charge
-                                ? `${CHARGE_RESPONSIBILITY[featured.charge.responsibility] ?? featured.charge.responsibility}${featured.charge.adjusts_with_rent ? " · reajusta com o aluguel" : featured.charge.adjustment_index ? ` · ${CHARGE_INDEX_LABELS[featured.charge.adjustment_index] ?? featured.charge.adjustment_index}` : ""}`
-                                : "Não informado no contrato",
+                            label: "Acumulado do aluguel",
+                            tone: !cycleKnown ? undefined : summary.accumulatedPct! < 0 ? "bad" : "good",
+                            value: cycleKnown ? pctText(summary.accumulatedPct!) : "—",
+                            hint: cycleKnown
+                                ? <>{countedText(summary.monthsCounted, summary.daysCounted)} de {summary.frequencyMonths} meses<br />{formatDateBR(summary.cycleStart)} a {formatDateBR(summary.indexThroughDate)}</>
+                                : !summary.nextAdjustmentDate ? "—" : !row.seriesCode ? "Índice sem série no Kitnets: informe o percentual no reajuste" : summary.accumulatedPct !== null ? waitingText(summary.firstClosingDate, today) : "Série do índice indisponível no momento",
                         }}
-                        right={{
-                            label: "Total mensal", value: <Money>{brl(monthly)}</Money>,
-                            hint: tenantFixed.items.length > 0
-                                ? <>Aluguel + {tenantFixed.items.map(chargeName).join(" + ")}<br /><Money>{brl(tenantFixed.total)}</Money> de encargos do inquilino</>
-                                : "Só o aluguel: sem encargos fixos do inquilino",
-                        }}
-                        footer={(
-                            <div className="flex items-baseline justify-between gap-2 border-t border-border/60 px-3 py-2 text-[11px] text-muted-foreground">
-                                <span>Valor total do contrato{row.termMonths !== null ? ` · ${row.termMonths} meses` : ""}</span>
-                                <span className="font-semibold tabular-nums text-foreground">{total !== null ? <Money>{brl(total)}</Money> : "Prazo indeterminado"}</span>
-                            </div>
-                        )}
+                        right={condo && condoAdjustment ? {
+                            label: "Acumulado do condomínio",
+                            tone: condoAdjustment.accumulatedPct === null ? undefined : condoAdjustment.accumulatedPct < 0 ? "bad" : "good",
+                            value: condoAdjustment.accumulatedPct !== null ? pctText(condoAdjustment.accumulatedPct) : "—",
+                            hint: (
+                                <>
+                                    {condoAdjustment.indexLabel} · {condoAdjustment.withRent ? "reajusta com o aluguel" : "índice do encargo"}<br />
+                                    {condoAdjustment.accumulatedPct !== null
+                                        ? <>{countedText(condoAdjustment.monthsCounted, condoAdjustment.daysCounted)} de {condoAdjustment.frequencyMonths} meses</>
+                                        : !condoCode || !(condoCode in seriesByCode) ? "Índice sem série no Kitnets"
+                                        : seriesByCode[condoCode] ? waitingText(condoAdjustment.firstClosingDate, today) : "Série do índice indisponível no momento"}
+                                </>
+                            ),
+                        } : { label: "Acumulado do condomínio", value: "—", hint: condo ? "O condomínio não reajusta por índice" : "Contrato sem condomínio" }}
                     />
-                    {/* The condominium's own pair, like the rent's "Acumulado no ciclo" and "Aluguel reajustado até hoje" */}
-                    {condo && condoAdjustment && (
-                        <Pair
-                            left={{
-                                label: "Acumulado do condomínio",
-                                tone: condoAdjustment.accumulatedPct === null ? undefined : condoAdjustment.accumulatedPct < 0 ? "bad" : "good",
-                                value: condoAdjustment.accumulatedPct !== null ? pctText(condoAdjustment.accumulatedPct) : "—",
-                                hint: (
-                                    <>
-                                        {condoAdjustment.indexLabel} · {condoAdjustment.withRent ? "reajusta com o aluguel" : "índice do encargo"}<br />
-                                        {condoAdjustment.accumulatedPct !== null
-                                            ? <>{countedText(condoAdjustment.monthsCounted, condoAdjustment.daysCounted)} de {condoAdjustment.frequencyMonths} meses, até {formatDateBR(condoAdjustment.indexThroughDate)}</>
-                                            : !condoCode || !(condoCode in seriesByCode) ? "Índice sem série no Kitnets"
-                                            : seriesByCode[condoCode] ? waitingText(condoAdjustment.firstClosingDate, today) : "Série do índice indisponível no momento"}
-                                    </>
-                                ),
-                            }}
-                            right={{
-                                label: "Condomínio reajustado até hoje",
-                                value: row.inForce && condoAdjustment.adjustedAmount !== null ? <Money>{brl(condoAdjustment.adjustedAmount)}</Money> : "—",
-                                hint: !row.inForce ? "Contrato encerrado" : (
-                                    <>
-                                        {condoAdjustment.adjustedAmount !== null && (
-                                            <><Money>{condoAdjustment.adjustedAmount >= amountOf(condo) ? "+" : "−"}{brl(Math.abs(condoAdjustment.adjustedAmount - amountOf(condo)))}</Money> sobre o atual<br /></>
-                                        )}
-                                        Próximo reajuste em {formatDateBR(condoAdjustment.nextDate)}
-                                        {condoAdjustment.closingAmount !== null && <>: <Money>{brl(condoAdjustment.closingAmount)}</Money></>}
-                                    </>
-                                ),
-                            }}
-                        />
-                    )}
                     <Pair
                         left={{
                             label: agencyManaged ? "Recebido (líquido)" : "Recebido", value: income.confirmedMonths > 0 ? <Money>{brl(income.received)}</Money> : "—",
                             hint: income.confirmedMonths > 0
-                                ? <>{plural(income.confirmedMonths, "mês confirmado", "meses confirmados")}{income.expectedMonths > 0 ? ` · ${income.expectedMonths} previsto${income.expectedMonths === 1 ? "" : "s"}` : ""}{income.missingMonths > 0 ? ` · ${income.missingMonths} sem lançamento` : ""}</>
+                                ? <>{plural(income.confirmedMonths, "mês confirmado", "meses confirmados")}{income.expectedMonths > 0 ? ` · ${income.expectedMonths} previsto${income.expectedMonths === 1 ? "" : "s"}` : ""}{income.missingMonths > 0 ? ` · ${plural(income.missingMonths, "mês vencido", "meses vencidos")} sem lançamento` : ""}</>
                                 : "Sem lançamentos na razão de receitas do imóvel",
                         }}
                         right={{
                             label: "Caução", value: lease.security_deposit ? <Money>{brl(Number(lease.security_deposit))}</Money> : "—",
-                            hint: lease.security_deposit ? `${lease.deposit_months ? `${plural(lease.deposit_months, "aluguel", "aluguéis")} · ` : ""}devolvida no fim do contrato` : "Sem caução informada",
+                            // an agency-managed lease leaves the deposit in the agency's custody, as the contract says
+                            hint: lease.security_deposit
+                                ? <>{lease.deposit_months ? <>{plural(lease.deposit_months, "aluguel", "aluguéis")}<br /></> : null}{agencyManaged ? "Sob custódia da imobiliária, por contrato" : "Devolvida no fim do contrato"}</>
+                                : "Sem caução informada",
                         }}
                     />
                 </div>

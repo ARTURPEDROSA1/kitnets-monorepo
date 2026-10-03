@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { NEGATIVE_NOTE, adjustableCondo, adjusted, cycleOf, dueAdjustments, initialValues, pastAdjustmentDates, rentChangePct, withAddendum, type AdjustableLease, type AdjustmentRow } from "./lease-adjustments";
+import type { LeaseCharge } from "@/types/lease";
+import { NEGATIVE_NOTE, adjustableCondo, adjusted, contractTotals, cycleOf, dueAdjustments, initialValues, pastAdjustmentDates, rentChangePct, withAddendum, type AdjustableLease, type AdjustmentRow } from "./lease-adjustments";
 import type { IndexPoint } from "./lease-summary";
 
 /** `n` months of the same rate from `from` (`YYYY-MM`). */
@@ -168,5 +169,34 @@ describe("initialValues + rentChangePct", () => {
     it("gives the variation an adjustment made", () => {
         expect(rentChangePct({ previous_rent: 1900, new_rent: 2017.19 })).toBe(6.17);
         expect(rentChangePct({ previous_rent: 0, new_rent: 100 })).toBeNull();
+    });
+});
+
+describe("contractTotals", () => {
+    const tenantCharge = (charge_type: LeaseCharge["charge_type"], amount: number, responsibility: LeaseCharge["responsibility"] = "TENANT"): LeaseCharge =>
+        ({ id: charge_type, lease_id: "l1", charge_type, label: null, responsibility, amount, adjustment_index: null, adjustment_notes: null });
+    // the Kitnet 35: 30 months from 20/12/2024, adjusted on 20/12/2025
+    const kitnet = { start_date: "2024-12-20", monthly_rent: 1603.53, charges: [tenantCharge("CONDOMINIUM", 267.25)] };
+    const adjustments = [{ effective_date: "2025-12-20", previous_rent: 1500, new_rent: 1603.53, previous_condo: 250, new_condo: 267.25 }];
+
+    it("adds each month at the amount in force then, and the months ahead at today's", () => {
+        // 12 months at 1.500 / 250, then 18 at 1.603,53 / 267,25
+        expect(contractTotals(kitnet, 30, adjustments, "2026-10-03")).toEqual({ rent: 46863.54, condo: 7810.5, total: 54674.04 });
+    });
+    it("is the monthly amount times the term for a lease that was never adjusted", () => {
+        expect(contractTotals({ start_date: "2026-09-16", monthly_rent: 1260, charges: [tenantCharge("CONDOMINIUM", 250)] }, 30, [], "2026-10-03")).toEqual({ rent: 37800, condo: 7500, total: 45300 });
+    });
+    it("counts the tenant's other fixed charges at today's amount, and leaves out what the tenant does not pay", () => {
+        const withIptu = { ...kitnet, charges: [tenantCharge("CONDOMINIUM", 267.25, "LANDLORD"), tenantCharge("IPTU", 40)] };
+        expect(contractTotals(withIptu, 30, adjustments, "2026-10-03")).toEqual({ rent: 46863.54, condo: null, total: 48063.54 });
+    });
+    it("takes a rent edited by hand for the months ahead only", () => {
+        const edited = contractTotals({ ...kitnet, monthly_rent: 1700 }, 30, adjustments, "2026-10-03")!;
+        // 12 at 1.500, 10 at 1.603,53 (20/12/2025 … 20/09/2026), 8 at 1.700
+        expect(edited.rent).toBe(47635.3);
+    });
+    it("has no total for an open-ended lease", () => {
+        expect(contractTotals(kitnet, null, adjustments, "2026-10-03")).toBeNull();
+        expect(contractTotals(kitnet, 0, adjustments, "2026-10-03")).toBeNull();
     });
 });

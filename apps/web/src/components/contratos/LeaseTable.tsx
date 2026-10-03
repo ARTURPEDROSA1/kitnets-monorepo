@@ -18,7 +18,8 @@ import { Sensitive } from "@/components/privacy";
 import { CellSumBar, useCellSum } from "@/components/properties/TableCellSum";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "@/components/properties/TableColumnFilters";
 import { ColumnVisibilityMenu, useColumnVisibility } from "@/components/properties/TableColumnVisibility";
-import { MANAGEMENT_LABELS, STATUS_META, brl, statusMeta, type LeaseRow } from "@/lib/lease-dashboard";
+import { MANAGEMENT_LABELS, STATUS_META, brl, statusMeta, todayBRT, type LeaseRow } from "@/lib/lease-dashboard";
+import { contractTotals } from "@/lib/lease-adjustments";
 import { amountOf, leaseTotals, type LeaseTotals, type PropertyKind } from "@/lib/lease-charges";
 import { LeaseTitle } from "./LeaseTitle";
 
@@ -75,16 +76,19 @@ const hintCls = "block text-[11px] font-normal text-muted-foreground";
 const iconBtn = "rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground";
 
 export default function LeaseTable({ rows, actions, propertyKinds = {} }: Props) {
+    const today = todayBRT();
     // the charge and the totals of every row, once (the columns' getters and the cells read them)
     const totals = useMemo(() => {
         const m = new Map<string, LeaseTotals>();
         for (const row of rows) {
             const { lease } = row;
             const kind = propertyKinds[lease.property_id] ?? (lease.unit_id ? "multi" : null);
-            m.set(lease.id, leaseTotals(Number(lease.monthly_rent) || 0, lease.charges, row.termMonths, kind));
+            // the total over the term counts every month at the amount in force then (the adjustments say)
+            const term = contractTotals(lease, row.termMonths, lease.adjustments ?? [], today);
+            m.set(lease.id, { ...leaseTotals(Number(lease.monthly_rent) || 0, lease.charges, row.termMonths, kind), total: term ? term.total : null });
         }
         return m;
-    }, [rows, propertyKinds]);
+    }, [rows, propertyKinds, today]);
     const totalsOf = (row: LeaseRow) => totals.get(row.lease.id) ?? leaseTotals(Number(row.lease.monthly_rent) || 0, row.lease.charges, row.termMonths, null);
 
     const columns = useMemo<ColumnDef<LeaseRow>[]>(() => [
@@ -93,7 +97,7 @@ export default function LeaseTable({ rows, actions, propertyKinds = {} }: Props)
         { key: "rent", label: "Aluguel", kind: "number", align: "right", title: "O aluguel de contrato (bruto, antes da taxa da imobiliária)", get: r => Number(r.lease.monthly_rent) || 0 },
         { key: "charge", label: "Condomínio / Energia", kind: "number", align: "right", title: "Condomínio de um imóvel multiunidade ou energia de uma casa/apartamento, como o contrato diz", get: r => { const c = totalsOf(r).featured.charge; return c && amountOf(c) > 0 ? amountOf(c) : null; } },
         { key: "monthly", label: "Total mensal", kind: "number", align: "right", title: "Aluguel + encargos com valor fixo pagos pelo inquilino", get: r => totalsOf(r).monthly },
-        { key: "total", label: "Valor total", kind: "number", align: "right", title: "Total mensal × meses do prazo (vazio quando o prazo é indeterminado)", get: r => totalsOf(r).total },
+        { key: "total", label: "Valor total", kind: "number", align: "right", title: "Soma dos meses do prazo, cada um pelo valor que valia; os meses à frente, pelo valor de hoje (vazio quando o prazo é indeterminado)", get: r => totalsOf(r).total },
         { key: "start", label: "Início", kind: "date", get: r => r.lease.start_date.slice(0, 10) },
         { key: "end", label: "Término", kind: "date", get: r => r.summary.effectiveEnd ?? "" },
         { key: "adjustment", label: "Reajuste", kind: "date", title: "Próximo reajuste do aluguel", get: r => (r.inForce && r.summary.nextAdjustmentDate ? r.summary.nextAdjustmentDate : "") },

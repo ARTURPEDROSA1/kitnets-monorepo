@@ -417,7 +417,7 @@ export interface LeaseIncome {
     gross: number;
     confirmedMonths: number;
     expectedMonths: number;
-    /** months of the lease (start → end/today) with no ledger row at all */
+    /** months of the lease whose rent already fell due and that have no ledger row */
     missingMonths: number;
     firstMonth: string | null;
     lastMonth: string | null;
@@ -429,8 +429,12 @@ export interface LeaseIncome {
  * The lease's months inside the property's income ledger. A lease for one unit reads that unit's
  * rows; a whole-property lease reads the months added up across units (`aggregateIncomeByMonth`).
  * Months run from the start to the end of the term (or today when open-ended / still running).
+ *
+ * A month without a row only counts as missing once its rent fell due: never the lease's first month
+ * (a lease that starts on the 20th has its first rent due the month after), nor a month whose due day
+ * is still ahead or falls after the lease ended.
  */
-export function leaseIncome(lease: Pick<LeaseWithDetails, "start_date" | "end_date" | "termination_date" | "unit_id" | "status">, rows: PropertyIncomeRow[], today: string): LeaseIncome {
+export function leaseIncome(lease: Pick<LeaseWithDetails, "start_date" | "end_date" | "termination_date" | "unit_id" | "status"> & { rent_due_day?: number | null }, rows: PropertyIncomeRow[], today: string): LeaseIncome {
     const from = monthKey(lease.start_date);
     const closed = CLOSED.has(lease.status);
     const endDate = (lease.termination_date ?? lease.end_date)?.slice(0, 10) ?? null;
@@ -439,11 +443,19 @@ export function leaseIncome(lease: Pick<LeaseWithDetails, "start_date" | "end_da
     const byMonth = new Map<string, PropertyIncomeRow>();
     for (const r of scoped) byMonth.set(monthKey(r.month), r);
 
+    const dueDay = Math.min(31, Math.max(1, Math.round(Number(lease.rent_due_day)) || 1));
+    const owed = (m: string): boolean => {
+        if (m === from) return false;
+        const [y, month] = m.split("-").map(Number);
+        const due = `${m}-${String(Math.min(dueDay, new Date(Date.UTC(y, month, 0)).getUTCDate())).padStart(2, "0")}`;
+        return due < today && (!endDate || due <= endDate);
+    };
+
     const points: LeaseIncomePoint[] = [];
     let received = 0, gross = 0, confirmed = 0, expected = 0, missing = 0, currentGross: number | null = null;
     for (let m = from, i = 0; m <= to && i < 600; m = addMonths(`${m}-01`, 1).slice(0, 7), i++) {
         const row = byMonth.get(m);
-        if (!row) { missing++; continue; }
+        if (!row) { if (owed(m)) missing++; continue; }
         const b = breakdown(row);
         points.push({ key: m, received: b.received, gross: b.grossRent, status: row.status });
         if (row.status === "CONFIRMED") {
