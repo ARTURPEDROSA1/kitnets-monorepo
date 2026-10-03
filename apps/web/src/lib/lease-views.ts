@@ -3,6 +3,7 @@
  * server builds them (lib/lease-views-server.ts) and the client consumes them. Types only, so the
  * client components never pull the server loader (Supabase, `next/cache`) into the browser bundle.
  */
+import type { StoredAdjustment, WaitingReason } from "@/lib/lease-adjustments";
 import type { LeaseWithDetails } from "@/types/lease";
 import type { IndexPoint } from "@/lib/lease-summary";
 import type { PropertyIncomeRow } from "@/lib/property-income";
@@ -24,6 +25,18 @@ export interface LeaseTenantContact {
     email: string | null;
 }
 
+/** The history of a lease's adjustments, as the contract's dashboard shows it (lib/lease-adjustments.ts). */
+export interface LeaseAdjustmentsView {
+    /** false while the history cannot be read (a deploy ahead of its migration) */
+    available: boolean;
+    /** oldest first */
+    rows: StoredAdjustment[];
+    /** the contract's original amounts, before any adjustment */
+    initial: { rent: number; condo: number | null };
+    /** an adjustment date already behind today that could not be calculated yet */
+    waiting: { date: string; reason: WaitingReason } | null;
+}
+
 export interface LeaseDashboardView {
     /** with its additional tenants, charges and documents (signed URLs) */
     lease: LeaseWithDetails;
@@ -34,6 +47,7 @@ export interface LeaseDashboardView {
     series: IndexPoint[] | null;
     /** series of the indexes the charges name for themselves when not the lease's, by calculator code */
     chargeSeries?: Record<string, IndexPoint[] | null>;
+    adjustments?: LeaseAdjustmentsView;
     /**
      * `single` (a house or apartment rented whole: the contract's card names the energy bill) or
      * `multi` (a property rented unit by unit: it names the condominium); null when the property is

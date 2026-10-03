@@ -17,6 +17,8 @@ import { chargeKindOf } from "@/lib/lease-charges";
 import { loadPropertyEntries } from "@/lib/property-entries-server";
 import type { PropertyIncomeRow } from "@/lib/property-income";
 import { INCOME_DIRECT_COLUMNS, normalizeIncomeRow } from "@/lib/property-income";
+import { initialValues } from "@/lib/lease-adjustments";
+import { syncLeaseAdjustments } from "@/lib/lease-adjustments-server";
 import type { LeaseWithDetails } from "@/types/lease";
 import type { LeaseDashboardView, LeaseListView, LeaseTenantContact } from "@/lib/lease-views";
 
@@ -139,6 +141,20 @@ export async function loadLeaseDashboard(supabase: AdminSupabase, leaseId: strin
     const chargeCodes = [...new Set(charges.map(c => (c.adjusts_with_rent ? null : leaseIndexSeriesCode(c.adjustment_index))).filter((c): c is string => !!c && c !== seriesCode))];
     const chargeSeries = chargeCodes.length > 0 ? await loadLeaseIndexSeries(chargeCodes) : {};
 
+    // The calculated adjustments this lease owes are recorded now, so the page opens on today's rent
+    // (the daily cron does the same for every lease). When they moved the amounts, read them again.
+    const synced = await syncLeaseAdjustments(supabase, { ...lease, charges }, { ...chargeSeries, ...(seriesCode ? { [seriesCode]: series } : {}) }, today);
+    let currentRent = Number(lease.monthly_rent) || 0;
+    let currentCharges = charges;
+    if (synced.changed) {
+        const [rentRes, freshCharges] = await Promise.all([
+            supabase.from("leases").select("monthly_rent").eq("id", leaseId).maybeSingle(),
+            supabase.from("lease_charges").select("*").eq("lease_id", leaseId),
+        ]);
+        if (rentRes.data) currentRent = Number(rentRes.data.monthly_rent) || currentRent;
+        if (freshCharges.data) currentCharges = freshCharges.data as unknown as LeaseWithDetails["charges"];
+    }
+
     const docs = (docsRes.data ?? []) as Array<Record<string, unknown> & { file_url: string }>;
     const signed = await signStorageUrls(supabase, LEASE_DOCUMENTS_BUCKET, docs.map(d => d.file_url));
     const entry = entries.find(e => e.id === lease.property_id);
@@ -148,12 +164,13 @@ export async function loadLeaseDashboard(supabase: AdminSupabase, leaseId: strin
         propertyKind,
         lease: {
             ...lease,
+            monthly_rent: currentRent,
             additional_tenants: (tenantsRes.data || []).map((t: Record<string, unknown>) => ({
                 ...t,
                 tenant_name: (t.tenant as Record<string, unknown> | null)?.full_name || null,
                 tenant: undefined,
             })) as unknown as LeaseWithDetails["additional_tenants"],
-            charges,
+            charges: currentCharges,
             documents: docs.map(doc => ({ ...doc, file_url: signed.get(storagePathOf(doc.file_url)) ?? doc.file_url })) as unknown as LeaseWithDetails["documents"],
             document_count: docs.length,
         },
@@ -161,6 +178,12 @@ export async function loadLeaseDashboard(supabase: AdminSupabase, leaseId: strin
         income,
         series,
         chargeSeries,
+        adjustments: {
+            available: synced.available,
+            rows: synced.rows,
+            initial: initialValues({ ...lease, monthly_rent: currentRent, charges: currentCharges }, synced.rows),
+            waiting: synced.waiting,
+        },
     };
 }
 

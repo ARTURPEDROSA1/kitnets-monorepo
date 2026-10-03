@@ -121,9 +121,9 @@ export interface Accumulated {
     throughDate: string | null;
 }
 
-const round2 = (v: number) => Math.round(v * 100) / 100;
+export const round2 = (v: number) => Math.round(v * 100) / 100;
 /** To the cent, without a binary tail (253.925 kept as 253.92499…) rounding the wrong way. */
-const cents = (v: number) => Math.round(Number((v * 100).toPrecision(12))) / 100;
+export const cents = (v: number) => Math.round(Number((v * 100).toPrecision(12))) / 100;
 
 const ratesOf = (series: IndexPoint[]) => {
     const rates = new Map<string, number>();
