@@ -30,6 +30,8 @@ interface Props {
     notice: string | null;
     /** the owner's bank connection can issue (connected, certificate in date) */
     bankUsable: boolean;
+    /** the owner has decided multa, juros and prazo in Configuração (an invoice created before takes them when issued) */
+    termsDecided?: boolean;
     /** the connection is the bank's sandbox and this site allows it: payments can be simulated */
     sandbox: boolean;
     /** the server can e-mail tenants */
@@ -53,6 +55,7 @@ const EVENT_LABELS: Record<string, string> = {
     DUE_DATE_MOVED: "Vencimento alterado",
     EMAIL_SENT: "E-mail enviado ao inquilino",
     EMAIL_FAILED: "O e-mail ao inquilino não foi enviado",
+    TERMS_SET: "Multa, juros e prazo aplicados conforme a Configuração",
     EMAIL_DELIVERED: "E-mail entregue na caixa do inquilino",
     EMAIL_BOUNCED: "O e-mail ao inquilino voltou",
     EMAIL_COMPLAINED: "O inquilino marcou o e-mail como spam",
@@ -136,7 +139,7 @@ const DELIVERY_KIND_LABELS: Record<string, string> = { ISSUE: "fatura", REMINDER
 /** the last address a copy was sent to, remembered on this device */
 const COPY_EMAIL_KEY = "kitnets_invoice_copy_email";
 
-export default function InvoiceDetail({ invoiceId, lang, today, initial, notice, bankUsable, sandbox, emailAvailable = true, onBack, onPay, onCancel, onChanged }: Props) {
+export default function InvoiceDetail({ invoiceId, lang, today, initial, notice, bankUsable, termsDecided = false, sandbox, emailAvailable = true, onBack, onPay, onCancel, onChanged }: Props) {
     const preloaded = initial && initial.invoice.id === invoiceId ? initial : null;
     const [fetched, setFetched] = useState<InvoiceDetailView | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -260,7 +263,7 @@ export default function InvoiceDetail({ invoiceId, lang, today, initial, notice,
         : null;
     const contratosHref = `${lang === "pt" ? "" : `/${lang}`}/contratos?id=${invoice.lease_id}`;
     const termsUndecided = invoice.fine_pct === null || invoice.interest_pct_month === null || invoice.days_payable_after_due === null;
-    const cannotIssue = !bankUsable ? "Conecte o Banco Inter em Conexões para emitir" : termsUndecided ? "Defina multa, juros e prazo em Configuração antes de emitir" : null;
+    const cannotIssue = !bankUsable ? "Conecte o Banco Inter em Conexões para emitir" : termsUndecided && !termsDecided ? "Defina multa, juros e prazo em Configuração antes de emitir" : null;
 
     const startIssue = () => {
         if (invoice.due_date < today) setIssueModal({ dueDate: today });
@@ -453,6 +456,9 @@ export default function InvoiceDetail({ invoiceId, lang, today, initial, notice,
                             <Field label="Juros de mora">{invoice.interest_pct_month !== null ? `${pct(invoice.interest_pct_month)} ao mês` : undecided}</Field>
                             <Field label="Pagamento após o vencimento">{invoice.days_payable_after_due !== null ? plural(invoice.days_payable_after_due, "dia", "dias") : undecided}</Field>
                             <Field label="Origem">{invoice.origin === "AUTO" ? "Gerada automaticamente" : "Gerada por você"}</Field>
+                            {open && termsUndecided && termsDecided && (
+                                <p className="col-span-2 text-xs text-muted-foreground">Esta fatura foi criada antes de você decidir multa, juros e prazo: ela assume os da Configuração no momento da emissão.</p>
+                            )}
                             {invoice.status === "PAID" && (
                                 <Field label="Pagamento" className="col-span-2">
                                     <Money>{brl(invoice.paid_amount ?? invoice.amount)}</Money> em {formatDateBR(invoice.paid_on)} · {invoice.paid_via ? PAID_VIA_LABELS[invoice.paid_via] ?? invoice.paid_via : "—"}

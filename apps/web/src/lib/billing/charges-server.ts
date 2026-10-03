@@ -21,7 +21,7 @@ import type { PayerAddress } from "@/lib/invoice-payer";
 import { ensureInterWebhook, ownerOfWebhookKey, sandboxAllowed, withInterSession } from "./connections-server";
 import { sendInvoiceEmail, sendReceipt } from "./deliveries-server";
 import { InterError, cancelInterCharge, createInterCharge, getInterCharge, getInterChargePdf, payInterChargeSandbox } from "./inter-client";
-import { ISSUE_BLOCKER_LABELS, buildChargePayload, issueBlockers, parseChargeState, parseCallbackEntry, seuNumeroFor, type ChargeInvoice, type ChargeStatus, type InterChargeState } from "./inter-payload";
+import { ISSUE_BLOCKER_LABELS, buildChargePayload, issueBlockers, termsToAdopt, parseChargeState, parseCallbackEntry, seuNumeroFor, type ChargeInvoice, type ChargeStatus, type InterChargeState } from "./inter-payload";
 
 export const INVOICE_DOCUMENTS_BUCKET = "invoice-documents";
 const TABLE = "invoice_charges";
@@ -268,9 +268,22 @@ export async function refreshInvoice(supabase: AdminSupabase, profileId: string,
  * already live, 502 with the bank's reason.
  */
 export async function issueInvoice(supabase: AdminSupabase, profileId: string, invoiceId: string, today: string, opts: { dueDate?: string | null } = {}): Promise<ChargeRow> {
-    const invoice = await loadInvoice(supabase, profileId, invoiceId);
+    let invoice = await loadInvoice(supabase, profileId, invoiceId);
     if (invoice.status === "PAID") throw new HttpError(409, { error: "Esta fatura já foi paga." });
     if (invoice.status === "CANCELLED") throw new HttpError(409, { error: "Esta fatura foi cancelada." });
+
+    // created before the owner decided multa, juros and prazo: it takes them now, on its way to the bank
+    if (invoice.fine_pct === null || invoice.interest_pct_month === null || invoice.days_payable_after_due === null) {
+        const { data: settings } = await supabase.from("billing_settings").select("fine_pct, interest_pct_month, days_payable_after_due").eq("owner_id", profileId).maybeSingle();
+        const num = (v: unknown) => (v == null ? null : Number(v));
+        const adopted = termsToAdopt(invoice, settings ? { fine_pct: num(settings.fine_pct), interest_pct_month: num(settings.interest_pct_month), days_payable_after_due: num(settings.days_payable_after_due) } : null);
+        if (Object.keys(adopted).length > 0) {
+            const { error } = await supabase.from("invoices").update(adopted).eq("id", invoiceId).eq("owner_id", profileId).in("status", ["DRAFT", "ISSUED"]);
+            if (error) throw new Error(`invoice terms: ${error.message}`);
+            await event(supabase, profileId, invoiceId, "TERMS_SET", "SYSTEM", adopted);
+            invoice = { ...invoice, ...adopted };
+        }
+    }
 
     const existing = await loadCharges(supabase, profileId, invoiceId);
     if (existing.some(isLiveBoleto)) throw new HttpError(409, { error: "Esta fatura já tem um boleto ativo. Atualize o status ou cancele-o antes de emitir outro." });

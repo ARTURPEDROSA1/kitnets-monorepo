@@ -171,6 +171,7 @@ export default function FaturasContent({ lang, initial = null, initialDetail = n
                     notice={detail?.invoice.id === selectedId ? detailNotice : null}
                     onBack={() => { setDetailNotice(null); select(null); }}
                     bankUsable={Boolean(connections.inter?.usable)}
+                    termsDecided={settings.fine_pct !== null && settings.interest_pct_month !== null && settings.days_payable_after_due !== null}
                     sandbox={connections.inter?.environment === "SANDBOX" && connections.sandboxAllowed}
                     emailAvailable={emailAvailable}
                     onPay={d => setPayTarget(d.invoice)}
