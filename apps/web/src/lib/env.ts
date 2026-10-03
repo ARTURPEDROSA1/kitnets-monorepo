@@ -49,6 +49,10 @@ export const serverSchema = z.object({
     BILLING_ENCRYPTION_KEY: secretKey.optional(),
     // Only during a rotation: the key being replaced, so what it sealed still opens.
     BILLING_ENCRYPTION_KEY_PREVIOUS: secretKey.optional(),
+    // Invoices e-mailed to tenants through Resend (lib/billing/email-provider.ts). Both or neither: without them
+    // nothing is sent and each delivery says so. The address must be on a domain verified in Resend.
+    RESEND_API_KEY: nonEmpty.optional(),
+    BILLING_EMAIL_FROM: z.string().regex(/^(?:[^<>]+<)?[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+>?$/, "must be an e-mail address, optionally as \"Name <address>\"").optional(),
     // Source-map upload at build time only.
     SENTRY_ORG: nonEmpty.optional(),
     SENTRY_PROJECT: nonEmpty.optional(),
@@ -108,6 +112,14 @@ export function parseEnv(
 
     const result = schema.safeParse(input);
     const issues: z.ZodIssue[] = result.success ? [] : [...result.error.issues];
+
+    if (scope === "server" && Boolean(input.RESEND_API_KEY) !== Boolean(input.BILLING_EMAIL_FROM)) {
+        issues.push({
+            code: z.ZodIssueCode.custom,
+            path: [input.RESEND_API_KEY ? "BILLING_EMAIL_FROM" : "RESEND_API_KEY"],
+            message: "set RESEND_API_KEY and BILLING_EMAIL_FROM together (invoices are e-mailed through Resend)",
+        });
+    }
 
     if (mode === "strict" && scope === "server" && !input.GEMINI_API_KEY && !input.OPENAI_API_KEY) {
         issues.push({

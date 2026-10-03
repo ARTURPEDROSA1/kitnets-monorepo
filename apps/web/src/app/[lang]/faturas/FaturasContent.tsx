@@ -18,7 +18,7 @@ import type { BillingSettingsView, GenerateResult, InvoiceDetailView, InvoiceLis
 import { NO_CONNECTIONS, type ConnectionsView } from "@/lib/billing/connections";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const NO_SETTINGS: BillingSettingsView = { days_in_advance: null, fine_pct: null, interest_pct_month: null, days_payable_after_due: null };
+const NO_SETTINGS: BillingSettingsView = { days_in_advance: null, fine_pct: null, interest_pct_month: null, days_payable_after_due: null, sender_name: null, reply_to_email: null, automation_enabled: false, automation_from_month: null };
 
 interface Props {
     lang: string;
@@ -56,6 +56,7 @@ export default function FaturasContent({ lang, initial = null, initialDetail = n
     const [recurring, setRecurring] = useState<RecurringLease[]>(initial?.recurring ?? []);
     const [settings, setSettings] = useState<BillingSettingsView>(initial?.settings ?? NO_SETTINGS);
     const [connections, setConnections] = useState<ConnectionsView>(initial?.connections ?? NO_CONNECTIONS);
+    const [emailAvailable, setEmailAvailable] = useState<boolean>(initial?.emailAvailable ?? false);
     const [seeded] = useState(initial !== null);
     const [listError, setListError] = useState<string | null>(null);
 
@@ -64,6 +65,7 @@ export default function FaturasContent({ lang, initial = null, initialDetail = n
         setRecurring(list.recurring);
         setSettings(list.settings);
         setConnections(list.connections ?? NO_CONNECTIONS);
+        setEmailAvailable(list.emailAvailable === true);
     }, []);
 
     const load = useCallback(async () => {
@@ -170,6 +172,7 @@ export default function FaturasContent({ lang, initial = null, initialDetail = n
                     onBack={() => { setDetailNotice(null); select(null); }}
                     bankUsable={Boolean(connections.inter?.usable)}
                     sandbox={connections.inter?.environment === "SANDBOX" && connections.sandboxAllowed}
+                    emailAvailable={emailAvailable}
                     onPay={d => setPayTarget(d.invoice)}
                     onCancel={d => setCancelTarget(d.invoice)}
                     onChanged={(fresh, message) => { void afterAction(fresh, message); }}
@@ -186,6 +189,7 @@ export default function FaturasContent({ lang, initial = null, initialDetail = n
                 recurring={recurringList}
                 settings={settings}
                 connections={connections}
+                emailAvailable={emailAvailable}
                 today={today}
                 loading={invoices === null}
                 error={listError}

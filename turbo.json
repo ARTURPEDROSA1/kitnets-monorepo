@@ -14,7 +14,9 @@
         "GOOGLE_MAPS_SERVER_KEY",
         "GATEWAY_PILOT_EMAILS",
         "BILLING_ENCRYPTION_KEY",
-        "BILLING_ENCRYPTION_KEY_PREVIOUS"
+        "BILLING_ENCRYPTION_KEY_PREVIOUS",
+        "RESEND_API_KEY",
+        "BILLING_EMAIL_FROM"
     ],
     "tasks": {
         "build": {

@@ -19,6 +19,7 @@ import { env } from "@/lib/env";
 import { signStorageUrl } from "@/lib/storage";
 import type { PayerAddress } from "@/lib/invoice-payer";
 import { ensureInterWebhook, ownerOfWebhookKey, sandboxAllowed, withInterSession } from "./connections-server";
+import { sendInvoiceEmail } from "./deliveries-server";
 import { InterError, cancelInterCharge, createInterCharge, getInterCharge, getInterChargePdf, payInterChargeSandbox } from "./inter-client";
 import { ISSUE_BLOCKER_LABELS, buildChargePayload, issueBlockers, parseChargeState, parseCallbackEntry, seuNumeroFor, type ChargeInvoice, type ChargeStatus, type InterChargeState } from "./inter-payload";
 
@@ -68,6 +69,13 @@ const normalize = (r: Record<string, unknown>): ChargeRow => ({
 /** The charges of one invoice, newest first. */
 export async function loadCharges(supabase: AdminSupabase, profileId: string, invoiceId: string): Promise<ChargeRow[]> {
     const { data, error } = await supabase.from(TABLE).select(COLUMNS).eq("owner_id", profileId).eq("invoice_id", invoiceId).order("created_at", { ascending: false });
+    if (error) throw new Error(`invoice_charges: ${error.message}`);
+    return ((data ?? []) as Record<string, unknown>[]).map(normalize);
+}
+
+/** The account's charges still waiting at the bank (REQUESTED or OPEN), oldest first. */
+export async function loadLiveCharges(supabase: AdminSupabase, profileId: string): Promise<ChargeRow[]> {
+    const { data, error } = await supabase.from(TABLE).select(COLUMNS).eq("owner_id", profileId).in("status", [...LIVE]).order("created_at", { ascending: true }).limit(500);
     if (error) throw new Error(`invoice_charges: ${error.message}`);
     return ((data ?? []) as Record<string, unknown>[]).map(normalize);
 }
@@ -212,6 +220,14 @@ export async function refreshCharge(supabase: AdminSupabase, profileId: string, 
         } catch (err) {
             // the boleto works without its PDF; the next refresh tries again
             console.error("[Invoices] boleto PDF failed:", (err as Error).message);
+        }
+    }
+    if (next.status === "OPEN" && charge.status !== "OPEN") {
+        // the tenant hears of the invoice the moment the bank makes it payable (one e-mail per boleto)
+        try {
+            await sendInvoiceEmail(supabase, profileId, charge.invoice_id, "ISSUE", { sequence: Math.max(0, next.attempts - 1) });
+        } catch (err) {
+            console.error("[Invoices] e-mail after issuing failed:", (err as Error).message);
         }
     }
     return next;

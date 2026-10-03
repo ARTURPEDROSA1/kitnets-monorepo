@@ -16,8 +16,10 @@ import type { PayerAddress } from "@/lib/invoice-payer";
 import { NO_CONNECTIONS } from "@/lib/billing/connections";
 import { loadConnections } from "@/lib/billing/connections-server";
 import { loadCharges, loadLatestCharges, type ChargeRow } from "@/lib/billing/charges-server";
+import { loadDeliveries, loadLatestDeliveries, publicInvoiceUrl, type DeliveryRow } from "@/lib/billing/deliveries-server";
+import { emailAvailable } from "@/lib/billing/email-provider";
 import type { LeaseWithDetails } from "@/types/lease";
-import type { BillingSettingsView, InvoiceChargeView, InvoiceDetailView, InvoiceEventView, InvoiceItemView, InvoiceListView, InvoiceView, RecurringLease } from "@/lib/invoice-views";
+import type { BillingSettingsView, InvoiceChargeView, InvoiceDeliveryView, InvoiceDetailView, InvoiceEventView, InvoiceItemView, InvoiceListView, InvoiceView, RecurringLease } from "@/lib/invoice-views";
 
 const INVOICE_COLUMNS =
     "id, number, lease_id, property_id, unit_id, unit_name, tenant_id, reference_month, due_date, amount, status, origin, blockers, payer_name, payer_email, issued_at, paid_on, paid_amount, late_fee_amount, surcharge_amount, paid_via, cancelled_at, cancel_reason, notes, created_at";
@@ -33,7 +35,12 @@ export const toChargeView = (c: ChargeRow | null | undefined): InvoiceChargeView
     pix_copy_paste: c.pix_copy_paste, has_pdf: Boolean(c.pdf_path), paid_via: c.paid_via, paid_amount: c.paid_amount, last_checked_at: c.last_checked_at, last_error: c.last_error, created_at: c.created_at,
 }) : null;
 
-function toInvoiceView(row: Record<string, unknown>, items: InvoiceItemView[], charge: ChargeRow | null = null): InvoiceView {
+/** What the screens get of an e-mail: never the provider's id. */
+export const toDeliveryView = (d: DeliveryRow | null | undefined): InvoiceDeliveryView | null => d ? ({
+    id: d.id, kind: d.kind, status: d.status, recipient: d.recipient, attempts: d.attempts, sent_at: d.sent_at, last_error: d.last_error, created_at: d.created_at,
+}) : null;
+
+function toInvoiceView(row: Record<string, unknown>, items: InvoiceItemView[], charge: ChargeRow | null = null, delivery: DeliveryRow | null = null): InvoiceView {
     const joined = (key: string, field: string) => ((row[key] as Record<string, unknown> | null)?.[field] as string | null | undefined) ?? null;
     return {
         id: String(row.id),
@@ -66,6 +73,7 @@ function toInvoiceView(row: Record<string, unknown>, items: InvoiceItemView[], c
         lease_reference: joined("lease", "reference_name"),
         items,
         charge: toChargeView(charge),
+        delivery: toDeliveryView(delivery),
     };
 }
 
@@ -90,33 +98,47 @@ async function allRows(fetchPage: (from: number, to: number) => PromiseLike<{ da
 
 /** The account's invoices, newest due date first, each with its items. */
 export async function loadInvoiceRows(supabase: AdminSupabase, profileId: string): Promise<InvoiceView[]> {
-    const [invoices, items, charges] = await Promise.all([
+    const [invoices, items, charges, deliveries] = await Promise.all([
         allRows((from, to) => supabase.from("invoices").select(INVOICE_SELECT).eq("owner_id", profileId).order("due_date", { ascending: false }).order("number", { ascending: false }).range(from, to), "invoices"),
         allRows((from, to) => supabase.from("invoice_items").select("id, invoice_id, kind, description, amount, position").eq("owner_id", profileId).order("position", { ascending: true }).order("id", { ascending: true }).range(from, to), "invoice_items"),
         loadLatestCharges(supabase, profileId),
+        loadLatestDeliveries(supabase, profileId),
     ]);
     const byInvoice = new Map<string, InvoiceItemView[]>();
     for (const item of items) byInvoice.set(String(item.invoice_id), [...(byInvoice.get(String(item.invoice_id)) ?? []), toItemView(item)]);
-    return invoices.map(row => toInvoiceView(row, byInvoice.get(String(row.id)) ?? [], charges.get(String(row.id)) ?? null));
+    return invoices.map(row => toInvoiceView(row, byInvoice.get(String(row.id)) ?? [], charges.get(String(row.id)) ?? null, deliveries.get(String(row.id)) ?? null));
 }
 
-export const EMPTY_BILLING_SETTINGS: BillingSettingsView = { days_in_advance: null, fine_pct: null, interest_pct_month: null, days_payable_after_due: null };
+export const EMPTY_BILLING_SETTINGS: BillingSettingsView = {
+    days_in_advance: null, fine_pct: null, interest_pct_month: null, days_payable_after_due: null,
+    sender_name: null, reply_to_email: null, automation_enabled: false, automation_from_month: null,
+};
 
-/** The owner's billing decisions; every one null until the owner makes it. */
-export async function loadBillingSettings(supabase: AdminSupabase, profileId: string): Promise<BillingSettingsView> {
-    const { data, error } = await supabase
-        .from("billing_settings")
-        .select("days_in_advance, fine_pct, interest_pct_month, days_payable_after_due")
-        .eq("owner_id", profileId)
-        .maybeSingle();
-    if (error) throw new Error(`billing_settings: ${error.message}`);
-    if (!data) return EMPTY_BILLING_SETTINGS;
+export const BILLING_SETTINGS_COLUMNS = "days_in_advance, fine_pct, interest_pct_month, days_payable_after_due, sender_name, reply_to_email, automation_enabled, automation_from_month";
+
+export function toBillingSettingsView(data: Record<string, unknown>): BillingSettingsView {
     return {
         days_in_advance: numOrNull(data.days_in_advance),
         fine_pct: numOrNull(data.fine_pct),
         interest_pct_month: numOrNull(data.interest_pct_month),
         days_payable_after_due: numOrNull(data.days_payable_after_due),
+        sender_name: (data.sender_name as string | null) ?? null,
+        reply_to_email: (data.reply_to_email as string | null) ?? null,
+        automation_enabled: data.automation_enabled === true,
+        automation_from_month: data.automation_from_month ? String(data.automation_from_month).slice(0, 7) : null,
     };
+}
+
+/** The owner's billing decisions; every one null until the owner makes it. */
+export async function loadBillingSettings(supabase: AdminSupabase, profileId: string): Promise<BillingSettingsView> {
+    const { data, error } = await supabase
+        .from("billing_settings")
+        .select(BILLING_SETTINGS_COLUMNS)
+        .eq("owner_id", profileId)
+        .maybeSingle();
+    if (error) throw new Error(`billing_settings: ${error.message}`);
+    if (!data) return EMPTY_BILLING_SETTINGS;
+    return toBillingSettingsView(data as Record<string, unknown>);
 }
 
 /** A lease of the list as "Cobranças recorrentes" shows it. */
@@ -162,24 +184,25 @@ export async function loadInvoiceList(supabase: AdminSupabase, profileId: string
         // the invoices are worth showing even when the connections cannot be read
         loadConnections(supabase, profileId).catch(err => { console.error("[Faturas] connections failed:", (err as Error).message); return NO_CONNECTIONS; }),
     ]);
-    return { invoices, recurring, settings, connections };
+    return { invoices, recurring, settings, connections, emailAvailable: emailAvailable() };
 }
 
 /** One invoice with its items, payer and timeline. 404 when it is not the account's. */
 export async function loadInvoiceDetail(supabase: AdminSupabase, invoiceId: string, profileId: string): Promise<InvoiceDetailView> {
     const { data: row, error } = await supabase
         .from("invoices")
-        .select(`${INVOICE_SELECT}, payer_cpf, payer_address, fine_pct, interest_pct_month, days_payable_after_due`)
+        .select(`${INVOICE_SELECT}, payer_cpf, payer_address, fine_pct, interest_pct_month, days_payable_after_due, public_token`)
         .eq("id", invoiceId)
         .eq("owner_id", profileId)
         .maybeSingle();
     if (error) throw new Error(`invoice: ${error.message}`);
     if (!row) throw notFound("Fatura não encontrada.");
 
-    const [itemsRes, eventsRes, charges] = await Promise.all([
+    const [itemsRes, eventsRes, charges, deliveries] = await Promise.all([
         supabase.from("invoice_items").select("id, invoice_id, kind, description, amount, position").eq("invoice_id", invoiceId).eq("owner_id", profileId).order("position", { ascending: true }),
         supabase.from("invoice_events").select("id, type, actor, detail, created_at").eq("invoice_id", invoiceId).eq("owner_id", profileId).order("created_at", { ascending: true }),
         loadCharges(supabase, profileId, invoiceId),
+        loadDeliveries(supabase, profileId, invoiceId),
     ]);
     if (itemsRes.error) throw new Error(`invoice_items: ${itemsRes.error.message}`);
     if (eventsRes.error) throw new Error(`invoice_events: ${eventsRes.error.message}`);
@@ -187,12 +210,13 @@ export async function loadInvoiceDetail(supabase: AdminSupabase, invoiceId: stri
     const record = row as unknown as Record<string, unknown>;
     return {
         invoice: {
-            ...toInvoiceView(record, ((itemsRes.data ?? []) as Record<string, unknown>[]).map(toItemView), charges.find(c => c.kind === "BOLEPIX") ?? null),
+            ...toInvoiceView(record, ((itemsRes.data ?? []) as Record<string, unknown>[]).map(toItemView), charges.find(c => c.kind === "BOLEPIX") ?? null, deliveries[0] ?? null),
             payer_cpf: (record.payer_cpf as string | null) ?? null,
             payer_address: (record.payer_address as PayerAddress | null) ?? null,
             fine_pct: numOrNull(record.fine_pct),
             interest_pct_month: numOrNull(record.interest_pct_month),
             days_payable_after_due: numOrNull(record.days_payable_after_due),
+            public_url: publicInvoiceUrl(String(record.public_token)),
         },
         events: ((eventsRes.data ?? []) as Record<string, unknown>[]).map((e): InvoiceEventView => ({
             id: String(e.id),
@@ -201,5 +225,6 @@ export async function loadInvoiceDetail(supabase: AdminSupabase, invoiceId: stri
             detail: (e.detail as Record<string, unknown> | null) ?? {},
             created_at: String(e.created_at),
         })),
+        deliveries: deliveries.map(d => toDeliveryView(d) as InvoiceDeliveryView),
     };
 }

@@ -70,7 +70,7 @@ One invoice per lease and month (`reference_month` = the month of the due date).
 
 ### Billing conditions (`billing_settings`)
 
-Days in advance, late fee (multa), interest (juros de mora) and how long after the due date the invoice still takes the payment. **Each is the owner's decision: blank is stored as NULL and nothing is assumed in its place.** An invoice created meanwhile states no late terms; the automation of later steps cannot be switched on before they are decided (CHECK `billing_settings_automation_needs_decisions`).
+Days in advance, late fee (multa), interest (juros de mora) and how long after the due date the invoice still takes the payment. **Each is the owner's decision: blank is stored as NULL and nothing is assumed in its place.** An invoice created meanwhile states no late terms; the daily run cannot be switched on before they are decided, nor before the owner picks the first month it bills (CHECK `billing_settings_automation_needs_decisions`, mirrored by the zod schema). The owner may also choose how the tenant sees the sender of the e-mails (`sender_name`, else the holding's name) and where replies go (`reply_to_email`, else the profile's e-mail).
 
 ## 4. Files
 
@@ -88,15 +88,20 @@ apps/web/src/
 │   ├── [id]/pdf/route.ts             # GET (signed URL of the boleto's PDF)
 │   ├── [id]/pagar-sandbox/route.ts   # POST (the bank's sandbox pays; outside production only)
 │   ├── [id]/cancelar/route.ts        # POST (cancels the boleto at the bank first)
+│   ├── [id]/reenviar/route.ts        # POST (the e-mail to the tenant, again)
 │   ├── cobrancas/route.ts            # PUT (who collects a component · pause a lease)
 │   ├── configuracoes/route.ts        # PUT (billing conditions)
 │   └── conexoes/                     # GET (status) · inter: PUT (save + test) · DELETE · inter/testar: POST
 ├── app/api/webhooks/inter/[key]/route.ts # POST: the bank's callbacks (no Clerk; the key leads to one connection)
+├── app/api/cron/faturas/route.ts     # GET: the daily run (cron secret; vercel.json 08:00 BRT)
+├── app/[lang]/pagar/[token]/page.tsx # The tenant's page: Pix QR code, copia e cola, linha digitável, PDF (no login, noindex)
+├── app/api/pagar/[token]/boleto/route.ts # GET: redirect to the boleto's PDF (no login; IP limit)
+├── components/pagar/CopyCode.tsx     # the copy button of the tenant's page
 ├── components/faturas/
 │   ├── FaturasHub.tsx                # KPI strip, "Atenção", sections, view pills, search
 │   ├── InvoiceTable.tsx              # The invoices as a spreadsheet (table key `invoices`)
 │   ├── RecurringChargesTable.tsx     # Lease × component, the "quem cobra" select (table key `invoice-recurring`)
-│   ├── BillingSettingsPanel.tsx      # The owner's decisions
+│   ├── BillingSettingsPanel.tsx      # The owner's decisions, the sender, the automation switch
 │   ├── ConnectionsPanel.tsx          # The owner's Banco Inter integration: credentials in, status and test out
 │   ├── InvoiceDetail.tsx             # One invoice's panel
 │   └── InvoiceActionModals.tsx       # Record a payment · cancel
@@ -119,7 +124,13 @@ apps/web/src/
         ├── inter-credentials.ts (+ test)  # certificate/key check, scopes, the bank's hosts
         ├── inter-client.ts (+ test)       # mutual TLS to the bank's API (node:https): token, charges, PDF, cancel, webhook
         ├── inter-payload.ts (+ test)      # the charge's body, the bank's states, what the webhook is trusted for
-        ├── charges-server.ts              # issue, refresh, cancel at the bank, PDF, the webhook's handling
+        ├── charges-server.ts              # issue, refresh, cancel at the bank, PDF, the webhook's handling; a boleto turning OPEN e-mails the tenant
+        ├── invoice-email.ts (+ test)      # the e-mail's subject, text and HTML; the sender's display name
+        ├── email-provider.ts (+ test)     # Resend over fetch, idempotency key = delivery id
+        ├── deliveries-server.ts           # queue, claim, send; resend by the owner
+        ├── public-invoice.ts (+ test)     # what the tenant's page shows, the token's shape, the masked CPF
+        ├── public-invoice-server.ts       # the invoice behind a token (refreshes a stale boleto first)
+        ├── automation-server.ts (+ test)  # the daily run: reconcile, generate, issue, send — per owner, within a time budget
         └── inter-test-certs.ts            # throwaway certificates for the tests (openssl at test time)
     ├── property-income.ts (+ test)    # the ledger's money model: deposit + what was paid by invoice
     └── property-income-readers.test.ts # every reader of the ledger selects the invoice columns
@@ -129,7 +140,8 @@ supabase/
 ├── migrations/20261002200000_invoice_ledger.sql
 ├── migrations/20261002230000_billing_connections.sql
 ├── migrations/20261003000000_invoice_charges.sql
-└── checks/invoices.sql, invoice_ledger.sql, billing_connections.sql, invoice_charges.sql
+├── migrations/20261003100000_invoice_deliveries.sql
+└── checks/invoices.sql, invoice_ledger.sql, billing_connections.sql, invoice_charges.sql, invoice_deliveries.sql
 ```
 
 ## 5. Database
@@ -213,11 +225,21 @@ An invoice becomes a charge at the owner's bank — the API Cobrança v3 "boleto
 
 **Sandbox**: outside the production site, a connection to the bank's sandbox can simulate the tenant's payment (`POST …/pagar`) from the invoice panel.
 
-**Not yet**: the e-mail to the tenant and the public payment page with the Pix QR code (step 5); the daily automation (step 5); matching a statement credit to its invoice (the existing rule keeps the credit "só contábil").
+**Not yet**: matching a statement credit to its invoice (the existing rule keeps the credit "só contábil").
 
-## 9. Not in these steps
+## 9. The e-mail, the tenant's page and the daily run (step 5)
 
-- Nothing is sent to the tenant yet: no e-mail, no public page; the owner copies the digitable line or the Pix code from the invoice panel. No card link.
+**The e-mail** (`lib/billing/invoice-email.ts`, sent by `lib/billing/deliveries-server.ts` through Resend, `lib/billing/email-provider.ts`): subject "Fatura nº N — mês — imóvel"; the items, the total, the due date; the Pix copia e cola, the boleto's digitable line, the link to the tenant's page, and the boleto's PDF attached when the bank has given it. Sender: "<owner> via Kitnets <BILLING_EMAIL_FROM>" with the owner's reply-to, so the tenant answers the owner, never the platform. It goes out **when the bank makes the boleto payable** — the REQUESTED → OPEN transition in `refreshCharge`, whether seen by the issue itself, "Atualizar status", the webhook, the tenant's page or the daily run — one e-mail per boleto (a reissue after expiry mails the new one). "Reenviar e-mail" on the invoice panel sends it again (`POST /api/faturas/[id]/reenviar`: a delivery that never got there is tried again; after one that did, a numbered resend).
+
+**Never twice** (`invoice_deliveries`, migration `20261003100000`): one row per e-mail, unique on (invoice, kind, sequence); the row is claimed in the database before the provider is called (`invoice_delivery_claim`: status SENDING with a lock; a claim older than ten minutes belongs to a dead run and can be taken over); the provider gets the row's id as `Idempotency-Key`. The outcome stays on the row — SENT with the provider's message id, FAILED with the reason (no e-mail on the tenant, the message refused, the server without `RESEND_API_KEY`) — and shows on the invoice panel and in Atenção. Without `RESEND_API_KEY` + `BILLING_EMAIL_FROM` (both or neither, checked in `lib/env.ts`) nothing is sent and every delivery says so; the Configuração panel warns.
+
+**The tenant's page** (`/pagar/[token]`): reached by the link in the e-mail, no login — the token (`invoices.public_token`, two UUIDs, 64 hex characters) is the key. It shows the least that identifies the invoice to the person who got the e-mail — first name, masked CPF (`***.456.789-**`), the place — and every way to pay: the Pix QR code (SVG made on the server with `qrcode` from the copia e cola), the copia e cola and the digitable line with copy buttons, the boleto's PDF (`GET /api/pagar/[token]/boleto` → 302 to a 5-minute signed URL). A live boleto not checked at the bank for 15 minutes is read back first, so a paid one reads "Paga" and is never paid twice. States: em aberto, vencida (still payable, with the terms), em preparação, boleto expirado (ask the owner for a new one), paga, cancelada. `noindex`, `referrer: no-referrer`, `robots.txt` disallows `/pagar/`, 60 views per IP per minute, page and PDF `force-dynamic`.
+
+**The daily run** (`GET /api/cron/faturas`, `vercel.json` at 11:00 UTC = 08:00 in Brasília, `CRON_SECRET`; `lib/billing/automation-server.ts`): for every owner with **Emissão automática** on, in order — (1) *reconcile*: every boleto still waiting at the bank is read back (paid settles, expired is recorded, just-ready e-mails); (2) *generate*: the invoices falling due from today to `days_in_advance` ahead, from `automation_from_month` on, never before it (origin AUTO; `generateInvoices` takes the due window); (3) *issue*: every open invoice with no boleto yet, no blocker and a due date still ahead, through the owner's usable bank connection — a boleto that expired or whose issue failed is **not** retried here, that is the owner's call and it shows in Atenção; (4) *send*: the e-mails that did not go out (up to ten tries; "Reenviar" has no limit). Each item is its own try/catch; a bank that is down stops that owner's issuing, not the run; the run stops starting work after 240 s of its 300 s and what is left waits for tomorrow. The outcome is one row in `index_sync_state` (job `BILLING`), like the index syncs. The automation needs every decision made and a first month chosen (CHECK + schema); switching it off stops every step — the owner's manual buttons keep working.
+
+## 10. Not in these steps
+
+- No card link yet (step 6, Stripe Connect); no reminders of a due date nor receipts (step 7).
 - A partial payment is not accepted: a payment recorded by hand must cover the invoice.
-- No automatic generation: "Gerar faturas" creates the month's invoices on demand; running it again only fills what is missing.
-- Out of scope for the module as planned: automatic rent adjustment on the invoice, pro rata of the first and last month, company tenants (CNPJ), variable-amount charges (metered energy).
+- Nothing retroactive: the daily run never creates an invoice whose due date has passed; "Gerar faturas" does, on demand.
+- Out of scope for the module as planned: automatic rent adjustment on the invoice, pro rata of the first and last month, company tenants (CNPJ), variable-amount charges (metered energy), bounce handling from the e-mail provider (a bounce is read as a failed delivery only when the provider refuses the address).
