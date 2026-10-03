@@ -32,6 +32,9 @@ import type { LeaseDashboardView } from "@/lib/lease-views";
 import type { IndexPoint } from "@/lib/lease-summary";
 import type { LeaseWithDetails } from "@/types/lease";
 import { RESPONSIBILITY_LABELS as CHARGE_RESPONSIBILITY, amountOf, chargeAdjustment, contractTotal, featuredCharge, monthlyTotal, tenantCharges } from "@/lib/lease-charges";
+import { pastAdjustmentDates } from "@/lib/lease-adjustments";
+import LeaseAdjustmentHistory from "./LeaseAdjustmentHistory";
+import LeaseAddendumModal from "./LeaseAddendumModal";
 import LeaseDocuments from "./LeaseDocuments";
 import { LeaseTitle } from "./LeaseTitle";
 
@@ -87,6 +90,7 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
     const [bundle, setBundle] = useState<LeaseDashboardView | null>(preloaded);
     const [error, setError] = useState<string | null>(null);
     const [viewing, setViewing] = useState<{ url: string; name: string } | null>(null);
+    const [addendumOpen, setAddendumOpen] = useState(false);
     const seededRef = useRef(preloaded !== null);
 
     const load = useCallback(async () => {
@@ -140,6 +144,9 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
     const condo = lease.charges.find(c => c.charge_type === "CONDOMINIUM") ?? null;
     const condoAdjustment = chargeAdjustment(condo, lease, seriesByCode, today);
     const condoCode = condoAdjustment ? seriesKey(condoAdjustment.index) : "";
+    // what the adjustments already made of the contract's original rent
+    const history = bundle.adjustments ?? null;
+    const lastAdjustment = history && history.rows.length > 0 ? history.rows[history.rows.length - 1] : null;
     const monthly = monthlyTotal(rent, lease.charges);
     const total = contractTotal(monthly, row.termMonths);
     const chargeName = (c: LeaseWithDetails["charges"][number]) => (c.charge_type === "OTHER" && c.label ? c.label : CHARGE_LABELS[c.charge_type] ?? c.charge_type);
@@ -245,7 +252,12 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                             label: "Vencimento do aluguel", value: `Todo dia ${lease.rent_due_day}`,
                             hint: row.inForce ? <>Próximo: {formatDateBR(summary.nextDueDate)}<br />{summary.daysToDue === 0 ? "Vence hoje" : `Em ${plural(summary.daysToDue, "dia", "dias")}`}</> : "Contrato encerrado",
                         }}
-                        right={{ label: "Aluguel atual", value: <Money>{brl(rent)}</Money>, hint: agencyManaged ? "Valor do contrato, antes da taxa da imobiliária" : "Valor do contrato" }}
+                        right={{
+                            label: "Aluguel atual", value: <Money>{brl(rent)}</Money>,
+                            hint: lastAdjustment && history
+                                ? <>Reajustado em {formatDateBR(lastAdjustment.effective_date)}<br />No contrato: <Money>{brl(history.initial.rent)}</Money>{agencyManaged ? " · antes da taxa da imobiliária" : ""}</>
+                                : agencyManaged ? "Valor do contrato, antes da taxa da imobiliária" : "Valor do contrato",
+                        }}
                     />
                     <Pair
                         left={{ label: "Índice de reajuste", value: row.indexLabel, hint: summary.nextAdjustmentDate ? `A cada ${summary.frequencyMonths} meses` : "Contrato sem reajuste" }}
@@ -480,6 +492,22 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                 </section>
             </div>
 
+            {/* Adjustments: what each one changed, by addendum or by Kitnets' calculation */}
+            {history && lease.adjustment_index !== "NONE" && (
+                <LeaseAdjustmentHistory
+                    leaseId={lease.id}
+                    startDate={lease.start_date}
+                    adjustments={history}
+                    summary={summary}
+                    indexLabel={row.indexLabel}
+                    inForce={row.inForce}
+                    documents={lease.documents}
+                    onView={openPdf}
+                    onAddendum={() => setAddendumOpen(true)}
+                    onChanged={() => load().catch(() => {})}
+                />
+            )}
+
             {/* Milestones */}
             {line.length > 1 && (
                 <section className="rounded-xl border border-border/80 bg-card px-4 py-3">
@@ -494,6 +522,18 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
             <LeaseDocuments leaseId={lease.id} documents={lease.documents} onChanged={() => load().catch(() => {})} onView={(url, name) => setViewing({ url, name })} />
 
             {error && <p className="text-sm text-rose-600">{error}</p>}
+
+            {addendumOpen && history && (
+                <LeaseAddendumModal
+                    leaseId={lease.id}
+                    initial={history.initial}
+                    rows={history.rows}
+                    hasCondo={Boolean(condo && amountOf(condo) > 0)}
+                    adjustmentDates={pastAdjustmentDates(lease, today)}
+                    onClose={() => setAddendumOpen(false)}
+                    onSaved={() => { setAddendumOpen(false); load().catch(() => {}); }}
+                />
+            )}
 
             <PdfViewerModal isOpen={viewing !== null} onClose={() => setViewing(null)} url={viewing?.url ?? null} title={viewing?.name ?? "Documento"} fileName={viewing?.name ?? "documento.pdf"} />
         </div>

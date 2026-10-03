@@ -1,6 +1,4 @@
 import { NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import OpenAI from "openai";
 import { extractText, getDocumentProxy } from "unpdf";
 import { extractLogoFromPdf, type PDFDocument } from "@/lib/agency-logo";
 import { readJsonBody, withAuth } from "@/lib/api-route";
@@ -8,8 +6,7 @@ import { downloadStagedUpload, mimeTypeOfStagedPath, ownStagedPath } from "@/lib
 import type { AdminSupabase } from "@/lib/api-auth";
 import { HOUR } from "@/lib/rate-limit";
 import { validateUpload } from "@/lib/session";
-import { AI_MODELS, reportAiFallback } from "@/lib/ai-models";
-import { scannedPdfPageImages } from "@/lib/pdf-page-images";
+import { aiAvailable, extractJsonFromDocument } from "@/lib/document-ai-server";
 import {
     LEASE_EXTRACTION_PROMPT,
     isEmptyExtraction,
@@ -27,84 +24,9 @@ import {
 export const runtime = "nodejs";
 // A long lease on the OpenAI fallback has taken close to two minutes, and it may only start after Gemini timed out.
 export const maxDuration = 300;
-// Gemini overloaded tends to hang before answering 503: leave the fallback time to run
-const GEMINI_TIMEOUT_MS = 90_000;
 
 const TAG = "Lease Extract";
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
-// Leases run long and the clauses that matter (reajuste, garantia) sit near the end.
-const MAX_TEXT_CHARS = 60000;
-
-function parseJsonResponse(text: string): unknown {
-    let clean = text.trim();
-    if (clean.startsWith("```")) {
-        clean = clean.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
-    }
-    const jsonStart = clean.indexOf("{");
-    const jsonEnd = clean.lastIndexOf("}");
-    if (jsonStart !== -1 && jsonEnd >= jsonStart) clean = clean.substring(jsonStart, jsonEnd + 1);
-    return JSON.parse(clean);
-}
-
-/**
- * Gemini on the text (or on the file when it is a scan), OpenAI as the fallback. A scanned PDF reaches
- * OpenAI as its page images: handed the PDF itself, gpt-4o got the names right and made up the address
- * and the dates (checked against a real signed lease, 2026-09-18).
- */
-async function runExtraction(textContent: string, buffer: Buffer, mimeType: string): Promise<unknown | null> {
-    const base64 = buffer.toString("base64");
-    const hasText = textContent.trim().length >= 100;
-
-    if (process.env.GEMINI_API_KEY) {
-        try {
-            const model = new GoogleGenerativeAI(process.env.GEMINI_API_KEY).getGenerativeModel(
-                { model: AI_MODELS.gemini, generationConfig: { temperature: 0, responseMimeType: "application/json" } },
-                { timeout: GEMINI_TIMEOUT_MS }
-            );
-            const result = await model.generateContent(
-                hasText
-                    ? [{ text: `${LEASE_EXTRACTION_PROMPT}\n\nConteúdo do contrato:\n\n${textContent.substring(0, MAX_TEXT_CHARS)}` }]
-                    : [{ text: LEASE_EXTRACTION_PROMPT }, { inlineData: { mimeType, data: base64 } }]
-            );
-            return parseJsonResponse(result.response.text());
-        } catch (err) {
-            console.warn(`[${TAG}] Gemini failed:`, err);
-            reportAiFallback(TAG, err);
-        }
-    }
-
-    if (!process.env.OPENAI_API_KEY) return null;
-    // Chat completions read images, not scans inside a PDF: send the pages as pictures
-    let images = [`data:${mimeType};base64,${base64}`];
-    if (!hasText && mimeType === "application/pdf") {
-        images = await scannedPdfPageImages(new Uint8Array(buffer));
-        if (images.length === 0) return null;
-    }
-
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const completion = await openai.chat.completions.create({
-        model: hasText ? AI_MODELS.openaiMini : AI_MODELS.openai,
-        response_format: { type: "json_object" },
-        temperature: 0,
-        max_tokens: 4000,
-        messages: hasText
-            ? [
-                  { role: "system", content: LEASE_EXTRACTION_PROMPT },
-                  { role: "user", content: textContent.substring(0, MAX_TEXT_CHARS) },
-              ]
-            : [
-                  {
-                      role: "user",
-                      content: [
-                          { type: "text", text: LEASE_EXTRACTION_PROMPT },
-                          ...images.map((url) => ({ type: "image_url" as const, image_url: { url, detail: "high" as const } })),
-                      ],
-                  },
-              ],
-    });
-    const content = completion.choices[0]?.message?.content;
-    return content ? parseJsonResponse(content) : null;
-}
 
 function isStandaloneUc(electronicId: unknown): boolean {
     if (!electronicId) return false;
@@ -225,13 +147,13 @@ export const POST = withAuth(
             }
         }
 
-        if (!process.env.GEMINI_API_KEY && !process.env.OPENAI_API_KEY) {
+        if (!aiAvailable()) {
             return NextResponse.json({ error: "Serviço de IA indisponível." }, { status: 503 });
         }
 
         let raw: unknown | null = null;
         try {
-            raw = await runExtraction(textContent, buffer, mimeType);
+            raw = await extractJsonFromDocument({ prompt: LEASE_EXTRACTION_PROMPT, contentLabel: "Conteúdo do contrato", textContent, buffer, mimeType, tag: TAG });
         } catch (err) {
             console.error(`[${TAG}] AI extraction failed:`, err);
         }
