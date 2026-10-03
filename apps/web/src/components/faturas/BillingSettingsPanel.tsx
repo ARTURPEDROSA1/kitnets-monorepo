@@ -24,7 +24,7 @@ interface Props {
 }
 
 type NumberField = "days_in_advance" | "fine_pct" | "interest_pct_month" | "days_payable_after_due" | "card_fee_pct" | "card_fee_fixed" | "reminder_days_before" | "overdue_notice_days";
-type Form = Record<NumberField | "sender_name" | "reply_to_email" | "automation_from_month", string> & { automation_enabled: boolean; send_receipts: boolean };
+type Form = Record<NumberField | "sender_name" | "reply_to_email" | "copy_to_email" | "automation_from_month", string> & { automation_enabled: boolean; send_receipts: boolean };
 
 /** what the automation needs decided before it can be switched on (the table's CHECK and the schema say the same) */
 const AUTOMATION_NEEDS: NumberField[] = ["days_in_advance", "fine_pct", "interest_pct_month", "days_payable_after_due"];
@@ -62,6 +62,7 @@ export default function BillingSettingsPanel({ settings, emailAvailable = true, 
         days_payable_after_due: show(settings.days_payable_after_due),
         sender_name: settings.sender_name ?? "",
         reply_to_email: settings.reply_to_email ?? "",
+        copy_to_email: settings.copy_to_email ?? "",
         automation_enabled: settings.automation_enabled,
         automation_from_month: settings.automation_from_month ?? "",
         card_fee_pct: show(settings.card_fee_pct),
@@ -160,7 +161,12 @@ export default function BillingSettingsPanel({ settings, emailAvailable = true, 
                     <div>
                         <Label htmlFor="billing-reply_to_email" className="text-xs">E-mail para respostas</Label>
                         <Input id="billing-reply_to_email" type="email" value={form.reply_to_email} onChange={e => set("reply_to_email", e.target.value)} placeholder="o e-mail do seu cadastro" className="mt-1 h-9" maxLength={120} aria-invalid={Boolean(errors.reply_to_email)} />
-                        {hint("reply_to_email", "Para onde vai a resposta do inquilino. Em branco, o e-mail do seu cadastro.")}
+                        {hint("reply_to_email", "Para onde vai a resposta do inquilino quando ele clica em Responder. Em branco, o e-mail do seu cadastro. Não é uma cópia do que é enviado.")}
+                    </div>
+                    <div className="sm:col-span-2">
+                        <Label htmlFor="billing-copy_to_email" className="text-xs">Receber cópia de cada e-mail em</Label>
+                        <Input id="billing-copy_to_email" type="email" value={form.copy_to_email} onChange={e => set("copy_to_email", e.target.value)} placeholder="em branco: nenhuma cópia" className="mt-1 h-9 sm:max-w-md" maxLength={120} aria-invalid={Boolean(errors.copy_to_email)} />
+                        {hint("copy_to_email", "Cada e-mail enviado a um inquilino — fatura, lembrete, aviso de atraso, recibo — chega também a este endereço, marcado como cópia. O inquilino não vê, e o link da cópia não conta como página aberta.")}
                     </div>
                 </div>
                 <h3 className="mt-5 border-t border-border/60 pt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Lembretes e recibo</h3>

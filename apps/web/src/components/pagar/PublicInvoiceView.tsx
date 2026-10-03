@@ -193,7 +193,7 @@ export default function PublicInvoiceView({ invoice, qrSvg, pdfHref, cardAction,
             )}
 
             <p className="text-center text-xs text-muted-foreground">
-                Cobrança emitida por {invoice.sender_name} através do Kitnets. Dúvidas sobre a fatura? Responda ao e-mail em que recebeu este link.
+                Cobrança emitida por {invoice.sender_name} através do Kitnets.com. Dúvidas sobre a fatura? Responda ao e-mail em que recebeu este link.
             </p>
         </Shell>
     );

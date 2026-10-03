@@ -168,16 +168,19 @@ interface OwnerSettings {
     card_fee_pct: number | null;
     card_fee_fixed: number | null;
     send_receipts: boolean;
+    /** where the owner gets a copy of every e-mail sent to tenants; null = none */
+    copy_to_email: string | null;
 }
 
 async function ownerSettings(supabase: AdminSupabase, profileId: string): Promise<OwnerSettings> {
-    const { data } = await supabase.from("billing_settings").select("sender_name, reply_to_email, card_fee_pct, card_fee_fixed, send_receipts").eq("owner_id", profileId).maybeSingle();
+    const { data } = await supabase.from("billing_settings").select("sender_name, reply_to_email, card_fee_pct, card_fee_fixed, send_receipts, copy_to_email").eq("owner_id", profileId).maybeSingle();
     return {
         sender_name: (data?.sender_name as string | null | undefined) ?? null,
         reply_to_email: (data?.reply_to_email as string | null | undefined) ?? null,
         card_fee_pct: data?.card_fee_pct == null ? null : Number(data.card_fee_pct),
         card_fee_fixed: data?.card_fee_fixed == null ? null : Number(data.card_fee_fixed),
         send_receipts: data?.send_receipts !== false,
+        copy_to_email: ((data?.copy_to_email as string | null | undefined) ?? "").trim() || null,
     };
 }
 
@@ -226,7 +229,7 @@ async function boletoAttachment(supabase: AdminSupabase, invoice: InvoiceForEmai
 }
 
 /** What the e-mail is made of, by kind; or the reason the invoice is not in a state for it. A copy's link does not count as the tenant opening the page. */
-async function compose(supabase: AdminSupabase, profileId: string, invoice: InvoiceForEmail, delivery: Pick<DeliveryRow, "kind" | "sequence">, senderName: string, settings: OwnerSettings, attachments: EmailAttachment[], opts: { copy?: boolean } = {}): Promise<{ content: EmailContent } | { refuse: string }> {
+async function compose(supabase: AdminSupabase, profileId: string, invoice: InvoiceForEmail, delivery: Pick<DeliveryRow, "kind" | "sequence">, senderName: string, settings: OwnerSettings, attachments: EmailAttachment[], opts: { copy?: boolean; preview?: boolean } = {}): Promise<{ content: EmailContent; placeholders?: boolean } | { refuse: string }> {
     const place = [invoice.property_name, invoice.unit_name].filter(Boolean).join(" · ") || "Imóvel";
     const common = { number: invoice.number, place, tenantName: invoice.payer_name ?? invoice.tenant_name ?? "", items: invoice.items, amount: invoice.amount, referenceMonth: invoice.reference_month, pageUrl: publicInvoiceUrl(invoice.public_token) + (opts.copy ? "?copia=1" : ""), senderName };
 
@@ -237,7 +240,9 @@ async function compose(supabase: AdminSupabase, profileId: string, invoice: Invo
     if (invoice.status !== "ISSUED" && invoice.status !== "DRAFT") return { refuse: "a fatura não está mais em aberto" };
     const cardAvailable = cardFeeDecided(settings.card_fee_pct, settings.card_fee_fixed) && (await usableStripeAccount(supabase, profileId)) !== null;
     const codes = invoice.charge && (invoice.charge.digitable_line || invoice.charge.pix_copy_paste);
-    if (!codes && !cardAvailable) return { refuse: "a fatura ainda não tem boleto e PIX emitidos pelo banco" };
+    if (!codes && !cardAvailable && !opts.preview) return { refuse: "a fatura ainda não tem boleto e PIX emitidos pelo banco" };
+    // a preview before the issue: the bank's codes do not exist yet, their places are shown
+    const placeholders = opts.preview === true && !codes;
 
     const kind = delivery.kind === "REMINDER" ? (delivery.sequence === REMINDER_OVERDUE ? "OVERDUE" : "REMINDER") : delivery.kind === "RESEND" ? "RESEND" : "ISSUE";
     const today = todayBRT();
@@ -251,11 +256,35 @@ async function compose(supabase: AdminSupabase, profileId: string, invoice: Invo
     return {
         content: buildInvoiceEmail({
             ...common, dueDate: invoice.due_date, kind,
-            digitableLine: invoice.charge?.digitable_line ?? null, pixCopyPaste: invoice.charge?.pix_copy_paste ?? null,
-            pdfAttached: attachments.length > 0, cardAvailable,
+            digitableLine: placeholders ? PREVIEW_DIGITABLE_LINE : invoice.charge?.digitable_line ?? null, pixCopyPaste: placeholders ? PREVIEW_PIX : invoice.charge?.pix_copy_paste ?? null,
+            pdfAttached: attachments.length > 0 || placeholders, cardAvailable,
             overdue: late ? { daysLate: late.daysLate, extra: late.extra, total: late.total, payableUntil } : undefined,
         }),
+        placeholders,
     };
+}
+
+const PREVIEW_PIX = "(código PIX copia e cola — gerado pelo banco na emissão)";
+const PREVIEW_DIGITABLE_LINE = "(linha digitável do boleto — gerada pelo banco na emissão)";
+const KIND_WORDS: Record<string, string> = { ISSUE: "da fatura", RESEND: "da fatura", REMINDER: "de lembrete", OVERDUE: "de aviso de atraso", RECEIPT: "de recibo" };
+
+/**
+ * The owner's copy of an e-mail that just went to the tenant (Configuração → "Receber cópia"): the
+ * same message, marked as a copy, its link not counting as the tenant opening the page. The provider
+ * gets `<delivery>:copy` as the idempotency key, so a retry never sends two. Never throws.
+ */
+async function sendOwnerCopy(supabase: AdminSupabase, profileId: string, invoice: InvoiceForEmail, delivery: DeliveryRow, sender: { from: string; replyTo: string | null; name: string }, settings: OwnerSettings, attachments: EmailAttachment[], tenantEmail: string): Promise<void> {
+    const to = settings.copy_to_email;
+    if (!to || to.toLowerCase() === tenantEmail.toLowerCase()) return;
+    try {
+        const composed = await compose(supabase, profileId, invoice, delivery, sender.name, settings, attachments, { copy: true });
+        if ("refuse" in composed) return;
+        const word = KIND_WORDS[delivery.kind === "REMINDER" && delivery.sequence === REMINDER_OVERDUE ? "OVERDUE" : delivery.kind] ?? "da fatura";
+        const content = withCopyNote(composed.content, `Cópia do e-mail ${word} enviado ao inquilino (${tenantEmail}). Você recebe uma de cada e-mail porque pediu em Faturas → Configuração.`);
+        await sendEmail({ from: sender.from, to, replyTo: sender.replyTo, subject: content.subject, text: content.text, html: content.html, attachments, idempotencyKey: `${delivery.id}:copy` });
+    } catch (err) {
+        console.error("[Invoices] the owner's copy failed:", (err as Error).message);
+    }
 }
 
 /**
@@ -295,6 +324,7 @@ export async function sendDelivery(supabase: AdminSupabase, profileId: string, d
             .eq("id", delivery.id).eq("owner_id", profileId).select(COLUMNS).single();
         if (error) throw new Error(`invoice_deliveries: ${error.message}`);
         await event(supabase, profileId, delivery.invoice_id, "EMAIL_SENT", { kind: delivery.kind, sequence: delivery.sequence, to, provider_id: providerId });
+        await sendOwnerCopy(supabase, profileId, invoice, delivery, sender, settings, attachments, to);
         return normalize(data as Record<string, unknown>);
     } catch (err) {
         if (err instanceof EmailError) return fail(err.message);
@@ -391,4 +421,42 @@ export async function sendInvoiceCopy(supabase: AdminSupabase, profileId: string
         throw err;
     }
     await event(supabase, profileId, invoiceId, "EMAIL_COPY", { kind });
+}
+
+export interface EmailPreview {
+    /** which e-mail it is: the invoice, or the receipt once it is paid */
+    kind: "ISSUE" | "RECEIPT";
+    from: string;
+    replyTo: string | null;
+    /** the tenant's address as it is now; null when there is none on file */
+    to: string | null;
+    subject: string;
+    text: string;
+    html: string;
+    /** the attachment's name, when the boleto's PDF goes (or will go) with it */
+    attachment: string | null;
+    /** the boleto is not issued yet: the Pix code and the digitable line are placeholders */
+    placeholders: boolean;
+}
+
+/**
+ * The e-mail the tenant gets for an invoice, as it would go out now — nothing is sent. Before the
+ * boleto exists the bank's codes are placeholders. Throws 400 for an invoice with no e-mail to show
+ * (cancelled).
+ */
+export async function previewInvoiceEmail(supabase: AdminSupabase, profileId: string, invoiceId: string): Promise<EmailPreview> {
+    const invoice = await loadInvoiceForEmail(supabase, profileId, invoiceId);
+    if (invoice.status === "CANCELLED") throw badRequest({ _form: "Esta fatura foi cancelada: nenhum e-mail sai dela." });
+    const settings = await ownerSettings(supabase, profileId);
+    const sender = await senderFor(supabase, profileId, settings);
+    const kind = invoice.status === "PAID" ? "RECEIPT" : "ISSUE";
+    const hasPdf = kind === "ISSUE" && Boolean(invoice.charge?.pdf_path);
+    const composed = await compose(supabase, profileId, invoice, { kind, sequence: 0 }, sender.name, settings, hasPdf ? [{ filename: "boleto.pdf", content: Buffer.alloc(0) }] : [], { preview: true });
+    if ("refuse" in composed) throw badRequest({ _form: `Não há e-mail para mostrar: ${composed.refuse}.` });
+    return {
+        kind, from: sender.from, replyTo: sender.replyTo, to: invoice.payer_email,
+        subject: composed.content.subject, text: composed.content.text, html: composed.content.html,
+        attachment: kind === "ISSUE" && (hasPdf || composed.placeholders) ? `fatura-${invoice.number}-boleto.pdf` : null,
+        placeholders: composed.placeholders === true,
+    };
 }

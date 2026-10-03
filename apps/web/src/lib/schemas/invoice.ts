@@ -94,6 +94,8 @@ export const billingSettingsSchema = z
         /** days after the due date an unpaid invoice gets the overdue notice; blank = none */
         overdue_notice_days: intOrNull.refine((v) => v === null || (v >= 1 && v <= 30), "Aviso de atraso entre 1 e 30 dias depois."),
         send_receipts: z.preprocess((v) => (v === undefined ? true : v === true || v === "true" || v === "on"), z.boolean()),
+        /** where the owner gets a copy of every e-mail sent to tenants; blank = no copy */
+        copy_to_email: optionalText(120).transform((v) => (v ? v.toLowerCase() : null)).refine((v) => v === null || /^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+$/.test(v), "E-mail da cópia inválido."),
     })
     .superRefine((d, ctx) => {
         if ((d.card_fee_pct === null) !== (d.card_fee_fixed === null)) {

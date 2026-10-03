@@ -6,7 +6,7 @@
  * PDF). The page preloads it; every action here answers with the fresh invoice, handed up to the parent.
  */
 import React, { useEffect, useState } from "react";
-import { AlertCircle, ArrowLeft, Ban, Check, CheckCircle2, Copy, CreditCard, Eye, FileDown, FileText, FlaskConical, Landmark, Loader2, Mail, Receipt, RefreshCw, Send, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, Ban, Check, CheckCircle2, Copy, CreditCard, Eye, FileDown, FileText, FlaskConical, Landmark, Loader2, Mail, MailOpen, Receipt, RefreshCw, Send, X } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { cn } from "@/lib/utils";
 import { formatDateBR } from "@/lib/dates";
@@ -20,6 +20,7 @@ import { blockersText } from "@/lib/invoice-payer";
 import { daysBetween, monthLabel } from "@/lib/invoice-schedule";
 import { CHARGE_STATUS_LABELS } from "@/lib/billing/inter-payload";
 import type { InvoiceDetailView, InvoiceEventView } from "@/lib/invoice-views";
+import type { EmailPreview } from "@/lib/billing/deliveries-server";
 
 interface Props {
     invoiceId: string;
@@ -145,6 +146,7 @@ export default function InvoiceDetail({ invoiceId, lang, today, initial, notice,
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState<"issue" | "refresh" | "pdf" | "sandbox" | "email" | "copy" | null>(null);
     const [copyModal, setCopyModal] = useState<{ email: string; error: string | null } | null>(null);
+    const [preview, setPreview] = useState<{ data: EmailPreview | null; error: string | null } | null>(null);
     const [actionError, setActionError] = useState<string | null>(null);
     const [issueModal, setIssueModal] = useState<{ dueDate: string } | null>(null);
     const detail = preloaded ?? (fetched && fetched.invoice.id === invoiceId ? fetched : null);
@@ -186,6 +188,17 @@ export default function InvoiceDetail({ invoiceId, lang, today, initial, notice,
             setActionError(err instanceof Error ? err.message : "Não foi possível enviar o e-mail.");
         } finally {
             setBusy(null);
+        }
+    };
+    const openPreview = async () => {
+        setPreview({ data: null, error: null });
+        try {
+            const res = await fetch(`/api/faturas/${invoiceId}/previa-email`);
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(json.errors ? Object.values(json.errors as Record<string, string>).join(" ") : typeof json.error === "string" ? json.error : "Não foi possível montar a prévia.");
+            setPreview({ data: json as EmailPreview, error: null });
+        } catch (err) {
+            setPreview({ data: null, error: err instanceof Error ? err.message : "Não foi possível montar a prévia." });
         }
     };
     const openCopy = () => {
@@ -386,11 +399,16 @@ export default function InvoiceDetail({ invoiceId, lang, today, initial, notice,
                 </section>
             )}
 
-            {(charge || delivery) && (
+            {(invoice.status !== "CANCELLED" || charge || delivery) && (
                 <section className="rounded-xl border border-border/80 bg-card">
                     <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-2.5">
                         <span className="inline-flex items-center gap-2 text-sm font-semibold text-foreground"><Mail className="h-4 w-4 text-sky-600" /> E-mail ao inquilino</span>
                         <span className="flex flex-wrap items-center gap-2">
+                            {invoice.status !== "CANCELLED" && (
+                                <Button variant="outline" size="sm" onClick={() => void openPreview()} disabled={busy !== null} title="Mostra a mensagem como o inquilino a recebe; nada é enviado">
+                                    <MailOpen className="mr-1 h-4 w-4" /> Ver o e-mail
+                                </Button>
+                            )}
                             {(charge?.status === "OPEN" || invoice.status === "PAID") && (
                                 <Button variant="outline" size="sm" onClick={openCopy} disabled={busy !== null || !emailAvailable} title={emailAvailable ? "Envia para um e-mail seu a mesma mensagem que o inquilino recebe" : "Envio de e-mail não configurado neste servidor"}>
                                     <Send className="mr-1 h-4 w-4" /> Enviar cópia para mim
@@ -404,7 +422,7 @@ export default function InvoiceDetail({ invoiceId, lang, today, initial, notice,
                         </span>
                     </header>
                     <div className="space-y-3 p-4">
-                        {!delivery && <p className="text-sm text-muted-foreground">{charge?.status === "OPEN" ? "Ainda não enviado." : "Enviado assim que o banco deixar o boleto pronto."}</p>}
+                        {!delivery && <p className="text-sm text-muted-foreground">{charge?.status === "OPEN" ? "Ainda não enviado." : invoice.status === "PAID" ? "Nenhum e-mail foi enviado para esta fatura." : "Sai sozinho assim que o banco deixar o boleto pronto. Em “Ver o e-mail” você confere antes como ele chega ao inquilino."}</p>}
                         {delivery?.status === "SENT" && delivery.sent_at && (
                             <p className="text-sm text-foreground">
                                 Enviado em {stamp(delivery.sent_at)} para <Sensitive>{delivery.recipient}</Sensitive>{delivery.kind !== "ISSUE" ? ` (${DELIVERY_KIND_LABELS[delivery.kind] ?? delivery.kind})` : ""}
@@ -521,6 +539,46 @@ export default function InvoiceDetail({ invoiceId, lang, today, initial, notice,
                     </section>
                 </div>
             </div>
+
+            {preview && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Prévia do e-mail ao inquilino">
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setPreview(null)} />
+                    <div className="relative flex max-h-[92vh] w-full max-w-2xl flex-col rounded-2xl border border-border bg-card shadow-xl">
+                        <header className="flex items-start justify-between gap-3 border-b border-border/60 px-5 py-4">
+                            <div>
+                                <h2 className="text-lg font-bold text-foreground">{preview.data?.kind === "RECEIPT" ? "O recibo que o inquilino recebe" : "O e-mail que o inquilino recebe"}</h2>
+                                <p className="text-xs text-muted-foreground">Só uma prévia: nada é enviado daqui.</p>
+                            </div>
+                            <button type="button" onClick={() => setPreview(null)} className="text-muted-foreground hover:text-foreground" aria-label="Fechar"><X className="h-5 w-5" /></button>
+                        </header>
+                        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
+                            {!preview.data && !preview.error && <p className="flex items-center gap-2 py-8 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Montando a prévia…</p>}
+                            {preview.error && <p role="alert" className="flex items-start gap-2 text-sm text-rose-600"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> {preview.error}</p>}
+                            {preview.data && (
+                                <>
+                                    <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+                                        <dt className="text-muted-foreground">De</dt><dd className="min-w-0 break-words text-foreground">{preview.data.from}</dd>
+                                        <dt className="text-muted-foreground">Responder para</dt><dd className="min-w-0 break-words text-foreground">{preview.data.replyTo ? <Sensitive>{preview.data.replyTo}</Sensitive> : "—"}</dd>
+                                        <dt className="text-muted-foreground">Para</dt><dd className="min-w-0 break-words text-foreground">{preview.data.to ? <Sensitive>{preview.data.to}</Sensitive> : <span className="text-rose-600">o inquilino não tem e-mail cadastrado: nada será enviado</span>}</dd>
+                                        <dt className="text-muted-foreground">Assunto</dt><dd className="min-w-0 break-words font-medium text-foreground">{preview.data.subject}</dd>
+                                        {preview.data.attachment && <><dt className="text-muted-foreground">Anexo</dt><dd className="min-w-0 break-words text-foreground">{preview.data.attachment}</dd></>}
+                                    </dl>
+                                    {preview.data.placeholders && (
+                                        <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200">
+                                            O boleto ainda não foi emitido: o código PIX, a linha digitável e o PDF entram no lugar dos textos entre parênteses quando o banco os gerar.
+                                        </p>
+                                    )}
+                                    {/* no scripts, no forms, no navigation: only our own template's HTML is drawn */}
+                                    <iframe title="Prévia do e-mail" srcDoc={preview.data.html} sandbox="allow-same-origin" className="h-[520px] w-full rounded-lg border border-border bg-white" />
+                                </>
+                            )}
+                        </div>
+                        <footer className="flex justify-end border-t border-border/60 px-5 py-3">
+                            <Button variant="outline" onClick={() => setPreview(null)}>Fechar</Button>
+                        </footer>
+                    </div>
+                </div>
+            )}
 
             {copyModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Enviar cópia do e-mail">

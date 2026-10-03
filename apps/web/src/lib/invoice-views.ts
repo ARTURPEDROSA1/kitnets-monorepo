@@ -149,6 +149,8 @@ export interface BillingSettingsView {
     overdue_notice_days?: number | null;
     /** a receipt is e-mailed when an invoice is paid */
     send_receipts?: boolean;
+    /** where the owner gets a copy of every e-mail sent to tenants; null = no copy */
+    copy_to_email?: string | null;
 }
 
 export interface InvoiceListView {

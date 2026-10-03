@@ -31,7 +31,7 @@ describe("buildInvoiceEmail", () => {
         expect(text).toContain("07790.00116 12345.678901");
         expect(text).toContain("https://kitnets.com/pt/pagar/abc123");
         expect(text).toContain("O boleto em PDF segue anexo.");
-        expect(text).toContain("Enviado por Holding Pedrosa através do Kitnets");
+        expect(text).toContain("Enviado por Holding Pedrosa através do Kitnets.com. Dúvidas? Responda a este e-mail.");
         expect(html).toContain("Ver fatura e pagar");
         expect(html).toContain('href="https://kitnets.com/pt/pagar/abc123"');
         expect(html).toContain("R$ 249,90");

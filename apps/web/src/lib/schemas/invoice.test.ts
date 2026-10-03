@@ -64,7 +64,7 @@ describe("collectionUpdateSchema", () => {
 
 describe("billingSettingsSchema", () => {
     it("blank is not decided, never a default", () => {
-        expect(billingSettingsSchema.parse({ days_in_advance: "", fine_pct: "", interest_pct_month: null })).toEqual({ days_in_advance: null, fine_pct: null, interest_pct_month: null, days_payable_after_due: null, sender_name: null, reply_to_email: null, automation_enabled: false, automation_from_month: null, card_fee_pct: null, card_fee_fixed: null, reminder_days_before: null, overdue_notice_days: null, send_receipts: true });
+        expect(billingSettingsSchema.parse({ days_in_advance: "", fine_pct: "", interest_pct_month: null })).toEqual({ days_in_advance: null, fine_pct: null, interest_pct_month: null, days_payable_after_due: null, sender_name: null, reply_to_email: null, automation_enabled: false, automation_from_month: null, card_fee_pct: null, card_fee_fixed: null, reminder_days_before: null, overdue_notice_days: null, send_receipts: true, copy_to_email: null });
     });
 
     it("reads numbers as typed in Brazil", () => {
@@ -98,6 +98,12 @@ describe("billingSettingsSchema", () => {
         expect(billingSettingsSchema.parse({ send_receipts: false })).toMatchObject({ send_receipts: false });
         expect(billingSettingsSchema.parse({ send_receipts: "false" })).toMatchObject({ send_receipts: false });
         expect(errorsOf(billingSettingsSchema, { reminder_days_before: "0", overdue_notice_days: "31" })).toEqual({ reminder_days_before: "Lembrete entre 1 e 15 dias antes.", overdue_notice_days: "Aviso de atraso entre 1 e 30 dias depois." });
+    });
+
+    it("the copy of every e-mail goes to one address, or nowhere", () => {
+        expect(billingSettingsSchema.parse({ copy_to_email: " Dono@Exemplo.com " })).toMatchObject({ copy_to_email: "dono@exemplo.com" });
+        expect(billingSettingsSchema.parse({ copy_to_email: "" })).toMatchObject({ copy_to_email: null });
+        expect(errorsOf(billingSettingsSchema, { copy_to_email: "dono" })).toEqual({ copy_to_email: "E-mail da cópia inválido." });
     });
 
     it("sender and reply-to", () => {
