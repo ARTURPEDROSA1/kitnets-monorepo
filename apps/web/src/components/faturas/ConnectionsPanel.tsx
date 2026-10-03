@@ -220,7 +220,7 @@ export default function ConnectionsPanel({ connections, today, onChange }: Props
                     )}
                     {inter?.status === "CONNECTED" && inter.usable && (
                         <p className="flex items-start gap-1.5 text-sm text-emerald-700 dark:text-emerald-400">
-                            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" /> O banco aceitou as credenciais. A emissão do boleto e do PIX por esta conexão entra na próxima etapa do módulo.
+                            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" /> O banco aceitou as credenciais. As faturas já podem ser emitidas por esta conexão: o boleto e o PIX saem pela sua conta e o banco avisa o Kitnets quando o inquilino paga.
                         </p>
                     )}
 
