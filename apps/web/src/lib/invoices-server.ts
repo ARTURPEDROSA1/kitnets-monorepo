@@ -17,6 +17,7 @@ import type { GenerateResult, InvoiceOrigin } from "@/lib/invoice-views";
 import type { BillingSettingsInput } from "@/lib/schemas/invoice";
 import { cancelChargeAtBank } from "@/lib/billing/charges-server";
 import { closeCardSessions } from "@/lib/billing/card-server";
+import { sendReceipt } from "@/lib/billing/deliveries-server";
 
 const TENANT_COLUMNS = "id, full_name, cpf, email, postal_code, street, street_number, address_complement, neighborhood, city, state, use_property_address";
 
@@ -140,6 +141,10 @@ export async function payInvoiceManually(
     });
     if (error) throw new Error(`invoice_mark_paid: ${error.message}`);
     if (data !== "PAID") throw settled((await ownedInvoice(supabase, profileId, invoiceId)).status);
+    // the boleto, if any, must not stay payable; then the receipt
+    await cancelChargeAtBank(supabase, profileId, invoiceId, "Pago por fora").catch(err => console.error("[Invoices] cancelling the boleto after a manual payment failed:", (err as Error).message));
+    await closeCardSessions(supabase, profileId, invoiceId);
+    await sendReceipt(supabase, profileId, invoiceId);
 
     if (input.notes) {
         const { error: notesError } = await supabase.from("invoices").update({ notes: input.notes }).eq("id", invoiceId).eq("owner_id", profileId);

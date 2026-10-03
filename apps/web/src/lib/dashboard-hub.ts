@@ -10,6 +10,7 @@ import { agentAttention, agentHubTotals, agentRows, type AgentHubTotals, type Ag
 import { condoAttention, condoHubTotals, condoRows, type CondoHubTotals, type CondoRow } from "@/lib/condominium-hub";
 import type { DashboardIncomeSnapshot, DashboardView } from "@/lib/dashboard-views";
 import { energyAttention, energyHubTotals, energyRows, type EnergyHubTotals, type EnergyUnitRow } from "@/lib/energy-hub";
+import { deliveryStuck, invoiceHubTotals, invoiceRows, isOpen as invoiceIsOpen, type InvoiceHubTotals, type InvoiceRow } from "@/lib/invoice-hub";
 import { IN_FORCE, attentionItems, brl, hubTotals, summarizeLeases, titleOf, type HubTotals, type LeaseRow } from "@/lib/lease-dashboard";
 import { daysBetween } from "@/lib/lease-summary";
 import { investmentTitle } from "@/lib/new-investments";
@@ -152,6 +153,7 @@ export interface DashboardRows {
     energy: EnergyUnitRow[];
     water: WaterUnitRow[];
     condos: CondoRow[];
+    invoices: InvoiceRow[];
 }
 
 export function dashboardRows(view: DashboardView, today: string): DashboardRows {
@@ -163,6 +165,7 @@ export function dashboardRows(view: DashboardView, today: string): DashboardRows
         energy: energyRows(view.energy ?? [], today).filter(r => r.kind === "rental"),
         water: waterRows(view.water ?? [], today),
         condos: condoRows(view.condominiums ?? []),
+        invoices: invoiceRows(view.invoices ?? [], today),
     };
 }
 
@@ -190,6 +193,8 @@ export interface DashboardTotals {
     /** the counts over every project; the money over the hub's slices, as the Projetos hub shows it */
     projects: { all: ProjectHubTotals; inProgress: ProjectHubTotals; sold: ProjectHubTotals } | null;
     taxes: TaxFigures | null;
+    /** Fatura: what is due, what came in, what is late; plus the next due date among the open invoices */
+    invoices: (InvoiceHubTotals & { nextDue: { date: string; days: number; amount: number } | null; open: { count: number; amount: number } }) | null;
 }
 
 export function dashboardTotals(view: DashboardView, today: string, rows: DashboardRows = dashboardRows(view, today)): DashboardTotals {
@@ -216,12 +221,24 @@ export function dashboardTotals(view: DashboardView, today: string, rows: Dashbo
             sold: projectHubTotals(view.projects.investments.filter(i => i.status === "SOLD"), view.projects.summaries),
         } : null,
         taxes: view.taxes ? taxFigures(view.taxes, today) : null,
+        invoices: view.invoices ? invoiceFigures(rows.invoices, today) : null,
+    };
+}
+
+function invoiceFigures(rows: InvoiceRow[], today: string): NonNullable<DashboardTotals["invoices"]> {
+    const open = rows.filter(r => invoiceIsOpen(r.invoice.status));
+    const upcoming = open.filter(r => r.invoice.due_date >= today).sort((a, b) => a.invoice.due_date.localeCompare(b.invoice.due_date));
+    const next = upcoming[0] ?? null;
+    return {
+        ...invoiceHubTotals(rows, [], today),
+        open: { count: open.length, amount: r2(open.reduce((s, r) => s + r.invoice.amount, 0)) },
+        nextDue: next ? { date: next.invoice.due_date, days: daysBetween(today, next.invoice.due_date), amount: next.invoice.amount } : null,
     };
 }
 
 // ── Attention ────────────────────────────────────────────────────────
 
-export type DashboardModule = "imoveis" | "contratos" | "inquilinos" | "corretores" | "imobiliaria" | "energia" | "agua" | "condominio" | "projetos" | "tributos";
+export type DashboardModule = "imoveis" | "contratos" | "inquilinos" | "corretores" | "imobiliaria" | "faturas" | "energia" | "agua" | "condominio" | "projetos" | "tributos";
 
 /** Label, hub path (Portuguese; the client prefixes the language) and display order of each module. */
 export const MODULE_META: Record<DashboardModule, { label: string; path: string; order: number }> = {
@@ -230,11 +247,12 @@ export const MODULE_META: Record<DashboardModule, { label: string; path: string;
     inquilinos: { label: "Inquilinos", path: "/inquilinos", order: 2 },
     corretores: { label: "Corretores", path: "/corretores", order: 3 },
     imobiliaria: { label: "Imobiliárias", path: "/imobiliaria", order: 4 },
-    energia: { label: "Energia", path: "/dashboard/energy", order: 5 },
-    agua: { label: "Água", path: "/dashboard/water", order: 6 },
-    condominio: { label: "Condomínio", path: "/condominio", order: 7 },
-    projetos: { label: "Projetos", path: "/projetos", order: 8 },
-    tributos: { label: "Tributos", path: "/imoveis", order: 9 },
+    faturas: { label: "Faturas", path: "/faturas", order: 5 },
+    energia: { label: "Energia", path: "/dashboard/energy", order: 6 },
+    agua: { label: "Água", path: "/dashboard/water", order: 7 },
+    condominio: { label: "Condomínio", path: "/condominio", order: 8 },
+    projetos: { label: "Projetos", path: "/projetos", order: 9 },
+    tributos: { label: "Tributos", path: "/imoveis", order: 10 },
 };
 
 export type DashboardTone = "rose" | "amber" | "sky" | "emerald" | "slate";
@@ -260,6 +278,7 @@ export function dashboardAttention(view: DashboardView, today: string, rows: Das
     for (const it of tenantAttention(rows.tenants, today)) items.push({ module: "inquilinos", tone: it.tone, name: it.row.tenant.full_name, text: it.text, date: it.date, href: `/inquilinos?id=${it.row.tenant.id}` });
     for (const it of agentAttention(rows.agents)) items.push({ module: "corretores", tone: it.tone, name: it.row.agent.full_name, text: it.text, date: null, href: `/corretores?id=${it.row.agent.id}` });
     for (const it of agencyAttention(rows.agencies)) items.push({ module: "imobiliaria", tone: it.tone, name: it.row.displayName, text: it.text, date: null, href: `/imobiliaria?id=${it.row.agency.id}` });
+    for (const it of invoiceDashboardAttention(rows.invoices, today)) items.push({ module: "faturas", ...it });
     for (const it of energyAttention(rows.energy)) items.push({ module: "energia", tone: it.tone, name: it.row.unit.name, text: it.text, date: null, href: `/dashboard/energy/${it.row.unit.id}` });
     for (const it of waterAttention(rows.water)) items.push({ module: "agua", tone: it.tone, name: it.row.unit.name, text: it.text, date: null, href: `/dashboard/billing/${it.row.unit.id}` });
     for (const it of condoAttention(rows.condos)) items.push({ module: "condominio", tone: it.tone, name: it.row.condo.name, text: it.text, date: null, href: `/condominio?id=${it.row.condo.id}` });
@@ -280,6 +299,22 @@ export function dashboardAttention(view: DashboardView, today: string, rows: Das
         .map((item, i) => ({ item, i }))
         .sort((a, b) => TONE_RANK[a.item.tone] - TONE_RANK[b.item.tone] || MODULE_META[a.item.module].order - MODULE_META[b.item.module].order || a.i - b.i)
         .map(x => x.item);
+}
+
+/** Fatura's part of the list: late money first, then a boleto that expired or an e-mail that did not reach the tenant. */
+function invoiceDashboardAttention(rows: InvoiceRow[], today: string): Array<Omit<DashboardAttentionItem, "module">> {
+    const out: Array<Omit<DashboardAttentionItem, "module">> = [];
+    const now = Date.parse(`${today}T23:59:59-03:00`);
+    for (const r of rows.filter(x => x.display === "em_atraso").sort((a, b) => b.daysLate - a.daysLate)) {
+        out.push({ tone: "rose", name: `Fatura nº ${r.invoice.number} · ${r.place}`, text: `${brl(r.invoice.amount)} vencida há ${r.daysLate} ${r.daysLate === 1 ? "dia" : "dias"}`, date: r.invoice.due_date, href: `/faturas?id=${r.invoice.id}` });
+    }
+    for (const r of rows.filter(x => x.display === "expirada")) {
+        out.push({ tone: "amber", name: `Fatura nº ${r.invoice.number} · ${r.place}`, text: "o boleto expirou sem pagamento: emita de novo", date: null, href: `/faturas?id=${r.invoice.id}` });
+    }
+    for (const r of rows.filter(x => invoiceIsOpen(x.invoice.status) && (x.invoice.charge?.status === "FAILED" || deliveryStuck(x.invoice, now)))) {
+        out.push({ tone: "amber", name: `Fatura nº ${r.invoice.number} · ${r.place}`, text: r.invoice.charge?.status === "FAILED" ? "a emissão no banco falhou" : "o e-mail ao inquilino não foi enviado", date: null, href: `/faturas?id=${r.invoice.id}` });
+    }
+    return out;
 }
 
 /** True when the account has nothing registered yet: the dashboard shows the first steps instead of empty figures. */

@@ -20,19 +20,19 @@ describe("summarize", () => {
     const report = (over: Partial<RunReport> = {}): RunReport => ({
         today: "2026-10-15",
         owners: [
-            { owner_id: "a", reconciled: 3, generated: 1, issued: 1, sent: 1, errors: [] },
-            { owner_id: "b", reconciled: 0, generated: 0, issued: 0, sent: 0, errors: ["emitir fatura nº 4: sem conexão"] },
+            { owner_id: "a", reconciled: 3, generated: 1, issued: 1, reminded: 2, sent: 1, errors: [] },
+            { owner_id: "b", reconciled: 0, generated: 0, issued: 0, reminded: 0, sent: 0, errors: ["emitir fatura nº 4: sem conexão"] },
         ],
         unreached: 0,
         ...over,
     });
 
     it("one line with the totals", () => {
-        expect(summarize(report())).toBe("2 proprietário(s); 3 boleto(s) conciliado(s); 1 fatura(s) gerada(s); 1 emitida(s); 1 e-mail(s) enviado(s); 1 erro(s)");
+        expect(summarize(report())).toBe("2 proprietário(s); 3 boleto(s) conciliado(s); 1 fatura(s) gerada(s); 1 emitida(s); 2 lembrete(s); 1 e-mail(s) enviado(s); 1 erro(s)");
     });
 
     it("says when the budget ran out", () => {
         expect(summarize(report({ unreached: 1 }))).toContain("tempo esgotado");
-        expect(summarize(report({ owners: [{ owner_id: "a", reconciled: 1, generated: 0, issued: 0, sent: 0, errors: [], cut_short: true }] }))).toContain("tempo esgotado");
+        expect(summarize(report({ owners: [{ owner_id: "a", reconciled: 1, generated: 0, issued: 0, reminded: 0, sent: 0, errors: [], cut_short: true }] }))).toContain("tempo esgotado");
     });
 });

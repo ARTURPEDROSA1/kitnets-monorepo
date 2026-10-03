@@ -16,6 +16,7 @@ import type { PropertyTax } from "@/lib/property-taxes";
 import type { TenantListView } from "@/lib/tenant-views";
 import type { WaterPropertySummary } from "@/lib/water-properties-server";
 import type { LeaseWithDetails } from "@/types/lease";
+import type { InvoiceView } from "@/lib/invoice-views";
 
 /** One property's latest confirmed ledger month plus its all-time agency fee (the "economia potencial com autogestão"). */
 export interface DashboardIncomeSnapshot {
@@ -49,7 +50,7 @@ export interface DashboardGateway {
     propertyId: string | null;
 }
 
-export type DashboardLoader = "properties" | "income" | "leases" | "tenants" | "agents" | "agencies" | "energy" | "water" | "condominiums" | "projects" | "taxes" | "gateways" | "map";
+export type DashboardLoader = "properties" | "income" | "leases" | "tenants" | "agents" | "agencies" | "energy" | "water" | "condominiums" | "projects" | "taxes" | "invoices" | "gateways" | "map";
 
 export interface DashboardView {
     profile: { fullName: string | null; email: string | null };
@@ -64,6 +65,8 @@ export interface DashboardView {
     condominiums: Condominium[] | null;
     projects: { investments: NewInvestment[]; summaries: Record<string, InvestmentCardSummary> } | null;
     taxes: PropertyTax[] | null;
+    /** the account's invoices (Fatura), with the latest boleto and e-mail of each */
+    invoices: InvoiceView[] | null;
     /** null = this account does not see the gateway pilot */
     gateways: DashboardGateway[] | null;
     map: {

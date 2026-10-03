@@ -89,6 +89,11 @@ export const billingSettingsSchema = z
         /** the card fee passed on to the tenant: % of what is charged + a fixed part, as the owner's processor charges */
         card_fee_pct: percentOrNull.refine((v) => v === null || (v >= 0 && v < 50), "Taxa entre 0 e 50%."),
         card_fee_fixed: money.refine((v) => v === null || (v >= 0 && v <= 100), "Parte fixa entre R$ 0 e R$ 100."),
+        /** days before the due date the tenant is reminded; blank = no reminder */
+        reminder_days_before: intOrNull.refine((v) => v === null || (v >= 1 && v <= 15), "Lembrete entre 1 e 15 dias antes."),
+        /** days after the due date an unpaid invoice gets the overdue notice; blank = none */
+        overdue_notice_days: intOrNull.refine((v) => v === null || (v >= 1 && v <= 30), "Aviso de atraso entre 1 e 30 dias depois."),
+        send_receipts: z.preprocess((v) => (v === undefined ? true : v === true || v === "true" || v === "on"), z.boolean()),
     })
     .superRefine((d, ctx) => {
         if ((d.card_fee_pct === null) !== (d.card_fee_fixed === null)) {

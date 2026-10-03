@@ -64,7 +64,7 @@ describe("collectionUpdateSchema", () => {
 
 describe("billingSettingsSchema", () => {
     it("blank is not decided, never a default", () => {
-        expect(billingSettingsSchema.parse({ days_in_advance: "", fine_pct: "", interest_pct_month: null })).toEqual({ days_in_advance: null, fine_pct: null, interest_pct_month: null, days_payable_after_due: null, sender_name: null, reply_to_email: null, automation_enabled: false, automation_from_month: null, card_fee_pct: null, card_fee_fixed: null });
+        expect(billingSettingsSchema.parse({ days_in_advance: "", fine_pct: "", interest_pct_month: null })).toEqual({ days_in_advance: null, fine_pct: null, interest_pct_month: null, days_payable_after_due: null, sender_name: null, reply_to_email: null, automation_enabled: false, automation_from_month: null, card_fee_pct: null, card_fee_fixed: null, reminder_days_before: null, overdue_notice_days: null, send_receipts: true });
     });
 
     it("reads numbers as typed in Brazil", () => {
@@ -91,6 +91,13 @@ describe("billingSettingsSchema", () => {
         expect(errorsOf(billingSettingsSchema, { card_fee_pct: "3,99" })).toEqual({ card_fee_fixed: "Informe as duas partes da taxa do cartão, ou deixe as duas em branco." });
         expect(errorsOf(billingSettingsSchema, { card_fee_fixed: "0,39" })).toEqual({ card_fee_pct: "Informe as duas partes da taxa do cartão, ou deixe as duas em branco." });
         expect(errorsOf(billingSettingsSchema, { card_fee_pct: "55", card_fee_fixed: "0,39" })).toEqual({ card_fee_pct: "Taxa entre 0 e 50%." });
+    });
+
+    it("reminders are decisions too; the receipt is on unless switched off", () => {
+        expect(billingSettingsSchema.parse({ reminder_days_before: "3", overdue_notice_days: "5" })).toMatchObject({ reminder_days_before: 3, overdue_notice_days: 5, send_receipts: true });
+        expect(billingSettingsSchema.parse({ send_receipts: false })).toMatchObject({ send_receipts: false });
+        expect(billingSettingsSchema.parse({ send_receipts: "false" })).toMatchObject({ send_receipts: false });
+        expect(errorsOf(billingSettingsSchema, { reminder_days_before: "0", overdue_notice_days: "31" })).toEqual({ reminder_days_before: "Lembrete entre 1 e 15 dias antes.", overdue_notice_days: "Aviso de atraso entre 1 e 30 dias depois." });
     });
 
     it("sender and reply-to", () => {

@@ -7,7 +7,9 @@
  *      month the owner chose on;
  *   3. issues — sends every invoice that has no boleto yet, no blocker and a due date still ahead to the
  *      bank (the boleto's readiness then triggers the e-mail);
- *   4. sends — tries again the e-mails that did not go out.
+ *   4. reminds — queues the reminder a few days before the due date and the overdue notice a few
+ *      days after it, each once per invoice, on the days the owner decided (none while undecided);
+ *   5. sends — tries again the e-mails that did not go out.
  *
  * Every step is idempotent (the database refuses a second invoice for the same month, a second live
  * boleto, a second e-mail of the same kind), every item is its own try/catch, and the run stops at its
@@ -25,7 +27,10 @@ import { shiftMonth } from "@/lib/invoice-schedule";
 import { loadConnections } from "./connections-server";
 import { InterError, type InterErrorCode } from "./inter-client";
 import { issueInvoice, loadLatestCharges, loadLiveCharges, refreshCharge } from "./charges-server";
-import { loadDeliveriesToSend, sendDelivery } from "./deliveries-server";
+import { REMINDER_BEFORE, REMINDER_OVERDUE, loadDeliveriesByInvoice, loadDeliveriesToSend, queueDelivery, sendDelivery } from "./deliveries-server";
+import { reminderDue } from "./reminder-schedule";
+import { usableStripeAccount } from "./stripe-connection-server";
+import { cardFeeDecided } from "@/lib/card-gross-up";
 
 export interface OwnerRunReport {
     owner_id: string;
@@ -34,6 +39,8 @@ export interface OwnerRunReport {
     reconciled: number;
     generated: number;
     issued: number;
+    /** reminders and overdue notices queued today */
+    reminded: number;
     sent: number;
     /** per-item failures, each one sentence */
     errors: string[];
@@ -77,7 +84,7 @@ export function monthsBetween(from: string, to: string): string[] {
 
 export async function runOwner(supabase: AdminSupabase, profileId: string, settings: ReturnType<typeof toBillingSettingsView>, opts: RunOptions): Promise<OwnerRunReport> {
     const now = opts.now ?? Date.now;
-    const report: OwnerRunReport = { owner_id: profileId, reconciled: 0, generated: 0, issued: 0, sent: 0, errors: [] };
+    const report: OwnerRunReport = { owner_id: profileId, reconciled: 0, generated: 0, issued: 0, reminded: 0, sent: 0, errors: [] };
     const outOfTime = () => { if (now() > opts.deadline) { report.cut_short = true; return true; } return false; };
     if (!settings.automation_enabled) return { ...report, skipped: "automação desligada" };
     if (settings.days_in_advance === null || settings.automation_from_month === null) return { ...report, skipped: "decisões pendentes" };
@@ -133,7 +140,39 @@ export async function runOwner(supabase: AdminSupabase, profileId: string, setti
     }
     if (outOfTime()) return report;
 
-    // 4. send what did not go out
+    // 4. reminders: on the days the owner decided, once per invoice, only when there is a way to pay
+    if (settings.reminder_days_before != null || settings.overdue_notice_days != null) {
+        try {
+            const cardAvailable = cardFeeDecided(settings.card_fee_pct, settings.card_fee_fixed) && (await usableStripeAccount(supabase, profileId)) !== null;
+            const [{ data: openInvoices, error: openError }, charges, deliveries] = await Promise.all([
+                supabase.from("invoices").select("id, number, status, due_date, days_payable_after_due").eq("owner_id", profileId).in("status", ["DRAFT", "ISSUED"]).limit(500),
+                loadLatestCharges(supabase, profileId),
+                loadDeliveriesByInvoice(supabase, profileId),
+            ]);
+            if (openError) throw new Error(`invoices: ${openError.message}`);
+            for (const row of (openInvoices ?? []) as Array<{ id: string; number: number; status: string; due_date: string; days_payable_after_due: number | null }>) {
+                if (outOfTime()) return report;
+                const boleto = charges.get(row.id);
+                const kind = reminderDue({
+                    status: row.status, due_date: String(row.due_date).slice(0, 10), days_payable_after_due: row.days_payable_after_due == null ? null : Number(row.days_payable_after_due),
+                    payable: boleto?.status === "OPEN" || cardAvailable,
+                    remindersSent: (deliveries.get(row.id) ?? []).filter(d => d.kind === "REMINDER").map(d => d.sequence),
+                }, { reminder_days_before: settings.reminder_days_before ?? null, overdue_notice_days: settings.overdue_notice_days ?? null }, opts.today);
+                if (!kind) continue;
+                try {
+                    await queueDelivery(supabase, profileId, row.id, "REMINDER", { sequence: kind === "BEFORE" ? REMINDER_BEFORE : REMINDER_OVERDUE });
+                    report.reminded += 1;
+                } catch (err) {
+                    report.errors.push(`lembrete da fatura nº ${row.number}: ${reason(err)}`);
+                }
+            }
+        } catch (err) {
+            report.errors.push(`lembretes: ${reason(err)}`);
+        }
+    }
+    if (outOfTime()) return report;
+
+    // 5. send what did not go out (the reminders just queued included)
     for (const delivery of await loadDeliveriesToSend(supabase, profileId, now())) {
         if (outOfTime()) return report;
         try {
@@ -159,7 +198,7 @@ export async function runBillingAutomation(supabase: AdminSupabase, opts: RunOpt
         try {
             report.owners.push(await runOwner(supabase, row.owner_id, toBillingSettingsView(row), opts));
         } catch (err) {
-            report.owners.push({ owner_id: row.owner_id, reconciled: 0, generated: 0, issued: 0, sent: 0, errors: [`a execução parou: ${reason(err)}`] });
+            report.owners.push({ owner_id: row.owner_id, reconciled: 0, generated: 0, issued: 0, reminded: 0, sent: 0, errors: [`a execução parou: ${reason(err)}`] });
         }
     }
     return report;
@@ -167,9 +206,9 @@ export async function runBillingAutomation(supabase: AdminSupabase, opts: RunOpt
 
 /** One line for the sync state: "2 proprietário(s): 3 conciliados, 1 gerada, 1 emitida, 1 enviado; 0 erro(s)". */
 export function summarize(report: RunReport): string {
-    const sum = (k: "reconciled" | "generated" | "issued" | "sent") => report.owners.reduce((a, o) => a + o[k], 0);
+    const sum = (k: "reconciled" | "generated" | "issued" | "reminded" | "sent") => report.owners.reduce((a, o) => a + o[k], 0);
     const errors = report.owners.reduce((a, o) => a + o.errors.length, 0);
-    const parts = [`${report.owners.length} proprietário(s)`, `${sum("reconciled")} boleto(s) conciliado(s)`, `${sum("generated")} fatura(s) gerada(s)`, `${sum("issued")} emitida(s)`, `${sum("sent")} e-mail(s) enviado(s)`, `${errors} erro(s)`];
+    const parts = [`${report.owners.length} proprietário(s)`, `${sum("reconciled")} boleto(s) conciliado(s)`, `${sum("generated")} fatura(s) gerada(s)`, `${sum("issued")} emitida(s)`, `${sum("reminded")} lembrete(s)`, `${sum("sent")} e-mail(s) enviado(s)`, `${errors} erro(s)`];
     if (report.unreached > 0 || report.owners.some(o => o.cut_short)) parts.push("tempo esgotado: o resto fica para amanhã");
     return parts.join("; ");
 }

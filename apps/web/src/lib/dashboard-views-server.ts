@@ -26,6 +26,7 @@ import { INCOME_DIRECT_COLUMNS, aggregateIncomeByMonth, breakdown, currentMonthK
 import { landlordIptuForMonth, normalizeInstallments, taxScopeForProperty, type PropertyTax } from "@/lib/property-taxes";
 import { loadTenantList } from "@/lib/tenant-views-server";
 import { getOwnerWaterPropertiesSummary } from "@/lib/water-properties-server";
+import { loadInvoiceRows } from "@/lib/invoice-views-server";
 import type { AgencyLeaseSummary } from "@/lib/agency-views";
 import type { AgencyWithRole } from "@/types/agency";
 
@@ -208,7 +209,7 @@ export async function loadDashboard(supabase: AdminSupabase, profileId: string, 
         const water = await settle(failed, "water", () => getOwnerWaterPropertiesSummary(userId, energy ?? undefined));
         return { energy, water };
     })();
-    const [entriesResult, taxes, leases, tenants, agents, agencies, { energy, water }, condominiums, investments] = await Promise.all([
+    const [entriesResult, taxes, leases, tenants, agents, agencies, { energy, water }, condominiums, investments, invoices] = await Promise.all([
         settle(failed, "properties", () => loadPropertyEntries(supabase, profileId)),
         settle(failed, "taxes", () => loadTaxRowsByOwner(supabase, profileId)),
         settle(failed, "leases", () => loadLeaseRows(supabase, profileId)),
@@ -218,6 +219,7 @@ export async function loadDashboard(supabase: AdminSupabase, profileId: string, 
         energyThenWater,
         settle(failed, "condominiums", () => loadCondominiumList(supabase, profileId)),
         settle(failed, "projects", () => loadInvestmentList(supabase, profileId)),
+        settle(failed, "invoices", () => loadInvoiceRows(supabase, profileId)),
     ]);
     const entries = entriesResult?.entries ?? [];
     const profile = entriesResult?.profile ?? { fullName: null, email: null };
@@ -259,6 +261,7 @@ export async function loadDashboard(supabase: AdminSupabase, profileId: string, 
         condominiums,
         projects,
         taxes,
+        invoices,
         gateways: showGateways ? gateways ?? [] : null,
         map: { pins: map?.pins ?? [], pending: map?.misses.length ?? 0 },
         failed,

@@ -8,7 +8,7 @@
  */
 import React, { useState } from "react";
 import Link from "next/link";
-import { AlertCircle, ArrowRight, Building, Building2, CheckCircle2, ChevronDown, ChevronUp, Droplets, FileSignature, HardHat, Home, Landmark, LayoutDashboard, Loader2, Plus, Sparkles, UserCheck, Users, Wallet, Zap } from "lucide-react";
+import { AlertCircle, ArrowRight, Building, Building2, CheckCircle2, ChevronDown, ChevronUp, Droplets, FileSignature, HardHat, Home, Landmark, LayoutDashboard, Loader2, Plus, Receipt, Sparkles, UserCheck, Users, Wallet, Zap } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import GatewaysSection from "@/components/dashboard/GatewaysSection";
 import PortfolioMap, { type GeocodeStatus } from "@/components/dashboard/PortfolioMap";
@@ -48,7 +48,7 @@ const hasAmount = (text: string) => /R\$\s?\d/.test(text);
 const DOT: Record<DashboardTone, string> = { rose: "bg-rose-500", amber: "bg-amber-500", sky: "bg-sky-500", emerald: "bg-emerald-500", slate: "bg-slate-400" };
 const LOADER_LABELS: Record<DashboardLoader, string> = {
     properties: "imóveis", income: "receitas", leases: "contratos", tenants: "inquilinos", agents: "corretores", agencies: "imobiliárias",
-    energy: "energia", water: "água", condominiums: "condomínio", projects: "projetos", taxes: "tributos", gateways: "gateways", map: "mapa",
+    energy: "energia", water: "água", condominiums: "condomínio", projects: "projetos", taxes: "tributos", invoices: "faturas", gateways: "gateways", map: "mapa",
 };
 
 interface Figure {
@@ -286,6 +286,15 @@ export default function DashboardHub({ base, view, totals, attention, loading, e
                                 { label: "Taxas de administração", value: `${brl(totals.jobs.agencies.monthlyFees, 0)}/mês`, money: true, hint: <><Money>{brl(totals.jobs.agencies.monthlyFees * 12, 0)}</Money> por ano: a economia potencial com autogestão</> },
                                 { label: "Inquilinos atendidos", value: totals.jobs.agencies.tenantsServed, hint: `${plural(totals.jobs.agencies.agentsLinked, "corretor vinculado", "corretores vinculados")}` },
                             ]}
+                        />
+                        <ModuleCard icon={<Receipt className="h-4 w-4" />} tone="emerald" title="Faturas" href="/faturas" base={base} unavailable={failed.has("invoices")}
+                            figures={totals.invoices ? [
+                                { label: "A receber no mês", value: brl(totals.invoices.dueThisMonth.amount, 0), money: true, hint: `${plural(totals.invoices.dueThisMonth.count, "fatura em aberto", "faturas em aberto")} com vencimento neste mês` },
+                                { label: "Recebido no mês", value: brl(totals.invoices.receivedThisMonth.amount, 0), money: true, hint: `${plural(totals.invoices.receivedThisMonth.count, "fatura paga", "faturas pagas")}` },
+                                { label: "Em atraso", value: <span className={totals.invoices.overdue.count > 0 ? "text-rose-600" : undefined}>{brl(totals.invoices.overdue.amount, 0)}</span>, money: true, hint: totals.invoices.overdue.count > 0 ? <span className="text-rose-600">{plural(totals.invoices.overdue.count, "fatura vencida", "faturas vencidas")}</span> : "nenhuma fatura vencida" },
+                                { label: "Próximo vencimento", value: totals.invoices.nextDue ? formatDateBR(totals.invoices.nextDue.date) : "—", hint: totals.invoices.nextDue ? <><Money>{brl(totals.invoices.nextDue.amount, 0)}</Money> · {totals.invoices.nextDue.days === 0 ? "hoje" : `em ${plural(totals.invoices.nextDue.days, "dia", "dias")}`}</> : `${plural(totals.invoices.open.count, "fatura em aberto", "faturas em aberto")}` },
+                            ] : []}
+                            note="O que você cobra direto do inquilino: aluguel, condomínio e encargos fora da imobiliária."
                         />
                         <ModuleCard icon={<Zap className="h-4 w-4" />} tone="amber" title="Energia" href="/dashboard/energy" base={base} unavailable={failed.has("energy")}
                             figures={totals.energy ? [

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildInvoiceEmail, senderAddress, type InvoiceEmailInput } from "./invoice-email";
+import { buildInvoiceEmail, buildReceiptEmail, senderAddress, type InvoiceEmailInput } from "./invoice-email";
 
 const input = (over: Partial<InvoiceEmailInput> = {}): InvoiceEmailInput => ({
     number: 12,
@@ -70,5 +70,61 @@ describe("senderAddress", () => {
     it("never lets the name break the header", () => {
         expect(senderAddress('Eve "<admin@kitnets.com>"', "faturas@kitnets.com")).toBe("Eve admin@kitnets.com via Kitnets <faturas@kitnets.com>");
         expect(senderAddress("  ", "Kitnets <faturas@kitnets.com>")).toBe("Kitnets <faturas@kitnets.com>");
+    });
+});
+
+describe("the overdue notice", () => {
+    it("says it is late, what it costs today and until when it still pays", () => {
+        const { subject, text, html } = buildInvoiceEmail(input({ kind: "OVERDUE", overdue: { daysLate: 7, extra: 5.58, total: 255.48, payableUntil: "2026-11-19" } }));
+        expect(subject).toBe("Fatura nº 12 vencida em 20/10/2026 — SANTO ANTONIO · Kitnet 35C");
+        expect(text).toContain("venceu em 20/10/2026 e ainda não consta como paga.");
+        expect(text).toContain("Com 7 dias de atraso, multa e juros somam R$ 5,58: o valor hoje é R$ 255,48.");
+        expect(text).toContain("aceitam o pagamento até 19/11/2026");
+        expect(text).toContain("Se já pagou, desconsidere este aviso.");
+        expect(html).toContain("Fatura vencida");
+        expect(html).toContain("Multa e juros até hoje");
+    });
+
+    it("without late terms it only says it is late", () => {
+        const { text, html } = buildInvoiceEmail(input({ kind: "OVERDUE", overdue: { daysLate: 7, extra: 0, total: 249.9, payableUntil: null } }));
+        expect(text).not.toContain("multa e juros somam");
+        expect(text).not.toContain("aceitam o pagamento até");
+        expect(html).not.toContain("Multa e juros até hoje");
+    });
+
+    it("mentions the card when the page offers it", () => {
+        const { text, html } = buildInvoiceEmail(input({ cardAvailable: true }));
+        expect(text).toContain("Cartão de crédito: na página da fatura.");
+        expect(html).toContain("cartão de crédito na página da fatura");
+        expect(buildInvoiceEmail(input({ cardAvailable: false })).text).not.toContain("Cartão de crédito");
+    });
+});
+
+describe("buildReceiptEmail", () => {
+    const receipt = {
+        number: 12, place: "SANTO ANTONIO · Kitnet 35C", tenantName: "Ana Paula Souza", items: [{ description: "Condomínio", amount: 150 }, { description: "Internet", amount: 99.9 }],
+        amount: 249.9, referenceMonth: "2026-10-01", paidOn: "2026-10-27", paidAmount: 255.48, paidVia: "CARD" as const, lateFee: 5.58, surcharge: 11.03,
+        pageUrl: "https://kitnets.com/pt/pagar/abc123", senderName: "Holding Pedrosa",
+    };
+
+    it("says it was paid, when, how and how much, line by line", () => {
+        const { subject, text, html } = buildReceiptEmail(receipt);
+        expect(subject).toBe("Recibo: fatura nº 12 paga — outubro de 2026 — SANTO ANTONIO · Kitnet 35C");
+        expect(text).toContain("em 27/10/2026 por cartão de crédito. Obrigado!");
+        expect(text).toContain("Multa e juros por atraso: R$ 5,58");
+        expect(text).toContain("Taxa de processamento do cartão: R$ 11,03");
+        expect(text).toContain("Total pago: R$ 266,51");
+        expect(text).toContain("Este e-mail comprova o recebimento.");
+        expect(html).toContain("Recibo");
+        expect(html).toContain("R$ 266,51");
+    });
+
+    it("a plain payment has no extra lines", () => {
+        const { text } = buildReceiptEmail({ ...receipt, paidAmount: 249.9, paidVia: "PIX", lateFee: 0, surcharge: 0 });
+        expect(text).toContain("por PIX. Obrigado!");
+        expect(text).not.toContain("Multa e juros");
+        expect(text).not.toContain("Taxa de processamento");
+        expect(text).toContain("Total pago: R$ 249,90");
+        expect(buildReceiptEmail({ ...receipt, paidVia: null, lateFee: 0, surcharge: 0 }).text).toContain("em 27/10/2026. Obrigado!");
     });
 });
