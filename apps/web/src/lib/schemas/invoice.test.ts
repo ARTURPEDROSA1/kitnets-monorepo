@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { fieldErrors } from "@/lib/api-route";
-import { billingSettingsSchema, collectionUpdateSchema, invoiceCancelSchema, invoiceGenerateSchema, invoicePaySchema } from "./invoice";
+import { billingSettingsSchema, collectionUpdateSchema, invoiceCancelSchema, invoiceCopySchema, invoiceGenerateSchema, invoicePaySchema } from "./invoice";
 
 const LEASE = "0b0c7b1e-5a0e-4c57-9d6a-2f1f3f0f8a11";
 const CHARGE = "7d3a1c52-93b4-4a6e-8f0d-5c2b9e4a7f33";
@@ -114,5 +114,17 @@ describe("billingSettingsSchema", () => {
             days_payable_after_due: "Prazo entre 0 e 60 dias.",
         });
         expect(errorsOf(billingSettingsSchema, { days_in_advance: "2,5", fine_pct: "abc" })).toEqual({ days_in_advance: "Antecedência entre 1 e 25 dias.", fine_pct: "Multa entre 0 e 20%." });
+    });
+});
+
+describe("invoiceCopySchema", () => {
+    it("takes an address, trimmed and lower-cased", () => {
+        expect(invoiceCopySchema.parse({ email: "  Dono@Exemplo.com " })).toEqual({ email: "dono@exemplo.com" });
+    });
+
+    it("refuses what is not an address", () => {
+        expect(errorsOf(invoiceCopySchema, { email: "dono" })).toEqual({ email: "E-mail inválido." });
+        expect(errorsOf(invoiceCopySchema, { email: "a@b.com, c@d.com" })).toEqual({ email: "E-mail inválido." });
+        expect(errorsOf(invoiceCopySchema, {})).toEqual({ email: "Informe o e-mail." });
     });
 });

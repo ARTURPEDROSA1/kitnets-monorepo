@@ -16,7 +16,7 @@ import { Sensitive } from "@/components/privacy";
 import { CellSumBar, useCellSum } from "@/components/properties/TableCellSum";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "@/components/properties/TableColumnFilters";
 import { ColumnVisibilityMenu, useColumnVisibility } from "@/components/properties/TableColumnVisibility";
-import { INVOICE_STATUS_META, PAID_VIA_LABELS, brl, isOpen, type InvoiceRow } from "@/lib/invoice-hub";
+import { DELIVERY_STATE_META, INVOICE_STATUS_META, PAID_VIA_LABELS, brl, deliveryState, isOpen, type InvoiceRow } from "@/lib/invoice-hub";
 import { blockersText } from "@/lib/invoice-payer";
 import { monthShort } from "@/lib/invoice-schedule";
 
@@ -51,6 +51,7 @@ export default function InvoiceTable({ rows, actions }: Props) {
     const columns = useMemo<ColumnDef<InvoiceRow>[]>(() => [
         { key: "invoice", label: "Fatura", kind: "text", get: r => [`nº ${r.invoice.number}`, r.place, r.invoice.tenant_name].filter(Boolean).join(" · ") },
         { key: "status", label: "Status", kind: "enum", options: Object.entries(INVOICE_STATUS_META).map(([value, m]) => ({ value, label: m.label })), get: r => r.display },
+        { key: "email", label: "E-mail", kind: "enum", title: "Até onde a fatura chegou: enviada, entregue na caixa do inquilino, página aberta", options: Object.entries(DELIVERY_STATE_META).map(([value, m]) => ({ value, label: m.label })), get: r => deliveryState(r.invoice) },
         { key: "month", label: "Referência", kind: "month", title: "O mês do vencimento", get: r => r.month },
         { key: "due", label: "Vencimento", kind: "date", get: r => r.invoice.due_date },
         { key: "items", label: "Itens", kind: "text", title: "O que a fatura cobra", get: r => r.itemsLabel },
@@ -94,6 +95,7 @@ export default function InvoiceTable({ rows, actions }: Props) {
                                 const hint = dueHint(row);
                                 const open = isOpen(invoice.status);
                                 const missing = open ? blockersText(invoice.blockers) : "";
+                                const mail = deliveryState(invoice);
                                 return (
                                     <tr key={id} className="border-b border-border/50 last:border-0 hover:bg-muted/30">
                                         <td {...sel.cellProps("invoice", id, null, "min-w-[220px] max-w-[420px] px-3 py-2.5")}>
@@ -108,6 +110,14 @@ export default function InvoiceTable({ rows, actions }: Props) {
                                             <td {...sel.cellProps("status", id, null, "px-3 py-2.5")}>
                                                 <span className={cn("inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", meta.pill)}>{meta.label}</span>
                                                 {missing && <span className={cn(hintCls, "max-w-[220px] text-amber-700 dark:text-amber-400")} title="O que falta para emitir o boleto e enviar o e-mail">falta: {missing}</span>}
+                                            </td>
+                                        )}
+                                        {show("email") && (
+                                            <td {...sel.cellProps("email", id, null, "whitespace-nowrap px-3 py-2.5")}>
+                                                {mail === "nenhum"
+                                                    ? <span className="text-muted-foreground">—</span>
+                                                    : <span className={cn("font-medium", DELIVERY_STATE_META[mail].tone)}>{DELIVERY_STATE_META[mail].label}</span>}
+                                                {invoice.first_viewed_at && <span className={hintCls}>aberta em {formatDateBR(invoice.first_viewed_at.slice(0, 10))}</span>}
                                             </td>
                                         )}
                                         {show("month") && (

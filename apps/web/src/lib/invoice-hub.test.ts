@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { leaseComponents } from "./invoice-collection";
-import { deliveryStuck, inInvoiceView, invoiceAttention, invoiceDisplay, invoiceHubTotals, invoiceRows, invoiceViewFromParam, recurringRows, settingsPending } from "./invoice-hub";
+import { deliveryState, deliveryStuck, inInvoiceView, invoiceAttention, invoiceDisplay, invoiceHubTotals, invoiceRows, invoiceViewFromParam, recurringRows, settingsPending } from "./invoice-hub";
 import type { BillingSettingsView, InvoiceDeliveryView, InvoiceView, RecurringLease } from "./invoice-views";
 
 const TODAY = "2026-10-15";
@@ -185,5 +185,32 @@ describe("invoiceAttention", () => {
         expect(items[0].text).toBe("o e-mail ao inquilino não foi enviado: o inquilino não tem e-mail cadastrado");
         // a paid invoice's old failure is history
         expect(invoiceAttention(invoiceRows([{ ...failed, status: "PAID", paid_on: TODAY }], TODAY), [], DECIDED, TODAY)).toEqual([]);
+    });
+});
+
+describe("deliveryState", () => {
+    const sent = (over: Partial<InvoiceDeliveryView> = {}): InvoiceDeliveryView => ({ id: "d1", kind: "ISSUE", status: "SENT", recipient: "ana@example.com", attempts: 1, sent_at: "2026-10-10T11:00:00Z", delivered_at: null, last_error: null, created_at: "2026-10-10T11:00:00Z", ...over });
+
+    it("says the furthest thing known", () => {
+        expect(deliveryState({ delivery: null, first_viewed_at: null })).toBe("nenhum");
+        expect(deliveryState({ delivery: sent({ status: "PENDING", sent_at: null }), first_viewed_at: null })).toBe("enviando");
+        expect(deliveryState({ delivery: sent(), first_viewed_at: null })).toBe("enviado");
+        expect(deliveryState({ delivery: sent({ delivered_at: "2026-10-10T11:00:20Z" }), first_viewed_at: null })).toBe("entregue");
+        expect(deliveryState({ delivery: sent({ status: "FAILED", sent_at: null, last_error: "x" }), first_viewed_at: null })).toBe("falhou");
+        expect(deliveryState({ delivery: sent({ status: "BOUNCED", last_error: "caixa inexistente" }), first_viewed_at: null })).toBe("devolvido");
+    });
+
+    it("an opened page beats everything: the tenant saw it, however the link got there", () => {
+        expect(deliveryState({ delivery: sent(), first_viewed_at: "2026-10-11T09:00:00Z" })).toBe("visualizada");
+        expect(deliveryState({ delivery: null, first_viewed_at: "2026-10-11T09:00:00Z" })).toBe("visualizada");
+        expect(deliveryState({ delivery: sent({ status: "BOUNCED" }), first_viewed_at: "2026-10-11T09:00:00Z" })).toBe("visualizada");
+    });
+
+    it("a bounce asks for the address to be checked", () => {
+        const bounced = invoice({ status: "ISSUED", delivery: sent({ status: "BOUNCED", last_error: "o provedor do inquilino devolveu a mensagem: mailbox does not exist" }) });
+        const items = invoiceAttention(invoiceRows([bounced], TODAY), [], DECIDED, TODAY);
+        expect(items.map(i => i.kind)).toEqual(["email_failed"]);
+        expect(items[0].text).toContain("voltou");
+        expect(items[0].text).toContain("confira o e-mail no cadastro");
     });
 });

@@ -54,6 +54,8 @@ export interface InvoiceDeliveryView {
     recipient: string;
     attempts: number;
     sent_at: string | null;
+    /** the provider confirmed it reached the tenant's mailbox */
+    delivered_at?: string | null;
     last_error: string | null;
     created_at: string;
 }
@@ -97,6 +99,10 @@ export interface InvoiceView {
     delivery?: InvoiceDeliveryView | null;
     /** the latest card session (Stripe Checkout); null before any */
     card?: InvoiceChargeView | null;
+    /** the invoice's public page: first and last time someone other than the owner opened it, and how often */
+    first_viewed_at?: string | null;
+    last_viewed_at?: string | null;
+    view_count?: number;
 }
 
 /** A lease in force with who collects each of its components: one block of "Cobranças recorrentes". */
