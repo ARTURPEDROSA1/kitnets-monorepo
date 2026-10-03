@@ -306,7 +306,7 @@ export default function FaturasHub(props: Props) {
 
             <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
                 <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500" />
-                Nesta etapa as faturas são geradas e baixadas aqui. Com o Banco Inter conectado em Conexões, cada fatura emite o boleto com QR code PIX no painel da fatura. O link de cartão e o envio automático por e-mail ao inquilino entram nas próximas etapas do módulo. O pagamento registrado aqui já entra nas Receitas do imóvel, sem taxa de imobiliária.
+                Com o Banco Inter conectado em Conexões, cada fatura emite o boleto com QR code PIX e vai por e-mail ao inquilino, com a página da fatura; com a Stripe conectada e a taxa do cartão decidida, a página oferece também o cartão. Ligada a emissão automática em Configuração, o ciclo roda sozinho todo dia às 8h. O pagamento, por qualquer caminho, entra nas Receitas do imóvel, sem taxa de imobiliária.
             </p>
         </div>
     );
