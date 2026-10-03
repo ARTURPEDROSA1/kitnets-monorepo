@@ -5,17 +5,19 @@
  * are debounced per preference, and localStorage keeps a copy so a table opens right away with the last
  * choice made on this device while the account's copy loads.
  *
- * Used by the table hooks (`useColumnVisibility`, `useColumnFilters`) and the sidebar's group store
+ * Used by the table hooks (`useColumnVisibility`, `useColumnWidths`, `useColumnFilters`) and the sidebar's group store
  * (lib/sidebar-preferences.ts); pages do not call this directly.
  */
 import {
-    filtersPrefKey, hiddenColumnsPrefKey, sanitizeFilters, sanitizeHiddenColumns, sanitizeSort, sidebarPrefKey, sortPrefKey,
-    notificationsPrefKey, sanitizeNotificationPrefs, type NotificationPrefs, type TableFilters, type TableSort,
+    columnWidthsPrefKey, filtersPrefKey, hiddenColumnsPrefKey, sanitizeColumnWidths, sanitizeFilters, sanitizeHiddenColumns, sanitizeSort, sidebarPrefKey, sortPrefKey,
+    notificationsPrefKey, sanitizeNotificationPrefs, type ColumnWidths, type NotificationPrefs, type TableFilters, type TableSort,
 } from "@/lib/ui-preferences";
 import { sanitizeCollapsedGroups } from "@/lib/sidebar-groups";
 
 export interface AccountPreferences {
     hiddenColumns: Record<string, string[]>;
+    /** table key → the widths of the columns the user dragged */
+    columnWidths: Record<string, ColumnWidths>;
     sort: Record<string, TableSort>;
     filters: Record<string, TableFilters>;
     /** "collapsed-groups" → the sidebar menu groups the user collapsed */
@@ -25,16 +27,16 @@ export interface AccountPreferences {
 }
 type Section = keyof AccountPreferences;
 
-const EMPTY: AccountPreferences = { hiddenColumns: {}, sort: {}, filters: {}, sidebar: {}, notifications: {} };
+const EMPTY: AccountPreferences = { hiddenColumns: {}, columnWidths: {}, sort: {}, filters: {}, sidebar: {}, notifications: {} };
 const ACCOUNT_TTL_MS = 60_000;
 const SAVE_DEBOUNCE_MS = 600;
 
 let account: { at: number; load: Promise<AccountPreferences> } | null = null;
 const pendingSaves = new Map<string, ReturnType<typeof setTimeout>>();
 
-const PREF_KEY: Record<Section, (tableKey: string) => string | null> = { hiddenColumns: hiddenColumnsPrefKey, sort: sortPrefKey, filters: filtersPrefKey, sidebar: sidebarPrefKey, notifications: notificationsPrefKey };
-const SANITIZE: Record<Section, (value: unknown) => unknown> = { hiddenColumns: sanitizeHiddenColumns, sort: sanitizeSort, filters: sanitizeFilters, sidebar: sanitizeCollapsedGroups, notifications: sanitizeNotificationPrefs };
-const LOCAL_NAME: Record<Section, string> = { hiddenColumns: "hidden-columns", sort: "sort", filters: "filters", sidebar: "sidebar", notifications: "notifications" };
+const PREF_KEY: Record<Section, (tableKey: string) => string | null> = { hiddenColumns: hiddenColumnsPrefKey, columnWidths: columnWidthsPrefKey, sort: sortPrefKey, filters: filtersPrefKey, sidebar: sidebarPrefKey, notifications: notificationsPrefKey };
+const SANITIZE: Record<Section, (value: unknown) => unknown> = { hiddenColumns: sanitizeHiddenColumns, columnWidths: sanitizeColumnWidths, sort: sanitizeSort, filters: sanitizeFilters, sidebar: sanitizeCollapsedGroups, notifications: sanitizeNotificationPrefs };
+const LOCAL_NAME: Record<Section, string> = { hiddenColumns: "hidden-columns", columnWidths: "column-widths", sort: "sort", filters: "filters", sidebar: "sidebar", notifications: "notifications" };
 
 // ── This device's copy ─────────────────────────────────────────────────────
 
@@ -61,7 +63,7 @@ export function loadAccountPreferences(): Promise<AccountPreferences> {
     if (!account || Date.now() - account.at > ACCOUNT_TTL_MS) {
         const load = fetch("/api/profiles/preferences")
             .then(res => (res.ok ? res.json() : EMPTY))
-            .then((data: Partial<AccountPreferences>) => ({ hiddenColumns: data.hiddenColumns ?? {}, sort: data.sort ?? {}, filters: data.filters ?? {}, sidebar: data.sidebar ?? {}, notifications: data.notifications ?? {} }))
+            .then((data: Partial<AccountPreferences>) => ({ hiddenColumns: data.hiddenColumns ?? {}, columnWidths: data.columnWidths ?? {}, sort: data.sort ?? {}, filters: data.filters ?? {}, sidebar: data.sidebar ?? {}, notifications: data.notifications ?? {} }))
             .catch(() => EMPTY);   // signed out or offline: this device's copy still works
         account = { at: Date.now(), load };
     }

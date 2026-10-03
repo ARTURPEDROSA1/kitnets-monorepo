@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { Button } from "@kitnets/ui";
@@ -28,6 +28,7 @@ import { Money, Sensitive } from "@/components/privacy";
 import { cn } from "@/lib/utils";
 import { columnTableKey, recordTableKey } from "@/lib/ui-preferences";
 import { CellSumBar, useCellSum } from "@/components/properties/TableCellSum";
+import { useColumnWidths } from "@/components/properties/TableColumnWidths";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "@/components/properties/TableColumnFilters";
 import { ColumnVisibilityMenu, useColumnVisibility } from "@/components/properties/TableColumnVisibility";
 import { parseMoneyText } from "@/components/properties/MoneyInput";
@@ -376,7 +377,8 @@ export default function BillingPage() {
         locked: ["month"],
         defaultHidden: ["prevReading", "currReading", "readingDate", "waterTariff", "sewageTariff", "waterFee", "sewageFee", "occurrence"],
     });
-    const sel = useCellSum({ formatByCol: { consumption: formatM3(1), billed: formatM3(1), prevReading: v => formatNumber(v, 0), currReading: v => formatNumber(v, 1), rate: formatRate } });
+    const widths = useColumnWidths(columnTableKey("water-bills"));
+    const sel = useCellSum({ formatByCol: { consumption: formatM3(1), billed: formatM3(1), prevReading: v => formatNumber(v, 0), currReading: v => formatNumber(v, 1), rate: formatRate }, widths });
 
     // Inline edits: draft while typing, save on blur/Enter through the upsert (optimistic, reverted on failure)
     const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -385,18 +387,11 @@ export default function BillingPage() {
     const draftKey = (id: string, field: InlineField) => `${id}:${field}`;
     const setDraft = (id: string, field: InlineField, text: string) => setDrafts(d => ({ ...d, [draftKey(id, field)]: text }));
     const cancelDraft = (id: string, field: InlineField) => setDrafts(d => { const n = { ...d }; delete n[draftKey(id, field)]; return n; });
-    const commitDraft = async (b: Bill, field: InlineField) => {
+    const billsRef = useRef(bills);
+    billsRef.current = bills;
+    /** Saves one field of a bill through the upsert, shown at once and put back if the save fails; true when it was saved. */
+    const saveField = async (b: Bill, field: InlineField, value: Bill[InlineField]): Promise<boolean> => {
         const k = draftKey(b.id, field);
-        const raw = drafts[k];
-        if (raw === undefined) return;
-        cancelDraft(b.id, field);
-        const value = parseMoneyText(raw);
-        if (value === null || value < 0) return;
-        if (value === (b[field] ?? 0)) return;
-        if ((field === "consumption_m3" || field === "total_amount") && value <= 0) {
-            setInlineError(field === "consumption_m3" ? "O consumo deve ser maior que zero." : "O valor da conta deve ser maior que zero.");
-            return;
-        }
         const next: Bill = { ...b, [field]: value };
         if (field === "consumption_m3" || field === "total_amount") {
             next.effective_rate_per_m3 = next.consumption_m3 > 0 ? Math.round((next.total_amount / next.consumption_m3) * 100) / 100 : null;
@@ -412,13 +407,35 @@ export default function BillingPage() {
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok || !data.success) throw new Error(data.error || "Erro ao salvar a conta");
+            return true;
         } catch (err) {
             console.error("[WaterDashboard] Inline edit failed:", err);
             setBills(prev => prev.map(x => (x.id === b.id ? b : x)));
             setInlineError(err instanceof Error ? err.message : "Erro ao salvar a conta");
+            return false;
         } finally {
             setSavingCells(prev => { const n = new Set(prev); n.delete(k); return n; });
         }
+    };
+    const commitDraft = async (b: Bill, col: string, field: InlineField) => {
+        const raw = drafts[draftKey(b.id, field)];
+        if (raw === undefined) return;
+        cancelDraft(b.id, field);
+        const value = parseMoneyText(raw);
+        if (value === null || value < 0) return;
+        if (value === (b[field] ?? 0)) return;
+        if ((field === "consumption_m3" || field === "total_amount") && value <= 0) {
+            setInlineError(field === "consumption_m3" ? "O consumo deve ser maior que zero." : "O valor da conta deve ser maior que zero.");
+            return;
+        }
+        if (!(await saveField(b, field, value))) return;
+        // Ctrl+Z puts the previous value back, on the bill as it is by then
+        const previous = b[field];
+        sel.recordUndo({
+            col, rowId: b.id,
+            label: `${columns.find(c => c.key === col)?.label ?? col} · ${formatMonth(b.reference_month)}`,
+            undo: () => { const now = billsRef.current.find(x => x.id === b.id); return now ? saveField(now, field, previous) : false; },
+        });
     };
 
     const editHref = (month?: string) => {
@@ -726,9 +743,9 @@ export default function BillingPage() {
                             </div>
                         ) : (
                             <div className="overflow-x-auto px-2 pb-2">
-                                <table className="w-full text-xs">
+                                <table className="w-full text-xs" style={widths.tableStyle}>
                                     <thead>
-                                        <ColumnHeaders columns={columns} ctl={cf} visibility={vis} trailing={<th className="px-2 py-2 font-semibold text-center">Ações</th>} />
+                                        <ColumnHeaders columns={columns} ctl={cf} widths={widths} visibility={vis} trailing={<th className="px-2 py-2 font-semibold text-center">Ações</th>} />
                                     </thead>
                                     <tbody>
                                         {cf.rows.map(b => {
@@ -742,7 +759,7 @@ export default function BillingPage() {
                                                         draft={drafts[draftKey(b.id, field)]}
                                                         disabled={savingCells.has(draftKey(b.id, field))}
                                                         onDraft={text => setDraft(b.id, field, text)}
-                                                        onCommit={() => commitDraft(b, field)}
+                                                        onCommit={() => commitDraft(b, col, field)}
                                                         decimals={decimals}
                                                         {...opts}
                                                     />
@@ -827,7 +844,7 @@ export default function BillingPage() {
             {/* Spreadsheet helpers: selection sum bar, column sort/filter and columns menus */}
             <CellSumBar ctl={sel} />
             <ColumnMenu columns={columns} ctl={cf} />
-            <ColumnVisibilityMenu columns={columns} ctl={vis} />
+            <ColumnVisibilityMenu columns={columns} ctl={vis} widths={widths} />
         </div>
     );
 }

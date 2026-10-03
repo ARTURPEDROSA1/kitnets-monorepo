@@ -2,19 +2,21 @@
  * Interface preferences kept in the user's account (`user_ui_preferences`), so they follow the user to any
  * device. Pure helpers shared by the API route and the client.
  *
- * Five kinds today, three per table (and per kind of property where the table differs by it):
+ * Six kinds today, four per table (and per kind of property where the table differs by it):
  *   hidden-columns:<table>[:<variant>]   string[] of column keys           e.g. ["energy", "received"]
+ *   column-widths:<table>[:<variant>]    { <column>: px }                  e.g. { notes: 320 }  (dragged header edges)
  *   sort:<table>[:<variant>]             { key, dir }                      e.g. { key: "due_on", dir: "asc" }
  *   filters:<table>:<record id>          { <column>: { text | min/max | values[] } }
  *   sidebar:collapsed-groups             string[] of menu group keys       e.g. ["contabil"]  (lib/sidebar-groups.ts)
  *   notifications:owner                  { marketing, security }           what the owner wants to receive (/proprietario)
  *
- * Hidden columns and sort are how the user wants a kind of table to look, so they are per table. Filters
+ * Hidden columns, widths and sort are how the user wants a kind of table to look, so they are per table. Filters
  * are a question asked of one property's (or one investment's) rows, so they are per record: a filter on
  * one property's ledger never reaches another property's.
  */
 
 export const HIDDEN_COLUMNS_PREFIX = "hidden-columns:";
+export const COLUMN_WIDTHS_PREFIX = "column-widths:";
 export const SORT_PREFIX = "sort:";
 export const FILTERS_PREFIX = "filters:";
 export const SIDEBAR_PREFIX = "sidebar:";
@@ -27,6 +29,9 @@ const COLUMN_KEY = /^[A-Za-z0-9_-]{1,40}$/;
 const MAX_COLUMNS = 60;
 const MAX_FILTER_TEXT = 200;
 const MAX_FILTER_VALUES = 500;
+/** How narrow and how wide a column can be dragged, in px. */
+export const MIN_COLUMN_WIDTH = 40;
+export const MAX_COLUMN_WIDTH = 1200;
 
 /** Kind of property a table is showing: rented as a whole, or unit by unit (kitnets, apartments). */
 export type PropertyKind = "single" | "multi";
@@ -37,6 +42,9 @@ export interface TableSort { key: string; dir: "asc" | "desc" }
 /** One column's filter as stored: enum values as a list (a Set does not survive JSON), the rest as typed. */
 export interface StoredFilter { text?: string; min?: string; max?: string; values?: string[] }
 export type TableFilters = Record<string, StoredFilter>;
+
+/** Column → width in px, for the columns the user dragged; the others keep their automatic width. */
+export type ColumnWidths = Record<string, number>;
 
 /** `income-ledger` + `multi` → `income-ledger:multi`: the name a table's choice is stored under. */
 export function columnTableKey(table: string, kind?: PropertyKind): string {
@@ -59,6 +67,10 @@ const tableKeyOf = (prefix: string, prefKey: string) => {
 export const hiddenColumnsPrefKey = (tableKey: string) => prefKeyOf(HIDDEN_COLUMNS_PREFIX, tableKey);
 /** `hidden-columns:income-ledger:multi` → `income-ledger:multi`; null for any other key. */
 export const tableKeyFromPrefKey = (prefKey: string) => tableKeyOf(HIDDEN_COLUMNS_PREFIX, prefKey);
+/** Preference key of a table's column widths, or null when the table key is not acceptable. */
+export const columnWidthsPrefKey = (tableKey: string) => prefKeyOf(COLUMN_WIDTHS_PREFIX, tableKey);
+/** `column-widths:income-ledger:multi` → `income-ledger:multi`; null for any other key. */
+export const tableKeyFromColumnWidthsPrefKey = (prefKey: string) => tableKeyOf(COLUMN_WIDTHS_PREFIX, prefKey);
 /** Preference key of a table's sort, or null when the table key is not acceptable. */
 export const sortPrefKey = (tableKey: string) => prefKeyOf(SORT_PREFIX, tableKey);
 /** `sort:investment-payments` → `investment-payments`; null for any other key. */
@@ -83,6 +95,23 @@ export function sanitizeHiddenColumns(value: unknown): string[] | null {
     for (const v of value) {
         if (typeof v !== "string" || !COLUMN_KEY.test(v)) return null;
         if (!out.includes(v)) out.push(v);
+    }
+    return out;
+}
+
+/** A width the table accepts: whole pixels, never narrower or wider than the limits. */
+export const clampColumnWidth = (px: number) => Math.min(MAX_COLUMN_WIDTH, Math.max(MIN_COLUMN_WIDTH, Math.round(px)));
+
+/** A clean map of column → width in px, or null when the value is junk; `{}` is a choice too — "all automatic". */
+export function sanitizeColumnWidths(value: unknown): ColumnWidths | null {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length > MAX_COLUMNS) return null;
+    const out: ColumnWidths = {};
+    for (const [column, px] of entries) {
+        if (!COLUMN_KEY.test(column)) return null;
+        if (typeof px !== "number" || !Number.isFinite(px) || px <= 0) return null;
+        out[column] = clampColumnWidth(px);
     }
     return out;
 }

@@ -9,6 +9,9 @@
  *   <FilterChips columns={columns} ctl={ctl} />   // active filters, one-click clear
  *   <ColumnMenu columns={columns} ctl={ctl} />    // the popup (fixed, never clipped by overflow)
  *
+ * `visibility` (TableColumnVisibility) and `widths` (TableColumnWidths) on `ColumnHeaders` add hiding columns
+ * from a right-click and resizing them by dragging the header's right edge.
+ *
  * Column kinds: text (contains), number (min–max), date (ISO min–max), month (YYYY-MM min–max),
  * enum (checkbox list with counts from the unfiltered rows).
  *
@@ -21,6 +24,7 @@
  * click to clear them.
  */
 import type { ColumnVisibility } from "./TableColumnVisibility";
+import { ColumnResizeHandle, type ColumnWidthsController } from "./TableColumnWidths";
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, Filter, FilterX, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -258,7 +262,7 @@ export function useColumnFilters<T>(rows: T[], columns: ColumnDef<T>[], defaultS
 const formatBRL = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /** Header cells: a button per column with sort arrow and filter icon. While a filter is active, number columns show the sum of the visible rows. Pass extra cells via `leading` / `trailing`. */
-export function ColumnHeaders<T>({ columns: allColumns, ctl, leading, trailing, className, visibility }: { columns: ColumnDef<T>[]; ctl: ColumnFilterController<T>; leading?: React.ReactNode; trailing?: React.ReactNode; /** hide / show columns: hidden ones are skipped and a right-click on a header opens the columns menu */ visibility?: ColumnVisibility; className?: string }) {
+export function ColumnHeaders<T>({ columns: allColumns, ctl, leading, trailing, className, visibility, widths }: { columns: ColumnDef<T>[]; ctl: ColumnFilterController<T>; leading?: React.ReactNode; trailing?: React.ReactNode; /** hide / show columns: hidden ones are skipped and a right-click on a header opens the columns menu */ visibility?: ColumnVisibility; /** resize columns: each header gets a grip on its right edge (drag: width · double-click: automatic) */ widths?: ColumnWidthsController; className?: string }) {
     const columns = visibility ? allColumns.filter(c => !visibility.isHidden(c.key)) : allColumns;
     const sums = useMemo(() => {
         const m = new Map<string, number>();
@@ -281,7 +285,10 @@ export function ColumnHeaders<T>({ columns: allColumns, ctl, leading, trailing, 
                 return (
                     <th key={c.key} title={c.title}
                         onContextMenu={visibility ? e => { e.preventDefault(); visibility.openMenu({ x: e.clientX, y: e.clientY }, c.key); } : undefined}
-                        className={cn("px-2 py-2 font-semibold", align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left", c.className)}>
+                        style={widths?.headerStyle(c.key)}
+                        data-column={widths ? c.key : undefined}
+                        className={cn("px-2 py-2 font-semibold", align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left", c.className,
+                            widths && "relative", widths?.widthOf(c.key) !== undefined && "overflow-hidden")}>
                         <button
                             type="button"
                             onClick={e => ctl.openMenu(c.key, e.currentTarget)}
@@ -299,6 +306,7 @@ export function ColumnHeaders<T>({ columns: allColumns, ctl, leading, trailing, 
                                 {(c.formatSum ?? formatBRL)(sums.get(c.key)!)}
                             </span>
                         )}
+                        {widths && <ColumnResizeHandle columnKey={c.key} label={c.label} ctl={widths} />}
                     </th>
                 );
             })}

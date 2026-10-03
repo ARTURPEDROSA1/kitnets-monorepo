@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireProfile } from "@/lib/api-auth";
 import {
-    FILTERS_PREFIX, HIDDEN_COLUMNS_PREFIX, NOTIFICATIONS_PREFIX, SIDEBAR_PREFIX, SORT_PREFIX,
-    sanitizeFilters, sanitizeHiddenColumns, sanitizeNotificationPrefs, sanitizeSort, tableKeyFromFiltersPrefKey, tableKeyFromNotificationsPrefKey, tableKeyFromPrefKey, tableKeyFromSidebarPrefKey, tableKeyFromSortPrefKey,
+    COLUMN_WIDTHS_PREFIX, FILTERS_PREFIX, HIDDEN_COLUMNS_PREFIX, NOTIFICATIONS_PREFIX, SIDEBAR_PREFIX, SORT_PREFIX,
+    sanitizeColumnWidths, sanitizeFilters, sanitizeHiddenColumns, sanitizeNotificationPrefs, sanitizeSort,
+    tableKeyFromColumnWidthsPrefKey, tableKeyFromFiltersPrefKey, tableKeyFromNotificationsPrefKey, tableKeyFromPrefKey, tableKeyFromSidebarPrefKey, tableKeyFromSortPrefKey,
 } from "@/lib/ui-preferences";
 import { sanitizeCollapsedGroups } from "@/lib/sidebar-groups";
 
@@ -14,6 +15,8 @@ const MAX_ROWS_PER_PUT = 20;
 /** The kinds of preference this route carries: the field in the JSON, the key prefix in the table, the checks. */
 const SECTIONS = {
     hiddenColumns: { prefix: HIDDEN_COLUMNS_PREFIX, tableKey: tableKeyFromPrefKey, sanitize: sanitizeHiddenColumns },
+    // the widths of the columns the user dragged, in px
+    columnWidths: { prefix: COLUMN_WIDTHS_PREFIX, tableKey: tableKeyFromColumnWidthsPrefKey, sanitize: sanitizeColumnWidths },
     sort: { prefix: SORT_PREFIX, tableKey: tableKeyFromSortPrefKey, sanitize: sanitizeSort },
     filters: { prefix: FILTERS_PREFIX, tableKey: tableKeyFromFiltersPrefKey, sanitize: sanitizeFilters },
     // the sidebar's collapsed menu groups (lib/sidebar-groups.ts), one entry: "collapsed-groups"
@@ -26,7 +29,7 @@ const SECTION_NAMES = Object.keys(SECTIONS) as Section[];
 
 /**
  * GET /api/profiles/preferences
- * → { hiddenColumns: { "<table key>": string[] }, sort: { "<table key>": { key, dir } }, filters: { "<table key>": {…} } }
+ * → { hiddenColumns: { "<table key>": string[] }, columnWidths: { "<table key>": { "<column>": px } }, sort: { "<table key>": { key, dir } }, filters: { "<table key>": {…} } }
  *
  * The signed-in user's interface preferences (lib/ui-preferences.ts). They live in the account, so the
  * choice made on one device is there on the next.
@@ -46,7 +49,7 @@ export async function GET() {
         return NextResponse.json({ error: "Erro ao carregar as preferências" }, { status: 500 });
     }
 
-    const out: Record<Section, Record<string, unknown>> = { hiddenColumns: {}, sort: {}, filters: {}, sidebar: {}, notifications: {} };
+    const out: Record<Section, Record<string, unknown>> = { hiddenColumns: {}, columnWidths: {}, sort: {}, filters: {}, sidebar: {}, notifications: {} };
     for (const row of data ?? []) {
         for (const name of SECTION_NAMES) {
             const tableKey = SECTIONS[name].tableKey(row.key);
@@ -61,7 +64,7 @@ export async function GET() {
 
 /**
  * PUT /api/profiles/preferences
- * body { hiddenColumns?: {…}, sort?: {…}, filters?: {…} }, each keyed by table → { ok: true }
+ * body { hiddenColumns?: {…}, columnWidths?: {…}, sort?: {…}, filters?: {…} }, each keyed by table → { ok: true }
  *
  * Replaces the preferences of each table sent; tables (and kinds) not sent are left alone.
  */

@@ -22,6 +22,7 @@ import MoneyInput from "@/components/properties/MoneyInput";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "@/components/properties/TableColumnFilters";
 import { ColumnVisibilityMenu, useColumnVisibility } from "@/components/properties/TableColumnVisibility";
 import { CellSumBar, useCellSum } from "@/components/properties/TableCellSum";
+import { useColumnWidths } from "@/components/properties/TableColumnWidths";
 
 const formatBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const COLLAPSED_ROWS = 24;
@@ -43,7 +44,8 @@ export default function CondominiumLedger({ propertyId, lang = "pt" }: { propert
     const [period, setPeriod] = useState<PeriodFilterValue>({ kind: "ytd" });
     const [chartGroup, setChartGroup] = useState<ChartGroup>("month");
     const [showAll, setShowAll] = useState(false);
-    const sel = useCellSum();
+    const widths = useColumnWidths(columnTableKey("condominium-ledger"));
+    const sel = useCellSum({ widths });
     const vis = useColumnVisibility(columnTableKey("condominium-ledger"), { locked: ["month"] });
 
     useEffect(() => {
@@ -70,8 +72,10 @@ export default function CondominiumLedger({ propertyId, lang = "pt" }: { propert
             if (!res.ok) throw new Error(data.error || "Erro ao salvar");
             setMonths(data.months ?? []);
             setDrafts(prev => { const n = { ...prev }; keys.forEach(k => delete n[k]); return n; });
+            return true;
         } catch (err) {
             setError((err as Error).message);
+            return false;
         } finally {
             setSaving(prev => { const n = new Set(prev); keys.forEach(k => n.delete(k)); return n; });
         }
@@ -97,17 +101,26 @@ export default function CondominiumLedger({ propertyId, lang = "pt" }: { propert
     // ── Inline editing ──────────────────────────────────────────────────
     const setDraft = (month: string, field: DraftField, value: string) => setDrafts(prev => ({ ...prev, [month]: { ...prev[month], [field]: value } }));
     const cancelDraft = (month: string, field: DraftField) => setDrafts(prev => { const n = { ...prev, [month]: { ...prev[month] } }; delete n[month][field]; return n; });
+    /** Saves one cell and remembers what it held, so Ctrl+Z can put it back. */
+    const saveCell = async (row: CondominiumMonth, field: DraftField, next: CondominiumCostInput, previous: CondominiumCostInput) => {
+        if (!(await putRows([next]))) return;
+        sel.recordUndo({
+            col: field, rowId: row.month,
+            label: `${field === "notes" ? "Descrição" : CONDO_COST_LABELS[field]} · ${formatMonthKey(row.month)}`,
+            undo: () => putRows([previous]),
+        });
+    };
     const commitDraft = (row: CondominiumMonth, field: DraftField) => {
         const raw = drafts[row.month]?.[field];
         if (raw === undefined) return;
         if (field === "notes") {
             const notes = raw.trim() ? raw.trim().slice(0, 500) : null;
             if (notes === (row.notes ?? null)) return cancelDraft(row.month, field);
-            return void putRows([{ month: row.month, notes }]);
+            return void saveCell(row, field, { month: row.month, notes }, { month: row.month, notes: row.notes ?? null });
         }
         const value = parseInput(raw);
         if (value === null || value === row[field]) return cancelDraft(row.month, field);
-        void putRows([{ month: row.month, [field]: value }]);
+        void saveCell(row, field, { month: row.month, [field]: value }, { month: row.month, [field]: row[field] });
     };
 
     // ── Derived ─────────────────────────────────────────────────────────
@@ -238,9 +251,9 @@ export default function CondominiumLedger({ propertyId, lang = "pt" }: { propert
                     <p className="text-sm text-muted-foreground py-6 text-center">Nenhum mês no período.</p>
                 ) : (
                     <div className="overflow-x-auto -mx-2">
-                        <table className="w-full text-xs" style={{ minWidth: `${Math.max(480, columns.filter(c => !vis.isHidden(c.key)).length * 104)}px` }}>
+                        <table className="w-full text-xs" style={{ minWidth: `${Math.max(480, columns.filter(c => !vis.isHidden(c.key)).length * 104)}px`, ...widths.tableStyle }}>
                             <thead>
-                                <ColumnHeaders columns={columns} ctl={cf} visibility={vis} trailing={<th className="px-2 py-2" />} />
+                                <ColumnHeaders columns={columns} ctl={cf} widths={widths} visibility={vis} trailing={<th className="px-2 py-2" />} />
                             </thead>
                             <tbody>
                                 {visible.map(row => {
@@ -298,7 +311,7 @@ export default function CondominiumLedger({ propertyId, lang = "pt" }: { propert
                     </div>
                 )}
                 <ColumnMenu columns={columns} ctl={cf} />
-                <ColumnVisibilityMenu columns={columns} ctl={vis} />
+                <ColumnVisibilityMenu columns={columns} ctl={vis} widths={widths} />
                 <CellSumBar ctl={sel} />
             </div>
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     AlertCircle, CheckCircle2, ChevronDown, ChevronRight, FileText, Landmark, LineChart, Loader2, Plus, Receipt, Scale, Sparkles, SplitSquareVertical, Trash2, TrendingUp, Upload,
 } from "lucide-react";
@@ -37,6 +37,7 @@ import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDe
 import { columnTableKey, recordTableKey } from "@/lib/ui-preferences";
 import { DateInput } from "@/components/ui/DateInput";
 import { CellSumBar, useCellSum } from "./TableCellSum";
+import { useColumnWidths } from "./TableColumnWidths";
 import MoneyInput, { parseMoneyText } from "./MoneyInput";
 
 /** Excel-style sort/filter columns for the taxes table (values honour parcelas). */
@@ -105,7 +106,8 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
     // default payer for new rows: whoever paid the most recent one
     const [rows, setRows] = useState<PropertyTax[]>([]);
     const defaultPayer: TaxPayer = rows[0]?.paid_by ?? "TENANT";
-    const sel = useCellSum();
+    const widths = useColumnWidths(columnTableKey("property-taxes"));
+    const sel = useCellSum({ widths });
     const [loading, setLoading] = useState<boolean>(Boolean(propertyId));
     const [error, setError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
@@ -177,6 +179,20 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
         }
     };
 
+    const rowsRef = useRef(rows);
+    rowsRef.current = rows;
+    /** Saves a row and remembers it as it was, so Ctrl+Z can put it back (`col` = the cell that was edited). */
+    const saveRow = async (row: PropertyTax, col: string, next: PropertyTaxInput, what?: string) => {
+        const before = rowToInput(row);
+        if (!(await put([next], [row.id]))) return;
+        sel.recordUndo({
+            col, rowId: row.id,
+            label: `${what ?? TAX_COLUMNS.find(c => c.key === col)?.label ?? col} · ${row.kind} ${row.year}`,
+            // a row deleted in the meantime stays deleted
+            undo: () => (rowsRef.current.some(r => r.id === row.id) ? put([before], [row.id]) : false),
+        });
+    };
+
     // ── Row-level inline editing ────────────────────────────────────────
     const setDraft = (id: string, field: keyof Draft, value: string) =>
         setDrafts(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
@@ -202,7 +218,7 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
             next.amount = v;
             if (next.installments?.length) next.installments = splitInstallments(v, next.installments.length, row.paid_by, next.installments);
         }
-        void put([next], [row.id]);
+        void saveRow(row, field === "paidBy" ? "payer" : field, next);
     };
 
     // ── Parcelas ────────────────────────────────────────────────────────
@@ -211,7 +227,7 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
         const next = rowToInput(row);
         next.installments = splitInstallments(effectiveTax(row).amount, n, row.paid_by, row.installments ?? []);
         setExpanded(prev => new Set([...prev, row.id]));
-        void put([next], [row.id]);
+        void saveRow(row, "parts", next);
     };
     const unsplitRow = (row: PropertyTax) => {
         const e = effectiveTax(row);
@@ -219,7 +235,7 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
         next.amount = e.amount;
         next.paid_by = e.byLandlord > e.byTenant ? "LANDLORD" : "TENANT";
         next.installments = [];
-        void put([next], [row.id]);
+        void saveRow(row, "parts", next);
     };
     const setPartDraft = (rowId: string, seq: number, field: keyof PartDraft, value: string) =>
         setPartDrafts(prev => ({ ...prev, [`${rowId}:${seq}`]: { ...prev[`${rowId}:${seq}`], [field]: value } }));
@@ -234,7 +250,7 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
         else { const d = raw || null; if (d !== null && !/^\d{4}-\d{2}-\d{2}$/.test(d)) return clear(); if (d === part.paid_on) return clear(); updated.paid_on = d; }
         const next = rowToInput(row);
         next.installments = (row.installments ?? []).map(p => (p.seq === part.seq ? updated : p));
-        void put([next], [row.id]);
+        void saveRow(row, "parts", next, `Parcela ${part.seq}`);
     };
 
     // ── Add dialog ──────────────────────────────────────────────────────
@@ -452,9 +468,9 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
                 </div>
             ) : (
                 <div className="overflow-x-auto -mx-2">
-                    <table className="w-full text-xs min-w-[900px]">
+                    <table className="w-full text-xs min-w-[900px]" style={widths.tableStyle}>
                         <thead>
-                            <ColumnHeaders columns={TAX_COLUMNS} ctl={cf} leading={<th className="px-1 py-2 w-6" />} trailing={<th className="px-2 py-2" />} />
+                            <ColumnHeaders columns={TAX_COLUMNS} ctl={cf} widths={widths} leading={<th className="px-1 py-2 w-6" />} trailing={<th className="px-2 py-2" />} />
                         </thead>
                         <tbody>
                             {cf.rows.length === 0 && (
@@ -551,18 +567,18 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
                                                     <td className="px-2 py-0.5 text-muted-foreground" colSpan={2}>
                                                         <span className="inline-flex items-center gap-1 pl-4"><SplitSquareVertical className="w-3 h-3" /> Parcela {part.seq}/{parts.length}</span>
                                                     </td>
-                                                    <td className="px-2 py-0.5 text-right">
+                                                    <td {...widths.cellProps("amount", "px-2 py-0.5 text-right")}>
                                                         <MoneyInput value={part.amount} draft={pd.amount} disabled={busy}
                                                             onDraft={text => setPartDraft(row.id, part.seq, "amount", text)} onCommit={() => commitPart(row, part, "amount")}
                                                             className="" />
                                                     </td>
-                                                    <td className="px-2 py-0.5">
+                                                    <td {...widths.cellProps("payer", "px-2 py-0.5")}>
                                                         <select disabled={busy} value={pd.paidBy ?? part.paid_by} onChange={ev => setPartDraft(row.id, part.seq, "paidBy", ev.target.value)} onBlur={() => commitPart(row, part, "paidBy")}
                                                             className={cn(BOX, (pd.paidBy ?? part.paid_by) === "LANDLORD" ? "text-rose-700 dark:text-rose-400" : "text-emerald-700 dark:text-emerald-400")}>
                                                             {TAX_PAYERS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                                                         </select>
                                                     </td>
-                                                    <td className="px-2 py-0.5 whitespace-nowrap">
+                                                    <td {...widths.cellProps("date", "px-2 py-0.5 whitespace-nowrap")}>
                                                         <DateInput variant="bare" disabled={busy} value={pd.date ?? (part.paid_on ?? "")} onChange={iso => setPartDraft(row.id, part.seq, "date", iso)} onBlur={() => commitPart(row, part, "date")} className={BOX} />
                                                     </td>
                                                     <td className="px-2 py-0.5 text-muted-foreground" colSpan={3} />

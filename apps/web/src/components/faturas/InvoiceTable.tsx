@@ -14,6 +14,7 @@ import { formatDateBR } from "@/lib/dates";
 import { columnTableKey } from "@/lib/ui-preferences";
 import { Sensitive } from "@/components/privacy";
 import { CellSumBar, useCellSum } from "@/components/properties/TableCellSum";
+import { useColumnWidths } from "@/components/properties/TableColumnWidths";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "@/components/properties/TableColumnFilters";
 import { ColumnVisibilityMenu, useColumnVisibility } from "@/components/properties/TableColumnVisibility";
 import { DELIVERY_STATE_META, INVOICE_STATUS_META, PAID_VIA_LABELS, brl, deliveryState, isOpen, type InvoiceRow } from "@/lib/invoice-hub";
@@ -63,7 +64,8 @@ export default function InvoiceTable({ rows, actions }: Props) {
 
     const cf = useColumnFilters(rows, columns, { key: "due", dir: "desc" }, { storageKey: TABLE_KEY, filtersKey: TABLE_KEY });
     const vis = useColumnVisibility(TABLE_KEY, { locked: ["invoice"] });
-    const sel = useCellSum();
+    const widths = useColumnWidths(TABLE_KEY);
+    const sel = useCellSum({ widths });
     const show = (key: string) => !vis.isHidden(key);
 
     return (
@@ -83,9 +85,9 @@ export default function InvoiceTable({ rows, actions }: Props) {
                 </div>
             ) : (
                 <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
+                    <table className="w-full text-xs" style={widths.tableStyle}>
                         <thead className="border-b border-border/60 bg-muted/30">
-                            <ColumnHeaders columns={columns} ctl={cf} visibility={vis} trailing={<th className="w-px px-2 py-2" />} />
+                            <ColumnHeaders columns={columns} ctl={cf} widths={widths} visibility={vis} trailing={<th className="w-px px-2 py-2" />} />
                         </thead>
                         <tbody>
                             {cf.rows.map(row => {
@@ -176,7 +178,7 @@ export default function InvoiceTable({ rows, actions }: Props) {
             )}
             <CellSumBar ctl={sel} />
             <ColumnMenu columns={columns} ctl={cf} />
-            <ColumnVisibilityMenu columns={columns} ctl={vis} />
+            <ColumnVisibilityMenu columns={columns} ctl={vis} widths={widths} />
         </div>
     );
 }
