@@ -33,6 +33,7 @@ import {
 } from "@/components/properties/TableColumnFilters";
 import { ColumnVisibilityMenu, useColumnVisibility } from "@/components/properties/TableColumnVisibility";
 import { CellSumBar, useCellSum } from "@/components/properties/TableCellSum";
+import { useColumnWidths } from "@/components/properties/TableColumnWidths";
 import { columnTableKey, recordTableKey } from "@/lib/ui-preferences";
 import { DateInput } from "@/components/ui/DateInput";
 import {
@@ -207,7 +208,8 @@ export default function InvestmentPaymentsTable({
         return () => clearTimeout(timer);
     }, [notice]);
 
-    const sel = useCellSum({ formatByCol: SUM_FORMATS });
+    const widths = useColumnWidths(columnTableKey("investment-payments"));
+    const sel = useCellSum({ formatByCol: SUM_FORMATS, widths });
     const vis = useColumnVisibility(columnTableKey("investment-payments"), {
         locked: ["due_on"],
         defaultHidden: ["installment_number"],
@@ -341,22 +343,34 @@ export default function InvestmentPaymentsTable({
         return parseMoneyText(text) ?? 0;
     };
 
+    /** A cell edit: patches the row and remembers what those fields held, so Ctrl+Z can put them back. */
+    const patchCell = async (row: InvestmentPayment, col: string, patch: Record<string, unknown>, coalesce = false) => {
+        const held = row as unknown as Record<string, unknown>;
+        const before = Object.fromEntries(Object.keys(patch).map(k => [k, held[k] ?? null]));
+        if (!(await onPatch(row.id, patch))) return;
+        sel.recordUndo({
+            col, rowId: row.id, coalesce,
+            label: `${columns.find(c => c.key === col)?.label ?? col} · vencimento ${formatDateBR(row.due_on)}`,
+            undo: () => onPatch(row.id, before),
+        });
+    };
+
     const commitAmount = async (row: InvestmentPayment) => {
         const amount = takeDraft(row.id, "amount");
         if (amount === null || amount === row.amount) return;
-        await onPatch(row.id, { amount, correction_amount: round2(paymentTotal(row) - amount) });
+        await patchCell(row, "amount", { amount, correction_amount: round2(paymentTotal(row) - amount) });
     };
 
     const commitPaid = async (row: InvestmentPayment) => {
         const paid = takeDraft(row.id, "paid");
         if (paid === null || paid === paymentTotal(row)) return;
-        await onPatch(row.id, { correction_amount: round2(paid - row.amount) });
+        await patchCell(row, "total", { correction_amount: round2(paid - row.amount) });
     };
 
     const commitPj = async (row: InvestmentPayment) => {
         const pj = takeDraft(row.id, "pj");
         if (pj === null) return;
-        await onPatch(row.id, { payer: "SPLIT", pj_amount: round2(Math.min(Math.max(pj, 0), paymentTotal(row))) });
+        await patchCell(row, "pj_amount", { payer: "SPLIT", pj_amount: round2(Math.min(Math.max(pj, 0), paymentTotal(row))) });
     };
 
     const cancelDraft = (rowId: string, field: string) =>
@@ -684,9 +698,9 @@ export default function InvestmentPaymentsTable({
                 </div>
 
                 <div className="overflow-x-auto -mx-2">
-                    <table className="w-full text-xs [&_td]:whitespace-nowrap">
+                    <table className="w-full text-xs [&_td]:whitespace-nowrap" style={widths.tableStyle}>
                         <thead>
-                            <ColumnHeaders columns={columns} ctl={cf} visibility={vis} trailing={<th className="px-2 py-2 w-px" />} />
+                            <ColumnHeaders columns={columns} ctl={cf} widths={widths} visibility={vis} trailing={<th className="px-2 py-2 w-px" />} />
                         </thead>
                         <tbody>
                             {rows.length === 0 && draft === null && (
@@ -717,7 +731,7 @@ export default function InvestmentPaymentsTable({
                                                 <DateInput
                                                     variant="bare"
                                                     value={row.due_on}
-                                                    onChange={iso => { if (iso) onPatch(row.id, { due_on: iso }); }}
+                                                    onChange={iso => { if (iso) patchCell(row, "due_on", { due_on: iso }, true); }}
                                                     aria-label="Vencimento"
                                                     className={cellInput}
                                                 />
@@ -728,7 +742,7 @@ export default function InvestmentPaymentsTable({
                                                 <DateInput
                                                     variant="bare"
                                                     value={row.paid_on ?? ""}
-                                                    onChange={iso => onPatch(row.id, { paid_on: iso || null, status: iso ? "PAID" : "PLANNED" })}
+                                                    onChange={iso => patchCell(row, "paid_on", { paid_on: iso || null, status: iso ? "PAID" : "PLANNED" }, true)}
                                                     aria-label="Pago em"
                                                     className={cellInput}
                                                 />
@@ -738,7 +752,7 @@ export default function InvestmentPaymentsTable({
                                             <td {...sel.cellProps("kind", row.id, null, "px-2 py-1")}>
                                                 <select
                                                     value={row.kind}
-                                                    onChange={e => onPatch(row.id, { kind: e.target.value })}
+                                                    onChange={e => patchCell(row, "kind", { kind: e.target.value })}
                                                     aria-label="Tipo do pagamento"
                                                     className={cn(cellInput, "w-auto cursor-pointer")}
                                                 >
@@ -750,7 +764,7 @@ export default function InvestmentPaymentsTable({
                                             <td {...sel.cellProps("status", row.id, null, "px-2 py-1")}>
                                                 <select
                                                     value={row.status}
-                                                    onChange={e => onPatch(row.id, { status: e.target.value })}
+                                                    onChange={e => patchCell(row, "status", { status: e.target.value })}
                                                     aria-label="Situação"
                                                     className={cn(cellInput, "w-auto cursor-pointer")}
                                                 >
@@ -765,7 +779,7 @@ export default function InvestmentPaymentsTable({
                                                     type="number"
                                                     min={1}
                                                     value={row.installment_number ?? ""}
-                                                    onChange={e => onPatch(row.id, { installment_number: e.target.value ? Number(e.target.value) : null })}
+                                                    onChange={e => patchCell(row, "installment_number", { installment_number: e.target.value ? Number(e.target.value) : null }, true)}
                                                     aria-label="Número da parcela"
                                                     className={cn(cellInput, "text-right tabular-nums")}
                                                 />
@@ -814,7 +828,7 @@ export default function InvestmentPaymentsTable({
                                         })()}
                                         {show("payer") && (
                                             <td {...sel.cellProps("payer", row.id, null, "px-2 py-1")}>
-                                                {payerSelect(row.payer, p => onPatch(row.id, { payer: p }), "Pagador")}
+                                                {payerSelect(row.payer, p => patchCell(row, "payer", { payer: p }), "Pagador")}
                                             </td>
                                         )}
                                         {show("pj_amount") && (
@@ -835,9 +849,10 @@ export default function InvestmentPaymentsTable({
                                         {show("notes") && (
                                             <td {...sel.cellProps("notes", row.id, null, "px-2 py-1")}>
                                                 <input
+                                                    key={row.notes ?? ""}   // uncontrolled: shows the stored note again when it changes underneath (Ctrl+Z)
                                                     type="text"
                                                     defaultValue={row.notes ?? ""}
-                                                    onBlur={e => { if (e.target.value !== (row.notes ?? "")) onPatch(row.id, { notes: e.target.value || null }); }}
+                                                    onBlur={e => { if (e.target.value !== (row.notes ?? "")) patchCell(row, "notes", { notes: e.target.value || null }); }}
                                                     onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
                                                     placeholder="—"
                                                     aria-label="Observação"
@@ -868,12 +883,12 @@ export default function InvestmentPaymentsTable({
                             {draft && (
                                 <tr className="border-b border-border/60 bg-emerald-50/50 dark:bg-emerald-950/20">
                                     {show("due_on") && (
-                                        <td className="px-2 py-1">
+                                        <td {...widths.cellProps("due_on", "px-2 py-1")}>
                                             <DateInput variant="bare" value={draft.due_on} onChange={iso => setDraft({ ...draft, due_on: iso })} aria-label="Vencimento do novo lançamento" className={cellInput} />
                                         </td>
                                     )}
                                     {show("paid_on") && (
-                                        <td className="px-2 py-1">
+                                        <td {...widths.cellProps("paid_on", "px-2 py-1")}>
                                             <DateInput
                                                 variant="bare"
                                                 value={draft.paid_on}
@@ -884,16 +899,16 @@ export default function InvestmentPaymentsTable({
                                         </td>
                                     )}
                                     {show("kind") && (
-                                        <td className="px-2 py-1">
+                                        <td {...widths.cellProps("kind", "px-2 py-1")}>
                                             <select value={draft.kind} onChange={e => setDraft({ ...draft, kind: e.target.value as PaymentKind })} aria-label="Tipo do novo lançamento" className={cn(cellInput, "w-auto cursor-pointer")}>
                                                 {PAYMENT_KINDS.map(k => <option key={k.kind} value={k.kind}>{k.label}</option>)}
                                             </select>
                                         </td>
                                     )}
-                                    {show("status") && <td className="px-2 py-1 text-muted-foreground">{draft.status === "PAID" ? "Pago" : "Previsto"}</td>}
-                                    {show("installment_number") && <td className="px-2 py-1" />}
+                                    {show("status") && <td {...widths.cellProps("status", "px-2 py-1 text-muted-foreground")}>{draft.status === "PAID" ? "Pago" : "Previsto"}</td>}
+                                    {show("installment_number") && <td {...widths.cellProps("installment_number", "px-2 py-1")} />}
                                     {show("amount") && (
-                                        <td className="px-2 py-1 text-right">
+                                        <td {...widths.cellProps("amount", "px-2 py-1 text-right")}>
                                             <MoneyInput
                                                 value={draft.amount}
                                                 draft={drafts["new:amount"]}
@@ -914,12 +929,12 @@ export default function InvestmentPaymentsTable({
                                         </td>
                                     )}
                                     {show("correction_amount") && (
-                                        <td className={cn("px-2 py-1 text-right tabular-nums", draft.correction_amount < 0 ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground")}>
+                                        <td {...widths.cellProps("correction_amount", cn("px-2 py-1 text-right tabular-nums", draft.correction_amount < 0 ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"))}>
                                             <Money>{formatBRL(draft.correction_amount)}</Money>
                                         </td>
                                     )}
                                     {show("total") && (
-                                        <td className="px-2 py-1 text-right font-semibold">
+                                        <td {...widths.cellProps("total", "px-2 py-1 text-right font-semibold")}>
                                             <MoneyInput
                                                 value={draft.amount + draft.correction_amount}
                                                 draft={drafts["new:paid"]}
@@ -937,14 +952,14 @@ export default function InvestmentPaymentsTable({
                                             />
                                         </td>
                                     )}
-                                    {show("index_pct") && <td className="px-2 py-1 text-right text-muted-foreground">—</td>}
+                                    {show("index_pct") && <td {...widths.cellProps("index_pct", "px-2 py-1 text-right text-muted-foreground")}>—</td>}
                                     {show("payer") && (
-                                        <td className="px-2 py-1">
+                                        <td {...widths.cellProps("payer", "px-2 py-1")}>
                                             {payerSelect(draft.payer, p => setDraft({ ...draft, payer: p, pj_amount: p === "SPLIT" ? draft.pj_amount : null }), "Pagador do novo lançamento")}
                                         </td>
                                     )}
                                     {show("pj_amount") && (
-                                        <td className="px-2 py-1 text-right">
+                                        <td {...widths.cellProps("pj_amount", "px-2 py-1 text-right")}>
                                             <MoneyInput
                                                 value={draft.payer === "SPLIT" ? draft.pj_amount : draft.payer === "PJ" ? draft.amount + draft.correction_amount : draft.payer === "PF" ? 0 : null}
                                                 draft={drafts["new:pj"]}
@@ -960,7 +975,7 @@ export default function InvestmentPaymentsTable({
                                         </td>
                                     )}
                                     {show("notes") && (
-                                        <td className="px-2 py-1">
+                                        <td {...widths.cellProps("notes", "px-2 py-1")}>
                                             <input
                                                 type="text"
                                                 value={draft.notes}
@@ -972,7 +987,7 @@ export default function InvestmentPaymentsTable({
                                         </td>
                                     )}
                                     {show("receipt") && (
-                                        <td className="px-2 py-1 text-center">
+                                        <td {...widths.cellProps("receipt", "px-2 py-1 text-center")}>
                                             <button
                                                 type="button"
                                                 onClick={() => newFileRef.current?.click()}
@@ -1052,7 +1067,7 @@ export default function InvestmentPaymentsTable({
             </div>
 
             <ColumnMenu columns={columns} ctl={cf} />
-            <ColumnVisibilityMenu columns={columns} ctl={vis} />
+            <ColumnVisibilityMenu columns={columns} ctl={vis} widths={widths} />
             <CellSumBar ctl={sel} />
         </section>
     );

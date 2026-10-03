@@ -45,6 +45,7 @@ import { cn } from "@/lib/utils";
 import PeriodFilter, { GroupSelect } from "./PeriodFilter";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "./TableColumnFilters";
 import { CellSumBar, useCellSum } from "./TableCellSum";
+import { useColumnWidths } from "./TableColumnWidths";
 import MoneyInput, { parseMoneyText } from "./MoneyInput";
 import Tile, { type TileInfo } from "./Tile";
 import { Money } from "@/components/privacy";
@@ -122,6 +123,13 @@ function parseMonthText(text: string): string | null {
 }
 type Drafts = Record<string, Partial<Record<DraftField, string>>>;
 
+/** Everything a row stores, as the PUT takes it: writes the row again as it is (under another month or unit, or back to what it was). */
+const storedFields = (row: PropertyIncomeRow): Omit<IncomeRowInput, "month" | "unit_id"> => ({
+    received_amount: row.received_amount, energy_portion: row.energy_portion, other_income: row.other_income,
+    other_expenses: row.other_expenses, condo_amount: row.condo_amount ?? 0, fee_on_condo: row.fee_on_condo ?? false, condo_direct: row.condo_direct ?? false, agency_fee_pct: row.agency_fee_pct, status: row.status, source: row.source,
+    received_on: row.received_on, notes: row.notes, bank_reference: row.bank_reference,
+});
+
 const FIELD_OPTIONS: IncomeField[] = ["unit", "gross", "fee_pct", "received", "energy", "other", "other_expenses", "condo", "fee_on_condo", "notes", "ignore"];
 const IMPORT_CHUNK = 300;
 const DEFAULT_AGENCY_FEE_PCT = 10;
@@ -148,7 +156,11 @@ export default function PropertyIncomeLedger({
     const [chartGroup, setChartGroup] = useState<ChartGroup>("month");   // chart only; the table stays monthly
 
     const [rows, setRows] = useState<PropertyIncomeRow[]>([]);
-    const sel = useCellSum();
+    const rowsRef = useRef(rows);
+    rowsRef.current = rows;
+    const widths = useColumnWidths(columnTableKey("income-ledger", multiUnit ? "multi" : "single"));
+    const sel = useCellSum({ widths });
+    const { recordUndo } = sel;
     const [loading, setLoading] = useState<boolean>(Boolean(propertyId));
     const [error, setError] = useState<string | null>(null);
     const [saving, setSaving] = useState<Set<string>>(new Set());
@@ -207,8 +219,8 @@ export default function PropertyIncomeLedger({
 
     // ── Persist ─────────────────────────────────────────────────────────
     const putRows = useCallback(
-        async (inputs: IncomeRowInput[]) => {
-            if (!endpoint) return;
+        async (inputs: IncomeRowInput[]): Promise<boolean> => {
+            if (!endpoint) return false;
             const months = inputs.map(r => incomeRowKey(r));   // row identity: month + unit
             setSaving(prev => new Set([...prev, ...months]));
             setError(null);
@@ -226,8 +238,10 @@ export default function PropertyIncomeLedger({
                     months.forEach(m => delete next[m]);
                     return next;
                 });
+                return true;
             } catch (err) {
                 setError((err as Error).message);
+                return false;
             } finally {
                 setSaving(prev => {
                     const next = new Set(prev);
@@ -265,27 +279,23 @@ export default function PropertyIncomeLedger({
 
     /** Moves a row to another month and/or unit: writes it under the new identity, then removes the old one. */
     const moveRow = useCallback(
-        async (row: PropertyIncomeRow, to: { month?: string; unit_id?: string | null }) => {
-            if (!endpoint) return;
+        async (row: PropertyIncomeRow, to: { month?: string; unit_id?: string | null }, undoable = true): Promise<boolean> => {
+            if (!endpoint) return false;
             const fromMonth = monthKey(row.month), fromKey = incomeRowKey(row);
             const target = { month: to.month ?? fromMonth, unit_id: to.unit_id === undefined ? row.unit_id ?? null : to.unit_id };
             const targetKey = incomeRowKey(target);
-            if (targetKey === fromKey) return;
-            if (rows.some(r => incomeRowKey(r) === targetKey)) {
+            if (targetKey === fromKey) return false;
+            if (rowsRef.current.some(r => incomeRowKey(r) === targetKey)) {
                 const unitName = target.unit_id ? units.find(u => u.id === target.unit_id)?.name : null;
                 setError(`Já existe um lançamento em ${formatMonthKey(target.month)}${unitName ? ` para ${unitName}` : multiUnit ? " para o imóvel inteiro" : ""}.`);
-                return;
+                return false;
             }
             setSaving(prev => new Set([...prev, fromKey]));
             setError(null);
             try {
                 const put = await fetch(endpoint, {
                     method: "PUT", headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ rows: [{
-                        ...target, received_amount: row.received_amount, energy_portion: row.energy_portion, other_income: row.other_income,
-                        other_expenses: row.other_expenses, condo_amount: row.condo_amount ?? 0, fee_on_condo: row.fee_on_condo ?? false, condo_direct: row.condo_direct ?? false, agency_fee_pct: row.agency_fee_pct, status: row.status, source: row.source,
-                        received_on: row.received_on, notes: row.notes, bank_reference: row.bank_reference,
-                    }] }),
+                    body: JSON.stringify({ rows: [{ ...target, ...storedFields(row) }] }),
                 });
                 const data = await put.json().catch(() => ({}));
                 if (!put.ok) throw new Error(data.error || "Erro ao mover o lançamento");
@@ -293,14 +303,44 @@ export default function PropertyIncomeLedger({
                 if (!del.ok) throw new Error((await del.json().catch(() => ({}))).error || "Erro ao remover o lançamento antigo");
                 applyRows(((data.rows ?? []) as PropertyIncomeRow[]).filter(r => incomeRowKey(r) !== fromKey));
                 setDrafts(prev => { const n = { ...prev }; delete n[fromKey]; return n; });
+                // Ctrl+Z moves the row back to the month / unit it came from
+                if (undoable) recordUndo({
+                    col: to.month ? "month" : "unit", rowId: fromKey,
+                    label: `${to.month ? "Mês" : "Unidade"} · ${formatMonthKey(fromMonth)}${row.unit_name ? ` · ${row.unit_name}` : ""}`,
+                    undo: () => {
+                        const moved = rowsRef.current.find(r => incomeRowKey(r) === targetKey);
+                        return moved ? moveRowRef.current(moved, { month: fromMonth, unit_id: row.unit_id ?? null }, false) : false;
+                    },
+                });
+                return true;
             } catch (err) {
                 setError((err as Error).message);
+                return false;
             } finally {
                 setSaving(prev => { const n = new Set(prev); n.delete(fromKey); return n; });
             }
         },
-        [endpoint, rows, applyRows, units, multiUnit]
+        [endpoint, applyRows, units, multiUnit, recordUndo]
     );
+    const moveRowRef = useRef(moveRow);
+    moveRowRef.current = moveRow;
+
+    /**
+     * Saves one cell and remembers the row as it was, so Ctrl+Z can put it back. An edit can move other figures
+     * of the row (the rent follows the condominium, the deposit follows the rent), so the undo writes back
+     * every stored field of the row, not only the one that was typed.
+     */
+    const saveCell = async (row: PropertyIncomeRow, col: string, input: IncomeRowInput) => {
+        const rk = incomeRowKey(row);
+        const before: IncomeRowInput = { month: monthKey(row.month), unit_id: row.unit_id ?? null, ...storedFields(row) };
+        if (!(await putRows([input]))) return;
+        recordUndo({
+            col, rowId: rk,
+            label: `${columns.find(c => c.key === col)?.label ?? col} · ${formatMonthKey(monthKey(row.month))}${row.unit_name ? ` · ${row.unit_name}` : ""}`,
+            // a row deleted in the meantime stays deleted
+            undo: () => (rowsRef.current.some(r => incomeRowKey(r) === rk) ? putRows([before]) : false),
+        });
+    };
 
     // ── Inline editing ──────────────────────────────────────────────────
     // drafts are keyed by the row's identity (month + unit), like `saving`
@@ -325,7 +365,7 @@ export default function PropertyIncomeLedger({
         if (field === "notes") {
             const notes = raw.trim() ? raw.trim().slice(0, 500) : null;
             if (notes === (row.notes ?? null)) return clear();
-            return void putRows([{ ...ident, notes }]);
+            return void saveCell(row, field, { ...ident, notes });
         }
 
         const value = parseInput(raw);
@@ -336,12 +376,12 @@ export default function PropertyIncomeLedger({
         if (field === "gross") {
             const received = receivedFromGross(Math.max(0, round2(value - b.directRent)), b.feePct, b.depositEnergy, b.condoDirect ? 0 : b.condo, b.feeOnCondo);
             if (received === b.deposit) return clear();
-            return void putRows([{ ...ident, received_amount: received }]);
+            return void saveCell(row, field, { ...ident, received_amount: received });
         }
         if (field === "condo") {
             if (value === b.condo) return clear();
             // the tenant's condominium comes inside the deposit: the rent stays, the deposit follows
-            return void putRows([{ ...ident, condo_amount: value, ...keepRent(row) }]);
+            return void saveCell(row, field, { ...ident, condo_amount: value, ...keepRent(row) });
         }
         const key =
             field === "received" ? "received_amount"
@@ -354,7 +394,7 @@ export default function PropertyIncomeLedger({
             : field === "energy" ? Math.max(0, round2(value - b.directEnergy))
                 : value;
         if (stored === (Number(row[key]) || 0)) return clear();
-        putRows([{ ...ident, [key]: stored }]);
+        void saveCell(row, field, { ...ident, [key]: stored });
     };
 
     /**
@@ -365,14 +405,14 @@ export default function PropertyIncomeLedger({
         row.source === "BANK" ? {} : { gross_rent: breakdown(row).agencyGrossRent };   // the rent that comes through the deposit
 
     const toggleFeeOnCondo = (row: PropertyIncomeRow) =>
-        putRows([{ month: monthKey(row.month), unit_id: row.unit_id ?? null, fee_on_condo: !row.fee_on_condo, ...keepRent(row) }]);
+        saveCell(row, "feeOnCondo", { month: monthKey(row.month), unit_id: row.unit_id ?? null, fee_on_condo: !row.fee_on_condo, ...keepRent(row) });
 
     /** The owner collects this unit's condominium (by invoice): it is not inside the agency's deposit, which is then all rent. */
     const toggleCondoDirect = (row: PropertyIncomeRow) =>
-        putRows([{ month: monthKey(row.month), unit_id: row.unit_id ?? null, condo_direct: !row.condo_direct, ...keepRent(row) }]);
+        saveCell(row, "condoDirect", { month: monthKey(row.month), unit_id: row.unit_id ?? null, condo_direct: !row.condo_direct, ...keepRent(row) });
 
     const toggleStatus = (row: PropertyIncomeRow) =>
-        putRows([{ month: monthKey(row.month), unit_id: row.unit_id ?? null, status: row.status === "CONFIRMED" ? "EXPECTED" : "CONFIRMED" }]);
+        saveCell(row, "status", { month: monthKey(row.month), unit_id: row.unit_id ?? null, status: row.status === "CONFIRMED" ? "EXPECTED" : "CONFIRMED" });
 
     // ── Derived ─────────────────────────────────────────────────────────
     /** Only a ledger with a condominium shows the "fee on the condominium" column. */
@@ -937,9 +977,9 @@ export default function PropertyIncomeLedger({
                 </div>
             ) : (
                 <div className="overflow-x-auto -mx-2">
-                    <table className="w-full text-xs" style={{ minWidth: `${Math.max(480, columns.filter(c => !vis.isHidden(c.key)).length * 104)}px` }}>
+                    <table className="w-full text-xs" style={{ minWidth: `${Math.max(480, columns.filter(c => !vis.isHidden(c.key)).length * 104)}px`, ...widths.tableStyle }}>
                         <thead>
-                            <ColumnHeaders columns={columns} ctl={cf} visibility={vis} trailing={<th className="px-2 py-2" />} />
+                            <ColumnHeaders columns={columns} ctl={cf} widths={widths} visibility={vis} trailing={<th className="px-2 py-2" />} />
                         </thead>
                         <tbody>
                             {visible.map(row => {
@@ -1127,7 +1167,7 @@ export default function PropertyIncomeLedger({
 
             {/* Column sort/filter popup: at the root so an empty filter result never unmounts it */}
             <ColumnMenu columns={columns} ctl={cf} />
-            <ColumnVisibilityMenu columns={columns} ctl={vis} />
+            <ColumnVisibilityMenu columns={columns} ctl={vis} widths={widths} />
 
             {/* Add month dialog */}
             <Dialog open={addOpen} onOpenChange={setAddOpen}>

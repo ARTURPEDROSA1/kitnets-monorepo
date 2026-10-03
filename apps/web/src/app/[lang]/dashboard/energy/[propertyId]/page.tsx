@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@kitnets/ui";
@@ -47,6 +47,7 @@ import { Money, Sensitive } from "@/components/privacy";
 import { cn } from "@/lib/utils";
 import { columnTableKey, recordTableKey } from "@/lib/ui-preferences";
 import { CellSumBar, useCellSum } from "@/components/properties/TableCellSum";
+import { useColumnWidths } from "@/components/properties/TableColumnWidths";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "@/components/properties/TableColumnFilters";
 import { ColumnVisibilityMenu, useColumnVisibility } from "@/components/properties/TableColumnVisibility";
 import { parseMoneyText } from "@/components/properties/MoneyInput";
@@ -102,6 +103,11 @@ const dailyAvg = (b: EnergyBillRecord) => b.daily_avg_kwh || (b.grid_consumption
 
 /** Bill fields that can be edited straight in the history table (double-click / Enter on the cell) */
 type InlineField = "grid_consumption_kwh" | "billing_days" | "generation_balance_kwh" | "solar_injected_kwh" | "availability_cost_amount" | "unit_price" | "total_amount";
+/** The table column each of those fields is edited in (Ctrl+Z shows that cell again). */
+const FIELD_COLUMN: Record<InlineField, string> = {
+    grid_consumption_kwh: "cons", billing_days: "days", generation_balance_kwh: "balance", solar_injected_kwh: "injected",
+    availability_cost_amount: "availability", unit_price: "unitPrice", total_amount: "total",
+};
 
 const CELL_INPUT = "text-right bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-none w-full min-w-[4rem] px-1.5 py-1 outline-none tabular-nums";
 
@@ -300,7 +306,8 @@ export default function EnergyDashboardPage() {
         filtersKey: recordTableKey("energy-bills", resolvedPropertyId || propertyId),
     });
     const vis = useColumnVisibility(columnTableKey("energy-bills"), { locked: ["month"] });
-    const sel = useCellSum({ formatByCol: { cons: formatKwh(0), daily: formatKwh(2), days: formatDays, balance: formatKwh(2), injected: formatKwh(0), unitPrice: formatUnitPrice } });
+    const widths = useColumnWidths(columnTableKey("energy-bills"));
+    const sel = useCellSum({ formatByCol: { cons: formatKwh(0), daily: formatKwh(2), days: formatDays, balance: formatKwh(2), injected: formatKwh(0), unitPrice: formatUnitPrice }, widths });
 
     // Inline edits in the history table: draft while typing, save on blur/Enter (optimistic, reverted on failure)
     const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -309,21 +316,16 @@ export default function EnergyDashboardPage() {
     const draftKey = (id: string, field: InlineField) => `${id}:${field}`;
     const setDraft = (id: string, field: InlineField, text: string) => setDrafts(d => ({ ...d, [draftKey(id, field)]: text }));
     const cancelDraft = (id: string, field: InlineField) => setDrafts(d => { const n = { ...d }; delete n[draftKey(id, field)]; return n; });
-    const commitDraft = async (b: EnergyBillRecord, field: InlineField) => {
+    const billsRef = useRef(bills);
+    billsRef.current = bills;
+    /** Saves one field of a bill, shown at once and put back if the save fails; true when it was saved. */
+    const saveField = async (b: EnergyBillRecord, field: InlineField, value: EnergyBillRecord[InlineField]): Promise<boolean> => {
         const k = draftKey(b.id, field);
-        const raw = drafts[k];
-        if (raw === undefined) return;
-        cancelDraft(b.id, field);
-        const parsed = parseMoneyText(raw);
-        if (parsed === null || parsed < 0) return;
-        const value = field === "billing_days" ? Math.round(parsed) : parsed;
-        if (value === (Number(b[field]) || 0)) return;
-
         const patch: Partial<EnergyBillRecord> = { [field]: value };
         if (field === "grid_consumption_kwh" || field === "billing_days") {
             // kWh/dia follows consumption ÷ days (the API recomputes it when daily_avg_kwh is sent as 0)
-            const cons = field === "grid_consumption_kwh" ? value : b.grid_consumption_kwh;
-            const days = field === "billing_days" ? value : (b.billing_days || 30);
+            const cons = field === "grid_consumption_kwh" ? Number(value) || 0 : b.grid_consumption_kwh;
+            const days = field === "billing_days" ? Number(value) || 0 : (b.billing_days || 30);
             patch.grid_consumption_kwh = cons;
             patch.billing_days = days;
             patch.daily_avg_kwh = days > 0 ? Math.round((cons / days) * 100) / 100 : b.daily_avg_kwh;
@@ -339,13 +341,34 @@ export default function EnergyDashboardPage() {
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok || !data.success) throw new Error(data.error || "Erro ao salvar a fatura");
+            return true;
         } catch (err) {
             console.error("[EnergyDashboard] Inline edit failed:", err);
             setBills(prev => prev.map(x => (x.id === b.id ? b : x)));
             setInlineError(err instanceof Error ? err.message : "Erro ao salvar a fatura");
+            return false;
         } finally {
             setSavingCells(prev => { const n = new Set(prev); n.delete(k); return n; });
         }
+    };
+
+    const commitDraft = async (b: EnergyBillRecord, field: InlineField) => {
+        const raw = drafts[draftKey(b.id, field)];
+        if (raw === undefined) return;
+        cancelDraft(b.id, field);
+        const parsed = parseMoneyText(raw);
+        if (parsed === null || parsed < 0) return;
+        const value = field === "billing_days" ? Math.round(parsed) : parsed;
+        if (value === (Number(b[field]) || 0)) return;
+        if (!(await saveField(b, field, value))) return;
+        // Ctrl+Z puts the previous value back, on the bill as it is by then
+        const previous = b[field];
+        const col = FIELD_COLUMN[field];
+        sel.recordUndo({
+            col, rowId: b.id,
+            label: `${billColumns.find(c => c.key === col)?.label ?? col} · ${b.reference_month_label || formatMonthLabel(b.reference_month)}`,
+            undo: () => { const now = billsRef.current.find(x => x.id === b.id); return now ? saveField(now, field, previous) : false; },
+        });
     };
 
     // Latest full bill (for current status cards)
@@ -915,9 +938,9 @@ export default function EnergyDashboardPage() {
                             </div>
                         ) : (
                             <div className="overflow-x-auto px-2 pb-2">
-                                <table className="w-full text-xs">
+                                <table className="w-full text-xs" style={widths.tableStyle}>
                                     <thead>
-                                        <ColumnHeaders columns={billColumns} ctl={cf} visibility={vis} trailing={<th className="px-2 py-2 font-semibold text-center">Ações</th>} />
+                                        <ColumnHeaders columns={billColumns} ctl={cf} widths={widths} visibility={vis} trailing={<th className="px-2 py-2 font-semibold text-center">Ações</th>} />
                                     </thead>
                                     <tbody>
                                         {cf.rows.map((b) => {
@@ -1090,7 +1113,7 @@ export default function EnergyDashboardPage() {
             {/* Spreadsheet helpers for the history table: selection sum bar, column sort/filter and columns menus */}
             <CellSumBar ctl={sel} />
             <ColumnMenu columns={billColumns} ctl={cf} />
-            <ColumnVisibilityMenu columns={billColumns} ctl={vis} />
+            <ColumnVisibilityMenu columns={billColumns} ctl={vis} widths={widths} />
 
             {/* In-App PDF Document Viewer */}
             {isPdfViewerOpen && pdfViewerUrl && (

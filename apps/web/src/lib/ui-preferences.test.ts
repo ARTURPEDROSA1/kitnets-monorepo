@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
     columnTableKey, filtersPrefKey, hiddenColumnsPrefKey, recordTableKey, sanitizeFilters, sanitizeHiddenColumns, sanitizeSort, sortPrefKey,
     notificationsPrefKey, sanitizeNotificationPrefs, tableKeyFromFiltersPrefKey, tableKeyFromNotificationsPrefKey, tableKeyFromPrefKey, tableKeyFromSortPrefKey,
+    columnWidthsPrefKey, sanitizeColumnWidths, tableKeyFromColumnWidthsPrefKey, MAX_COLUMN_WIDTH, MIN_COLUMN_WIDTH,
 } from "./ui-preferences";
 
 describe("hidden-column preferences", () => {
@@ -94,6 +95,31 @@ describe("filter preferences", () => {
         expect(sanitizeFilters({ tenant: { text: 3 } })).toBeNull();
         expect(sanitizeFilters({ tenant: { text: "x".repeat(201) } })).toBeNull();
         expect(sanitizeFilters(Object.fromEntries(Array.from({ length: 61 }, (_, i) => [`c${i}`, { text: "a" }])))).toBeNull();
+    });
+});
+
+describe("column-width preferences", () => {
+    it("builds and reads back the preference key, per table and kind of property", () => {
+        expect(columnWidthsPrefKey("income-ledger:multi")).toBe("column-widths:income-ledger:multi");
+        expect(tableKeyFromColumnWidthsPrefKey("column-widths:income-ledger:multi")).toBe("income-ledger:multi");
+        expect(tableKeyFromColumnWidthsPrefKey("hidden-columns:income-ledger")).toBeNull();
+        expect(columnWidthsPrefKey("Income Ledger")).toBeNull();
+    });
+
+    it("keeps whole pixels inside the limits", () => {
+        expect(sanitizeColumnWidths({ notes: 320.4, amount: 96 })).toEqual({ notes: 320, amount: 96 });
+        expect(sanitizeColumnWidths({ notes: 5, amount: 99999 })).toEqual({ notes: MIN_COLUMN_WIDTH, amount: MAX_COLUMN_WIDTH });
+        expect(sanitizeColumnWidths({})).toEqual({});   // "all automatic" is a choice too
+    });
+
+    it("refuses junk", () => {
+        expect(sanitizeColumnWidths(null)).toBeNull();
+        expect(sanitizeColumnWidths([120])).toBeNull();
+        expect(sanitizeColumnWidths({ notes: "120" })).toBeNull();
+        expect(sanitizeColumnWidths({ notes: NaN })).toBeNull();
+        expect(sanitizeColumnWidths({ notes: -3 })).toBeNull();
+        expect(sanitizeColumnWidths({ "<script>": 120 })).toBeNull();
+        expect(sanitizeColumnWidths(Object.fromEntries(Array.from({ length: 61 }, (_, i) => [`c${i}`, 100])))).toBeNull();
     });
 });
 

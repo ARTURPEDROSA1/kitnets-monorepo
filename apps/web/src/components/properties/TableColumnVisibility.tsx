@@ -15,8 +15,9 @@
  * with the last choice made on this device while the account's copy loads.
  */
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Check, Columns3, Eye, EyeOff } from "lucide-react";
+import { Check, Columns3, Eye, EyeOff, MoveHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { ColumnWidthsController } from "./TableColumnWidths";
 import { loadAccountPreferences, readLocalPreference, saveAccountPreference, writeLocalPreference } from "@/lib/ui-preferences-client";
 
 export interface ColumnVisibility {
@@ -95,8 +96,8 @@ export function useColumnVisibility(storageKey: string, opts: ColumnVisibilityOp
     };
 }
 
-/** Floating menu: "hide this column", a checklist of every column, "show all". Always fully on screen. */
-export function ColumnVisibilityMenu({ columns, ctl }: { columns: Array<{ key: string; label: string }>; ctl: ColumnVisibility }) {
+/** Floating menu: "hide this column", a checklist of every column, "show all"; with `widths`, the automatic width back too. Always fully on screen. */
+export function ColumnVisibilityMenu({ columns, ctl, widths }: { columns: Array<{ key: string; label: string }>; ctl: ColumnVisibility; widths?: ColumnWidthsController }) {
     const ref = useRef<HTMLDivElement>(null);
     const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
     const menu = ctl.menu;
@@ -161,6 +162,20 @@ export function ColumnVisibilityMenu({ columns, ctl }: { columns: Array<{ key: s
             <button type="button" role="menuitem" className={item} disabled={ctl.hiddenCount === 0} onClick={() => { ctl.showAll(); ctl.closeMenu(); }}>
                 <Eye className="w-3.5 h-3.5 text-muted-foreground" /> Mostrar todas
             </button>
+            {widths && (
+                <>
+                    <div className="my-1 border-t border-border" />
+                    <span className="block px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Largura · arraste a borda do cabeçalho</span>
+                    {clicked && widths.widthOf(clicked.key) !== undefined && (
+                        <button type="button" role="menuitem" className={item} onClick={() => { widths.reset(clicked.key); ctl.closeMenu(); }}>
+                            <MoveHorizontal className="w-3.5 h-3.5 text-muted-foreground" /> Largura automática em “{clicked.label}”
+                        </button>
+                    )}
+                    <button type="button" role="menuitem" className={item} disabled={widths.count === 0} onClick={() => { widths.resetAll(); ctl.closeMenu(); }}>
+                        <MoveHorizontal className="w-3.5 h-3.5 text-muted-foreground" /> Largura automática em todas
+                    </button>
+                </>
+            )}
         </div>
     );
 }

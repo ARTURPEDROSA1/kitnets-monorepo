@@ -30,6 +30,7 @@ import PeriodFilter from "./PeriodFilter";
 import Tile, { type TileInfo } from "./Tile";
 import { Money } from "@/components/privacy";
 import { CellSumBar, useCellSum } from "./TableCellSum";
+import { useColumnWidths } from "./TableColumnWidths";
 import MoneyInput, { parseMoneyText } from "./MoneyInput";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "./TableColumnFilters";
 import { columnTableKey, recordTableKey } from "@/lib/ui-preferences";
@@ -96,7 +97,8 @@ type TxDraft = Partial<Record<"date" | "kind" | "amount" | "interest" | "princip
 
 export default function PropertyInvestmentSection({ propertyId, incomeRows, onDataChange, preloaded, landlordTaxes, solarExtra }: Props) {
     const taxes = landlordTaxes ?? { iptu: 0, itbi: 0, other: 0, total: 0 };
-    const sel = useCellSum();
+    const widths = useColumnWidths(columnTableKey("property-investments"));
+    const sel = useCellSum({ widths });
     const txEndpoint = propertyId ? `/api/properties/${propertyId}/transactions` : null;
     const invEndpoint = propertyId ? `/api/properties/${propertyId}/investment` : null;
 
@@ -187,15 +189,19 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
     const cancelDraft = (id: string, field: keyof TxDraft) =>
         setDrafts(prev => { const n = { ...prev, [id]: { ...prev[id] } }; delete n[id][field]; return n; });
 
+    const txInput = (tx: PropertyTransaction): TransactionInput => ({
+        id: tx.id, occurred_on: tx.occurred_on, kind: tx.kind, amount: tx.amount,
+        interest_part: tx.interest_part, principal_part: tx.principal_part, insurance_part: tx.insurance_part,
+        comment: tx.comment, source: tx.source,
+    });
+    const txsRef = useRef(txs);
+    txsRef.current = txs;
+
     const commit = (tx: PropertyTransaction, field: keyof TxDraft) => {
         const raw = drafts[tx.id]?.[field];
         if (raw === undefined) return;
         const clear = () => setDrafts(prev => { const n = { ...prev, [tx.id]: { ...prev[tx.id] } }; delete n[tx.id][field]; return n; });
-        const next: TransactionInput = {
-            id: tx.id, occurred_on: tx.occurred_on, kind: tx.kind, amount: tx.amount,
-            interest_part: tx.interest_part, principal_part: tx.principal_part, insurance_part: tx.insurance_part,
-            comment: tx.comment, source: tx.source,
-        };
+        const next = txInput(tx);
         if (field === "date") {
             if (!/^\d{4}-\d{2}-\d{2}$/.test(raw) || raw === tx.occurred_on) return clear();
             next.occurred_on = raw;
@@ -217,7 +223,16 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                 next[key] = v;
             }
         }
-        void putTxs([next], false, [tx.id]);
+        // Ctrl+Z writes the transaction back as it was (one that was deleted in the meantime stays deleted)
+        const before = txInput(tx);
+        void putTxs([next], false, [tx.id]).then(saved => {
+            if (!saved) return;
+            sel.recordUndo({
+                col: field, rowId: tx.id,
+                label: `${INVESTMENT_COLUMNS.find(c => c.key === field)?.label ?? field} · ${KIND_LABELS[tx.kind]} ${formatDateBR(tx.occurred_on)}`,
+                undo: () => (txsRef.current.some(t => t.id === tx.id) ? putTxs([before], false, [tx.id]) : false),
+            });
+        });
     };
 
     // ── Derived ─────────────────────────────────────────────────────────
@@ -630,9 +645,9 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                 </div>
             ) : (
                 <div className="overflow-x-auto -mx-2">
-                    <table className="w-full text-xs min-w-[980px]">
+                    <table className="w-full text-xs min-w-[980px]" style={widths.tableStyle}>
                         <thead>
-                            <ColumnHeaders columns={columns} ctl={cf} trailing={<th className="px-2 py-2" />} />
+                            <ColumnHeaders columns={columns} ctl={cf} widths={widths} trailing={<th className="px-2 py-2" />} />
                         </thead>
                         <tbody>
                             {visible.map(tx => {

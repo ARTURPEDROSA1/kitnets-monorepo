@@ -14,6 +14,7 @@ import { addMonths, formatDateBR, lastDayOfMonth, monthOf } from "@/lib/index-co
 import { formatMonthYear } from "@/lib/index-period";
 import { columnTableKey } from "@/lib/ui-preferences";
 import { CellSumBar, useCellSum } from "@/components/properties/TableCellSum";
+import { useColumnWidths } from "@/components/properties/TableColumnWidths";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "@/components/properties/TableColumnFilters";
 import { ColumnVisibilityMenu, useColumnVisibility } from "@/components/properties/TableColumnVisibility";
 import { computeCorrection, formatBRL, type Correction } from "./panorama-correction";
@@ -69,7 +70,8 @@ export function PanoramaResultsTable({ applied }: { applied: Correction }) {
 
     const cf = useColumnFilters(rows, columns, { key: "percent", dir: "desc" }, { storageKey: TABLE_KEY });
     const vis = useColumnVisibility(TABLE_KEY, { locked: ["index"] });
-    const sel = useCellSum({ formatByCol: { percent: formatPercent } });
+    const widths = useColumnWidths(TABLE_KEY);
+    const sel = useCellSum({ formatByCol: { percent: formatPercent }, widths });
     const show = (key: string) => !vis.isHidden(key);
     const num = "px-2 py-1.5 text-right tabular-nums whitespace-nowrap";
 
@@ -96,9 +98,9 @@ export function PanoramaResultsTable({ applied }: { applied: Correction }) {
                 </div>
             ) : (
                 <div className="overflow-x-auto px-2 pb-2">
-                    <table className="w-full text-xs">
+                    <table className="w-full text-xs" style={widths.tableStyle}>
                         <thead>
-                            <ColumnHeaders columns={columns} ctl={cf} visibility={vis} />
+                            <ColumnHeaders columns={columns} ctl={cf} widths={widths} visibility={vis} />
                         </thead>
                         <tbody>
                             {cf.rows.map((r) => (
@@ -138,7 +140,7 @@ export function PanoramaResultsTable({ applied }: { applied: Correction }) {
 
             <CellSumBar ctl={sel} />
             <ColumnMenu columns={columns} ctl={cf} />
-            <ColumnVisibilityMenu columns={columns} ctl={vis} />
+            <ColumnVisibilityMenu columns={columns} ctl={vis} widths={widths} />
         </div>
     );
 }

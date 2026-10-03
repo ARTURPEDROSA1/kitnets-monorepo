@@ -13,6 +13,7 @@ import { columnTableKey } from "@/lib/ui-preferences";
 import { Money, Sensitive } from "@/components/privacy";
 import { formatDateBR } from "@/lib/dates";
 import { CellSumBar, useCellSum } from "@/components/properties/TableCellSum";
+import { useColumnWidths } from "@/components/properties/TableColumnWidths";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "@/components/properties/TableColumnFilters";
 import { ColumnVisibilityMenu, useColumnVisibility } from "@/components/properties/TableColumnVisibility";
 import { MANAGEMENT_LABELS } from "@/lib/lease-dashboard";
@@ -65,7 +66,8 @@ export default function RecurringChargesTable({ rows, savingKey, onCollector, on
     // by contract, so a lease's rent and charges stay together
     const cf = useColumnFilters(lines, columns, { key: "lease", dir: "asc" }, { storageKey: TABLE_KEY, filtersKey: TABLE_KEY });
     const vis = useColumnVisibility(TABLE_KEY, { locked: ["lease", "component", "collector"] });
-    const sel = useCellSum({ formatByCol: { due_day: v => String(v) } });
+    const widths = useColumnWidths(TABLE_KEY);
+    const sel = useCellSum({ formatByCol: { due_day: v => String(v) }, widths });
     const show = (key: string) => !vis.isHidden(key);
 
     if (lines.length === 0) {
@@ -93,9 +95,9 @@ export default function RecurringChargesTable({ rows, savingKey, onCollector, on
                 </div>
             ) : (
                 <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
+                    <table className="w-full text-xs" style={widths.tableStyle}>
                         <thead className="border-b border-border/60 bg-muted/30">
-                            <ColumnHeaders columns={columns} ctl={cf} visibility={vis} />
+                            <ColumnHeaders columns={columns} ctl={cf} widths={widths} visibility={vis} />
                         </thead>
                         <tbody>
                             {cf.rows.map(line => {
@@ -127,7 +129,7 @@ export default function RecurringChargesTable({ rows, savingKey, onCollector, on
                                             </td>
                                         )}
                                         {/* a plain cell: inside a selectable one a select only opens on a double click */}
-                                        <td className="px-3 py-2">
+                                        <td {...widths.cellProps("collector", "px-3 py-2")}>
                                             <span className="flex items-center gap-1.5">
                                                 <select
                                                     className={cn("h-8 min-w-[200px] rounded-md border bg-background px-2 text-xs", component.undecided && "border-amber-400")}
@@ -181,7 +183,7 @@ export default function RecurringChargesTable({ rows, savingKey, onCollector, on
             )}
             <CellSumBar ctl={sel} />
             <ColumnMenu columns={columns} ctl={cf} />
-            <ColumnVisibilityMenu columns={columns} ctl={vis} />
+            <ColumnVisibilityMenu columns={columns} ctl={vis} widths={widths} />
         </div>
     );
 }

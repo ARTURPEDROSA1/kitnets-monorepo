@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { columnTableKey, recordTableKey } from "@/lib/ui-preferences";
 import { Money } from "@/components/privacy";
 import { CellSumBar, useCellSum } from "@/components/properties/TableCellSum";
+import { useColumnWidths } from "@/components/properties/TableColumnWidths";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "@/components/properties/TableColumnFilters";
 import { ColumnVisibilityMenu, useColumnVisibility } from "@/components/properties/TableColumnVisibility";
 import { formatDateBR } from "@/lib/dates";
@@ -165,7 +166,8 @@ export default function LeaseAdjustmentTable({ leaseId, startDate, adjustments, 
 
     const cf = useColumnFilters(lines, columns, { key: "date", dir: "asc" }, { storageKey: TABLE_KEY, filtersKey: recordTableKey("lease-adjustments", leaseId) });
     const vis = useColumnVisibility(TABLE_KEY, { locked: ["step", "date", "rent"], defaultHidden: ["index", "previous_condo", "total"] });
-    const sel = useCellSum({ formatByCol: { index_pct: pctText, change_pct: pctText } });
+    const widths = useColumnWidths(TABLE_KEY);
+    const sel = useCellSum({ formatByCol: { index_pct: pctText, change_pct: pctText }, widths });
     const show = (key: string) => !vis.isHidden(key);
 
     const remove = async (row: StoredAdjustment) => {
@@ -228,9 +230,9 @@ export default function LeaseAdjustmentTable({ leaseId, startDate, adjustments, 
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
-                            <table className="w-full text-xs">
+                            <table className="w-full text-xs" style={widths.tableStyle}>
                                 <thead className="border-b border-border/60 bg-muted/30">
-                                    <ColumnHeaders columns={columns} ctl={cf} visibility={vis} />
+                                    <ColumnHeaders columns={columns} ctl={cf} widths={widths} visibility={vis} />
                                 </thead>
                                 <tbody>
                                     {cf.rows.map(line => {
@@ -256,7 +258,7 @@ export default function LeaseAdjustmentTable({ leaseId, startDate, adjustments, 
                                                 {show("total") && <td {...sel.cellProps("total", line.id, line.total, num)}>{money(line.total, true, preview)}</td>}
                                                 {/* a plain cell: its links and buttons take the click */}
                                                 {show("document") && (
-                                                    <td className="px-3 py-2">
+                                                    <td {...widths.cellProps("document", "px-3 py-2")}>
                                                         <span className="flex items-center gap-1.5">
                                                             {line.doc ? (
                                                                 <button type="button" onClick={() => onView(line.doc!.file_url, line.doc!.file_name)} className={link} title={`Abrir ${line.doc.file_name}`}>
@@ -292,7 +294,7 @@ export default function LeaseAdjustmentTable({ leaseId, startDate, adjustments, 
             {error && <p className="border-t border-border/60 px-4 py-2 text-xs text-rose-600">{error}</p>}
             <CellSumBar ctl={sel} />
             <ColumnMenu columns={columns} ctl={cf} />
-            <ColumnVisibilityMenu columns={columns} ctl={vis} />
+            <ColumnVisibilityMenu columns={columns} ctl={vis} widths={widths} />
         </section>
     );
 }

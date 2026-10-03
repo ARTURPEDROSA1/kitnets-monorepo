@@ -16,16 +16,42 @@
  *   • arrows / Tab     move the selected cell (Shift+arrows extend the rectangle from the anchor)
  *   • Enter / F2       start editing the selected cell; Enter while editing commits and moves down
  *   • Esc              while editing: cancels the edit (draft discarded, nothing saved); otherwise clears the selection
+ *   • Ctrl/Cmd+Z       undoes the last cell edit (the last 5 edits of the page, see lib/cell-undo.ts)
  * A floating bar shows count, sum and average of the selected numeric cells. Sums are R$ unless
  * the column has its own unit: useCellSum({ formatByCol: { cons: v => `${v} kWh` } }).
+ *
+ * Undo: a table that saves a cell tells the controller how to put the previous value back —
+ *   sel.recordUndo({ col: "amount", rowId: row.id, label: "Valor · IPTU 2025", undo: () => save(row.id, previous) });
+ * Ctrl+Z runs the newest `undo`, selects that cell and says what was undone; while the user is typing in a
+ * text box it is left to the browser (its own undo of the typing). `undo` saves like an edit and answers
+ * false when it could not.
+ *
+ * Column widths: useCellSum({ widths }) with the controller of `useColumnWidths` makes the cells of a
+ * column the user resized follow its width (components/properties/TableColumnWidths.tsx).
  */
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Sigma, X } from "lucide-react";
+import { Sigma, Undo2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { dropUndoOwner, popUndo, pushUndo, undoDepth, type UndoEntry } from "@/lib/cell-undo";
+import type { ColumnWidthsController } from "./TableColumnWidths";
 
 export interface CellSumOptions {
     /** How to print the sum/average of a column's cells; columns without one are R$ */
     formatByCol?: Record<string, (v: number) => string>;
+    /** Widths the user gave the columns (`useColumnWidths`): the cells of a resized column follow it */
+    widths?: ColumnWidthsController;
+}
+
+/** An edit the user can take back with Ctrl+Z. */
+export interface CellEdit {
+    col: string;
+    rowId: string;
+    /** what was edited, for the notice: "Valor · IPTU 2025" */
+    label?: string;
+    /** puts the previous value back, saving it like an edit; false (or a rejection) = it could not */
+    undo: () => unknown;
+    /** a field that saves on every keystroke: the saves of one burst are a single edit */
+    coalesce?: boolean;
 }
 
 export interface CellSumController {
@@ -35,6 +61,7 @@ export interface CellSumController {
         onDoubleClick: (e: React.MouseEvent) => void;
         onKeyDown: (e: React.KeyboardEvent) => void;
         className: string;
+        style?: React.CSSProperties;
         title?: string;
         /** lets the keyboard navigation find the cell in the DOM */
         "data-cell": string;
@@ -44,6 +71,10 @@ export interface CellSumController {
     stats: () => { count: number; numeric: number; total: number; format: (v: number) => string; money: boolean };
     count: number;
     clear: () => void;
+    /** Call after a cell edit was saved, so Ctrl+Z can take it back. */
+    recordUndo: (edit: CellEdit) => void;
+    /** What the last Ctrl+Z did, shown for a few seconds by `CellSumBar`. */
+    notice: { text: string; failed: boolean } | null;
 }
 
 const formatBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -69,8 +100,73 @@ function startEdit(cell: HTMLElement) {
 
 interface Grid { cols: string[]; rows: string[]; cells: Map<string, number | null> }
 
+// ── Ctrl+Z ─────────────────────────────────────────────────────────────────
+// One listener for the page, however many tables are on it: the buffer is the page's (lib/cell-undo.ts).
+
+/** The table an edit came from: told when its edit was undone, so it can show the cell and say so. */
+interface UndoOwner { undone: (entry: UndoEntry, ok: boolean) => void }
+
+const NOTICE_MS = 5000;
+/** The text box the user typed in since it took the focus. */
+let typedIn: EventTarget | null = null;
+const onTyped = (e: Event) => { typedIn = e.target; };
+const onFocusMoved = () => { typedIn = null; };
+/** A text box (a select or a checkbox has no typing to undo). */
+const isTextBox = (el: HTMLElement | null): el is HTMLElement => {
+    if (!el) return false;
+    if (el.tagName === "TEXTAREA" || el.isContentEditable) return true;
+    return el.tagName === "INPUT" && !["checkbox", "radio", "button", "submit", "reset", "range", "file", "color"].includes((el as HTMLInputElement).type);
+};
+/**
+ * Typing in a text box: there Ctrl+Z is the browser's undo of the typing. A cell's box that only holds the
+ * focus — Tab took it there after the edit in the cell before — is not typing: Ctrl+Z undoes that edit.
+ */
+const isTextEditing = () => {
+    const el = document.activeElement as HTMLElement | null;
+    return isTextBox(el) && (typedIn === el || !el.closest("[data-cell]"));
+};
+/** One undo at a time: each saves, and two saves of the same table must not cross. */
+let undoQueue: Promise<void> = Promise.resolve();
+const undoLast = () => {
+    undoQueue = undoQueue.then(async () => {
+        const entry = popUndo();
+        if (!entry) return;
+        let ok = true;
+        try { ok = (await entry.undo()) !== false; } catch { ok = false; }
+        (entry.owner as UndoOwner).undone(entry, ok);
+    });
+};
+const onUndoKey = (e: KeyboardEvent) => {
+    if (e.key.toLowerCase() !== "z" || !(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
+    if (undoDepth() === 0 || isTextEditing()) return;
+    if (document.querySelector('[role="dialog"][data-state="open"], [aria-modal="true"]')) return;   // a dialog is over the table
+    e.preventDefault();
+    // a cell's box that only held the focus lets go of it: the cell that changes back is the one shown as selected
+    const el = document.activeElement as HTMLElement | null;
+    if (isTextBox(el)) el.blur();
+    undoLast();
+};
+/** Takes down the notice of the table that showed one last: with several tables on the page, only the latest undo is announced. */
+let dismissNotice: (() => void) | null = null;
+let undoListeners = 0;
+const listenForUndo = () => {
+    if (undoListeners++ === 0) {
+        window.addEventListener("keydown", onUndoKey);
+        window.addEventListener("input", onTyped, true);
+        window.addEventListener("focusin", onFocusMoved, true);
+    }
+    return () => {
+        if (--undoListeners > 0) return;
+        window.removeEventListener("keydown", onUndoKey);
+        window.removeEventListener("input", onTyped, true);
+        window.removeEventListener("focusin", onFocusMoved, true);
+    };
+};
+
 export function useCellSum(options: CellSumOptions = {}): CellSumController {
     const [selected, setSelected] = useState<Set<string>>(new Set());
+    const [notice, setNotice] = useState<CellSumController["notice"]>(null);
+    const { widths } = options;
     const formatByCol = useRef(options.formatByCol);
     useEffect(() => { formatByCol.current = options.formatByCol; });
     const grid = useRef<Grid>({ cols: [], rows: [], cells: new Map() });
@@ -128,8 +224,9 @@ export function useCellSum(options: CellSumOptions = {}): CellSumController {
         const me = { col, rowId };
         return {
             "data-cell": k,
-            title: "Clique: selecionar · arraste ou Shift+clique: intervalo · Ctrl+clique: adicionar · duplo clique ou Enter: editar · setas: navegar",
-            className: cn(className, "cursor-cell", selected.has(k) && "bg-emerald-100 dark:bg-emerald-900/40 ring-1 ring-inset ring-emerald-400"),
+            title: "Clique: selecionar · arraste ou Shift+clique: intervalo · Ctrl+clique: adicionar · duplo clique ou Enter: editar · setas: navegar · Ctrl+Z: desfazer",
+            className: cn(className, "cursor-cell", widths?.cellClass(col), selected.has(k) && "bg-emerald-100 dark:bg-emerald-900/40 ring-1 ring-inset ring-emerald-400"),
+            style: widths?.cellStyle(col),
             onMouseDown: (e: React.MouseEvent) => {
                 if (e.button !== 0) return;
                 const target = e.target as HTMLElement;
@@ -171,7 +268,31 @@ export function useCellSum(options: CellSumOptions = {}): CellSumController {
             },
             onDoubleClick: (e: React.MouseEvent) => startEdit(e.currentTarget as HTMLElement),
         };
-    }, [selected, selectRect, moveBy]);
+    }, [selected, selectRect, moveBy, widths]);
+
+    // ── Undo ────────────────────────────────────────────────────────────
+    const [owner] = useState<UndoOwner>(() => ({ undone: () => { } }));
+    useEffect(() => {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        owner.undone = (entry, ok) => {
+            // show the cell that changed back: it may be off screen, or the user may be looking elsewhere
+            const k = key(entry.col, entry.rowId);
+            const cell = { col: entry.col, rowId: entry.rowId };
+            setSelected(new Set([k]));
+            anchor.current = cell;
+            cursor.current = cell;
+            requestAnimationFrame(() => cellElement(k)?.scrollIntoView({ block: "nearest", inline: "nearest" }));
+            const hide = () => setNotice(null);
+            dismissNotice?.();
+            dismissNotice = hide;
+            setNotice({ failed: !ok, text: `${ok ? "Desfeito" : "Não foi possível desfazer"}${entry.label ? `: ${entry.label}` : ok ? ": a célula voltou ao valor anterior" : ""}` });
+            clearTimeout(timer);
+            timer = setTimeout(hide, NOTICE_MS);
+        };
+        const stopListening = listenForUndo();
+        return () => { stopListening(); clearTimeout(timer); dropUndoOwner(owner); owner.undone = () => { }; };
+    }, [owner]);
+    const recordUndo = useCallback(({ coalesce, ...edit }: CellEdit) => pushUndo({ ...edit, owner }, { coalesce }), [owner]);
 
     useEffect(() => {
         const up = () => { dragging.current = false; };
@@ -219,25 +340,36 @@ export function useCellSum(options: CellSumOptions = {}): CellSumController {
         const format = formats.size <= 1 ? ([...formats][0] ?? formatBRL) : formatPlain;
         return { count: selected.size, numeric, total: Math.round(total * 100) / 100, format, money: format === formatBRL };
     }, [selected]);
-    return { cellProps, isSelected, stats, count: selected.size, clear };
+    return { cellProps, isSelected, stats, count: selected.size, clear, recordUndo, notice };
 }
 
-/** Floating status bar (bottom centre) with count, sum and average of the selected cells. */
+/** Floating status bar (bottom centre) with count, sum and average of the selected cells; above it, what the last Ctrl+Z undid. */
 export function CellSumBar({ ctl }: { ctl: CellSumController }) {
-    if (ctl.count === 0) return null;
+    if (ctl.count === 0 && !ctl.notice) return null;
     const { count, numeric, total, format, money } = ctl.stats();
     return (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-full border border-emerald-300 bg-background/95 backdrop-blur px-4 py-2 text-xs shadow-lg">
-            <Sigma className="w-4 h-4 text-emerald-600" />
-            <span><span className="font-semibold text-foreground">{count}</span> {count === 1 ? "célula" : "células"}</span>
-            {numeric > 0 && (
-                <>
-                    {/* sums in R$ follow the dollar privacy toggle (components/privacy); sums in another unit (kWh, m³) stay readable */}
-                    <span>Soma <span className={cn("font-bold text-foreground tabular-nums", money && "privacy-money")}>{format(total)}</span></span>
-                    <span className="text-muted-foreground">Média <span className={cn(money && "privacy-money")}>{format(total / numeric)}</span></span>
-                </>
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 text-xs">
+            {ctl.notice && (
+                <div role="status" className={cn("flex items-center gap-2 rounded-full border bg-background/95 backdrop-blur px-4 py-2 shadow-lg max-w-[90vw]",
+                    ctl.notice.failed ? "border-rose-300 text-rose-700 dark:text-rose-400" : "border-border text-foreground")}>
+                    <Undo2 className="w-4 h-4 shrink-0 text-muted-foreground" />
+                    <span className="truncate">{ctl.notice.text}</span>
+                </div>
             )}
-            <button type="button" onClick={ctl.clear} className="text-muted-foreground hover:text-foreground" title="Limpar seleção (Esc)"><X className="w-3.5 h-3.5" /></button>
+            {count > 0 && (
+                <div className="flex items-center gap-3 rounded-full border border-emerald-300 bg-background/95 backdrop-blur px-4 py-2 shadow-lg">
+                    <Sigma className="w-4 h-4 text-emerald-600" />
+                    <span><span className="font-semibold text-foreground">{count}</span> {count === 1 ? "célula" : "células"}</span>
+                    {numeric > 0 && (
+                        <>
+                            {/* sums in R$ follow the dollar privacy toggle (components/privacy); sums in another unit (kWh, m³) stay readable */}
+                            <span>Soma <span className={cn("font-bold text-foreground tabular-nums", money && "privacy-money")}>{format(total)}</span></span>
+                            <span className="text-muted-foreground">Média <span className={cn(money && "privacy-money")}>{format(total / numeric)}</span></span>
+                        </>
+                    )}
+                    <button type="button" onClick={ctl.clear} className="text-muted-foreground hover:text-foreground" title="Limpar seleção (Esc)"><X className="w-3.5 h-3.5" /></button>
+                </div>
+            )}
         </div>
     );
 }
