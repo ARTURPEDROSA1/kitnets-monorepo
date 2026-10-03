@@ -163,6 +163,11 @@ export async function saveAddendum(supabase: AdminSupabase, leaseId: string, pro
     if (!stored.available) throw new HttpError(503, { error: "O histórico de reajustes ainda não está disponível. Tente novamente em instantes." });
 
     const initial = initialValues(lease, stored.rows);
+    // the lease's first adjustment may say what the amounts were before it: the contract was registered with today's
+    if (!stored.rows.some(r => r.effective_date < input.effective_date)) {
+        if (input.previous_rent !== null) initial.rent = input.previous_rent;
+        if (input.previous_condo !== null && initial.condo !== null) initial.condo = input.previous_condo;
+    }
     // a lease without a condominium charge has none to change
     const chained = withAddendum(stored.rows, { ...input, new_condo: initial.condo === null ? null : input.new_condo }, initial);
     const { data, error } = await supabase.rpc("lease_adjustments_record", {

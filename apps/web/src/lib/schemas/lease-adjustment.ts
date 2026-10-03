@@ -30,6 +30,20 @@ export const leaseAddendumSchema = z.object({
         .optional()
         .transform((v) => (v == null || v === "" ? null : toCents(v)))
         .refine((v) => v === null || v > 0, "Valor do condomínio inválido."),
+    /**
+     * What the rent (and the condominium) were before this adjustment. Only for the lease's first
+     * adjustment: the contract was registered with today's amounts, and this says the original ones.
+     */
+    previous_rent: z
+        .union([z.number(), z.string(), z.null()])
+        .optional()
+        .transform((v) => (v == null || v === "" ? null : toCents(v)))
+        .refine((v) => v === null || v > 0, "Valor anterior inválido."),
+    previous_condo: z
+        .union([z.number(), z.string(), z.null()])
+        .optional()
+        .transform((v) => (v == null || v === "" ? null : toCents(v)))
+        .refine((v) => v === null || v > 0, "Valor anterior do condomínio inválido."),
     index_code: z.unknown().transform((v) => ((LEASE_ADJUSTMENT as readonly unknown[]).includes(v) && v !== "NONE" ? (v as string) : null)),
     index_pct: z
         .union([z.number(), z.string(), z.null()])

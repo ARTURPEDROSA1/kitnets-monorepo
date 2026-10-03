@@ -77,6 +77,9 @@ export default function LeaseAddendumModal({ leaseId, initial, rows, hasCondo, a
     const [index, setIndex] = useState("");
     const [pct, setPct] = useState("");
     const [notes, setNotes] = useState("");
+    // the amounts before the adjustment, when the contract was registered with today's (the first adjustment only)
+    const [previousRent, setPreviousRent] = useState("");
+    const [previousCondo, setPreviousCondo] = useState("");
 
     const busy = reading || saving;
 
@@ -145,7 +148,7 @@ export default function LeaseAddendumModal({ leaseId, initial, rows, hasCondo, a
             const res = await fetch(`/api/leases/${leaseId}/reajustes`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ effective_date: iso, new_rent: rent, new_condo: condo || null, index_code: index || null, index_pct: pct || null, document_id: docId, notes: notes || null }),
+                body: JSON.stringify({ effective_date: iso, new_rent: rent, new_condo: condo || null, index_code: index || null, index_pct: pct || null, previous_rent: first ? previousRent || null : null, previous_condo: first ? previousCondo || null : null, document_id: docId, notes: notes || null }),
             });
             const json = await res.json().catch(() => ({}));
             if (!res.ok) {
@@ -163,7 +166,11 @@ export default function LeaseAddendumModal({ leaseId, initial, rows, hasCondo, a
 
     const prior = before(parseDateBR(date) || latest || "9999-12-31", initial, rows);
     const newRent = Number(rent.replace(/\D/g, "")) / 100;
-    const change = newRent > 0 && prior.rent > 0 ? (newRent / prior.rent - 1) * 100 : null;
+    const isoDate = parseDateBR(date) || latest;
+    const first = !rows.some(r => r.effective_date < isoDate);
+    const typedPrevious = Number(previousRent.replace(/\D/g, "")) / 100;
+    const baseRent = first && typedPrevious > 0 ? typedPrevious : prior.rent;
+    const change = newRent > 0 && baseRent > 0 ? (newRent / baseRent - 1) * 100 : null;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -231,6 +238,27 @@ export default function LeaseAddendumModal({ leaseId, initial, rows, hasCondo, a
 
                     {showForm && !reading && (
                         <div className="space-y-3">
+                            {first && (
+                                <div className="rounded-lg border border-dashed border-border p-3">
+                                    <p className="mb-2 text-xs text-muted-foreground">
+                                        Primeiro reajuste do histórico. Se o contrato foi cadastrado com os valores de hoje, informe os valores de antes deste reajuste: eles passam a ser o valor inicial do contrato.
+                                    </p>
+                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                        <div>
+                                            <Label className="text-xs">Aluguel antes (R$)</Label>
+                                            <Input value={previousRent} onChange={e => setPreviousRent(maskCurrency(e.target.value))} placeholder={moneyToMask(prior.rent)} className={cn("h-9", errors.previous_rent && "border-red-500")} />
+                                            {errors.previous_rent && <p className="mt-1 text-xs text-red-500">{errors.previous_rent}</p>}
+                                        </div>
+                                        {hasCondo && (
+                                            <div>
+                                                <Label className="text-xs">Condomínio antes (R$)</Label>
+                                                <Input value={previousCondo} onChange={e => setPreviousCondo(maskCurrency(e.target.value))} placeholder={prior.condo !== null ? moneyToMask(prior.condo) : "0,00"} className={cn("h-9", errors.previous_condo && "border-red-500")} />
+                                                {errors.previous_condo && <p className="mt-1 text-xs text-red-500">{errors.previous_condo}</p>}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <div>
                                     <Label className="text-xs">Vale a partir de *</Label>
@@ -251,7 +279,7 @@ export default function LeaseAddendumModal({ leaseId, initial, rows, hasCondo, a
                                     <Input value={rent} onChange={e => setRent(maskCurrency(e.target.value))} placeholder="0,00" className={cn("h-9", errors.new_rent && "border-red-500")} />
                                     {errors.new_rent && <p className="mt-1 text-xs text-red-500">{errors.new_rent}</p>}
                                     <p className="mt-1 text-xs text-muted-foreground">
-                                        Antes: <Money>{brl(prior.rent)}</Money>
+                                        Antes: <Money>{brl(baseRent)}</Money>
                                         {change !== null && <> · {change > 0 ? "+" : ""}{change.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%</>}
                                     </p>
                                 </div>
