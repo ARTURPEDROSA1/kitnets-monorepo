@@ -30,8 +30,8 @@ interface Props {
     notice: string | null;
     /** the owner's bank connection can issue (connected, certificate in date) */
     bankUsable: boolean;
-    /** the owner has decided multa, juros and prazo in Configuração (an invoice created before takes them when issued) */
-    termsDecided?: boolean;
+    /** the owner's multa, juros and prazo in Configuração: an open invoice created before they were decided shows and takes them */
+    settingsTerms?: { fine_pct: number | null; interest_pct_month: number | null; days_payable_after_due: number | null } | null;
     /** the connection is the bank's sandbox and this site allows it: payments can be simulated */
     sandbox: boolean;
     /** the server can e-mail tenants */
@@ -139,7 +139,7 @@ const DELIVERY_KIND_LABELS: Record<string, string> = { ISSUE: "fatura", REMINDER
 /** the last address a copy was sent to, remembered on this device */
 const COPY_EMAIL_KEY = "kitnets_invoice_copy_email";
 
-export default function InvoiceDetail({ invoiceId, lang, today, initial, notice, bankUsable, termsDecided = false, sandbox, emailAvailable = true, onBack, onPay, onCancel, onChanged }: Props) {
+export default function InvoiceDetail({ invoiceId, lang, today, initial, notice, bankUsable, settingsTerms = null, sandbox, emailAvailable = true, onBack, onPay, onCancel, onChanged }: Props) {
     const preloaded = initial && initial.invoice.id === invoiceId ? initial : null;
     const [fetched, setFetched] = useState<InvoiceDetailView | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -262,8 +262,16 @@ export default function InvoiceDetail({ invoiceId, lang, today, initial, notice,
         ? [[address.street, address.number].filter(Boolean).join(", "), address.complement, address.neighborhood, [address.city, address.state].filter(Boolean).join("/"), address.cep ? `CEP ${address.cep.replace(/^(\d{5})(\d{3})$/, "$1-$2")}` : null].filter(Boolean).join(" · ")
         : null;
     const contratosHref = `${lang === "pt" ? "" : `/${lang}`}/contratos?id=${invoice.lease_id}`;
-    const termsUndecided = invoice.fine_pct === null || invoice.interest_pct_month === null || invoice.days_payable_after_due === null;
-    const cannotIssue = !bankUsable ? "Conecte o Banco Inter em Conexões para emitir" : termsUndecided && !termsDecided ? "Defina multa, juros e prazo em Configuração antes de emitir" : null;
+    // an open invoice that states no late terms yet follows the owner's Configuração: that is what it will be issued with
+    const term = (key: "fine_pct" | "interest_pct_month" | "days_payable_after_due"): { value: number | null; fromSettings: boolean } => {
+        if (invoice[key] !== null) return { value: invoice[key], fromSettings: false };
+        const decided = open ? settingsTerms?.[key] ?? null : null;
+        return { value: decided, fromSettings: decided !== null };
+    };
+    const fine = term("fine_pct"), interest = term("interest_pct_month"), payable = term("days_payable_after_due");
+    const termsUndecided = fine.value === null || interest.value === null || payable.value === null;
+    const termsFromSettings = fine.fromSettings || interest.fromSettings || payable.fromSettings;
+    const cannotIssue = !bankUsable ? "Conecte o Banco Inter em Conexões para emitir" : termsUndecided ? "Defina multa, juros e prazo em Configuração antes de emitir" : null;
 
     const startIssue = () => {
         if (invoice.due_date < today) setIssueModal({ dueDate: today });
@@ -452,12 +460,12 @@ export default function InvoiceDetail({ invoiceId, lang, today, initial, notice,
                                 {open && <span className={cn("ml-1.5 text-xs", gap < 0 ? "text-rose-600 dark:text-rose-400" : "text-muted-foreground")}>{gap < 0 ? `vencida há ${plural(-gap, "dia", "dias")}` : gap === 0 ? "vence hoje" : `em ${plural(gap, "dia", "dias")}`}</span>}
                             </Field>
                             <Field label="Referência">{monthLabel(invoice.reference_month)}</Field>
-                            <Field label="Multa por atraso">{invoice.fine_pct !== null ? pct(invoice.fine_pct) : undecided}</Field>
-                            <Field label="Juros de mora">{invoice.interest_pct_month !== null ? `${pct(invoice.interest_pct_month)} ao mês` : undecided}</Field>
-                            <Field label="Pagamento após o vencimento">{invoice.days_payable_after_due !== null ? plural(invoice.days_payable_after_due, "dia", "dias") : undecided}</Field>
+                            <Field label="Multa por atraso">{fine.value !== null ? pct(fine.value) : undecided}</Field>
+                            <Field label="Juros de mora">{interest.value !== null ? `${pct(interest.value)} ao mês` : undecided}</Field>
+                            <Field label="Pagamento após o vencimento">{payable.value !== null ? plural(payable.value, "dia", "dias") : undecided}</Field>
                             <Field label="Origem">{invoice.origin === "AUTO" ? "Gerada automaticamente" : "Gerada por você"}</Field>
-                            {open && termsUndecided && termsDecided && (
-                                <p className="col-span-2 text-xs text-muted-foreground">Esta fatura foi criada antes de você decidir multa, juros e prazo: ela assume os da Configuração no momento da emissão.</p>
+                            {termsFromSettings && (
+                                <p className="col-span-2 text-xs text-muted-foreground">Multa, juros e prazo são os da sua Configuração de hoje; ficam gravados nesta fatura quando o boleto é emitido.</p>
                             )}
                             {invoice.status === "PAID" && (
                                 <Field label="Pagamento" className="col-span-2">
