@@ -136,7 +136,7 @@ describe("invoiceAttention", () => {
     });
 
     it("reads the boleto: issued while it lives, expired when it stopped taking payment, to issue again after a failure", () => {
-        const charge = (status: "REQUESTED" | "OPEN" | "PAID" | "CANCELLED" | "EXPIRED" | "FAILED", last_error: string | null = null) => ({ id: "c1", status, provider_status: null, due_date: "2026-10-20", digitable_line: null, barcode: null, pix_copy_paste: null, has_pdf: false, paid_via: null, paid_amount: null, last_checked_at: null, last_error, created_at: "2026-10-01T12:00:00Z" });
+        const charge = (status: "REQUESTED" | "OPEN" | "PAID" | "CANCELLED" | "EXPIRED" | "FAILED", last_error: string | null = null) => ({ id: "c1", kind: "BOLEPIX" as const, status, amount: 150, surcharge_amount: null, expires_at: null, provider_status: null, due_date: "2026-10-20", digitable_line: null, barcode: null, pix_copy_paste: null, has_pdf: false, paid_via: null, paid_amount: null, last_checked_at: null, last_error, created_at: "2026-10-01T12:00:00Z" });
         expect(invoiceDisplay(invoice({ status: "ISSUED", charge: charge("OPEN") }), TODAY)).toBe("emitida");
         expect(invoiceDisplay(invoice({ status: "ISSUED", charge: charge("REQUESTED") }), TODAY)).toBe("emitida");
         expect(invoiceDisplay(invoice({ status: "ISSUED", charge: charge("EXPIRED"), due_date: "2026-09-20" }), TODAY)).toBe("expirada");

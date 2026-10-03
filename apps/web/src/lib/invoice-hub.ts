@@ -12,6 +12,7 @@ import { blockersText } from "@/lib/invoice-payer";
 import { daysBetween, dueDateIn, monthLabel, chargeable } from "@/lib/invoice-schedule";
 import type { BillingSettingsView, InvoiceStatus, InvoiceView, RecurringLease } from "@/lib/invoice-views";
 import { connectionAttention, type ConnectionsView } from "@/lib/billing/connections";
+import { cardFeeDecided } from "@/lib/card-gross-up";
 
 export { brl };
 
@@ -217,8 +218,8 @@ export const deliveryStuck = (invoice: Pick<InvoiceView, "delivery">, now: numbe
 export function invoiceAttention(rows: readonly InvoiceRow[], recurring: readonly RecurringRow[], settings: BillingSettingsView, today: string, connections?: ConnectionsView): InvoiceAttentionItem[] {
     const items: InvoiceAttentionItem[] = [];
     const collects = recurring.some(r => r.monthly > 0);
-    const bank = connections ? connectionAttention(connections, today, collects) : [];
-    const bankItem = (c: (typeof bank)[number]): InvoiceAttentionItem => ({ kind: "connection", tone: c.tone, subject: "Banco Inter", text: c.text, target: { type: "connections" } });
+    const bank = connections ? connectionAttention(connections, today, collects, { cardFeeDecided: cardFeeDecided(settings.card_fee_pct, settings.card_fee_fixed) }) : [];
+    const bankItem = (c: (typeof bank)[number]): InvoiceAttentionItem => ({ kind: "connection", tone: c.tone, subject: c.provider === "STRIPE" ? "Stripe" : "Banco Inter", text: c.text, target: { type: c.kind === "card_fee" ? "settings" : "connections" } });
 
     for (const r of [...rows].filter(x => x.display === "em_atraso").sort((a, b) => b.daysLate - a.daysLate)) {
         items.push({

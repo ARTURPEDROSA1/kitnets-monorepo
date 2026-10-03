@@ -23,7 +23,7 @@ interface Props {
 }
 
 type NumberField = "days_in_advance" | "fine_pct" | "interest_pct_month" | "days_payable_after_due";
-type Form = Record<NumberField | "sender_name" | "reply_to_email" | "automation_from_month", string> & { automation_enabled: boolean };
+type Form = Record<NumberField | "sender_name" | "reply_to_email" | "automation_from_month" | "card_fee_pct" | "card_fee_fixed", string> & { automation_enabled: boolean };
 
 const FIELDS: Array<{ key: NumberField; label: string; suffix: string; placeholder: string; help: string; decimal: boolean }> = [
     { key: "days_in_advance", label: "Antecedência da emissão", suffix: "dias antes do vencimento", placeholder: "a decidir", decimal: false, help: "Quantos dias antes do vencimento a fatura sai para o inquilino, quando a emissão automática estiver ligada. De 1 a 25." },
@@ -44,6 +44,8 @@ export default function BillingSettingsPanel({ settings, emailAvailable = true, 
         reply_to_email: settings.reply_to_email ?? "",
         automation_enabled: settings.automation_enabled,
         automation_from_month: settings.automation_from_month ?? "",
+        card_fee_pct: show(settings.card_fee_pct ?? null),
+        card_fee_fixed: show(settings.card_fee_fixed ?? null),
     }));
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [saving, setSaving] = useState(false);
@@ -120,6 +122,30 @@ export default function BillingSettingsPanel({ settings, emailAvailable = true, 
                         <Label htmlFor="billing-reply_to_email" className="text-xs">E-mail para respostas</Label>
                         <Input id="billing-reply_to_email" type="email" value={form.reply_to_email} onChange={e => set("reply_to_email", e.target.value)} placeholder="o e-mail do seu cadastro" className="mt-1 h-9" maxLength={120} aria-invalid={Boolean(errors.reply_to_email)} />
                         {error("reply_to_email", "Para onde vai a resposta do inquilino. Em branco, o e-mail do seu cadastro.")}
+                    </div>
+                </div>
+            </div>
+
+            <div className="border-t border-border/60 px-4 py-3">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cartão de crédito</h3>
+                <p className="mt-1 text-xs text-muted-foreground">A taxa que a sua conta Stripe cobra de você, somada à fatura paga por cartão para que você receba o valor cheio. Consulte-a no painel da Stripe (Configurações → Tarifas); em branco, o cartão não é oferecido.</p>
+                <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                    <div>
+                        <Label htmlFor="billing-card_fee_pct" className="text-xs">Taxa do cartão</Label>
+                        <div className="mt-1 flex items-center gap-2">
+                            <Input id="billing-card_fee_pct" value={form.card_fee_pct} onChange={e => set("card_fee_pct", e.target.value.replace(/[^\d.,]/g, ""))} inputMode="decimal" placeholder="a decidir" className="h-9 w-28" aria-invalid={Boolean(errors.card_fee_pct)} />
+                            <span className="text-xs text-muted-foreground">% do valor cobrado</span>
+                        </div>
+                        {error("card_fee_pct", "A parte percentual da tarifa por transação do seu contrato com a Stripe.")}
+                    </div>
+                    <div>
+                        <Label htmlFor="billing-card_fee_fixed" className="text-xs">Parte fixa</Label>
+                        <div className="mt-1 flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">R$</span>
+                            <Input id="billing-card_fee_fixed" value={form.card_fee_fixed} onChange={e => set("card_fee_fixed", e.target.value.replace(/[^\d.,]/g, ""))} inputMode="decimal" placeholder="a decidir" className="h-9 w-28" aria-invalid={Boolean(errors.card_fee_fixed)} />
+                            <span className="text-xs text-muted-foreground">por pagamento</span>
+                        </div>
+                        {error("card_fee_fixed", "A parte fixa da tarifa por transação. Zero é uma resposta; em branco não é.")}
                     </div>
                 </div>
             </div>

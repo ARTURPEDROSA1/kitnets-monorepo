@@ -22,18 +22,25 @@ export const metadata: Metadata = {
     referrer: "no-referrer",
 };
 
-export default async function PagarPage({ params }: { params: Promise<{ lang: string; token: string }> }) {
-    const { token } = await params;
+export default async function PagarPage({ params, searchParams }: { params: Promise<{ lang: string; token: string }>; searchParams: Promise<{ cartao?: string | string[]; motivo?: string | string[] }> }) {
+    const [{ token }, query] = await Promise.all([params, searchParams]);
     if (!PUBLIC_TOKEN_REGEX.test(token)) return <PublicInvoiceNotFound reason="missing" />;
     const limit = await rateLimitByIp("pagar-page", 60, 60_000);
     if (!limit.ok) return <PublicInvoiceNotFound reason="limited" />;
 
-    const invoice = await loadPublicInvoice(createAdminClient(), token);
+    const today = todayBRT();
+    const cartao = typeof query.cartao === "string" ? query.cartao : null;
+    const cardOutcome = cartao === "ok" || cartao === "cancelado" || cartao === "erro" ? cartao : null;
+    const invoice = await loadPublicInvoice(createAdminClient(), token, { today, afterCheckout: cardOutcome === "ok" });
     if (!invoice) return <PublicInvoiceNotFound reason="missing" />;
 
-    const today = todayBRT();
     const state = publicInvoiceState(invoice, today);
     const pix = (state === "pay" || state === "late_pay") ? invoice.charge?.pix_copy_paste ?? null : null;
     const qrSvg = pix ? await QRCode.toString(pix, { type: "svg", margin: 1, errorCorrectionLevel: "M" }) : null;
-    return <PublicInvoiceView invoice={invoice} qrSvg={qrSvg} pdfHref={`/api/pagar/${token}/boleto`} today={today} />;
+    return (
+        <PublicInvoiceView
+            invoice={invoice} qrSvg={qrSvg} pdfHref={`/api/pagar/${token}/boleto`} cardAction={`/api/pagar/${token}/cartao`} today={today}
+            cardOutcome={cardOutcome} cardError={typeof query.motivo === "string" ? query.motivo.slice(0, 200) : null}
+        />
+    );
 }

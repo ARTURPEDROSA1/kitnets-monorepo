@@ -19,7 +19,7 @@ The end state is automatic: every month the module issues a boleto + PIX through
 | 3 | The owner's own Banco Inter integration: sealed credentials, connection screen and test | live (PR #234), §7 |
 | 4 | Boleto + PIX issued through Banco Inter, PDF, webhook, refresh from the bank | **this document, §8** |
 | 5 | E-mail to the tenant, public payment page, daily cron | pending |
-| 6 | Stripe Connect, card link with the fee passed on to the tenant | pending |
+| 6 | Stripe Connect, card link with the fee passed on to the tenant | done |
 | 7 | Dashboard card, overdue reminders, receipt | pending |
 
 - **Hub** `/faturas` — KPI strip, "Atenção", then four sections: the invoices as a spreadsheet, "Cobranças recorrentes" (who collects each component of each lease in force), the billing conditions and "Conexões" (the owner's bank integration).
@@ -91,11 +91,13 @@ apps/web/src/
 │   ├── [id]/reenviar/route.ts        # POST (the e-mail to the tenant, again)
 │   ├── cobrancas/route.ts            # PUT (who collects a component · pause a lease)
 │   ├── configuracoes/route.ts        # PUT (billing conditions)
-│   └── conexoes/                     # GET (status) · inter: PUT (save + test) · DELETE · inter/testar: POST
+│   └── conexoes/                     # GET (status) · inter: PUT (save + test) · DELETE · inter/testar: POST · stripe: POST (re-read) · DELETE · stripe/iniciar: POST · stripe/retorno: GET
 ├── app/api/webhooks/inter/[key]/route.ts # POST: the bank's callbacks (no Clerk; the key leads to one connection)
 ├── app/api/cron/faturas/route.ts     # GET: the daily run (cron secret; vercel.json 08:00 BRT)
 ├── app/[lang]/pagar/[token]/page.tsx # The tenant's page: Pix QR code, copia e cola, linha digitável, PDF (no login, noindex)
 ├── app/api/pagar/[token]/boleto/route.ts # GET: redirect to the boleto's PDF (no login; IP limit)
+├── app/api/pagar/[token]/cartao/route.ts # POST: opens the Stripe Checkout Session and sends the tenant there (no login; IP limit)
+├── app/api/webhooks/stripe/route.ts  # POST: Stripe's Connect webhook (signature on the raw body; sessions read back)
 ├── components/pagar/CopyCode.tsx     # the copy button of the tenant's page
 ├── components/faturas/
 │   ├── FaturasHub.tsx                # KPI strip, "Atenção", sections, view pills, search
@@ -103,6 +105,7 @@ apps/web/src/
 │   ├── RecurringChargesTable.tsx     # Lease × component, the "quem cobra" select (table key `invoice-recurring`)
 │   ├── BillingSettingsPanel.tsx      # The owner's decisions, the sender, the automation switch
 │   ├── ConnectionsPanel.tsx          # The owner's Banco Inter integration: credentials in, status and test out
+│   ├── StripeConnectionCard.tsx      # The owner's Stripe account: connect (OAuth), standing, disconnect
 │   ├── InvoiceDetail.tsx             # One invoice's panel
 │   └── InvoiceActionModals.tsx       # Record a payment · cancel
 ├── components/contratos/LeaseForm.tsx  # "Emissor da fatura" on each charge; "Incluso no condomínio"
@@ -131,7 +134,14 @@ apps/web/src/
         ├── public-invoice.ts (+ test)     # what the tenant's page shows, the token's shape, the masked CPF
         ├── public-invoice-server.ts       # the invoice behind a token (refreshes a stale boleto first)
         ├── automation-server.ts (+ test)  # the daily run: reconcile, generate, issue, send — per owner, within a time budget
+        ├── stripe-client.ts (+ test)      # Stripe over fetch: Connect OAuth, the account, Checkout Sessions on the connected account, the webhook's signature
+        ├── stripe-connection-server.ts    # connect (state + OAuth code → account id), re-read, disconnect, the account's owner
+        ├── card-offer.ts (+ test)         # whether and for how much the card is offered today (late charges + fee)
+        ├── card-server.ts                 # the Checkout Session: open (one at a time), read back, settle as CARD, cancel the boleto; the webhook's handling
+        ├── invoice-token-server.ts        # the invoice behind a public token
         └── inter-test-certs.ts            # throwaway certificates for the tests (openssl at test time)
+    ├── card-gross-up.ts (+ test)      # the card fee passed on: gross = ceil((net + fixed) / (1 − pct))
+    ├── invoice-late-fees.ts (+ test)  # multa once + juros pro rata die, from the invoice's terms (the card's late charges)
     ├── property-income.ts (+ test)    # the ledger's money model: deposit + what was paid by invoice
     └── property-income-readers.test.ts # every reader of the ledger selects the invoice columns
 
@@ -141,7 +151,8 @@ supabase/
 ├── migrations/20261002230000_billing_connections.sql
 ├── migrations/20261003000000_invoice_charges.sql
 ├── migrations/20261003100000_invoice_deliveries.sql
-└── checks/invoices.sql, invoice_ledger.sql, billing_connections.sql, invoice_charges.sql, invoice_deliveries.sql
+├── migrations/20261003200000_card_checkout.sql
+└── checks/invoices.sql, invoice_ledger.sql, billing_connections.sql, invoice_charges.sql, invoice_deliveries.sql, card_checkout.sql
 ```
 
 ## 5. Database
@@ -209,7 +220,7 @@ Invoices are issued through the owner's **own** integration with the bank — th
 
 **Attention**: a failing connection or a certificate about to expire (the bank allows renewal from 90 days before) is listed right after the late invoices; an account that collects something and has no connection is reminded, after the open decisions.
 
-**Not yet**: the Stripe connection (step 6).
+The Stripe connection (step 6) is another row of the same table — see §10.
 
 ## 8. Boleto + Pix at Banco Inter (step 4)
 
@@ -237,9 +248,25 @@ An invoice becomes a charge at the owner's bank — the API Cobrança v3 "boleto
 
 **The daily run** (`GET /api/cron/faturas`, `vercel.json` at 11:00 UTC = 08:00 in Brasília, `CRON_SECRET`; `lib/billing/automation-server.ts`): for every owner with **Emissão automática** on, in order — (1) *reconcile*: every boleto still waiting at the bank is read back (paid settles, expired is recorded, just-ready e-mails); (2) *generate*: the invoices falling due from today to `days_in_advance` ahead, from `automation_from_month` on, never before it (origin AUTO; `generateInvoices` takes the due window); (3) *issue*: every open invoice with no boleto yet, no blocker and a due date still ahead, through the owner's usable bank connection — a boleto that expired or whose issue failed is **not** retried here, that is the owner's call and it shows in Atenção; (4) *send*: the e-mails that did not go out (up to ten tries; "Reenviar" has no limit). Each item is its own try/catch; a bank that is down stops that owner's issuing, not the run; the run stops starting work after 240 s of its 300 s and what is left waits for tomorrow. The outcome is one row in `index_sync_state` (job `BILLING`), like the index syncs. The automation needs every decision made and a first month chosen (CHECK + schema); switching it off stops every step — the owner's manual buttons keep working.
 
-## 10. Not in these steps
+## 10. The card (step 6): Stripe Connect and the fee passed on
 
-- No card link yet (step 6, Stripe Connect); no reminders of a due date nor receipts (step 7).
+**The owner's Stripe account** (`billing_connections`, provider STRIPE): connected through Stripe Connect **OAuth for Standard accounts** — "Conectar com Stripe" (`POST /api/faturas/conexoes/stripe/iniciar`) hashes a random `state` onto the row and sends the owner to Stripe, where they sign in to their own account (the holding's existing one) or open one; Stripe brings them back to `GET …/stripe/retorno?code&state`, which checks the state (thirty minutes, this account), swaps the code for the account id (`POST connect.stripe.com/oauth/token`) and reads the account (`GET /v1/accounts/{id}`). Only the id and the standing are kept (`charges_enabled`, `payouts_enabled`, `details_submitted`, `requirements.currently_due`, name, country): the platform's key with `Stripe-Account` is all the calls need, so **there is no secret to seal**. The unique index on `(provider, external_account_id)` keeps one Stripe account from serving two owners. "Atualizar" re-reads the account; "Desconectar" deauthorizes it from the platform and forgets it. **Usable** = CONNECTED, `charges_enabled`, and the same environment as the server's key (a test account on the live site takes no cards, and vice versa). `account.updated` on the webhook re-reads it. The platform's credentials — `STRIPE_SECRET_KEY`, `STRIPE_CLIENT_ID`, `STRIPE_WEBHOOK_SECRET` — are the **Kitnets platform account's**, distinct from any owner's; all three or none (`lib/env.ts`).
+
+**The fee passed on** (`lib/card-gross-up.ts`): the owner types the fee their Stripe account charges them (percentage + fixed part, Configuração → Cartão de crédito; both or neither, zero is a decision, blank means no card). The card is charged `gross = ceil₂((net + fixed) / (1 − pct))`, so the owner receives `net` in full (a centavo more at most); `gross − net` is the line "Taxa de processamento do cartão". **Late payments** cost the same as the boleto would: `lib/invoice-late-fees.ts` applies the invoice's own terms — the fine once, the interest per month pro rata die on a 30-day month — and the fee is grossed up on the whole; an undecided term charges nothing in its place; the owner's payment window (`days_payable_after_due`) closes the card too (`lib/billing/card-offer.ts`).
+
+**The payment** (`lib/billing/card-server.ts`): the tenant's page offers the card whenever the invoice is open, the owner's account is usable and the fee is decided — the boleto is not needed (a draft, an expired boleto, a boleto still being made all take the card). The button is a **form POST** to `/api/pagar/[token]/cartao` (never a link: scanners following links in e-mails would open sessions). The route reads the boleto back from the bank first (a boleto paid minutes ago is not paid again by card), computes today's amount, and opens a **Checkout Session on the connected account** (direct charge: the owner is the merchant, the money lands in their Stripe balance; no application fee) with the lines — the invoice, the late charges, the card fee — `client_reference_id` = invoice id, our ids in the metadata, the tenant's e-mail prefilled, `FATURA N` as the statement descriptor suffix, one hour to pay. The row is inserted REQUESTED first (**one open card session per invoice**, unique index), then OPEN with the session id and URL: a second click within the hour, for the same amount, is sent to the same session; another day of interest expires it and opens another. Then 303 to Stripe.
+
+**Settling**: what Stripe says of the session is the truth, read back (`GET /v1/checkout/sessions/{id}`) — by the webhook (`checkout.session.completed` / `expired`), by the tenant's page when they come back (`?cartao=ok` forces the read; otherwise a session not checked for two minutes), never from the payload alone; an event seen before (`invoice_events.dedupe_key = stripe:<event id>`) is ignored. A paid session marks the charge PAID and the invoice through `invoice_mark_paid` as **CARD**: `paid_amount` = the invoice plus the late charges (what the owner receives), `late_fee_amount` = the late charges, `surcharge_amount` = the card line; then the boleto is **cancelled at the bank**, so the tenant cannot pay twice. Cancelling the invoice closes the open session. The income ledger carries the invoice's items as before — never the fee, never the surcharge.
+
+**Books**: the surcharge is posted on the day of the payment as a reimbursement of a charge (D Aluguéis a receber / C Receita de reembolsos de encargos, `cardSurchargeEntry`), beside the late fee's entry; Stripe's own fee reaches the books with the payout on the bank statement (matching is still manual).
+
+**Webhook** (`POST /api/webhooks/stripe`): the platform's Connect endpoint ("listen to events on connected accounts"), signature checked on the raw body (`t=…,v1=…`, HMAC-SHA256, five minutes of tolerance); 200 once verified, 400 for a bad signature, 500 when we fail (Stripe retries). The tenant's page keeps working without it: the read-back on return covers the common path.
+
+**Sandbox**: with a test platform key, the OAuth connects test accounts and the sessions take Stripe's test cards; the connection's environment follows `livemode`.
+
+## 11. Not in these steps
+
+- No reminders of a due date nor receipts (step 7); no refunds from the module (a refund made in the Stripe dashboard is not read back yet).
 - A partial payment is not accepted: a payment recorded by hand must cover the invoice.
 - Nothing retroactive: the daily run never creates an invoice whose due date has passed; "Gerar faturas" does, on demand.
 - Out of scope for the module as planned: automatic rent adjustment on the invoice, pro rata of the first and last month, company tenants (CNPJ), variable-amount charges (metered energy), bounce handling from the e-mail provider (a bounce is read as a failed delivery only when the provider refuses the address).

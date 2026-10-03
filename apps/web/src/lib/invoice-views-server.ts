@@ -31,7 +31,7 @@ const numOrNull = (v: unknown) => (v == null ? null : Number(v));
 
 /** What the screens get of a boleto: never the bank's reference. */
 export const toChargeView = (c: ChargeRow | null | undefined): InvoiceChargeView | null => c ? ({
-    id: c.id, status: c.status, provider_status: c.provider_status, due_date: c.due_date, digitable_line: c.digitable_line, barcode: c.barcode,
+    id: c.id, kind: c.kind, status: c.status, amount: c.amount, surcharge_amount: c.surcharge_amount, expires_at: c.expires_at, provider_status: c.provider_status, due_date: c.due_date, digitable_line: c.digitable_line, barcode: c.barcode,
     pix_copy_paste: c.pix_copy_paste, has_pdf: Boolean(c.pdf_path), paid_via: c.paid_via, paid_amount: c.paid_amount, last_checked_at: c.last_checked_at, last_error: c.last_error, created_at: c.created_at,
 }) : null;
 
@@ -40,7 +40,7 @@ export const toDeliveryView = (d: DeliveryRow | null | undefined): InvoiceDelive
     id: d.id, kind: d.kind, status: d.status, recipient: d.recipient, attempts: d.attempts, sent_at: d.sent_at, last_error: d.last_error, created_at: d.created_at,
 }) : null;
 
-function toInvoiceView(row: Record<string, unknown>, items: InvoiceItemView[], charge: ChargeRow | null = null, delivery: DeliveryRow | null = null): InvoiceView {
+function toInvoiceView(row: Record<string, unknown>, items: InvoiceItemView[], charge: ChargeRow | null = null, delivery: DeliveryRow | null = null, card: ChargeRow | null = null): InvoiceView {
     const joined = (key: string, field: string) => ((row[key] as Record<string, unknown> | null)?.[field] as string | null | undefined) ?? null;
     return {
         id: String(row.id),
@@ -74,6 +74,7 @@ function toInvoiceView(row: Record<string, unknown>, items: InvoiceItemView[], c
         items,
         charge: toChargeView(charge),
         delivery: toDeliveryView(delivery),
+        card: toChargeView(card),
     };
 }
 
@@ -111,10 +112,10 @@ export async function loadInvoiceRows(supabase: AdminSupabase, profileId: string
 
 export const EMPTY_BILLING_SETTINGS: BillingSettingsView = {
     days_in_advance: null, fine_pct: null, interest_pct_month: null, days_payable_after_due: null,
-    sender_name: null, reply_to_email: null, automation_enabled: false, automation_from_month: null,
+    sender_name: null, reply_to_email: null, automation_enabled: false, automation_from_month: null, card_fee_pct: null, card_fee_fixed: null,
 };
 
-export const BILLING_SETTINGS_COLUMNS = "days_in_advance, fine_pct, interest_pct_month, days_payable_after_due, sender_name, reply_to_email, automation_enabled, automation_from_month";
+export const BILLING_SETTINGS_COLUMNS = "days_in_advance, fine_pct, interest_pct_month, days_payable_after_due, sender_name, reply_to_email, automation_enabled, automation_from_month, card_fee_pct, card_fee_fixed";
 
 export function toBillingSettingsView(data: Record<string, unknown>): BillingSettingsView {
     return {
@@ -126,6 +127,8 @@ export function toBillingSettingsView(data: Record<string, unknown>): BillingSet
         reply_to_email: (data.reply_to_email as string | null) ?? null,
         automation_enabled: data.automation_enabled === true,
         automation_from_month: data.automation_from_month ? String(data.automation_from_month).slice(0, 7) : null,
+        card_fee_pct: numOrNull(data.card_fee_pct),
+        card_fee_fixed: numOrNull(data.card_fee_fixed),
     };
 }
 
@@ -210,7 +213,7 @@ export async function loadInvoiceDetail(supabase: AdminSupabase, invoiceId: stri
     const record = row as unknown as Record<string, unknown>;
     return {
         invoice: {
-            ...toInvoiceView(record, ((itemsRes.data ?? []) as Record<string, unknown>[]).map(toItemView), charges.find(c => c.kind === "BOLEPIX") ?? null, deliveries[0] ?? null),
+            ...toInvoiceView(record, ((itemsRes.data ?? []) as Record<string, unknown>[]).map(toItemView), charges.find(c => c.kind === "BOLEPIX") ?? null, deliveries[0] ?? null, charges.find(c => c.kind === "CARD_CHECKOUT") ?? null),
             payer_cpf: (record.payer_cpf as string | null) ?? null,
             payer_address: (record.payer_address as PayerAddress | null) ?? null,
             fine_pct: numOrNull(record.fine_pct),

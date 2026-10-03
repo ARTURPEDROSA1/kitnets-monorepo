@@ -52,6 +52,11 @@ export const serverSchema = z.object({
     // Invoices e-mailed to tenants through Resend (lib/billing/email-provider.ts). Both or neither: without them
     // nothing is sent and each delivery says so. The address must be on a domain verified in Resend.
     RESEND_API_KEY: nonEmpty.optional(),
+    // The Kitnets Stripe platform (Connect): the platform's secret key, its Connect client id and the Connect
+    // webhook's signing secret (lib/billing/stripe-client.ts). All three or none; a test key is the sandbox.
+    STRIPE_SECRET_KEY: z.string().regex(/^(sk|rk)_(live|test)_[A-Za-z0-9]+$/, "must be a Stripe secret key (sk_live_… / sk_test_…)").optional(),
+    STRIPE_CLIENT_ID: z.string().regex(/^ca_[A-Za-z0-9]+$/, "must be a Stripe Connect client id (ca_…)").optional(),
+    STRIPE_WEBHOOK_SECRET: z.string().regex(/^whsec_[A-Za-z0-9]+$/, "must be a Stripe webhook signing secret (whsec_…)").optional(),
     BILLING_EMAIL_FROM: z.string().regex(/^(?:[^<>]+<)?[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+>?$/, "must be an e-mail address, optionally as \"Name <address>\"").optional(),
     // Source-map upload at build time only.
     SENTRY_ORG: nonEmpty.optional(),
@@ -90,6 +95,20 @@ function dropEmpty(raw: Record<string, string | undefined>): Record<string, stri
     return out;
 }
 
+/** Optional integrations whose variables only work together; a set half filled in is reported, never fatal. Exported for tests. */
+export function halfConfiguredSets(input: Record<string, string | undefined>): string[] {
+    const out: string[] = [];
+    const sets: Array<{ keys: readonly string[]; what: string }> = [
+        { keys: ["RESEND_API_KEY", "BILLING_EMAIL_FROM"], what: "invoices are not e-mailed until both are set" },
+        { keys: ["STRIPE_SECRET_KEY", "STRIPE_CLIENT_ID", "STRIPE_WEBHOOK_SECRET"], what: "the card payment stays off until all three are set" },
+    ];
+    for (const { keys, what } of sets) {
+        const missing = keys.filter(k => !input[k]);
+        if (missing.length > 0 && missing.length < keys.length) out.push(`${missing.join(", ")} not set while ${keys.filter(k => input[k]).join(", ")} ${keys.length - missing.length === 1 ? "is" : "are"}: ${what}`);
+    }
+    return out;
+}
+
 function formatIssues(issues: z.ZodIssue[]): string {
     return issues
         .map((i) => `  - ${i.path.join(".") || "(root)"}: ${i.message}`)
@@ -113,12 +132,12 @@ export function parseEnv(
     const result = schema.safeParse(input);
     const issues: z.ZodIssue[] = result.success ? [] : [...result.error.issues];
 
-    if (scope === "server" && Boolean(input.RESEND_API_KEY) !== Boolean(input.BILLING_EMAIL_FROM)) {
-        issues.push({
-            code: z.ZodIssueCode.custom,
-            path: [input.RESEND_API_KEY ? "BILLING_EMAIL_FROM" : "RESEND_API_KEY"],
-            message: "set RESEND_API_KEY and BILLING_EMAIL_FROM together (invoices are e-mailed through Resend)",
-        });
+    // Optional integrations come in sets (Resend: key + sender; Stripe: key + client id + webhook secret).
+    // A set half filled in is the owner mid-configuration, not a broken deploy: the module runs without
+    // that integration (lib/billing/email-provider.ts `emailAvailable`, stripe-client.ts `stripeAvailable`)
+    // and the Faturas screens say so — here it is only pointed out in the build log.
+    if (scope === "server") {
+        for (const warning of halfConfiguredSets(input)) console.warn(`[env] ${warning}`);
     }
 
     if (mode === "strict" && scope === "server" && !input.GEMINI_API_KEY && !input.OPENAI_API_KEY) {

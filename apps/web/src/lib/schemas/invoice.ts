@@ -86,8 +86,14 @@ export const billingSettingsSchema = z
         automation_enabled: z.preprocess((v) => v === true || v === "true" || v === "on", z.boolean()).optional().default(false),
         /** `YYYY-MM`: the first month the run bills; earlier months are never created on their own */
         automation_from_month: optionalText(7).refine((v) => v === null || MONTH_REGEX.test(v), "Mês inválido."),
+        /** the card fee passed on to the tenant: % of what is charged + a fixed part, as the owner's processor charges */
+        card_fee_pct: percentOrNull.refine((v) => v === null || (v >= 0 && v < 50), "Taxa entre 0 e 50%."),
+        card_fee_fixed: money.refine((v) => v === null || (v >= 0 && v <= 100), "Parte fixa entre R$ 0 e R$ 100."),
     })
     .superRefine((d, ctx) => {
+        if ((d.card_fee_pct === null) !== (d.card_fee_fixed === null)) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, path: [d.card_fee_pct === null ? "card_fee_pct" : "card_fee_fixed"], message: "Informe as duas partes da taxa do cartão, ou deixe as duas em branco." });
+        }
         if (!d.automation_enabled) return;
         // mirrors the table's CHECK: the run only acts on decisions the owner has made
         const missing: Array<keyof typeof d> = [];

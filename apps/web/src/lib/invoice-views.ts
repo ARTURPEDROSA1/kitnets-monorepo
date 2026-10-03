@@ -24,7 +24,14 @@ export interface InvoiceItemView {
 /** The invoice's latest boleto at the bank, as far as the screens need it (lib/billing/charges-server.ts). */
 export interface InvoiceChargeView {
     id: string;
+    kind: "BOLEPIX" | "CARD_CHECKOUT";
     status: ChargeStatus;
+    /** what the charge asks for (the card: grossed up by the fee) */
+    amount: number;
+    /** the card: the fee passed on to the tenant */
+    surcharge_amount: number | null;
+    /** the card: when the session stops taking the payment */
+    expires_at: string | null;
     /** the bank's own word (A_RECEBER, RECEBIDO, EXPIRADO…) */
     provider_status: string | null;
     due_date: string | null;
@@ -88,6 +95,8 @@ export interface InvoiceView {
     charge?: InvoiceChargeView | null;
     /** the latest e-mail to the tenant; null before any */
     delivery?: InvoiceDeliveryView | null;
+    /** the latest card session (Stripe Checkout); null before any */
+    card?: InvoiceChargeView | null;
 }
 
 /** A lease in force with who collects each of its components: one block of "Cobranças recorrentes". */
@@ -125,6 +134,9 @@ export interface BillingSettingsView {
     automation_enabled: boolean;
     /** `YYYY-MM`: the first month the run bills */
     automation_from_month: string | null;
+    /** the card fee passed on to the tenant: % of the amount charged + fixed part, as the owner's processor charges; both or neither */
+    card_fee_pct?: number | null;
+    card_fee_fixed?: number | null;
 }
 
 export interface InvoiceListView {

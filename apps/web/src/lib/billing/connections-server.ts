@@ -14,6 +14,8 @@ import { todayBRT } from "@/lib/lease-dashboard";
 import type { InterConnectionInput } from "@/lib/schemas/billing-connection";
 import { certificateStanding, type ConnectionStatus, type ConnectionsView, type InterConnectionView } from "./connections";
 import { InterError, putInterWebhook, requestInterToken, type InterRequestOptions } from "./inter-client";
+import { stripeAvailable } from "./stripe-client";
+import { loadStripeView } from "./stripe-connection-server";
 import {
     CERTIFICATE_PROBLEMS, INTER_REQUIRED_SCOPES, inspectCertificate, missingScopes, normalizePem, tail,
     type InterCredentials, type InterEnvironment,
@@ -71,8 +73,8 @@ function toView(row: ConnectionRow, today: string): InterConnectionView {
 
 /** The account's connections as the screens show them. Never a secret. */
 export async function loadConnections(supabase: AdminSupabase, profileId: string): Promise<ConnectionsView> {
-    const row = await loadRow(supabase, profileId);
-    return { available: secretBoxAvailable(), sandboxAllowed: sandboxAllowed(), inter: row ? toView(row, todayBRT()) : null };
+    const [row, stripe] = await Promise.all([loadRow(supabase, profileId), loadStripeView(supabase, profileId)]);
+    return { available: secretBoxAvailable(), sandboxAllowed: sandboxAllowed(), inter: row ? toView(row, todayBRT()) : null, stripeAvailable: stripeAvailable(), stripe };
 }
 
 const unavailable = () => new HttpError(503, { error: "A conexão com o banco está indisponível neste servidor: falta configurar a chave de criptografia." });

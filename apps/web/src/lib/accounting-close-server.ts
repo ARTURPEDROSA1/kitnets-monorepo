@@ -12,7 +12,7 @@ import type { AccountingAccount } from "./accounting-chart";
 import { AUTO_SOURCES, formatMoney, monthStart, postingErrorMessage, type AccountingPeriod } from "./accounting-journal";
 import type { AccountingSettings } from "./accounting-policies";
 import {
-    checklistSummary, closeChecklist, depreciationEntry, diffEntries, fairValueEntry, financingEntry, lateFeeEntry, monthEnd, monthRange,
+    cardSurchargeEntry, checklistSummary, closeChecklist, depreciationEntry, diffEntries, fairValueEntry, financingEntry, lateFeeEntry, monthEnd, monthRange,
     pendingChanges, rentAccrual, resolveEntries, shiftMonth, sortChecklist,
     type AutoEntry, type CheckItem, type CloseFacts, type EntryDiff, type FinancingPayment, type IncomeRowForAccrual, type PaidInvoiceLateFee, type PostableEntry, type StoredEntry,
 } from "./accounting-accruals";
@@ -84,14 +84,14 @@ async function loadOtherChargeItems(supabase: AdminSupabase, ownerId: string, mo
     return out;
 }
 
-/** Invoices paid in [from, to] with a late fee: financial revenue of the day they were paid. */
+/** Invoices paid in [from, to] with a late fee or a card fee passed on: revenue of the day they were paid. */
 async function loadLateFees(supabase: AdminSupabase, ownerId: string, from: string, to: string): Promise<PaidInvoiceLateFee[]> {
     const rows = await fetchAllPages<Record<string, unknown>>((a, b) =>
-        supabase.from("invoices").select("id, number, property_id, unit_id, paid_on, late_fee_amount")
-            .eq("owner_id", ownerId).eq("status", "PAID").gt("late_fee_amount", 0).gte("paid_on", from).lte("paid_on", to).order("number").range(a, b));
+        supabase.from("invoices").select("id, number, property_id, unit_id, paid_on, late_fee_amount, surcharge_amount")
+            .eq("owner_id", ownerId).eq("status", "PAID").or("late_fee_amount.gt.0,surcharge_amount.gt.0").gte("paid_on", from).lte("paid_on", to).order("number").range(a, b));
     return rows.map(r => ({
         id: String(r.id), number: Number(r.number) || 0, property_id: String(r.property_id), unit_id: (r.unit_id as string | null) ?? null,
-        paid_on: String(r.paid_on).slice(0, 10), late_fee_amount: Number(r.late_fee_amount) || 0,
+        paid_on: String(r.paid_on).slice(0, 10), late_fee_amount: Number(r.late_fee_amount) || 0, surcharge_amount: Number(r.surcharge_amount) || 0,
     }));
 }
 
@@ -285,10 +285,13 @@ export async function computeMonth(supabase: AdminSupabase, ctx: CloseContext, m
         if (row.status === "EXPECTED") rent.expected++;
     }
 
-    // the late fee and interest tenants paid on their invoices (the ledger never carries them)
+    // the late fee and interest tenants paid on their invoices, and the card fee passed on (the ledger never carries them)
     for (const invoice of lateFees) {
-        const e = lateFeeEntry(invoice, ctx.propertyNames.get(invoice.property_id) ?? "Imóvel");
+        const name = ctx.propertyNames.get(invoice.property_id) ?? "Imóvel";
+        const e = lateFeeEntry(invoice, name);
         if (e) auto.push(e);
+        const s = cardSurchargeEntry(invoice, name);
+        if (s) auto.push(s);
     }
 
     // the rented properties on the first day of the month

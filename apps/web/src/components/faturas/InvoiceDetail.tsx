@@ -6,7 +6,7 @@
  * PDF). The page preloads it; every action here answers with the fresh invoice, handed up to the parent.
  */
 import React, { useEffect, useState } from "react";
-import { AlertCircle, ArrowLeft, Ban, Check, CheckCircle2, Copy, FileDown, FileText, FlaskConical, Landmark, Loader2, Mail, Receipt, RefreshCw, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, Ban, Check, CheckCircle2, Copy, CreditCard, FileDown, FileText, FlaskConical, Landmark, Loader2, Mail, Receipt, RefreshCw, X } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { cn } from "@/lib/utils";
 import { formatDateBR } from "@/lib/dates";
@@ -52,6 +52,8 @@ const EVENT_LABELS: Record<string, string> = {
     DUE_DATE_MOVED: "Vencimento alterado",
     EMAIL_SENT: "E-mail enviado ao inquilino",
     EMAIL_FAILED: "O e-mail ao inquilino não foi enviado",
+    CARD_OPENED: "Inquilino abriu o pagamento por cartão",
+    CARD_FAILED: "O pagamento por cartão não pôde ser aberto",
     PAID: "Pagamento registrado",
     CANCELLED: "Fatura cancelada",
     DUPLICATE_PAYMENT: "Pagamento recebido em duplicidade",
@@ -64,7 +66,8 @@ const plural = (n: number, one: string, many: string) => `${n.toLocaleString("pt
 
 function eventText(e: InvoiceEventView): string | null {
     const amount = typeof e.detail.amount === "number" ? e.detail.amount : null;
-    if (e.type === "CANCELLED" || e.type === "ISSUE_FAILED" || e.type === "EMAIL_FAILED") return typeof e.detail.reason === "string" ? e.detail.reason : typeof e.detail.error === "string" ? e.detail.error : null;
+    if (e.type === "CANCELLED" || e.type === "ISSUE_FAILED" || e.type === "EMAIL_FAILED" || e.type === "CARD_FAILED") return typeof e.detail.reason === "string" ? e.detail.reason : typeof e.detail.error === "string" ? e.detail.error : null;
+    if (e.type === "CARD_OPENED") return amount !== null ? `${brl(amount)} no cartão${typeof e.detail.surcharge === "number" && e.detail.surcharge > 0 ? ` (taxa ${brl(e.detail.surcharge)})` : ""}` : null;
     if (e.type === "EMAIL_SENT") return e.detail.kind === "RESEND" ? "reenvio" : e.detail.kind === "REMINDER" ? "lembrete" : null;
     if (e.type === "DUE_DATE_MOVED") return typeof e.detail.from === "string" && typeof e.detail.to === "string" ? `de ${formatDateBR(e.detail.from)} para ${formatDateBR(e.detail.to)}` : null;
     if (e.type === "WEBHOOK") return typeof e.detail.situacao === "string" ? e.detail.situacao : null;
@@ -74,7 +77,7 @@ function eventText(e: InvoiceEventView): string | null {
     }
     return amount !== null ? brl(amount) : null;
 }
-const MONEY_EVENTS = new Set(["CREATED", "PAID", "DUPLICATE_PAYMENT", "CHARGE_PAID", "ISSUED"]);
+const MONEY_EVENTS = new Set(["CREATED", "PAID", "DUPLICATE_PAYMENT", "CHARGE_PAID", "ISSUED", "CARD_OPENED"]);
 
 function Field({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
     return (
@@ -209,6 +212,7 @@ export default function InvoiceDetail({ invoiceId, lang, today, initial, notice,
     const charge = invoice.charge ?? null;
     const delivery = invoice.delivery ?? null;
     const deliveries = detail.deliveries ?? [];
+    const card = invoice.card ?? null;
     const display = invoiceDisplay(invoice, today);
     const meta = INVOICE_STATUS_META[display];
     const open = isOpen(invoice.status);
@@ -323,6 +327,20 @@ export default function InvoiceDetail({ invoiceId, lang, today, initial, notice,
                 </section>
             )}
 
+            {card && (card.status === "OPEN" || card.status === "PAID" || (open && card.status === "FAILED")) && (
+                <section className="rounded-xl border border-border/80 bg-card">
+                    <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-2.5">
+                        <span className="inline-flex items-center gap-2 text-sm font-semibold text-foreground"><CreditCard className="h-4 w-4 text-violet-500" /> Cartão de crédito</span>
+                        {card.status === "OPEN" && card.expires_at && <span className="text-xs text-muted-foreground">sessão aberta até {stamp(card.expires_at)}</span>}
+                    </header>
+                    <div className="p-4 text-sm text-foreground">
+                        {card.status === "OPEN" && <p>O inquilino abriu o pagamento por cartão de <Money>{brl(card.amount)}</Money>{card.surcharge_amount ? <> (<Money>{brl(card.surcharge_amount)}</Money> de taxa repassada)</> : null}. A confirmação da Stripe chega sozinha.</p>}
+                        {card.status === "PAID" && <p>Pago por cartão: <Money>{brl(card.amount)}</Money> cobrados do inquilino{card.surcharge_amount ? <>, dos quais <Money>{brl(card.surcharge_amount)}</Money> de taxa repassada</> : null}. O valor cai na sua conta Stripe, descontada a tarifa dela.</p>}
+                        {card.status === "FAILED" && card.last_error && <p role="alert" className="text-rose-600">{card.last_error}</p>}
+                    </div>
+                </section>
+            )}
+
             {(charge || delivery) && (
                 <section className="rounded-xl border border-border/80 bg-card">
                     <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-2.5">
@@ -382,6 +400,7 @@ export default function InvoiceDetail({ invoiceId, lang, today, initial, notice,
                                 <Field label="Pagamento" className="col-span-2">
                                     <Money>{brl(invoice.paid_amount ?? invoice.amount)}</Money> em {formatDateBR(invoice.paid_on)} · {invoice.paid_via ? PAID_VIA_LABELS[invoice.paid_via] ?? invoice.paid_via : "—"}
                                     {invoice.late_fee_amount > 0 && <span className="text-muted-foreground"> · <Money>{brl(invoice.late_fee_amount)}</Money> de multa e juros</span>}
+                                    {invoice.surcharge_amount > 0 && <span className="text-muted-foreground"> · <Money>{brl(invoice.surcharge_amount)}</Money> de taxa do cartão repassada</span>}
                                 </Field>
                             )}
                             {invoice.status === "CANCELLED" && (
