@@ -66,7 +66,7 @@ function shell(subject: string, eyebrow: string, eyebrowColor: string, title: st
       <h1 style="margin:0 0 16px;font-size:20px">${escape(title)}</h1>
 ${body}
     </div>
-    <p style="margin:16px 0 0;font-size:12px;color:#6b7280;text-align:center">Enviado por ${escape(senderName)} através do Kitnets. Dúvidas? Responda a este e-mail.</p>
+    <p style="margin:16px 0 0;font-size:12px;color:#6b7280;text-align:center">Enviado por ${escape(senderName)} através do Kitnets.com. Dúvidas? Responda a este e-mail.</p>
   </div>
 </body></html>`;
 }
@@ -111,7 +111,7 @@ export function buildInvoiceEmail(input: InvoiceEmailInput): EmailContent {
         `Página da fatura${input.pixCopyPaste ? ", com o QR code" : ""}: ${input.pageUrl}`,
         ...(input.pdfAttached ? ["O boleto em PDF segue anexo."] : []),
         "",
-        `Enviado por ${input.senderName} através do Kitnets. Dúvidas? Responda a este e-mail.`,
+        `Enviado por ${input.senderName} através do Kitnets.com. Dúvidas? Responda a este e-mail.`,
     ];
 
     const eyebrow = input.kind === "REMINDER" ? "Lembrete de vencimento" : input.kind === "OVERDUE" ? "Fatura vencida" : "Fatura";
@@ -179,7 +179,7 @@ export function buildReceiptEmail(input: ReceiptEmailInput): EmailContent {
         "",
         `Este e-mail comprova o recebimento. A fatura: ${input.pageUrl}`,
         "",
-        `Enviado por ${input.senderName} através do Kitnets. Dúvidas? Responda a este e-mail.`,
+        `Enviado por ${input.senderName} através do Kitnets.com. Dúvidas? Responda a este e-mail.`,
     ];
     const body = `      <p style="margin:0 0 16px;font-size:15px;line-height:1.5">Olá${name ? `, ${escape(name)}` : ""}, ${escape(intro)}</p>
       <table style="width:100%;border-collapse:collapse;font-size:14px">${itemRows([...input.items, ...extras])}

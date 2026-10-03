@@ -90,6 +90,7 @@ apps/web/src/
 │   ├── [id]/cancelar/route.ts        # POST (cancels the boleto at the bank first)
 │   ├── [id]/reenviar/route.ts        # POST (the e-mail to the tenant, again)
 │   ├── [id]/copia/route.ts           # POST { email } (a copy of the tenant's e-mail to the address the owner types)
+│   ├── [id]/previa-email/route.ts    # GET (the tenant's e-mail as it would go out now; nothing is sent)
 │   ├── cobrancas/route.ts            # PUT (who collects a component · pause a lease)
 │   ├── configuracoes/route.ts        # PUT (billing conditions)
 │   └── conexoes/                     # GET (status) · inter: PUT (save + test) · DELETE · inter/testar: POST · stripe: POST (re-read) · DELETE · stripe/iniciar: POST · stripe/retorno: GET
@@ -158,6 +159,7 @@ supabase/
 ├── migrations/20261003200000_card_checkout.sql
 ├── migrations/20261003300000_invoice_reminders.sql
 ├── migrations/20261003400000_invoice_tracking.sql
+├── migrations/20261003500000_billing_copy_email.sql
 └── checks/invoices.sql, invoice_ledger.sql, billing_connections.sql, invoice_charges.sql, invoice_deliveries.sql, card_checkout.sql, invoice_reminders.sql, invoice_tracking.sql
 ```
 
@@ -291,6 +293,10 @@ An invoice becomes a charge at the owner's bank — the API Cobrança v3 "boleto
 **On the screens** (`deliveryState` in `lib/invoice-hub.ts`): the furthest thing known — Visualizada › Entregue › Enviado, or Devolvido / Não enviado — is the **E-mail** column of the invoices table and the first lines of the panel's "E-mail ao inquilino" section, which also says when the page was opened and how often.
 
 **A copy for the owner** (`POST /api/faturas/[id]/copia { email }`, `sendInvoiceCopy`): "Enviar cópia para mim" asks for an address (remembered on the device) and sends the same message the tenant gets — the invoice with the boleto, the Pix and the PDF, or the receipt once it is paid — with `[Cópia]` in the subject and a band on top saying so. It is not a delivery (the tenant's e-mails and their one-per-kind keys are untouched), its link carries `?copia=1` so it never reads as the tenant opening the page, and it is an event on the timeline. 10 per user per minute.
+
+**Seeing the e-mail before it goes** (`GET /api/faturas/[id]/previa-email`, `previewInvoiceEmail`): "Ver o e-mail" on the invoice panel shows sender, reply-to, recipient, subject, attachment and the message itself (the HTML in a sandboxed frame) exactly as it would go out now — the invoice, or the receipt once it is paid. Before the boleto is issued the Pix code, the digitable line and the PDF are placeholders and the dialog says so. Nothing is sent, and it works whether or not the server can e-mail.
+
+**A copy of every e-mail** (`billing_settings.copy_to_email`, migration `20261003500000`; `sendOwnerCopy`): when the owner gives an address in Configuração → E-mail ao inquilino, each e-mail that goes out to a tenant — invoice, reminder, overdue notice, receipt — is followed by the same message to that address, marked as a copy like the manual one (`[Cópia]`, the band, `?copia=1` on the link). It is a message of its own, not a BCC, so the tenant's message is untouched and the owner opening the link never reads as the tenant; the provider gets `<delivery id>:copy` as the idempotency key, so a retry does not send two; its failure never fails the tenant's delivery. "E-mail para respostas" is something else: where the tenant's reply goes.
 
 ## 13. Not in these steps
 
