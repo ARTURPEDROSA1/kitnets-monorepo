@@ -306,6 +306,19 @@ describe("leaseIncome", () => {
         expect(income.currentGross).toBe(1300);
         expect(income.firstMonth).toBe("2026-06");
     });
+    it("only misses a month whose rent already fell due: not the first month, not a due day still ahead", () => {
+        // started on 20/12/2024, due every 10th: the first rent is January's; seen on 03/10/2026, October's is not due yet
+        const l = lease({ start_date: "2024-12-20", end_date: "2027-06-20", rent_due_day: 10 });
+        const months = Array.from({ length: 21 }, (_, i) => { const t = 2025 * 12 + i; return `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, "0")}`; });
+        const ledger = months.map(m => row(m));
+        expect(leaseIncome(l, ledger, "2026-10-03")).toMatchObject({ confirmedMonths: 21, missingMonths: 0 });
+        expect(leaseIncome(l, ledger, "2026-10-10").missingMonths).toBe(0);   // due today: not late yet
+        expect(leaseIncome(l, ledger, "2026-10-11").missingMonths).toBe(1);
+        // a gap in the middle is still a gap
+        expect(leaseIncome(l, ledger.filter(r => r.id !== "2025-06"), "2026-10-03").missingMonths).toBe(1);
+        // a lease that ended before the month's due day owes nothing for it
+        expect(leaseIncome(lease({ start_date: "2024-12-20", end_date: "2026-09-05", rent_due_day: 10, status: "EXPIRED" }), ledger.slice(0, 20), "2026-10-03").missingMonths).toBe(0);
+    });
     it("reads one unit's rows for a unit lease", () => {
         const l = lease({ start_date: "2026-07-01", end_date: null, unit_id: "u2" });
         const income = leaseIncome(l, [row("2026-07", { unit_id: "u1", received_amount: 999 }), row("2026-07", { unit_id: "u2" }), row("2026-08", { unit_id: "u2" })], TODAY);
