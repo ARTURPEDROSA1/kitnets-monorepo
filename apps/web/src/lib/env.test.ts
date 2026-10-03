@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { currentMode, parseEnv } from "./env";
+import { currentMode, halfConfiguredSets, parseEnv } from "./env";
 
 const complete = {
     SUPABASE_SERVICE_ROLE_KEY: "service-role",
@@ -70,5 +70,22 @@ describe("currentMode", () => {
         expect(currentMode({ VERCEL_ENV: "preview" })).toBe("lenient");
         expect(currentMode({ NODE_ENV: "production" })).toBe("lenient");
         expect(currentMode({})).toBe("lenient");
+    });
+});
+
+describe("optional integrations that come in sets", () => {
+    it("a half-configured set is pointed out, never fatal, in either mode", () => {
+        const half = { ...complete, BILLING_EMAIL_FROM: "Kitnets <faturas@kitnets.com>" };
+        expect(() => parseEnv(half, "lenient")).not.toThrow();
+        expect(() => parseEnv(half, "strict")).not.toThrow();
+        expect(halfConfiguredSets(half)).toEqual(["RESEND_API_KEY not set while BILLING_EMAIL_FROM is: invoices are not e-mailed until both are set"]);
+        expect(halfConfiguredSets({ ...complete, STRIPE_SECRET_KEY: "sk_test_1", STRIPE_CLIENT_ID: "ca_1" })).toEqual(["STRIPE_WEBHOOK_SECRET not set while STRIPE_SECRET_KEY, STRIPE_CLIENT_ID are: the card payment stays off until all three are set"]);
+        expect(halfConfiguredSets(complete)).toEqual([]);
+        expect(halfConfiguredSets({ ...complete, RESEND_API_KEY: "re_1", BILLING_EMAIL_FROM: "f@kitnets.com", STRIPE_SECRET_KEY: "sk_test_1", STRIPE_CLIENT_ID: "ca_1", STRIPE_WEBHOOK_SECRET: "whsec_1" })).toEqual([]);
+    });
+
+    it("still refuses a value of the wrong shape", () => {
+        expect(() => parseEnv({ ...complete, STRIPE_SECRET_KEY: "not-a-key" }, "lenient")).toThrow(/STRIPE_SECRET_KEY/);
+        expect(() => parseEnv({ ...complete, BILLING_EMAIL_FROM: "not an address" }, "lenient")).toThrow(/BILLING_EMAIL_FROM/);
     });
 });
