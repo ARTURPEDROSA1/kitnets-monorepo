@@ -183,6 +183,8 @@ export async function loadLeaseDashboard(supabase: AdminSupabase, leaseId: strin
             rows: synced.rows,
             initial: initialValues({ ...lease, monthly_rent: currentRent, charges: currentCharges }, synced.rows),
             waiting: synced.waiting,
+            pending: synced.pending,
+            error: synced.error,
         },
     };
 }

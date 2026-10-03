@@ -82,6 +82,10 @@ export interface AdjustmentSync {
     /** the lease's rent or condominium may have moved (here, or by someone who got there first): read them again */
     changed: boolean;
     waiting: DueAdjustments["waiting"];
+    /** adjustments calculated but not written, because the write failed: shown as such, never silently dropped */
+    pending: AdjustmentRow[];
+    /** why the write failed */
+    error: string | null;
 }
 
 /**
@@ -90,12 +94,19 @@ export interface AdjustmentSync {
  */
 export async function syncLeaseAdjustments(supabase: AdminSupabase, lease: AdjustmentLease, seriesByCode: SeriesByCode, today: string): Promise<AdjustmentSync> {
     const stored = await loadAdjustments(supabase, lease.id);
-    const idle: AdjustmentSync = { ...stored, recorded: 0, changed: false, waiting: null };
+    const idle: AdjustmentSync = { ...stored, recorded: 0, changed: false, waiting: null, pending: [], error: null };
     if (!stored.available || !IN_FORCE.has(lease.status)) return idle;
-    try {
-        const due = dueAdjustments(lease, stored.rows, seriesByCode, today);
-        if (due.rows.length === 0) return { ...idle, waiting: due.waiting };
 
+    let due: DueAdjustments;
+    try {
+        due = dueAdjustments(lease, stored.rows, seriesByCode, today);
+    } catch (err) {
+        console.error(`[${TAG}] calculation of lease ${lease.id} failed:`, (err as Error).message);
+        return { ...idle, error: `cálculo: ${(err as Error).message}` };
+    }
+    if (due.rows.length === 0) return { ...idle, waiting: due.waiting };
+
+    try {
         const { data, error } = await supabase.rpc("lease_adjustments_record", {
             p_lease_id: lease.id,
             p_rows: due.rows.map(toDb),
@@ -105,11 +116,12 @@ export async function syncLeaseAdjustments(supabase: AdminSupabase, lease: Adjus
         });
         if (error) throw new Error(error.message);
         // STALE: another reader recorded the same dates a moment ago — its rows are the ones to show
+        if (data !== "OK" && data !== "STALE") throw new Error(`lease_adjustments_record: ${String(data)}`);
         const after = await loadAdjustments(supabase, lease.id);
-        return { ...after, recorded: data === "OK" ? due.rows.length : 0, changed: true, waiting: due.waiting };
+        return { ...after, recorded: data === "OK" ? due.rows.length : 0, changed: true, waiting: due.waiting, pending: [], error: null };
     } catch (err) {
         console.error(`[${TAG}] sync of lease ${lease.id} failed:`, (err as Error).message);
-        return idle;
+        return { ...idle, waiting: due.waiting, pending: due.rows, error: (err as Error).message };
     }
 }
 
@@ -228,6 +240,7 @@ export async function runAdjustmentSync(
             report.errors.push(`lease ${full[i].id}: history unavailable`);
             continue;
         }
+        if (result.error) report.errors.push(`lease ${full[i].id}: ${result.error}`);
         report.recorded += result.recorded;
         if (result.waiting) report.waiting++;
     }
