@@ -30,6 +30,8 @@ interface Props {
     hasCondo: boolean;
     /** the lease's adjustment dates already behind today, oldest first: the dates an addendum usually refers to */
     adjustmentDates: string[];
+    /** the adjustment the addendum is for, when it was opened from its line */
+    initialDate?: string | null;
     onClose: () => void;
     onSaved: () => void;
 }
@@ -54,7 +56,7 @@ function before(date: string, initial: Props["initial"], rows: StoredAdjustment[
     return { rent, condo };
 }
 
-export default function LeaseAddendumModal({ leaseId, initial, rows, hasCondo, adjustmentDates, onClose, onSaved }: Props) {
+export default function LeaseAddendumModal({ leaseId, initial, rows, hasCondo, adjustmentDates, initialDate = null, onClose, onSaved }: Props) {
     const input = useRef<HTMLInputElement>(null);
     const [file, setFile] = useState<File | null>(null);
     const [storagePath, setStoragePath] = useState<string | null>(null);
@@ -69,7 +71,7 @@ export default function LeaseAddendumModal({ leaseId, initial, rows, hasCondo, a
     const [error, setError] = useState<string | null>(null);
 
     const latest = adjustmentDates[adjustmentDates.length - 1] ?? "";
-    const [date, setDate] = useState(isoToMasked(latest || null));
+    const [date, setDate] = useState(isoToMasked(initialDate || latest || null));
     const [rent, setRent] = useState("");
     const [condo, setCondo] = useState("");
     const [index, setIndex] = useState("");

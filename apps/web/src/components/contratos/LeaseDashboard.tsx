@@ -33,7 +33,7 @@ import type { IndexPoint } from "@/lib/lease-summary";
 import type { LeaseWithDetails } from "@/types/lease";
 import { RESPONSIBILITY_LABELS as CHARGE_RESPONSIBILITY, amountOf, chargeAdjustment, contractTotal, featuredCharge, monthlyTotal, tenantCharges } from "@/lib/lease-charges";
 import { pastAdjustmentDates } from "@/lib/lease-adjustments";
-import LeaseAdjustmentHistory from "./LeaseAdjustmentHistory";
+import LeaseAdjustmentTable from "./LeaseAdjustmentTable";
 import LeaseAddendumModal from "./LeaseAddendumModal";
 import LeaseDocuments from "./LeaseDocuments";
 import { LeaseTitle } from "./LeaseTitle";
@@ -90,7 +90,8 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
     const [bundle, setBundle] = useState<LeaseDashboardView | null>(preloaded);
     const [error, setError] = useState<string | null>(null);
     const [viewing, setViewing] = useState<{ url: string; name: string } | null>(null);
-    const [addendumOpen, setAddendumOpen] = useState(false);
+    // "Registrar aditivo": undefined = closed, null = no adjustment chosen, a date = that adjustment's
+    const [addendumFor, setAddendumFor] = useState<string | null | undefined>(undefined);
     const seededRef = useRef(preloaded !== null);
 
     const load = useCallback(async () => {
@@ -494,16 +495,19 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
 
             {/* Adjustments: what each one changed, by addendum or by Kitnets' calculation */}
             {history && lease.adjustment_index !== "NONE" && (
-                <LeaseAdjustmentHistory
+                <LeaseAdjustmentTable
                     leaseId={lease.id}
                     startDate={lease.start_date}
                     adjustments={history}
                     summary={summary}
                     indexLabel={row.indexLabel}
+                    currentRent={rent}
+                    currentCondo={condo && amountOf(condo) > 0 ? amountOf(condo) : null}
+                    nextCondo={condoAdjustment?.adjustedAmount ?? null}
                     inForce={row.inForce}
                     documents={lease.documents}
                     onView={openPdf}
-                    onAddendum={() => setAddendumOpen(true)}
+                    onAddendum={date => setAddendumFor(date)}
                     onChanged={() => load().catch(() => {})}
                 />
             )}
@@ -523,15 +527,16 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
 
             {error && <p className="text-sm text-rose-600">{error}</p>}
 
-            {addendumOpen && history && (
+            {addendumFor !== undefined && history && (
                 <LeaseAddendumModal
                     leaseId={lease.id}
                     initial={history.initial}
                     rows={history.rows}
                     hasCondo={Boolean(condo && amountOf(condo) > 0)}
                     adjustmentDates={pastAdjustmentDates(lease, today)}
-                    onClose={() => setAddendumOpen(false)}
-                    onSaved={() => { setAddendumOpen(false); load().catch(() => {}); }}
+                    initialDate={addendumFor}
+                    onClose={() => setAddendumFor(undefined)}
+                    onSaved={() => { setAddendumFor(undefined); load().catch(() => {}); }}
                 />
             )}
 
