@@ -7,9 +7,10 @@
  * on screen, and what is missing says so.
  */
 import React from "react";
-import { Check, FileText, Home, MapPin, PenLine, SlidersHorizontal, Sun } from "lucide-react";
+import { Car, Check, FileText, Home, MapPin, PenLine, SlidersHorizontal, Sun } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { cn } from "@/lib/utils";
+import { GARAGE_LOCATION_LABELS, garageSpaces, type PropertyType } from "@/lib/property-type";
 import { Sensitive } from "@/components/privacy";
 import type { PropertyDetails } from "@/components/profile/PropertyDetailsCard";
 
@@ -25,7 +26,7 @@ export interface PropertyAddressData {
 }
 
 interface Props {
-    propertyType: "single" | "multi";
+    propertyType: PropertyType;
     details: PropertyDetails;
     address: PropertyAddressData;
     unitsCount: number;
@@ -107,7 +108,7 @@ export default function PropertyRegisterSection({ propertyType, details, address
                 summary={(
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 lg:grid-cols-4">
                         <Field label="Nome" value={dash(details.propertyName)} />
-                        <Field label="Tipo" value={propertyType === "multi" ? <><Home className="mr-1 inline h-3.5 w-3.5 align-[-2px] text-violet-600" />Multifamiliar · {unitsCount} {unitsCount === 1 ? "unidade" : "unidades"}</> : <><Home className="mr-1 inline h-3.5 w-3.5 align-[-2px] text-emerald-600" />Unifamiliar</>} />
+                        <Field label="Tipo" value={propertyType === "multi" ? <><Home className="mr-1 inline h-3.5 w-3.5 align-[-2px] text-violet-600" />Multifamiliar · {unitsCount} {unitsCount === 1 ? "unidade" : "unidades"}</> : propertyType === "garage" ? <><Car className="mr-1 inline h-3.5 w-3.5 align-[-2px] text-slate-500" />Garagem</> : <><Home className="mr-1 inline h-3.5 w-3.5 align-[-2px] text-emerald-600" />Unifamiliar</>} />
                         <Field label="Área total" value={dash(details.totalSqMeters, " m²")} />
                         <Field label="Área edificada" value={dash(details.areaEdificada, " m²")} />
                         <Field label="Área do lote" value={dash(details.areaLote, " m²")} />
@@ -115,9 +116,16 @@ export default function PropertyRegisterSection({ propertyType, details, address
                         <Field label="Inscrição imobiliária" value={sensitiveDash(details.inscricaoImobiliaria)} />
                         <Field label="Matrícula" value={sensitiveDash(details.matricula)} />
                         {propertyType === "single" && <Field label="Cômodos" value={[details.bedrooms ? `${details.bedrooms} quartos` : null, details.bathrooms ? `${details.bathrooms} banheiros` : null, details.parkingSpaces ? `${details.parkingSpaces} vagas` : null].filter(Boolean).join(" · ") || <span className="text-muted-foreground">—</span>} />}
+                        {propertyType === "garage" && <>
+                            <Field label="Vagas" value={garageSpaces(details)} />
+                            <Field label="Local" value={details.garageLocation ? GARAGE_LOCATION_LABELS[details.garageLocation] : muted("—")} />
+                            <Field label="Cobertura" value={details.garageCover === "covered" ? "Coberta" : details.garageCover === "uncovered" ? "Descoberta" : muted("—")} />
+                            <Field label="Identificação da vaga" value={dash(details.garageSpotLabel)} />
+                            <Field label="Portão eletrônico" value={details.garageElectricGate ? "sim" : muted("não")} />
+                        </>}
                         <Field label="Medidores principais" value={meters || <span className="text-muted-foreground">nenhum pago por você</span>} />
                         <Field label="Internet" value={details.internetBill ? "conta do imóvel" : <span className="text-muted-foreground">não</span>} />
-                        <Field label="Energia solar" value={details.solarEnergy ? <><Sun className="mr-1 inline h-3.5 w-3.5 align-[-2px] text-amber-500" />{details.solarKwp ? `${details.solarKwp} kWp` : "sim"}</> : <span className="text-muted-foreground">não</span>} />
+                        {propertyType !== "garage" && <Field label="Energia solar" value={details.solarEnergy ? <><Sun className="mr-1 inline h-3.5 w-3.5 align-[-2px] text-amber-500" />{details.solarKwp ? `${details.solarKwp} kWp` : "sim"}</> : <span className="text-muted-foreground">não</span>} />}
                     </dl>
                 )}
                 editor={detailsEditor}

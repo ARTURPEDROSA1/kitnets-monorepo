@@ -10,6 +10,7 @@
 import type { AdminSupabase } from "@/lib/api-auth";
 import { addressFromProfile, addressText, type AddressParts } from "@/lib/geocode";
 import { orderPhotos } from "@/lib/property-photos-server";
+import { parsePropertyType, type PropertyType } from "@/lib/property-type";
 
 type Json = Record<string, unknown>;
 
@@ -24,8 +25,8 @@ export interface PropertyEntry {
     /** 0 = the first property (the profile's own columns), 1.. = additional_properties[index - 1] */
     index: number;
     name: string;
-    propertyType: "single" | "multi";
-    /** rentable units: multi → max(numberOfUnits, subUnits, 1); single → 1 */
+    propertyType: PropertyType;
+    /** rentable units: multi → max(numberOfUnits, subUnits, 1); single and garage → 1 */
     units: number;
     /** the sub-units' ids (multi), the ones a lease can point to */
     unitIds: string[];
@@ -53,7 +54,7 @@ function unitIdsOf(raw: unknown): string[] {
 }
 
 function entryOf(args: { id: string | null; index: number; type: unknown; details: Json | null; address: Json | null; subUnits: unknown; cover: unknown; photos: unknown; isSaved: boolean }): PropertyEntry {
-    const propertyType: "single" | "multi" = args.type === "multi" ? "multi" : "single";
+    const propertyType = parsePropertyType(args.type);
     const subUnits = Array.isArray(args.subUnits) ? args.subUnits : [];
     const declared = Number(args.details?.numberOfUnits) || 0;
     const address = addressFromProfile(args.address);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { LeaseCharge } from "@/types/lease";
-import { contractTotal, featuredCharge, monthlyTotal, tenantCharges } from "./lease-charges";
+import { chargeKindOf, contractTotal, featuredCharge, monthlyTotal, tenantCharges } from "./lease-charges";
 
 const charge = (charge_type: LeaseCharge["charge_type"], responsibility: LeaseCharge["responsibility"], amount: number | null): LeaseCharge =>
     ({ id: `${charge_type}-${responsibility}`, lease_id: "l1", charge_type, label: null, responsibility, amount, adjustment_index: null, adjustment_notes: null });
@@ -21,6 +21,13 @@ describe("featuredCharge", () => {
         expect(featuredCharge([energy], null)).toEqual({ label: "Energia", charge: energy });
         expect(featuredCharge([condo, energy], null)).toEqual({ label: "Condomínio", charge: condo });
         expect(featuredCharge([water], null)).toEqual({ label: "Encargos", charge: null });
+    });
+
+    it("leaves a garage without a kind, so its card shows whichever charge the contract has", () => {
+        expect(chargeKindOf("single")).toBe("single");
+        expect(chargeKindOf("multi")).toBe("multi");
+        expect(chargeKindOf("garage")).toBeNull();
+        expect(featuredCharge([condo], chargeKindOf("garage"))).toEqual({ label: "Condomínio", charge: condo });
     });
 });
 

@@ -13,6 +13,7 @@ import { signStorageUrls } from "@/lib/storage";
 import { getAllIndexValuesForCalculator, getIndexMetadata } from "@/lib/indexes";
 import { resolveCalculatorIndex } from "@/lib/index-calculator";
 import { addMonths, leaseIndexSeriesCode, type IndexPoint } from "@/lib/lease-summary";
+import { chargeKindOf } from "@/lib/lease-charges";
 import { loadPropertyEntries } from "@/lib/property-entries-server";
 import type { PropertyIncomeRow } from "@/lib/property-income";
 import { INCOME_DIRECT_COLUMNS, normalizeIncomeRow } from "@/lib/property-income";
@@ -50,11 +51,16 @@ export async function loadLeaseRows(supabase: AdminSupabase, profileId: string):
     });
 }
 
-/** `properties.id` → single or multi, from the profile's cadastro; empty when it cannot be read (the cards then show whichever charge the contract has). */
+/** `properties.id` → single or multi, from the profile's cadastro; a garage is left out and so is everything when the cadastro cannot be read (the cards then show whichever charge the contract has). */
 export async function loadPropertyKinds(supabase: AdminSupabase, profileId: string): Promise<LeaseListView["propertyKinds"]> {
     try {
         const { entries } = await loadPropertyEntries(supabase, profileId);
-        return Object.fromEntries(entries.filter(e => e.id).map(e => [e.id as string, e.propertyType]));
+        const kinds: LeaseListView["propertyKinds"] = {};
+        for (const e of entries) {
+            const kind = chargeKindOf(e.propertyType);
+            if (e.id && kind) kinds[e.id] = kind;
+        }
+        return kinds;
     } catch (err) {
         console.error("[Lease views] property kinds failed:", (err as Error).message);
         return {};
@@ -130,7 +136,8 @@ export async function loadLeaseDashboard(supabase: AdminSupabase, leaseId: strin
 
     const docs = (docsRes.data ?? []) as Array<Record<string, unknown> & { file_url: string }>;
     const signed = await signStorageUrls(supabase, LEASE_DOCUMENTS_BUCKET, docs.map(d => d.file_url));
-    const propertyKind = entries.find(e => e.id === lease.property_id)?.propertyType ?? (lease.unit_id ? "multi" : null);
+    const entry = entries.find(e => e.id === lease.property_id);
+    const propertyKind = entry ? chargeKindOf(entry.propertyType) : (lease.unit_id ? "multi" : null);
 
     return {
         propertyKind,

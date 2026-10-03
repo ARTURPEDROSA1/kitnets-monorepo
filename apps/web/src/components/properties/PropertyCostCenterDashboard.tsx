@@ -8,6 +8,7 @@ import {
     DollarSign,
     Percent,
     Building2,
+    Car,
     Home,
     Sun,
     Building,
@@ -62,12 +63,13 @@ import type { PropertyInvestment, PropertyTransaction } from '@/lib/property-inv
 import { landlordIptuByMonth, landlordTaxTotals, taxScopeForProperty, type PropertyTax } from '@/lib/property-taxes';
 import type { PropertyValuation } from '@/lib/property-valuations';
 import { condominiumResultByMonth, type CondominiumMonth } from '@/lib/condominium';
+import { GARAGE_BASELINE, garageSpaces, garageSummary, type PropertyType } from '@/lib/property-type';
 
 interface PropertyCostCenterDashboardProps {
     propertyIndex: number;
     /** `properties.id` — enables the real income ledger when present */
     dbId?: string;
-    propertyType: 'single' | 'multi';
+    propertyType: PropertyType;
     details: PropertyDetails;
     subUnits: SubUnit[];
     address: {
@@ -222,6 +224,8 @@ export default function PropertyCostCenterDashboard({
             if (details.monthlyRentEstimate) {
                 const parsed = parseFloat(details.monthlyRentEstimate.replace(/[^\d.,]/g, '').replace(',', '.'));
                 grossMonthlyRevenue = isNaN(parsed) ? 2200 : parsed;
+            } else if (propertyType === 'garage') {
+                grossMonthlyRevenue = garageSpaces(details) * GARAGE_BASELINE.rentPerSpace;
             } else {
                 const beds = parseInt(details.bedrooms || '2', 10);
                 grossMonthlyRevenue = (isNaN(beds) ? 2 : beds) * 750 + 600;
@@ -241,16 +245,17 @@ export default function PropertyCostCenterDashboard({
 
         if (current) {
             grossMonthlyRevenue = Math.round(current.revenue);   // gross rent + energy income
-            if (propertyType === 'single') rentedUnitsCount = 1;
+            if (propertyType !== 'multi') rentedUnitsCount = 1;
         }
 
         const range = periodRange(period);
         const periodRows = filterRowsByPeriod(incomeRows, range).sort((a, b) => (a.month < b.month ? -1 : 1));
 
         // Operational Expenses (OPEX) — estimates from "Ajustar Custos", used only without ledger data
+        const iptuDefault = propertyType === 'garage' ? GARAGE_BASELINE.iptuMonthly : 140;
         const iptuMonthly = details.iptuMonthly
-            ? (parseFloat(details.iptuMonthly.replace(/[^\d.,]/g, '').replace(',', '.')) || 140)
-            : 140;
+            ? (parseFloat(details.iptuMonthly.replace(/[^\d.,]/g, '').replace(',', '.')) || iptuDefault)
+            : iptuDefault;
 
         const condoMonthly = details.condoMonthly
             ? (parseFloat(details.condoMonthly.replace(/[^\d.,]/g, '').replace(',', '.')) || (propertyType === 'multi' ? totalUnits * 75 : 0))
@@ -262,9 +267,10 @@ export default function PropertyCostCenterDashboard({
 
         const adminFee = Math.round(grossMonthlyRevenue * (parseFloat(details.managementFeePercent || '8') / 100));
 
+        const otherDefault = propertyType === 'garage' ? 0 : 65;
         const insuranceAndOther = details.otherExpensesMonthly
-            ? (parseFloat(details.otherExpensesMonthly.replace(/[^\d.,]/g, '').replace(',', '.')) || 65)
-            : 65;
+            ? (parseFloat(details.otherExpensesMonthly.replace(/[^\d.,]/g, '').replace(',', '.')) || otherDefault)
+            : otherDefault;
 
         const estimatedExpenses = iptuMonthly + condoMonthly + maintenanceReserve + adminFee + insuranceAndOther;
 
@@ -399,6 +405,15 @@ export default function PropertyCostCenterDashboard({
         const cost = fromLedger ? fromLedger.totalCost : 0;
         return { month, revenue, cost, result: Math.round((revenue - cost) * 100) / 100, hasCosts: Boolean(fromLedger?.hasCosts) };
     })();
+    // Vagas card (garage): takes the place of Energia & Solar, unless the ledger carries energy for it
+    const garageCard = (() => {
+        if (propertyType !== 'garage' || (financials.energyIncome ?? 0) > 0 || (financials.energyCost ?? 0) > 0) return null;
+        const spaces = garageSpaces(details);
+        const rent = financials.currentGrossRent;
+        // the summary without its leading "N vagas": the card's figure already says it
+        const traits = garageSummary(details).split(' · ').slice(1).join(' · ');
+        return { spaces, summary: traits || (spaces === 1 ? 'vaga de garagem' : 'vagas de garagem'), rentPerSpace: rent && rent > 0 ? rent / spaces : null };
+    })();
     const kpiInfo: Record<'revenue' | 'opex' | 'noi' | 'occupancy' | 'energy' | 'condo', TileInfo> = {
         condo: {
             what: 'O condomínio das unidades como centro de custos, no mês mais recente: o que as unidades pagam de condomínio, o que o condomínio gastou (energia das áreas comuns, internet, água, IPTU, manutenção) e o resultado.',
@@ -468,6 +483,8 @@ export default function PropertyCostCenterDashboard({
                         <Home className="w-3.5 h-3.5" />
                         Anunciar Aluguel
                     </Button>
+                    {/* A garage has no consumer unit of its own unless the owner pays its meter (Energia under Medidores) */}
+                    {(propertyType !== 'garage' || details.mainMeters?.energy) && (
                     <Link href={dbId ? `/${lang}/dashboard/energy/${dbId}` : `/${lang}/dashboard/energy`}>
                         <Button
                             size="sm"
@@ -478,6 +495,7 @@ export default function PropertyCostCenterDashboard({
                             Gestão de Energia
                         </Button>
                     </Link>
+                    )}
                     {/* Water is a landlord cost only on multi-unit buildings (one main meter for all units) */}
                     {propertyType === 'multi' && (
                         <Link href={dbId ? `/${lang}/dashboard/billing/${dbId}` : `/${lang}/dashboard/water`}>
@@ -505,6 +523,11 @@ export default function PropertyCostCenterDashboard({
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-800">
                                 <Building2 className="w-3.5 h-3.5 text-violet-500" />
                                 Multifamiliar ({totalUnits} unidades)
+                            </span>
+                        ) : propertyType === 'garage' ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800/60 dark:text-slate-300 dark:border-slate-700">
+                                <Car className="w-3.5 h-3.5 text-slate-500" />
+                                Garagem
                             </span>
                         ) : (
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800">
@@ -662,6 +685,20 @@ export default function PropertyCostCenterDashboard({
                         </span>
                     </div>
                 </Link>
+                ) : garageCard ? (
+                <div className="p-5 rounded-2xl border border-border bg-card shadow-xs space-y-2">
+                    <div className="flex items-center justify-between text-muted-foreground">
+                        <span className="text-xs font-semibold uppercase tracking-wider">Vagas</span>
+                        <span className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300"><Car className="w-4 h-4" /></span>
+                    </div>
+                    <div>
+                        <span className="text-xl sm:text-2xl font-bold text-foreground block">{garageCard.spaces}</span>
+                        <span className="text-xs text-muted-foreground block leading-snug">
+                            {garageCard.summary}
+                            {garageCard.rentPerSpace !== null && <><br />Aluguel por vaga: <Money>{formatBRL2(garageCard.rentPerSpace)}</Money></>}
+                        </span>
+                    </div>
+                </div>
                 ) : (
                 <div className="p-5 rounded-2xl border border-border bg-card shadow-xs space-y-2">
                     <div className="flex items-center justify-between text-muted-foreground">

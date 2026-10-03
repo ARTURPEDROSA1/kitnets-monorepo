@@ -22,6 +22,7 @@ import { STRATEGY_LABELS, investmentTitle, type NewInvestment } from "@/lib/new-
 import { loadInvestmentList } from "@/lib/new-investments-server";
 import { mappableProjects } from "@/lib/project-hub";
 import { loadPropertyEntries, type PropertyEntry } from "@/lib/property-entries-server";
+import { PROPERTY_TYPE_LABELS } from "@/lib/property-type";
 import { INCOME_DIRECT_COLUMNS, aggregateIncomeByMonth, breakdown, currentMonthKey, monthKey, summarize, type PropertyIncomeRow } from "@/lib/property-income";
 import { landlordIptuForMonth, normalizeInstallments, taxScopeForProperty, type PropertyTax } from "@/lib/property-taxes";
 import { loadTenantList } from "@/lib/tenant-views-server";
@@ -135,7 +136,7 @@ export function propertyPinSources(entries: PropertyEntry[]): PinSource[] {
         id: e.key,
         kind: "property",
         label: e.name,
-        subtitle: e.propertyType === "multi" ? `${e.units} ${e.units === 1 ? "unidade" : "unidades"}` : "Unifamiliar",
+        subtitle: e.propertyType === "multi" ? `${e.units} ${e.units === 1 ? "unidade" : "unidades"}` : PROPERTY_TYPE_LABELS[e.propertyType],
         address: e.address,
         href: e.id ? `/imoveis?id=${e.id}` : "/imoveis",
         cover: e.photos[0] ?? null,

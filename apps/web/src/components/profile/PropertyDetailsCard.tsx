@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { cn } from "@/lib/utils";
+import { GARAGE_LOCATION_LABELS, garageSummary, type PropertyType } from "@/lib/property-type";
 import { PdfViewerModal } from "@/components/ui/PdfViewerModal";
 
 // ── Types ──────────────────────────────────────────────────────────
@@ -41,6 +42,13 @@ export interface PropertyDetails {
     laundry?: "none" | "individual" | "shared";
     ac?: "none" | "cold" | "cold_hot";
     cooktop?: "none" | "gas" | "electric" | "induction";
+    // Garage (a parking space rented on its own; `parkingSpaces` holds how many) — lib/property-type.ts
+    /** the garage of a street house, or a space in a building / condominium */
+    garageLocation?: "house" | "building" | "";
+    garageCover?: "covered" | "uncovered" | "";
+    /** how the building identifies the space: "Vaga 23 · G2" */
+    garageSpotLabel?: string;
+    garageElectricGate?: boolean;
     // Cost Center & Financial Metrics
     /** Who pays the property tax. 'landlord' adds an IPTU column to the income ledger. Default 'tenant'. */
     iptuPaidBy?: 'tenant' | 'landlord';
@@ -225,7 +233,7 @@ interface DetailsProps {
     units: SubUnit[];
     onDetailsChange: (details: PropertyDetails) => void;
     onUnitsChange: (units: SubUnit[]) => void;
-    propertyType: "single" | "multi";
+    propertyType: PropertyType;
     propertyId?: string;
     initialOpen?: boolean;
     onOpenChange?: (open: boolean) => void;
@@ -303,7 +311,7 @@ export default function PropertyDetailsCard({
                     <h3 className="text-lg font-semibold text-foreground">Dados do Imóvel</h3>
                     {!isOpen && (details.propertyName || details.totalSqMeters) && (
                         <span className="ml-2 text-xs bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 px-2 py-0.5 rounded-full">
-                            {details.propertyName ? `${details.propertyName} · ` : ''}{details.totalSqMeters ? `${details.totalSqMeters} m²` : ''}{propertyType === 'multi' && details.numberOfUnits > 0 ? ` · ${details.numberOfUnits} unidades` : ''} ✓
+                            {details.propertyName ? `${details.propertyName} · ` : ''}{details.totalSqMeters ? `${details.totalSqMeters} m²` : ''}{propertyType === 'multi' && details.numberOfUnits > 0 ? ` · ${details.numberOfUnits} unidades` : ''}{propertyType === 'garage' ? ` · ${garageSummary(details)}` : ''} ✓
                         </span>
                     )}
                 </div>
@@ -325,7 +333,7 @@ export default function PropertyDetailsCard({
                         <Input
                             value={details.propertyName || ''}
                             onChange={(e) => updateDetail("propertyName", e.target.value)}
-                            placeholder="ex: Casa Principal, Edifício Aurora"
+                            placeholder={propertyType === "garage" ? "ex: Garagem Rua Atlas, Vaga 23 Ed. Aurora" : "ex: Casa Principal, Edifício Aurora"}
                         />
                     </div>
 
@@ -414,6 +422,65 @@ export default function PropertyDetailsCard({
                                         }
                                     }}
                                     placeholder="ex: 1"
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Garage: how many spaces, where they are and how the building names them */}
+                    {propertyType === "garage" && (
+                        <div className="space-y-4 pt-1 border-t border-border/60">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-end">
+                                <div className="space-y-1.5">
+                                    <Label className="flex items-center gap-1.5">
+                                        <Car className="w-4 h-4 text-muted-foreground" />
+                                        Vagas
+                                    </Label>
+                                    <Input
+                                        type="number"
+                                        min={1}
+                                        value={details.parkingSpaces !== undefined ? details.parkingSpaces : '1'}
+                                        onChange={(e) => updateDetail("parkingSpaces", e.target.value)}
+                                        placeholder="ex: 1"
+                                    />
+                                </div>
+                                <SelectField
+                                    label="Local"
+                                    value={details.garageLocation || ''}
+                                    onChange={(val) => updateDetail("garageLocation", val as PropertyDetails["garageLocation"])}
+                                    icon={<Building2 className="w-4 h-4 text-muted-foreground" />}
+                                    options={[
+                                        { value: "", label: "Selecione" },
+                                        { value: "house", label: GARAGE_LOCATION_LABELS.house },
+                                        { value: "building", label: GARAGE_LOCATION_LABELS.building },
+                                    ]}
+                                />
+                                <SelectField
+                                    label="Cobertura"
+                                    value={details.garageCover || ''}
+                                    onChange={(val) => updateDetail("garageCover", val as PropertyDetails["garageCover"])}
+                                    icon={<Home className="w-4 h-4 text-muted-foreground" />}
+                                    options={[
+                                        { value: "", label: "Selecione" },
+                                        { value: "covered", label: "Coberta" },
+                                        { value: "uncovered", label: "Descoberta" },
+                                    ]}
+                                />
+                                <div className="space-y-1.5">
+                                    <Label>Identificação</Label>
+                                    <Input
+                                        value={details.garageSpotLabel || ''}
+                                        onChange={(e) => updateDetail("garageSpotLabel", e.target.value)}
+                                        placeholder="ex: Vaga 23 · G2"
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex flex-wrap gap-5">
+                                <Checkbox
+                                    checked={details.garageElectricGate || false}
+                                    onChange={(val) => updateDetail("garageElectricGate", val)}
+                                    label="Portão eletrônico"
+                                    icon={<DoorOpen className="w-4 h-4" />}
                                 />
                             </div>
                         </div>
@@ -528,8 +595,8 @@ export default function PropertyDetailsCard({
                         </div>
                     )}
 
-                    {/* Solar Energy */}
-                    <div className="space-y-3">
+                    {/* Solar Energy (a garage has no generation of its own) */}
+                    {propertyType !== "garage" && <div className="space-y-3">
                         <Checkbox
                             checked={details.solarEnergy}
                             onChange={(val) => updateDetail("solarEnergy", val)}
@@ -580,7 +647,7 @@ export default function PropertyDetailsCard({
                                 </div>
                             </div>
                         )}
-                    </div>
+                    </div>}
 
                     {/* Main Meters & Utilities */}
                     <div className="space-y-2">

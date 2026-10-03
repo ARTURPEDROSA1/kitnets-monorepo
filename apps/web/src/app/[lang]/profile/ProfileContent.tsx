@@ -6,7 +6,7 @@ import { Button } from '@kitnets/ui';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Image from 'next/image';
-import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera, Video, Sparkles, Save, UploadCloud, Home, Building2, User, ShieldCheck, Fingerprint, ChevronDown, ChevronUp, Wand2, Plus, ArrowRight, Minus, Edit3, X, Search, Sun, ArrowLeft } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, FileText, Loader2, Trash2, MapPin, Camera, Video, Sparkles, Save, UploadCloud, Home, Building2, Car, User, ShieldCheck, Fingerprint, ChevronDown, ChevronUp, Wand2, Plus, ArrowRight, Minus, Edit3, X, Search, Sun, ArrowLeft } from 'lucide-react';
 import PropertyDetailsCard, { PropertyDetails, SubUnit, SubUnitsSection, Checkbox as DetailCheckbox, defaultSubUnit, type UnitContractFile } from '@/components/profile/PropertyDetailsCard';
 import SubUnitsFlatSection from '@/components/profile/SubUnitsFlatSection';
 import LeaseImportModal, { type LeaseImportResult } from '@/components/contratos/LeaseImportModal';
@@ -23,6 +23,7 @@ import PortfolioStrip, { type PortfolioIncomeData, type PortfolioTotalsData } fr
 import PhotoLightbox from '@/components/investments/PhotoLightbox';
 import PropertyCostCenterDashboard from '@/components/properties/PropertyCostCenterDashboard';
 import { cn } from '@/lib/utils';
+import { PROPERTY_TYPE_LABELS, parsePropertyType, type PropertyType } from '@/lib/property-type';
 import { uploadPropertyPhoto, uploadPropertyVideo } from '@/lib/property-media-upload';
 import { Sensitive } from '@/components/privacy';
 import { useUser, useAuth } from '@clerk/nextjs';
@@ -76,7 +77,7 @@ export const dedupeProofs = (proofsList: ProofData[]): ProofData[] => {
 // Per-property bundled state
 interface PropertyState {
     id?: string;
-    propertyType: 'single' | 'multi';
+    propertyType: PropertyType;
     details: PropertyDetails;
     subUnits: SubUnit[];
     address: {
@@ -112,6 +113,8 @@ interface PropertyState {
 }
 
 type ProfileView = 'proprietario' | 'imoveis' | 'full';
+
+const GARAGE_DESCRIPTION_PLACEHOLDER = "Ex: Vaga coberta para um carro, com portão eletrônico e acesso 24 horas, a duas quadras do metrô...";
 
 interface ProfileContentProps {
     dict: Dictionary;
@@ -226,20 +229,20 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
     // NOTE: ownership tab label is set below after `properties` state is defined
 
     // Property type: single-family or multi-family
-    const [propertyType, setPropertyType] = useState<'single' | 'multi'>('single');
+    const [propertyType, setPropertyType] = useState<PropertyType>('single');
 
     // ── Multi-Property State ──
     const emptyPropertyAddress = () => ({
         cep: '', street: '', number: '', city: '', state: '', neighborhood: '', complement: '', description: ''
     });
-    const emptyPropertyDetails = (type?: 'single' | 'multi'): PropertyDetails => ({
+    const emptyPropertyDetails = (type?: PropertyType): PropertyDetails => ({
         propertyName: '', cadastroImobiliario: '', inscricaoImobiliaria: '', matricula: '',
         areaLote: '', areaEdificada: '', numberOfUnits: type === 'multi' ? 1 : 0, totalSqMeters: '',
         solarEnergy: false, solarKwp: '', mainMeters: { water: false, energy: false, gas: false }, internetBill: false,
         rooms: '', bedrooms: '', bathrooms: '', parkingSpaces: '1',
         kitchenCabinets: false, laundry: 'none', ac: 'none', cooktop: 'none',
     });
-    const createEmptyProperty = (type: 'single' | 'multi'): PropertyState => ({
+    const createEmptyProperty = (type: PropertyType): PropertyState => ({
         propertyType: type,
         details: emptyPropertyDetails(type),
         subUnits: type === 'multi' ? [defaultSubUnit(0)] : [],
@@ -267,10 +270,10 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
     const [expandedPropertyIdx, setExpandedPropertyIdx] = useState<number | null>(null);
     const [collapsedUnitsTrees, setCollapsedUnitsTrees] = useState<Record<number, boolean>>({});
 
-    // Count all leasable units (1 per single-family property + count of units for multi-family)
+    // Count all leasable units (1 per single-family property or garage + count of units for multi-family)
     const totalUnits = useMemo(() => {
         return properties.reduce((acc, prop) => {
-            if (prop.propertyType === 'single') return acc + 1;
+            if (prop.propertyType !== 'multi') return acc + 1;
             const count = (prop.subUnits && prop.subUnits.length > 0)
                 ? prop.subUnits.length
                 : (prop.details?.numberOfUnits || 0);
@@ -439,7 +442,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
             window.localStorage.setItem(cardsCacheKey, JSON.stringify(snapshot));
         } catch { /* storage blocked or full: the next visit shows skeletons instead */ }
     }, [properties, propertiesLoaded, realIncomeLoaded, realIncomeByProperty, cardsCacheKey]);
-    const [imoveisFilterTab, setImoveisFilterTab] = useState<'all' | 'multi' | 'single' | 'solar'>('all');
+    const [imoveisFilterTab, setImoveisFilterTab] = useState<'all' | PropertyType | 'solar'>('all');
     const [imoveisSearch, setImoveisSearch] = useState('');
 
     // Add Property modal + wizard
@@ -676,7 +679,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                     console.log('[Profile] Loaded profile:', profile.id, 'clerk_id:', profile.clerk_id);
                     setProfileId(profile.id);
                     if (profile.person_type) setPersonType(profile.person_type as 'pf' | 'pj');
-                    if (profile.property_type) setPropertyType(profile.property_type as 'single' | 'multi');
+                    if (profile.property_type) setPropertyType(parsePropertyType(profile.property_type));
                     if (profile.admin_data) {
                         const ad = profile.admin_data as Record<string, unknown>;
                         setAdminData({
@@ -771,7 +774,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
 
                     const primaryProperty: PropertyState = {
                         id: matchedPrimary?.id,
-                        propertyType: (profile.property_type as 'single' | 'multi') || 'single',
+                        propertyType: parsePropertyType(profile.property_type),
                         details: primaryPropDetails ? {
                             propertyName: primaryPropDetails.propertyName || '',
                             cadastroImobiliario: primaryPropDetails.cadastroImobiliario || '',
@@ -795,7 +798,11 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             laundry: primaryPropDetails.laundry || 'none',
                             ac: primaryPropDetails.ac || 'none',
                             cooktop: primaryPropDetails.cooktop || 'none',
-                        } : emptyPropertyDetails((profile.property_type as 'single' | 'multi') || 'single'),
+                            garageLocation: primaryPropDetails.garageLocation || '',
+                            garageCover: primaryPropDetails.garageCover || '',
+                            garageSpotLabel: primaryPropDetails.garageSpotLabel || '',
+                            garageElectricGate: primaryPropDetails.garageElectricGate || false,
+                        } : emptyPropertyDetails(parsePropertyType(profile.property_type)),
                         subUnits: (profile.property_type === 'multi' && primarySubUnits.length === 0) ? [defaultSubUnit(0)] : primarySubUnits,
                         address: primaryPropAddr,
                         photos: [],
@@ -836,7 +843,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             const hasAddPhotos = (Array.isArray(apTyped.savedPhotos) && apTyped.savedPhotos.length > 0) || (Array.isArray(apTyped.savedVideos) && apTyped.savedVideos.length > 0);
                             const hasAddDesc = Boolean(apTyped.address && (apTyped.address as PropertyState['address']).description);
 
-                            const propType = (apTyped.propertyType as 'single' | 'multi') || 'single';
+                            const propType = parsePropertyType(apTyped.propertyType);
                             const apDetails = apTyped.details as PropertyDetails | undefined;
                             const apUnits = Array.isArray(apTyped.subUnits) ? apTyped.subUnits as SubUnit[] : [];
 
@@ -1254,6 +1261,10 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                         laundry: prop.details.laundry,
                         ac: prop.details.ac,
                         cooktop: prop.details.cooktop,
+                        garageLocation: prop.details.garageLocation,
+                        garageCover: prop.details.garageCover,
+                        garageSpotLabel: prop.details.garageSpotLabel,
+                        garageElectricGate: prop.details.garageElectricGate,
                     },
                 }),
             });
@@ -2099,8 +2110,9 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
     const propertyCounts = useMemo(() => {
         const multi = properties.filter(p => p.propertyType === 'multi').length;
         const single = properties.filter(p => p.propertyType === 'single').length;
+        const garage = properties.filter(p => p.propertyType === 'garage').length;
         const solar = properties.filter(p => p.details?.solarEnergy).length;
-        return { all: properties.length, multi, single, solar };
+        return { all: properties.length, multi, single, garage, solar };
     }, [properties]);
 
     const filteredProperties = useMemo(() => {
@@ -2110,6 +2122,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
             .filter(({ prop }) => {
                 if (imoveisFilterTab === 'multi' && prop.propertyType !== 'multi') return false;
                 if (imoveisFilterTab === 'single' && prop.propertyType !== 'single') return false;
+                if (imoveisFilterTab === 'garage' && prop.propertyType !== 'garage') return false;
                 if (imoveisFilterTab === 'solar' && !prop.details?.solarEnergy) return false;
 
                 if (imoveisSearch.trim()) {
@@ -2229,8 +2242,8 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
         const isExpanded = mode === 'accordion' ? expandedPropertyIdx === propIdx : true;
         const propComplete = isPropertyComplete(prop);
         const propLabel = prop.details?.propertyName || `Propriedade ${propIdx + 1}`;
-        const propIcon = prop.propertyType === 'single' ? <Home className="w-4 h-4" /> : <Building2 className="w-4 h-4" />;
-        const propTypeName = prop.propertyType === 'single' ? 'Unifamiliar' : 'Multifamiliar';
+        const propIcon = prop.propertyType === 'single' ? <Home className="w-4 h-4" /> : prop.propertyType === 'garage' ? <Car className="w-4 h-4" /> : <Building2 className="w-4 h-4" />;
+        const propTypeName = PROPERTY_TYPE_LABELS[prop.propertyType];
 
         // Per-property local aliases
         const pAddr = prop.address;
@@ -2755,7 +2768,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             </div>
                             <textarea
                                 className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[120px]"
-                                placeholder="Ex: Excelente apartamento com varanda gourmet, vista livre, armários planejados na cozinha e banheiros..."
+                                placeholder={pType === 'garage' ? GARAGE_DESCRIPTION_PLACEHOLDER : "Ex: Excelente apartamento com varanda gourmet, vista livre, armários planejados na cozinha e banheiros..."}
                                 value={pAddr.description || ''}
                                 onChange={(e) => handlePropAddrChange('description', e.target.value)}
                             />
@@ -3277,7 +3290,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                 </div>
                                 <textarea
                                     className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[120px]"
-                                    placeholder="Ex: Excelente apartamento com varanda gourmet, vista livre, armários planejados na cozinha e banheiros..."
+                                    placeholder={pType === 'garage' ? GARAGE_DESCRIPTION_PLACEHOLDER : "Ex: Excelente apartamento com varanda gourmet, vista livre, armários planejados na cozinha e banheiros..."}
                                     value={pAddr.description || ''}
                                     onChange={(e) => handlePropAddrChange('description', e.target.value)}
                                 />
@@ -3427,7 +3440,9 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                     "p-2 rounded-lg flex-shrink-0",
                                     prop.propertyType === 'single'
                                         ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600"
-                                        : "bg-violet-100 dark:bg-violet-900/50 text-violet-600"
+                                        : prop.propertyType === 'garage'
+                                            ? "bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300"
+                                            : "bg-violet-100 dark:bg-violet-900/50 text-violet-600"
                                 )}>
                                     {propIcon}
                                 </div>
@@ -3672,6 +3687,18 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                         </button>
                                         <button
                                             type="button"
+                                            onClick={() => setImoveisFilterTab('garage')}
+                                            className={cn(
+                                                "px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap",
+                                                imoveisFilterTab === 'garage'
+                                                    ? "bg-slate-700 text-white shadow-xs"
+                                                    : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                                            )}
+                                        >
+                                            Garagem ({propertyCounts.garage})
+                                        </button>
+                                        <button
+                                            type="button"
                                             onClick={() => setImoveisFilterTab('solar')}
                                             className={cn(
                                                 "px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap flex items-center gap-1",
@@ -3891,7 +3918,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                     <div>
                                         <h2 className="text-xl font-bold text-foreground">
                                             {properties[selectedPropertyIdx ?? properties.length - 1]?.details?.propertyName ||
-                                                `Cadastrar Imóvel (${properties[selectedPropertyIdx ?? properties.length - 1]?.propertyType === 'multi' ? 'Multifamiliar' : 'Unifamiliar'})`}
+                                                `Cadastrar Imóvel (${PROPERTY_TYPE_LABELS[properties[selectedPropertyIdx ?? properties.length - 1]?.propertyType ?? 'single']})`}
                                         </h2>
                                         <p className="text-xs text-muted-foreground">
                                             Preencha os dados passo a passo para gerar o centro de custos e o painel financeiro.
@@ -4624,12 +4651,12 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
             {
                 showAddPropertyModal && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                        <div className="bg-background rounded-xl p-8 max-w-lg w-full space-y-6 shadow-2xl border border-border animate-in fade-in zoom-in-95 duration-200">
+                        <div className="bg-background rounded-xl p-8 max-w-2xl w-full max-h-[calc(100vh-2rem)] overflow-y-auto space-y-6 shadow-2xl border border-border animate-in fade-in zoom-in-95 duration-200">
                             <div className="text-center space-y-2">
                                 <h3 className="text-xl font-bold text-foreground">Adicionar Propriedade</h3>
                                 <p className="text-sm text-muted-foreground">Selecione o tipo de propriedade que deseja cadastrar.</p>
                             </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -4674,6 +4701,29 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                     <div>
                                         <p className="font-semibold text-foreground">Multifamiliar</p>
                                         <p className="text-xs text-muted-foreground mt-1">Prédio, vila ou condomínio</p>
+                                    </div>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const newProp = createEmptyProperty('garage');
+                                        const newIdx = properties.length;
+                                        setProperties(prev => [...prev, newProp]);
+                                        setSelectedPropertyIdx(newIdx);
+                                        setExpandedPropertyIdx(newIdx);
+                                        if (view === 'imoveis') {
+                                            setImoveisViewMode('wizard');
+                                        }
+                                        setShowAddPropertyModal(false);
+                                    }}
+                                    className="group flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-border hover:border-slate-400 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-all duration-200 text-center"
+                                >
+                                    <div className="p-3 bg-slate-200 dark:bg-slate-800/60 rounded-xl text-slate-700 dark:text-slate-300 group-hover:scale-110 transition-transform">
+                                        <Car className="w-8 h-8" />
+                                    </div>
+                                    <div>
+                                        <p className="font-semibold text-foreground">Garagem</p>
+                                        <p className="text-xs text-muted-foreground mt-1">Vaga em casa de rua ou em prédio</p>
                                     </div>
                                 </button>
                             </div>
