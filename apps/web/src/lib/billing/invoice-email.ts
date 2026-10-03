@@ -54,11 +54,13 @@ const code = (label: string, value: string) => `
       <p style="margin:16px 0 4px;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#6b7280">${label}</p>
       <p style="margin:0;padding:10px 12px;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;word-break:break-all;color:#111827">${escape(value)}</p>`;
 
+const SHELL_OPEN = `<div style="max-width:560px;margin:0 auto;padding:24px 16px">`;
+
 function shell(subject: string, eyebrow: string, eyebrowColor: string, title: string, body: string, senderName: string): string {
     return `<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${escape(subject)}</title></head>
 <body style="margin:0;background:#f3f4f6;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111827">
-  <div style="max-width:560px;margin:0 auto;padding:24px 16px">
+  ${SHELL_OPEN}
     <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:24px">
       <p style="margin:0 0 4px;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:${eyebrowColor}">${escape(eyebrow)}</p>
       <h1 style="margin:0 0 16px;font-size:20px">${escape(title)}</h1>
@@ -187,6 +189,16 @@ export function buildReceiptEmail(input: ReceiptEmailInput): EmailContent {
       </table>
       <p style="margin:24px 0 0;font-size:13px;color:#6b7280">Este e-mail comprova o recebimento. <a href="${escape(input.pageUrl)}" style="color:#059669">Ver a fatura</a>.</p>`;
     return { subject, text: lines.join("\n"), html: shell(subject, "Recibo", "#059669", `Fatura nº ${input.number} — ${month} — paga`, body, input.senderName) };
+}
+
+/** Marks an e-mail as a copy sent to the owner: the subject, a first line in the text and a band on top of the HTML. */
+export function withCopyNote(content: EmailContent, note: string): EmailContent {
+    const band = `<p style="margin:0 0 12px;padding:10px 12px;border:1px dashed #9ca3af;border-radius:8px;background:#ffffff;font-size:13px;color:#374151">${escape(note)}</p>`;
+    return {
+        subject: `[Cópia] ${content.subject}`,
+        text: `${note}\n\n${content.text}`,
+        html: content.html.replace(SHELL_OPEN, `${SHELL_OPEN}\n    ${band}`),
+    };
 }
 
 /** The e-mail's sender as the tenant sees it: the owner's name, with the platform's address. */

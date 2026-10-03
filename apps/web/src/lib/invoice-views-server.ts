@@ -22,7 +22,7 @@ import type { LeaseWithDetails } from "@/types/lease";
 import type { BillingSettingsView, InvoiceChargeView, InvoiceDeliveryView, InvoiceDetailView, InvoiceEventView, InvoiceItemView, InvoiceListView, InvoiceView, RecurringLease } from "@/lib/invoice-views";
 
 const INVOICE_COLUMNS =
-    "id, number, lease_id, property_id, unit_id, unit_name, tenant_id, reference_month, due_date, amount, status, origin, blockers, payer_name, payer_email, issued_at, paid_on, paid_amount, late_fee_amount, surcharge_amount, paid_via, cancelled_at, cancel_reason, notes, created_at";
+    "id, number, lease_id, property_id, unit_id, unit_name, tenant_id, reference_month, due_date, amount, status, origin, blockers, payer_name, payer_email, issued_at, paid_on, paid_amount, late_fee_amount, surcharge_amount, paid_via, cancelled_at, cancel_reason, notes, created_at, first_viewed_at, last_viewed_at, view_count";
 const INVOICE_SELECT = `${INVOICE_COLUMNS}, property:properties!property_id(name), tenant:tenants!tenant_id(full_name), lease:leases!lease_id(reference_name)`;
 const PAGE = 1000;
 
@@ -37,7 +37,7 @@ export const toChargeView = (c: ChargeRow | null | undefined): InvoiceChargeView
 
 /** What the screens get of an e-mail: never the provider's id. */
 export const toDeliveryView = (d: DeliveryRow | null | undefined): InvoiceDeliveryView | null => d ? ({
-    id: d.id, kind: d.kind, status: d.status, recipient: d.recipient, attempts: d.attempts, sent_at: d.sent_at, last_error: d.last_error, created_at: d.created_at,
+    id: d.id, kind: d.kind, status: d.status, recipient: d.recipient, attempts: d.attempts, sent_at: d.sent_at, delivered_at: d.delivered_at, last_error: d.last_error, created_at: d.created_at,
 }) : null;
 
 function toInvoiceView(row: Record<string, unknown>, items: InvoiceItemView[], charge: ChargeRow | null = null, delivery: DeliveryRow | null = null, card: ChargeRow | null = null): InvoiceView {
@@ -68,6 +68,9 @@ function toInvoiceView(row: Record<string, unknown>, items: InvoiceItemView[], c
         cancel_reason: (row.cancel_reason as string | null) ?? null,
         notes: (row.notes as string | null) ?? null,
         created_at: String(row.created_at),
+        first_viewed_at: (row.first_viewed_at as string | null) ?? null,
+        last_viewed_at: (row.last_viewed_at as string | null) ?? null,
+        view_count: num(row.view_count),
         property_name: joined("property", "name"),
         tenant_name: joined("tenant", "full_name"),
         lease_reference: joined("lease", "reference_name"),

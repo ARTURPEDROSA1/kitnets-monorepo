@@ -206,6 +206,33 @@ export const settingsPending = (s: BillingSettingsView): string[] => [
     s.automation_from_month === null ? "mês inicial da emissão automática" : null,
 ].filter((v): v is string => v !== null);
 
+/** How far the invoice got on its way to the tenant: the furthest thing known. */
+export type DeliveryState = "visualizada" | "entregue" | "enviado" | "devolvido" | "falhou" | "enviando" | "nenhum";
+
+export const DELIVERY_STATE_META: Record<DeliveryState, { label: string; tone: string }> = {
+    visualizada: { label: "Visualizada", tone: "text-emerald-700 dark:text-emerald-400" },
+    entregue: { label: "Entregue", tone: "text-sky-700 dark:text-sky-400" },
+    enviado: { label: "Enviado", tone: "text-foreground" },
+    devolvido: { label: "Devolvido", tone: "text-rose-600 dark:text-rose-400" },
+    falhou: { label: "Não enviado", tone: "text-rose-600 dark:text-rose-400" },
+    enviando: { label: "Em envio", tone: "text-muted-foreground" },
+    nenhum: { label: "Sem e-mail", tone: "text-muted-foreground" },
+};
+
+/**
+ * Opening the page beats everything (the tenant saw it, however the link got there); then what the
+ * provider reported of the latest e-mail: bounced, failed, delivered, or just accepted.
+ */
+export function deliveryState(invoice: Pick<InvoiceView, "delivery" | "first_viewed_at">): DeliveryState {
+    if (invoice.first_viewed_at) return "visualizada";
+    const d = invoice.delivery;
+    if (!d) return "nenhum";
+    if (d.status === "BOUNCED") return "devolvido";
+    if (d.status === "FAILED") return "falhou";
+    if (d.status === "SENT") return d.delivered_at ? "entregue" : "enviado";
+    return "enviando";
+}
+
 /** The e-mail did not reach the tenant, or has been "sending" for longer than a run lasts. */
 export const deliveryStuck = (invoice: Pick<InvoiceView, "delivery">, now: number): boolean => {
     const d = invoice.delivery;
@@ -248,7 +275,7 @@ export function invoiceAttention(rows: readonly InvoiceRow[], recurring: readonl
         const d = r.invoice.delivery as NonNullable<InvoiceView["delivery"]>;
         items.push({
             kind: "email_failed", tone: "amber", subject: `Fatura nº ${r.invoice.number} · ${r.place}`,
-            text: d.status === "SENDING" ? "o e-mail ao inquilino está preso em envio: reenvie" : `o e-mail ao inquilino não foi enviado: ${d.last_error ?? "motivo não informado"}`,
+            text: d.status === "SENDING" ? "o e-mail ao inquilino está preso em envio: reenvie" : d.status === "BOUNCED" ? `o e-mail ao inquilino voltou: ${d.last_error ?? "endereço recusado"} — confira o e-mail no cadastro e reenvie` : `o e-mail ao inquilino não foi enviado: ${d.last_error ?? "motivo não informado"}`,
             target: { type: "invoice", id: r.invoice.id },
         });
     }

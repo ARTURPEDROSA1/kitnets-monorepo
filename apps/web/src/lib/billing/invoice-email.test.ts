@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildInvoiceEmail, buildReceiptEmail, senderAddress, type InvoiceEmailInput } from "./invoice-email";
+import { buildInvoiceEmail, buildReceiptEmail, senderAddress, withCopyNote, type InvoiceEmailInput } from "./invoice-email";
 
 const input = (over: Partial<InvoiceEmailInput> = {}): InvoiceEmailInput => ({
     number: 12,
@@ -126,5 +126,19 @@ describe("buildReceiptEmail", () => {
         expect(text).not.toContain("Taxa de processamento");
         expect(text).toContain("Total pago: R$ 249,90");
         expect(buildReceiptEmail({ ...receipt, paidVia: null, lateFee: 0, surcharge: 0 }).text).toContain("em 27/10/2026. Obrigado!");
+    });
+});
+
+describe("withCopyNote", () => {
+    it("marks the subject, the text and the HTML, and leaves the rest as the tenant gets it", () => {
+        const original = buildInvoiceEmail(input());
+        const copy = withCopyNote(original, "Cópia do e-mail da fatura que o inquilino recebe (ana@example.com).");
+        expect(copy.subject).toBe(`[Cópia] ${original.subject}`);
+        expect(copy.text.startsWith("Cópia do e-mail da fatura que o inquilino recebe (ana@example.com).\n\nOlá, Ana,")).toBe(true);
+        expect(copy.html).toContain("Cópia do e-mail da fatura que o inquilino recebe (ana@example.com).");
+        expect(copy.html.length).toBeGreaterThan(original.html.length);
+        expect(copy.html).toContain("Ver fatura e pagar");
+        // the note is escaped like everything else
+        expect(withCopyNote(original, "a <b> & c").html).toContain("a &lt;b&gt; &amp; c");
     });
 });

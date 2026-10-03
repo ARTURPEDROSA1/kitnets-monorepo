@@ -11,20 +11,22 @@
  *
  * Every function is scoped to the account (`profileId`).
  */
+import { randomUUID } from "node:crypto";
 import type { AdminSupabase } from "@/lib/api-auth";
 import { env } from "@/lib/env";
-import { notFound } from "@/lib/api-route";
+import { HttpError, badRequest, notFound } from "@/lib/api-route";
 import { cardFeeDecided } from "@/lib/card-gross-up";
 import { lateCharges, stillPayable } from "@/lib/invoice-late-fees";
 import { todayBRT } from "@/lib/lease-dashboard";
 import { EmailError, emailAvailable, sendEmail, type EmailAttachment } from "./email-provider";
-import { buildInvoiceEmail, buildReceiptEmail, senderAddress, type EmailContent } from "./invoice-email";
+import { buildInvoiceEmail, buildReceiptEmail, senderAddress, withCopyNote, type EmailContent } from "./invoice-email";
+import { bounceReason, type ResendEvent } from "./resend-webhook";
 import { usableStripeAccount } from "./stripe-connection-server";
 
 // the same bucket charges-server.ts writes the boleto PDFs to (not imported: that module imports this one)
 const INVOICE_DOCUMENTS_BUCKET = "invoice-documents";
 const TABLE = "invoice_deliveries";
-const COLUMNS = "id, invoice_id, owner_id, kind, sequence, recipient, status, provider_id, attempts, last_error, locked_at, sent_at, created_at";
+const COLUMNS = "id, invoice_id, owner_id, kind, sequence, recipient, status, provider_id, attempts, last_error, locked_at, sent_at, delivered_at, bounced_at, complained_at, created_at";
 
 export type DeliveryKind = "ISSUE" | "REMINDER" | "RECEIPT" | "RESEND";
 export type DeliveryStatus = "PENDING" | "SENDING" | "SENT" | "FAILED" | "BOUNCED";
@@ -46,6 +48,12 @@ export interface DeliveryRow {
     last_error: string | null;
     locked_at: string | null;
     sent_at: string | null;
+    /** the provider's webhook: reached the tenant's mailbox */
+    delivered_at: string | null;
+    /** the provider's webhook: the address does not take mail (status BOUNCED) */
+    bounced_at: string | null;
+    /** the provider's webhook: the tenant marked it as spam */
+    complained_at: string | null;
     created_at: string;
 }
 
@@ -210,10 +218,17 @@ export async function queueDelivery(supabase: AdminSupabase, profileId: string, 
     return normalize(data as Record<string, unknown>);
 }
 
-/** What the e-mail is made of, by kind; or the reason the invoice is not in a state for it. */
-async function compose(supabase: AdminSupabase, profileId: string, invoice: InvoiceForEmail, delivery: DeliveryRow, senderName: string, settings: OwnerSettings, attachments: EmailAttachment[]): Promise<{ content: EmailContent } | { refuse: string }> {
+/** The boleto's PDF, when the bank has given it. */
+async function boletoAttachment(supabase: AdminSupabase, invoice: InvoiceForEmail): Promise<EmailAttachment[]> {
+    if (!invoice.charge?.pdf_path) return [];
+    const { data: file } = await supabase.storage.from(INVOICE_DOCUMENTS_BUCKET).download(invoice.charge.pdf_path);
+    return file ? [{ filename: `fatura-${invoice.number}-boleto.pdf`, content: Buffer.from(await file.arrayBuffer()), contentType: "application/pdf" }] : [];
+}
+
+/** What the e-mail is made of, by kind; or the reason the invoice is not in a state for it. A copy's link does not count as the tenant opening the page. */
+async function compose(supabase: AdminSupabase, profileId: string, invoice: InvoiceForEmail, delivery: Pick<DeliveryRow, "kind" | "sequence">, senderName: string, settings: OwnerSettings, attachments: EmailAttachment[], opts: { copy?: boolean } = {}): Promise<{ content: EmailContent } | { refuse: string }> {
     const place = [invoice.property_name, invoice.unit_name].filter(Boolean).join(" · ") || "Imóvel";
-    const common = { number: invoice.number, place, tenantName: invoice.payer_name ?? invoice.tenant_name ?? "", items: invoice.items, amount: invoice.amount, referenceMonth: invoice.reference_month, pageUrl: publicInvoiceUrl(invoice.public_token), senderName };
+    const common = { number: invoice.number, place, tenantName: invoice.payer_name ?? invoice.tenant_name ?? "", items: invoice.items, amount: invoice.amount, referenceMonth: invoice.reference_month, pageUrl: publicInvoiceUrl(invoice.public_token) + (opts.copy ? "?copia=1" : ""), senderName };
 
     if (delivery.kind === "RECEIPT") {
         if (invoice.status !== "PAID" || !invoice.paid_on) return { refuse: "a fatura ainda não consta como paga" };
@@ -269,11 +284,7 @@ export async function sendDelivery(supabase: AdminSupabase, profileId: string, d
 
     const settings = await ownerSettings(supabase, profileId);
     const sender = await senderFor(supabase, profileId, settings);
-    const attachments: EmailAttachment[] = [];
-    if (delivery.kind !== "RECEIPT" && invoice.charge?.pdf_path) {
-        const { data: file } = await supabase.storage.from(INVOICE_DOCUMENTS_BUCKET).download(invoice.charge.pdf_path);
-        if (file) attachments.push({ filename: `fatura-${invoice.number}-boleto.pdf`, content: Buffer.from(await file.arrayBuffer()), contentType: "application/pdf" });
-    }
+    const attachments = delivery.kind !== "RECEIPT" ? await boletoAttachment(supabase, invoice) : [];
     const composed = await compose(supabase, profileId, invoice, delivery, sender.name, settings, attachments);
     if ("refuse" in composed) return fail(composed.refuse);
 
@@ -304,9 +315,10 @@ export async function sendInvoiceEmail(supabase: AdminSupabase, profileId: strin
  */
 export async function resendInvoiceEmail(supabase: AdminSupabase, profileId: string, invoiceId: string): Promise<DeliveryRow> {
     const existing = await loadDeliveries(supabase, profileId, invoiceId);
-    const unsent = existing.find(d => d.kind !== "RECEIPT" && (d.status === "PENDING" || d.status === "FAILED" || d.status === "BOUNCED"));
+    // a bounced delivery is finished (the address refused it): after the owner fixes the e-mail, a new one goes out
+    const unsent = existing.find(d => d.kind !== "RECEIPT" && (d.status === "PENDING" || d.status === "FAILED"));
     if (unsent) return (await sendDelivery(supabase, profileId, unsent.id)) ?? unsent;
-    return sendInvoiceEmail(supabase, profileId, invoiceId, existing.some(d => d.status === "SENT" && d.kind !== "RECEIPT") ? "RESEND" : "ISSUE");
+    return sendInvoiceEmail(supabase, profileId, invoiceId, existing.some(d => (d.status === "SENT" || d.status === "BOUNCED") && d.kind !== "RECEIPT") ? "RESEND" : "ISSUE");
 }
 
 /**
@@ -322,4 +334,61 @@ export async function sendReceipt(supabase: AdminSupabase, profileId: string, in
         console.error("[Invoices] receipt failed:", (err as Error).message);
         return null;
     }
+}
+
+/**
+ * The provider's webhook: what became of a message after it was accepted. The delivery is found by
+ * the provider's message id; an event seen before (`eventId`) is ignored. A message that is not a
+ * delivery of ours — a copy sent to the owner, another application's — is simply not handled.
+ */
+export async function applyEmailEvent(supabase: AdminSupabase, e: ResendEvent, eventId: string): Promise<{ handled: boolean; ignored: boolean }> {
+    const type = e.type === "email.delivered" ? "EMAIL_DELIVERED" : e.type === "email.bounced" ? "EMAIL_BOUNCED" : e.type === "email.complained" ? "EMAIL_COMPLAINED" : null;
+    if (!type) return { handled: false, ignored: true };
+    const { data, error } = await supabase.from(TABLE).select(COLUMNS).eq("provider_id", e.emailId).maybeSingle();
+    if (error) throw new Error(`invoice_deliveries: ${error.message}`);
+    if (!data) return { handled: false, ignored: true };
+    const delivery = normalize(data as Record<string, unknown>);
+    const reason = type === "EMAIL_BOUNCED" ? bounceReason(e.reason) : null;
+
+    const { error: eventError } = await supabase.from("invoice_events").insert({
+        invoice_id: delivery.invoice_id, owner_id: delivery.owner_id, type, actor: "SYSTEM",
+        detail: { kind: delivery.kind, sequence: delivery.sequence, ...(reason ? { reason } : {}) }, dedupe_key: `resend:${eventId}`,
+    });
+    if (eventError) {
+        if (eventError.code === "23505") return { handled: true, ignored: true };
+        throw new Error(`invoice_events: ${eventError.message}`);
+    }
+    const at = e.createdAt ?? new Date().toISOString();
+    const patch = type === "EMAIL_DELIVERED" ? { delivered_at: at }
+        : type === "EMAIL_BOUNCED" ? { status: "BOUNCED", bounced_at: at, last_error: reason }
+            : { complained_at: at };
+    const { error: updateError } = await supabase.from(TABLE).update(patch).eq("id", delivery.id);
+    if (updateError) throw new Error(`invoice_deliveries: ${updateError.message}`);
+    return { handled: true, ignored: false };
+}
+
+/**
+ * A copy of the e-mail the tenant gets — the invoice, or the receipt once it is paid — sent to the
+ * address the owner typed. Marked as a copy; not a delivery (the tenant's e-mails are untouched), and
+ * the link in it does not count as the tenant opening the page. Throws 400 when there is nothing to
+ * copy yet, 502 with the provider's reason, 503 when the server cannot e-mail.
+ */
+export async function sendInvoiceCopy(supabase: AdminSupabase, profileId: string, invoiceId: string, to: string): Promise<void> {
+    if (!emailAvailable()) throw new HttpError(503, { error: "O envio de e-mail não está configurado neste servidor." });
+    const invoice = await loadInvoiceForEmail(supabase, profileId, invoiceId);
+    const settings = await ownerSettings(supabase, profileId);
+    const sender = await senderFor(supabase, profileId, settings);
+    const kind: DeliveryKind = invoice.status === "PAID" ? "RECEIPT" : "ISSUE";
+    const attachments = kind !== "RECEIPT" ? await boletoAttachment(supabase, invoice) : [];
+    const composed = await compose(supabase, profileId, invoice, { kind, sequence: 0 }, sender.name, settings, attachments, { copy: true });
+    if ("refuse" in composed) throw badRequest({ _form: `Ainda não há o que copiar: ${composed.refuse}.` });
+    const note = `Cópia do e-mail ${kind === "RECEIPT" ? "de recibo" : "da fatura"} que o inquilino recebe${invoice.payer_email ? ` (${invoice.payer_email})` : " — ele ainda não tem e-mail cadastrado"}. Enviada a seu pedido; não conta como envio ao inquilino.`;
+    const content = withCopyNote(composed.content, note);
+    try {
+        await sendEmail({ from: sender.from, to, replyTo: sender.replyTo, subject: content.subject, text: content.text, html: content.html, attachments, idempotencyKey: randomUUID() });
+    } catch (err) {
+        if (err instanceof EmailError) throw new HttpError(502, { error: err.message });
+        throw err;
+    }
+    await event(supabase, profileId, invoiceId, "EMAIL_COPY", { kind });
 }

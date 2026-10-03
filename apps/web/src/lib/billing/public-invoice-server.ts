@@ -5,6 +5,7 @@
  * never pays an invoice the page should have known was settled.
  */
 import type { AdminSupabase } from "@/lib/api-auth";
+import { isCrawler } from "@/lib/crawler-guard";
 import { signStorageUrl } from "@/lib/storage";
 import { INVOICE_DOCUMENTS_BUCKET, isLiveBoleto, loadCharges, refreshCharge, type ChargeRow } from "./charges-server";
 import { cardOfferFor, isLiveCard, refreshCardOfInvoice } from "./card-server";
@@ -85,4 +86,27 @@ export async function publicBoletoPdfUrl(supabase: AdminSupabase, token: string)
     if (!row) return null;
     const charge = (await loadCharges(supabase, row.owner_id, row.id)).find(c => c.kind === "BOLEPIX" && c.pdf_path);
     return charge?.pdf_path ? signStorageUrl(supabase, INVOICE_DOCUMENTS_BUCKET, charge.pdf_path, 5 * 60) : null;
+}
+
+/**
+ * The page was opened: the owner sees the invoice as "visualizada". Not counted for a crawler or a
+ * link scanner, nor for the owner looking at their own invoice while signed in; at most once per half
+ * hour (the database decides). Never throws: the page renders whatever happens here.
+ */
+export async function recordPublicView(supabase: AdminSupabase, token: string, viewer: { userAgent: string | null; clerkUserId: string | null }): Promise<void> {
+    try {
+        if (isCrawler(viewer.userAgent)) return;
+        if (viewer.clerkUserId) {
+            const [row, { data: profile }] = await Promise.all([rowByToken(supabase, token), supabase.from("profiles").select("id").eq("clerk_id", viewer.clerkUserId).maybeSingle()]);
+            if (!row || profile?.id === row.owner_id) return;
+        }
+        const { data, error } = await supabase.rpc("invoice_record_view", { p_token: token });
+        if (error) throw new Error(error.message);
+        const counted = (Array.isArray(data) ? data[0] : data) as { invoice_id: string; owner_id: string; first_view: boolean } | null | undefined;
+        if (counted?.first_view) {
+            await supabase.from("invoice_events").insert({ invoice_id: counted.invoice_id, owner_id: counted.owner_id, type: "VIEWED", actor: "TENANT", detail: {} });
+        }
+    } catch (err) {
+        console.error("[Pagar] view not recorded:", (err as Error).message);
+    }
 }

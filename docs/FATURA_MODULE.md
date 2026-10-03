@@ -89,6 +89,7 @@ apps/web/src/
 │   ├── [id]/pagar-sandbox/route.ts   # POST (the bank's sandbox pays; outside production only)
 │   ├── [id]/cancelar/route.ts        # POST (cancels the boleto at the bank first)
 │   ├── [id]/reenviar/route.ts        # POST (the e-mail to the tenant, again)
+│   ├── [id]/copia/route.ts           # POST { email } (a copy of the tenant's e-mail to the address the owner types)
 │   ├── cobrancas/route.ts            # PUT (who collects a component · pause a lease)
 │   ├── configuracoes/route.ts        # PUT (billing conditions)
 │   └── conexoes/                     # GET (status) · inter: PUT (save + test) · DELETE · inter/testar: POST · stripe: POST (re-read) · DELETE · stripe/iniciar: POST · stripe/retorno: GET
@@ -98,6 +99,7 @@ apps/web/src/
 ├── app/api/pagar/[token]/boleto/route.ts # GET: redirect to the boleto's PDF (no login; IP limit)
 ├── app/api/pagar/[token]/cartao/route.ts # POST: opens the Stripe Checkout Session and sends the tenant there (no login; IP limit)
 ├── app/api/webhooks/stripe/route.ts  # POST: Stripe's Connect webhook (signature on the raw body; sessions read back)
+├── app/api/webhooks/resend/route.ts  # POST: Resend's webhook (Svix signature): delivered / bounced / complained
 ├── components/pagar/CopyCode.tsx     # the copy button of the tenant's page
 ├── components/faturas/
 │   ├── FaturasHub.tsx                # KPI strip, "Atenção", sections, view pills, search
@@ -130,6 +132,7 @@ apps/web/src/
         ├── charges-server.ts              # issue, refresh, cancel at the bank, PDF, the webhook's handling; a boleto turning OPEN e-mails the tenant
         ├── invoice-email.ts (+ test)      # the e-mails: invoice, reminder, overdue notice, receipt; the sender's display name
         ├── email-provider.ts (+ test)     # Resend over fetch, idempotency key = delivery id
+        ├── resend-webhook.ts (+ test)     # the Svix signature and the event of Resend's webhook
         ├── deliveries-server.ts           # queue, claim, send; resend by the owner
         ├── public-invoice.ts (+ test)     # what the tenant's page shows, the token's shape, the masked CPF
         ├── public-invoice-server.ts       # the invoice behind a token (refreshes a stale boleto first)
@@ -154,7 +157,8 @@ supabase/
 ├── migrations/20261003100000_invoice_deliveries.sql
 ├── migrations/20261003200000_card_checkout.sql
 ├── migrations/20261003300000_invoice_reminders.sql
-└── checks/invoices.sql, invoice_ledger.sql, billing_connections.sql, invoice_charges.sql, invoice_deliveries.sql, card_checkout.sql, invoice_reminders.sql
+├── migrations/20261003400000_invoice_tracking.sql
+└── checks/invoices.sql, invoice_ledger.sql, billing_connections.sql, invoice_charges.sql, invoice_deliveries.sql, card_checkout.sql, invoice_reminders.sql, invoice_tracking.sql
 ```
 
 ## 5. Database
@@ -276,9 +280,21 @@ An invoice becomes a charge at the owner's bank — the API Cobrança v3 "boleto
 
 **The Dashboard** (`lib/dashboard-hub.ts`, `components/dashboard/DashboardHub.tsx`): the Faturas card — a receber no mês, recebido no mês, em atraso, próximo vencimento — from the same maths as the hub (`invoiceHubTotals`); its attention items (late money, an expired boleto, a failed issue or e-mail) join the merged list; the loader is one more `settle()` in `loadDashboard`, so a failure shows the card as unavailable, never as zero.
 
-## 12. Not in these steps
+## 12. Did it reach the tenant? Delivered, bounced, viewed — and a copy for the owner
 
-- No refunds from the module (a refund made in the Stripe dashboard is not read back yet); no repeated overdue notices (one per invoice); no bounce handling from the e-mail provider.
+"Enviado" only means the provider accepted the message. Three things say more (migration `20261003400000`):
+
+**Delivered / bounced** (`POST /api/webhooks/resend`, `lib/billing/resend-webhook.ts`, `applyEmailEvent`): Resend reports what became of each message — `email.delivered`, `email.bounced`, `email.complained` — signed with Svix (`svix-id`, `svix-timestamp`, `svix-signature`; HMAC-SHA256 of `id.timestamp.body` with the endpoint's `whsec_` secret, `RESEND_WEBHOOK_SECRET`; five minutes of tolerance). The delivery is found by the provider's message id (`invoice_deliveries.provider_id`); an event seen before (`invoice_events.dedupe_key = resend:<svix-id>`) is ignored. Delivered sets `delivered_at`; a bounce turns the delivery **BOUNCED** with the provider's reason — it shows in Atenção ("o e-mail voltou… confira o e-mail no cadastro"), is never retried by the daily run, and "Reenviar" then sends a new, numbered e-mail (to the address as it is now); a complaint is recorded. Without the secret the route answers 503 and the invoices simply stay at "Enviado". Optional: the e-mail works without it.
+
+**Viewed** (`invoice_record_view`, `recordPublicView`): the tenant's page records when it is opened — first time, last time, how many — at most once per half hour. Not counted: crawlers and link scanners (`lib/crawler-guard.ts`), the owner looking at their own invoice while signed in, and the link of a copy (`?copia=1`). The first view is an event on the timeline. It is the strongest signal short of the payment: nobody opens the page without having got the link. (Open-tracking pixels in the e-mail are not used: mail clients mask them.)
+
+**On the screens** (`deliveryState` in `lib/invoice-hub.ts`): the furthest thing known — Visualizada › Entregue › Enviado, or Devolvido / Não enviado — is the **E-mail** column of the invoices table and the first lines of the panel's "E-mail ao inquilino" section, which also says when the page was opened and how often.
+
+**A copy for the owner** (`POST /api/faturas/[id]/copia { email }`, `sendInvoiceCopy`): "Enviar cópia para mim" asks for an address (remembered on the device) and sends the same message the tenant gets — the invoice with the boleto, the Pix and the PDF, or the receipt once it is paid — with `[Cópia]` in the subject and a band on top saying so. It is not a delivery (the tenant's e-mails and their one-per-kind keys are untouched), its link carries `?copia=1` so it never reads as the tenant opening the page, and it is an event on the timeline. 10 per user per minute.
+
+## 13. Not in these steps
+
+- No refunds from the module (a refund made in the Stripe dashboard is not read back yet); no repeated overdue notices (one per invoice).
 - A partial payment is not accepted: a payment recorded by hand must cover the invoice.
 - Nothing retroactive: the daily run never creates an invoice whose due date has passed; "Gerar faturas" does, on demand.
 - Out of scope for the module as planned: automatic rent adjustment on the invoice, pro rata of the first and last month, company tenants (CNPJ), variable-amount charges (metered energy), bounce handling from the e-mail provider (a bounce is read as a failed delivery only when the provider refuses the address).

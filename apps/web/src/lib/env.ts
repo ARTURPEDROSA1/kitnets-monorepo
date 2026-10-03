@@ -52,6 +52,8 @@ export const serverSchema = z.object({
     // Invoices e-mailed to tenants through Resend (lib/billing/email-provider.ts). Both or neither: without them
     // nothing is sent and each delivery says so. The address must be on a domain verified in Resend.
     RESEND_API_KEY: nonEmpty.optional(),
+    // The signing secret of Resend's webhook (/api/webhooks/resend): delivered / bounced. Optional on top of the pair above.
+    RESEND_WEBHOOK_SECRET: z.string().regex(/^whsec_[A-Za-z0-9+/=]+$/, "must be a Resend webhook signing secret (whsec_…)").optional(),
     // The Kitnets Stripe platform (Connect): the platform's secret key, its Connect client id and the Connect
     // webhook's signing secret (lib/billing/stripe-client.ts). All three or none; a test key is the sandbox.
     STRIPE_SECRET_KEY: z.string().regex(/^(sk|rk)_(live|test)_[A-Za-z0-9]+$/, "must be a Stripe secret key (sk_live_… / sk_test_…)").optional(),
@@ -100,6 +102,7 @@ export function halfConfiguredSets(input: Record<string, string | undefined>): s
     const out: string[] = [];
     const sets: Array<{ keys: readonly string[]; what: string }> = [
         { keys: ["RESEND_API_KEY", "BILLING_EMAIL_FROM"], what: "invoices are not e-mailed until both are set" },
+        { keys: ["RESEND_API_KEY", "RESEND_WEBHOOK_SECRET"], what: "delivered / bounced is not tracked until both are set" },
         { keys: ["STRIPE_SECRET_KEY", "STRIPE_CLIENT_ID", "STRIPE_WEBHOOK_SECRET"], what: "the card payment stays off until all three are set" },
     ];
     for (const { keys, what } of sets) {

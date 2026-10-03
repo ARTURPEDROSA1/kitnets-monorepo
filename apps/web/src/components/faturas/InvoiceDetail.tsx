@@ -6,13 +6,14 @@
  * PDF). The page preloads it; every action here answers with the fresh invoice, handed up to the parent.
  */
 import React, { useEffect, useState } from "react";
-import { AlertCircle, ArrowLeft, Ban, Check, CheckCircle2, Copy, CreditCard, FileDown, FileText, FlaskConical, Landmark, Loader2, Mail, Receipt, RefreshCw, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, Ban, Check, CheckCircle2, Copy, CreditCard, Eye, FileDown, FileText, FlaskConical, Landmark, Loader2, Mail, Receipt, RefreshCw, Send, X } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { cn } from "@/lib/utils";
 import { formatDateBR } from "@/lib/dates";
 import { formatCPF } from "@/lib/validators";
 import { Money, Sensitive } from "@/components/privacy";
 import { DateInput } from "@/components/ui/DateInput";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { INVOICE_STATUS_META, PAID_VIA_LABELS, brl, hasLiveCharge, invoiceDisplay, isOpen } from "@/lib/invoice-hub";
 import { blockersText } from "@/lib/invoice-payer";
@@ -52,6 +53,11 @@ const EVENT_LABELS: Record<string, string> = {
     DUE_DATE_MOVED: "Vencimento alterado",
     EMAIL_SENT: "E-mail enviado ao inquilino",
     EMAIL_FAILED: "O e-mail ao inquilino não foi enviado",
+    EMAIL_DELIVERED: "E-mail entregue na caixa do inquilino",
+    EMAIL_BOUNCED: "O e-mail ao inquilino voltou",
+    EMAIL_COMPLAINED: "O inquilino marcou o e-mail como spam",
+    EMAIL_COPY: "Cópia do e-mail enviada a você",
+    VIEWED: "Página da fatura aberta pela primeira vez",
     CARD_OPENED: "Inquilino abriu o pagamento por cartão",
     CARD_FAILED: "O pagamento por cartão não pôde ser aberto",
     PAID: "Pagamento registrado",
@@ -66,7 +72,7 @@ const plural = (n: number, one: string, many: string) => `${n.toLocaleString("pt
 
 function eventText(e: InvoiceEventView): string | null {
     const amount = typeof e.detail.amount === "number" ? e.detail.amount : null;
-    if (e.type === "CANCELLED" || e.type === "ISSUE_FAILED" || e.type === "EMAIL_FAILED" || e.type === "CARD_FAILED") return typeof e.detail.reason === "string" ? e.detail.reason : typeof e.detail.error === "string" ? e.detail.error : null;
+    if (e.type === "CANCELLED" || e.type === "ISSUE_FAILED" || e.type === "EMAIL_FAILED" || e.type === "EMAIL_BOUNCED" || e.type === "CARD_FAILED") return typeof e.detail.reason === "string" ? e.detail.reason : typeof e.detail.error === "string" ? e.detail.error : null;
     if (e.type === "CARD_OPENED") return amount !== null ? `${brl(amount)} no cartão${typeof e.detail.surcharge === "number" && e.detail.surcharge > 0 ? ` (taxa ${brl(e.detail.surcharge)})` : ""}` : null;
     if (e.type === "EMAIL_SENT") return e.detail.kind === "RESEND" ? "reenvio" : e.detail.kind === "REMINDER" ? "lembrete" : null;
     if (e.type === "DUE_DATE_MOVED") return typeof e.detail.from === "string" && typeof e.detail.to === "string" ? `de ${formatDateBR(e.detail.from)} para ${formatDateBR(e.detail.to)}` : null;
@@ -127,12 +133,15 @@ async function post(url: string, body?: Record<string, unknown>): Promise<{ deta
 }
 
 const DELIVERY_KIND_LABELS: Record<string, string> = { ISSUE: "fatura", REMINDER: "lembrete", RECEIPT: "recibo", RESEND: "reenvio" };
+/** the last address a copy was sent to, remembered on this device */
+const COPY_EMAIL_KEY = "kitnets_invoice_copy_email";
 
 export default function InvoiceDetail({ invoiceId, lang, today, initial, notice, bankUsable, sandbox, emailAvailable = true, onBack, onPay, onCancel, onChanged }: Props) {
     const preloaded = initial && initial.invoice.id === invoiceId ? initial : null;
     const [fetched, setFetched] = useState<InvoiceDetailView | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [busy, setBusy] = useState<"issue" | "refresh" | "pdf" | "sandbox" | "email" | null>(null);
+    const [busy, setBusy] = useState<"issue" | "refresh" | "pdf" | "sandbox" | "email" | "copy" | null>(null);
+    const [copyModal, setCopyModal] = useState<{ email: string; error: string | null } | null>(null);
     const [actionError, setActionError] = useState<string | null>(null);
     const [issueModal, setIssueModal] = useState<{ dueDate: string } | null>(null);
     const detail = preloaded ?? (fetched && fetched.invoice.id === invoiceId ? fetched : null);
@@ -172,6 +181,31 @@ export default function InvoiceDetail({ invoiceId, lang, today, initial, notice,
             if (!email.sent) setActionError(`O e-mail não foi enviado: ${email.error ?? "motivo não informado"}.`);
         } catch (err) {
             setActionError(err instanceof Error ? err.message : "Não foi possível enviar o e-mail.");
+        } finally {
+            setBusy(null);
+        }
+    };
+    const openCopy = () => {
+        let last = "";
+        try { last = window.localStorage.getItem(COPY_EMAIL_KEY) ?? ""; } catch { /* storage refused: the field starts empty */ }
+        setCopyModal({ email: last, error: null });
+    };
+    const sendCopy = async () => {
+        if (!copyModal) return;
+        const email = copyModal.email.trim();
+        setBusy("copy");
+        try {
+            const res = await fetch(`/api/faturas/${invoiceId}/copia`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                setCopyModal({ email: copyModal.email, error: json.errors ? Object.values(json.errors as Record<string, string>).join(" ") : typeof json.error === "string" ? json.error : "Não foi possível enviar a cópia." });
+                return;
+            }
+            try { window.localStorage.setItem(COPY_EMAIL_KEY, email); } catch { /* not remembered, that is all */ }
+            setCopyModal(null);
+            onChanged(json as InvoiceDetailView, `Cópia enviada para ${email}.`);
+        } catch {
+            setCopyModal({ email: copyModal.email, error: "Erro de conexão. Tente novamente." });
         } finally {
             setBusy(null);
         }
@@ -345,19 +379,42 @@ export default function InvoiceDetail({ invoiceId, lang, today, initial, notice,
                 <section className="rounded-xl border border-border/80 bg-card">
                     <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-2.5">
                         <span className="inline-flex items-center gap-2 text-sm font-semibold text-foreground"><Mail className="h-4 w-4 text-sky-600" /> E-mail ao inquilino</span>
-                        {open && charge?.status === "OPEN" && (
-                            <Button variant="outline" size="sm" onClick={resend} disabled={busy !== null || !emailAvailable} title={emailAvailable ? "Envia de novo o boleto, o PIX e o link da fatura" : "Envio de e-mail não configurado neste servidor"}>
-                                {busy === "email" ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Mail className="mr-1 h-4 w-4" />} {deliveries.some(d => d.status === "SENT") ? "Reenviar e-mail" : "Enviar e-mail"}
-                            </Button>
-                        )}
+                        <span className="flex flex-wrap items-center gap-2">
+                            {(charge?.status === "OPEN" || invoice.status === "PAID") && (
+                                <Button variant="outline" size="sm" onClick={openCopy} disabled={busy !== null || !emailAvailable} title={emailAvailable ? "Envia para um e-mail seu a mesma mensagem que o inquilino recebe" : "Envio de e-mail não configurado neste servidor"}>
+                                    <Send className="mr-1 h-4 w-4" /> Enviar cópia para mim
+                                </Button>
+                            )}
+                            {open && charge?.status === "OPEN" && (
+                                <Button variant="outline" size="sm" onClick={resend} disabled={busy !== null || !emailAvailable} title={emailAvailable ? "Envia de novo o boleto, o PIX e o link da fatura" : "Envio de e-mail não configurado neste servidor"}>
+                                    {busy === "email" ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Mail className="mr-1 h-4 w-4" />} {deliveries.some(d => d.status === "SENT" || d.status === "BOUNCED") ? "Reenviar e-mail" : "Enviar e-mail"}
+                                </Button>
+                            )}
+                        </span>
                     </header>
                     <div className="space-y-3 p-4">
                         {!delivery && <p className="text-sm text-muted-foreground">{charge?.status === "OPEN" ? "Ainda não enviado." : "Enviado assim que o banco deixar o boleto pronto."}</p>}
                         {delivery?.status === "SENT" && delivery.sent_at && (
-                            <p className="text-sm text-foreground">Enviado em {stamp(delivery.sent_at)} para <Sensitive>{delivery.recipient}</Sensitive>{delivery.kind !== "ISSUE" ? ` (${DELIVERY_KIND_LABELS[delivery.kind] ?? delivery.kind})` : ""}.</p>
+                            <p className="text-sm text-foreground">
+                                Enviado em {stamp(delivery.sent_at)} para <Sensitive>{delivery.recipient}</Sensitive>{delivery.kind !== "ISSUE" ? ` (${DELIVERY_KIND_LABELS[delivery.kind] ?? delivery.kind})` : ""}
+                                {delivery.delivered_at
+                                    ? <span className="text-emerald-700 dark:text-emerald-400"> · entregue na caixa do inquilino em {stamp(delivery.delivered_at)}</span>
+                                    : <span className="text-muted-foreground"> · aceito pelo provedor; a confirmação de entrega ainda não chegou</span>}.
+                            </p>
                         )}
-                        {(delivery?.status === "FAILED" || delivery?.status === "BOUNCED") && (
+                        {delivery?.status === "FAILED" && (
                             <p role="alert" className="text-sm text-rose-600">Não enviado: {delivery.last_error ?? "motivo não informado"}.{delivery.attempts > 1 ? ` (${plural(delivery.attempts, "tentativa", "tentativas")})` : ""}</p>
+                        )}
+                        {delivery?.status === "BOUNCED" && (
+                            <p role="alert" className="text-sm text-rose-600">Devolvido: {delivery.last_error ?? "o provedor do inquilino recusou a mensagem"}. Confira o e-mail no cadastro do inquilino e reenvie.</p>
+                        )}
+                        {(delivery || charge?.status === "OPEN") && (
+                            <p className={cn("inline-flex items-center gap-1.5 text-sm", invoice.first_viewed_at ? "text-foreground" : "text-muted-foreground")}>
+                                <Eye className={cn("h-4 w-4", invoice.first_viewed_at ? "text-emerald-600" : "text-muted-foreground")} />
+                                {invoice.first_viewed_at
+                                    ? <>Página da fatura aberta em {stamp(invoice.first_viewed_at)}{(invoice.view_count ?? 0) > 1 && invoice.last_viewed_at ? ` · ${plural(invoice.view_count ?? 0, "vez", "vezes")}, a última em ${stamp(invoice.last_viewed_at)}` : ""}.</>
+                                    : "A página da fatura ainda não foi aberta."}
+                            </p>
                         )}
                         {(delivery?.status === "PENDING" || delivery?.status === "SENDING") && <p className="text-sm text-muted-foreground">Em envio…</p>}
                         {deliveries.filter(d => d.status === "SENT").length > 1 && (
@@ -450,6 +507,30 @@ export default function InvoiceDetail({ invoiceId, lang, today, initial, notice,
                     </section>
                 </div>
             </div>
+
+            {copyModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Enviar cópia do e-mail">
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => busy === null && setCopyModal(null)} />
+                    <div className="relative w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">
+                        <button type="button" onClick={() => setCopyModal(null)} disabled={busy !== null} className="absolute right-4 top-4 text-muted-foreground hover:text-foreground" aria-label="Fechar"><X className="h-5 w-5" /></button>
+                        <h2 className="mb-1 text-lg font-bold text-foreground">Enviar cópia para mim</h2>
+                        <p className="text-sm text-muted-foreground">
+                            Você recebe a mesma mensagem que o inquilino {invoice.status === "PAID" ? "recebeu ao pagar (o recibo)" : "recebe (a fatura, com o boleto, o PIX e o link)"}, marcada como cópia. Não conta como envio ao inquilino, e o link da cópia não conta como página aberta.
+                        </p>
+                        <form onSubmit={e => { e.preventDefault(); void sendCopy(); }} className="mt-4">
+                            <Label htmlFor="invoice-copy-email" className="text-xs">E-mail que recebe a cópia</Label>
+                            <Input id="invoice-copy-email" type="email" autoFocus required value={copyModal.email} onChange={e => setCopyModal({ email: e.target.value, error: null })} placeholder="voce@exemplo.com" className="mt-1 h-9" maxLength={120} aria-invalid={Boolean(copyModal.error)} />
+                            {copyModal.error && <p role="alert" className="mt-1 text-xs text-rose-600">{copyModal.error}</p>}
+                            <div className="mt-5 flex gap-3">
+                                <Button type="button" variant="outline" className="flex-1" onClick={() => setCopyModal(null)} disabled={busy !== null}>Voltar</Button>
+                                <Button type="submit" className="flex-1" disabled={busy !== null || !copyModal.email.trim()}>
+                                    {busy === "copy" ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Enviando…</> : "Enviar cópia"}
+                                </Button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {issueModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Emitir com nova data de vencimento">

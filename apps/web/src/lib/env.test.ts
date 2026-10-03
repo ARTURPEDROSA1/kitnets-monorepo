@@ -81,7 +81,9 @@ describe("optional integrations that come in sets", () => {
         expect(halfConfiguredSets(half)).toEqual(["RESEND_API_KEY not set while BILLING_EMAIL_FROM is: invoices are not e-mailed until both are set"]);
         expect(halfConfiguredSets({ ...complete, STRIPE_SECRET_KEY: "sk_test_1", STRIPE_CLIENT_ID: "ca_1" })).toEqual(["STRIPE_WEBHOOK_SECRET not set while STRIPE_SECRET_KEY, STRIPE_CLIENT_ID are: the card payment stays off until all three are set"]);
         expect(halfConfiguredSets(complete)).toEqual([]);
-        expect(halfConfiguredSets({ ...complete, RESEND_API_KEY: "re_1", BILLING_EMAIL_FROM: "f@kitnets.com", STRIPE_SECRET_KEY: "sk_test_1", STRIPE_CLIENT_ID: "ca_1", STRIPE_WEBHOOK_SECRET: "whsec_1" })).toEqual([]);
+        expect(halfConfiguredSets({ ...complete, RESEND_API_KEY: "re_1", BILLING_EMAIL_FROM: "f@kitnets.com", RESEND_WEBHOOK_SECRET: "whsec_abc=", STRIPE_SECRET_KEY: "sk_test_1", STRIPE_CLIENT_ID: "ca_1", STRIPE_WEBHOOK_SECRET: "whsec_1" })).toEqual([]);
+        // the e-mail works without the webhook; only the tracking is off
+        expect(halfConfiguredSets({ ...complete, RESEND_API_KEY: "re_1", BILLING_EMAIL_FROM: "f@kitnets.com" })).toEqual(["RESEND_WEBHOOK_SECRET not set while RESEND_API_KEY is: delivered / bounced is not tracked until both are set"]);
     });
 
     it("still refuses a value of the wrong shape", () => {

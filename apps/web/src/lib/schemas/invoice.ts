@@ -121,3 +121,8 @@ export const invoiceIssueSchema = z.object({
 export const invoiceSandboxPaySchema = z.object({
     via: z.preprocess((v) => (v == null || v === "" ? "PIX" : v), z.enum(["BOLETO", "PIX"], { errorMap: () => ({ message: "Forma inválida." }) })),
 });
+
+/** POST /api/faturas/[id]/copia — where the owner wants a copy of the e-mail the tenant gets. */
+export const invoiceCopySchema = z.object({
+    email: z.string({ required_error: "Informe o e-mail.", invalid_type_error: "Informe o e-mail." }).trim().toLowerCase().max(120, "E-mail longo demais.").regex(/^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+$/, "E-mail inválido."),
+});
