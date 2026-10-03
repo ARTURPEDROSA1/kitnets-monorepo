@@ -76,6 +76,26 @@ export const ISSUE_BLOCKER_LABELS: Record<IssueBlocker, string> = {
     TERMS_UNDECIDED: "defina multa, juros e prazo de pagamento em Configuração",
 };
 
+export interface LateTermsDecision {
+    fine_pct: number | null;
+    interest_pct_month: number | null;
+    days_payable_after_due: number | null;
+}
+
+/**
+ * The late terms an invoice still lacks and the owner has since decided: an invoice created before the
+ * decisions takes them when it is first issued (nobody has seen it without them). A term the invoice
+ * already states is kept; a term still undecided stays empty — and keeps the invoice from being issued.
+ */
+export function termsToAdopt(invoice: LateTermsDecision, settings: LateTermsDecision | null | undefined): Partial<LateTermsDecision> {
+    const out: Partial<LateTermsDecision> = {};
+    if (!settings) return out;
+    for (const key of ["fine_pct", "interest_pct_month", "days_payable_after_due"] as const) {
+        if (invoice[key] === null && settings[key] !== null && settings[key] !== undefined) out[key] = settings[key];
+    }
+    return out;
+}
+
 /** What keeps the invoice from being issued at the bank on `today`. */
 export function issueBlockers(invoice: ChargeInvoice, today: string): IssueBlocker[] {
     const out: IssueBlocker[] = [];

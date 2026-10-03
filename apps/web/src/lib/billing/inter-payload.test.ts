@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildChargePayload, chargeStatusOf, issueBlockers, parseCallbackEntry, parseChargeState, seuNumeroFor, type ChargeInvoice } from "./inter-payload";
+import { buildChargePayload, chargeStatusOf, issueBlockers, parseCallbackEntry, parseChargeState, seuNumeroFor, termsToAdopt, type ChargeInvoice } from "./inter-payload";
 
 const TODAY = "2026-10-02";
 
@@ -94,5 +94,23 @@ describe("parseCallbackEntry", () => {
         expect(parseCallbackEntry({ codigoSolicitacao: "183e982a", situacao: "RECEBIDO", dataHoraSituacao: "2026-10-19T14:15:22Z", valorTotalRecebido: "999" })).toEqual({ codigoSolicitacao: "183e982a", situacao: "RECEBIDO", at: "2026-10-19T14:15:22Z" });
         expect(parseCallbackEntry({ situacao: "RECEBIDO" })).toBeNull();
         expect(parseCallbackEntry("junk")).toBeNull();
+    });
+});
+
+describe("termsToAdopt", () => {
+    const undecided = { fine_pct: null, interest_pct_month: null, days_payable_after_due: null };
+    const decided = { fine_pct: 10, interest_pct_month: 1, days_payable_after_due: 5 };
+
+    it("an invoice created before the decisions takes them when issued", () => {
+        expect(termsToAdopt(undecided, decided)).toEqual(decided);
+        expect(termsToAdopt({ ...undecided, fine_pct: 2 }, decided)).toEqual({ interest_pct_month: 1, days_payable_after_due: 5 });
+    });
+
+    it("what the invoice already states is kept; what is still undecided stays empty", () => {
+        expect(termsToAdopt({ fine_pct: 2, interest_pct_month: 0.5, days_payable_after_due: 30 }, decided)).toEqual({});
+        expect(termsToAdopt(undecided, { ...decided, interest_pct_month: null })).toEqual({ fine_pct: 10, days_payable_after_due: 5 });
+        expect(termsToAdopt(undecided, null)).toEqual({});
+        // zero is a decision
+        expect(termsToAdopt(undecided, { fine_pct: 0, interest_pct_month: 0, days_payable_after_due: 0 })).toEqual({ fine_pct: 0, interest_pct_month: 0, days_payable_after_due: 0 });
     });
 });
