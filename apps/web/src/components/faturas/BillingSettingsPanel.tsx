@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import type { BillingSettingsView } from "@/lib/invoice-views";
+import Group from "./SettingsGroup";
 
 interface Props {
     settings: BillingSettingsView;
@@ -30,29 +31,6 @@ type Form = Record<NumberField | "sender_name" | "reply_to_email" | "copy_to_ema
 const AUTOMATION_NEEDS: NumberField[] = ["days_in_advance", "fine_pct", "interest_pct_month", "days_payable_after_due"];
 
 const show = (v: number | null | undefined) => (v == null ? "" : String(v).replace(".", ","));
-
-const TONES = {
-    orange: { bar: "border-l-orange-400", icon: "bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300" },
-    violet: { bar: "border-l-violet-400", icon: "bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300" },
-    sky: { bar: "border-l-sky-400", icon: "bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300" },
-    emerald: { bar: "border-l-emerald-500", icon: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" },
-} as const;
-
-/** One subject of the settings: its own card, a coloured edge and a header, so it cannot be mistaken for the next. */
-function Group({ tone, icon, title, description, children }: { tone: keyof typeof TONES; icon: React.ReactNode; title: string; description: React.ReactNode; children: React.ReactNode }) {
-    return (
-        <section className={cn("overflow-hidden rounded-xl border border-l-4 border-border/80 bg-card", TONES[tone].bar)}>
-            <header className="flex items-start gap-3 border-b border-border/60 bg-muted/30 px-4 py-3">
-                <span className={cn("mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", TONES[tone].icon)}>{icon}</span>
-                <div className="min-w-0">
-                    <h2 className="text-sm font-semibold text-foreground">{title}</h2>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
-                </div>
-            </header>
-            <div className="p-4">{children}</div>
-        </section>
-    );
-}
 
 export default function BillingSettingsPanel({ settings, emailAvailable = true, onSaved }: Props) {
     const [form, setForm] = useState<Form>(() => ({

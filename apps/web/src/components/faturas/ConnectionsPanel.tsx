@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { formatDateBR } from "@/lib/dates";
 import { Sensitive } from "@/components/privacy";
 import { CONNECTION_STATUS_META, certificateStanding, type ConnectionsView, type InterConnectionView } from "@/lib/billing/connections";
+import SettingsGroup from "./SettingsGroup";
 import StripeConnectionCard from "./StripeConnectionCard";
 
 interface Props {
@@ -172,35 +173,29 @@ export default function ConnectionsPanel({ connections, today, onChange }: Props
 
     return (
         <div className="space-y-5">
-            <section className="rounded-xl border border-border/80 bg-card">
-                <header className="flex flex-wrap items-start justify-between gap-3 border-b border-border/60 px-4 py-3">
-                    <div className="min-w-0">
-                        <h2 className="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
-                            <Landmark className="h-4 w-4 text-orange-500" /> Banco Inter — boleto e PIX
-                            {meta && <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", meta.pill)}>{meta.label}</span>}
-                            {inter?.environment === "SANDBOX" && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">Ambiente de testes</span>}
-                            {!inter && <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-700 dark:bg-slate-800 dark:text-slate-300">Não conectado</span>}
-                        </h2>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                            A cobrança sai pela integração da sua própria conta PJ no Inter: o dinheiro cai direto na sua conta. As credenciais ficam cifradas e nunca voltam a ser exibidas.
-                        </p>
-                    </div>
-                    {inter && available && (
-                        <div className="flex flex-wrap items-center gap-2">
-                            <Button variant="outline" size="sm" onClick={test} disabled={busy !== null}>
-                                {busy === "test" ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <PlugZap className="mr-1 h-4 w-4" />} Testar conexão
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={() => { setEditing(v => !v); setErrors({}); }} disabled={busy !== null}>
-                                <RefreshCw className="mr-1 h-4 w-4" /> Atualizar credenciais
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => setConfirmDelete(true)} disabled={busy !== null} title="Remover as credenciais" aria-label="Remover as credenciais do Banco Inter" className="text-muted-foreground hover:text-rose-600">
-                                <Trash2 className="h-4 w-4" />
-                            </Button>
-                        </div>
-                    )}
-                </header>
-
-                <div className="space-y-4 p-4">
+            <SettingsGroup
+                tone="orange"
+                icon={<Landmark className="h-4 w-4" />}
+                title="Banco Inter — boleto e PIX"
+                badges={<>
+                    {meta && <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", meta.pill)}>{meta.label}</span>}
+                    {inter?.environment === "SANDBOX" && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">Ambiente de testes</span>}
+                    {!inter && <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-700 dark:bg-slate-800 dark:text-slate-300">Não conectado</span>}
+                </>}
+                description="A cobrança sai pela integração da sua própria conta PJ no Inter: o dinheiro cai direto na sua conta. As credenciais ficam cifradas e nunca voltam a ser exibidas."
+                actions={inter && available ? <>
+                    <Button variant="outline" size="sm" onClick={test} disabled={busy !== null}>
+                        {busy === "test" ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <PlugZap className="mr-1 h-4 w-4" />} Testar conexão
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => { setEditing(v => !v); setErrors({}); }} disabled={busy !== null}>
+                        <RefreshCw className="mr-1 h-4 w-4" /> Atualizar credenciais
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => setConfirmDelete(true)} disabled={busy !== null} title="Remover as credenciais" aria-label="Remover as credenciais do Banco Inter" className="text-muted-foreground hover:text-rose-600">
+                        <Trash2 className="h-4 w-4" />
+                    </Button>
+                </> : undefined}
+                bodyClassName="space-y-4 p-4"
+            >
                     {!available && (
                         <p role="note" className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200">
                             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -291,8 +286,7 @@ export default function ConnectionsPanel({ connections, today, onChange }: Props
                             </ol>
                         )}
                     </div>
-                </div>
-            </section>
+            </SettingsGroup>
 
             <StripeConnectionCard connections={connections} onChange={onChange} />
 

@@ -75,6 +75,25 @@ describe("leaseComponents", () => {
     });
 });
 
+describe("leaseComponents adjustment", () => {
+    const lease = (over: Partial<CollectionLease> = {}): CollectionLease => ({ management_type: "AGENCY", monthly_rent: 1260, adjustment_index: "IGP_M", charges: [], ...over });
+    it("says what is readjusted on the lease's date: the rent, what follows it, what has an index of its own", () => {
+        const out = leaseComponents(lease({
+            charges: [
+                charge({ id: "c1", adjusts_with_rent: true }),
+                charge({ id: "c2", charge_type: "IPTU", adjustment_index: "IPCA" }),
+                charge({ id: "c3", charge_type: "INTERNET", adjustment_index: "NONE" }),
+                charge({ id: "c4", charge_type: "WATER" }),
+            ],
+        }));
+        expect(out.map(c => c.adjustment ?? null)).toEqual(["RENT", "WITH_RENT", "OWN_INDEX", null, null]);
+    });
+    it("says nothing for a rent without adjustment, nor when the caller leaves the index out", () => {
+        expect(leaseComponents(lease({ adjustment_index: "NONE", charges: [charge({ adjusts_with_rent: true })] })).map(c => c.adjustment ?? null)).toEqual([null, null]);
+        expect("adjustment" in leaseComponents({ management_type: "AGENCY", monthly_rent: 1260 })[0]).toBe(false);
+    });
+});
+
 describe("inheritCollectors", () => {
     const incoming = (over: Record<string, unknown> = {}) => ({ charge_type: "CONDOMINIUM", label: null as string | null, responsibility: "TENANT", ...over });
 

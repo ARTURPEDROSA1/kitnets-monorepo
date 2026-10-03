@@ -9,7 +9,8 @@
 import type { AdminSupabase } from "@/lib/api-auth";
 import { notFound } from "@/lib/api-route";
 import { loadLeaseRows } from "@/lib/lease-views-server";
-import { IN_FORCE, placeOf, titleOf } from "@/lib/lease-dashboard";
+import { IN_FORCE, placeOf, titleOf, todayBRT } from "@/lib/lease-dashboard";
+import { nextAdjustment } from "@/lib/lease-summary";
 import { leaseComponents } from "@/lib/invoice-collection";
 import { leaseDueDay } from "@/lib/invoice-schedule";
 import type { PayerAddress } from "@/lib/invoice-payer";
@@ -169,6 +170,7 @@ export function toRecurringLease(lease: LeaseWithDetails, tenantEmail: string | 
         due_day: leaseDueDay(lease),
         paused: lease.billing_paused === true,
         components: leaseComponents(lease),
+        next_adjustment: nextAdjustment(lease, todayBRT()),
     };
 }
 

@@ -397,6 +397,7 @@ export default function ContratosContent({ lang, initial = null, initialDashboar
                     aiImported={formState.aiImported}
                     importedFile={formState.importedFile}
                     importedStoragePath={formState.importedStoragePath}
+                    indexSeries={series}
                     onSaved={onSaved}
                     onCancel={() => setFormState(null)}
                     topSlot={<ReturnToPropertyLink propertyId={returnPropertyId} />}

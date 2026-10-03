@@ -61,7 +61,7 @@ export default function InvoiceTable({ rows, actions }: Props) {
         { key: "via", label: "Forma", kind: "enum", options: Object.entries(PAID_VIA_LABELS).map(([value, label]) => ({ value, label })), get: r => r.invoice.paid_via ?? "" },
     ], []);
 
-    const cf = useColumnFilters(rows, columns, { key: "due", dir: "desc" }, { storageKey: TABLE_KEY });
+    const cf = useColumnFilters(rows, columns, { key: "due", dir: "desc" }, { storageKey: TABLE_KEY, filtersKey: TABLE_KEY });
     const vis = useColumnVisibility(TABLE_KEY, { locked: ["invoice"] });
     const sel = useCellSum();
     const show = (key: string) => !vis.isHidden(key);

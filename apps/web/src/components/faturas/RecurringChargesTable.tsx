@@ -10,7 +10,8 @@ import React, { useMemo } from "react";
 import { Loader2, Pause, Play } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { columnTableKey } from "@/lib/ui-preferences";
-import { Sensitive } from "@/components/privacy";
+import { Money, Sensitive } from "@/components/privacy";
+import { formatDateBR } from "@/lib/dates";
 import { CellSumBar, useCellSum } from "@/components/properties/TableCellSum";
 import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "@/components/properties/TableColumnFilters";
 import { ColumnVisibilityMenu, useColumnVisibility } from "@/components/properties/TableColumnVisibility";
@@ -62,7 +63,7 @@ export default function RecurringChargesTable({ rows, savingKey, onCollector, on
     ], []);
 
     // by contract, so a lease's rent and charges stay together
-    const cf = useColumnFilters(lines, columns, { key: "lease", dir: "asc" }, { storageKey: TABLE_KEY });
+    const cf = useColumnFilters(lines, columns, { key: "lease", dir: "asc" }, { storageKey: TABLE_KEY, filtersKey: TABLE_KEY });
     const vis = useColumnVisibility(TABLE_KEY, { locked: ["lease", "component", "collector"] });
     const sel = useCellSum({ formatByCol: { due_day: v => String(v) } });
     const show = (key: string) => !vis.isHidden(key);
@@ -115,8 +116,14 @@ export default function RecurringChargesTable({ rows, savingKey, onCollector, on
                                         </td>
                                         <td {...sel.cellProps("component", line.id, null, "whitespace-nowrap px-3 py-2.5 font-medium text-foreground")}>{component.label}</td>
                                         {show("amount") && (
-                                            <td {...sel.cellProps("amount", line.id, component.amount, "whitespace-nowrap px-3 py-2.5 text-right tabular-nums privacy-money text-foreground")}>
-                                                {component.amount !== null ? brl(component.amount) : <span className="text-muted-foreground" title="O contrato não dá um valor fixo a este encargo">sem valor</span>}
+                                            <td {...sel.cellProps("amount", line.id, component.amount, "whitespace-nowrap px-3 py-2.5 text-right tabular-nums text-foreground")}>
+                                                {component.amount !== null ? <Money>{brl(component.amount)}</Money> : <span className="text-muted-foreground" title="O contrato não dá um valor fixo a este encargo">sem valor</span>}
+                                                {/* when the contract readjusts this line: the rent's date, shared by what follows it */}
+                                                {component.adjustment && component.amount !== null && l.next_adjustment && (
+                                                    <span className="block text-[11px] font-normal text-muted-foreground">
+                                                        {component.adjustment === "WITH_RENT" ? "reajusta com o aluguel em " : "reajuste em "}{formatDateBR(l.next_adjustment)}
+                                                    </span>
+                                                )}
                                             </td>
                                         )}
                                         {/* a plain cell: inside a selectable one a select only opens on a double click */}

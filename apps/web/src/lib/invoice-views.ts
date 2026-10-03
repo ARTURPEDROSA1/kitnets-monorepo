@@ -125,6 +125,8 @@ export interface RecurringLease {
     due_day: number;
     paused: boolean;
     components: CollectionComponent[];
+    /** `YYYY-MM-DD`: the lease's next adjustment date — the rent's, and of every charge readjusted with it */
+    next_adjustment?: string | null;
 }
 
 /** The owner's billing decisions; null = not decided yet (nothing is assumed in its place). */

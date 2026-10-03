@@ -29,8 +29,9 @@ import {
     type Milestone,
 } from "@/lib/lease-dashboard";
 import type { LeaseDashboardView } from "@/lib/lease-views";
+import type { IndexPoint } from "@/lib/lease-summary";
 import type { LeaseWithDetails } from "@/types/lease";
-import { RESPONSIBILITY_LABELS as CHARGE_RESPONSIBILITY, amountOf, contractTotal, featuredCharge, monthlyTotal, tenantCharges } from "@/lib/lease-charges";
+import { RESPONSIBILITY_LABELS as CHARGE_RESPONSIBILITY, amountOf, chargeAdjustment, contractTotal, featuredCharge, monthlyTotal, tenantCharges } from "@/lib/lease-charges";
 import LeaseDocuments from "./LeaseDocuments";
 import { LeaseTitle } from "./LeaseTitle";
 
@@ -99,7 +100,9 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
     }, [load, refreshKey]);
 
     const base = lang === "pt" ? "" : `/${lang}`;
-    const row = useMemo(() => (bundle ? summarizeLease(bundle.lease, bundle.series ? { [seriesKey(bundle.lease.adjustment_index)]: bundle.series } : {}, today) : null), [bundle, today]);
+    // the lease's own index, plus the index a charge names for itself
+    const seriesByCode = useMemo<Record<string, IndexPoint[] | null>>(() => (bundle ? { ...(bundle.chargeSeries ?? {}), ...(bundle.series ? { [seriesKey(bundle.lease.adjustment_index)]: bundle.series } : {}) } : {}), [bundle]);
+    const row = useMemo(() => (bundle ? summarizeLease(bundle.lease, seriesByCode, today) : null), [bundle, seriesByCode, today]);
     const income = useMemo(() => (bundle ? leaseIncome(bundle.lease, bundle.income, today) : null), [bundle, today]);
     const line = useMemo(() => (bundle ? milestones(bundle.lease, today) : []), [bundle, today]);
 
@@ -128,16 +131,20 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
     // the property's own charge (condomínio for kitnets, energia for a house) and what the tenant pays in all
     const featured = featuredCharge(lease.charges, bundle.propertyKind ?? (lease.unit_id ? "multi" : null));
     const tenantFixed = tenantCharges(lease.charges);
+    // the condominium readjusted on the lease's dates: with the rent ("Reajusta com o aluguel") or by its own index
+    const condo = lease.charges.find(c => c.charge_type === "CONDOMINIUM") ?? null;
+    const condoAdjustment = chargeAdjustment(condo, lease, seriesByCode, today);
+    const condoCode = condoAdjustment ? seriesKey(condoAdjustment.index) : "";
     const monthly = monthlyTotal(rent, lease.charges);
     const total = contractTotal(monthly, row.termMonths);
     const chargeName = (c: LeaseWithDetails["charges"][number]) => (c.charge_type === "OTHER" && c.label ? c.label : CHARGE_LABELS[c.charge_type] ?? c.charge_type);
     const endTone: PairTone | undefined = !row.inForce ? undefined : summary.daysLeft !== null && summary.daysLeft < 0 ? "bad" : summary.daysLeft !== null && summary.daysLeft <= 90 ? "warn" : undefined;
     const cycleKnown = summary.accumulatedPct !== null && summary.monthsCounted > 0;
     const cardInfo: TileInfo = {
-        what: `O contrato lido como na ficha do imóvel: prazo, vencimento, reajuste pelo índice acumulado no ciclo (a cada aniversário o aluguel é corrigido pelo acumulado do ciclo que terminou, a prática dos contratos brasileiros), ${featured.label.toLowerCase()} e o total que sai do bolso do inquilino; o que a razão de receitas registrou e a caução.`,
-        formula: <>Acumulado no ciclo = Π (1 + variação mensal) − 1, dos meses já divulgados<br />Aluguel reajustado até hoje = aluguel × (1 + acumulado)<br />Total mensal = aluguel + encargos com valor fixo pagos pelo inquilino<br />Valor total do contrato = total mensal × meses do prazo</>,
+        what: `O contrato lido como na ficha do imóvel: prazo, vencimento, reajuste pelo índice acumulado no ciclo (do primeiro dia do ciclo até hoje, contado dia a dia como na calculadora de Índices; a cada aniversário o aluguel é corrigido pelo acumulado do ciclo que terminou), ${featured.label.toLowerCase()} e o total que sai do bolso do inquilino; o que a razão de receitas registrou e a caução.`,
+        formula: <>Acumulado no ciclo = índice do primeiro dia do ciclo até hoje, em dias corridos; no mês parcial entra pro rata die: (1 + índice do mês)^(dias ÷ dias do mês)<br />Aluguel reajustado até hoje = aluguel × (1 + acumulado)<br />Condomínio reajustado até hoje = condomínio × (1 + acumulado), quando ele reajusta com o aluguel ou tem índice próprio<br />Total mensal = aluguel + encargos com valor fixo pagos pelo inquilino<br />Valor total do contrato = total mensal × meses do prazo</>,
         example: cycleKnown && summary.adjustedRent !== null ? `${brl(rent)} × (1 ${summary.accumulatedPct! >= 0 ? "+" : "−"} ${Math.abs(summary.accumulatedPct!).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}%) = ${brl(summary.adjustedRent)}` : undefined,
-        note: "O valor reajustado é uma prévia: o percentual definitivo só fecha quando o último mês do ciclo é divulgado. O recebido vem da razão de receitas do imóvel, líquido da taxa da imobiliária quando há.",
+        note: "O valor reajustado é uma prévia: conta até o último mês do índice já divulgado e só fecha na data do reajuste. O recebido vem da razão de receitas do imóvel, líquido da taxa da imobiliária quando há.",
     };
     const phone = tenant?.main_phone ?? null;
     const waLink = phone ? `https://wa.me/${phone.replace(/\D/g, "")}` : null;
@@ -242,7 +249,7 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                             tone: !cycleKnown ? undefined : summary.accumulatedPct! < 0 ? "bad" : "good",
                             value: cycleKnown ? pctText(summary.accumulatedPct!) : "—",
                             hint: cycleKnown
-                                ? <>{summary.monthsCounted} de {summary.frequencyMonths} meses<br />{summary.cycleStart ? formatMonthKey(summary.cycleStart.slice(0, 7)) : "—"} a {summary.indexThrough ? formatMonthKey(summary.indexThrough) : "—"}</>
+                                ? <>{formatDateBR(summary.cycleStart)} a {formatDateBR(summary.indexThroughDate)}<br />{plural(summary.daysCounted, "dia", "dias")}, pro rata die</>
                                 : !summary.nextAdjustmentDate ? "—" : !row.seriesCode ? "Índice sem série no Kitnets: informe o percentual no reajuste" : summary.accumulatedPct !== null ? "Nenhum mês do ciclo divulgado ainda" : "Série do índice indisponível no momento",
                         }}
                     />
@@ -255,7 +262,7 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                         right={{
                             label: "Aluguel reajustado até hoje", value: row.inForce && cycleKnown && summary.adjustedRent !== null ? <Money>{brl(summary.adjustedRent)}</Money> : "—",
                             hint: row.inForce && cycleKnown && summary.adjustedRent !== null
-                                ? <><Money>{summary.adjustedRent >= rent ? "+" : "−"}{brl(Math.abs(summary.adjustedRent - rent))}</Money> sobre o atual<br />Prévia com os meses já divulgados</>
+                                ? <><Money>{summary.adjustedRent >= rent ? "+" : "−"}{brl(Math.abs(summary.adjustedRent - rent))}</Money> sobre o atual<br />Prévia com o índice até {formatDateBR(summary.indexThroughDate)}</>
                                 : "—",
                         }}
                     />
@@ -264,7 +271,7 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                             label: featured.label,
                             value: featured.charge && amountOf(featured.charge) > 0 ? <Money>{brl(amountOf(featured.charge))}</Money> : featured.charge ? "Sem valor" : "—",
                             hint: featured.charge
-                                ? `${CHARGE_RESPONSIBILITY[featured.charge.responsibility] ?? featured.charge.responsibility}${featured.charge.adjustment_index ? ` · ${CHARGE_INDEX_LABELS[featured.charge.adjustment_index] ?? featured.charge.adjustment_index}` : ""}`
+                                ? `${CHARGE_RESPONSIBILITY[featured.charge.responsibility] ?? featured.charge.responsibility}${featured.charge.adjusts_with_rent ? " · reajusta com o aluguel" : featured.charge.adjustment_index ? ` · ${CHARGE_INDEX_LABELS[featured.charge.adjustment_index] ?? featured.charge.adjustment_index}` : ""}`
                                 : "Não informado no contrato",
                         }}
                         right={{
@@ -280,6 +287,37 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                             </div>
                         )}
                     />
+                    {/* The condominium's own pair, like the rent's "Acumulado no ciclo" and "Aluguel reajustado até hoje" */}
+                    {condo && condoAdjustment && (
+                        <Pair
+                            left={{
+                                label: "Acumulado do condomínio",
+                                tone: condoAdjustment.accumulatedPct === null ? undefined : condoAdjustment.accumulatedPct < 0 ? "bad" : "good",
+                                value: condoAdjustment.accumulatedPct !== null ? pctText(condoAdjustment.accumulatedPct) : "—",
+                                hint: (
+                                    <>
+                                        {condoAdjustment.indexLabel} · {condoAdjustment.withRent ? "reajusta com o aluguel" : "índice do encargo"}<br />
+                                        {condoAdjustment.accumulatedPct !== null
+                                            ? <>{formatDateBR(condoAdjustment.cycleStart)} a {formatDateBR(condoAdjustment.indexThroughDate)}</>
+                                            : !condoCode || !(condoCode in seriesByCode) ? "Índice sem série no Kitnets"
+                                            : seriesByCode[condoCode] ? "Nenhum mês do ciclo divulgado ainda" : "Série do índice indisponível no momento"}
+                                    </>
+                                ),
+                            }}
+                            right={{
+                                label: "Condomínio reajustado até hoje",
+                                value: row.inForce && condoAdjustment.adjustedAmount !== null ? <Money>{brl(condoAdjustment.adjustedAmount)}</Money> : "—",
+                                hint: !row.inForce ? "Contrato encerrado" : (
+                                    <>
+                                        {condoAdjustment.adjustedAmount !== null && (
+                                            <><Money>{condoAdjustment.adjustedAmount >= amountOf(condo) ? "+" : "−"}{brl(Math.abs(condoAdjustment.adjustedAmount - amountOf(condo)))}</Money> sobre o atual<br /></>
+                                        )}
+                                        Próximo reajuste em {formatDateBR(condoAdjustment.nextDate)}
+                                    </>
+                                ),
+                            }}
+                        />
+                    )}
                     <Pair
                         left={{
                             label: agencyManaged ? "Recebido (líquido)" : "Recebido", value: income.confirmedMonths > 0 ? <Money>{brl(income.received)}</Money> : "—",
@@ -414,7 +452,7 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                                                     {c.responsibility === "TENANT" && c.collected_by && <span title="Quem emite a fatura deste encargo"> · fatura: {COLLECTOR_SHORT[c.collected_by] ?? c.collected_by}</span>}
                                                 </td>
                                                 <td className="py-1 text-right tabular-nums text-foreground">{c.amount ? <Money>{brl(Number(c.amount))}</Money> : "—"}</td>
-                                                <td className="py-1 pl-2 text-right text-muted-foreground" title={c.adjustment_notes ?? undefined}>{c.adjustment_index ? CHARGE_INDEX_LABELS[c.adjustment_index] ?? c.adjustment_index : ""}</td>
+                                                <td className="py-1 pl-2 text-right text-muted-foreground" title={c.adjusts_with_rent ? undefined : c.adjustment_notes ?? undefined}>{c.adjusts_with_rent ? "Com o aluguel" : c.adjustment_index ? CHARGE_INDEX_LABELS[c.adjustment_index] ?? c.adjustment_index : ""}</td>
                                             </tr>
                                         ))}
                                     </tbody>

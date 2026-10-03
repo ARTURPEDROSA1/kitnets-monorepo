@@ -12,6 +12,7 @@ import { Button } from "@kitnets/ui";
 import { cn } from "@/lib/utils";
 import { Sensitive } from "@/components/privacy";
 import { CONNECTION_STATUS_META, type ConnectionsView, type StripeConnectionView } from "@/lib/billing/connections";
+import SettingsGroup from "./SettingsGroup";
 
 interface Props {
     connections: ConnectionsView;
@@ -125,22 +126,18 @@ export default function StripeConnectionCard({ connections, onChange }: Props) {
     };
 
     return (
-        <section className="rounded-xl border border-border/80 bg-card">
-            <header className="flex flex-wrap items-start justify-between gap-3 border-b border-border/60 px-4 py-3">
-                <div className="min-w-0">
-                    <h2 className="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
-                        <CreditCard className="h-4 w-4 text-violet-500" /> Stripe — cartão de crédito
-                        {meta && <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", meta.pill)}>{meta.label}</span>}
-                        {stripe?.environment === "SANDBOX" && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">Conta de teste</span>}
-                        {!stripe && <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-700 dark:bg-slate-800 dark:text-slate-300">Não conectado</span>}
-                    </h2>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                        O inquilino paga com cartão numa página da Stripe e o dinheiro cai na <span className="font-medium text-foreground">sua</span> conta Stripe, que transfere para o seu banco. A taxa do cartão é somada à fatura (Configuração), então você recebe o valor cheio.
-                    </p>
-                </div>
-                {stripeAvailable && (
-                    <div className="flex flex-wrap items-center gap-2">
-                        {stripe ? (
+        <SettingsGroup
+            tone="violet"
+            icon={<CreditCard className="h-4 w-4" />}
+            title="Stripe — cartão de crédito"
+            badges={<>
+                {meta && <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", meta.pill)}>{meta.label}</span>}
+                {stripe?.environment === "SANDBOX" && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">Conta de teste</span>}
+                {!stripe && <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-700 dark:bg-slate-800 dark:text-slate-300">Não conectado</span>}
+            </>}
+            description={<>O inquilino paga com cartão numa página da Stripe e o dinheiro cai na <span className="font-medium text-foreground">sua</span> conta Stripe, que transfere para o seu banco. A taxa do cartão é somada à fatura (Configuração), então você recebe o valor cheio.</>}
+            actions={stripeAvailable ? (
+                        stripe ? (
                             <>
                                 <Button variant="outline" size="sm" onClick={() => void call("refresh", { method: "POST" })} disabled={busy !== null}>
                                     {busy === "refresh" ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1 h-4 w-4" />} Atualizar
@@ -156,11 +153,10 @@ export default function StripeConnectionCard({ connections, onChange }: Props) {
                             <Button onClick={connect} disabled={busy !== null}>
                                 {busy === "connect" ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <ExternalLink className="mr-1 h-4 w-4" />} Conectar com Stripe
                             </Button>
-                        )}
-                    </div>
-                )}
-            </header>
-            <div className="space-y-3 p-4">
+                        )
+            ) : undefined}
+            bodyClassName="space-y-3 p-4"
+        >
                 {!stripeAvailable && <p className="text-sm text-muted-foreground">O pagamento por cartão não está configurado neste servidor.</p>}
                 {notice && <p role="status" className="text-sm text-emerald-700 dark:text-emerald-400">{notice}</p>}
                 {error && <p role="alert" className="inline-flex items-center gap-1 text-sm text-rose-600"><AlertCircle className="h-4 w-4" /> {error}</p>}
@@ -169,7 +165,6 @@ export default function StripeConnectionCard({ connections, onChange }: Props) {
                         Você será levado à Stripe para entrar na sua conta (ou criar uma, em nome da sua empresa) e autorizar o Kitnets a abrir cobranças nela. Nenhuma senha ou chave da Stripe passa pelo Kitnets.
                     </p>
                 )}
-            </div>
 
             {confirmDelete && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Desconectar a conta Stripe">
@@ -187,6 +182,6 @@ export default function StripeConnectionCard({ connections, onChange }: Props) {
                     </div>
                 </div>
             )}
-        </section>
+        </SettingsGroup>
     );
 }

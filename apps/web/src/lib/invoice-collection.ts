@@ -18,7 +18,7 @@
  * condominium stored OWNER. The contract form asks it per charge as "Emissor da fatura".
  */
 import type { ChargeType, LeaseCharge, LeaseManagementType } from "@/types/lease";
-import { chargeName } from "@/lib/lease-charges";
+import { chargeAdjustmentRule, chargeName } from "@/lib/lease-charges";
 
 export const COLLECTORS = ["OWNER", "AGENCY", "THIRD_PARTY"] as const;
 export type Collector = (typeof COLLECTORS)[number];
@@ -55,6 +55,11 @@ export interface CollectionComponent {
     undecided: boolean;
     /** goes into the invoice: the owner collects it and it has an amount */
     billable: boolean;
+    /**
+     * Readjusted on the lease's adjustment date: the rent itself, a charge that follows it ("Reajusta
+     * com o aluguel") or a charge with a published index of its own; absent = fixed, or not said.
+     */
+    adjustment?: "RENT" | "WITH_RENT" | "OWN_INDEX";
 }
 
 /** The components whose collector follows the lease's management when the owner has not answered. */
@@ -72,7 +77,9 @@ export interface CollectionLease {
     management_type: LeaseManagementType;
     monthly_rent: number | string | null;
     rent_collected_by?: string | null;
-    charges?: ReadonlyArray<Pick<LeaseCharge, "id" | "charge_type" | "label" | "responsibility" | "amount"> & { collected_by?: string | null }> | null;
+    /** the rent's index; left out by callers that do not show adjustments */
+    adjustment_index?: string | null;
+    charges?: ReadonlyArray<Pick<LeaseCharge, "id" | "charge_type" | "label" | "responsibility" | "amount"> & { collected_by?: string | null; adjustment_index?: string | null; adjusts_with_rent?: boolean }> | null;
 }
 
 const amount = (v: number | string | null | undefined): number | null => {
@@ -82,15 +89,20 @@ const amount = (v: number | string | null | undefined): number | null => {
 
 /** The rent and every charge the tenant pays, each with who collects it. Charges the owner pays or that are included in the rent are not the tenant's to be charged. */
 export function leaseComponents(lease: CollectionLease): CollectionComponent[] {
-    const component = (key: string, kind: InvoiceItemKind, label: string, value: number | null, stored: Collector | null): CollectionComponent => {
+    const component = (key: string, kind: InvoiceItemKind, label: string, value: number | null, stored: Collector | null, adjustment: CollectionComponent["adjustment"]): CollectionComponent => {
         const resolved = resolveCollector(kind, stored, lease.management_type);
-        return { key, kind, label, amount: value, stored, ...resolved, billable: resolved.collector === "OWNER" && value !== null };
+        return { key, kind, label, amount: value, stored, ...resolved, billable: resolved.collector === "OWNER" && value !== null, ...(adjustment ? { adjustment } : {}) };
+    };
+    const chargeAdjusts = (c: { adjustment_index?: string | null; adjusts_with_rent?: boolean }): CollectionComponent["adjustment"] => {
+        const rule = chargeAdjustmentRule({ adjustment_index: c.adjustment_index ?? null, adjusts_with_rent: c.adjusts_with_rent }, lease.adjustment_index);
+        return rule ? (rule.withRent ? "WITH_RENT" : "OWN_INDEX") : undefined;
     };
     return [
-        component(RENT_KEY, "RENT", "Aluguel", amount(lease.monthly_rent), isCollector(lease.rent_collected_by) ? lease.rent_collected_by : null),
+        component(RENT_KEY, "RENT", "Aluguel", amount(lease.monthly_rent), isCollector(lease.rent_collected_by) ? lease.rent_collected_by : null,
+            lease.adjustment_index !== undefined && lease.adjustment_index !== "NONE" ? "RENT" : undefined),
         ...(lease.charges ?? [])
             .filter(c => c.responsibility === "TENANT")
-            .map(c => component(c.id, c.charge_type, chargeName(c), amount(c.amount), isCollector(c.collected_by) ? c.collected_by : null)),
+            .map(c => component(c.id, c.charge_type, chargeName(c), amount(c.amount), isCollector(c.collected_by) ? c.collected_by : null, chargeAdjusts(c))),
     ];
 }
 
