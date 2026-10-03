@@ -234,6 +234,8 @@ export default function LeaseOverview({ lease, row, rent, monthly, featured, ten
                 <div className="space-y-3">
                     <SplitRow tone="emerald" name={agencyManaged ? "Aluguel bruto" : "Aluguel"} split={term.rent} known={term.forecastKnown} />
                     {term.condo && <SplitRow tone="sky" name="Condomínio" split={term.condo} known={term.forecastKnown} />}
+                    {/* the colour it has in the monthly bar: the second part there, unless the condominium took it */}
+                    {term.energy && <SplitRow tone={term.condo ? "amber" : "sky"} name="Energia" split={term.energy} known={term.forecastKnown} />}
                     <SplitRow tone="violet" name="Total" split={term.total} known={term.forecastKnown} strong />
                 </div>
                 {!term.forecastKnown && <p className="mt-2 text-[11px] text-muted-foreground">Prazo indeterminado: sem previsto, só o que já foi recebido.</p>}

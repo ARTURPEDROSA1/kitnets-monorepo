@@ -145,7 +145,7 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
     const term = leaseTermTotals(
         { ...lease, monthly_rent: rent },
         history?.rows ?? [],
-        income.points.filter(p => p.status === "CONFIRMED").map(p => ({ month: p.key, rent: p.gross, condo: p.condo })),
+        income.points.filter(p => p.status === "CONFIRMED").map(p => ({ month: p.key, rent: p.gross, condo: p.condo, energy: p.energy })),
         today
     );
     const monthly = monthlyTotal(rent, lease.charges);
