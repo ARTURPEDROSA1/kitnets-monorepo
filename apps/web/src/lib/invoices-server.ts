@@ -18,6 +18,7 @@ import type { BillingSettingsInput } from "@/lib/schemas/invoice";
 import { cancelChargeAtBank } from "@/lib/billing/charges-server";
 import { closeCardSessions } from "@/lib/billing/card-server";
 import { sendReceipt } from "@/lib/billing/deliveries-server";
+import { termsToAdopt } from "@/lib/billing/inter-payload";
 
 const TENANT_COLUMNS = "id, full_name, cpf, email, postal_code, street, street_number, address_complement, neighborhood, city, state, use_property_address";
 
@@ -195,5 +196,29 @@ export async function saveBillingSettings(supabase: AdminSupabase, profileId: st
         // the table refuses the automation without every decision (the schema checks the same; this is the backstop)
         if (error.code === "23514" && error.message.includes("automation_needs_decisions")) throw badRequest({ automation_enabled: "Decida antecedência, multa, juros, prazo e o mês inicial antes de ligar a emissão automática." });
         throw new Error(`billing_settings: ${error.message}`);
+    }
+    await adoptTermsOnOpenInvoices(supabase, profileId, input);
+}
+
+/**
+ * Open invoices that state no late terms yet (created before the owner decided them) take the terms
+ * just saved — only the ones they lack; an invoice with a boleto already has its own. Best effort: the
+ * issue step does the same for whatever is missed here (lib/billing/charges-server.ts).
+ */
+async function adoptTermsOnOpenInvoices(supabase: AdminSupabase, profileId: string, settings: Pick<BillingSettingsInput, "fine_pct" | "interest_pct_month" | "days_payable_after_due">): Promise<void> {
+    try {
+        const { data, error } = await supabase.from("invoices").select("id, fine_pct, interest_pct_month, days_payable_after_due")
+            .eq("owner_id", profileId).in("status", ["DRAFT", "ISSUED"]).or("fine_pct.is.null,interest_pct_month.is.null,days_payable_after_due.is.null").limit(500);
+        if (error) throw new Error(error.message);
+        const num = (v: unknown) => (v == null ? null : Number(v));
+        for (const row of (data ?? []) as Array<Record<string, unknown>>) {
+            const adopted = termsToAdopt({ fine_pct: num(row.fine_pct), interest_pct_month: num(row.interest_pct_month), days_payable_after_due: num(row.days_payable_after_due) }, settings);
+            if (Object.keys(adopted).length === 0) continue;
+            const { error: updateError } = await supabase.from("invoices").update(adopted).eq("id", String(row.id)).eq("owner_id", profileId).in("status", ["DRAFT", "ISSUED"]);
+            if (updateError) throw new Error(updateError.message);
+            await supabase.from("invoice_events").insert({ invoice_id: String(row.id), owner_id: profileId, type: "TERMS_SET", actor: "OWNER", detail: adopted });
+        }
+    } catch (err) {
+        console.error("[Invoices] adopting the terms on open invoices failed:", (err as Error).message);
     }
 }
