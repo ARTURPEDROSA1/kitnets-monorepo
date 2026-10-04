@@ -4,8 +4,10 @@
  * "Histórico de reajustes" on the contract's dashboard, as a spreadsheet: the contract's initial
  * amounts, every adjustment in order (1º, 2º…) with where it came from — an addendum ("aditivo", the
  * truth when there is one, opened from its cell) or Kitnets' calculation by the contract's index —
- * what is waiting for its index, and the next one with its preview. Same machinery as the other
- * tables: sort and filter on the headers, sum cells, hide columns.
+ * what is waiting for its index, and the next one with its preview. Next to the rent, the property's
+ * own charge in one column, "Condomínio / Energia": the condominium of a kitnet, or the energy of a
+ * house (a contract without a condominium). Same machinery as the other tables: sort and filter on the
+ * headers, sum cells, hide columns.
  */
 import React, { useMemo, useState } from "react";
 import { AlertTriangle, FilePlus2, FileText, Loader2, Trash2 } from "lucide-react";
@@ -32,7 +34,7 @@ interface Props {
     summary: LeaseSummary;
     /** the lease's index, as the contract names it ("IVAR") */
     indexLabel: string;
-    /** the rent in force and the condominium's preview for the next adjustment, when it follows an index */
+    /** the rent in force, and the condominium's (or a house's energy's) amount and preview for the next adjustment, when it follows an index */
     currentRent: number;
     currentCondo: number | null;
     nextCondo: number | null;
@@ -71,7 +73,7 @@ interface Line {
     changePct: number | null;
     previousCondo: number | null;
     condo: number | null;
-    /** rent + condominium after this line */
+    /** rent + condominium / energy after this line */
     total: number | null;
     doc: LeaseDocument | null;
     notes: string | null;
@@ -157,9 +159,9 @@ export default function LeaseAdjustmentTable({ leaseId, startDate, adjustments, 
         { key: "rent", label: "Aluguel", kind: "number", align: "right", sum: false, title: "O aluguel a partir da data", get: r => r.rent },
         { key: "change", label: "Variação (R$)", kind: "number", align: "right", get: r => r.changeAmount },
         { key: "change_pct", label: "Variação (%)", kind: "number", align: "right", sum: false, title: "Quanto o aluguel mudou de fato: num aditivo pode ser diferente do índice", get: r => r.changePct },
-        { key: "previous_condo", label: "Condomínio anterior", kind: "number", align: "right", sum: false, get: r => r.previousCondo },
-        { key: "condo", label: "Condomínio", kind: "number", align: "right", sum: false, title: "O condomínio a partir da data", get: r => r.condo },
-        { key: "total", label: "Aluguel + condomínio", kind: "number", align: "right", sum: false, get: r => r.total },
+        { key: "previous_condo", label: "Condomínio / Energia anterior", kind: "number", align: "right", sum: false, get: r => r.previousCondo },
+        { key: "condo", label: "Condomínio / Energia", kind: "number", align: "right", sum: false, title: "A partir da data: o condomínio de um imóvel multiunidade, ou a energia de uma casa (contrato sem condomínio)", get: r => r.condo },
+        { key: "total", label: "Aluguel + condomínio / energia", kind: "number", align: "right", sum: false, get: r => r.total },
         { key: "document", label: "Aditivo", kind: "text", title: "O arquivo do aditivo (ou do contrato, na primeira linha): clique para abrir", get: r => r.doc?.file_name ?? "" },
         { key: "notes", label: "Observação", kind: "text", get: r => r.notes ?? "" },
     ], []);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NEGATIVE_NOTE, adjustableCondo, adjusted, cycleOf, dueAdjustments, initialValues, pastAdjustmentDates, rentChangePct, withAddendum, type AdjustableLease, type AdjustmentRow } from "./lease-adjustments";
+import { NEGATIVE_NOTE, adjustableCharge, adjusted, cycleOf, dueAdjustments, initialValues, pastAdjustmentDates, rentChangePct, trackedCharge, withAddendum, type AdjustableLease, type AdjustmentRow } from "./lease-adjustments";
 import type { IndexPoint } from "./lease-summary";
 
 /** `n` months of the same rate from `from` (`YYYY-MM`). */
@@ -16,6 +16,8 @@ const lease = (over: Partial<AdjustableLease> = {}): AdjustableLease => ({
     start_date: "2025-08-29", monthly_rent: 1900, adjustment_index: "IVAR", adjustment_frequency: 12, next_adjustment_date: null, charges: [], ...over,
 });
 const condo = (over: Record<string, unknown> = {}) => ({ charge_type: "CONDOMINIUM" as const, amount: 400, adjustment_index: null, adjusts_with_rent: true, ...over });
+// a house's fixed energy, readjusted by the IPCA on the lease's dates
+const energy = (over: Record<string, unknown> = {}) => ({ charge_type: "ELECTRICITY" as const, amount: 350, adjustment_index: "IPCA", adjusts_with_rent: false, ...over });
 const TODAY = "2026-10-03";
 
 describe("pastAdjustmentDates + cycleOf", () => {
@@ -97,7 +99,24 @@ describe("dueAdjustments", () => {
         // a fixed condominium is left alone
         const fixed = dueAdjustments(lease({ charges: [condo({ adjusts_with_rent: false, adjustment_index: "NONE" })] }), [], series, TODAY);
         expect(fixed.rows[0]).toMatchObject({ previous_condo: null, new_condo: null });
-        expect(adjustableCondo(lease({ charges: [condo({ adjusts_with_rent: false })] }))).toBeNull();
+        expect(adjustableCharge(lease({ charges: [condo({ adjusts_with_rent: false })] }))).toBeNull();
+    });
+    it("follows a house's energy, in a contract without a condominium, the same way", () => {
+        const series = { ivar: flat("2025-08", 14, 0.5), ipca: flat("2025-08", 14, 1) };
+        const house = dueAdjustments(lease({ charges: [energy()] }), [], series, TODAY);
+        expect(house.rows[0]).toMatchObject({ new_rent: 2017.19, previous_condo: 350, new_condo: 394.39, charge_type: "ELECTRICITY" });
+        expect(house.condo).toBe(394.39);
+        // a condominium is the one followed when the contract has both
+        const both = dueAdjustments(lease({ charges: [energy(), condo()] }), [], series, TODAY);
+        expect(both.rows[0]).toMatchObject({ previous_condo: 400, new_condo: 424.67, charge_type: "CONDOMINIUM" });
+        // an energy bill without a fixed amount is not followed
+        expect(dueAdjustments(lease({ charges: [energy({ amount: null })] }), [], series, TODAY).rows[0]).toMatchObject({ previous_condo: null, new_condo: null, charge_type: null });
+    });
+    it("picks the condominium, else the energy, among the charges with an amount", () => {
+        expect(trackedCharge([energy(), condo()])?.charge_type).toBe("CONDOMINIUM");
+        expect(trackedCharge([condo({ amount: 0 }), energy()])?.charge_type).toBe("ELECTRICITY");
+        expect(trackedCharge([energy({ amount: 0 })])).toBeNull();
+        expect(trackedCharge(null)).toBeNull();
     });
     it("holds the whole adjustment until the condominium's own index is out too", () => {
         const due = dueAdjustments(lease({ charges: [condo({ adjusts_with_rent: false, adjustment_index: "IPCA" })] }), [], { ivar: flat("2025-08", 14, 0.5), ipca: flat("2025-08", 11, 1) }, TODAY);
@@ -116,6 +135,11 @@ describe("withAddendum", () => {
         expect(out.rows).toHaveLength(1);
         expect(out.rows[0]).toMatchObject({ source: "ADDENDUM", previous_rent: 1900, new_rent: 2000, previous_condo: 400, new_condo: null, document_id: "d1" });
         expect(out).toMatchObject({ rent: 2000, condo: 400 });
+    });
+    it("says which charge its amount is", () => {
+        const out = withAddendum([], { effective_date: "2026-12-10", new_rent: 4100, new_condo: 360, charge_type: "ELECTRICITY" }, { rent: 4000, condo: 350 });
+        expect(out.rows[0]).toMatchObject({ previous_condo: 350, new_condo: 360, charge_type: "ELECTRICITY" });
+        expect(out.condo).toBe(360);
     });
     it("replaces the calculated row of its date and chains the later ones again", () => {
         const rows = [calculated("2024-03-10", 1000, 1.1), calculated("2025-03-10", 1100, 1.1), calculated("2026-03-10", 1210, 1.1)];
@@ -161,9 +185,10 @@ describe("withAddendum", () => {
 
 describe("initialValues + rentChangePct", () => {
     it("reads the contract's original amounts from the first adjustment, else from the lease", () => {
-        expect(initialValues(lease({ monthly_rent: 2017.19, charges: [condo({ amount: 424.67 })] }), [{ effective_date: "2026-08-29", previous_rent: 1900, previous_condo: 400 }])).toEqual({ rent: 1900, condo: 400 });
-        expect(initialValues(lease({ charges: [condo()] }), [])).toEqual({ rent: 1900, condo: 400 });
-        expect(initialValues(lease(), [])).toEqual({ rent: 1900, condo: null });
+        expect(initialValues(lease({ monthly_rent: 2017.19, charges: [condo({ amount: 424.67 })] }), [{ effective_date: "2026-08-29", previous_rent: 1900, previous_condo: 400 }])).toEqual({ rent: 1900, condo: 400, chargeType: "CONDOMINIUM" });
+        expect(initialValues(lease({ charges: [condo()] }), [])).toEqual({ rent: 1900, condo: 400, chargeType: "CONDOMINIUM" });
+        expect(initialValues(lease({ charges: [energy()] }), [])).toEqual({ rent: 1900, condo: 350, chargeType: "ELECTRICITY" });
+        expect(initialValues(lease(), [])).toEqual({ rent: 1900, condo: null, chargeType: null });
     });
     it("gives the variation an adjustment made", () => {
         expect(rentChangePct({ previous_rent: 1900, new_rent: 2017.19 })).toBe(6.17);

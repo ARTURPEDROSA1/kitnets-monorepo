@@ -16,7 +16,7 @@ import { Money } from "@/components/privacy";
 import { formatDateBR } from "@/lib/dates";
 import { brl } from "@/lib/lease-dashboard";
 import { daysBetween, LEASE_INDEX_LABELS } from "@/lib/lease-summary";
-import { COVER_DAYS, type StoredAdjustment } from "@/lib/lease-adjustments";
+import { COVER_DAYS, type AdjustedChargeType, type StoredAdjustment } from "@/lib/lease-adjustments";
 import type { ExtractedAddendum } from "@/lib/lease-addendum-extract";
 import { attachLeaseDocument, checkLeaseFile, LEASE_UPLOAD_ACCEPT, ROUTE_BODY_SAFE_SIZE, stageLeaseFile } from "@/lib/lease-upload-client";
 import { formatDateBR as isoToMasked, maskCurrency, maskDate, moneyToMask, parseDateBR } from "./LeaseForm";
@@ -26,8 +26,8 @@ interface Props {
     /** the contract's original amounts and the adjustments recorded, oldest first: what was in force before the addendum's date */
     initial: { rent: number; condo: number | null };
     rows: StoredAdjustment[];
-    /** the lease has a condominium charge (without one the field is left out) */
-    hasCondo: boolean;
+    /** the charge adjusted next to the rent — the condominium, or a house's energy; null leaves the field out */
+    charge: { type: AdjustedChargeType; label: string } | null;
     /** the lease's adjustment dates already behind today, oldest first: the dates an addendum usually refers to */
     adjustmentDates: string[];
     /** the adjustment the addendum is for, when it was opened from its line */
@@ -56,7 +56,9 @@ function before(date: string, initial: Props["initial"], rows: StoredAdjustment[
     return { rent, condo };
 }
 
-export default function LeaseAddendumModal({ leaseId, initial, rows, hasCondo, adjustmentDates, initialDate = null, onClose, onSaved }: Props) {
+export default function LeaseAddendumModal({ leaseId, initial, rows, charge, adjustmentDates, initialDate = null, onClose, onSaved }: Props) {
+    const hasCondo = charge !== null;
+    const chargeName = (charge?.label ?? "Condomínio").toLowerCase();
     const input = useRef<HTMLInputElement>(null);
     const [file, setFile] = useState<File | null>(null);
     const [storagePath, setStoragePath] = useState<string | null>(null);
@@ -86,7 +88,7 @@ export default function LeaseAddendumModal({ leaseId, initial, rows, hasCondo, a
     const fill = (data: ExtractedAddendum) => {
         if (data.effective_date) setDate(isoToMasked(snapToAnniversary(data.effective_date, adjustmentDates)));
         if (data.new_rent !== null) setRent(moneyToMask(data.new_rent));
-        if (data.new_condominium !== null && hasCondo) setCondo(moneyToMask(data.new_condominium));
+        if (data.new_condominium !== null && charge?.type === "CONDOMINIUM") setCondo(moneyToMask(data.new_condominium));
         if (data.index) setIndex(data.index);
         if (data.percent !== null) setPct(String(data.percent).replace(".", ","));
         if (data.summary) setNotes(data.summary);
@@ -251,7 +253,7 @@ export default function LeaseAddendumModal({ leaseId, initial, rows, hasCondo, a
                                         </div>
                                         {hasCondo && (
                                             <div>
-                                                <Label className="text-xs">Condomínio antes (R$)</Label>
+                                                <Label className="text-xs">{charge?.label ?? "Condomínio"} antes (R$)</Label>
                                                 <Input value={previousCondo} onChange={e => setPreviousCondo(maskCurrency(e.target.value))} placeholder={prior.condo !== null ? moneyToMask(prior.condo) : "0,00"} className={cn("h-9", errors.previous_condo && "border-red-500")} />
                                                 {errors.previous_condo && <p className="mt-1 text-xs text-red-500">{errors.previous_condo}</p>}
                                             </div>
@@ -287,7 +289,7 @@ export default function LeaseAddendumModal({ leaseId, initial, rows, hasCondo, a
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                 {hasCondo && (
                                     <div>
-                                        <Label className="text-xs">Novo condomínio (R$)</Label>
+                                        <Label className="text-xs">{charge?.type === "ELECTRICITY" ? "Nova energia" : `Novo ${chargeName}`} (R$)</Label>
                                         <Input value={condo} onChange={e => setCondo(maskCurrency(e.target.value))} placeholder="Sem alteração" className={cn("h-9", errors.new_condo && "border-red-500")} />
                                         {errors.new_condo && <p className="mt-1 text-xs text-red-500">{errors.new_condo}</p>}
                                         {prior.condo !== null && <p className="mt-1 text-xs text-muted-foreground">Antes: <Money>{brl(prior.condo)}</Money></p>}

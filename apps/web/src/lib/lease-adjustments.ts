@@ -12,12 +12,30 @@
  *
  * With a negative index the amount is kept, as most contracts do; the row still shows the index, and
  * an addendum can say otherwise.
+ *
+ * Next to the rent the history follows one charge, the property's own: the condominium, or — in a
+ * contract without one, a house — the energy bill. The `*_condo` fields carry it (the database
+ * columns keep that name); `charge_type` says which.
  */
 import { addMonths, cents, cycleFactor, daysBetween, leaseIndexSeriesCode, nextAdjustment, round2, type IndexPoint, type LeaseForSummary } from "@/lib/lease-summary";
 import { amountOf, chargeAdjustmentRule } from "@/lib/lease-charges";
 import type { LeaseCharge } from "@/types/lease";
 
 export type AdjustmentSource = "CALCULATED" | "ADDENDUM";
+
+/** The charge the history follows next to the rent: the condominium, else the energy. */
+export type AdjustedChargeType = "CONDOMINIUM" | "ELECTRICITY";
+export const ADJUSTED_CHARGE_TYPES: readonly AdjustedChargeType[] = ["CONDOMINIUM", "ELECTRICITY"];
+export const ADJUSTED_CHARGE_LABELS: Record<AdjustedChargeType, string> = { CONDOMINIUM: "Condomínio", ELECTRICITY: "Energia" };
+
+/** The charge the history follows: the condominium when the contract has one with an amount, else the energy with an amount. */
+export function trackedCharge<C extends Pick<LeaseCharge, "charge_type" | "amount">>(charges: readonly C[] | null | undefined): (C & { charge_type: AdjustedChargeType }) | null {
+    for (const type of ADJUSTED_CHARGE_TYPES) {
+        const charge = (charges ?? []).find(c => c.charge_type === type && amountOf(c) > 0);
+        if (charge) return charge as C & { charge_type: AdjustedChargeType };
+    }
+    return null;
+}
 
 /** One adjustment, as `lease_adjustments` stores it. */
 export interface AdjustmentRow {
@@ -32,12 +50,14 @@ export interface AdjustmentRow {
     index_factor: number | null;
     previous_rent: number;
     new_rent: number;
-    /** the condominium before; null when the lease has none */
+    /** the followed charge (condominium or energy) before; null when the lease has none */
     previous_condo: number | null;
-    /** the condominium after; null = unchanged */
+    /** the followed charge after; null = unchanged */
     new_condo: number | null;
-    /** the factor applied to the condominium (the rent's, or its own index's); null = not adjusted */
+    /** the factor applied to it (the rent's, or its own index's); null = not adjusted */
     condo_factor: number | null;
+    /** which charge the `*_condo` fields carry; null on the rows written before the energy was followed (the condominium) */
+    charge_type?: AdjustedChargeType | null;
     /** the addendum's file among the lease's documents */
     document_id?: string | null;
     notes: string | null;
@@ -60,12 +80,12 @@ export const NEGATIVE_NOTE = "Índice negativo: valor mantido.";
 const frequencyOf = (lease: Pick<AdjustableLease, "adjustment_frequency">) => (lease.adjustment_frequency && lease.adjustment_frequency > 0 ? lease.adjustment_frequency : 12);
 const byDate = <T extends { effective_date: string }>(rows: readonly T[]): T[] => [...rows].sort((a, b) => (a.effective_date < b.effective_date ? -1 : a.effective_date > b.effective_date ? 1 : 0));
 
-/** The lease's condominium charge when it is readjusted on the lease's dates (with the rent, or by its own index). */
-export function adjustableCondo(lease: AdjustableLease): { amount: number; withRent: boolean; index: string | null } | null {
-    const condo = (lease.charges ?? []).find(c => c.charge_type === "CONDOMINIUM");
-    if (!condo || amountOf(condo) <= 0) return null;
-    const rule = chargeAdjustmentRule(condo, lease.adjustment_index);
-    return rule ? { amount: amountOf(condo), ...rule } : null;
+/** The followed charge (condominium, else energy) when it is readjusted on the lease's dates (with the rent, or by its own index). */
+export function adjustableCharge(lease: AdjustableLease): { type: AdjustedChargeType; amount: number; withRent: boolean; index: string | null } | null {
+    const charge = trackedCharge(lease.charges);
+    if (!charge) return null;
+    const rule = chargeAdjustmentRule(charge, lease.adjustment_index);
+    return rule ? { type: charge.charge_type, amount: amountOf(charge), ...rule } : null;
 }
 
 /** The adjustment dates already behind `today` — the anniversaries at the lease's frequency — oldest first. */
@@ -100,7 +120,7 @@ export const adjusted = (amount: number, factor: number): number => (factor < 1 
 export type WaitingReason =
     /** the cycle's last months are not published yet */
     | "NOT_PUBLISHED"
-    /** the lease's index (or the condominium's) has no series in Kitnets: only an addendum can say the value */
+    /** the lease's index (or the followed charge's) has no series in Kitnets: only an addendum can say the value */
     | "NO_SERIES";
 
 export interface DueAdjustments {
@@ -115,9 +135,9 @@ export interface DueAdjustments {
 
 /**
  * The calculated adjustments a lease still owes: every anniversary behind `today` that is later than
- * the last one recorded, each on top of the one before. `lease.monthly_rent` (and the condominium
- * charge's amount) are the values in force since the last recorded adjustment — or since the start.
- * The count stops at the first date whose cycle is not fully published.
+ * the last one recorded, each on top of the one before. `lease.monthly_rent` (and the followed
+ * charge's amount — condominium or energy) are the values in force since the last recorded adjustment
+ * — or since the start. The count stops at the first date whose cycle is not fully published.
  */
 export function dueAdjustments(
     lease: AdjustableLease,
@@ -125,7 +145,7 @@ export function dueAdjustments(
     seriesByCode: Record<string, IndexPoint[] | null | undefined>,
     today: string
 ): DueAdjustments {
-    const condoRule = adjustableCondo(lease);
+    const condoRule = adjustableCharge(lease);
     let rent = Number(lease.monthly_rent) || 0;
     let condo = condoRule ? condoRule.amount : null;
     const out: DueAdjustments = { rows: [], rent, condo, waiting: null };
@@ -149,7 +169,7 @@ export function dueAdjustments(
         if (condoRule && condo !== null) {
             const own = condoCode ? seriesByCode[condoCode] : null;
             condoFactor = condoRule.withRent ? factor : own ? cycleFactor(own, cycle.start, cycle.periods) : null;
-            // the condominium's own index is not out yet: the whole adjustment waits for it
+            // the charge's own index is not out yet: the whole adjustment waits for it
             if (condoFactor === null) return { ...out, rent, condo, waiting: { date, reason: "NOT_PUBLISHED" } };
         }
 
@@ -166,6 +186,7 @@ export function dueAdjustments(
             previous_condo: condo,
             new_condo: newCondo,
             condo_factor: condoFactor,
+            charge_type: condoRule ? condoRule.type : null,
             notes: factor < 1 ? NEGATIVE_NOTE : null,
         });
         rent = newRent;
@@ -177,8 +198,10 @@ export function dueAdjustments(
 export interface AddendumInput {
     effective_date: string;
     new_rent: number;
-    /** null / undefined = the addendum does not change the condominium */
+    /** null / undefined = the addendum does not change the followed charge (condominium or energy) */
     new_condo?: number | null;
+    /** which charge `new_condo` is */
+    charge_type?: AdjustedChargeType | null;
     index_code?: string | null;
     index_pct?: number | null;
     document_id?: string | null;
@@ -208,6 +231,7 @@ export function withAddendum<T extends AdjustmentRow>(
         previous_condo: null,
         new_condo: addendum.new_condo == null ? null : cents(addendum.new_condo),
         condo_factor: null,
+        charge_type: addendum.charge_type ?? null,
         document_id: addendum.document_id ?? null,
         notes: addendum.notes ?? null,
     };
@@ -229,12 +253,19 @@ export function withAddendum<T extends AdjustmentRow>(
     return { rows: chained, rent, condo };
 }
 
-/** The contract's original amounts: what the first adjustment started from, or today's values when there is none. */
-export function initialValues(lease: AdjustableLease, rows: readonly Pick<AdjustmentRow, "effective_date" | "previous_rent" | "previous_condo">[]): { rent: number; condo: number | null } {
+/**
+ * The contract's original amounts: what the first adjustment started from, or today's values when there
+ * is none. `condo` is the followed charge, `chargeType` which one it is (null: the contract has neither).
+ */
+export function initialValues(
+    lease: AdjustableLease,
+    rows: readonly Pick<AdjustmentRow, "effective_date" | "previous_rent" | "previous_condo">[]
+): { rent: number; condo: number | null; chargeType: AdjustedChargeType | null } {
     const first = byDate(rows)[0];
-    const condo = (lease.charges ?? []).find(c => c.charge_type === "CONDOMINIUM");
-    if (first) return { rent: Number(first.previous_rent) || 0, condo: first.previous_condo === null ? null : Number(first.previous_condo) };
-    return { rent: Number(lease.monthly_rent) || 0, condo: condo && amountOf(condo) > 0 ? amountOf(condo) : null };
+    const charge = trackedCharge(lease.charges);
+    const chargeType = charge ? charge.charge_type : null;
+    if (first) return { rent: Number(first.previous_rent) || 0, condo: first.previous_condo === null ? null : Number(first.previous_condo), chargeType };
+    return { rent: Number(lease.monthly_rent) || 0, condo: charge ? amountOf(charge) : null, chargeType };
 }
 
 /** The variation an adjustment made to the rent, in % (an addendum may not name an index). */

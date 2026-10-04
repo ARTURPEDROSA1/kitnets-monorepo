@@ -31,7 +31,7 @@ import type { LeaseDashboardView } from "@/lib/lease-views";
 import type { IndexPoint } from "@/lib/lease-summary";
 import type { LeaseWithDetails } from "@/types/lease";
 import { amountOf, chargeAdjustment, featuredCharge, monthlyTotal, tenantCharges } from "@/lib/lease-charges";
-import { pastAdjustmentDates } from "@/lib/lease-adjustments";
+import { ADJUSTED_CHARGE_LABELS, pastAdjustmentDates, trackedCharge } from "@/lib/lease-adjustments";
 import { leaseTermTotals } from "@/lib/lease-term";
 import LeaseAdjustmentTable from "./LeaseAdjustmentTable";
 import LeaseAddendumModal from "./LeaseAddendumModal";
@@ -135,10 +135,12 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
     // the property's own charge (condomínio for kitnets, energia for a house) and what the tenant pays in all
     const featured = featuredCharge(lease.charges, bundle.propertyKind ?? (lease.unit_id ? "multi" : null));
     const tenantFixed = tenantCharges(lease.charges);
-    // the condominium readjusted on the lease's dates: with the rent ("Reajusta com o aluguel") or by its own index
-    const condo = lease.charges.find(c => c.charge_type === "CONDOMINIUM") ?? null;
-    const condoAdjustment = chargeAdjustment(condo, lease, seriesByCode, today);
-    const condoCode = condoAdjustment ? seriesKey(condoAdjustment.index) : "";
+    // the charge the adjustments follow next to the rent — the condominium, or a house's energy — readjusted on
+    // the lease's dates: with the rent ("Reajusta com o aluguel") or by its own index
+    const followed = trackedCharge(lease.charges);
+    const followedLabel = followed ? ADJUSTED_CHARGE_LABELS[followed.charge_type] : featured.charge ? featured.label : "Condomínio";
+    const followedAdjustment = chargeAdjustment(followed, lease, seriesByCode, today);
+    const followedCode = followedAdjustment ? seriesKey(followedAdjustment.index) : "";
     // what the adjustments already made of the contract's original rent
     const history = bundle.adjustments ?? null;
     // what the contract adds up to over its term: what the ledger confirmed, and what is still to come by the contract
@@ -241,8 +243,9 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                     featured={featured}
                     tenantFixed={tenantFixed}
                     term={term}
-                    condoAdjustment={condoAdjustment}
-                    condoSeries={!condoCode || !(condoCode in seriesByCode) ? "none" : seriesByCode[condoCode] ? "ok" : "unavailable"}
+                    chargeLabel={followedLabel}
+                    chargeAdjustment={followedAdjustment}
+                    chargeSeries={!followedCode || !(followedCode in seriesByCode) ? "none" : seriesByCode[followedCode] ? "ok" : "unavailable"}
                     income={income}
                     today={today}
                 />
@@ -392,8 +395,8 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                     summary={summary}
                     indexLabel={row.indexLabel}
                     currentRent={rent}
-                    currentCondo={condo && amountOf(condo) > 0 ? amountOf(condo) : null}
-                    nextCondo={condoAdjustment?.adjustedAmount ?? null}
+                    currentCondo={followed ? amountOf(followed) : null}
+                    nextCondo={followedAdjustment?.adjustedAmount ?? null}
                     inForce={row.inForce}
                     documents={lease.documents}
                     onView={openPdf}
@@ -422,7 +425,7 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                     leaseId={lease.id}
                     initial={history.initial}
                     rows={history.rows}
-                    hasCondo={Boolean(condo && amountOf(condo) > 0)}
+                    charge={followed ? { type: followed.charge_type, label: followedLabel } : null}
                     adjustmentDates={pastAdjustmentDates(lease, today)}
                     initialDate={addendumFor}
                     onClose={() => setAddendumFor(undefined)}

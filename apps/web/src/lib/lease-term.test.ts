@@ -108,6 +108,16 @@ describe("leaseTermTotals", () => {
         expect(t.total.forecast).toBe(108000 + 9450);
         expect(leaseTermTotals(kitnet, adjustments, [], TODAY).energy).toBeNull();
     });
+    it("forecasts a house's energy at the amount its adjustments left in force, like the condominium", () => {
+        // 36 months from 10/12/2024; the energy went from 330 to 350 (and the rent from 3.800 to 4.000) on 10/12/2025
+        const house: TermLease = { start_date: "2024-12-10", end_date: "2027-12-09", rent_due_day: 10, monthly_rent: 4000, charges: [charge("ELECTRICITY", 350)] };
+        const history = [{ effective_date: "2025-12-10", previous_rent: 3800, new_rent: 4000, previous_condo: 330, new_condo: 350 }];
+        const t = leaseTermTotals(house, history, [], TODAY);
+        // 10/01 … 10/11/2025 at the old amounts, 10/12/2025 … 10/12/2027 at the new ones
+        expect(t.energy).toEqual({ realized: 0, forecast: 11 * 330 + 25 * 350, total: 11 * 330 + 25 * 350 });
+        expect(t.rent.forecast).toBe(11 * 3800 + 25 * 4000);
+        expect(t.condo).toBeNull();
+    });
     it("has only the realized side for an open-ended lease", () => {
         const t = leaseTermTotals({ ...kitnet, end_date: null }, adjustments, [{ month: "2025-01", rent: 1000, condo: 166.67 }], TODAY);
         expect(t).toMatchObject({ forecastKnown: false, rent: { realized: 1000, forecast: 0, total: 1000 } });
