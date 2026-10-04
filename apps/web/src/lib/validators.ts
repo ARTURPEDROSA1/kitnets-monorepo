@@ -303,7 +303,7 @@ export function maskCPF(value: string): string {
  * Formats CRECI number + state for display.
  * ("12345", "MG") → "CRECI-MG 12345"
  */
-export function formatCRECI(number: string, state: string): string {
+export function formatCRECI(number: string | null, state: string | null): string {
     if (!number || !state) return number || '';
     return `CRECI-${state} ${number}`;
 }

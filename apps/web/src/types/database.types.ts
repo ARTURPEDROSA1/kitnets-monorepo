@@ -183,8 +183,8 @@ export type Database = {
           agent_type: string
           cpf: string | null
           created_at: string
-          creci_number: string
-          creci_state: string
+          creci_number: string | null
+          creci_state: string | null
           deleted_at: string | null
           deleted_by: string | null
           email: string | null
@@ -206,8 +206,8 @@ export type Database = {
           agent_type?: string
           cpf?: string | null
           created_at?: string
-          creci_number: string
-          creci_state: string
+          creci_number?: string | null
+          creci_state?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
           email?: string | null
@@ -229,8 +229,8 @@ export type Database = {
           agent_type?: string
           cpf?: string | null
           created_at?: string
-          creci_number?: string
-          creci_state?: string
+          creci_number?: string | null
+          creci_state?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
           email?: string | null

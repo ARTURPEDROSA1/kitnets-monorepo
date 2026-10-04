@@ -34,16 +34,19 @@ export async function assertAgentRelations(
     data: AgentInput,
     opts: { excludeAgentId?: string; cpfConflictMessage?: string } = {}
 ): Promise<void> {
-    let creci = supabase
-        .from("agents")
-        .select("id")
-        .eq("creci_number", data.creci_number)
-        .eq("creci_state", data.creci_state)
-        .is("deleted_at", null);
-    if (opts.excludeAgentId) creci = creci.neq("id", opts.excludeAgentId);
-    const { data: creciDup } = await creci.maybeSingle();
-    if (creciDup) {
-        throw conflict({ creci_number: `CRECI-${data.creci_state} ${data.creci_number} já está cadastrado.` });
+    // the CRECI is optional: only a complete one (number and UF) can be taken by someone else
+    if (data.creci_number && data.creci_state) {
+        let creci = supabase
+            .from("agents")
+            .select("id")
+            .eq("creci_number", data.creci_number)
+            .eq("creci_state", data.creci_state)
+            .is("deleted_at", null);
+        if (opts.excludeAgentId) creci = creci.neq("id", opts.excludeAgentId);
+        const { data: creciDup } = await creci.maybeSingle();
+        if (creciDup) {
+            throw conflict({ creci_number: `CRECI-${data.creci_state} ${data.creci_number} já está cadastrado.` });
+        }
     }
 
     if (data.cpf) {

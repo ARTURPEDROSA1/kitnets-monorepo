@@ -43,8 +43,9 @@ export const agentInputSchema = z
                 const digits = parseCPF(v);
                 return digits.length === 11 ? digits : null;
             }),
-        creci_number: requiredText("CRECI é obrigatório.", 30),
-        creci_state: requiredText("UF do CRECI é obrigatório.", 2).transform((v) => v.toUpperCase()),
+        // Optional: a lease agreement often names the corretor without the CRECI
+        creci_number: optionalText(30),
+        creci_state: optionalText(2).transform((v) => (v ? v.toUpperCase() : null)),
         agent_type: z.enum(AGENT_TYPES, { errorMap: () => ({ message: "Tipo de atuação é obrigatório." }) }),
         agency_id: optionalText(64),
         // Optional: a corretor registered from a lease agreement may have no phone yet.

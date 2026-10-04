@@ -37,12 +37,18 @@ describe("agentInputSchema", () => {
         if (!r.success) {
             const e = fieldErrors(r.error);
             expect(e.full_name).toBe("Nome completo é obrigatório.");
-            expect(e.creci_number).toBe("CRECI é obrigatório.");
-            expect(e.creci_state).toBe("UF do CRECI é obrigatório.");
+            expect(e.creci_number).toBeUndefined();
+            expect(e.creci_state).toBeUndefined();
             expect(e.agent_type).toBe("Tipo de atuação é obrigatório.");
             expect(e.main_phone).toBeUndefined();
             expect(e.status).toBe("Status é obrigatório.");
         }
+    });
+
+    it("accepts a corretor without a CRECI (the contract does not say it)", () => {
+        const out = agentInputSchema.parse({ ...valid, creci_number: "", creci_state: "" });
+        expect(out.creci_number).toBeNull();
+        expect(out.creci_state).toBeNull();
     });
 
     it("validates optional CPF, e-mail, phone and website when present", () => {
