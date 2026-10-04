@@ -379,7 +379,6 @@ export default function BillingPage() {
         filtersKey: recordTableKey("water-bills", propertyId),
     });
     const vis = useColumnVisibility(columnTableKey("water-bills"), {
-        locked: ["month", ACTIONS_COLUMN],
         defaultHidden: ["prevReading", "currReading", "readingDate", "waterTariff", "sewageTariff", "waterFee", "sewageFee", "occurrence"],
     });
     const widths = useColumnWidths(columnTableKey("water-bills"));
@@ -772,9 +771,11 @@ export default function BillingPage() {
                                             );
                                             return (
                                                 <tr key={b.id} className="border-b border-border/60 hover:bg-muted/30 transition-colors">
-                                                    <td {...sel.cellProps("month", b.id, null, "px-2 py-1.5 font-semibold text-foreground whitespace-nowrap")}>
-                                                        {formatMonth(b.reference_month)}
-                                                    </td>
+                                                    {show("month") && (
+                                                        <td {...sel.cellProps("month", b.id, null, "px-2 py-1.5 font-semibold text-foreground whitespace-nowrap")}>
+                                                            {formatMonth(b.reference_month)}
+                                                        </td>
+                                                    )}
                                                     {show("consumption") && cell("consumption", "consumption_m3", 1, { suffix: " m³", className: "font-semibold text-blue-700 dark:text-blue-300" })}
                                                     {show("billed") && cell("billed", "billed_consumption_m3", 1, { suffix: " m³", dashWhenEmpty: true, className: "text-muted-foreground" })}
                                                     {show("prevReading") && cell("prevReading", "previous_reading", 0, { dashWhenEmpty: true, className: "font-mono text-muted-foreground" })}
@@ -798,39 +799,41 @@ export default function BillingPage() {
                                                     {show("occurrence") && (
                                                         <td {...sel.cellProps("occurrence", b.id, null, "px-2 py-1.5 whitespace-nowrap text-muted-foreground")}>{b.occurrence_code || "-"}</td>
                                                     )}
-                                                    <td {...widths.cellProps(ACTIONS_COLUMN, "px-2 py-1.5 text-center whitespace-nowrap")}>
-                                                        <div className="flex items-center justify-center gap-1.5">
-                                                            {b.bill_pdf_url && (
-                                                                <a
-                                                                    href={b.bill_pdf_url}
-                                                                    target="_blank"
-                                                                    rel="noreferrer"
-                                                                    className="p-1.5 rounded-lg text-blue-600 dark:text-blue-400 hover:text-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/60 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 transition-colors shadow-2xs"
-                                                                    title="Abrir a conta em PDF"
-                                                                    aria-label="Abrir a conta em PDF"
+                                                    {show(ACTIONS_COLUMN) && (
+                                                        <td {...widths.cellProps(ACTIONS_COLUMN, "px-2 py-1.5 text-center whitespace-nowrap")}>
+                                                            <div className="flex items-center justify-center gap-1.5">
+                                                                {b.bill_pdf_url && (
+                                                                    <a
+                                                                        href={b.bill_pdf_url}
+                                                                        target="_blank"
+                                                                        rel="noreferrer"
+                                                                        className="p-1.5 rounded-lg text-blue-600 dark:text-blue-400 hover:text-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/60 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 transition-colors shadow-2xs"
+                                                                        title="Abrir a conta em PDF"
+                                                                        aria-label="Abrir a conta em PDF"
+                                                                    >
+                                                                        <FileText className="w-3.5 h-3.5" />
+                                                                    </a>
+                                                                )}
+                                                                <Link
+                                                                    href={editHref(b.reference_month)}
+                                                                    className="p-1.5 rounded-lg text-amber-600 dark:text-amber-400 hover:text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/60 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 transition-colors shadow-2xs"
+                                                                    title="Editar a conta completa"
+                                                                    aria-label="Editar conta"
                                                                 >
-                                                                    <FileText className="w-3.5 h-3.5" />
-                                                                </a>
-                                                            )}
-                                                            <Link
-                                                                href={editHref(b.reference_month)}
-                                                                className="p-1.5 rounded-lg text-amber-600 dark:text-amber-400 hover:text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/60 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 transition-colors shadow-2xs"
-                                                                title="Editar a conta completa"
-                                                                aria-label="Editar conta"
-                                                            >
-                                                                <Pencil className="w-3.5 h-3.5" />
-                                                            </Link>
-                                                            <button
-                                                                onClick={() => handleDelete(b)}
-                                                                disabled={deletingId === b.id}
-                                                                className="p-1.5 rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors disabled:opacity-50"
-                                                                title="Excluir conta"
-                                                                aria-label="Excluir conta"
-                                                            >
-                                                                <Trash2 className="w-3.5 h-3.5" />
-                                                            </button>
-                                                        </div>
-                                                    </td>
+                                                                    <Pencil className="w-3.5 h-3.5" />
+                                                                </Link>
+                                                                <button
+                                                                    onClick={() => handleDelete(b)}
+                                                                    disabled={deletingId === b.id}
+                                                                    className="p-1.5 rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors disabled:opacity-50"
+                                                                    title="Excluir conta"
+                                                                    aria-label="Excluir conta"
+                                                                >
+                                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    )}
                                                 </tr>
                                             );
                                         })}

@@ -65,7 +65,7 @@ export default function RecurringChargesTable({ rows, savingKey, onCollector, on
 
     // by contract, so a lease's rent and charges stay together
     const cf = useColumnFilters(lines, columns, { key: "lease", dir: "asc" }, { storageKey: TABLE_KEY, filtersKey: TABLE_KEY });
-    const vis = useColumnVisibility(TABLE_KEY, { locked: ["lease", "component", "collector"] });
+    const vis = useColumnVisibility(TABLE_KEY);
     const widths = useColumnWidths(TABLE_KEY);
     const sel = useCellSum({ formatByCol: { due_day: v => String(v) }, widths });
     const show = (key: string) => !vis.isHidden(key);
@@ -107,16 +107,18 @@ export default function RecurringChargesTable({ rows, savingKey, onCollector, on
                                 const pausing = savingKey === `${l.lease_id}:pause`;
                                 return (
                                     <tr key={line.id} className={cn("border-b border-border/50 last:border-0 hover:bg-muted/30", l.paused && "opacity-70")}>
-                                        <td {...sel.cellProps("lease", line.id, null, "min-w-[220px] max-w-[420px] px-3 py-2.5")}>
-                                            <button type="button" onClick={() => onOpenLease(l.lease_id)} className="block w-full rounded text-left text-sm font-semibold leading-snug text-foreground underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500" title="Abrir o contrato">
-                                                <span className="block break-words">{l.title}</span>
-                                            </button>
-                                            <span className="block break-words text-[11px] leading-snug text-muted-foreground">
-                                                {l.tenant_name ? <Sensitive>{l.tenant_name}</Sensitive> : "Sem inquilino"}
-                                                {!l.tenant_email && lease.monthly > 0 && <span className="text-amber-700 dark:text-amber-400"> · sem e-mail</span>}
-                                            </span>
-                                        </td>
-                                        <td {...sel.cellProps("component", line.id, null, "whitespace-nowrap px-3 py-2.5 font-medium text-foreground")}>{component.label}</td>
+                                        {show("lease") && (
+                                            <td {...sel.cellProps("lease", line.id, null, "min-w-[220px] max-w-[420px] px-3 py-2.5")}>
+                                                <button type="button" onClick={() => onOpenLease(l.lease_id)} className="block w-full rounded text-left text-sm font-semibold leading-snug text-foreground underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500" title="Abrir o contrato">
+                                                    <span className="block break-words">{l.title}</span>
+                                                </button>
+                                                <span className="block break-words text-[11px] leading-snug text-muted-foreground">
+                                                    {l.tenant_name ? <Sensitive>{l.tenant_name}</Sensitive> : "Sem inquilino"}
+                                                    {!l.tenant_email && lease.monthly > 0 && <span className="text-amber-700 dark:text-amber-400"> · sem e-mail</span>}
+                                                </span>
+                                            </td>
+                                        )}
+                                        {show("component") && <td {...sel.cellProps("component", line.id, null, "whitespace-nowrap px-3 py-2.5 font-medium text-foreground")}>{component.label}</td>}
                                         {show("amount") && (
                                             <td {...sel.cellProps("amount", line.id, component.amount, "whitespace-nowrap px-3 py-2.5 text-right tabular-nums text-foreground")}>
                                                 {component.amount !== null ? <Money>{brl(component.amount)}</Money> : <span className="text-muted-foreground" title="O contrato não dá um valor fixo a este encargo">sem valor</span>}
@@ -129,21 +131,23 @@ export default function RecurringChargesTable({ rows, savingKey, onCollector, on
                                             </td>
                                         )}
                                         {/* a plain cell: inside a selectable one a select only opens on a double click */}
-                                        <td {...widths.cellProps("collector", "px-3 py-2")}>
-                                            <span className="flex items-center gap-1.5">
-                                                <select
-                                                    className={cn("h-8 min-w-[200px] rounded-md border bg-background px-2 text-xs", component.undecided && "border-amber-400")}
-                                                    value={component.stored ?? ""}
-                                                    disabled={saving}
-                                                    onChange={e => onCollector(l.lease_id, component.key, (e.target.value || null) as Collector | null)}
-                                                    aria-label={`Quem cobra ${component.label} de ${l.title}`}
-                                                >
-                                                    <option value="">{blankLabel(component)}</option>
-                                                    {COLLECTORS.map(c => <option key={c} value={c}>{c === "OWNER" ? "Proprietário (entra na fatura)" : COLLECTOR_LABELS[c]}</option>)}
-                                                </select>
-                                                {saving && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
-                                            </span>
-                                        </td>
+                                        {show("collector") && (
+                                            <td {...widths.cellProps("collector", "px-3 py-2")}>
+                                                <span className="flex items-center gap-1.5">
+                                                    <select
+                                                        className={cn("h-8 min-w-[200px] rounded-md border bg-background px-2 text-xs", component.undecided && "border-amber-400")}
+                                                        value={component.stored ?? ""}
+                                                        disabled={saving}
+                                                        onChange={e => onCollector(l.lease_id, component.key, (e.target.value || null) as Collector | null)}
+                                                        aria-label={`Quem cobra ${component.label} de ${l.title}`}
+                                                    >
+                                                        <option value="">{blankLabel(component)}</option>
+                                                        {COLLECTORS.map(c => <option key={c} value={c}>{c === "OWNER" ? "Proprietário (entra na fatura)" : COLLECTOR_LABELS[c]}</option>)}
+                                                    </select>
+                                                    {saving && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+                                                </span>
+                                            </td>
+                                        )}
                                         {show("billable") && (
                                             <td {...sel.cellProps("billable", line.id, null, "whitespace-nowrap px-3 py-2.5 text-center")}>
                                                 {component.billable

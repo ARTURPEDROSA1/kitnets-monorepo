@@ -114,7 +114,7 @@ export default function LeaseTable({ rows, actions, propertyKinds = {} }: Props)
     ], [totals]);
 
     const cf = useColumnFilters(rows, columns, { key: "end", dir: "asc" }, { storageKey: TABLE_KEY, filtersKey: TABLE_KEY });
-    const vis = useColumnVisibility(TABLE_KEY, { locked: ["title", ACTIONS_COLUMN] });
+    const vis = useColumnVisibility(TABLE_KEY);
     const widths = useColumnWidths(TABLE_KEY);
     const sel = useCellSum({ widths });
     const show = (key: string) => !vis.isHidden(key);
@@ -156,18 +156,20 @@ export default function LeaseTable({ rows, actions, propertyKinds = {} }: Props)
                                 const chargeAmount = featured.charge && amountOf(featured.charge) > 0 ? amountOf(featured.charge) : null;
                                 return (
                                     <tr key={id} className="border-b border-border/50 last:border-0 hover:bg-muted/30">
-                                        <td {...sel.cellProps("title", id, null, "min-w-[220px] max-w-[420px] px-3 py-2.5")}>
-                                            <button type="button" onClick={() => actions.onOpen(row)} className="block w-full rounded text-left text-sm font-semibold leading-snug text-foreground underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500" title="Abrir o painel do contrato">
-                                                <span className="block break-words"><LeaseTitle title={row.title} tenant={lease.primary_tenant_name} /></span>
-                                            </button>
-                                            {(subtitle.place || subtitle.tenant || subtitle.noTenant) && (
-                                                <span className="block break-words text-[11px] leading-snug text-muted-foreground">
-                                                    {subtitle.place}
-                                                    {subtitle.place && (subtitle.tenant || subtitle.noTenant) ? " · " : ""}
-                                                    {subtitle.tenant ? <Sensitive>{subtitle.tenant}</Sensitive> : subtitle.noTenant ? "Sem inquilino" : null}
-                                                </span>
-                                            )}
-                                        </td>
+                                        {show("title") && (
+                                            <td {...sel.cellProps("title", id, null, "min-w-[220px] max-w-[420px] px-3 py-2.5")}>
+                                                <button type="button" onClick={() => actions.onOpen(row)} className="block w-full rounded text-left text-sm font-semibold leading-snug text-foreground underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500" title="Abrir o painel do contrato">
+                                                    <span className="block break-words"><LeaseTitle title={row.title} tenant={lease.primary_tenant_name} /></span>
+                                                </button>
+                                                {(subtitle.place || subtitle.tenant || subtitle.noTenant) && (
+                                                    <span className="block break-words text-[11px] leading-snug text-muted-foreground">
+                                                        {subtitle.place}
+                                                        {subtitle.place && (subtitle.tenant || subtitle.noTenant) ? " · " : ""}
+                                                        {subtitle.tenant ? <Sensitive>{subtitle.tenant}</Sensitive> : subtitle.noTenant ? "Sem inquilino" : null}
+                                                    </span>
+                                                )}
+                                            </td>
+                                        )}
                                         {show("status") && (
                                             <td {...sel.cellProps("status", id, null, "whitespace-nowrap px-3 py-2.5")}>
                                                 <span className={cn("inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", meta.pill)}>{meta.label}</span>
@@ -249,21 +251,23 @@ export default function LeaseTable({ rows, actions, propertyKinds = {} }: Props)
                                                 )}
                                             </td>
                                         )}
-                                        <td {...widths.cellProps(ACTIONS_COLUMN, "whitespace-nowrap px-2 py-2.5")}>
-                                            <span className="flex items-center justify-end gap-0.5">
-                                                <button type="button" onClick={() => actions.onEdit(row)} title="Editar contrato" aria-label={`Editar o contrato de ${row.place}`} className={iconBtn}>
-                                                    <PenLine className="h-4 w-4" />
-                                                </button>
-                                                {row.inForce && (
-                                                    <button type="button" onClick={() => actions.onTerminate(row)} title="Rescindir contrato" aria-label={`Rescindir o contrato de ${row.place}`} className={cn(iconBtn, "hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-950/30")}>
-                                                        <Ban className="h-4 w-4" />
+                                        {show(ACTIONS_COLUMN) && (
+                                            <td {...widths.cellProps(ACTIONS_COLUMN, "whitespace-nowrap px-2 py-2.5")}>
+                                                <span className="flex items-center justify-end gap-0.5">
+                                                    <button type="button" onClick={() => actions.onEdit(row)} title="Editar contrato" aria-label={`Editar o contrato de ${row.place}`} className={iconBtn}>
+                                                        <PenLine className="h-4 w-4" />
                                                     </button>
-                                                )}
-                                                <button type="button" onClick={() => actions.onDelete(row)} title="Excluir contrato" aria-label={`Excluir o contrato de ${row.place}`} className={cn(iconBtn, "hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/30")}>
-                                                    <Trash2 className="h-4 w-4" />
-                                                </button>
-                                            </span>
-                                        </td>
+                                                    {row.inForce && (
+                                                        <button type="button" onClick={() => actions.onTerminate(row)} title="Rescindir contrato" aria-label={`Rescindir o contrato de ${row.place}`} className={cn(iconBtn, "hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-950/30")}>
+                                                            <Ban className="h-4 w-4" />
+                                                        </button>
+                                                    )}
+                                                    <button type="button" onClick={() => actions.onDelete(row)} title="Excluir contrato" aria-label={`Excluir o contrato de ${row.place}`} className={cn(iconBtn, "hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/30")}>
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </button>
+                                                </span>
+                                            </td>
+                                        )}
                                     </tr>
                                 );
                             })}

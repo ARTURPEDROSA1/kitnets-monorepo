@@ -324,7 +324,7 @@ export default function EnergyDashboardPage() {
         storageKey: columnTableKey("energy-bills"),
         filtersKey: recordTableKey("energy-bills", resolvedPropertyId || propertyId),
     });
-    const vis = useColumnVisibility(columnTableKey("energy-bills"), { locked: ["month", ACTIONS_COLUMN] });
+    const vis = useColumnVisibility(columnTableKey("energy-bills"));
     const widths = useColumnWidths(columnTableKey("energy-bills"));
     const sel = useCellSum({ formatByCol: { cons: formatKwh(0), daily: formatKwh(2), days: formatDays, balance: formatKwh(2), injected: formatKwh(0), unitPrice: formatUnitPrice }, widths });
 
@@ -970,9 +970,11 @@ export default function EnergyDashboardPage() {
                                             );
                                             return (
                                                 <tr key={b.id} className="border-b border-border/60 hover:bg-muted/30 transition-colors">
-                                                    <td {...sel.cellProps("month", b.id, null, "px-2 py-1.5 font-semibold text-foreground whitespace-nowrap")}>
-                                                        {b.reference_month_label || formatMonthLabel(b.reference_month)}
-                                                    </td>
+                                                    {show("month") && (
+                                                        <td {...sel.cellProps("month", b.id, null, "px-2 py-1.5 font-semibold text-foreground whitespace-nowrap")}>
+                                                            {b.reference_month_label || formatMonthLabel(b.reference_month)}
+                                                        </td>
+                                                    )}
                                                     {show("cons") && (
                                                         <td {...sel.cellProps("cons", b.id, b.grid_consumption_kwh, edit, () => cancelDraft(b.id, "grid_consumption_kwh"))}>
                                                             {input("grid_consumption_kwh", 0, { className: "font-medium text-foreground" })}
@@ -1026,45 +1028,47 @@ export default function EnergyDashboardPage() {
                                                             )}
                                                         </td>
                                                     )}
-                                                    <td {...widths.cellProps(ACTIONS_COLUMN, "px-2 py-1.5 text-center whitespace-nowrap")}>
-                                                        <div className="flex items-center justify-center gap-1.5">
-                                                            {billPdfOf(b) && (
+                                                    {show(ACTIONS_COLUMN) && (
+                                                        <td {...widths.cellProps(ACTIONS_COLUMN, "px-2 py-1.5 text-center whitespace-nowrap")}>
+                                                            <div className="flex items-center justify-center gap-1.5">
+                                                                {billPdfOf(b) && (
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            const billPdf = b.pdf_url || activePdfUrl;
+                                                                            if (billPdf) {
+                                                                                setPdfViewerUrl(billPdf);
+                                                                                setPdfViewerTitle(`Fatura de Energia - ${b.reference_month_label || formatMonthLabel(b.reference_month)}`);
+                                                                                setPdfViewerFileName(`fatura-${b.reference_month}.pdf`);
+                                                                                setIsPdfViewerOpen(true);
+                                                                            }
+                                                                        }}
+                                                                        className="p-1.5 rounded-lg text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 transition-colors shadow-2xs"
+                                                                        title="Visualizar fatura em PDF dentro do Kitnets"
+                                                                        aria-label="Visualizar fatura em PDF"
+                                                                    >
+                                                                        <FileText className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                )}
                                                                 <button
-                                                                    onClick={() => {
-                                                                        const billPdf = b.pdf_url || activePdfUrl;
-                                                                        if (billPdf) {
-                                                                            setPdfViewerUrl(billPdf);
-                                                                            setPdfViewerTitle(`Fatura de Energia - ${b.reference_month_label || formatMonthLabel(b.reference_month)}`);
-                                                                            setPdfViewerFileName(`fatura-${b.reference_month}.pdf`);
-                                                                            setIsPdfViewerOpen(true);
-                                                                        }
-                                                                    }}
-                                                                    className="p-1.5 rounded-lg text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 transition-colors shadow-2xs"
-                                                                    title="Visualizar fatura em PDF dentro do Kitnets"
-                                                                    aria-label="Visualizar fatura em PDF"
+                                                                    onClick={() => setEditingBill(b)}
+                                                                    className="p-1.5 rounded-lg text-amber-600 dark:text-amber-400 hover:text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/60 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 transition-colors shadow-2xs"
+                                                                    title="Editar valores desta fatura"
+                                                                    aria-label="Editar fatura"
                                                                 >
-                                                                    <FileText className="w-3.5 h-3.5" />
+                                                                    <Pencil className="w-3.5 h-3.5" />
                                                                 </button>
-                                                            )}
-                                                            <button
-                                                                onClick={() => setEditingBill(b)}
-                                                                className="p-1.5 rounded-lg text-amber-600 dark:text-amber-400 hover:text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/60 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 transition-colors shadow-2xs"
-                                                                title="Editar valores desta fatura"
-                                                                aria-label="Editar fatura"
-                                                            >
-                                                                <Pencil className="w-3.5 h-3.5" />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDelete(b.id)}
-                                                                disabled={deletingId === b.id}
-                                                                className="p-1.5 rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-                                                                title="Excluir registro"
-                                                                aria-label="Excluir registro"
-                                                            >
-                                                                <Trash2 className="w-3.5 h-3.5" />
-                                                            </button>
-                                                        </div>
-                                                    </td>
+                                                                <button
+                                                                    onClick={() => handleDelete(b.id)}
+                                                                    disabled={deletingId === b.id}
+                                                                    className="p-1.5 rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                                                                    title="Excluir registro"
+                                                                    aria-label="Excluir registro"
+                                                                >
+                                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    )}
                                                 </tr>
                                             );
                                         })}

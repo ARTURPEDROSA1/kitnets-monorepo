@@ -46,7 +46,7 @@ export default function CondominiumLedger({ propertyId, lang = "pt" }: { propert
     const [showAll, setShowAll] = useState(false);
     const widths = useColumnWidths(columnTableKey("condominium-ledger"));
     const sel = useCellSum({ widths });
-    const vis = useColumnVisibility(columnTableKey("condominium-ledger"), { locked: ["month", ACTIONS_COLUMN] });
+    const vis = useColumnVisibility(columnTableKey("condominium-ledger"));
 
     useEffect(() => {
         let alive = true;
@@ -265,11 +265,13 @@ export default function CondominiumLedger({ propertyId, lang = "pt" }: { propert
                                     );
                                     return (
                                         <tr key={row.month} className={cn("border-b border-border/60 hover:bg-muted/30", row.expected && "opacity-70")}>
-                                            <td {...sel.cellProps("month", row.month, null, "px-2 py-1 font-semibold text-foreground whitespace-nowrap")}>
-                                                {formatMonthKey(row.month)}
-                                                {row.expected && <span className="ml-1 text-[10px] font-semibold text-amber-700 dark:text-amber-400">previsto</span>}
-                                                {busy && <Loader2 className="inline w-3 h-3 ml-1 animate-spin text-muted-foreground" />}
-                                            </td>
+                                            {show("month") && (
+                                                <td {...sel.cellProps("month", row.month, null, "px-2 py-1 font-semibold text-foreground whitespace-nowrap")}>
+                                                    {formatMonthKey(row.month)}
+                                                    {row.expected && <span className="ml-1 text-[10px] font-semibold text-amber-700 dark:text-amber-400">previsto</span>}
+                                                    {busy && <Loader2 className="inline w-3 h-3 ml-1 animate-spin text-muted-foreground" />}
+                                                </td>
+                                            )}
                                             {show("revenue") && <td {...sel.cellProps("revenue", row.month, row.revenue, "px-2 py-1 text-right font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums")} title={row.units ? `${row.units} ${row.units === 1 ? "unidade" : "unidades"} com condomínio no mês` : "Nenhuma unidade com condomínio neste mês em Receitas de Aluguel"}><Money>{formatBRL(row.revenue)}</Money></td>}
                                             {CONDO_COST_KEYS.map(k => show(k) && (isAutoCostKey(k) ? (
                                                 <td key={k} {...sel.cellProps(k, row.month, row[k], "px-2 py-1 text-right tabular-nums text-muted-foreground")} title={source[k].title}>
@@ -292,13 +294,15 @@ export default function CondominiumLedger({ propertyId, lang = "pt" }: { propert
                                                     className="bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-none w-full min-w-[10rem] px-1.5 py-1 outline-none"
                                                 />
                                             </td>}
-                                            <td {...widths.cellProps(ACTIONS_COLUMN, "px-2 py-1 text-center")}>
-                                                {row.hasCosts && (
-                                                    <button type="button" disabled={busy} onClick={() => void deleteCosts(row.month)} title="Remover os custos deste mês" className="text-muted-foreground hover:text-rose-600 disabled:opacity-40">
-                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                    </button>
-                                                )}
-                                            </td>
+                                            {show(ACTIONS_COLUMN) && (
+                                                <td {...widths.cellProps(ACTIONS_COLUMN, "px-2 py-1 text-center")}>
+                                                    {row.hasCosts && (
+                                                        <button type="button" disabled={busy} onClick={() => void deleteCosts(row.month)} title="Remover os custos deste mês" className="text-muted-foreground hover:text-rose-600 disabled:opacity-40">
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
+                                                </td>
+                                            )}
                                         </tr>
                                     );
                                 })}

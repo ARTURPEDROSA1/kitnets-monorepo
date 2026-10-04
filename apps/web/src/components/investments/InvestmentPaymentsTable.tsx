@@ -213,7 +213,6 @@ export default function InvestmentPaymentsTable({
     const widths = useColumnWidths(columnTableKey("investment-payments"));
     const sel = useCellSum({ formatByCol: SUM_FORMATS, widths });
     const vis = useColumnVisibility(columnTableKey("investment-payments"), {
-        locked: ["due_on", ACTIONS_COLUMN],
         defaultHidden: ["installment_number"],
     });
 
@@ -313,7 +312,9 @@ export default function InvestmentPaymentsTable({
         filtersKey: recordTableKey("investment-payments", investmentId),
     });
     const rows = cf.rows;
-    const show = (key: string) => !vis.isHidden(key);
+    // the new payment's Salvar / Cancelar sit in the actions column: while that row is open the column shows, hidden or not
+    const shownVis = draft !== null && vis.isHidden(ACTIONS_COLUMN) ? { ...vis, isHidden: (key: string) => key !== ACTIONS_COLUMN && vis.isHidden(key) } : vis;
+    const show = (key: string) => !shownVis.isHidden(key);
     const visibleCount = columns.filter(c => show(c.key)).length;
 
     const totals = useMemo(() => {
@@ -519,7 +520,7 @@ export default function InvestmentPaymentsTable({
     };
 
     /** Columns before "Valor", so the footer's label spans exactly the ones on screen. */
-    const labelSpan = Math.max(1, columns.slice(0, columns.findIndex(c => c.key === "amount")).filter(c => show(c.key)).length);
+    const labelSpan = columns.slice(0, columns.findIndex(c => c.key === "amount")).filter(c => show(c.key)).length;
     /** Everything after "Valor pago", the actions column included. */
     const tailSpan = ["index_pct", "payer", "pj_amount", "notes", "receipt", ACTIONS_COLUMN].filter(show).length;
 
@@ -703,7 +704,7 @@ export default function InvestmentPaymentsTable({
                 <div className="overflow-x-auto -mx-2">
                     <table className="w-full text-xs [&_td]:whitespace-nowrap" style={widths.tableStyle}>
                         <thead>
-                            <ColumnHeaders columns={columns} ctl={cf} widths={widths} visibility={vis} />
+                            <ColumnHeaders columns={columns} ctl={cf} widths={widths} visibility={shownVis} />
                         </thead>
                         <tbody>
                             {rows.length === 0 && draft === null && (
@@ -868,17 +869,19 @@ export default function InvestmentPaymentsTable({
                                                 {receiptList(row)}
                                             </td>
                                         )}
-                                        <td {...widths.cellProps(ACTIONS_COLUMN, "px-2 py-1 text-center")}>
-                                            <button
-                                                type="button"
-                                                onClick={() => onDelete(row.id)}
-                                                title="Excluir lançamento"
-                                                aria-label="Excluir lançamento"
-                                                className="text-muted-foreground hover:text-rose-600"
-                                            >
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                            </button>
-                                        </td>
+                                        {show(ACTIONS_COLUMN) && (
+                                            <td {...widths.cellProps(ACTIONS_COLUMN, "px-2 py-1 text-center")}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onDelete(row.id)}
+                                                    title="Excluir lançamento"
+                                                    aria-label="Excluir lançamento"
+                                                    className="text-muted-foreground hover:text-rose-600"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            </td>
+                                        )}
                                     </tr>
                                 );
                             })}
@@ -1011,36 +1014,40 @@ export default function InvestmentPaymentsTable({
                                             />
                                         </td>
                                     )}
-                                    <td {...widths.cellProps(ACTIONS_COLUMN, "px-2 py-1")}>
-                                        <div className="flex items-center gap-1 justify-end">
-                                            <button type="button" onClick={save} disabled={saving || uploading !== null} title="Salvar" aria-label="Salvar lançamento" className="p-1 rounded text-emerald-600 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 disabled:opacity-50">
-                                                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                                            </button>
-                                            <button type="button" onClick={() => { setDraft(null); setError(null); setNotice(null); }} title="Cancelar" aria-label="Cancelar" className="p-1 rounded text-muted-foreground hover:text-foreground">
-                                                <X className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    </td>
+                                    {show(ACTIONS_COLUMN) && (
+                                        <td {...widths.cellProps(ACTIONS_COLUMN, "px-2 py-1")}>
+                                            <div className="flex items-center gap-1 justify-end">
+                                                <button type="button" onClick={save} disabled={saving || uploading !== null} title="Salvar" aria-label="Salvar lançamento" className="p-1 rounded text-emerald-600 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 disabled:opacity-50">
+                                                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                                                </button>
+                                                <button type="button" onClick={() => { setDraft(null); setError(null); setNotice(null); }} title="Cancelar" aria-label="Cancelar" className="p-1 rounded text-muted-foreground hover:text-foreground">
+                                                    <X className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    )}
                                 </tr>
                             )}
                         </tbody>
                         {rows.length > 0 && (
                             <tfoot>
                                 <tr className="font-semibold border-t border-border">
-                                    <td colSpan={labelSpan} className="px-2 py-2 text-right text-[10px] uppercase tracking-wider text-muted-foreground">
-                                        Total pago
-                                    </td>
+                                    {labelSpan > 0 && (
+                                        <td colSpan={labelSpan} className="px-2 py-2 text-right text-[10px] uppercase tracking-wider text-muted-foreground">
+                                            Total pago
+                                        </td>
+                                    )}
                                     {show("amount") && <Money as="td" className="px-2 py-2 text-right tabular-nums">{formatBRL(totals.paid - totals.corrections)}</Money>}
                                     {show("correction_amount") && <Money as="td" className="px-2 py-2 text-right tabular-nums">{formatBRL(totals.corrections)}</Money>}
                                     {show("total") && <Money as="td" className="px-2 py-2 text-right tabular-nums text-emerald-700 dark:text-emerald-400">{formatBRL(totals.paid)}</Money>}
-                                    <td colSpan={tailSpan} className="px-2 py-2 text-[11px] font-normal text-muted-foreground whitespace-normal">
+                                    {tailSpan > 0 && <td colSpan={tailSpan} className="px-2 py-2 text-[11px] font-normal text-muted-foreground whitespace-normal">
                                         {[
                                             totals.pf > 0 || totals.pj > 0 ? <>PF <Money>{formatBRL(totals.pf)}</Money> · PJ <Money>{formatBRL(totals.pj)}</Money></> : null,
                                             totals.unknown > 0 ? <><Money>{formatBRL(totals.unknown)}</Money> sem pagador informado</> : null,
                                             totals.planned > 0 ? <><Money>{formatBRL(totals.planned)}</Money> lançados como previstos</> : null,
                                             show("index_pct") && rows.some(r => indexOf.get(r.id)?.sinceContract) ? "* índice acumulado desde o contrato" : null,
                                         ].filter(Boolean).map((part, i) => <React.Fragment key={i}>{i > 0 && " · "}{part}</React.Fragment>)}
-                                    </td>
+                                    </td>}
                                 </tr>
                             </tfoot>
                         )}

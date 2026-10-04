@@ -67,7 +67,7 @@ export default function InvoiceTable({ rows, actions }: Props) {
     ], []);
 
     const cf = useColumnFilters(rows, columns, { key: "due", dir: "desc" }, { storageKey: TABLE_KEY, filtersKey: TABLE_KEY });
-    const vis = useColumnVisibility(TABLE_KEY, { locked: ["invoice", ACTIONS_COLUMN] });
+    const vis = useColumnVisibility(TABLE_KEY);
     const widths = useColumnWidths(TABLE_KEY);
     const sel = useCellSum({ widths });
     const show = (key: string) => !vis.isHidden(key);
@@ -104,14 +104,16 @@ export default function InvoiceTable({ rows, actions }: Props) {
                                 const mail = deliveryState(invoice);
                                 return (
                                     <tr key={id} className="border-b border-border/50 last:border-0 hover:bg-muted/30">
-                                        <td {...sel.cellProps("invoice", id, null, "min-w-[220px] max-w-[420px] px-3 py-2.5")}>
-                                            <button type="button" onClick={() => actions.onOpen(row)} className="block w-full rounded text-left text-sm font-semibold leading-snug text-foreground underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500" title="Abrir a fatura">
-                                                <span className="block break-words">Fatura nº {invoice.number} · {row.place}</span>
-                                            </button>
-                                            <span className="block break-words text-[11px] leading-snug text-muted-foreground">
-                                                {invoice.tenant_name ? <Sensitive>{invoice.tenant_name}</Sensitive> : "Sem inquilino"}
-                                            </span>
-                                        </td>
+                                        {show("invoice") && (
+                                            <td {...sel.cellProps("invoice", id, null, "min-w-[220px] max-w-[420px] px-3 py-2.5")}>
+                                                <button type="button" onClick={() => actions.onOpen(row)} className="block w-full rounded text-left text-sm font-semibold leading-snug text-foreground underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500" title="Abrir a fatura">
+                                                    <span className="block break-words">Fatura nº {invoice.number} · {row.place}</span>
+                                                </button>
+                                                <span className="block break-words text-[11px] leading-snug text-muted-foreground">
+                                                    {invoice.tenant_name ? <Sensitive>{invoice.tenant_name}</Sensitive> : "Sem inquilino"}
+                                                </span>
+                                            </td>
+                                        )}
                                         {show("status") && (
                                             <td {...sel.cellProps("status", id, null, "px-3 py-2.5")}>
                                                 <span className={cn("inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", meta.pill)}>{meta.label}</span>
@@ -159,20 +161,22 @@ export default function InvoiceTable({ rows, actions }: Props) {
                                                 {invoice.paid_via ? PAID_VIA_LABELS[invoice.paid_via] ?? invoice.paid_via : <span className="text-muted-foreground">—</span>}
                                             </td>
                                         )}
-                                        <td {...widths.cellProps(ACTIONS_COLUMN, "whitespace-nowrap px-2 py-2.5")}>
-                                            <span className="flex items-center justify-end gap-0.5">
-                                                {open && (
-                                                    <>
-                                                        <button type="button" onClick={() => actions.onPay(row)} title="Registrar o pagamento (baixa manual)" aria-label={`Registrar o pagamento da fatura nº ${invoice.number}`} className={cn(iconBtn, "hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/30")}>
-                                                            <CheckCircle2 className="h-4 w-4" />
-                                                        </button>
-                                                        <button type="button" onClick={() => actions.onCancel(row)} title="Cancelar a fatura" aria-label={`Cancelar a fatura nº ${invoice.number}`} className={cn(iconBtn, "hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/30")}>
-                                                            <Ban className="h-4 w-4" />
-                                                        </button>
-                                                    </>
-                                                )}
-                                            </span>
-                                        </td>
+                                        {show(ACTIONS_COLUMN) && (
+                                            <td {...widths.cellProps(ACTIONS_COLUMN, "whitespace-nowrap px-2 py-2.5")}>
+                                                <span className="flex items-center justify-end gap-0.5">
+                                                    {open && (
+                                                        <>
+                                                            <button type="button" onClick={() => actions.onPay(row)} title="Registrar o pagamento (baixa manual)" aria-label={`Registrar o pagamento da fatura nº ${invoice.number}`} className={cn(iconBtn, "hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/30")}>
+                                                                <CheckCircle2 className="h-4 w-4" />
+                                                            </button>
+                                                            <button type="button" onClick={() => actions.onCancel(row)} title="Cancelar a fatura" aria-label={`Cancelar a fatura nº ${invoice.number}`} className={cn(iconBtn, "hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/30")}>
+                                                                <Ban className="h-4 w-4" />
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                </span>
+                                            </td>
+                                        )}
                                     </tr>
                                 );
                             })}

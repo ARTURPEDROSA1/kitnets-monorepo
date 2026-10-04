@@ -148,7 +148,7 @@ export default function PropertyIncomeLedger({
 }: PropertyIncomeLedgerProps) {
     const multiUnit = units.length > 0;
     // hidden columns are remembered in the user's account, separately for properties rented as a whole and unit by unit
-    const vis = useColumnVisibility(columnTableKey("income-ledger", multiUnit ? "multi" : "single"), { locked: ["month", ACTIONS_COLUMN], legacyKey: multiUnit ? "income-ledger" : undefined });
+    const vis = useColumnVisibility(columnTableKey("income-ledger", multiUnit ? "multi" : "single"), { legacyKey: multiUnit ? "income-ledger" : undefined });
     const [localPeriod, setLocalPeriod] = useState<PeriodFilterValue>({ kind: "all" });   // the ledger opens on the whole history
     const period = periodProp ?? localPeriod;
     const setPeriod = onPeriodChange ?? setLocalPeriod;
@@ -1017,23 +1017,25 @@ export default function PropertyIncomeLedger({
                                 );
                                 return (
                                     <tr key={row.id} className={cn("border-b border-border/60 hover:bg-muted/30", row.status === "EXPECTED" && "opacity-70")}>
-                                        <td {...sel.cellProps("month", rk, null, "px-2 py-1 font-semibold text-foreground whitespace-nowrap", () => cancelDraft(rk, "month"))}>
-                                            <MonthCell
-                                                month={month}
-                                                draft={d.month}
-                                                disabled={busy}
-                                                onDraft={text => setDraft(rk, "month", text)}
-                                                onCommit={() => {
-                                                    const raw = drafts[rk]?.month;
-                                                    if (raw === undefined) return;
-                                                    const target = parseMonthText(raw);
-                                                    cancelDraft(rk, "month");
-                                                    if (!target) { setError("Mês inválido: use AAAA-MM ou MM/AAAA."); return; }
-                                                    void moveRow(row, { month: target });
-                                                }}
-                                            />
-                                            {busy && <Loader2 className="inline w-3 h-3 ml-1 animate-spin text-muted-foreground" />}
-                                        </td>
+                                        {show("month") && (
+                                            <td {...sel.cellProps("month", rk, null, "px-2 py-1 font-semibold text-foreground whitespace-nowrap", () => cancelDraft(rk, "month"))}>
+                                                <MonthCell
+                                                    month={month}
+                                                    draft={d.month}
+                                                    disabled={busy}
+                                                    onDraft={text => setDraft(rk, "month", text)}
+                                                    onCommit={() => {
+                                                        const raw = drafts[rk]?.month;
+                                                        if (raw === undefined) return;
+                                                        const target = parseMonthText(raw);
+                                                        cancelDraft(rk, "month");
+                                                        if (!target) { setError("Mês inválido: use AAAA-MM ou MM/AAAA."); return; }
+                                                        void moveRow(row, { month: target });
+                                                    }}
+                                                />
+                                                {busy && <Loader2 className="inline w-3 h-3 ml-1 animate-spin text-muted-foreground" />}
+                                            </td>
+                                        )}
                                         {multiUnit && show("unit") && (
                                             <td {...sel.cellProps("unit", rk, null, "px-2 py-1 whitespace-nowrap")}>
                                                 <select
@@ -1131,17 +1133,19 @@ export default function PropertyIncomeLedger({
                                                 className="bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-none w-full min-w-[5rem] px-1.5 py-1 outline-none truncate"
                                             />
                                         </td>}
-                                        <td {...widths.cellProps(ACTIONS_COLUMN, "px-2 py-1 text-right")}>
-                                            <button
-                                                type="button"
-                                                disabled={busy}
-                                                onClick={() => deleteRow(row)}
-                                                className="p-1 rounded-md text-muted-foreground hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
-                                                title={multiUnit ? "Excluir lançamento" : "Excluir mês"}
-                                            >
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                            </button>
-                                        </td>
+                                        {show(ACTIONS_COLUMN) && (
+                                            <td {...widths.cellProps(ACTIONS_COLUMN, "px-2 py-1 text-right")}>
+                                                <button
+                                                    type="button"
+                                                    disabled={busy}
+                                                    onClick={() => deleteRow(row)}
+                                                    className="p-1 rounded-md text-muted-foreground hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                                                    title={multiUnit ? "Excluir lançamento" : "Excluir mês"}
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            </td>
+                                        )}
                                     </tr>
                                 );
                             })}

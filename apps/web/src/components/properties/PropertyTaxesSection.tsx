@@ -38,6 +38,7 @@ import { columnTableKey, recordTableKey } from "@/lib/ui-preferences";
 import { DateInput } from "@/components/ui/DateInput";
 import { CellSumBar, useCellSum } from "./TableCellSum";
 import { useColumnWidths } from "./TableColumnWidths";
+import { ColumnVisibilityMenu, useColumnVisibility } from "./TableColumnVisibility";
 import MoneyInput, { parseMoneyText } from "./MoneyInput";
 
 /** Excel-style sort/filter columns for the taxes table (values honour parcelas). */
@@ -111,6 +112,8 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
     const [rows, setRows] = useState<PropertyTax[]>([]);
     const defaultPayer: TaxPayer = rows[0]?.paid_by ?? "TENANT";
     const widths = useColumnWidths(columnTableKey("property-taxes"));
+    const vis = useColumnVisibility(columnTableKey("property-taxes"));
+    const show = (key: string) => !vis.isHidden(key);
     const sel = useCellSum({ widths });
     const [loading, setLoading] = useState<boolean>(Boolean(propertyId));
     const [error, setError] = useState<string | null>(null);
@@ -392,6 +395,9 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
 
     /** The years on screen that are split in parcelas, and whether all of them are open. */
     const withParts = cf.rows.filter(r => (r.installments ?? []).length > 0);
+    /** A parcela's row: its label under the visible Ano / Tributo, blank under the visible Comentários / Parcelas / Ações. */
+    const partLabelSpan = ["year", "kind"].filter(show).length;
+    const partTailSpan = ["comment", "parts", ACTIONS_COLUMN].filter(show).length;
     const allPartsOpen = withParts.length > 0 && withParts.every(r => expanded.has(r.id));
     const toggleAllParts = () => setExpanded(allPartsOpen ? new Set() : new Set(withParts.map(r => r.id)));
 
@@ -479,7 +485,7 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
                 <div className="overflow-x-auto -mx-2">
                     <table className="w-full text-xs min-w-[900px]" style={widths.tableStyle}>
                         <thead>
-                            <ColumnHeaders columns={TAX_COLUMNS} ctl={cf} widths={widths} leading={
+                            <ColumnHeaders columns={TAX_COLUMNS} ctl={cf} widths={widths} visibility={vis} leading={
                                 // the outline column: its header opens or closes the parcelas of every year shown
                                 <th className="px-1 py-2 w-6">
                                     {withParts.length > 0 && (
@@ -493,7 +499,7 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
                         </thead>
                         <tbody>
                             {cf.rows.length === 0 && (
-                                <tr><td colSpan={9} className="px-2 py-6 text-center text-muted-foreground">
+                                <tr><td colSpan={1 + TAX_COLUMNS.filter(c => show(c.key)).length} className="px-2 py-6 text-center text-muted-foreground">
                                     Nenhum tributo com os filtros atuais. <button type="button" onClick={cf.clearFilters} className="underline underline-offset-2">Limpar filtros</button>
                                 </td></tr>
                             )}
@@ -514,68 +520,84 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
                                                     </button>
                                                 )}
                                             </td>
-                                            <td {...sel.cellProps("year", row.id, null, "px-2 py-1", () => cancelDraft(row.id, "year"))}>
-                                                <input type="number" min={1990} max={2100} step={1} disabled={busy} value={d.year ?? String(row.year)}
-                                                    onChange={ev => setDraft(row.id, "year", ev.target.value)} onBlur={() => commit(row, "year")}
-                                                    className={cn(BOX, "font-semibold text-foreground")} />
-                                                {busy && <Loader2 className="inline w-3 h-3 ml-1 animate-spin text-muted-foreground" />}
-                                                {row.extracted_at && <span className="block text-[9px] text-muted-foreground pl-1.5" title={`Valor venal ${row.valor_venal_imovel ? formatBRL(Number(row.valor_venal_imovel)) : "—"} · alíquota ${row.aliquota_pct ?? "—"}%`}>guia lida por IA</span>}
-                                            </td>
-                                            <td {...sel.cellProps("kind", row.id, null, "px-2 py-1", () => cancelDraft(row.id, "kind"))}>
-                                                <select disabled={busy} value={d.kind ?? row.kind} onChange={ev => setDraft(row.id, "kind", ev.target.value)} onBlur={() => commit(row, "kind")} className={BOX}>
-                                                    {TAX_KINDS.map(k => <option key={k.kind} value={k.kind}>{k.label}</option>)}
-                                                </select>
-                                            </td>
-                                            <td {...sel.cellProps("amount", row.id, e.amount, "px-2 py-1 text-right", () => cancelDraft(row.id, "amount"))}>
-                                                <MoneyInput value={e.amount} draft={d.amount} disabled={busy}
-                                                    onDraft={text => setDraft(row.id, "amount", text)} onCommit={() => commit(row, "amount")}
-                                                    title={hasParts ? "Alterar o total redistribui entre as parcelas" : undefined}
-                                                    className="font-semibold text-foreground" />
-                                            </td>
-                                            <td {...sel.cellProps("payer", row.id, null, "px-2 py-1", () => cancelDraft(row.id, "paidBy"))}>
-                                                {e.payer === "MIXED" ? (
-                                                    <span className="text-violet-700 dark:text-violet-400 font-medium" title={`Inquilino ${formatBRL(e.byTenant)} · Proprietário ${formatBRL(e.byLandlord)}`}>{payerLabel(row)}</span>
-                                                ) : (
-                                                    <select disabled={busy} value={d.paidBy ?? row.paid_by} onChange={ev => setDraft(row.id, "paidBy", ev.target.value)} onBlur={() => commit(row, "paidBy")}
-                                                        title={hasParts ? "Aplica a todas as parcelas" : undefined}
-                                                        className={cn(BOX, (d.paidBy ?? row.paid_by) === "LANDLORD" ? "text-rose-700 dark:text-rose-400" : "text-emerald-700 dark:text-emerald-400")}>
-                                                        {TAX_PAYERS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                                            {show("year") && (
+                                                <td {...sel.cellProps("year", row.id, null, "px-2 py-1", () => cancelDraft(row.id, "year"))}>
+                                                    <input type="number" min={1990} max={2100} step={1} disabled={busy} value={d.year ?? String(row.year)}
+                                                        onChange={ev => setDraft(row.id, "year", ev.target.value)} onBlur={() => commit(row, "year")}
+                                                        className={cn(BOX, "font-semibold text-foreground")} />
+                                                    {busy && <Loader2 className="inline w-3 h-3 ml-1 animate-spin text-muted-foreground" />}
+                                                    {row.extracted_at && <span className="block text-[9px] text-muted-foreground pl-1.5" title={`Valor venal ${row.valor_venal_imovel ? formatBRL(Number(row.valor_venal_imovel)) : "—"} · alíquota ${row.aliquota_pct ?? "—"}%`}>guia lida por IA</span>}
+                                                </td>
+                                            )}
+                                            {show("kind") && (
+                                                <td {...sel.cellProps("kind", row.id, null, "px-2 py-1", () => cancelDraft(row.id, "kind"))}>
+                                                    <select disabled={busy} value={d.kind ?? row.kind} onChange={ev => setDraft(row.id, "kind", ev.target.value)} onBlur={() => commit(row, "kind")} className={BOX}>
+                                                        {TAX_KINDS.map(k => <option key={k.kind} value={k.kind}>{k.label}</option>)}
                                                     </select>
-                                                )}
-                                            </td>
-                                            <td {...sel.cellProps("date", row.id, null, "px-2 py-1 whitespace-nowrap", () => cancelDraft(row.id, "date"))}>
-                                                <DateInput variant="bare" disabled={busy} value={d.date ?? (row.paid_on ?? "")} onChange={iso => setDraft(row.id, "date", iso)} onBlur={() => commit(row, "date")} className={BOX} />
-                                            </td>
-                                            <td {...sel.cellProps("comment", row.id, null, "px-2 py-1", () => cancelDraft(row.id, "comment"))}>
-                                                <input type="text" disabled={busy} value={d.comment ?? (row.comment ?? "")} placeholder="—"
-                                                    onChange={ev => setDraft(row.id, "comment", ev.target.value)} onBlur={() => commit(row, "comment")}
-                                                    onKeyDown={ev => { if (ev.key === "Enter") (ev.target as HTMLInputElement).blur(); }}
-                                                    className={cn(BOX, "truncate")} />
-                                            </td>
-                                            <td {...sel.cellProps("parts", row.id, null, "px-2 py-1 whitespace-nowrap")}>
-                                                {hasParts ? (
-                                                    <span className="inline-flex items-center gap-1.5 px-1.5 py-1 border border-transparent">
-                                                        <button type="button" onClick={() => toggleExpanded(row.id)} className="text-emerald-700 dark:text-emerald-400 underline underline-offset-2">{parts.length}x</button>
-                                                        <button type="button" disabled={busy} onClick={() => unsplitRow(row)} className="text-muted-foreground hover:text-foreground" title="Voltar a pagamento único">unir</button>
-                                                    </span>
-                                                ) : (
-                                                    <select disabled={busy} value="1" onChange={ev => { const n = Number(ev.target.value); if (n > 1) splitRow(row, n); }} className={BOX} title="Dividir em parcelas">
-                                                        <option value="1">à vista</option>
-                                                        {Array.from({ length: MAX_INSTALLMENTS - 1 }, (_, i) => i + 2).map(n => <option key={n} value={n}>{n}x</option>)}
-                                                    </select>
-                                                )}
-                                            </td>
-                                            <td {...widths.cellProps(ACTIONS_COLUMN, "px-2 py-1 text-right whitespace-nowrap")}>
-                                                {row.document_url && (
-                                                    <button type="button" onClick={() => setViewer({ url: row.document_url!, title: `IPTU ${row.year}` })} title="Ver a guia do IPTU (PDF)"
-                                                        className="p-1 rounded-md text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30">
-                                                        <FileText className="w-3.5 h-3.5" />
+                                                </td>
+                                            )}
+                                            {show("amount") && (
+                                                <td {...sel.cellProps("amount", row.id, e.amount, "px-2 py-1 text-right", () => cancelDraft(row.id, "amount"))}>
+                                                    <MoneyInput value={e.amount} draft={d.amount} disabled={busy}
+                                                        onDraft={text => setDraft(row.id, "amount", text)} onCommit={() => commit(row, "amount")}
+                                                        title={hasParts ? "Alterar o total redistribui entre as parcelas" : undefined}
+                                                        className="font-semibold text-foreground" />
+                                                </td>
+                                            )}
+                                            {show("payer") && (
+                                                <td {...sel.cellProps("payer", row.id, null, "px-2 py-1", () => cancelDraft(row.id, "paidBy"))}>
+                                                    {e.payer === "MIXED" ? (
+                                                        <span className="text-violet-700 dark:text-violet-400 font-medium" title={`Inquilino ${formatBRL(e.byTenant)} · Proprietário ${formatBRL(e.byLandlord)}`}>{payerLabel(row)}</span>
+                                                    ) : (
+                                                        <select disabled={busy} value={d.paidBy ?? row.paid_by} onChange={ev => setDraft(row.id, "paidBy", ev.target.value)} onBlur={() => commit(row, "paidBy")}
+                                                            title={hasParts ? "Aplica a todas as parcelas" : undefined}
+                                                            className={cn(BOX, (d.paidBy ?? row.paid_by) === "LANDLORD" ? "text-rose-700 dark:text-rose-400" : "text-emerald-700 dark:text-emerald-400")}>
+                                                            {TAX_PAYERS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                                                        </select>
+                                                    )}
+                                                </td>
+                                            )}
+                                            {show("date") && (
+                                                <td {...sel.cellProps("date", row.id, null, "px-2 py-1 whitespace-nowrap", () => cancelDraft(row.id, "date"))}>
+                                                    <DateInput variant="bare" disabled={busy} value={d.date ?? (row.paid_on ?? "")} onChange={iso => setDraft(row.id, "date", iso)} onBlur={() => commit(row, "date")} className={BOX} />
+                                                </td>
+                                            )}
+                                            {show("comment") && (
+                                                <td {...sel.cellProps("comment", row.id, null, "px-2 py-1", () => cancelDraft(row.id, "comment"))}>
+                                                    <input type="text" disabled={busy} value={d.comment ?? (row.comment ?? "")} placeholder="—"
+                                                        onChange={ev => setDraft(row.id, "comment", ev.target.value)} onBlur={() => commit(row, "comment")}
+                                                        onKeyDown={ev => { if (ev.key === "Enter") (ev.target as HTMLInputElement).blur(); }}
+                                                        className={cn(BOX, "truncate")} />
+                                                </td>
+                                            )}
+                                            {show("parts") && (
+                                                <td {...sel.cellProps("parts", row.id, null, "px-2 py-1 whitespace-nowrap")}>
+                                                    {hasParts ? (
+                                                        <span className="inline-flex items-center gap-1.5 px-1.5 py-1 border border-transparent">
+                                                            <button type="button" onClick={() => toggleExpanded(row.id)} className="text-emerald-700 dark:text-emerald-400 underline underline-offset-2">{parts.length}x</button>
+                                                            <button type="button" disabled={busy} onClick={() => unsplitRow(row)} className="text-muted-foreground hover:text-foreground" title="Voltar a pagamento único">unir</button>
+                                                        </span>
+                                                    ) : (
+                                                        <select disabled={busy} value="1" onChange={ev => { const n = Number(ev.target.value); if (n > 1) splitRow(row, n); }} className={BOX} title="Dividir em parcelas">
+                                                            <option value="1">à vista</option>
+                                                            {Array.from({ length: MAX_INSTALLMENTS - 1 }, (_, i) => i + 2).map(n => <option key={n} value={n}>{n}x</option>)}
+                                                        </select>
+                                                    )}
+                                                </td>
+                                            )}
+                                            {show(ACTIONS_COLUMN) && (
+                                                <td {...widths.cellProps(ACTIONS_COLUMN, "px-2 py-1 text-right whitespace-nowrap")}>
+                                                    {row.document_url && (
+                                                        <button type="button" onClick={() => setViewer({ url: row.document_url!, title: `IPTU ${row.year}` })} title="Ver a guia do IPTU (PDF)"
+                                                            className="p-1 rounded-md text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30">
+                                                            <FileText className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
+                                                    <button type="button" disabled={busy} onClick={() => remove(row)} title="Excluir" className="p-1 rounded-md text-muted-foreground hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30">
+                                                        <Trash2 className="w-3.5 h-3.5" />
                                                     </button>
-                                                )}
-                                                <button type="button" disabled={busy} onClick={() => remove(row)} title="Excluir" className="p-1 rounded-md text-muted-foreground hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30">
-                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                </button>
-                                            </td>
+                                                </td>
+                                            )}
                                         </tr>
                                         {hasParts && open && parts.map(part => {
                                             const key = `${row.id}:${part.seq}`;
@@ -583,24 +605,32 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
                                             return (
                                                 <tr key={key} className="border-b border-border/40 bg-muted/20 text-[11px]">
                                                     <td className="px-1 py-0.5" />
-                                                    <td className="px-2 py-0.5 text-muted-foreground" colSpan={2}>
-                                                        <span className="inline-flex items-center gap-1 pl-4"><SplitSquareVertical className="w-3 h-3" /> Parcela {part.seq}/{parts.length}</span>
-                                                    </td>
-                                                    <td {...widths.cellProps("amount", "px-2 py-0.5 text-right")}>
-                                                        <MoneyInput value={part.amount} draft={pd.amount} disabled={busy}
-                                                            onDraft={text => setPartDraft(row.id, part.seq, "amount", text)} onCommit={() => commitPart(row, part, "amount")}
-                                                            className="" />
-                                                    </td>
-                                                    <td {...widths.cellProps("payer", "px-2 py-0.5")}>
-                                                        <select disabled={busy} value={pd.paidBy ?? part.paid_by} onChange={ev => setPartDraft(row.id, part.seq, "paidBy", ev.target.value)} onBlur={() => commitPart(row, part, "paidBy")}
-                                                            className={cn(BOX, (pd.paidBy ?? part.paid_by) === "LANDLORD" ? "text-rose-700 dark:text-rose-400" : "text-emerald-700 dark:text-emerald-400")}>
-                                                            {TAX_PAYERS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-                                                        </select>
-                                                    </td>
-                                                    <td {...widths.cellProps("date", "px-2 py-0.5 whitespace-nowrap")}>
-                                                        <DateInput variant="bare" disabled={busy} value={pd.date ?? (part.paid_on ?? "")} onChange={iso => setPartDraft(row.id, part.seq, "date", iso)} onBlur={() => commitPart(row, part, "date")} className={BOX} />
-                                                    </td>
-                                                    <td className="px-2 py-0.5 text-muted-foreground" colSpan={3} />
+                                                    {partLabelSpan > 0 && (
+                                                        <td className="px-2 py-0.5 text-muted-foreground" colSpan={partLabelSpan}>
+                                                            <span className="inline-flex items-center gap-1 pl-4"><SplitSquareVertical className="w-3 h-3" /> Parcela {part.seq}/{parts.length}</span>
+                                                        </td>
+                                                    )}
+                                                    {show("amount") && (
+                                                        <td {...widths.cellProps("amount", "px-2 py-0.5 text-right")}>
+                                                            <MoneyInput value={part.amount} draft={pd.amount} disabled={busy}
+                                                                onDraft={text => setPartDraft(row.id, part.seq, "amount", text)} onCommit={() => commitPart(row, part, "amount")}
+                                                                className="" />
+                                                        </td>
+                                                    )}
+                                                    {show("payer") && (
+                                                        <td {...widths.cellProps("payer", "px-2 py-0.5")}>
+                                                            <select disabled={busy} value={pd.paidBy ?? part.paid_by} onChange={ev => setPartDraft(row.id, part.seq, "paidBy", ev.target.value)} onBlur={() => commitPart(row, part, "paidBy")}
+                                                                className={cn(BOX, (pd.paidBy ?? part.paid_by) === "LANDLORD" ? "text-rose-700 dark:text-rose-400" : "text-emerald-700 dark:text-emerald-400")}>
+                                                                {TAX_PAYERS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                                                            </select>
+                                                        </td>
+                                                    )}
+                                                    {show("date") && (
+                                                        <td {...widths.cellProps("date", "px-2 py-0.5 whitespace-nowrap")}>
+                                                            <DateInput variant="bare" disabled={busy} value={pd.date ?? (part.paid_on ?? "")} onChange={iso => setPartDraft(row.id, part.seq, "date", iso)} onBlur={() => commitPart(row, part, "date")} className={BOX} />
+                                                        </td>
+                                                    )}
+                                                    {partTailSpan > 0 && <td className="px-2 py-0.5 text-muted-foreground" colSpan={partTailSpan} />}
                                                 </tr>
                                             );
                                         })}
@@ -735,6 +765,7 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
             </Dialog>
 
             <ColumnMenu columns={TAX_COLUMNS} ctl={cf} />
+            <ColumnVisibilityMenu columns={TAX_COLUMNS} ctl={vis} widths={widths} />
             <IptuHistoryModal isOpen={historyOpen} onClose={() => setHistoryOpen(false)} rows={rows} />
             <PdfViewerModal isOpen={viewer !== null} onClose={() => setViewer(null)} url={viewer?.url ?? null} title={viewer?.title ?? "Guia do IPTU"} fileName={`${(viewer?.title ?? "iptu").toLowerCase().replace(/\s+/g, "-")}.pdf`} />
         </div>

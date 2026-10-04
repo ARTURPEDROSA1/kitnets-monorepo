@@ -3,9 +3,9 @@
 /**
  * Hide / show table columns, Excel style.
  *
- *   const vis = useColumnVisibility(columnTableKey("income-ledger", multiUnit ? "multi" : "single"), { locked: ["month"] });
+ *   const vis = useColumnVisibility(columnTableKey("income-ledger", multiUnit ? "multi" : "single"));
  *   <ColumnHeaders columns={columns} ctl={cf} visibility={vis} />          // right-click a header → menu
- *   {!vis.isHidden("energy") && <td>…</td>}                                  // body cells follow
+ *   {!vis.isHidden("energy") && <td>…</td>}                                  // body cells follow — every one of them
  *   <ColumnVisibilityButton ctl={vis} />                                     // same menu, for touch screens
  *   <ColumnVisibilityMenu columns={columns} ctl={vis} />                     // once, at the section root
  *
@@ -13,6 +13,9 @@
  * device the user signs in on. A table that looks different per kind of property uses one key per kind
  * (`income-ledger:single`, `income-ledger:multi`). localStorage keeps a copy, so the table opens right away
  * with the last choice made on this device while the account's copy loads.
+ *
+ * Any column can be hidden, the one that names the row and the actions included: the only rule is that the
+ * table keeps at least one column on screen.
  */
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Check, Columns3, Eye, EyeOff, MoveHorizontal } from "lucide-react";
@@ -22,7 +25,6 @@ import { loadAccountPreferences, readLocalPreference, saveAccountPreference, wri
 
 export interface ColumnVisibility {
     isHidden: (key: string) => boolean;
-    isLocked: (key: string) => boolean;
     hiddenCount: number;
     hide: (key: string) => void;
     toggle: (key: string) => void;
@@ -39,14 +41,12 @@ const writeLocal = (key: string, hidden: string[]) => writeLocalPreference("hidd
 const saveAccountColumns = (key: string, hidden: string[]) => saveAccountPreference("hiddenColumns", key, hidden);
 
 export interface ColumnVisibilityOptions {
-    locked?: string[];
     defaultHidden?: string[];
     /** Key this table used before it had one per kind of property: its choice on this device seeds the new key once. */
     legacyKey?: string;
 }
 
 export function useColumnVisibility(storageKey: string, opts: ColumnVisibilityOptions = {}): ColumnVisibility {
-    const locked = opts.locked ?? [];
     const { legacyKey, defaultHidden } = opts;
     const initial = (key: string) => new Set(readLocal(key) ?? (legacyKey ? readLocal(legacyKey) : null) ?? defaultHidden ?? []);
     const [state, setState] = useState(() => ({ key: storageKey, hidden: initial(storageKey) }));
@@ -82,13 +82,11 @@ export function useColumnVisibility(storageKey: string, opts: ColumnVisibilityOp
         setState({ key: storageKey, hidden: next });
     };
 
-    const isLocked = (key: string) => locked.includes(key);
     return {
-        isHidden: key => hidden.has(key) && !locked.includes(key),
-        isLocked,
-        hiddenCount: [...hidden].filter(k => !locked.includes(k)).length,
-        hide: key => { if (!locked.includes(key)) update(prev => new Set(prev).add(key)); },
-        toggle: key => { if (!locked.includes(key)) update(prev => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n; }); },
+        isHidden: key => hidden.has(key),
+        hiddenCount: hidden.size,
+        hide: key => update(prev => new Set(prev).add(key)),
+        toggle: key => update(prev => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n; }),
         showAll: () => update(() => new Set()),
         openMenu: (at, key) => setMenu({ ...at, key }),
         closeMenu: () => setMenu(null),
@@ -126,6 +124,9 @@ export function ColumnVisibilityMenu({ columns, ctl, widths }: { columns: Array<
 
     if (!menu) return null;
     const clicked = menu.key ? columns.find(c => c.key === menu.key) : undefined;
+    /** The table keeps at least one column: the last one on screen cannot be hidden. */
+    const shownCount = columns.filter(c => !ctl.isHidden(c.key)).length;
+    const isLast = (key: string) => shownCount <= 1 && !ctl.isHidden(key);
     const item = "w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-muted transition-colors disabled:opacity-50 disabled:hover:bg-transparent";
     return (
         <div
@@ -136,7 +137,7 @@ export function ColumnVisibilityMenu({ columns, ctl, widths }: { columns: Array<
             style={{ left: pos?.left ?? menu.x, top: pos?.top ?? menu.y, visibility: pos ? "visible" : "hidden" }}
             className="fixed z-[80] w-60 max-h-[70vh] overflow-y-auto rounded-xl border border-border bg-background shadow-2xl py-1.5"
         >
-            {clicked && !ctl.isLocked(clicked.key) && (
+            {clicked && !isLast(clicked.key) && (
                 <>
                     <button type="button" role="menuitem" className={cn(item, "font-semibold")} onClick={() => { ctl.hide(clicked.key); ctl.closeMenu(); }}>
                         <EyeOff className="w-3.5 h-3.5 text-muted-foreground" /> Ocultar “{clicked.label}”
@@ -146,11 +147,11 @@ export function ColumnVisibilityMenu({ columns, ctl, widths }: { columns: Array<
             )}
             <span className="block px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Colunas</span>
             {columns.map(c => {
-                const lockedCol = ctl.isLocked(c.key);
+                const last = isLast(c.key);
                 const shown = !ctl.isHidden(c.key);
                 return (
-                    <button key={c.key} type="button" role="menuitemcheckbox" aria-checked={shown} disabled={lockedCol} className={item}
-                        title={lockedCol ? "Esta coluna fica sempre visível" : undefined} onClick={() => ctl.toggle(c.key)}>
+                    <button key={c.key} type="button" role="menuitemcheckbox" aria-checked={shown} disabled={last} className={item}
+                        title={last ? "A tabela precisa de pelo menos uma coluna visível" : undefined} onClick={() => ctl.toggle(c.key)}>
                         <span className={cn("w-4 h-4 rounded border flex items-center justify-center shrink-0", shown ? "bg-emerald-600 border-emerald-600 text-white" : "border-input")}>
                             {shown && <Check className="w-3 h-3" />}
                         </span>
