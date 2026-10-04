@@ -16,9 +16,15 @@
  *   • arrows / Tab     move the selected cell (Shift+arrows extend the rectangle from the anchor)
  *   • Enter / F2       start editing the selected cell; Enter while editing commits and moves down
  *   • Esc              while editing: cancels the edit (draft discarded, nothing saved); otherwise clears the selection
+ *   • Ctrl/Cmd+C       copies the selected cells, a line per row and a tab between columns (pastes into Excel / Sheets as cells)
  *   • Ctrl/Cmd+Z       undoes the last cell edit (the last 5 edits of the page, see lib/cell-undo.ts)
  * A floating bar shows count, sum and average of the selected numeric cells. Sums are R$ unless
  * the column has its own unit: useCellSum({ formatByCol: { cons: v => `${v} kWh` } }).
+ *
+ * Copy takes what the cell shows: the text of its box or the option chosen in its list, otherwise its first
+ * line (a second line is a note under the value, like "dia 10" or "faltam 259 dias"). With several tables on
+ * the page, Ctrl+C copies from the one the user worked in last. Inside a text box, or with page text selected,
+ * Ctrl+C stays the browser's.
  *
  * Undo: a table that saves a cell tells the controller how to put the previous value back —
  *   sel.recordUndo({ col: "amount", rowId: row.id, label: "Valor · IPTU 2025", undo: () => save(row.id, previous) });
@@ -30,7 +36,7 @@
  * column the user resized follow its width (components/properties/TableColumnWidths.tsx).
  */
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Sigma, Undo2, X } from "lucide-react";
+import { Copy, Sigma, Undo2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { dropUndoOwner, popUndo, pushUndo, undoDepth, type UndoEntry } from "@/lib/cell-undo";
 import type { ColumnWidthsController } from "./TableColumnWidths";
@@ -73,14 +79,15 @@ export interface CellSumController {
     clear: () => void;
     /** Call after a cell edit was saved, so Ctrl+Z can take it back. */
     recordUndo: (edit: CellEdit) => void;
-    /** What the last Ctrl+Z did, shown for a few seconds by `CellSumBar`. */
-    notice: { text: string; failed: boolean } | null;
+    /** What the last Ctrl+Z or Ctrl+C did, shown for a few seconds by `CellSumBar`. */
+    notice: { text: string; failed: boolean; kind: "undo" | "copy" } | null;
 }
 
 const formatBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const formatPlain = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 const key = (col: string, rowId: string) => `${col}::${rowId}`;
 const colOf = (k: string) => k.slice(0, k.indexOf("::"));
+const rowOf = (k: string) => k.slice(k.indexOf("::") + 2);
 const cellElement = (k: string) => document.querySelector<HTMLElement>(`[data-cell="${CSS.escape(k)}"]`);
 const isTyping = () => {
     const el = document.activeElement as HTMLElement | null;
@@ -99,6 +106,39 @@ function startEdit(cell: HTMLElement) {
 }
 
 interface Grid { cols: string[]; rows: string[]; cells: Map<string, number | null> }
+
+// ── Ctrl+C ─────────────────────────────────────────────────────────────────
+
+const oneLine = (s: string) => s.replace(/\s+/g, " ").trim();
+
+/**
+ * What a cell holds, as the user reads it: the text of its box, the option chosen in its list, Sim / Não for
+ * a checkbox; otherwise its first line (a second line is a note under the value: "dia 10", "faltam 259 dias").
+ */
+function cellText(cell: HTMLElement): string {
+    const control = cell.querySelector("input:not([type=hidden]):not([type=file]):not([type=button]), select, textarea");
+    if (control instanceof HTMLSelectElement) return oneLine(control.selectedOptions[0]?.text ?? "");
+    if (control instanceof HTMLInputElement && (control.type === "checkbox" || control.type === "radio")) return control.checked ? "Sim" : "Não";
+    if (control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement) return oneLine(control.value);
+    return oneLine(cell.innerText.split("\n").find(line => line.trim()) ?? "");
+}
+
+/**
+ * The selected cells as a spreadsheet pastes them back into the same shape: a line per row, a tab between
+ * columns, in the order the table shows them. Gaps of a Ctrl+click selection stay as empty cells.
+ */
+function selectionText(selected: Set<string>, g: Grid): string {
+    const cols = new Set([...selected].map(colOf)), rows = new Set([...selected].map(rowOf));
+    return g.rows.filter(r => rows.has(r)).map(r =>
+        g.cols.filter(c => cols.has(c)).map(c => {
+            const el = selected.has(key(c, r)) ? cellElement(key(c, r)) : null;
+            return el ? cellText(el) : "";
+        }).join("\t"),
+    ).join("\r\n");
+}
+
+/** The table the user worked in last (clicked, moved in, undid an edit): Ctrl+C copies its selection. */
+let activeTable: object | null = null;
 
 // ── Ctrl+Z ─────────────────────────────────────────────────────────────────
 // One listener for the page, however many tables are on it: the buffer is the page's (lib/cell-undo.ts).
@@ -166,6 +206,19 @@ const listenForUndo = () => {
 export function useCellSum(options: CellSumOptions = {}): CellSumController {
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [notice, setNotice] = useState<CellSumController["notice"]>(null);
+    /** This table, for the page-wide Ctrl+Z buffer and for Ctrl+C. */
+    const [owner] = useState<UndoOwner>(() => ({ undone: () => { } }));
+    const noticeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+    /** Shows what Ctrl+Z / Ctrl+C did; with several tables on the page, only the latest notice stays up. */
+    const announce = useCallback((next: NonNullable<CellSumController["notice"]>) => {
+        const hide = () => setNotice(null);
+        dismissNotice?.();
+        dismissNotice = hide;
+        setNotice(next);
+        clearTimeout(noticeTimer.current);
+        noticeTimer.current = setTimeout(hide, NOTICE_MS);
+    }, []);
+    useEffect(() => () => clearTimeout(noticeTimer.current), []);
     const { widths } = options;
     const formatByCol = useRef(options.formatByCol);
     useEffect(() => { formatByCol.current = options.formatByCol; });
@@ -209,8 +262,9 @@ export function useCellSum(options: CellSumOptions = {}): CellSumController {
         if (extend && anchor.current) selectRect(anchor.current, next);
         else { setSelected(new Set([k])); anchor.current = next; }
         cursor.current = next;
+        activeTable = owner;
         requestAnimationFrame(() => cellElement(k)?.scrollIntoView({ block: "nearest", inline: "nearest" }));
-    }, [selectRect]);
+    }, [selectRect, owner]);
 
     const cellProps = useCallback((col: string, rowId: string, value: number | null | undefined, className?: string, onCancel?: () => void) => {
         // rebuild the grid on every render pass (cells register in DOM order)
@@ -224,7 +278,7 @@ export function useCellSum(options: CellSumOptions = {}): CellSumController {
         const me = { col, rowId };
         return {
             "data-cell": k,
-            title: "Clique: selecionar · arraste ou Shift+clique: intervalo · Ctrl+clique: adicionar · duplo clique ou Enter: editar · setas: navegar · Ctrl+Z: desfazer",
+            title: "Clique: selecionar · arraste ou Shift+clique: intervalo · Ctrl+clique: adicionar · duplo clique ou Enter: editar · setas: navegar · Ctrl+C: copiar · Ctrl+Z: desfazer",
             className: cn(className, "cursor-cell", widths?.cellClass(col), selected.has(k) && "bg-emerald-100 dark:bg-emerald-900/40 ring-1 ring-inset ring-emerald-400"),
             style: widths?.cellStyle(col),
             onMouseDown: (e: React.MouseEvent) => {
@@ -235,6 +289,8 @@ export function useCellSum(options: CellSumOptions = {}): CellSumController {
                 if (control && document.activeElement === control) return;                             // already editing this cell
                 e.preventDefault();                                                                     // no focus on single click
                 if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) document.activeElement.blur();   // commits a pending edit
+                window.getSelection()?.removeAllRanges();                                               // text selected earlier on the page must not win Ctrl+C
+                activeTable = owner;
                 if (e.ctrlKey || e.metaKey) {
                     setSelected(prev => { const next = new Set(prev); if (next.has(k)) next.delete(k); else next.add(k); return next; });
                     anchor.current = me;
@@ -268,12 +324,10 @@ export function useCellSum(options: CellSumOptions = {}): CellSumController {
             },
             onDoubleClick: (e: React.MouseEvent) => startEdit(e.currentTarget as HTMLElement),
         };
-    }, [selected, selectRect, moveBy, widths]);
+    }, [selected, selectRect, moveBy, widths, owner]);
 
     // ── Undo ────────────────────────────────────────────────────────────
-    const [owner] = useState<UndoOwner>(() => ({ undone: () => { } }));
     useEffect(() => {
-        let timer: ReturnType<typeof setTimeout> | undefined;
         owner.undone = (entry, ok) => {
             // show the cell that changed back: it may be off screen, or the user may be looking elsewhere
             const k = key(entry.col, entry.rowId);
@@ -281,18 +335,41 @@ export function useCellSum(options: CellSumOptions = {}): CellSumController {
             setSelected(new Set([k]));
             anchor.current = cell;
             cursor.current = cell;
+            activeTable = owner;
             requestAnimationFrame(() => cellElement(k)?.scrollIntoView({ block: "nearest", inline: "nearest" }));
-            const hide = () => setNotice(null);
-            dismissNotice?.();
-            dismissNotice = hide;
-            setNotice({ failed: !ok, text: `${ok ? "Desfeito" : "Não foi possível desfazer"}${entry.label ? `: ${entry.label}` : ok ? ": a célula voltou ao valor anterior" : ""}` });
-            clearTimeout(timer);
-            timer = setTimeout(hide, NOTICE_MS);
+            announce({ kind: "undo", failed: !ok, text: `${ok ? "Desfeito" : "Não foi possível desfazer"}${entry.label ? `: ${entry.label}` : ok ? ": a célula voltou ao valor anterior" : ""}` });
         };
         const stopListening = listenForUndo();
-        return () => { stopListening(); clearTimeout(timer); dropUndoOwner(owner); owner.undone = () => { }; };
-    }, [owner]);
+        return () => { stopListening(); dropUndoOwner(owner); owner.undone = () => { }; if (activeTable === owner) activeTable = null; };
+    }, [owner, announce]);
     const recordUndo = useCallback(({ coalesce, ...edit }: CellEdit) => pushUndo({ ...edit, owner }, { coalesce }), [owner]);
+
+    // ── Copy ────────────────────────────────────────────────────────────
+    // Ctrl/Cmd+C writes the selected cells through the Clipboard API (Safari fires no copy event while nothing
+    // is selected on the page); the browser's copy event covers its own Copy menu and pages without that API.
+    useEffect(() => {
+        if (selected.size === 0) return;
+        /** The copy is the table's: it is the one worked in last, and no text box or page text is in the way. */
+        const ours = () => activeTable === owner
+            && !isTextBox(document.activeElement as HTMLElement | null)     // inside a text box: the browser copies its text
+            && !window.getSelection()?.toString().trim();                    // text the user selected on the page: the browser copies it
+        const copied = () => announce({ kind: "copy", failed: false, text: `Copiado: ${selected.size} ${selected.size === 1 ? "célula" : "células"}` });
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key.toLowerCase() !== "c" || !(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || !ours()) return;
+            if (!navigator.clipboard?.writeText) return;
+            e.preventDefault();
+            navigator.clipboard.writeText(selectionText(selected, grid.current)).then(copied, () => announce({ kind: "copy", failed: true, text: "Não foi possível copiar: o navegador bloqueou a área de transferência" }));
+        };
+        const onCopy = (e: ClipboardEvent) => {
+            if (!e.clipboardData || !ours()) return;
+            e.preventDefault();
+            e.clipboardData.setData("text/plain", selectionText(selected, grid.current));
+            copied();
+        };
+        window.addEventListener("keydown", onKey);
+        document.addEventListener("copy", onCopy);
+        return () => { window.removeEventListener("keydown", onKey); document.removeEventListener("copy", onCopy); };
+    }, [selected, owner, announce]);
 
     useEffect(() => {
         const up = () => { dragging.current = false; };
@@ -343,7 +420,7 @@ export function useCellSum(options: CellSumOptions = {}): CellSumController {
     return { cellProps, isSelected, stats, count: selected.size, clear, recordUndo, notice };
 }
 
-/** Floating status bar (bottom centre) with count, sum and average of the selected cells; above it, what the last Ctrl+Z undid. */
+/** Floating status bar (bottom centre) with count, sum and average of the selected cells; above it, what the last Ctrl+Z / Ctrl+C did. */
 export function CellSumBar({ ctl }: { ctl: CellSumController }) {
     if (ctl.count === 0 && !ctl.notice) return null;
     const { count, numeric, total, format, money } = ctl.stats();
@@ -352,7 +429,7 @@ export function CellSumBar({ ctl }: { ctl: CellSumController }) {
             {ctl.notice && (
                 <div role="status" className={cn("flex items-center gap-2 rounded-full border bg-background/95 backdrop-blur px-4 py-2 shadow-lg max-w-[90vw]",
                     ctl.notice.failed ? "border-rose-300 text-rose-700 dark:text-rose-400" : "border-border text-foreground")}>
-                    <Undo2 className="w-4 h-4 shrink-0 text-muted-foreground" />
+                    {ctl.notice.kind === "copy" ? <Copy className="w-4 h-4 shrink-0 text-muted-foreground" /> : <Undo2 className="w-4 h-4 shrink-0 text-muted-foreground" />}
                     <span className="truncate">{ctl.notice.text}</span>
                 </div>
             )}

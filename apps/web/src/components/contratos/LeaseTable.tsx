@@ -17,7 +17,7 @@ import { columnTableKey } from "@/lib/ui-preferences";
 import { Sensitive } from "@/components/privacy";
 import { CellSumBar, useCellSum } from "@/components/properties/TableCellSum";
 import { useColumnWidths } from "@/components/properties/TableColumnWidths";
-import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "@/components/properties/TableColumnFilters";
+import { ACTIONS_COLUMN, ColumnHeaders, ColumnMenu, FilterChips, actionsColumn, useColumnFilters, type ColumnDef } from "@/components/properties/TableColumnFilters";
 import { ColumnVisibilityMenu, useColumnVisibility } from "@/components/properties/TableColumnVisibility";
 import { MANAGEMENT_LABELS, STATUS_META, brl, statusMeta, todayBRT, type LeaseRow } from "@/lib/lease-dashboard";
 import { leaseTermTotals } from "@/lib/lease-term";
@@ -105,11 +105,16 @@ export default function LeaseTable({ rows, actions, propertyKinds = {} }: Props)
         { key: "adjustment", label: "Reajuste", kind: "date", title: "Próximo reajuste do aluguel", get: r => (r.inForce && r.summary.nextAdjustmentDate ? r.summary.nextAdjustmentDate : "") },
         { key: "management", label: "Gestão", kind: "enum", options: Object.entries(MANAGEMENT_LABELS).map(([value, label]) => ({ value, label })), get: r => r.lease.management_type },
         { key: "file", label: "Arquivo", kind: "enum", align: "center", options: [{ value: "sim", label: "Com PDF" }, { value: "nao", label: "Sem PDF" }], get: r => (r.hasFile ? "sim" : "nao") },
+        actionsColumn<LeaseRow>([
+            { key: "edit", label: "Editar" },
+            { key: "terminate", label: "Rescindir", when: r => r.inForce },
+            { key: "delete", label: "Excluir" },
+        ], { className: "w-px whitespace-nowrap" }),
         // eslint-disable-next-line react-hooks/exhaustive-deps
     ], [totals]);
 
     const cf = useColumnFilters(rows, columns, { key: "end", dir: "asc" }, { storageKey: TABLE_KEY, filtersKey: TABLE_KEY });
-    const vis = useColumnVisibility(TABLE_KEY, { locked: ["title"] });
+    const vis = useColumnVisibility(TABLE_KEY, { locked: ["title", ACTIONS_COLUMN] });
     const widths = useColumnWidths(TABLE_KEY);
     const sel = useCellSum({ widths });
     const show = (key: string) => !vis.isHidden(key);
@@ -117,7 +122,7 @@ export default function LeaseTable({ rows, actions, propertyKinds = {} }: Props)
     return (
         <div className="overflow-hidden rounded-xl border border-border/80 bg-card">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
-                <span>Clique no cabeçalho para ordenar e filtrar (botão direito: colunas) · selecione células para somar · setas movem entre as células</span>
+                <span>Clique no cabeçalho para ordenar e filtrar (botão direito: colunas) · selecione células para somar · setas movem entre as células · Ctrl+C copia</span>
                 <span>{cf.rows.length} de {rows.length}</span>
             </div>
             {cf.anyFilter && (
@@ -133,7 +138,7 @@ export default function LeaseTable({ rows, actions, propertyKinds = {} }: Props)
                 <div className="overflow-x-auto">
                     <table className="w-full text-xs" style={widths.tableStyle}>
                         <thead className="border-b border-border/60 bg-muted/30">
-                            <ColumnHeaders columns={columns} ctl={cf} widths={widths} visibility={vis} trailing={<th className="w-px px-2 py-2" />} />
+                            <ColumnHeaders columns={columns} ctl={cf} widths={widths} visibility={vis} />
                         </thead>
                         <tbody>
                             {cf.rows.map(row => {
@@ -244,7 +249,7 @@ export default function LeaseTable({ rows, actions, propertyKinds = {} }: Props)
                                                 )}
                                             </td>
                                         )}
-                                        <td className="whitespace-nowrap px-2 py-2.5">
+                                        <td {...widths.cellProps(ACTIONS_COLUMN, "whitespace-nowrap px-2 py-2.5")}>
                                             <span className="flex items-center justify-end gap-0.5">
                                                 <button type="button" onClick={() => actions.onEdit(row)} title="Editar contrato" aria-label={`Editar o contrato de ${row.place}`} className={iconBtn}>
                                                     <PenLine className="h-4 w-4" />

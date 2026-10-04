@@ -15,7 +15,7 @@ import { columnTableKey } from "@/lib/ui-preferences";
 import { Sensitive } from "@/components/privacy";
 import { CellSumBar, useCellSum } from "@/components/properties/TableCellSum";
 import { useColumnWidths } from "@/components/properties/TableColumnWidths";
-import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "@/components/properties/TableColumnFilters";
+import { ACTIONS_COLUMN, ColumnHeaders, ColumnMenu, FilterChips, actionsColumn, useColumnFilters, type ColumnDef } from "@/components/properties/TableColumnFilters";
 import { ColumnVisibilityMenu, useColumnVisibility } from "@/components/properties/TableColumnVisibility";
 import { DELIVERY_STATE_META, INVOICE_STATUS_META, PAID_VIA_LABELS, brl, deliveryState, isOpen, type InvoiceRow } from "@/lib/invoice-hub";
 import { blockersText } from "@/lib/invoice-payer";
@@ -60,10 +60,14 @@ export default function InvoiceTable({ rows, actions }: Props) {
         { key: "paid_on", label: "Pago em", kind: "date", get: r => r.invoice.paid_on ?? "" },
         { key: "paid", label: "Recebido", kind: "number", align: "right", title: "O que o inquilino pagou (valor da fatura + multa e juros, quando houve)", get: r => r.invoice.paid_amount },
         { key: "via", label: "Forma", kind: "enum", options: Object.entries(PAID_VIA_LABELS).map(([value, label]) => ({ value, label })), get: r => r.invoice.paid_via ?? "" },
+        actionsColumn<InvoiceRow>([
+            { key: "pay", label: "Registrar pagamento", when: r => isOpen(r.invoice.status) },
+            { key: "cancel", label: "Cancelar", when: r => isOpen(r.invoice.status) },
+        ], { className: "w-px whitespace-nowrap" }),
     ], []);
 
     const cf = useColumnFilters(rows, columns, { key: "due", dir: "desc" }, { storageKey: TABLE_KEY, filtersKey: TABLE_KEY });
-    const vis = useColumnVisibility(TABLE_KEY, { locked: ["invoice"] });
+    const vis = useColumnVisibility(TABLE_KEY, { locked: ["invoice", ACTIONS_COLUMN] });
     const widths = useColumnWidths(TABLE_KEY);
     const sel = useCellSum({ widths });
     const show = (key: string) => !vis.isHidden(key);
@@ -71,7 +75,7 @@ export default function InvoiceTable({ rows, actions }: Props) {
     return (
         <div className="overflow-hidden rounded-xl border border-border/80 bg-card">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
-                <span>Clique no cabeçalho para ordenar e filtrar (botão direito: colunas) · selecione células para somar · setas movem entre as células</span>
+                <span>Clique no cabeçalho para ordenar e filtrar (botão direito: colunas) · selecione células para somar · setas movem entre as células · Ctrl+C copia</span>
                 <span>{cf.rows.length} de {rows.length}</span>
             </div>
             {cf.anyFilter && (
@@ -87,7 +91,7 @@ export default function InvoiceTable({ rows, actions }: Props) {
                 <div className="overflow-x-auto">
                     <table className="w-full text-xs" style={widths.tableStyle}>
                         <thead className="border-b border-border/60 bg-muted/30">
-                            <ColumnHeaders columns={columns} ctl={cf} widths={widths} visibility={vis} trailing={<th className="w-px px-2 py-2" />} />
+                            <ColumnHeaders columns={columns} ctl={cf} widths={widths} visibility={vis} />
                         </thead>
                         <tbody>
                             {cf.rows.map(row => {
@@ -155,7 +159,7 @@ export default function InvoiceTable({ rows, actions }: Props) {
                                                 {invoice.paid_via ? PAID_VIA_LABELS[invoice.paid_via] ?? invoice.paid_via : <span className="text-muted-foreground">—</span>}
                                             </td>
                                         )}
-                                        <td className="whitespace-nowrap px-2 py-2.5">
+                                        <td {...widths.cellProps(ACTIONS_COLUMN, "whitespace-nowrap px-2 py-2.5")}>
                                             <span className="flex items-center justify-end gap-0.5">
                                                 {open && (
                                                     <>

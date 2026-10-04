@@ -25,9 +25,11 @@ import { formatDateBR } from "@/lib/dates";
 import MoneyInput, { parseMoneyText } from "@/components/properties/MoneyInput";
 import { Money } from "@/components/privacy";
 import {
+    ACTIONS_COLUMN,
     ColumnHeaders,
     ColumnMenu,
     FilterChips,
+    actionsColumn,
     useColumnFilters,
     type ColumnDef,
 } from "@/components/properties/TableColumnFilters";
@@ -211,7 +213,7 @@ export default function InvestmentPaymentsTable({
     const widths = useColumnWidths(columnTableKey("investment-payments"));
     const sel = useCellSum({ formatByCol: SUM_FORMATS, widths });
     const vis = useColumnVisibility(columnTableKey("investment-payments"), {
-        locked: ["due_on"],
+        locked: ["due_on", ACTIONS_COLUMN],
         defaultHidden: ["installment_number"],
     });
 
@@ -302,6 +304,7 @@ export default function InvestmentPaymentsTable({
             get: r => ((receiptsByPayment[r.id]?.length ?? 0) > 0 ? "YES" : "NO"),
             options: [{ value: "YES", label: "Anexado" }, { value: "NO", label: "Sem comprovante" }],
         },
+        actionsColumn<InvestmentPayment>([{ key: "delete", label: "Excluir" }], { align: "center", className: tight }),
     ], [indexOf, receiptsByPayment]);
 
     // The order and filters chosen here follow the user to any device, like the hidden columns.
@@ -517,8 +520,8 @@ export default function InvestmentPaymentsTable({
 
     /** Columns before "Valor", so the footer's label spans exactly the ones on screen. */
     const labelSpan = Math.max(1, columns.slice(0, columns.findIndex(c => c.key === "amount")).filter(c => show(c.key)).length);
-    /** Everything after "Valor pago", plus the trailing actions column. */
-    const tailSpan = 1 + ["index_pct", "payer", "pj_amount", "notes", "receipt"].filter(show).length;
+    /** Everything after "Valor pago", the actions column included. */
+    const tailSpan = ["index_pct", "payer", "pj_amount", "notes", "receipt", ACTIONS_COLUMN].filter(show).length;
 
     const payerSelect = (value: Payer | null, onChange: (p: Payer | null) => void, label: string) => (
         <select
@@ -700,12 +703,12 @@ export default function InvestmentPaymentsTable({
                 <div className="overflow-x-auto -mx-2">
                     <table className="w-full text-xs [&_td]:whitespace-nowrap" style={widths.tableStyle}>
                         <thead>
-                            <ColumnHeaders columns={columns} ctl={cf} widths={widths} visibility={vis} trailing={<th className="px-2 py-2 w-px" />} />
+                            <ColumnHeaders columns={columns} ctl={cf} widths={widths} visibility={vis} />
                         </thead>
                         <tbody>
                             {rows.length === 0 && draft === null && (
                                 <tr>
-                                    <td colSpan={visibleCount + 1} className="px-3 py-8 text-center text-sm text-muted-foreground">
+                                    <td colSpan={visibleCount} className="px-3 py-8 text-center text-sm text-muted-foreground">
                                         {payments.length === 0
                                             ? "Nenhum pagamento lançado ainda. Comece pela entrada ou pelo sinal."
                                             : "Nenhum lançamento com os filtros atuais."}
@@ -865,7 +868,7 @@ export default function InvestmentPaymentsTable({
                                                 {receiptList(row)}
                                             </td>
                                         )}
-                                        <td className="px-2 py-1 text-center">
+                                        <td {...widths.cellProps(ACTIONS_COLUMN, "px-2 py-1 text-center")}>
                                             <button
                                                 type="button"
                                                 onClick={() => onDelete(row.id)}
@@ -1008,7 +1011,7 @@ export default function InvestmentPaymentsTable({
                                             />
                                         </td>
                                     )}
-                                    <td className="px-2 py-1">
+                                    <td {...widths.cellProps(ACTIONS_COLUMN, "px-2 py-1")}>
                                         <div className="flex items-center gap-1 justify-end">
                                             <button type="button" onClick={save} disabled={saving || uploading !== null} title="Salvar" aria-label="Salvar lançamento" className="p-1 rounded text-emerald-600 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 disabled:opacity-50">
                                                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}

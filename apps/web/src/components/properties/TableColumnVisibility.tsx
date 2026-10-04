@@ -150,7 +150,7 @@ export function ColumnVisibilityMenu({ columns, ctl, widths }: { columns: Array<
                 const shown = !ctl.isHidden(c.key);
                 return (
                     <button key={c.key} type="button" role="menuitemcheckbox" aria-checked={shown} disabled={lockedCol} className={item}
-                        title={lockedCol ? "Esta coluna identifica a linha e fica sempre visível" : undefined} onClick={() => ctl.toggle(c.key)}>
+                        title={lockedCol ? "Esta coluna fica sempre visível" : undefined} onClick={() => ctl.toggle(c.key)}>
                         <span className={cn("w-4 h-4 rounded border flex items-center justify-center shrink-0", shown ? "bg-emerald-600 border-emerald-600 text-white" : "border-input")}>
                             {shown && <Check className="w-3 h-3" />}
                         </span>

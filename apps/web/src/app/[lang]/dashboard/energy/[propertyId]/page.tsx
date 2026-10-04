@@ -48,7 +48,7 @@ import { cn } from "@/lib/utils";
 import { columnTableKey, recordTableKey } from "@/lib/ui-preferences";
 import { CellSumBar, useCellSum } from "@/components/properties/TableCellSum";
 import { useColumnWidths } from "@/components/properties/TableColumnWidths";
-import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "@/components/properties/TableColumnFilters";
+import { ACTIONS_COLUMN, ColumnHeaders, ColumnMenu, FilterChips, actionsColumn, useColumnFilters, type ColumnDef } from "@/components/properties/TableColumnFilters";
 import { ColumnVisibilityMenu, useColumnVisibility } from "@/components/properties/TableColumnVisibility";
 import { parseMoneyText } from "@/components/properties/MoneyInput";
 
@@ -288,6 +288,19 @@ export default function EnergyDashboardPage() {
         return bills.filter((b) => b.reference_month >= cutoffStr);
     }, [bills, filterMonths]);
 
+    // Latest full bill (for current status cards)
+    const latestFullBill = useMemo(() => {
+        return bills.find((b) => !b.is_historical_only) || bills[0] || null;
+    }, [bills]);
+
+    // Active current PDF URL (from latest full bill or currentPdfUrl fallback)
+    const activePdfUrl = useMemo(() => {
+        return latestFullBill?.pdf_url || currentPdfUrl || null;
+    }, [currentPdfUrl, latestFullBill]);
+
+    /** The bill's PDF: its own, or the current one for the latest full bill. */
+    const billPdfOf = (b: EnergyBillRecord) => b.pdf_url || (b.id === latestFullBill?.id ? activePdfUrl : null);
+
     // Spreadsheet-style history table: sort/filter per column, hide columns, select cells to sum
     const billColumns = useMemo<ColumnDef<EnergyBillRecord>[]>(() => [
         { key: "month", label: "Mês/Ano", kind: "month", get: b => b.reference_month.slice(0, 7) },
@@ -300,12 +313,18 @@ export default function EnergyDashboardPage() {
         { key: "unitPrice", label: "Preço Unit.", kind: "number", align: "right", sum: false, get: b => b.unit_price ?? null },
         { key: "total", label: "Valor a Pagar", kind: "number", align: "right", get: b => b.total_amount > 0 ? b.total_amount : null },
         { key: "origin", label: "Origem", kind: "enum", align: "center", options: [{ value: "full", label: "Fatura Completa" }, { value: "hist", label: "Histórico Base" }], get: b => b.is_historical_only ? "hist" : "full" },
-    ], []);
+        actionsColumn<EnergyBillRecord>([
+            { key: "pdf", label: "Ver a fatura (PDF)", when: b => Boolean(billPdfOf(b)) },
+            { key: "edit", label: "Editar" },
+            { key: "delete", label: "Excluir" },
+        ], { align: "center" }),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    ], [latestFullBill, activePdfUrl]);
     const cf = useColumnFilters(filteredBills, billColumns, { key: "month", dir: "desc" }, {
         storageKey: columnTableKey("energy-bills"),
         filtersKey: recordTableKey("energy-bills", resolvedPropertyId || propertyId),
     });
-    const vis = useColumnVisibility(columnTableKey("energy-bills"), { locked: ["month"] });
+    const vis = useColumnVisibility(columnTableKey("energy-bills"), { locked: ["month", ACTIONS_COLUMN] });
     const widths = useColumnWidths(columnTableKey("energy-bills"));
     const sel = useCellSum({ formatByCol: { cons: formatKwh(0), daily: formatKwh(2), days: formatDays, balance: formatKwh(2), injected: formatKwh(0), unitPrice: formatUnitPrice }, widths });
 
@@ -370,16 +389,6 @@ export default function EnergyDashboardPage() {
             undo: () => { const now = billsRef.current.find(x => x.id === b.id); return now ? saveField(now, field, previous) : false; },
         });
     };
-
-    // Latest full bill (for current status cards)
-    const latestFullBill = useMemo(() => {
-        return bills.find((b) => !b.is_historical_only) || bills[0] || null;
-    }, [bills]);
-
-    // Active current PDF URL (from latest full bill or currentPdfUrl fallback)
-    const activePdfUrl = useMemo(() => {
-        return latestFullBill?.pdf_url || currentPdfUrl || null;
-    }, [currentPdfUrl, latestFullBill]);
 
     // Formatted due date (Vencimento ex: 17/09/2026)
     const formattedDueDate = useMemo(() => {
@@ -920,7 +929,7 @@ export default function EnergyDashboardPage() {
                             <div>
                                 <h3 className="text-base font-semibold text-foreground">Histórico de Consumo Detalhado</h3>
                                 <p className="text-xs text-muted-foreground mt-0.5">
-                                    Registros de consumo, injeção solar, saldo de créditos e custos por ciclo de faturamento · clique no cabeçalho para ordenar e filtrar (botão direito: colunas); selecione células para somar; duplo clique ou Enter edita na própria célula; o lápis abre a fatura completa
+                                    Registros de consumo, injeção solar, saldo de créditos e custos por ciclo de faturamento · clique no cabeçalho para ordenar e filtrar (botão direito: colunas); selecione células para somar (Ctrl+C copia); duplo clique ou Enter edita na própria célula; o lápis abre a fatura completa
                                 </p>
                                 {inlineError && <p className="text-xs text-red-600 mt-1">{inlineError}</p>}
                             </div>
@@ -940,7 +949,7 @@ export default function EnergyDashboardPage() {
                             <div className="overflow-x-auto px-2 pb-2">
                                 <table className="w-full text-xs" style={widths.tableStyle}>
                                     <thead>
-                                        <ColumnHeaders columns={billColumns} ctl={cf} widths={widths} visibility={vis} trailing={<th className="px-2 py-2 font-semibold text-center">Ações</th>} />
+                                        <ColumnHeaders columns={billColumns} ctl={cf} widths={widths} visibility={vis} />
                                     </thead>
                                     <tbody>
                                         {cf.rows.map((b) => {
@@ -1017,9 +1026,9 @@ export default function EnergyDashboardPage() {
                                                             )}
                                                         </td>
                                                     )}
-                                                    <td className="px-2 py-1.5 text-center whitespace-nowrap">
+                                                    <td {...widths.cellProps(ACTIONS_COLUMN, "px-2 py-1.5 text-center whitespace-nowrap")}>
                                                         <div className="flex items-center justify-center gap-1.5">
-                                                            {(b.pdf_url || (b.id === latestFullBill?.id && activePdfUrl)) && (
+                                                            {billPdfOf(b) && (
                                                                 <button
                                                                     onClick={() => {
                                                                         const billPdf = b.pdf_url || activePdfUrl;

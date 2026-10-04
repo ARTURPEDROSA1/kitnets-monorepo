@@ -32,7 +32,7 @@ import { Money } from "@/components/privacy";
 import { CellSumBar, useCellSum } from "./TableCellSum";
 import { useColumnWidths } from "./TableColumnWidths";
 import MoneyInput, { parseMoneyText } from "./MoneyInput";
-import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "./TableColumnFilters";
+import { ACTIONS_COLUMN, ColumnHeaders, ColumnMenu, FilterChips, actionsColumn, useColumnFilters, type ColumnDef } from "./TableColumnFilters";
 import { columnTableKey, recordTableKey } from "@/lib/ui-preferences";
 import { DateInput } from "@/components/ui/DateInput";
 import { monthsBetween, periodLabel, periodRange, type PeriodFilterValue } from "@/lib/period-filter";
@@ -89,6 +89,7 @@ const INVESTMENT_COLUMNS: ColumnDef<PropertyTransaction>[] = [
     { key: "principal", label: "Amortização", kind: "number", align: "right", get: t => t.principal_part },
     { key: "insurance", label: "Seguro", kind: "number", align: "right", get: t => t.insurance_part },
     { key: "comment", label: "Comentários", kind: "text", get: t => t.comment ?? "" },
+    actionsColumn<PropertyTransaction>([{ key: "delete", label: "Excluir" }], { className: "w-px whitespace-nowrap" }),
 ];
 
 const FIN_KINDS: TransactionKind[] = ["PRESTACAO", "AMORTIZACAO", "QUITACAO"];
@@ -647,7 +648,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                 <div className="overflow-x-auto -mx-2">
                     <table className="w-full text-xs min-w-[980px]" style={widths.tableStyle}>
                         <thead>
-                            <ColumnHeaders columns={columns} ctl={cf} widths={widths} trailing={<th className="px-2 py-2" />} />
+                            <ColumnHeaders columns={columns} ctl={cf} widths={widths} />
                         </thead>
                         <tbody>
                             {visible.map(tx => {
@@ -699,7 +700,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                                                 onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
                                                 className="bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-none w-full min-w-[5rem] px-1.5 py-1 outline-none truncate" />
                                         </td>
-                                        <td className="px-2 py-1 text-right">
+                                        <td {...widths.cellProps(ACTIONS_COLUMN, "px-2 py-1 text-right")}>
                                             <button type="button" disabled={busy} onClick={() => deleteTx(tx)} title="Excluir"
                                                 className="p-1 rounded-md text-muted-foreground hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30">
                                                 <Trash2 className="w-3.5 h-3.5" />

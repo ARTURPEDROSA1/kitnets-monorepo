@@ -29,7 +29,7 @@ import { cn } from "@/lib/utils";
 import { columnTableKey, recordTableKey } from "@/lib/ui-preferences";
 import { CellSumBar, useCellSum } from "@/components/properties/TableCellSum";
 import { useColumnWidths } from "@/components/properties/TableColumnWidths";
-import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "@/components/properties/TableColumnFilters";
+import { ACTIONS_COLUMN, ColumnHeaders, ColumnMenu, FilterChips, actionsColumn, useColumnFilters, type ColumnDef } from "@/components/properties/TableColumnFilters";
 import { ColumnVisibilityMenu, useColumnVisibility } from "@/components/properties/TableColumnVisibility";
 import { parseMoneyText } from "@/components/properties/MoneyInput";
 
@@ -368,13 +368,18 @@ export default function BillingPage() {
         { key: "total", label: "Valor", kind: "number", align: "right", get: b => b.total_amount },
         { key: "rate", label: "R$/m³", kind: "number", align: "right", sum: false, title: "Valor ÷ consumo", get: b => b.effective_rate_per_m3 },
         { key: "occurrence", label: "Ocorrência", kind: "text", get: b => b.occurrence_code ?? "" },
+        actionsColumn<Bill>([
+            { key: "pdf", label: "Abrir a conta (PDF)", when: b => Boolean(b.bill_pdf_url) },
+            { key: "edit", label: "Editar" },
+            { key: "delete", label: "Excluir" },
+        ], { align: "center" }),
     ], []);
     const cf = useColumnFilters(filteredBills, columns, { key: "month", dir: "desc" }, {
         storageKey: columnTableKey("water-bills"),
         filtersKey: recordTableKey("water-bills", propertyId),
     });
     const vis = useColumnVisibility(columnTableKey("water-bills"), {
-        locked: ["month"],
+        locked: ["month", ACTIONS_COLUMN],
         defaultHidden: ["prevReading", "currReading", "readingDate", "waterTariff", "sewageTariff", "waterFee", "sewageFee", "occurrence"],
     });
     const widths = useColumnWidths(columnTableKey("water-bills"));
@@ -726,7 +731,7 @@ export default function BillingPage() {
                         <div className="px-6 py-4 border-b border-border bg-muted/20 rounded-t-xl">
                             <h3 className="text-base font-semibold text-foreground">Histórico de Contas</h3>
                             <p className="text-xs text-muted-foreground mt-0.5">
-                                Contas da concessionária por mês · clique no cabeçalho para ordenar e filtrar (botão direito: colunas); selecione células para somar; duplo clique ou Enter edita na própria célula; o lápis abre a conta completa
+                                Contas da concessionária por mês · clique no cabeçalho para ordenar e filtrar (botão direito: colunas); selecione células para somar (Ctrl+C copia); duplo clique ou Enter edita na própria célula; o lápis abre a conta completa
                             </p>
                             {inlineError && <p className="text-xs text-red-600 mt-1">{inlineError}</p>}
                         </div>
@@ -745,7 +750,7 @@ export default function BillingPage() {
                             <div className="overflow-x-auto px-2 pb-2">
                                 <table className="w-full text-xs" style={widths.tableStyle}>
                                     <thead>
-                                        <ColumnHeaders columns={columns} ctl={cf} widths={widths} visibility={vis} trailing={<th className="px-2 py-2 font-semibold text-center">Ações</th>} />
+                                        <ColumnHeaders columns={columns} ctl={cf} widths={widths} visibility={vis} />
                                     </thead>
                                     <tbody>
                                         {cf.rows.map(b => {
@@ -793,7 +798,7 @@ export default function BillingPage() {
                                                     {show("occurrence") && (
                                                         <td {...sel.cellProps("occurrence", b.id, null, "px-2 py-1.5 whitespace-nowrap text-muted-foreground")}>{b.occurrence_code || "-"}</td>
                                                     )}
-                                                    <td className="px-2 py-1.5 text-center whitespace-nowrap">
+                                                    <td {...widths.cellProps(ACTIONS_COLUMN, "px-2 py-1.5 text-center whitespace-nowrap")}>
                                                         <div className="flex items-center justify-center gap-1.5">
                                                             {b.bill_pdf_url && (
                                                                 <a

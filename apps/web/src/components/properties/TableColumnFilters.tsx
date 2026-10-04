@@ -53,6 +53,42 @@ export interface ColumnDef<T> {
     headerExtra?: React.ReactNode;
 }
 
+/** One button of a row's actions: shown when `when` says so (always, without it). */
+export interface RowAction<T> {
+    key: string;
+    label: string;
+    when?: (row: T) => boolean;
+}
+
+/** Key of the actions column (lock it in `useColumnVisibility`: the buttons must not get lost). */
+export const ACTIONS_COLUMN = "actions";
+
+/**
+ * The row's buttons as a column like any other: a header ("Ações") with the sort & filter menu, the width grip
+ * and the right-click menu. It filters by the actions each row offers — the contracts that can still be
+ * rescinded, the invoices still open, the bills with a PDF. The body cell is the table's own `<td>` (with
+ * `widths.cellProps(ACTIONS_COLUMN, …)`), not a selectable one: its buttons take the click.
+ */
+export function actionsColumn<T>(actions: RowAction<T>[], opts: { align?: "left" | "right" | "center"; className?: string } = {}): ColumnDef<T> {
+    const valueOf = (on: RowAction<T>[]) => on.map(a => a.key).join("+") || "none";
+    // every combination of the buttons (tables have up to three); the menu lists only those present in the rows
+    const options: { value: string; label: string }[] = [];
+    for (let mask = (1 << actions.length) - 1; mask >= 0; mask--) {
+        const on = actions.filter((_, i) => mask & (1 << i));
+        options.push({ value: valueOf(on), label: on.length > 0 ? on.map(a => a.label).join(" · ") : "Nenhuma ação" });
+    }
+    return {
+        key: ACTIONS_COLUMN,
+        label: "Ações",
+        kind: "enum",
+        align: opts.align ?? "right",
+        className: opts.className,
+        title: "O que dá para fazer em cada linha · clique para filtrar pelas ações disponíveis",
+        options,
+        get: row => valueOf(actions.filter(a => !a.when || a.when(row))),
+    };
+}
+
 export interface ColumnFilter {
     /** enum: allowed values; null/undefined = all */
     values?: Set<string> | null;
