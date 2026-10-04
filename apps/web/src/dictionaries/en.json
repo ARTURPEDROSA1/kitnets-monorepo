@@ -1911,6 +1911,40 @@
         "secondaryCta": "Create account to save simulations",
         "searchPlaceholder": "Search calculator...",
         "mostUsed": "Most Used",
+        "hub": {
+            "badge": "{count} free calculators",
+            "perks": [
+                "Free, no sign-up",
+                "Instant results",
+                "Up-to-date indexes and rules"
+            ],
+            "mostUsedSubtitle": "Favorites among landlords and investors.",
+            "exploreTitle": "Browse by topic",
+            "exploreSubtitle": "Pick a subject and find the right calculation for your property.",
+            "count": "{count} calculators",
+            "countOne": "1 calculator",
+            "resultsFor": "Results for “{query}”",
+            "empty": "No calculator found.",
+            "clear": "Clear filters",
+            "groups": {
+                "rent": {
+                    "title": "Rent",
+                    "description": "Rent adjustments, late and termination fees, and pro-rata amounts."
+                },
+                "taxes": {
+                    "title": "Taxes",
+                    "description": "Income tax on rent as an individual or through a holding, IRPF 2026 and the minimum tax."
+                },
+                "finance": {
+                    "title": "Finance",
+                    "description": "Interest, property payback and the road to financial independence."
+                },
+                "investment": {
+                    "title": "Investment",
+                    "description": "Mortgages, amortization and whether the rent pays for the property."
+                }
+            }
+        },
         "categories": {
             "all": "All",
             "rent": "Rent",
