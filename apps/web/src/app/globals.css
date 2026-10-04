@@ -40,6 +40,11 @@
     --index-chart-fipezap-locacao: 160 84% 39%;
     --index-chart-fipezap-venda: 199 89% 48%;
     --index-chart-fipezap-yield: 330 81% 60%;
+    /* /calculadoras hub: text colour of each calculator group (CalculatorsOverview) */
+    --calc-ink-rent: 163 94% 24%;
+    --calc-ink-taxes: 26 90% 37%;
+    --calc-ink-finance: 224 76% 48%;
+    --calc-ink-investment: 263 70% 50%;
   }
 
   .dark {
@@ -78,6 +83,10 @@
     --index-chart-fipezap-locacao: 161 94% 30%;
     --index-chart-fipezap-venda: 200 98% 39%;
     --index-chart-fipezap-yield: 333 71% 51%;
+    --calc-ink-rent: 158 64% 52%;
+    --calc-ink-taxes: 43 96% 56%;
+    --calc-ink-finance: 213 94% 68%;
+    --calc-ink-investment: 255 92% 76%;
   }
 }
 

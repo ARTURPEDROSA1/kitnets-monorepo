@@ -1394,6 +1394,40 @@
             "taxes": "Impostos"
         },
         "mostUsed": "Mais Usadas",
+        "hub": {
+            "badge": "{count} calculadoras gratuitas",
+            "perks": [
+                "Grátis e sem cadastro",
+                "Resultado na hora",
+                "Índices e regras atualizados"
+            ],
+            "mostUsedSubtitle": "As preferidas de proprietários e investidores.",
+            "exploreTitle": "Explore por tema",
+            "exploreSubtitle": "Escolha um assunto e encontre a conta certa para o seu imóvel.",
+            "count": "{count} calculadoras",
+            "countOne": "1 calculadora",
+            "resultsFor": "Resultados para “{query}”",
+            "empty": "Nenhuma calculadora encontrada.",
+            "clear": "Limpar filtros",
+            "groups": {
+                "rent": {
+                    "title": "Aluguel",
+                    "description": "Reajuste, multas e valores proporcionais do contrato de locação."
+                },
+                "taxes": {
+                    "title": "Impostos",
+                    "description": "IR do aluguel na pessoa física ou na holding, IRPF 2026 e imposto mínimo."
+                },
+                "finance": {
+                    "title": "Financeiro",
+                    "description": "Juros, payback do imóvel e o caminho até a independência financeira."
+                },
+                "investment": {
+                    "title": "Investimento",
+                    "description": "Financiamento, amortização e se o aluguel paga o imóvel."
+                }
+            }
+        },
         "cards": {
             "ctaPrimary": "Calcular",
             "items": {

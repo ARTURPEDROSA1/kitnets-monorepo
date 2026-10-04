@@ -1906,6 +1906,40 @@
         "secondaryCta": "Crear cuenta para guardar simulaciones",
         "searchPlaceholder": "Buscar calculadora...",
         "mostUsed": "Más Utilizadas",
+        "hub": {
+            "badge": "{count} calculadoras gratuitas",
+            "perks": [
+                "Gratis y sin registro",
+                "Resultado al instante",
+                "Índices y reglas actualizados"
+            ],
+            "mostUsedSubtitle": "Las favoritas de propietarios e inversores.",
+            "exploreTitle": "Explora por tema",
+            "exploreSubtitle": "Elige un tema y encuentra el cálculo adecuado para tu inmueble.",
+            "count": "{count} calculadoras",
+            "countOne": "1 calculadora",
+            "resultsFor": "Resultados para “{query}”",
+            "empty": "No se encontró ninguna calculadora.",
+            "clear": "Limpiar filtros",
+            "groups": {
+                "rent": {
+                    "title": "Alquiler",
+                    "description": "Reajuste, multas y valores proporcionales del contrato de alquiler."
+                },
+                "taxes": {
+                    "title": "Impuestos",
+                    "description": "Impuesto sobre el alquiler como persona física o en un holding, IRPF 2026 e impuesto mínimo."
+                },
+                "finance": {
+                    "title": "Finanzas",
+                    "description": "Intereses, payback del inmueble y el camino a la independencia financiera."
+                },
+                "investment": {
+                    "title": "Inversión",
+                    "description": "Financiación, amortización y si el alquiler paga el inmueble."
+                }
+            }
+        },
         "categories": {
             "all": "Todas",
             "rent": "Alquiler",
