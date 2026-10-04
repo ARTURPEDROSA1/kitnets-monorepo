@@ -16,6 +16,7 @@
 import type { LeaseManagementType, LeaseStatus, LeaseWithDetails } from "@/types/lease";
 import { LEASE_INDEX_LABELS, addMonths, daysBetween, leaseIndexSeriesCode, leaseSummary, nextAdjustment, type IndexPoint, type LeaseSummary } from "@/lib/lease-summary";
 import { aggregateIncomeByMonth, breakdown, monthKey, round2, type PropertyIncomeRow } from "@/lib/property-income";
+import { leaseTermTotals } from "@/lib/lease-term";
 
 /** Today in Brasília, `YYYY-MM-DD`. */
 export const todayBRT = (now = Date.now()) => new Date(now - 3 * 3600 * 1000).toISOString().slice(0, 10);
@@ -243,8 +244,16 @@ export interface HubTotals {
     /** Σ security deposit of the contracts in force */
     deposits: number;
     depositsCount: number;
+    /** the deposits of the contracts an agency manages: in the agency's custody */
+    depositsAgency: number;
+    depositsAgencyCount: number;
+    /** the deposits of the contracts the owner manages (a corretor's included): with the owner */
+    depositsOwn: number;
+    depositsOwnCount: number;
     /** contracts with at least one file attached */
     withFile: number;
+    /** contracts in force with at least one file attached */
+    withFileInForce: number;
     /** contracts in force run by an agency */
     agencyManaged: number;
     /** how many agencies run them (by name, like the filter) */
@@ -262,7 +271,7 @@ export function hubTotals(rows: LeaseRow[], today: string): HubTotals {
     const inForce = rows.filter(r => r.inForce);
     let nextEnd: HubTotals["nextEnd"] = null;
     let nextAdjustment: HubTotals["nextAdjustment"] = null;
-    let ending90 = 0, overdueTerm = 0, adjustments90 = 0, deposits = 0, depositsCount = 0;
+    let ending90 = 0, overdueTerm = 0, adjustments90 = 0, deposits = 0, depositsCount = 0, depositsAgency = 0, depositsAgencyCount = 0;
 
     for (const row of inForce) {
         const end = row.summary.effectiveEnd;
@@ -285,6 +294,10 @@ export function hubTotals(rows: LeaseRow[], today: string): HubTotals {
         if (row.lease.security_deposit && row.lease.security_deposit > 0) {
             deposits += row.lease.security_deposit;
             depositsCount++;
+            if (row.lease.management_type === "AGENCY") {
+                depositsAgency += row.lease.security_deposit;
+                depositsAgencyCount++;
+            }
         }
     }
 
@@ -302,7 +315,12 @@ export function hubTotals(rows: LeaseRow[], today: string): HubTotals {
         adjustments90,
         deposits: round2(deposits),
         depositsCount,
+        depositsAgency: round2(depositsAgency),
+        depositsAgencyCount,
+        depositsOwn: round2(deposits - depositsAgency),
+        depositsOwnCount: depositsCount - depositsAgencyCount,
         withFile: rows.filter(r => r.hasFile).length,
+        withFileInForce: inForce.filter(r => r.hasFile).length,
         agencyManaged: managedBy("AGENCY"),
         agencies: managers.filter(m => m.type === "AGENCY").length,
         agentManaged: managedBy("AGENT"),
@@ -310,6 +328,36 @@ export function hubTotals(rows: LeaseRow[], today: string): HubTotals {
         managers,
         drafts: rows.filter(r => r.stored === "DRAFT").length,
     };
+}
+
+// ── What the contracts in force add up to ───────────────────────────
+
+export interface ContractsValue {
+    /** Σ over the contracts in force of what each adds up to over its term: executed + forecast */
+    total: number;
+    /** the months the property's ledger confirmed (the dashboard's "realizado") */
+    executed: number;
+    /** the rest of each term by the contract's schedule, at the amounts in force */
+    forecast: number;
+    /** contracts in force without an end: only what they executed counts */
+    openEnded: number;
+}
+
+/**
+ * The contracts in force over their whole terms, as each contract's dashboard counts them
+ * (lib/lease-term.ts): what the ledger confirmed, plus what the schedule still has to come. Rent and
+ * the tenant's fixed charges; a lease without `realized` months (the ledger not at hand) is all forecast.
+ */
+export function contractsValue(rows: LeaseRow[], today: string): ContractsValue {
+    let executed = 0, forecast = 0, openEnded = 0;
+    for (const { lease, inForce } of rows) {
+        if (!inForce) continue;
+        const term = leaseTermTotals({ ...lease, monthly_rent: Number(lease.monthly_rent) || 0 }, lease.adjustments ?? [], lease.realized ?? [], today);
+        executed += term.total.realized;
+        forecast += term.total.forecast;
+        if (!term.forecastKnown) openEnded++;
+    }
+    return { total: round2(executed + forecast), executed: round2(executed), forecast: round2(forecast), openEnded };
 }
 
 // ── Attention list ───────────────────────────────────────────────────

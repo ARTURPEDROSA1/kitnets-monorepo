@@ -84,9 +84,9 @@ export default function LeaseTable({ rows, actions, propertyKinds = {} }: Props)
         for (const row of rows) {
             const { lease } = row;
             const kind = propertyKinds[lease.property_id] ?? (lease.unit_id ? "multi" : null);
-            // the contract's own schedule (first and last months pro rata), each payment at the amount in force then;
-            // the list has no ledger, so nothing here is "realizado": the contract's panel splits the two
-            const term = leaseTermTotals({ ...lease, monthly_rent: Number(lease.monthly_rent) || 0 }, lease.adjustments ?? [], [], today);
+            // what the ledger confirmed (`lease.realized`) plus the rest of the contract's schedule (first and last
+            // months pro rata), each payment at the amount in force then — the hub's "Valor total" card adds these up
+            const term = leaseTermTotals({ ...lease, monthly_rent: Number(lease.monthly_rent) || 0 }, lease.adjustments ?? [], lease.realized ?? [], today);
             m.set(lease.id, { ...leaseTotals(Number(lease.monthly_rent) || 0, lease.charges, row.termMonths, kind), total: term.forecastKnown ? term.total.total : null });
         }
         return m;
@@ -100,7 +100,7 @@ export default function LeaseTable({ rows, actions, propertyKinds = {} }: Props)
         { key: "rent", label: "Aluguel", kind: "number", align: "right", title: "O aluguel de contrato (bruto, antes da taxa da imobiliária)", get: r => Number(r.lease.monthly_rent) || 0 },
         { key: "charge", label: "Condomínio / Energia", kind: "number", align: "right", title: "Condomínio de um imóvel multiunidade ou energia de uma casa/apartamento, como o contrato diz", get: r => { const c = totalsOf(r).featured.charge; return c && amountOf(c) > 0 ? amountOf(c) : null; } },
         { key: "monthly", label: "Total mensal", kind: "number", align: "right", title: "Aluguel + encargos com valor fixo pagos pelo inquilino", get: r => totalsOf(r).monthly },
-        { key: "total", label: "Valor total", kind: "number", align: "right", title: "O que o contrato soma no prazo: o primeiro e o último mês pro rata, cada pagamento pelo valor que valia e os que faltam pelo valor de hoje (vazio quando o prazo é indeterminado). O painel do contrato separa o realizado do previsto", get: r => totalsOf(r).total },
+        { key: "total", label: "Valor total", kind: "number", align: "right", title: "O que o contrato soma no prazo: os meses confirmados na razão de receitas (executado) mais o resto do prazo pelo contrato, com o primeiro e o último mês pro rata e cada pagamento pelo valor em vigor (previsto); vazio quando o prazo é indeterminado. O painel do contrato mostra os dois separados", get: r => totalsOf(r).total },
         { key: "start", label: "Início", kind: "date", get: r => r.lease.start_date.slice(0, 10) },
         { key: "end", label: "Término", kind: "date", sortLabels: UPCOMING_SORT, get: r => r.summary.effectiveEnd ?? "" },
         { key: "adjustment", label: "Reajuste", kind: "date", sortLabels: UPCOMING_SORT, title: "Próximo reajuste do aluguel", get: r => (r.inForce && r.summary.nextAdjustmentDate ? r.summary.nextAdjustmentDate : "") },

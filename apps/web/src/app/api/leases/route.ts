@@ -2,19 +2,20 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/api-route";
 import { leaseInputSchema } from "@/lib/schemas/lease";
 import { activeLeaseWarning, assertLeaseRelations, writeLeaseChildren } from "@/lib/leases-server";
-import { loadLeaseRows, loadPropertyKinds } from "@/lib/lease-views-server";
+import { loadLeaseRows, loadPropertyKinds, withRealizedMonths } from "@/lib/lease-views-server";
 
 /**
  * GET /api/leases
  * The account's leases (soft-deleted excluded) with property, tenant, agency and agent names, their
  * charges and how many files each has (so the list can offer "open the contract" without loading
- * them all), plus each property's kind (single/multi) for the hub's cards.
+ * them all) and the months the ledger confirmed for each (the totals' "executado"), plus each
+ * property's kind (single/multi) for the hub's cards.
  * Same builders the Contratos page preloads with (lib/lease-views-server.ts).
  */
 export const GET = withAuth({ tag: "Leases GET" }, async ({ profileId, supabase }) => {
     try {
-        const [leases, propertyKinds] = await Promise.all([loadLeaseRows(supabase, profileId), loadPropertyKinds(supabase, profileId)]);
-        return NextResponse.json({ leases, propertyKinds });
+        const [rows, propertyKinds] = await Promise.all([loadLeaseRows(supabase, profileId), loadPropertyKinds(supabase, profileId)]);
+        return NextResponse.json({ leases: await withRealizedMonths(supabase, rows), propertyKinds });
     } catch (err) {
         console.error("[Leases GET] Error:", (err as Error).message);
         return NextResponse.json({ error: "Erro ao carregar contratos." }, { status: 500 });

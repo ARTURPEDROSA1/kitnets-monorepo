@@ -4,6 +4,7 @@ import type { PropertyIncomeRow } from "@/lib/property-income";
 import {
     adjustmentDates,
     attentionItems,
+    contractsValue,
     displayStatus,
     guessUnit,
     hubTotals,
@@ -228,6 +229,52 @@ describe("who manages a contract", () => {
         expect(totals.selfManaged).toBe(1);
         expect(totals.agentManaged).toBe(1);
         expect(totals.managers.find(m => m.type === "AGENCY")?.count).toBe(3);
+    });
+});
+
+describe("hubTotals: deposits and files", () => {
+    const rows = summarizeLeases(
+        [
+            lease({ id: "a", security_deposit: 2600 }),                                                               // agency
+            lease({ id: "b", security_deposit: 900, management_type: "SELF_MANAGED", agency_id: null, agency_name: null }),
+            lease({ id: "c", security_deposit: 1200, management_type: "AGENT", agency_id: null, agency_name: null, agent_id: "g1", agent_name: "Rafael" }),
+            lease({ id: "d", security_deposit: null, document_count: 0 }),
+            lease({ id: "e", status: "TERMINATED", termination_date: "2026-03-01", security_deposit: 5000, document_count: 0 }),
+        ],
+        { ipca: IPCA },
+        TODAY
+    );
+    const totals = hubTotals(rows, TODAY);
+
+    it("splits the deposits in force between the agency's custody and the owner's", () => {
+        expect(totals).toMatchObject({ deposits: 4700, depositsCount: 3, depositsAgency: 2600, depositsAgencyCount: 1, depositsOwn: 2100, depositsOwnCount: 2 });
+    });
+    it("counts the contracts in force with their PDF apart from all of them", () => {
+        expect(totals.withFile).toBe(3);
+        expect(totals.withFileInForce).toBe(3);
+        expect(totals.inForce).toBe(4);
+    });
+});
+
+describe("contractsValue", () => {
+    it("adds up the contracts in force over their terms: what the ledger confirmed, then the schedule", () => {
+        const rows = summarizeLeases(
+            [
+                // 06/01/2025 → 06/07/2027, due on the 6th: thirty whole payments of 1.300; February/2025 confirmed at 1.250
+                lease({ id: "a", charges: [], realized: [{ month: "2025-02", rent: 1250, condo: 0, energy: 0 }] }),
+                // open-ended: only what it executed
+                lease({ id: "b", end_date: null, realized: [{ month: "2025-02", rent: 1000, condo: 0, energy: 0 }, { month: "2025-03", rent: 1000, condo: 0, energy: 0 }] }),
+                // closed: not in the portfolio's value
+                lease({ id: "c", status: "TERMINATED", termination_date: "2026-03-01" }),
+            ],
+            { ipca: IPCA },
+            TODAY
+        );
+        expect(contractsValue(rows, TODAY)).toEqual({ executed: 1250 + 2000, forecast: 29 * 1300, total: 1250 + 2000 + 29 * 1300, openEnded: 1 });
+    });
+    it("is all forecast when the ledger is not at hand", () => {
+        const rows = summarizeLeases([lease({ id: "a" })], { ipca: IPCA }, TODAY);
+        expect(contractsValue(rows, TODAY)).toEqual({ executed: 0, forecast: 30 * 1300, total: 30 * 1300, openEnded: 0 });
     });
 });
 

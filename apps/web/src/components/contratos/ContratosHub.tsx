@@ -1,18 +1,19 @@
 "use client";
 
 /**
- * The Contratos hub: the portfolio of leases at a glance — how many are in force and what they
- * bring in, what ends or adjusts next, the deposits held, which contracts still lack their file —
- * then what needs a decision, then the contracts themselves as a table or on a calendar.
+ * The Contratos hub: the portfolio of leases at a glance — how many are in force, who manages them
+ * and whether their file is attached, what they bring in each month and over their terms (executed
+ * and forecast), what ends or adjusts next, the deposits and who holds them — then what needs a
+ * decision, then the contracts themselves as a table or on a calendar.
  * The view (Vigentes · Vencendo · Encerrados · Rascunhos · Todos) lives in the URL.
  */
 import React, { useMemo, useState } from "react";
-import { AlertCircle, Archive, CalendarClock, ChevronDown, ChevronUp, DollarSign, FileSignature, FileText, GanttChart, List, Loader2, PiggyBank, Plus, Search, TrendingUp, X } from "lucide-react";
+import { AlertCircle, Archive, Banknote, CalendarClock, ChevronDown, ChevronUp, DollarSign, FileSignature, GanttChart, List, Loader2, PiggyBank, Plus, Search, TrendingUp, X } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatDateBR } from "@/lib/dates";
-import { LEASE_VIEWS, MANAGEMENT_LABELS, attentionItems, brl, hubTotals, inView, leaseManagers, matchesManager, type LeaseRow, type LeaseView } from "@/lib/lease-dashboard";
+import { LEASE_VIEWS, MANAGEMENT_LABELS, attentionItems, brl, contractsValue, hubTotals, inView, leaseManagers, matchesManager, type LeaseRow, type LeaseView } from "@/lib/lease-dashboard";
 import type { PropertyKind } from "@/lib/lease-charges";
 import LeaseTable, { type LeaseTableActions } from "./LeaseTable";
 import LeaseTimeline from "./LeaseTimeline";
@@ -37,7 +38,7 @@ type Mode = "lista" | "linha";
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString("pt-BR")} ${n === 1 ? one : many}`;
 const pctText = (v: number) => `${v > 0 ? "+" : ""}${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 
-/** One KPI. The hint wraps (two short lines at most by construction): nothing on the strip is ever clipped. */
+/** One KPI. The hint is a few short lines (wrapping, never clipped): the cards of a row stretch to the tallest. */
 function Item({ icon, label, value, hint, tone, valueTone, onClick, title, money }: { icon: React.ReactNode; label: string; value: string; hint: React.ReactNode; tone: string; valueTone?: string; onClick?: () => void; title?: string; /** the figure is an amount in R$: value and hint get the class the dollar toggle blurs (components/privacy) */ money?: boolean }) {
     const Tag = onClick ? "button" : "div";
     return (
@@ -66,6 +67,7 @@ export default function ContratosHub({ rows, today, propertyKinds = {}, loading,
     const [allAttention, setAllAttention] = useState(false);
 
     const totals = useMemo(() => hubTotals(rows, today), [rows, today]);
+    const value = useMemo(() => contractsValue(rows, today), [rows, today]);
     const attention = useMemo(() => attentionItems(rows), [rows]);
     const counts = useMemo(() => Object.fromEntries(LEASE_VIEWS.map(v => [v.key, rows.filter(r => inView(r, v.key)).length])) as Record<LeaseView, number>, [rows]);
 
@@ -126,25 +128,33 @@ export default function ContratosHub({ rows, today, propertyKinds = {}, loading,
             {rows.length > 0 && (
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
                     <Item
-                        icon={<FileSignature className="h-3.5 w-3.5" />} tone="text-emerald-600" label="Contratos em vigor"
+                        icon={<FileSignature className="h-3.5 w-3.5" />} tone="text-emerald-600" label="Contratos"
                         value={String(totals.inForce)}
                         hint={<>
-                            {/* who runs them: via how many agencies, and the owner's own; the term alert only when there is one */}
+                            {/* the ones in force: who runs them, whether their PDF is attached; the term alert only when there is one */}
                             {totals.agencyManaged > 0 ? `${totals.agencyManaged} via ${plural(totals.agencies, "imobiliária", "imobiliárias")}` : "0 via imobiliária"}
                             <br />{totals.selfManaged} gestão própria{totals.agentManaged > 0 ? ` · ${totals.agentManaged} via corretor` : ""}
+                            <br /><span className={cn(totals.withFileInForce < totals.inForce && "text-amber-600 dark:text-amber-400")}>{totals.withFileInForce} de {totals.inForce} com PDF</span>
                             {totals.overdueTerm > 0
                                 ? <><br /><span className="text-rose-600 dark:text-rose-400">{plural(totals.overdueTerm, "com o prazo vencido", "com o prazo vencido")}</span></>
                                 : totals.ending90 > 0 ? <><br /><span className="text-amber-600 dark:text-amber-400">{plural(totals.ending90, "vence", "vencem")} em 90 dias</span></> : null}
                         </>}
                         valueTone={totals.overdueTerm > 0 ? "text-rose-600" : undefined}
                         onClick={() => onViewChange(totals.overdueTerm > 0 || totals.ending90 > 0 ? "vencendo" : "vigentes")}
-                        title={totals.managers.length > 0 ? totals.managers.map(m => `${m.label}: ${plural(m.count, "contrato", "contratos")}`).join("\n") : undefined}
+                        title={[`Contratos em vigor: ${totals.inForce} (${totals.total} no total)`, ...totals.managers.map(m => `${m.label}: ${plural(m.count, "contrato", "contratos")}`)].join("\n")}
                     />
                     <Item
                         icon={<DollarSign className="h-3.5 w-3.5" />} tone="text-emerald-600" label="Aluguel contratado"
                         value={`${brl(totals.contractedRent, 0)}/mês`}
                         hint={`${brl(totals.contractedRent * 12, 0)} por ano`}
                         title="Soma do aluguel de contrato dos contratos em vigor (valor bruto, antes da taxa da imobiliária)"
+                        money
+                    />
+                    <Item
+                        icon={<Banknote className="h-3.5 w-3.5" />} tone="text-teal-600" label="Valor total"
+                        value={brl(value.total, 0)}
+                        hint={<>Executado: {brl(value.executed, 0)}<br />Previsto: {brl(value.forecast, 0)}</>}
+                        title={`Valor total dos contratos em vigor no prazo inteiro: o executado (meses confirmados na razão de receitas — o aluguel antes da taxa da imobiliária e os encargos pagos pelo inquilino) mais o previsto (o resto do prazo pelo contrato, cada pagamento pelo valor em vigor)${value.openEnded > 0 ? `. ${plural(value.openEnded, "contrato sem prazo final conta", "contratos sem prazo final contam")} só o executado` : ""}`}
                         money
                     />
                     <Item
@@ -167,17 +177,11 @@ export default function ContratosHub({ rows, today, propertyKinds = {}, loading,
                         title={totals.nextAdjustment ? `Abrir o contrato de ${totals.nextAdjustment.row.place}` : undefined}
                     />
                     <Item
-                        icon={<PiggyBank className="h-3.5 w-3.5" />} tone="text-blue-600" label="Caução em mãos"
+                        icon={<PiggyBank className="h-3.5 w-3.5" />} tone="text-blue-600" label="Caução"
                         value={brl(totals.deposits, 0)}
-                        hint={totals.depositsCount > 0 ? `${totals.depositsCount} de ${totals.inForce} contratos com caução` : "nenhum contrato em vigor com caução"}
-                        title="Soma das cauções dos contratos em vigor: dinheiro do inquilino que volta no fim do contrato"
+                        hint={<>Com caução: {totals.depositsCount} de {totals.inForce}<br />Imobiliária: {totals.depositsAgencyCount}<br />Gestão própria: {totals.depositsOwnCount}</>}
+                        title={`Soma das cauções dos contratos em vigor: dinheiro do inquilino que volta no fim do contrato.\nImobiliária (sob a custódia dela): ${brl(totals.depositsAgency)}\nGestão própria (com o proprietário): ${brl(totals.depositsOwn)}`}
                         money
-                    />
-                    <Item
-                        icon={<FileText className="h-3.5 w-3.5" />} tone={totals.withFile < totals.total ? "text-amber-600" : "text-emerald-600"} label="Arquivos"
-                        value={`${totals.withFile} de ${totals.total}`}
-                        hint={totals.withFile < totals.total ? `${plural(totals.total - totals.withFile, "contrato sem o PDF", "contratos sem o PDF")}` : "todos com o PDF anexado"}
-                        valueTone={totals.withFile < totals.total ? "text-amber-600" : undefined}
                     />
                 </div>
             )}
