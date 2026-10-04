@@ -88,7 +88,6 @@ const view: DashboardView = {
         tax({ id: "x3", year: 2025, kind: "ITBI", amount: 5000, paid_on: "2025-06-01" }),
         tax({ id: "x4", property_id: "p2", kind: "OUTRO", amount: 300, paid_on: "2026-04-01" }),
     ],
-    gateways: null,
     invoices: null,
     map: { pins: [], pending: 0 },
     failed: [],

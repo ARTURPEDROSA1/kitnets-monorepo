@@ -180,8 +180,8 @@ export default function EditGatewayPage() {
                 return;
             }
 
-            // Redirect to dashboard
-            router.push(`/${lang}/dashboard`);
+            // Back to Proprietário ("Meus Gateways")
+            router.push(`/${lang}/proprietario`);
         } catch (err) {
             setError("Erro inesperado.");
             console.error(err);
@@ -203,8 +203,8 @@ export default function EditGatewayPage() {
         return (
             <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center">
                 <p className="text-muted-foreground">Gateway não encontrado.</p>
-                <Link href={`/${lang}/dashboard`} className="text-primary mt-4 inline-block">
-                    Voltar para Dashboard
+                <Link href={`/${lang}/proprietario`} className="text-primary mt-4 inline-block">
+                    Voltar para Proprietário
                 </Link>
             </div>
         );

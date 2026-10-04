@@ -449,16 +449,9 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
     const MAX_PROPERTIES = 30;
     const [showAddPropertyModal, setShowAddPropertyModal] = useState(false);
 
-    // Auto-open add property modal when ?add=true is in the URL (from dashboard "Novo Imóvel" button)
     const searchParams = useSearchParams();
     const pendingPropertyIdRef = useRef<string | null>(null);
     useEffect(() => {
-        if (searchParams.get('add') === 'true') {
-            setActiveTab('ownership');
-            setImoveisViewMode('wizard');
-            // Small delay to let the tab switch render, then show modal
-            setTimeout(() => setShowAddPropertyModal(true), 100);
-        }
         // ?id=<index> opens a property by position; ?id=<properties.id> (uuid, e.g. from the
         // energy dashboard's "Voltar ao Imóvel") is resolved once the properties have loaded.
         const idParam = searchParams.get('id');

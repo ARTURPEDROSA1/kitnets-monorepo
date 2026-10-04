@@ -376,11 +376,11 @@ export default function GatewayDetailPage() {
             {/* ── Header ─────────────────────────────────────── */}
             <div className="mb-6">
                 <Link
-                    href={`/${lang}/dashboard`}
+                    href={`/${lang}/proprietario`}
                     className="flex items-center text-sm text-muted-foreground hover:text-foreground mb-4"
                 >
                     <ArrowLeft className="w-4 h-4 mr-2" />
-                    Voltar para Dashboard
+                    Voltar para Proprietário
                 </Link>
                 <div className="flex-1">
                     <div className="flex items-start justify-between">

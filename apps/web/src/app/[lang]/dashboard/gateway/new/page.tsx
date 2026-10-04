@@ -58,9 +58,9 @@ export default function AddGatewayPage() {
 
             setSuccess(true);
 
-            // Redirect to dashboard after 2 seconds
+            // Back to Proprietário ("Meus Gateways") after 2 seconds
             setTimeout(() => {
-                router.push(`/${lang}/dashboard`);
+                router.push(`/${lang}/proprietario`);
             }, 2000);
 
         } catch (err) {
@@ -75,11 +75,11 @@ export default function AddGatewayPage() {
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {/* Back link */}
             <Link
-                href={`/${lang}/dashboard`}
+                href={`/${lang}/proprietario`}
                 className="flex items-center text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors"
             >
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                Voltar para Dashboard
+                Voltar para Proprietário
             </Link>
 
             {/* Header */}
@@ -103,7 +103,7 @@ export default function AddGatewayPage() {
                         </div>
                         <h2 className="text-xl font-bold text-foreground mb-2">Gateway Conectado!</h2>
                         <p className="text-muted-foreground">
-                            Seu gateway foi registrado com sucesso. Redirecionando para o dashboard...
+                            Seu gateway foi registrado com sucesso. Redirecionando para Proprietário...
                         </p>
                     </div>
                 ) : (
@@ -200,7 +200,7 @@ export default function AddGatewayPage() {
                                     <div>
                                         <p className="text-sm font-medium text-foreground">3. Dados em Tempo Real</p>
                                         <p className="text-xs text-muted-foreground mt-0.5">
-                                            Após o registro, os dados de consumo aparecem automaticamente no dashboard.
+                                            Após o registro, os dados de consumo aparecem automaticamente em Meus Gateways, na página Proprietário.
                                         </p>
                                     </div>
                                 </div>

@@ -1,7 +1,7 @@
 /**
  * The dashboard's bundle, built on the server: every module's own loader in parallel (the same ones the
- * hubs preload), the portfolio's latest ledger month per property, the taxes register, the gateways for
- * the pilot accounts, and the map pins paired with the geocode cache. A loader that fails is reported in
+ * hubs preload), the portfolio's latest ledger month per property, the taxes register and the map pins
+ * paired with the geocode cache. A loader that fails is reported in
  * `failed` and its figures show as unavailable; the page never blanks. Shared by the page preload and
  * GET /api/dashboard; `loadMapPins` also serves POST /api/geocode.
  */
@@ -9,10 +9,8 @@ import { loadAgencyList } from "@/lib/agency-views-server";
 import { loadAgentList } from "@/lib/agent-views-server";
 import type { AdminSupabase } from "@/lib/api-auth";
 import { loadCondominiumList } from "@/lib/condominium-views-server";
-import type { DashboardGateway, DashboardIncomeSnapshot, DashboardLoader, DashboardView } from "@/lib/dashboard-views";
+import type { DashboardIncomeSnapshot, DashboardLoader, DashboardView } from "@/lib/dashboard-views";
 import { getOwnerPropertiesSummary } from "@/lib/energy-properties-server";
-import { env } from "@/lib/env";
-import { canSeeGateways } from "@/lib/gateways-access";
 import { addressFromAgency, addressFromInvestment, attachGeocodes, type GeocodeMiss, type MapPin, type PinSource } from "@/lib/geocode";
 import { googleGeocodingAvailable, readGeocodes } from "@/lib/geocode-server";
 import { IN_FORCE, todayBRT } from "@/lib/lease-dashboard";
@@ -33,8 +31,6 @@ import type { AgencyWithRole } from "@/types/agency";
 
 const TAX_COLUMNS = "id, property_id, year, kind, amount, paid_by, paid_on, installments";
 const INCOME_COLUMNS = `id, property_id, month, unit_id, received_on, received_amount, energy_portion, other_income, other_expenses, condo_amount, fee_on_condo, iptu_amount, agency_fee_pct, status, source, bank_reference, notes, ${INCOME_DIRECT_COLUMNS}`;
-/** A gateway is online when it reported in the last ten minutes. */
-const ONLINE_WINDOW_MS = 10 * 60 * 1000;
 
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
@@ -111,21 +107,6 @@ export async function loadIncomeSnapshots(supabase: AdminSupabase, profileId: st
         });
     }
     return snapshots;
-}
-
-/**
- * The account's gateways. The ingest API stamps `last_seen_at`; a gateway that never reported reads "Nunca".
- * (The old page fell back to the newest meter reading of any account, which leaked another owner's sync time.)
- */
-async function loadGateways(supabase: AdminSupabase, profileId: string): Promise<DashboardGateway[]> {
-    const { data, error } = await supabase.from("gateways").select("id, label, serial_number, status, last_seen_at, property_id").eq("owner_id", profileId).order("created_at", { ascending: true });
-    if (error) throw new Error(`gateways: ${error.message}`);
-    const now = Date.now();
-    const rows = (data ?? []) as Array<{ id: string; label: string | null; serial_number: string; status: string | null; last_seen_at: string | null; property_id: string | null }>;
-    return rows.map(gw => {
-        const seen = gw.last_seen_at ? Date.parse(gw.last_seen_at) : NaN;
-        return { id: gw.id, label: gw.label, serialNumber: gw.serial_number, status: gw.status, lastSeenAt: gw.last_seen_at, online: Number.isFinite(seen) && now - seen < ONLINE_WINDOW_MS, propertyId: gw.property_id };
-    });
 }
 
 // ── Map ──────────────────────────────────────────────────────────────
@@ -238,10 +219,8 @@ export async function loadDashboard(supabase: AdminSupabase, profileId: string, 
         projects = { investments: investments.investments, summaries };
     }
 
-    const showGateways = canSeeGateways(profile.email, env.GATEWAY_PILOT_EMAILS);
-    const [income, gateways, map] = await Promise.all([
+    const [income, map] = await Promise.all([
         settle(failed, "income", () => loadIncomeSnapshots(supabase, profileId, entries, taxes ?? [])),
-        showGateways ? settle(failed, "gateways", () => loadGateways(supabase, profileId)) : Promise.resolve(null),
         settle(failed, "map", () => pairPins(supabase, [
             ...propertyPinSources(entries),
             ...projectPinSources(investments?.investments ?? []),
@@ -263,7 +242,6 @@ export async function loadDashboard(supabase: AdminSupabase, profileId: string, 
         projects,
         taxes,
         invoices,
-        gateways: showGateways ? gateways ?? [] : null,
         map: { pins: map?.pins ?? [], pending: map?.misses.length ?? 0 },
         failed,
     };
