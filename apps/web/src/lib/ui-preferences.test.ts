@@ -3,6 +3,9 @@ import {
     columnTableKey, filtersPrefKey, hiddenColumnsPrefKey, recordTableKey, sanitizeFilters, sanitizeHiddenColumns, sanitizeSort, sortPrefKey,
     notificationsPrefKey, sanitizeNotificationPrefs, tableKeyFromFiltersPrefKey, tableKeyFromNotificationsPrefKey, tableKeyFromPrefKey, tableKeyFromSortPrefKey,
     columnWidthsPrefKey, sanitizeColumnWidths, tableKeyFromColumnWidthsPrefKey, MAX_COLUMN_WIDTH, MIN_COLUMN_WIDTH,
+    sanitizeViewMode,
+    tableKeyFromViewPrefKey,
+    viewPrefKey,
 } from "./ui-preferences";
 
 describe("hidden-column preferences", () => {
@@ -136,5 +139,17 @@ describe("notification preferences", () => {
         expect(sanitizeNotificationPrefs({ marketing: true })).toBeNull();
         expect(sanitizeNotificationPrefs([])).toBeNull();
         expect(sanitizeNotificationPrefs(null)).toBeNull();
+    });
+});
+
+describe("view preferences", () => {
+    it("keys a page's view and keeps only a short slug", () => {
+        expect(viewPrefKey("contratos")).toBe("view:contratos");
+        expect(tableKeyFromViewPrefKey("view:contratos")).toBe("contratos");
+        expect(tableKeyFromViewPrefKey("sort:contratos")).toBeNull();
+        expect(sanitizeViewMode("linha")).toBe("linha");
+        expect(sanitizeViewMode("lista")).toBe("lista");
+        expect(sanitizeViewMode("Linha do tempo")).toBeNull();
+        expect(sanitizeViewMode(3)).toBeNull();
     });
 });
