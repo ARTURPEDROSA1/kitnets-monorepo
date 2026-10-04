@@ -1,6 +1,6 @@
 /**
  * What the dashboard shows, as one bundle: the modules' own list views side by side, the portfolio's
- * income snapshot, the taxes register, the gateways (founder pilot) and the map pins. Built by
+ * income snapshot, the taxes register and the map pins. Built by
  * lib/dashboard-views-server.ts (`loadDashboard`), read by lib/dashboard-hub.ts (pure) and the client.
  * Types only: safe for client components.
  */
@@ -40,17 +40,7 @@ export interface DashboardIncomeSnapshot {
     fee12m: number;
 }
 
-export interface DashboardGateway {
-    id: string;
-    label: string | null;
-    serialNumber: string;
-    status: string | null;
-    lastSeenAt: string | null;
-    online: boolean;
-    propertyId: string | null;
-}
-
-export type DashboardLoader = "properties" | "income" | "leases" | "tenants" | "agents" | "agencies" | "energy" | "water" | "condominiums" | "projects" | "taxes" | "invoices" | "gateways" | "map";
+export type DashboardLoader = "properties" | "income" | "leases" | "tenants" | "agents" | "agencies" | "energy" | "water" | "condominiums" | "projects" | "taxes" | "invoices" | "map";
 
 export interface DashboardView {
     profile: { fullName: string | null; email: string | null };
@@ -67,8 +57,6 @@ export interface DashboardView {
     taxes: PropertyTax[] | null;
     /** the account's invoices (Fatura), with the latest boleto and e-mail of each */
     invoices: InvoiceView[] | null;
-    /** null = this account does not see the gateway pilot */
-    gateways: DashboardGateway[] | null;
     map: {
         pins: MapPin[];
         /** addresses still to geocode (the client asks POST /api/geocode once) */

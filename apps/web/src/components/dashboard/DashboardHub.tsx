@@ -1,16 +1,15 @@
 "use client";
 
 /**
- * The dashboard: the headline figures of the whole portfolio, the map, the merged attention list, one
- * card per module with its own figures, and — for the pilot accounts only — the IoT gateways. Everything
- * is computed by lib/dashboard-hub.ts; this file only renders. A figure whose loader failed reads "—" and
- * says so, never zero.
+ * The dashboard: the headline figures of the whole portfolio, the map, the merged attention list and one
+ * card per module with its own figures. It only reads: adding a property or importing a contract happens
+ * in Imóveis. Everything is computed by lib/dashboard-hub.ts; this file only renders. A figure whose
+ * loader failed reads "—" and says so, never zero.
  */
 import React, { useState } from "react";
 import Link from "next/link";
-import { AlertCircle, ArrowRight, Building, Building2, CheckCircle2, ChevronDown, ChevronUp, Droplets, FileSignature, HardHat, Home, Landmark, LayoutDashboard, Loader2, Plus, Receipt, Sparkles, UserCheck, Users, Wallet, Zap } from "lucide-react";
+import { AlertCircle, ArrowRight, Building, Building2, CheckCircle2, ChevronDown, ChevronUp, Droplets, FileSignature, HardHat, Home, Landmark, LayoutDashboard, Loader2, Receipt, UserCheck, Users, Wallet, Zap } from "lucide-react";
 import { Button } from "@kitnets/ui";
-import GatewaysSection from "@/components/dashboard/GatewaysSection";
 import PortfolioMap, { type GeocodeStatus } from "@/components/dashboard/PortfolioMap";
 import { Money } from "@/components/privacy";
 import Tile, { TILE_TONES, type TileTone } from "@/components/properties/Tile";
@@ -36,9 +35,6 @@ interface Props {
     onOpen: (href: string) => void;
 }
 
-/** Contratos opens its import ("Importar contratos", mode current) straight away with this parameter. */
-const IMPORT_HREF = "/contratos?importar=1";
-
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString("pt-BR")} ${n === 1 ? one : many}`;
 const pct1 = (v: number | null) => (v === null ? "—" : `${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`);
 const kwh = (v: number) => `${Math.round(v).toLocaleString("pt-BR")} kWh`;
@@ -48,7 +44,7 @@ const hasAmount = (text: string) => /R\$\s?\d/.test(text);
 const DOT: Record<DashboardTone, string> = { rose: "bg-rose-500", amber: "bg-amber-500", sky: "bg-sky-500", emerald: "bg-emerald-500", slate: "bg-slate-400" };
 const LOADER_LABELS: Record<DashboardLoader, string> = {
     properties: "imóveis", income: "receitas", leases: "contratos", tenants: "inquilinos", agents: "corretores", agencies: "imobiliárias",
-    energy: "energia", water: "água", condominiums: "condomínio", projects: "projetos", taxes: "tributos", invoices: "faturas", gateways: "gateways", map: "mapa",
+    energy: "energia", water: "água", condominiums: "condomínio", projects: "projetos", taxes: "tributos", invoices: "faturas", map: "mapa",
 };
 
 interface Figure {
@@ -152,10 +148,6 @@ export default function DashboardHub({ base, view, totals, attention, loading, e
                         {name ? `Bem-vindo de volta, ${name}. ` : ""}A carteira inteira num só painel: o que rende, quem mora, quem trabalha e o que está por vencer.
                     </p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                    <Button variant="outline" onClick={() => onOpen(IMPORT_HREF)}><Sparkles className="mr-1 h-4 w-4 text-amber-500" /> Importar contrato</Button>
-                    <Button onClick={() => onOpen("/imoveis?add=true")}><Plus className="mr-1 h-4 w-4" /> Novo imóvel</Button>
-                </div>
             </div>
 
             {error && (
@@ -171,12 +163,8 @@ export default function DashboardHub({ base, view, totals, attention, loading, e
                         <section className="space-y-3 rounded-2xl border border-dashed border-border px-6 py-10 text-center">
                             <Home className="mx-auto h-10 w-10 text-muted-foreground/60" />
                             <h2 className="text-lg font-semibold text-foreground">Comece pela carteira</h2>
-                            <p className="mx-auto max-w-md text-sm text-muted-foreground">Cadastre um imóvel ou envie um contrato de locação: a IA cria o imóvel, o contrato, a imobiliária, o corretor e os inquilinos. Os números aparecem aqui conforme os módulos ganham dados.</p>
-                            <div className="flex flex-wrap justify-center gap-2">
-                                <Button onClick={() => onOpen("/imoveis?add=true")}><Plus className="mr-1 h-4 w-4" /> Cadastrar imóvel</Button>
-                                <Button variant="outline" onClick={() => onOpen(IMPORT_HREF)}><Sparkles className="mr-1 h-4 w-4 text-amber-500" /> Importar contrato</Button>
-                                <Button variant="outline" onClick={() => onOpen("/projetos")}><HardHat className="mr-1 h-4 w-4" /> Novo projeto</Button>
-                            </div>
+                            <p className="mx-auto max-w-md text-sm text-muted-foreground">Em Imóveis, cadastre um imóvel ou envie um contrato de locação: a IA cria o imóvel, o contrato, a imobiliária, o corretor e os inquilinos. Os números aparecem aqui conforme os módulos ganham dados.</p>
+                            <Button onClick={() => onOpen("/imoveis")}>Ir para Imóveis <ArrowRight className="ml-1 h-4 w-4" /></Button>
                         </section>
                     )}
 
@@ -343,8 +331,6 @@ export default function DashboardHub({ base, view, totals, attention, loading, e
                             note="IPTU no mês do pagamento, até este mês, como na DRE; o registro fica em cada imóvel, em Tributos do imóvel."
                         />
                     </div>
-
-                    {view.gateways && <GatewaysSection gateways={view.gateways} base={base} />}
 
                     {view.failed.length > 0 && (
                         <p className="flex items-start gap-2 text-xs text-rose-600"><AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> Não foi possível carregar: {view.failed.map(f => LOADER_LABELS[f]).join(", ")}. Recarregue a página; se persistir, o módulo em questão mostra o erro completo.</p>

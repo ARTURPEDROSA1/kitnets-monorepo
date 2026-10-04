@@ -1,7 +1,7 @@
 # Dashboard (`/dashboard`)
 
-**Version:** 1.0
-**Last updated:** 2026-09-25
+**Version:** 1.1
+**Last updated:** 2026-10-04
 **Author:** Kitnets Engineering
 
 ---
@@ -10,16 +10,18 @@
 
 The dashboard is the owner's landing page after signing in: the whole portfolio in one panel. It shows the
 headline figures of the carteira, a Google map of the rental properties, the live projects and the agencies
-with a contract in force, an "Atenção" list merged from every module, one card per module with that
-module's own figures, and — only for the pilot accounts — the IoT gateways.
+with a contract in force, an "Atenção" list merged from every module and one card per module with that
+module's own figures. It only reads: there are no action buttons in its header — adding a property and
+importing a contract live in Imóveis.
 
 Every number is the number the module's own hub shows: the dashboard's maths (`lib/dashboard-hub.ts`) is
 built on the hubs' pure modules (`lease-dashboard`, `tenant-dashboard`, `agent-dashboard`,
 `agency-dashboard`, `energy-hub`, `water-hub`, `condominium-hub`, `project-hub`, `property-taxes`).
 Strings are hard-coded pt-BR like every hub; `lang` only builds links.
 
-The gateways ("Meus Gateways") are a founder-only pilot, not a product of Kitnets.com: the block is
-rendered only for the accounts in `GATEWAY_PILOT_EMAILS` (default `pedrosa.ac@gmail.com`).
+The gateways ("Meus Gateways") are a founder-only pilot, not a product of Kitnets.com: since 2026-10-04
+the block sits at the bottom of `/proprietario`, rendered only for the accounts in `GATEWAY_PILOT_EMAILS`
+(default `pedrosa.ac@gmail.com`); see `docs/GATEWAY_DASHBOARD_MANUAL.md`.
 
 ## 2. Files
 
@@ -28,9 +30,8 @@ apps/web/src/app/[lang]/dashboard/
   page.tsx                          # server: requireProfile() → loadDashboard() → <DashboardContent initial>
   DashboardContent.tsx              # client: the bundle, today, the pure figures, the one-off geocoding call
 apps/web/src/components/dashboard/
-  DashboardHub.tsx                  # the page: headline Tiles, map + Atenção, one card per module, gateways
+  DashboardHub.tsx                  # the page: headline Tiles, map + Atenção, one card per module
   PortfolioMap.tsx                  # Google map (@vis.gl/react-google-maps) with legend and popups; a list without a key
-  GatewaysSection.tsx               # the pilot's gateway cards (the old dashboard's)
 apps/web/src/lib/
   dashboard-views.ts                # DashboardView (types only)
   dashboard-views-server.ts         # loadDashboard(), loadMapPins(), loadIncomeSnapshots(), loadTaxRowsByOwner()
@@ -39,7 +40,6 @@ apps/web/src/lib/
   property-entries-server.ts (+ test) # the profile JSON's properties paired with `properties` rows (address, units, photos)
   geocode.ts (+ test)               # address keys, geocoder query, adapters, attachGeocodes, pinBounds (pure)
   geocode-server.ts                 # the `geocodes` cache, Google Geocoding / BrasilAPI CEP
-  gateways-access.ts                # the pilot allowlist
 apps/web/src/app/api/dashboard/route.ts   # GET: the bundle
 apps/web/src/app/api/geocode/route.ts     # POST: geocode up to 25 missing addresses, return the pins
 supabase/migrations/20260925190000_geocodes.sql
@@ -108,9 +108,9 @@ with "… indisponíveis" on the headline tiles that depend on it, never zeros.
 
 A brand-new account lands on `/dashboard` right after signing up, sometimes before its profile row
 exists: `requireProfile()` answers 403, the page renders the unseeded client, which calls
-`POST /api/profiles/create` and then `GET /api/dashboard`. With nothing registered the page shows the
-first steps (cadastrar imóvel, importar contrato, novo projeto) above the zeros. "Importar contrato" opens
-`/contratos?importar=1`, where the import of current contracts starts on arrival.
+`POST /api/profiles/create` and then `GET /api/dashboard`. With nothing registered the page shows a
+"Comece pela carteira" note above the zeros with one link, "Ir para Imóveis", where the owner adds a
+property or imports a lease agreement.
 
 The old page's write-on-GET behaviours (relinking a profile by an unverified e-mail, nulling legacy
 `property_*` columns) were not kept: the create route relinks by verified e-mail only, and the dashboard
@@ -122,7 +122,7 @@ counts properties through the same pairing the Imóveis page uses.
 `failed` instead of throwing: `loadPropertyEntries`, `loadTaxRowsByOwner`, `loadLeaseRows`,
 `loadTenantList`, `loadAgentList`, `loadAgencyList`, `getOwnerPropertiesSummary(userId)`,
 `getOwnerWaterPropertiesSummary(userId)`, `loadCondominiumList`, `loadInvestmentList` (metrics computed
-without signing photos), then `loadIncomeSnapshots`, the gateways (pilot only) and the map pins. The
+without signing photos), then `loadIncomeSnapshots` and the map pins. The
 energy and water loaders take the Clerk `userId` and, like the hubs, create `properties` rows for
 profile-JSON properties still without one — so they run one after the other on a single energy result
 (`getOwnerWaterPropertiesSummary(userId, energy)`): two concurrent runs would both insert the missing row.
@@ -139,7 +139,6 @@ account's own registers) and is limited to 10 calls per user per hour.
 | `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | browser | Maps JavaScript API key, HTTP-referrer restricted (kitnets.com, the Vercel previews, localhost). Empty = the pins are listed instead of mapped. |
 | `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` | browser | Cloud-console Map ID for advanced markers; Google's demo id when empty. |
 | `GOOGLE_MAPS_SERVER_KEY` | server | Geocoding API key, IP/API restricted. Empty = BrasilAPI CEP coordinates. |
-| `GATEWAY_PILOT_EMAILS` | server | comma-separated accounts that see the gateways block; the founder's when empty. |
 
 All optional: previews and local builds do not need them. `NEXT_PUBLIC_*` values are inlined at build
 time, so adding them in Vercel needs a redeploy.
@@ -147,10 +146,6 @@ time, so adding them in Vercel needs a redeploy.
 **Before setting `GOOGLE_MAPS_SERVER_KEY`, put a daily request quota on the Geocoding API in the Google Cloud
 console.** The per-user limit (10 calls × 25 addresses per hour) bounds one account, not the total across
 accounts; only the quota caps the bill.
-
-The gateways gate compares `profiles.email` exactly (case aside) with the list. That column is writable by
-the owner, so the gate is cosmetic — it hides a block and guards no data (the gateway queries are
-owner-scoped); never gate data on it.
 
 ## 6. Design decisions
 
@@ -164,6 +159,10 @@ owner-scoped); never gate data on it.
 
 ## 7. Changelog
 
+- **2026-10-04 (v1.1)** — "Importar contrato" and "Novo imóvel" removed from the header (they live in Imóveis;
+  "Novo imóvel" opened Adicionar Propriedade over the wizard of the first property). The empty account's note
+  links to Imóveis only, and Imóveis no longer reads `?add=true`. "Meus Gateways" moved to the bottom of
+  `/proprietario` (pilot accounts only); `DashboardView.gateways` and the `gateways` loader removed.
 - **2026-09-25 (v1.0, review)** — Energy and water loaders run in sequence on one result (no duplicate `properties`
   rows); occupancy counts every unit-less lease; Projetos figures follow the hub's slices; taxes YTD stop at
   this month; unavailable figures read "—"; map legend as a Google control, notes under the map, overlapping pins

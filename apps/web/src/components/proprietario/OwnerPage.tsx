@@ -5,7 +5,8 @@
  * CNAEs, the head office, the administrator and the access account as summaries, "Editar" opening
  * the editor in place; then the holding's files, where a Cartão CNPJ is read by the AI and fills
  * the record (and the natureza jurídica and porte of /contabil/politicas); then the notification
- * preferences and the account deletion. PJ only: the owner is the holding.
+ * preferences and the account deletion; last, for the pilot accounts only, "Meus Gateways". PJ only:
+ * the owner is the holding.
  */
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -16,12 +17,14 @@ import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/DateInput";
 import { PdfViewerModal } from "@/components/ui/PdfViewerModal";
 import { Sensitive } from "@/components/privacy";
+import GatewaysSection from "@/components/proprietario/GatewaysSection";
 import { Field, dash, muted } from "@/components/profile/PropertyRegisterSection";
 import { formatFileSize } from "@/components/profile/PropertyDocumentsCard";
 import { deleteAccount } from "@/app/[lang]/profile/actions";
 import { readByFromJson, readerLabel } from "@/lib/ai-reader-label";
 import { BRAZIL_UFS, COMPANY_SIZE_LABELS, LEGAL_NATURE_LABELS, type CompanySize, type LegalNature } from "@/lib/accounting-policies";
 import { formatDateBR } from "@/lib/dates";
+import type { GatewayView } from "@/lib/gateway-views";
 import { addressLine, type HoldingAddress, type HoldingAdmin, type HoldingProfile } from "@/lib/profile-holding";
 import { MAX_PROFILE_DOCUMENT_BYTES, PROFILE_DOC_CATEGORIES, type ProfileDocCategory, type ProfileDocument } from "@/lib/profile-documents";
 import { NOTIFICATIONS_KEY, type NotificationPrefs } from "@/lib/ui-preferences";
@@ -38,6 +41,8 @@ interface Props {
     lang: string;
     /** preloaded by the server page; null before the profile row exists (first visit) */
     initial: OwnerPageInitial | null;
+    /** the IoT gateways of the founder-only pilot; null = this account is not on the pilot list */
+    gateways: GatewayView[] | null;
 }
 
 type BlockKey = "identity" | "address" | "admin" | "account";
@@ -172,7 +177,7 @@ function AddressEditor({ value, onChange, idPrefix }: { value: HoldingAddress; o
     );
 }
 
-export default function OwnerPage({ lang, initial }: Props) {
+export default function OwnerPage({ lang, initial, gateways }: Props) {
     const href = (path: string) => (lang === "pt" ? path : `/${lang}${path}`);
     const router = useRouter();
 
@@ -646,6 +651,8 @@ export default function OwnerPage({ lang, initial }: Props) {
                     <Button variant="destructive" size="sm" onClick={() => setShowDelete(true)}>Excluir conta</Button>
                 </div>
             </section>
+
+            {gateways && <GatewaysSection gateways={gateways} href={href} />}
 
             {showDelete && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-account-title">
