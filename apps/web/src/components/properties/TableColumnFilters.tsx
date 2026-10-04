@@ -51,7 +51,15 @@ export interface ColumnDef<T> {
     formatSum?: (n: number) => string;
     /** rendered inside the header cell after the label (e.g. an expand/collapse toggle) */
     headerExtra?: React.ReactNode;
+    /** the sort buttons' wording when the kind's default misleads — dates ahead take `UPCOMING_SORT` */
+    sortLabels?: { asc: string; desc: string };
 }
+
+/**
+ * Sort wording for dates that lie ahead (a term's end, the next adjustment). "Mais recente primeiro" there
+ * puts the farthest date on top, which reads as "the newest contract first".
+ */
+export const UPCOMING_SORT = { asc: "Mais próximo primeiro", desc: "Mais distante primeiro" } as const;
 
 /** One button of a row's actions: shown when `when` says so (always, without it). */
 export interface RowAction<T> {
@@ -411,8 +419,8 @@ export function ColumnMenu<T>({ columns, ctl }: { columns: ColumnDef<T>[]; ctl: 
     const c = columns.find(x => x.key === ctl.menu!.key);
     if (!c) return null;
     const f = ctl.filters[c.key] ?? {};
-    const ascLabel = c.kind === "date" || c.kind === "month" ? "Mais antigo primeiro" : c.kind === "number" ? "Menor → maior" : "A → Z";
-    const descLabel = c.kind === "date" || c.kind === "month" ? "Mais recente primeiro" : c.kind === "number" ? "Maior → menor" : "Z → A";
+    const ascLabel = c.sortLabels?.asc ?? (c.kind === "date" || c.kind === "month" ? "Mais antigo primeiro" : c.kind === "number" ? "Menor → maior" : "A → Z");
+    const descLabel = c.sortLabels?.desc ?? (c.kind === "date" || c.kind === "month" ? "Mais recente primeiro" : c.kind === "number" ? "Maior → menor" : "Z → A");
     const inputCls = "w-full h-8 rounded-md border border-input bg-background px-2 text-xs";
     const sortBtn = (dir: "asc" | "desc", label: string, Icon: typeof ArrowUp) => (
         <button type="button" onClick={() => { ctl.setSort({ key: c.key, dir }); ctl.closeMenu(); }}

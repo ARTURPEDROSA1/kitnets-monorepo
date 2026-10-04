@@ -12,7 +12,7 @@ import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatDateBR } from "@/lib/dates";
-import { LEASE_VIEWS, MANAGEMENT_LABELS, attentionItems, brl, hubTotals, inView, type LeaseRow, type LeaseView } from "@/lib/lease-dashboard";
+import { LEASE_VIEWS, MANAGEMENT_LABELS, attentionItems, brl, hubTotals, inView, leaseManagers, matchesManager, type LeaseRow, type LeaseView } from "@/lib/lease-dashboard";
 import type { PropertyKind } from "@/lib/lease-charges";
 import LeaseTable, { type LeaseTableActions } from "./LeaseTable";
 import LeaseTimeline from "./LeaseTimeline";
@@ -75,12 +75,18 @@ export default function ContratosHub({ rows, today, propertyKinds = {}, loading,
         return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]));
     }, [rows]);
 
+    const managers = useMemo(() => leaseManagers(rows), [rows]);
+    const managerGroups = useMemo(() => ([
+        { type: "AGENCY", label: "Imobiliárias", all: "Todas as imobiliárias" },
+        { type: "AGENT", label: "Corretores", all: "Todos os corretores" },
+    ] as const).map(g => ({ ...g, items: managers.filter(m => m.type === g.type) })).filter(g => g.items.length > 0), [managers]);
+
     const visible = useMemo(() => {
         const q = search.trim().toLowerCase();
         return rows.filter(r => {
             if (!inView(r, view)) return false;
             if (property && r.lease.property_id !== property) return false;
-            if (management && r.lease.management_type !== management) return false;
+            if (!matchesManager(r.lease, management)) return false;
             if (q) {
                 const hay = [r.title, r.place, r.lease.primary_tenant_name, r.lease.agency_name, r.lease.agent_name].filter(Boolean).join(" ").toLowerCase();
                 if (!hay.includes(q)) return false;
@@ -122,14 +128,22 @@ export default function ContratosHub({ rows, today, propertyKinds = {}, loading,
                     <Item
                         icon={<FileSignature className="h-3.5 w-3.5" />} tone="text-emerald-600" label="Contratos em vigor"
                         value={String(totals.inForce)}
-                        hint={totals.overdueTerm > 0 ? `${plural(totals.overdueTerm, "com o prazo vencido", "com o prazo vencido")}` : totals.ending90 > 0 ? `${plural(totals.ending90, "vence", "vencem")} em 90 dias` : `${totals.total} no total · nenhum vencendo`}
+                        hint={<>
+                            {/* who runs them: via how many agencies, and the owner's own; the term alert only when there is one */}
+                            {totals.agencyManaged > 0 ? `${totals.agencyManaged} via ${plural(totals.agencies, "imobiliária", "imobiliárias")}` : "0 via imobiliária"}
+                            <br />{totals.selfManaged} gestão própria{totals.agentManaged > 0 ? ` · ${totals.agentManaged} via corretor` : ""}
+                            {totals.overdueTerm > 0
+                                ? <><br /><span className="text-rose-600 dark:text-rose-400">{plural(totals.overdueTerm, "com o prazo vencido", "com o prazo vencido")}</span></>
+                                : totals.ending90 > 0 ? <><br /><span className="text-amber-600 dark:text-amber-400">{plural(totals.ending90, "vence", "vencem")} em 90 dias</span></> : null}
+                        </>}
                         valueTone={totals.overdueTerm > 0 ? "text-rose-600" : undefined}
                         onClick={() => onViewChange(totals.overdueTerm > 0 || totals.ending90 > 0 ? "vencendo" : "vigentes")}
+                        title={totals.managers.length > 0 ? totals.managers.map(m => `${m.label}: ${plural(m.count, "contrato", "contratos")}`).join("\n") : undefined}
                     />
                     <Item
                         icon={<DollarSign className="h-3.5 w-3.5" />} tone="text-emerald-600" label="Aluguel contratado"
                         value={`${brl(totals.contractedRent, 0)}/mês`}
-                        hint={<>{brl(totals.contractedRent * 12, 0)} por ano<br />{plural(totals.agencyManaged, "via imobiliária", "via imobiliária")}{totals.selfManaged > 0 ? ` · ${totals.selfManaged} própria` : ""}</>}
+                        hint={`${brl(totals.contractedRent * 12, 0)} por ano`}
                         title="Soma do aluguel de contrato dos contratos em vigor (valor bruto, antes da taxa da imobiliária)"
                         money
                     />
@@ -246,9 +260,16 @@ export default function ContratosHub({ rows, today, propertyKinds = {}, loading,
                                 <option value="">Todos os imóveis</option>
                                 {properties.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
                             </select>
-                            <select className="flex h-9 rounded-md border bg-background px-3 text-sm" value={management} onChange={e => setManagement(e.target.value)} aria-label="Gestão">
+                            {/* gestão própria, then each agency and corretor by name; agency names run long, so the box is capped */}
+                            <select className="flex h-9 max-w-[18rem] rounded-md border bg-background px-3 text-sm" value={management} onChange={e => setManagement(e.target.value)} aria-label="Gestão">
                                 <option value="">Todas as gestões</option>
-                                {Object.entries(MANAGEMENT_LABELS).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+                                {managers.some(m => m.type === "SELF_MANAGED") && <option value="SELF_MANAGED">{MANAGEMENT_LABELS.SELF_MANAGED}</option>}
+                                {managerGroups.map(g => (
+                                    <optgroup key={g.type} label={g.label}>
+                                        {g.items.length > 1 && <option value={g.type}>{g.all}</option>}
+                                        {g.items.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
+                                    </optgroup>
+                                ))}
                             </select>
                             {filtered && (
                                 <Button variant="ghost" size="sm" onClick={() => { setSearch(""); setProperty(""); setManagement(""); }}>

@@ -9,6 +9,9 @@ import {
     hubTotals,
     inView,
     leaseIncome,
+    leaseManager,
+    leaseManagers,
+    matchesManager,
     milestones,
     positionPct,
     referenceNameFor,
@@ -168,6 +171,63 @@ describe("summarizeLeases + hubTotals", () => {
         expect(b.hasFile).toBe(false);
         expect(rows.find(r => r.lease.id === "c")!.indexLabel).toBe("Sem reajuste");
         expect(rows.find(r => r.lease.id === "e")!.status).toBe("TERMINATED");
+    });
+});
+
+describe("who manages a contract", () => {
+    const rows = summarizeLeases(
+        [
+            lease({ id: "a", agency_id: "bb1", agency_name: "BASTOS BRAGA NEGOCIOS IMOBILIARIOS LTDA" }),
+            lease({ id: "b", agency_id: "bb1", agency_name: "BASTOS BRAGA NEGOCIOS IMOBILIARIOS LTDA" }),
+            // the same agency registered a second time by an import: one agency for the owner
+            lease({ id: "c", agency_id: "bb2", agency_name: "Bastos Braga  Negócios Imobiliarios Ltda " }),
+            lease({ id: "d", agency_id: "hm", agency_name: "HAMILTON Oliveira Imóveis" }),
+            lease({ id: "e", agency_id: "mr", agency_name: "MR IMÓVEIS LTDA-ME" }),
+            lease({ id: "f", management_type: "SELF_MANAGED", agency_id: null, agency_name: null }),
+            lease({ id: "g", management_type: "AGENT", agency_id: null, agency_name: null, agent_id: "ag1", agent_name: "Rafael Souza" }),
+            lease({ id: "h", status: "TERMINATED", termination_date: "2026-03-01", agency_id: "pj", agency_name: "Imobiliária Projetar LTDA" }),
+        ],
+        { ipca: IPCA },
+        TODAY
+    );
+
+    it("names the agency, the corretor or the owner", () => {
+        const byId = (id: string) => leaseManager(rows.find(r => r.lease.id === id)!.lease);
+        expect(byId("a")).toEqual({ key: "AGENCY:bastos braga negocios imobiliarios ltda", type: "AGENCY", label: "BASTOS BRAGA NEGOCIOS IMOBILIARIOS LTDA" });
+        expect(byId("c").key).toBe(byId("a").key);
+        expect(byId("f")).toEqual({ key: "SELF_MANAGED", type: "SELF_MANAGED", label: "Gestão própria" });
+        expect(byId("g")).toEqual({ key: "AGENT:rafael souza", type: "AGENT", label: "Corretor Rafael Souza" });
+        expect(leaseManager({ management_type: "AGENCY", agency_id: "x1", agency_name: null, agent_id: null, agent_name: null })).toEqual({ key: "AGENCY:x1", type: "AGENCY", label: "Imobiliária não informada" });
+    });
+
+    it("lists every manager once, own management first, then agencies and corretores by name", () => {
+        expect(leaseManagers(rows).map(m => [m.label, m.count])).toEqual([
+            ["Gestão própria", 1],
+            ["BASTOS BRAGA NEGOCIOS IMOBILIARIOS LTDA", 3],
+            ["HAMILTON Oliveira Imóveis", 1],
+            ["Imobiliária Projetar LTDA", 1],
+            ["MR IMÓVEIS LTDA-ME", 1],
+            ["Corretor Rafael Souza", 1],
+        ]);
+    });
+
+    it("filters by type or by one manager", () => {
+        const pick = (filter: string) => rows.filter(r => matchesManager(r.lease, filter)).map(r => r.lease.id);
+        expect(pick("")).toHaveLength(8);
+        expect(pick("AGENCY")).toEqual(["a", "b", "c", "d", "e", "h"]);
+        expect(pick("AGENCY:bastos braga negocios imobiliarios ltda")).toEqual(["a", "b", "c"]);
+        expect(pick("SELF_MANAGED")).toEqual(["f"]);
+        expect(pick("AGENT")).toEqual(["g"]);
+    });
+
+    it("splits the contracts in force by who manages them", () => {
+        const totals = hubTotals(rows, TODAY);
+        expect(totals.inForce).toBe(7);
+        expect(totals.agencyManaged).toBe(5);
+        expect(totals.agencies).toBe(3);         // the terminated Projetar contract is not in force
+        expect(totals.selfManaged).toBe(1);
+        expect(totals.agentManaged).toBe(1);
+        expect(totals.managers.find(m => m.type === "AGENCY")?.count).toBe(3);
     });
 });
 
