@@ -3,7 +3,7 @@
  * server builds them (lib/lease-views-server.ts) and the client consumes them. Types only, so the
  * client components never pull the server loader (Supabase, `next/cache`) into the browser bundle.
  */
-import type { AdjustmentRow, StoredAdjustment, WaitingReason } from "@/lib/lease-adjustments";
+import type { AdjustedChargeType, AdjustmentRow, StoredAdjustment, WaitingReason } from "@/lib/lease-adjustments";
 import type { LeaseWithDetails } from "@/types/lease";
 import type { IndexPoint } from "@/lib/lease-summary";
 import type { PropertyIncomeRow } from "@/lib/property-income";
@@ -31,8 +31,8 @@ export interface LeaseAdjustmentsView {
     available: boolean;
     /** oldest first */
     rows: StoredAdjustment[];
-    /** the contract's original amounts, before any adjustment */
-    initial: { rent: number; condo: number | null };
+    /** the contract's original amounts, before any adjustment; `condo` is the followed charge — the condominium, or the energy of a contract without one (`chargeType`) */
+    initial: { rent: number; condo: number | null; chargeType?: AdjustedChargeType | null };
     /** an adjustment date already behind today that could not be calculated yet */
     waiting: { date: string; reason: WaitingReason } | null;
     /** adjustments calculated but not written because the write failed, and why */

@@ -3,19 +3,21 @@
  * fell due (the dashboard does it when it is opened, the daily cron for every lease), and saving or
  * removing an addendum. The maths is lib/lease-adjustments.ts; the writes go through the database
  * functions of migrations/20261003700000_lease_adjustments.sql, which move the lease's current rent
- * and condominium together with the history.
+ * and the followed charge (the condominium, or a house's energy — 20261004200000_lease_adjustment_energy.sql)
+ * together with the history.
  */
 import type { AdminSupabase } from "@/lib/api-auth";
 import { HttpError, badRequest, notFound } from "@/lib/api-route";
 import { loadOwnedLease } from "@/lib/leases-server";
 import { IN_FORCE } from "@/lib/lease-dashboard";
 import { leaseIndexSeriesCode, type IndexPoint } from "@/lib/lease-summary";
-import { adjustableCondo, dueAdjustments, initialValues, withAddendum, type AdjustableLease, type AdjustmentRow, type DueAdjustments, type StoredAdjustment } from "@/lib/lease-adjustments";
+import { ADJUSTED_CHARGE_TYPES, adjustableCharge, dueAdjustments, initialValues, withAddendum, type AdjustableLease, type AdjustmentRow, type DueAdjustments, type StoredAdjustment } from "@/lib/lease-adjustments";
 import type { LeaseAddendumInput } from "@/lib/schemas/lease-adjustment";
 import type { LeaseStatus } from "@/types/lease";
 
 const TAG = "Lease adjustments";
-const COLUMNS = "id, lease_id, effective_date, source, index_code, index_pct, index_factor, previous_rent, new_rent, previous_condo, new_condo, condo_factor, document_id, notes, created_at";
+// `*`: charge_type arrives with its own migration; a deploy ahead of it still reads the history
+const COLUMNS = "*";
 
 export type SeriesByCode = Record<string, IndexPoint[] | null | undefined>;
 export type AdjustmentLease = AdjustableLease & { id: string; status: LeaseStatus };
@@ -36,6 +38,7 @@ function normalize(r: Record<string, unknown>): StoredAdjustment {
         previous_condo: num(r.previous_condo),
         new_condo: num(r.new_condo),
         condo_factor: num(r.condo_factor),
+        charge_type: r.charge_type === "ELECTRICITY" || r.charge_type === "CONDOMINIUM" ? r.charge_type : null,
         document_id: (r.document_id as string | null) ?? null,
         notes: (r.notes as string | null) ?? null,
         created_at: r.created_at ? String(r.created_at) : undefined,
@@ -54,11 +57,12 @@ const toDb = (r: AdjustmentRow) => ({
     previous_condo: r.previous_condo,
     new_condo: r.new_condo,
     condo_factor: r.condo_factor,
+    charge_type: r.charge_type ?? null,
     document_id: r.document_id ?? null,
     notes: r.notes,
 });
 
-/** The condominium the lease ends up with, when any row moved it; null leaves the charge alone. */
+/** The followed charge (condominium or energy) the lease ends up with, when any row moved it; null leaves the charge alone. */
 const condoToWrite = (rows: readonly AdjustmentRow[], condo: number | null) => (rows.some(r => r.new_condo !== null) ? condo : null);
 
 /**
@@ -79,7 +83,7 @@ export interface AdjustmentSync {
     available: boolean;
     /** calculated adjustments recorded by this call */
     recorded: number;
-    /** the lease's rent or condominium may have moved (here, or by someone who got there first): read them again */
+    /** the lease's rent or followed charge may have moved (here, or by someone who got there first): read them again */
     changed: boolean;
     waiting: DueAdjustments["waiting"];
     /** adjustments calculated but not written, because the write failed: shown as such, never silently dropped */
@@ -139,15 +143,15 @@ export async function loadAdjustmentLease(supabase: AdminSupabase, leaseId: stri
     return { ...(row as unknown as AdjustmentLease), monthly_rent: Number(row.monthly_rent) || 0, charges: await loadCharges(supabase, leaseId) };
 }
 
-/** The calculator codes a lease's adjustment reads: the rent's index and, when it has one of its own, the condominium's. */
+/** The calculator codes a lease's adjustment reads: the rent's index and, when it has one of its own, the followed charge's. */
 export function seriesCodesOf(lease: AdjustableLease): string[] {
-    const condo = adjustableCondo(lease);
-    return [leaseIndexSeriesCode(lease.adjustment_index), condo && !condo.withRent ? leaseIndexSeriesCode(condo.index) : null].filter((c): c is string => Boolean(c));
+    const charge = adjustableCharge(lease);
+    return [leaseIndexSeriesCode(lease.adjustment_index), charge && !charge.withRent ? leaseIndexSeriesCode(charge.index) : null].filter((c): c is string => Boolean(c));
 }
 
 /**
  * Saves an addendum — the truth of its date, whatever the index says — and chains the calculated rows
- * after it again. The lease's rent and condominium become what the history ends with.
+ * after it again. The lease's rent and followed charge (condominium or energy) become what the history ends with.
  */
 export async function saveAddendum(supabase: AdminSupabase, leaseId: string, profileId: string, input: LeaseAddendumInput, today: string): Promise<void> {
     const lease = await loadAdjustmentLease(supabase, leaseId, profileId);
@@ -168,8 +172,8 @@ export async function saveAddendum(supabase: AdminSupabase, leaseId: string, pro
         if (input.previous_rent !== null) initial.rent = input.previous_rent;
         if (input.previous_condo !== null && initial.condo !== null) initial.condo = input.previous_condo;
     }
-    // a lease without a condominium charge has none to change
-    const chained = withAddendum(stored.rows, { ...input, new_condo: initial.condo === null ? null : input.new_condo }, initial);
+    // a lease with neither a condominium nor an energy charge has none to change
+    const chained = withAddendum(stored.rows, { ...input, new_condo: initial.condo === null ? null : input.new_condo, charge_type: initial.chargeType }, initial);
     const { data, error } = await supabase.rpc("lease_adjustments_record", {
         p_lease_id: leaseId,
         p_rows: chained.rows.map(toDb),
@@ -228,7 +232,7 @@ export async function runAdjustmentSync(
     if (leases.length === 0) return report;
 
     const charges = new Map<string, NonNullable<AdjustableLease["charges"]>[number][]>();
-    const { data: chargeRows } = await supabase.from("lease_charges").select("*").in("lease_id", leases.map(l => l.id)).eq("charge_type", "CONDOMINIUM");
+    const { data: chargeRows } = await supabase.from("lease_charges").select("*").in("lease_id", leases.map(l => l.id)).in("charge_type", [...ADJUSTED_CHARGE_TYPES]);
     for (const c of (chargeRows ?? []) as unknown as Array<NonNullable<AdjustableLease["charges"]>[number] & { lease_id: string }>) {
         charges.set(c.lease_id, [...(charges.get(c.lease_id) ?? []), c]);
     }

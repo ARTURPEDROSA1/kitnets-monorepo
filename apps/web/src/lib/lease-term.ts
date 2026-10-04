@@ -10,11 +10,13 @@
  *
  * A month the ledger confirmed counts at what the ledger says, whatever the schedule expected. Every
  * other payment of the schedule is a forecast at the contract's amount: the amount in force on its due
- * date when that is behind today (the adjustments tell it), today's amount for the ones ahead.
+ * date when that is behind today (the adjustments tell it), today's amount for the ones ahead. The
+ * adjustments follow the rent and one charge — the condominium, or the energy of a contract without
+ * one (lib/lease-adjustments.ts); any other charge counts at today's amount.
  */
 import { addMonths, cents } from "@/lib/lease-summary";
 import { amountOf, tenantCharges } from "@/lib/lease-charges";
-import type { AdjustmentBrief } from "@/lib/lease-adjustments";
+import { trackedCharge, type AdjustmentBrief } from "@/lib/lease-adjustments";
 import type { LeaseCharge } from "@/types/lease";
 
 export interface ScheduledPayment {
@@ -124,20 +126,24 @@ export function leaseTermTotals(lease: TermLease, adjustments: readonly Adjustme
     const currentEnergy = tenantEnergy ? amountOf(tenantEnergy) : null;
     const others = tenant.total - (currentCondo ?? 0) - (currentEnergy ?? 0);
 
+    // the history's *_condo fields carry the condominium, or the energy of a contract without one
+    const followsEnergy = trackedCharge(lease.charges)?.charge_type === "ELECTRICITY";
+    const currentFollowed = followsEnergy ? currentEnergy : currentCondo;
+
     const sorted = [...adjustments].sort((a, b) => (a.effective_date < b.effective_date ? -1 : 1));
-    const firstCondoChange = sorted.find(r => r.new_condo !== null);
+    const firstChargeChange = sorted.find(r => r.new_condo !== null);
     const initialRent = sorted.length > 0 ? Number(sorted[0].previous_rent) || 0 : currentRent;
-    const initialCondo = currentCondo === null ? null : firstCondoChange && firstCondoChange.previous_condo !== null ? Number(firstCondoChange.previous_condo) : currentCondo;
+    const initialFollowed = currentFollowed === null ? null : firstChargeChange && firstChargeChange.previous_condo !== null ? Number(firstChargeChange.previous_condo) : currentFollowed;
     /** the amounts in force on a date: by the history behind today, today's ahead of it */
-    const inForce = (date: string): { rent: number; condo: number | null } => {
-        if (date > today) return { rent: currentRent, condo: currentCondo };
-        let rent = initialRent, condo = initialCondo;
+    const inForce = (date: string): { rent: number; charge: number | null } => {
+        if (date > today) return { rent: currentRent, charge: currentFollowed };
+        let rent = initialRent, charge = initialFollowed;
         for (const r of sorted) {
             if (r.effective_date.slice(0, 10) > date) break;
             rent = Number(r.new_rent) || 0;
-            if (condo !== null && r.new_condo !== null) condo = Number(r.new_condo);
+            if (charge !== null && r.new_condo !== null) charge = Number(r.new_condo);
         }
-        return { rent, condo };
+        return { rent, charge };
     };
 
     const confirmed = new Set(realized.map(r => r.month));
@@ -152,9 +158,8 @@ export function leaseTermTotals(lease: TermLease, adjustments: readonly Adjustme
         if (confirmed.has(p.month)) continue;
         const amounts = inForce(p.due);
         rentForecast += amounts.rent * p.fraction;
-        condoForecast += (amounts.condo ?? 0) * p.fraction;
-        // the energy has no history of its own: today's amount
-        energyForecast += (currentEnergy ?? 0) * p.fraction;
+        condoForecast += ((followsEnergy ? currentCondo : amounts.charge) ?? 0) * p.fraction;
+        energyForecast += ((followsEnergy ? amounts.charge : currentEnergy) ?? 0) * p.fraction;
         otherForecast += others * p.fraction;
     }
 

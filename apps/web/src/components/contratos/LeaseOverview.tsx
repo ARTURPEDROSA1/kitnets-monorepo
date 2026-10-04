@@ -25,9 +25,11 @@ interface Props {
     featured: { label: string; charge: LeaseCharge | null };
     tenantFixed: { items: LeaseCharge[]; total: number };
     term: LeaseTermTotals;
-    condoAdjustment: ChargeAdjustment | null;
-    /** whether the condominium's index has a series here: says why it has no figure */
-    condoSeries: "ok" | "none" | "unavailable";
+    /** the charge readjusted next to the rent: "Condomínio", or "Energia" in a contract without a condominium (a house) */
+    chargeLabel: string;
+    chargeAdjustment: ChargeAdjustment | null;
+    /** whether that charge's index has a series here: says why it has no figure */
+    chargeSeries: "ok" | "none" | "unavailable";
     income: LeaseIncome;
     today: string;
 }
@@ -113,7 +115,7 @@ function Fact({ label, children }: { label: string; children: React.ReactNode })
     );
 }
 
-export default function LeaseOverview({ lease, row, rent, monthly, featured, tenantFixed, term, condoAdjustment, condoSeries, income, today }: Props) {
+export default function LeaseOverview({ lease, row, rent, monthly, featured, tenantFixed, term, chargeLabel, chargeAdjustment, chargeSeries, income, today }: Props) {
     const { summary } = row;
     const agencyManaged = lease.management_type === "AGENCY";
     const adjusts = summary.nextAdjustmentDate !== null;
@@ -135,7 +137,7 @@ export default function LeaseOverview({ lease, row, rent, monthly, featured, ten
 
     // the cycle's progress: the months counted, the one in course by its days
     const cycleShare = adjusts && summary.frequencyMonths > 0 ? (summary.monthsCounted + summary.daysCounted / 30) / summary.frequencyMonths : 0;
-    const sameIndex = condoAdjustment !== null && condoAdjustment.accumulatedPct !== null && cycleKnown && condoAdjustment.accumulatedPct === summary.accumulatedPct;
+    const sameIndex = chargeAdjustment !== null && chargeAdjustment.accumulatedPct !== null && cycleKnown && chargeAdjustment.accumulatedPct === summary.accumulatedPct;
     const paidShare = term.months > 0 ? Math.min(1, income.confirmedMonths / term.months) : 0;
 
     return (
@@ -275,11 +277,11 @@ export default function LeaseOverview({ lease, row, rent, monthly, featured, ten
                                     <>
                                         <span className="flex flex-wrap gap-1.5">
                                             <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
-                                                {sameIndex ? "Aluguel e condomínio" : "Aluguel"} {pctText(summary.accumulatedPct!)}
+                                                {sameIndex ? `Aluguel e ${chargeLabel.toLowerCase()}` : "Aluguel"} {pctText(summary.accumulatedPct!)}
                                             </span>
-                                            {!sameIndex && condoAdjustment && condoAdjustment.accumulatedPct !== null && (
+                                            {!sameIndex && chargeAdjustment && chargeAdjustment.accumulatedPct !== null && (
                                                 <span className="rounded-md bg-sky-100 px-1.5 py-0.5 text-xs font-semibold text-sky-800 dark:bg-sky-950/50 dark:text-sky-300">
-                                                    Condomínio {pctText(condoAdjustment.accumulatedPct)} <span className="font-normal">({condoAdjustment.indexLabel})</span>
+                                                    {chargeLabel} {pctText(chargeAdjustment.accumulatedPct)} <span className="font-normal">({chargeAdjustment.indexLabel})</span>
                                                 </span>
                                             )}
                                         </span>
@@ -291,11 +293,11 @@ export default function LeaseOverview({ lease, row, rent, monthly, featured, ten
                                     </span>
                                 )}
                             </Fact>
-                            <Fact label="Condomínio">
+                            <Fact label={chargeLabel}>
                                 <span className="text-xs text-muted-foreground">
-                                    {condoAdjustment
-                                        ? condoAdjustment.withRent ? "Reajusta com o aluguel" : condoSeries === "ok" ? `Reajusta pelo ${condoAdjustment.indexLabel}, na data do contrato` : condoSeries === "none" ? `${condoAdjustment.indexLabel}: índice sem série no Kitnets` : "Série do índice indisponível no momento"
-                                        : lease.charges.some(c => c.charge_type === "CONDOMINIUM") ? "Não reajusta por índice" : "Contrato sem condomínio"}
+                                    {chargeAdjustment
+                                        ? chargeAdjustment.withRent ? "Reajusta com o aluguel" : chargeSeries === "ok" ? `Reajusta pelo ${chargeAdjustment.indexLabel}, na data do contrato` : chargeSeries === "none" ? `${chargeAdjustment.indexLabel}: índice sem série no Kitnets` : "Série do índice indisponível no momento"
+                                        : lease.charges.some(c => c.charge_type === "CONDOMINIUM" || c.charge_type === "ELECTRICITY") ? "Não reajusta por índice" : `Contrato sem ${chargeLabel.toLowerCase()}`}
                                 </span>
                             </Fact>
                         </dl>
