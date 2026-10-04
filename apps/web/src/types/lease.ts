@@ -80,6 +80,19 @@ export interface LeaseWithDetails extends Lease {
     documents: LeaseDocument[];
     /** what each adjustment took and left (list endpoint only): the totals over the term follow them */
     adjustments?: LeaseAdjustmentBrief[];
+    /** the months the property's ledger confirmed for the lease (list endpoint only): the "executado" of the totals */
+    realized?: LeaseRealizedMonth[];
+}
+
+/** One month the property's income ledger confirmed for a lease, as the contract's totals count it (lib/lease-term.ts). */
+export interface LeaseRealizedMonth {
+    /** `YYYY-MM` */
+    month: string;
+    /** the rent before the agency's cut */
+    rent: number;
+    /** the condominium and the energy the tenant paid */
+    condo: number;
+    energy: number;
 }
 
 /** One row of the lease's adjustment history, cut to its amounts (lib/lease-adjustments.ts). */

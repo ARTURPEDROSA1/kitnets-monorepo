@@ -18,6 +18,8 @@ import { loadPropertyEntries } from "@/lib/property-entries-server";
 import type { PropertyIncomeRow } from "@/lib/property-income";
 import { INCOME_DIRECT_COLUMNS, normalizeIncomeRow } from "@/lib/property-income";
 import { initialValues } from "@/lib/lease-adjustments";
+import { leaseIncome } from "@/lib/lease-dashboard";
+import { fetchAllPages } from "@/lib/accounting-server";
 import { syncLeaseAdjustments } from "@/lib/lease-adjustments-server";
 import type { LeaseWithDetails } from "@/types/lease";
 import type { LeaseDashboardView, LeaseListView, LeaseTenantContact } from "@/lib/lease-views";
@@ -102,7 +104,8 @@ export async function loadLeaseIndexSeries(codes: string[]): Promise<Record<stri
 }
 
 export async function loadLeaseList(supabase: AdminSupabase, profileId: string): Promise<LeaseListView> {
-    const [leases, propertyKinds] = await Promise.all([loadLeaseRows(supabase, profileId), loadPropertyKinds(supabase, profileId)]);
+    const [rows, propertyKinds] = await Promise.all([loadLeaseRows(supabase, profileId), loadPropertyKinds(supabase, profileId)]);
+    const leases = await withRealizedMonths(supabase, rows);
     const codes = leases.map(l => leaseIndexSeriesCode(l.adjustment_index)).filter((c): c is string => Boolean(c));
     const series = await loadLeaseIndexSeries(codes);
     return { leases, series, propertyKinds };
@@ -110,6 +113,47 @@ export async function loadLeaseList(supabase: AdminSupabase, profileId: string):
 
 const INCOME_COLUMNS =
     `id, property_id, month, unit_id, unit_name, received_on, received_amount, energy_portion, other_income, other_expenses, condo_amount, fee_on_condo, iptu_amount, agency_fee_pct, status, source, bank_reference, notes, ${INCOME_DIRECT_COLUMNS}`;
+
+const todayBRT = () => new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
+
+/**
+ * Each lease with the months the property's income ledger confirmed for it — the rent before the agency's
+ * cut, the condominium and the energy the tenant paid: what the contract's totals count as executed, the
+ * dashboard's "realizado" (lib/lease-term.ts). The ledger is read once: the rows of the leased units, and
+ * every row of a property leased whole. A failed read leaves the leases without it (all forecast).
+ */
+export async function withRealizedMonths(supabase: AdminSupabase, leases: LeaseWithDetails[]): Promise<LeaseWithDetails[]> {
+    if (leases.length === 0) return leases;
+    const today = todayBRT();
+    const from = leases.reduce((m, l) => (l.start_date.slice(0, 7) < m ? l.start_date.slice(0, 7) : m), today.slice(0, 7));
+    const to = addMonths(`${today.slice(0, 7)}-01`, 1).slice(0, 7);
+    const wholeIds = [...new Set(leases.filter(l => !l.unit_id).map(l => l.property_id))];
+    const unitLeases = leases.filter(l => l.unit_id && !wholeIds.includes(l.property_id));
+    const unitIds = [...new Set(unitLeases.map(l => String(l.unit_id)))];
+    const unitPropertyIds = [...new Set(unitLeases.map(l => l.property_id))];
+    const ledger = () => supabase.from("property_income_months").select(INCOME_COLUMNS).gte("month", `${from}-01`).lte("month", `${to}-01`);
+
+    let rows: PropertyIncomeRow[];
+    try {
+        const [whole, units] = await Promise.all([
+            wholeIds.length > 0 ? fetchAllPages<PropertyIncomeRow>((a, b) => ledger().in("property_id", wholeIds).order("id").range(a, b)) : Promise.resolve([]),
+            unitIds.length > 0 ? fetchAllPages<PropertyIncomeRow>((a, b) => ledger().in("property_id", unitPropertyIds).in("unit_id", unitIds).order("id").range(a, b)) : Promise.resolve([]),
+        ]);
+        rows = [...whole, ...units].map(normalizeIncomeRow);
+    } catch (err) {
+        console.error("[Lease views] ledger for the totals failed:", (err as Error).message);
+        return leases;
+    }
+
+    const byProperty = new Map<string, PropertyIncomeRow[]>();
+    for (const r of rows) byProperty.set(r.property_id, [...(byProperty.get(r.property_id) ?? []), r]);
+    return leases.map(l => ({
+        ...l,
+        realized: leaseIncome(l, byProperty.get(l.property_id) ?? [], today).points
+            .filter(p => p.status === "CONFIRMED")
+            .map(p => ({ month: p.key, rent: p.gross, condo: p.condo, energy: p.energy })),
+    }));
+}
 
 /** The property's ledger rows between two months (inclusive), numbers normalised like the income route does. */
 export async function loadIncomeRows(supabase: AdminSupabase, propertyId: string, fromMonth: string, toMonth: string): Promise<PropertyIncomeRow[]> {
