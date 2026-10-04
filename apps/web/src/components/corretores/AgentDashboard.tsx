@@ -205,8 +205,8 @@ export default function AgentDashboard({ agentId, lang, today, initialBundle = n
                     label="CRECI"
                     tone="slate"
                     icon={<Shield className="h-4 w-4" />}
-                    value={agent.creci_number}
-                    hint={`${agent.creci_state}${agent.cpf ? ` · CPF ${formatCPF(agent.cpf)}` : ""}`}
+                    value={agent.creci_number ?? "—"}
+                    hint={[agent.creci_number ? agent.creci_state : "não informado", agent.cpf ? `CPF ${formatCPF(agent.cpf)}` : null].filter(Boolean).join(" · ")}
                     info={{ what: "O registro profissional no Conselho Regional de Corretores de Imóveis. Sem CRECI não há corretor.", formula: "CRECI-UF número" }}
                     sensitive
                 />

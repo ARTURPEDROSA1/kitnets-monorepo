@@ -12,9 +12,9 @@ export interface Agent {
     cpf: string | null;
     photo_url: string | null;
 
-    // Professional
-    creci_number: string;
-    creci_state: string;
+    // Professional (optional: a lease agreement may name the corretor without it)
+    creci_number: string | null;
+    creci_state: string | null;
 
     // Type & Agency
     agent_type: AgentType;

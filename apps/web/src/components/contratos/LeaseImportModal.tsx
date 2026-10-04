@@ -440,8 +440,6 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                 if (g.agentId || !g.create) continue;
                 const errors: FieldErrors = {};
                 if (!g.full_name.trim()) errors.full_name = 'Nome é obrigatório.';
-                if (!g.creci_number.trim()) errors.creci_number = 'Informe o CRECI do corretor (o contrato não traz).';
-                if (!g.creci_state.trim()) errors.creci_state = 'UF do CRECI.';
                 if (Object.keys(errors).length > 0) {
                     agentsNext[i] = { ...g, errors };
                     agentFailed = true;
@@ -759,7 +757,8 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                                     )
                                 ) : (
                                     <>
-                                        {propertyMatch || createdProperty ? null : data.property ? (
+                                        {/* the question goes away once an existing property is picked instead */}
+                                        {propertyMatch || createdProperty || propertyMode === 'existing' ? null : data.property ? (
                                             <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950/30">
                                                 <p className="font-medium text-foreground">O imóvel deste contrato não está no seu cadastro.</p>
                                                 <p className="mt-0.5 text-xs text-muted-foreground">{[data.property.name, addressLine(data.property)].filter(Boolean).join(' · ')}</p>
@@ -875,7 +874,7 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                                                 O contrato não cita imobiliária{agencyMode === 'skip' && <>: será preenchido como <strong className="text-foreground">gestão própria</strong></>}.
                                             </p>
                                         )}
-                                        {data.agency && !agencyMatch && !createdAgency && (
+                                        {data.agency && !agencyMatch && !createdAgency && agencyMode !== 'existing' && (
                                             <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950/30">
                                                 <p className="font-medium text-foreground">A imobiliária deste contrato não está no seu cadastro.</p>
                                                 <p className="mt-0.5 text-xs text-muted-foreground">
@@ -1013,12 +1012,12 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                                                     {fieldError(g.errors, 'cpf')}
                                                 </div>
                                                 <div className="sm:col-span-2">
-                                                    <Label className="text-xs">Nº CRECI *</Label>
+                                                    <Label className="text-xs">Nº CRECI</Label>
                                                     <Input className="h-9" value={g.creci_number} onChange={e => setAgentDrafts(prev => prev.map((x, i) => (i === idx ? { ...x, creci_number: e.target.value } : x)))} placeholder="Ex: 12345" />
                                                     {fieldError(g.errors, 'creci_number')}
                                                 </div>
                                                 <div className="sm:col-span-1">
-                                                    <Label className="text-xs">UF *</Label>
+                                                    <Label className="text-xs">UF</Label>
                                                     <Input className="h-9" maxLength={2} value={g.creci_state} onChange={e => setAgentDrafts(prev => prev.map((x, i) => (i === idx ? { ...x, creci_state: e.target.value.toUpperCase() } : x)))} />
                                                     {fieldError(g.errors, 'creci_state')}
                                                 </div>

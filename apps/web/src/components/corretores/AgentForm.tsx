@@ -88,8 +88,6 @@ export default function AgentForm({ editingId, initial, agencies, onSaved, onCan
     const validate = (): FieldErrors => {
         const errs: FieldErrors = {};
         if (!form.full_name.trim()) errs.full_name = "Nome completo é obrigatório.";
-        if (!form.creci_number.trim()) errs.creci_number = "CRECI é obrigatório.";
-        if (!form.creci_state.trim()) errs.creci_state = "UF do CRECI é obrigatório.";
         if (form.agent_type === "IMOBILIARIA" && !form.agency_id.trim()) errs.agency_id = "Selecione a imobiliária.";
         if (form.main_phone.trim() && !validatePhone(form.main_phone)) errs.main_phone = "Telefone inválido. Use (XX) XXXXX-XXXX.";
         const cpfDigits = parseCPF(form.cpf);
@@ -168,12 +166,12 @@ export default function AgentForm({ editingId, initial, agencies, onSaved, onCan
                         </div>
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div id="field-creci_number">
-                                <Label htmlFor="agent-creci">Nº CRECI <span className="text-red-500">*</span></Label>
+                                <Label htmlFor="agent-creci">Nº CRECI</Label>
                                 <Input id="agent-creci" value={form.creci_number} onChange={e => updateField("creci_number", e.target.value)} placeholder="Ex: 12345" className={cn(errors.creci_number && "border-red-500")} maxLength={20} />
                                 {err("creci_number")}
                             </div>
                             <div id="field-creci_state">
-                                <Label htmlFor="agent-creci-state">UF CRECI <span className="text-red-500">*</span></Label>
+                                <Label htmlFor="agent-creci-state">UF CRECI</Label>
                                 <select id="agent-creci-state" value={form.creci_state} onChange={e => updateField("creci_state", e.target.value)} className={cn(selectClass, errors.creci_state && "border-red-500")}>
                                     <option value="">Selecione</option>
                                     {BRAZILIAN_STATES.map(s => <option key={s.code} value={s.code}>{s.code}</option>)}
