@@ -17,9 +17,9 @@ import { columnTableKey } from "@/lib/ui-preferences";
 import { Sensitive } from "@/components/privacy";
 import { CellSumBar, useCellSum } from "@/components/properties/TableCellSum";
 import { useColumnWidths } from "@/components/properties/TableColumnWidths";
-import { ACTIONS_COLUMN, ColumnHeaders, ColumnMenu, FilterChips, actionsColumn, useColumnFilters, type ColumnDef } from "@/components/properties/TableColumnFilters";
+import { ACTIONS_COLUMN, ColumnHeaders, ColumnMenu, FilterChips, UPCOMING_SORT, actionsColumn, useColumnFilters, type ColumnDef } from "@/components/properties/TableColumnFilters";
 import { ColumnVisibilityMenu, useColumnVisibility } from "@/components/properties/TableColumnVisibility";
-import { MANAGEMENT_LABELS, STATUS_META, brl, statusMeta, todayBRT, type LeaseRow } from "@/lib/lease-dashboard";
+import { MANAGEMENT_LABELS, STATUS_META, brl, leaseManager, leaseManagers, statusMeta, todayBRT, type LeaseRow } from "@/lib/lease-dashboard";
 import { leaseTermTotals } from "@/lib/lease-term";
 import { amountOf, leaseTotals, type LeaseTotals, type PropertyKind } from "@/lib/lease-charges";
 import { LeaseTitle } from "./LeaseTitle";
@@ -92,6 +92,7 @@ export default function LeaseTable({ rows, actions, propertyKinds = {} }: Props)
         return m;
     }, [rows, propertyKinds, today]);
     const totalsOf = (row: LeaseRow) => totals.get(row.lease.id) ?? leaseTotals(Number(row.lease.monthly_rent) || 0, row.lease.charges, row.termMonths, null);
+    const managers = useMemo(() => leaseManagers(rows), [rows]);
 
     const columns = useMemo<ColumnDef<LeaseRow>[]>(() => [
         { key: "title", label: "Contrato", kind: "text", get: r => [r.title, r.place, r.lease.primary_tenant_name].filter(Boolean).join(" · ") },
@@ -101,9 +102,10 @@ export default function LeaseTable({ rows, actions, propertyKinds = {} }: Props)
         { key: "monthly", label: "Total mensal", kind: "number", align: "right", title: "Aluguel + encargos com valor fixo pagos pelo inquilino", get: r => totalsOf(r).monthly },
         { key: "total", label: "Valor total", kind: "number", align: "right", title: "O que o contrato soma no prazo: o primeiro e o último mês pro rata, cada pagamento pelo valor que valia e os que faltam pelo valor de hoje (vazio quando o prazo é indeterminado). O painel do contrato separa o realizado do previsto", get: r => totalsOf(r).total },
         { key: "start", label: "Início", kind: "date", get: r => r.lease.start_date.slice(0, 10) },
-        { key: "end", label: "Término", kind: "date", get: r => r.summary.effectiveEnd ?? "" },
-        { key: "adjustment", label: "Reajuste", kind: "date", title: "Próximo reajuste do aluguel", get: r => (r.inForce && r.summary.nextAdjustmentDate ? r.summary.nextAdjustmentDate : "") },
-        { key: "management", label: "Gestão", kind: "enum", options: Object.entries(MANAGEMENT_LABELS).map(([value, label]) => ({ value, label })), get: r => r.lease.management_type },
+        { key: "end", label: "Término", kind: "date", sortLabels: UPCOMING_SORT, get: r => r.summary.effectiveEnd ?? "" },
+        { key: "adjustment", label: "Reajuste", kind: "date", sortLabels: UPCOMING_SORT, title: "Próximo reajuste do aluguel", get: r => (r.inForce && r.summary.nextAdjustmentDate ? r.summary.nextAdjustmentDate : "") },
+        // one entry per agency (and corretor), not just the three kinds of management
+        { key: "management", label: "Gestão", kind: "enum", options: managers.map(m => ({ value: m.key, label: m.label })), get: r => leaseManager(r.lease).key },
         { key: "file", label: "Arquivo", kind: "enum", align: "center", options: [{ value: "sim", label: "Com PDF" }, { value: "nao", label: "Sem PDF" }], get: r => (r.hasFile ? "sim" : "nao") },
         actionsColumn<LeaseRow>([
             { key: "edit", label: "Editar" },
@@ -111,7 +113,7 @@ export default function LeaseTable({ rows, actions, propertyKinds = {} }: Props)
             { key: "delete", label: "Excluir" },
         ], { className: "w-px whitespace-nowrap" }),
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    ], [totals]);
+    ], [totals, managers]);
 
     const cf = useColumnFilters(rows, columns, { key: "end", dir: "asc" }, { storageKey: TABLE_KEY, filtersKey: TABLE_KEY });
     const vis = useColumnVisibility(TABLE_KEY);

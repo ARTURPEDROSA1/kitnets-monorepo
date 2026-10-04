@@ -13,7 +13,7 @@
  *     "Vencendo", one past its end date shows "Vencido". TERMINATED, CANCELLED and DRAFT are
  *     what they are.
  */
-import type { LeaseStatus, LeaseWithDetails } from "@/types/lease";
+import type { LeaseManagementType, LeaseStatus, LeaseWithDetails } from "@/types/lease";
 import { LEASE_INDEX_LABELS, addMonths, daysBetween, leaseIndexSeriesCode, leaseSummary, nextAdjustment, type IndexPoint, type LeaseSummary } from "@/lib/lease-summary";
 import { aggregateIncomeByMonth, breakdown, monthKey, round2, type PropertyIncomeRow } from "@/lib/property-income";
 
@@ -80,6 +80,57 @@ export function statusMeta(row: { status: LeaseStatus; inForce: boolean }): Stat
 }
 
 export const MANAGEMENT_LABELS: Record<string, string> = { SELF_MANAGED: "Gestão própria", AGENCY: "Imobiliária", AGENT: "Corretor" };
+
+// ── Who manages a contract (the "Gestão" filters) ────────────────────
+
+export interface LeaseManager {
+    /**
+     * The filter value: "SELF_MANAGED", or the type plus the agency / corretor. Agencies and corretores go by
+     * name (case, accents and spacing aside), so an agency registered twice by imports reads as one, the way
+     * the owner counts them; the id only stands in when the name is missing.
+     */
+    key: string;
+    type: LeaseManagementType;
+    /** the agency's name, "Corretor <name>", "Gestão própria" */
+    label: string;
+}
+
+type ManagerFields = Pick<LeaseWithDetails, "management_type" | "agency_id" | "agent_id" | "agency_name" | "agent_name">;
+
+const nameKey = (name: string) => name.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
+
+export function leaseManager(lease: ManagerFields): LeaseManager {
+    if (lease.management_type === "AGENCY") {
+        const name = lease.agency_name?.trim();
+        return { key: `AGENCY:${name ? nameKey(name) : lease.agency_id ?? ""}`, type: "AGENCY", label: name || "Imobiliária não informada" };
+    }
+    if (lease.management_type === "AGENT") {
+        const name = lease.agent_name?.trim();
+        return { key: `AGENT:${name ? nameKey(name) : lease.agent_id ?? ""}`, type: "AGENT", label: name ? `Corretor ${name}` : "Corretor não informado" };
+    }
+    return { key: "SELF_MANAGED", type: "SELF_MANAGED", label: MANAGEMENT_LABELS.SELF_MANAGED };
+}
+
+const MANAGER_ORDER: Record<LeaseManagementType, number> = { SELF_MANAGED: 0, AGENCY: 1, AGENT: 2 };
+
+/** The managers among the rows and how many contracts each runs: gestão própria first, then the agencies and the corretores by name. */
+export function leaseManagers(rows: Array<{ lease: ManagerFields }>): Array<LeaseManager & { count: number }> {
+    const map = new Map<string, LeaseManager & { count: number }>();
+    for (const { lease } of rows) {
+        const m = leaseManager(lease);
+        const seen = map.get(m.key);
+        if (seen) seen.count++;
+        else map.set(m.key, { ...m, count: 1 });
+    }
+    return [...map.values()].sort((a, b) => MANAGER_ORDER[a.type] - MANAGER_ORDER[b.type] || a.label.localeCompare(b.label, "pt-BR"));
+}
+
+/** The hub's "Gestão" filter: "" lets everything through, a type ("AGENCY") takes every agency, a manager's key just that one. */
+export function matchesManager(lease: ManagerFields, filter: string): boolean {
+    if (!filter) return true;
+    const m = leaseManager(lease);
+    return filter === m.type || filter === m.key;
+}
 
 // ── Views (the pills on the hub) ─────────────────────────────────────
 
@@ -194,8 +245,16 @@ export interface HubTotals {
     depositsCount: number;
     /** contracts with at least one file attached */
     withFile: number;
+    /** contracts in force run by an agency */
     agencyManaged: number;
+    /** how many agencies run them (by name, like the filter) */
+    agencies: number;
+    /** contracts in force run by a corretor */
+    agentManaged: number;
+    /** contracts in force run by the owner */
     selfManaged: number;
+    /** who runs the contracts in force, with how many each (`leaseManagers`) */
+    managers: Array<LeaseManager & { count: number }>;
     drafts: number;
 }
 
@@ -229,6 +288,9 @@ export function hubTotals(rows: LeaseRow[], today: string): HubTotals {
         }
     }
 
+    const managers = leaseManagers(inForce);
+    const managedBy = (type: LeaseManagementType) => managers.reduce((s, m) => s + (m.type === type ? m.count : 0), 0);
+
     return {
         total: rows.length,
         inForce: inForce.length,
@@ -241,8 +303,11 @@ export function hubTotals(rows: LeaseRow[], today: string): HubTotals {
         deposits: round2(deposits),
         depositsCount,
         withFile: rows.filter(r => r.hasFile).length,
-        agencyManaged: inForce.filter(r => r.lease.management_type === "AGENCY").length,
-        selfManaged: inForce.filter(r => r.lease.management_type !== "AGENCY").length,
+        agencyManaged: managedBy("AGENCY"),
+        agencies: managers.filter(m => m.type === "AGENCY").length,
+        agentManaged: managedBy("AGENT"),
+        selfManaged: managedBy("SELF_MANAGED"),
+        managers,
         drafts: rows.filter(r => r.stored === "DRAFT").length,
     };
 }
