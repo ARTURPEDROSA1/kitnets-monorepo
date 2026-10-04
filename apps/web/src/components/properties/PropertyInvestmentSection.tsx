@@ -31,6 +31,7 @@ import Tile, { type TileInfo } from "./Tile";
 import { Money } from "@/components/privacy";
 import { CellSumBar, useCellSum } from "./TableCellSum";
 import { useColumnWidths } from "./TableColumnWidths";
+import { ColumnVisibilityMenu, useColumnVisibility } from "./TableColumnVisibility";
 import MoneyInput, { parseMoneyText } from "./MoneyInput";
 import { ACTIONS_COLUMN, ColumnHeaders, ColumnMenu, FilterChips, actionsColumn, useColumnFilters, type ColumnDef } from "./TableColumnFilters";
 import { columnTableKey, recordTableKey } from "@/lib/ui-preferences";
@@ -99,6 +100,8 @@ type TxDraft = Partial<Record<"date" | "kind" | "amount" | "interest" | "princip
 export default function PropertyInvestmentSection({ propertyId, incomeRows, onDataChange, preloaded, landlordTaxes, solarExtra }: Props) {
     const taxes = landlordTaxes ?? { iptu: 0, itbi: 0, other: 0, total: 0 };
     const widths = useColumnWidths(columnTableKey("property-investments"));
+    const vis = useColumnVisibility(columnTableKey("property-investments"));
+    const show = (key: string) => !vis.isHidden(key);
     const sel = useCellSum({ widths });
     const txEndpoint = propertyId ? `/api/properties/${propertyId}/transactions` : null;
     const invEndpoint = propertyId ? `/api/properties/${propertyId}/investment` : null;
@@ -250,6 +253,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
     );
     // Juros / Amortização / Seguro are grouped like an Excel outline: collapsed by default, "+" expands, "−" collapses.
     const [showSplit, setShowSplit] = useState(false);
+    const hiddenKeys = INVESTMENT_COLUMNS.map(c => c.key).filter(k => vis.isHidden(k)).join(",");
     const columns = useMemo<ColumnDef<PropertyTransaction>[]>(() => {
         const toggle = (expanded: boolean) => (
             <button
@@ -262,10 +266,12 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
             </button>
         );
         const split = new Set(["interest", "principal", "insurance"]);
+        const toggleOn = (showSplit ? ["insurance", "principal", "interest", "amount", "kind", "date", "comment"] : ["amount", "kind", "date", "comment"])
+            .find(k => !hiddenKeys.includes(k));
         return INVESTMENT_COLUMNS
             .filter(c => showSplit || !split.has(c.key))
-            .map(c => (c.key === "amount" && !showSplit ? { ...c, headerExtra: toggle(false) } : c.key === "insurance" && showSplit ? { ...c, headerExtra: toggle(true) } : c));
-    }, [showSplit]);
+            .map(c => (c.key === toggleOn ? { ...c, headerExtra: toggle(showSplit) } : c));
+    }, [showSplit, hiddenKeys]);
     const cf = useColumnFilters(inPeriod, columns, { key: "date", dir: "desc" }, {
         storageKey: columnTableKey("property-investments"),
         filtersKey: propertyId ? recordTableKey("property-investments", propertyId) : undefined,
@@ -648,7 +654,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                 <div className="overflow-x-auto -mx-2">
                     <table className="w-full text-xs min-w-[980px]" style={widths.tableStyle}>
                         <thead>
-                            <ColumnHeaders columns={columns} ctl={cf} widths={widths} />
+                            <ColumnHeaders columns={columns} ctl={cf} widths={widths} visibility={vis} />
                         </thead>
                         <tbody>
                             {visible.map(tx => {
@@ -668,44 +674,52 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
                                 );
                                 return (
                                     <tr key={tx.id} className="border-b border-border/60 hover:bg-muted/30">
-                                        <td {...sel.cellProps("date", tx.id, null, "px-2 py-1 whitespace-nowrap", () => cancelDraft(tx.id, "date"))}>
-                                            <DateInput variant="bare" disabled={busy} value={d.date ?? tx.occurred_on}
-                                                onChange={iso => { if (iso) setDraft(tx.id, "date", iso); }} onBlur={() => commit(tx, "date")}
-                                                className="bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-none w-full min-w-[6.5rem] px-1 py-1 outline-none" />
-                                            {busy && <Loader2 className="inline w-3 h-3 ml-1 animate-spin text-muted-foreground" />}
-                                        </td>
-                                        <td {...sel.cellProps("kind", tx.id, null, "px-2 py-1", () => cancelDraft(tx.id, "kind"))}>
-                                            <select disabled={busy} value={d.kind ?? tx.kind}
-                                                onChange={e => { setDraft(tx.id, "kind", e.target.value); }}
-                                                onBlur={() => commit(tx, "kind")}
-                                                className={cn("bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-none w-full min-w-[5rem] px-1 py-1 outline-none",
-                                                    KIND_GROUP[tx.kind] === "FINANCIAMENTO" && "text-blue-700 dark:text-blue-400",
-                                                    KIND_GROUP[tx.kind] === "CAPEX" && "text-violet-700 dark:text-violet-400",
-                                                    KIND_GROUP[tx.kind] === "ENERGIA" && "text-amber-700 dark:text-amber-400",
-                                                    KIND_GROUP[tx.kind] === "CUSTOS" && "text-rose-700 dark:text-rose-400")}>
-                                                {ACTIVE_TRANSACTION_KINDS.map(k => <option key={k.kind} value={k.kind}>{k.label}</option>)}
-                                            </select>
-                                        </td>
-                                        <td {...sel.cellProps("amount", tx.id, tx.amount, "px-2 py-1 text-right", () => cancelDraft(tx.id, "amount"))}>{money("amount", tx.amount)}</td>
+                                        {show("date") && (
+                                            <td {...sel.cellProps("date", tx.id, null, "px-2 py-1 whitespace-nowrap", () => cancelDraft(tx.id, "date"))}>
+                                                <DateInput variant="bare" disabled={busy} value={d.date ?? tx.occurred_on}
+                                                    onChange={iso => { if (iso) setDraft(tx.id, "date", iso); }} onBlur={() => commit(tx, "date")}
+                                                    className="bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-none w-full min-w-[6.5rem] px-1 py-1 outline-none" />
+                                                {busy && <Loader2 className="inline w-3 h-3 ml-1 animate-spin text-muted-foreground" />}
+                                            </td>
+                                        )}
+                                        {show("kind") && (
+                                            <td {...sel.cellProps("kind", tx.id, null, "px-2 py-1", () => cancelDraft(tx.id, "kind"))}>
+                                                <select disabled={busy} value={d.kind ?? tx.kind}
+                                                    onChange={e => { setDraft(tx.id, "kind", e.target.value); }}
+                                                    onBlur={() => commit(tx, "kind")}
+                                                    className={cn("bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-none w-full min-w-[5rem] px-1 py-1 outline-none",
+                                                        KIND_GROUP[tx.kind] === "FINANCIAMENTO" && "text-blue-700 dark:text-blue-400",
+                                                        KIND_GROUP[tx.kind] === "CAPEX" && "text-violet-700 dark:text-violet-400",
+                                                        KIND_GROUP[tx.kind] === "ENERGIA" && "text-amber-700 dark:text-amber-400",
+                                                        KIND_GROUP[tx.kind] === "CUSTOS" && "text-rose-700 dark:text-rose-400")}>
+                                                    {ACTIVE_TRANSACTION_KINDS.map(k => <option key={k.kind} value={k.kind}>{k.label}</option>)}
+                                                </select>
+                                            </td>
+                                        )}
+                                        {show("amount") && <td {...sel.cellProps("amount", tx.id, tx.amount, "px-2 py-1 text-right", () => cancelDraft(tx.id, "amount"))}>{money("amount", tx.amount)}</td>}
                                         {showSplit && (
                                             <>
-                                                <td {...sel.cellProps("interest", tx.id, tx.interest_part, "px-2 py-1 text-right", () => cancelDraft(tx.id, "interest"))}>{money("interest", tx.interest_part, isFin)}</td>
-                                                <td {...sel.cellProps("principal", tx.id, tx.principal_part, "px-2 py-1 text-right", () => cancelDraft(tx.id, "principal"))}>{money("principal", tx.principal_part, isFin)}</td>
-                                                <td {...sel.cellProps("insurance", tx.id, tx.insurance_part, "px-2 py-1 text-right", () => cancelDraft(tx.id, "insurance"))}>{money("insurance", tx.insurance_part, isFin)}</td>
+                                                {show("interest") && <td {...sel.cellProps("interest", tx.id, tx.interest_part, "px-2 py-1 text-right", () => cancelDraft(tx.id, "interest"))}>{money("interest", tx.interest_part, isFin)}</td>}
+                                                {show("principal") && <td {...sel.cellProps("principal", tx.id, tx.principal_part, "px-2 py-1 text-right", () => cancelDraft(tx.id, "principal"))}>{money("principal", tx.principal_part, isFin)}</td>}
+                                                {show("insurance") && <td {...sel.cellProps("insurance", tx.id, tx.insurance_part, "px-2 py-1 text-right", () => cancelDraft(tx.id, "insurance"))}>{money("insurance", tx.insurance_part, isFin)}</td>}
                                             </>
                                         )}
-                                        <td {...sel.cellProps("comment", tx.id, null, "px-2 py-1", () => cancelDraft(tx.id, "comment"))}>
-                                            <input type="text" disabled={busy} value={d.comment ?? (tx.comment ?? "")} placeholder="—"
-                                                onChange={e => setDraft(tx.id, "comment", e.target.value)} onBlur={() => commit(tx, "comment")}
-                                                onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                                                className="bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-none w-full min-w-[5rem] px-1.5 py-1 outline-none truncate" />
-                                        </td>
-                                        <td {...widths.cellProps(ACTIONS_COLUMN, "px-2 py-1 text-right")}>
-                                            <button type="button" disabled={busy} onClick={() => deleteTx(tx)} title="Excluir"
-                                                className="p-1 rounded-md text-muted-foreground hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30">
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                            </button>
-                                        </td>
+                                        {show("comment") && (
+                                            <td {...sel.cellProps("comment", tx.id, null, "px-2 py-1", () => cancelDraft(tx.id, "comment"))}>
+                                                <input type="text" disabled={busy} value={d.comment ?? (tx.comment ?? "")} placeholder="—"
+                                                    onChange={e => setDraft(tx.id, "comment", e.target.value)} onBlur={() => commit(tx, "comment")}
+                                                    onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                                                    className="bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-none w-full min-w-[5rem] px-1.5 py-1 outline-none truncate" />
+                                            </td>
+                                        )}
+                                        {show(ACTIONS_COLUMN) && (
+                                            <td {...widths.cellProps(ACTIONS_COLUMN, "px-2 py-1 text-right")}>
+                                                <button type="button" disabled={busy} onClick={() => deleteTx(tx)} title="Excluir"
+                                                    className="p-1 rounded-md text-muted-foreground hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30">
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            </td>
+                                        )}
                                     </tr>
                                 );
                             })}
@@ -721,6 +735,7 @@ export default function PropertyInvestmentSection({ propertyId, incomeRows, onDa
             )}
 
             <ColumnMenu columns={columns} ctl={cf} />
+            <ColumnVisibilityMenu columns={columns} ctl={vis} widths={widths} />
 
             {/* Estimate interest / amortisation / insurance */}
             <Dialog open={splitOpen} onOpenChange={setSplitOpen}>

@@ -69,7 +69,7 @@ export function PanoramaResultsTable({ applied }: { applied: Correction }) {
     ], []);
 
     const cf = useColumnFilters(rows, columns, { key: "percent", dir: "desc" }, { storageKey: TABLE_KEY });
-    const vis = useColumnVisibility(TABLE_KEY, { locked: ["index"] });
+    const vis = useColumnVisibility(TABLE_KEY);
     const widths = useColumnWidths(TABLE_KEY);
     const sel = useCellSum({ formatByCol: { percent: formatPercent }, widths });
     const show = (key: string) => !vis.isHidden(key);
@@ -105,7 +105,7 @@ export function PanoramaResultsTable({ applied }: { applied: Correction }) {
                         <tbody>
                             {cf.rows.map((r) => (
                                 <tr key={r.key} className="border-b border-border/60 transition-colors hover:bg-muted/30">
-                                    <td {...sel.cellProps("index", r.key, null, "px-2 py-1.5 font-semibold text-foreground whitespace-nowrap")}>{r.index}</td>
+                                    {show("index") && <td {...sel.cellProps("index", r.key, null, "px-2 py-1.5 font-semibold text-foreground whitespace-nowrap")}>{r.index}</td>}
                                     {show("corrected") && (
                                         <td {...sel.cellProps("corrected", r.key, r.corrected, cn(num, "privacy-money font-bold text-foreground"))}>
                                             {r.corrected === null ? <span className="font-normal text-muted-foreground">{r.note}</span> : `R$ ${formatBRL(r.corrected)}`}

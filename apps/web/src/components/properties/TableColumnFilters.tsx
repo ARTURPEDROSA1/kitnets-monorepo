@@ -60,7 +60,7 @@ export interface RowAction<T> {
     when?: (row: T) => boolean;
 }
 
-/** Key of the actions column (lock it in `useColumnVisibility`: the buttons must not get lost). */
+/** Key of the actions column. */
 export const ACTIONS_COLUMN = "actions";
 
 /**

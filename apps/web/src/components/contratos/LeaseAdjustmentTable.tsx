@@ -165,7 +165,7 @@ export default function LeaseAdjustmentTable({ leaseId, startDate, adjustments, 
     ], []);
 
     const cf = useColumnFilters(lines, columns, { key: "date", dir: "asc" }, { storageKey: TABLE_KEY, filtersKey: recordTableKey("lease-adjustments", leaseId) });
-    const vis = useColumnVisibility(TABLE_KEY, { locked: ["step", "date", "rent"], defaultHidden: ["index", "previous_condo", "total"] });
+    const vis = useColumnVisibility(TABLE_KEY, { defaultHidden: ["index", "previous_condo", "total"] });
     const widths = useColumnWidths(TABLE_KEY);
     const sel = useCellSum({ formatByCol: { index_pct: pctText, change_pct: pctText }, widths });
     const show = (key: string) => !vis.isHidden(key);
@@ -240,8 +240,8 @@ export default function LeaseAdjustmentTable({ leaseId, startDate, adjustments, 
                                         const tone = line.changePct === null || line.changePct === 0 ? "text-muted-foreground" : line.changePct < 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400";
                                         return (
                                             <tr key={line.id} className={cn("border-b border-border/50 last:border-0 hover:bg-muted/30", (line.origin === "WAITING" || line.origin === "UNRECORDED") && "bg-amber-50/60 dark:bg-amber-950/20")}>
-                                                <td {...sel.cellProps("step", line.id, null, "whitespace-nowrap px-3 py-2 font-semibold text-foreground")}>{line.step}</td>
-                                                <td {...sel.cellProps("date", line.id, null, "whitespace-nowrap px-3 py-2 tabular-nums text-foreground")}>{formatDateBR(line.date)}</td>
+                                                {show("step") && <td {...sel.cellProps("step", line.id, null, "whitespace-nowrap px-3 py-2 font-semibold text-foreground")}>{line.step}</td>}
+                                                {show("date") && <td {...sel.cellProps("date", line.id, null, "whitespace-nowrap px-3 py-2 tabular-nums text-foreground")}>{formatDateBR(line.date)}</td>}
                                                 {show("origin") && <td {...sel.cellProps("origin", line.id, null, "px-3 py-2")}><span className={cn(pill, ORIGIN[line.origin].pill)}>{ORIGIN[line.origin].label}</span></td>}
                                                 {show("index") && <td {...sel.cellProps("index", line.id, null, "whitespace-nowrap px-3 py-2 text-muted-foreground")}>{line.indexName ?? "—"}</td>}
                                                 {show("index_pct") && (
@@ -250,7 +250,7 @@ export default function LeaseAdjustmentTable({ leaseId, startDate, adjustments, 
                                                     </td>
                                                 )}
                                                 {show("previous_rent") && <td {...sel.cellProps("previous_rent", line.id, line.previousRent, cn(num, "text-muted-foreground"))}>{money(line.previousRent)}</td>}
-                                                <td {...sel.cellProps("rent", line.id, line.rent, num)}>{money(line.rent, true, preview)}</td>
+                                                {show("rent") && <td {...sel.cellProps("rent", line.id, line.rent, num)}>{money(line.rent, true, preview)}</td>}
                                                 {show("change") && <td {...sel.cellProps("change", line.id, line.changeAmount, cn(num, preview ? "italic text-muted-foreground" : tone))}>{line.changeAmount === null ? "—" : <Money>{line.changeAmount > 0 ? "+" : line.changeAmount < 0 ? "−" : ""}{brl(Math.abs(line.changeAmount))}</Money>}</td>}
                                                 {show("change_pct") && <td {...sel.cellProps("change_pct", line.id, line.changePct, cn(num, "font-medium", preview ? "italic text-muted-foreground" : tone))}>{line.changePct === null ? "—" : line.changePct === 0 ? "sem alteração" : pctText(line.changePct)}</td>}
                                                 {show("previous_condo") && <td {...sel.cellProps("previous_condo", line.id, line.previousCondo, cn(num, "text-muted-foreground"))}>{money(line.previousCondo)}</td>}
