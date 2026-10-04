@@ -82,7 +82,7 @@ export function PanoramaResultsTable({ applied }: { applied: Correction }) {
                     R$ {formatBRL(applied.value)} de {formatDateBR(applied.start)} a {formatDateBR(applied.end)}, corrigido por cada índice
                 </h3>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                    Clique no cabeçalho para ordenar e filtrar (botão direito: colunas); selecione células para somar; setas movem entre as células
+                    Clique no cabeçalho para ordenar e filtrar (botão direito: colunas); selecione células para somar (Ctrl+C copia); setas movem entre as células
                 </p>
             </div>
 

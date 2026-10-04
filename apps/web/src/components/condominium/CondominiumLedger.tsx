@@ -19,7 +19,7 @@ import { columnTableKey, recordTableKey } from "@/lib/ui-preferences";
 import PeriodFilter, { GroupSelect } from "@/components/properties/PeriodFilter";
 import Tile, { type TileInfo } from "@/components/properties/Tile";
 import MoneyInput from "@/components/properties/MoneyInput";
-import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "@/components/properties/TableColumnFilters";
+import { ACTIONS_COLUMN, ColumnHeaders, ColumnMenu, FilterChips, actionsColumn, useColumnFilters, type ColumnDef } from "@/components/properties/TableColumnFilters";
 import { ColumnVisibilityMenu, useColumnVisibility } from "@/components/properties/TableColumnVisibility";
 import { CellSumBar, useCellSum } from "@/components/properties/TableCellSum";
 import { useColumnWidths } from "@/components/properties/TableColumnWidths";
@@ -46,7 +46,7 @@ export default function CondominiumLedger({ propertyId, lang = "pt" }: { propert
     const [showAll, setShowAll] = useState(false);
     const widths = useColumnWidths(columnTableKey("condominium-ledger"));
     const sel = useCellSum({ widths });
-    const vis = useColumnVisibility(columnTableKey("condominium-ledger"), { locked: ["month"] });
+    const vis = useColumnVisibility(columnTableKey("condominium-ledger"), { locked: ["month", ACTIONS_COLUMN] });
 
     useEffect(() => {
         let alive = true;
@@ -141,6 +141,7 @@ export default function CondominiumLedger({ propertyId, lang = "pt" }: { propert
         { key: "totalCost", label: "Total de custos", kind: "number", align: "right", get: r => r.totalCost },
         { key: "result", label: "Resultado", kind: "number", align: "right", title: "Receita − custos", get: r => r.result },
         { key: "notes", label: "Descrição", kind: "text", get: r => r.notes ?? "" },
+        actionsColumn<CondominiumMonth>([{ key: "delete", label: "Remover os custos", when: r => r.hasCosts }], { align: "center", className: "w-px whitespace-nowrap" }),
     ], [source]);
     const cf = useColumnFilters(filtered, columns, { key: "month", dir: "desc" }, {
         storageKey: columnTableKey("condominium-ledger"),
@@ -238,7 +239,7 @@ export default function CondominiumLedger({ propertyId, lang = "pt" }: { propert
                     <p className="text-xs text-muted-foreground">
                         Um mês por linha, criado sozinho para cada mês em que alguma unidade do imóvel tem aluguel em Receitas de Aluguel. A receita vem de lá;
                         Energia vem das <Link href={source.energy_cost.href} className="text-emerald-700 dark:text-emerald-400 hover:underline">faturas de energia</Link> (Valor a pagar), água das <Link href={source.water_cost.href} className="text-emerald-700 dark:text-emerald-400 hover:underline">contas de água</Link> (Valor) e IPTU de <Link href={source.iptu_amount.href} className="text-emerald-700 dark:text-emerald-400 hover:underline">Tributos do imóvel</Link>, uma entrada só.
-                        Internet e manutenção você digita nas células (Enter ou Tab para salvar). Clique no cabeçalho para ordenar e filtrar, com o botão direito para ocultar colunas; clique nas células para somá-las.
+                        Internet e manutenção você digita nas células (Enter ou Tab para salvar). Clique no cabeçalho para ordenar e filtrar, com o botão direito para ocultar colunas; clique nas células para somá-las (Ctrl+C copia).
                     </p>
                 </div>
 
@@ -251,9 +252,9 @@ export default function CondominiumLedger({ propertyId, lang = "pt" }: { propert
                     <p className="text-sm text-muted-foreground py-6 text-center">Nenhum mês no período.</p>
                 ) : (
                     <div className="overflow-x-auto -mx-2">
-                        <table className="w-full text-xs" style={{ minWidth: `${Math.max(480, columns.filter(c => !vis.isHidden(c.key)).length * 104)}px`, ...widths.tableStyle }}>
+                        <table className="w-full text-xs" style={{ minWidth: `${Math.max(480, columns.filter(c => c.key !== ACTIONS_COLUMN && !vis.isHidden(c.key)).length * 104)}px`, ...widths.tableStyle }}>
                             <thead>
-                                <ColumnHeaders columns={columns} ctl={cf} widths={widths} visibility={vis} trailing={<th className="px-2 py-2" />} />
+                                <ColumnHeaders columns={columns} ctl={cf} widths={widths} visibility={vis} />
                             </thead>
                             <tbody>
                                 {visible.map(row => {
@@ -291,7 +292,7 @@ export default function CondominiumLedger({ propertyId, lang = "pt" }: { propert
                                                     className="bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-none w-full min-w-[10rem] px-1.5 py-1 outline-none"
                                                 />
                                             </td>}
-                                            <td className="px-2 py-1 text-center">
+                                            <td {...widths.cellProps(ACTIONS_COLUMN, "px-2 py-1 text-center")}>
                                                 {row.hasCosts && (
                                                     <button type="button" disabled={busy} onClick={() => void deleteCosts(row.month)} title="Remover os custos deste mês" className="text-muted-foreground hover:text-rose-600 disabled:opacity-40">
                                                         <Trash2 className="w-3.5 h-3.5" />

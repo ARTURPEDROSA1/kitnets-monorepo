@@ -43,7 +43,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import PeriodFilter, { GroupSelect } from "./PeriodFilter";
-import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "./TableColumnFilters";
+import { ACTIONS_COLUMN, ColumnHeaders, ColumnMenu, FilterChips, actionsColumn, useColumnFilters, type ColumnDef } from "./TableColumnFilters";
 import { CellSumBar, useCellSum } from "./TableCellSum";
 import { useColumnWidths } from "./TableColumnWidths";
 import MoneyInput, { parseMoneyText } from "./MoneyInput";
@@ -148,7 +148,7 @@ export default function PropertyIncomeLedger({
 }: PropertyIncomeLedgerProps) {
     const multiUnit = units.length > 0;
     // hidden columns are remembered in the user's account, separately for properties rented as a whole and unit by unit
-    const vis = useColumnVisibility(columnTableKey("income-ledger", multiUnit ? "multi" : "single"), { locked: ["month"], legacyKey: multiUnit ? "income-ledger" : undefined });
+    const vis = useColumnVisibility(columnTableKey("income-ledger", multiUnit ? "multi" : "single"), { locked: ["month", ACTIONS_COLUMN], legacyKey: multiUnit ? "income-ledger" : undefined });
     const [localPeriod, setLocalPeriod] = useState<PeriodFilterValue>({ kind: "all" });   // the ledger opens on the whole history
     const period = periodProp ?? localPeriod;
     const setPeriod = onPeriodChange ?? setLocalPeriod;
@@ -456,6 +456,7 @@ export default function PropertyIncomeLedger({
         }] : []),
         { key: "status", label: "Status", kind: "enum", align: "center", get: r => r.status, options: [{ value: "CONFIRMED", label: "Confirmado" }, { value: "EXPECTED", label: "Previsto" }] },
         { key: "notes", label: "Comentários", kind: "text", get: r => r.notes ?? "" },
+        actionsColumn<PropertyIncomeRow>([{ key: "delete", label: multiUnit ? "Excluir lançamento" : "Excluir mês" }], { className: "w-px whitespace-nowrap" }),
     ], [multiUnit, units, hasCondo, hasDirect]);
     const cf = useColumnFilters(filtered, columns, { key: "month", dir: "desc" }, {
         storageKey: columnTableKey("income-ledger", multiUnit ? "multi" : "single"),
@@ -977,9 +978,9 @@ export default function PropertyIncomeLedger({
                 </div>
             ) : (
                 <div className="overflow-x-auto -mx-2">
-                    <table className="w-full text-xs" style={{ minWidth: `${Math.max(480, columns.filter(c => !vis.isHidden(c.key)).length * 104)}px`, ...widths.tableStyle }}>
+                    <table className="w-full text-xs" style={{ minWidth: `${Math.max(480, columns.filter(c => c.key !== ACTIONS_COLUMN && !vis.isHidden(c.key)).length * 104)}px`, ...widths.tableStyle }}>
                         <thead>
-                            <ColumnHeaders columns={columns} ctl={cf} widths={widths} visibility={vis} trailing={<th className="px-2 py-2" />} />
+                            <ColumnHeaders columns={columns} ctl={cf} widths={widths} visibility={vis} />
                         </thead>
                         <tbody>
                             {visible.map(row => {
@@ -1130,7 +1131,7 @@ export default function PropertyIncomeLedger({
                                                 className="bg-transparent border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background rounded-none w-full min-w-[5rem] px-1.5 py-1 outline-none truncate"
                                             />
                                         </td>}
-                                        <td className="px-2 py-1 text-right">
+                                        <td {...widths.cellProps(ACTIONS_COLUMN, "px-2 py-1 text-right")}>
                                             <button
                                                 type="button"
                                                 disabled={busy}

@@ -33,7 +33,7 @@ import PeriodFilter from "./PeriodFilter";
 import Tile, { type TileInfo } from "./Tile";
 import { Money } from "@/components/privacy";
 import { periodLabel, periodRange, type PeriodFilterValue } from "@/lib/period-filter";
-import { ColumnHeaders, ColumnMenu, FilterChips, useColumnFilters, type ColumnDef } from "./TableColumnFilters";
+import { ACTIONS_COLUMN, ColumnHeaders, ColumnMenu, FilterChips, actionsColumn, useColumnFilters, type ColumnDef } from "./TableColumnFilters";
 import { columnTableKey, recordTableKey } from "@/lib/ui-preferences";
 import { DateInput } from "@/components/ui/DateInput";
 import { CellSumBar, useCellSum } from "./TableCellSum";
@@ -49,6 +49,10 @@ const TAX_COLUMNS: ColumnDef<PropertyTax>[] = [
     { key: "date", label: "Data", kind: "date", get: r => r.paid_on },
     { key: "comment", label: "Comentários", kind: "text", get: r => r.comment ?? "" },
     { key: "parts", label: "Parcelas", kind: "number", sum: false, get: r => (r.installments?.length ? r.installments.length : 1) },
+    actionsColumn<PropertyTax>([
+        { key: "document", label: "Ver a guia", when: r => Boolean(r.document_url) },
+        { key: "delete", label: "Excluir" },
+    ], { className: "w-px whitespace-nowrap" }),
 ];
 
 interface Props {
@@ -386,6 +390,11 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
 
     if (!propertyId) return null;
 
+    /** The years on screen that are split in parcelas, and whether all of them are open. */
+    const withParts = cf.rows.filter(r => (r.installments ?? []).length > 0);
+    const allPartsOpen = withParts.length > 0 && withParts.every(r => expanded.has(r.id));
+    const toggleAllParts = () => setExpanded(allPartsOpen ? new Set() : new Set(withParts.map(r => r.id)));
+
     const payerLabel = (row: PropertyTax) => {
         const e = effectiveTax(row);
         if (e.payer === "MIXED") return `Misto · inquilino ${Math.round((e.byTenant / e.amount) * 100)}%`;
@@ -470,7 +479,17 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
                 <div className="overflow-x-auto -mx-2">
                     <table className="w-full text-xs min-w-[900px]" style={widths.tableStyle}>
                         <thead>
-                            <ColumnHeaders columns={TAX_COLUMNS} ctl={cf} widths={widths} leading={<th className="px-1 py-2 w-6" />} trailing={<th className="px-2 py-2" />} />
+                            <ColumnHeaders columns={TAX_COLUMNS} ctl={cf} widths={widths} leading={
+                                // the outline column: its header opens or closes the parcelas of every year shown
+                                <th className="px-1 py-2 w-6">
+                                    {withParts.length > 0 && (
+                                        <button type="button" onClick={toggleAllParts} className="p-0.5 rounded text-muted-foreground hover:text-foreground"
+                                            title={allPartsOpen ? "Ocultar as parcelas de todos" : "Mostrar as parcelas de todos"} aria-label={allPartsOpen ? "Ocultar as parcelas de todos" : "Mostrar as parcelas de todos"}>
+                                            {allPartsOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                                        </button>
+                                    )}
+                                </th>
+                            } />
                         </thead>
                         <tbody>
                             {cf.rows.length === 0 && (
@@ -546,7 +565,7 @@ export default function PropertyTaxesSection({ propertyId, onRowsChange, preload
                                                     </select>
                                                 )}
                                             </td>
-                                            <td className="px-2 py-1 text-right whitespace-nowrap">
+                                            <td {...widths.cellProps(ACTIONS_COLUMN, "px-2 py-1 text-right whitespace-nowrap")}>
                                                 {row.document_url && (
                                                     <button type="button" onClick={() => setViewer({ url: row.document_url!, title: `IPTU ${row.year}` })} title="Ver a guia do IPTU (PDF)"
                                                         className="p-1 rounded-md text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30">

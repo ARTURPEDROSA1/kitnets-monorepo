@@ -216,7 +216,7 @@ export default function LeaseAdjustmentTable({ leaseId, startDate, adjustments, 
                         </p>
                     )}
                     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
-                        <span>Uma linha por reajuste · clique no cabeçalho para ordenar e filtrar · arraste sobre as células para somar</span>
+                        <span>Uma linha por reajuste · clique no cabeçalho para ordenar e filtrar · arraste sobre as células para somar · Ctrl+C copia</span>
                         <span>{cf.rows.length} de {lines.length}</span>
                     </div>
                     {cf.anyFilter && (
