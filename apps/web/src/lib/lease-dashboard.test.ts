@@ -7,6 +7,7 @@ import {
     contractsValue,
     displayStatus,
     guessUnit,
+    guessUnitFromContract,
     hubTotals,
     inView,
     leaseIncome,
@@ -452,6 +453,20 @@ describe("guessUnit", () => {
         expect(guessUnit(units, ["35A ou 35B"])).toBeNull();
         expect(guessUnit(units, [])).toBeNull();
         expect(guessUnit([], ["Kitnet 35B"])).toBeNull();
+    });
+});
+
+describe("guessUnitFromContract", () => {
+    const units = [{ id: "1", name: "Kitnet 35" }, { id: "2", name: "Kitnet 35A" }, { id: "3", name: "Kitnet 35C" }, { id: "4", name: "Casa 35D" }];
+    it("reads the street number glued to a one-letter complement", () => {
+        // "Rua Claudionor Idelfonso Braga, 35 - C": the kitnet 35C
+        expect(guessUnitFromContract(units, { name: "Kit Net", street_number: "35", address_complement: "C" })?.id).toBe("3");
+        expect(guessUnitFromContract(units, { name: "Kitnet 35A", street_number: "35", address_complement: null })?.id).toBe("2");
+    });
+    it("never guesses from the bare street number", () => {
+        expect(guessUnitFromContract(units, { name: "Kit Net", street_number: "35", address_complement: null })).toBeNull();
+        expect(guessUnitFromContract(units, { name: "Kit Net", street_number: "35", address_complement: "fundos" })).toBeNull();
+        expect(guessUnitFromContract(units, null)).toBeNull();
     });
 });
 

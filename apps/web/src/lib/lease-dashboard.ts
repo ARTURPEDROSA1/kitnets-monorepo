@@ -628,6 +628,22 @@ export function guessUnit<T extends { id: string; name: string }>(units: T[], hi
     return specific.length === 1 ? specific[0] : null;
 }
 
+/**
+ * The unit a contract is about, from the property the AI read: its name and complement, plus the
+ * street number glued to a complement of one or two letters ("35" + "C" → "35C", the way kitnets on one
+ * lot are often named) — never the bare number, which would fit "Kitnet 35" for any "35 - C".
+ */
+export function guessUnitFromContract<T extends { id: string; name: string }>(
+    units: T[],
+    property: { name?: string | null; street_number?: string | null; address_complement?: string | null } | null | undefined
+): T | null {
+    if (!property) return null;
+    const complement = property.address_complement?.trim() ?? "";
+    const number = property.street_number?.trim() ?? "";
+    const glued = /^\d+$/.test(number) && /^[a-z]{1,2}$/i.test(complement) ? `${number}${complement}` : null;
+    return guessUnit(units, [property.name, complement, glued]);
+}
+
 /** "SANTO ANTONIO · Kitnet 35B - Maria Silva - 2025", the convention of the form's suggestion. */
 export function referenceNameFor(propertyName: string | null | undefined, unitName: string | null | undefined, tenantName: string | null | undefined, startDate: string | null | undefined): string {
     const place = [propertyName, unitName].filter(Boolean).join(" · ");

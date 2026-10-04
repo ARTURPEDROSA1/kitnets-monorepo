@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { Button } from '@kitnets/ui';
 import { Input } from '@/components/ui/input';
@@ -24,6 +24,7 @@ import { Money, Sensitive } from '@/components/privacy';
 import type { ExtractedLease, ExtractedTenantRole, MatchResult } from '@/lib/lease-extract';
 import type { AdditionalTenantFormItem, LeaseAgencyOption, LeasePropertyOption } from '@/types/lease';
 import { ROUTE_BODY_SAFE_SIZE, stageLeaseFile } from '@/lib/lease-upload-client';
+import { guessUnitFromContract, todayBRT } from '@/lib/lease-dashboard';
 
 /**
  * "Novo Contrato" entry point: upload a lease agreement, let the AI read it,
@@ -44,7 +45,14 @@ export interface LeaseImportResult {
     agentId: string;
     primaryTenantId: string;
     additionalTenants: AdditionalTenantFormItem[];
+    /** the unit of a multi-unit property the contract is for; null = the whole property, a property without units, or not asked */
+    unitId: string | null;
+    /** asked with `settleLease`: still in force or over; null when not asked */
+    status: 'ACTIVE' | 'EXPIRED' | null;
 }
+
+/** Value of the unit select for a contract of the whole multi-unit property. */
+const WHOLE_PROPERTY = '__whole__';
 
 interface Props {
     properties: LeasePropertyOption[];
@@ -65,6 +73,13 @@ interface Props {
     createsLease?: boolean;
     /** Import started from an agency's dashboard (Imobiliárias): the agency is settled, nothing to match or create */
     fixedAgency?: { id: string; label: string };
+    /**
+     * Also settle here which unit of a multi-unit property the contract is for and whether it is still in
+     * force (a Vigente | Encerrado toggle), so nothing is asked after this screen. `defaultStatus` is where
+     * the toggle starts; a term already over starts it at Encerrado either way. Left out when the unit is
+     * already known (an import from a unit card).
+     */
+    settleLease?: { defaultStatus: 'ACTIVE' | 'EXPIRED' };
 }
 
 type FieldErrors = Record<string, string>;
@@ -138,7 +153,7 @@ function errorsFrom(json: Record<string, unknown>, fallback: string): FieldError
     return { _form: typeof json.error === 'string' ? json.error : fallback };
 }
 
-export default function LeaseImportModal({ properties, agencies, onClose, onManual, onComplete, fixedProperty, initialFile, createsLease, fixedAgency }: Props) {
+export default function LeaseImportModal({ properties, agencies, onClose, onManual, onComplete, fixedProperty, initialFile, createsLease, fixedAgency, settleLease }: Props) {
     const [step, setStep] = useState<'upload' | 'review'>('upload');
     const [isExtracting, setIsExtracting] = useState(false);
     const [extractError, setExtractError] = useState<string | null>(null);
@@ -173,6 +188,11 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
     const [agentDrafts, setAgentDrafts] = useState<AgentDraft[]>([]);
     const [applying, setApplying] = useState(false);
     const [completeErrors, setCompleteErrors] = useState<string[]>([]);
+    /** the unit picked per property (a unit id or WHOLE_PROPERTY); without a pick, the one the contract names */
+    const [unitPicks, setUnitPicks] = useState<Record<string, string>>({});
+    const [unitError, setUnitError] = useState<string | null>(null);
+    /** Vigente | Encerrado as toggled; untouched, it follows `settleLease.defaultStatus` and the term */
+    const [statusPick, setStatusPick] = useState<'ACTIVE' | 'EXPIRED' | null>(null);
 
     const busy = isExtracting || applying;
 
@@ -184,12 +204,23 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
         return () => window.removeEventListener('keydown', onKey);
     }, [busy, onClose]);
 
-    const propertyOptions = createdProperty ? [...properties, createdProperty] : properties;
+    const propertyOptions = useMemo(() => (createdProperty ? [...properties, createdProperty] : properties), [createdProperty, properties]);
     const agencyOptions = createdAgency ? [...agencies, createdAgency] : agencies;
     const propertySettled = propertyMode === 'existing' && !propertyEditing && !!propertyId &&
         (propertyMatch?.id === propertyId || createdProperty?.id === propertyId);
     const agencySettled = !!fixedAgency || (agencyMode === 'existing' && !agencyEditing && !!agencyId &&
         (agencyMatch?.id === agencyId || createdAgency?.id === agencyId));
+
+    // The unit and the status, when this screen settles them (settleLease)
+    const chosenPropertyId = fixedProperty?.id ?? (propertyMode === 'existing' ? propertyId : '');
+    const units = useMemo(
+        () => (settleLease && chosenPropertyId ? propertyOptions.find(p => p.id === chosenPropertyId)?.units ?? [] : []),
+        [settleLease, chosenPropertyId, propertyOptions]
+    );
+    const unitGuess = useMemo(() => (units.length > 0 ? guessUnitFromContract(units, data?.property) : null), [units, data]);
+    const unitChoice = unitPicks[chosenPropertyId] ?? unitGuess?.id ?? '';
+    const termOver = !!data?.lease.end_date && data.lease.end_date < todayBRT();
+    const leaseStatus = statusPick ?? (termOver ? 'EXPIRED' : settleLease?.defaultStatus ?? 'ACTIVE');
 
     // ── Step 1: upload + extraction ───────────────────────────────
 
@@ -337,6 +368,11 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
 
     const handleApply = async () => {
         if (!data || !file) return;
+        // the unit first: nothing is created while it is missing
+        if (units.length > 0 && !unitChoice) {
+            setUnitError('Escolha a unidade deste contrato (ou o imóvel inteiro).');
+            return;
+        }
         setApplying(true);
         setPropertyErrors({});
         setAgencyErrors({});
@@ -483,6 +519,9 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                 additionalTenants: linked
                     .filter(t => t !== primary)
                     .map(t => ({ tenant_id: t.tenantId, role: t.role === 'OCCUPANT' ? 'OCCUPANT' : 'CO_TENANT' })),
+                // a property created just now has no units: the unit only counts for the one it was picked on
+                unitId: finalPropertyId === chosenPropertyId && units.some(u => u.id === unitChoice) ? unitChoice : null,
+                status: settleLease ? leaseStatus : null,
             });
             if (problems && problems.length > 0) setCompleteErrors(problems);
         } catch {
@@ -673,6 +712,36 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                                 <div><p className="text-muted-foreground">Vencimento</p><p className="font-semibold text-foreground">{data.lease.rent_due_day ? `Dia ${data.lease.rent_due_day}` : '—'}</p></div>
                             </div>
 
+                            {/* ── In force or over ── */}
+                            {settleLease && (
+                                <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border p-4">
+                                    <div className="min-w-0 flex-1">
+                                        <h3 className="text-sm font-semibold text-foreground">Situação do contrato</h3>
+                                        <p className="mt-0.5 text-xs text-muted-foreground">
+                                            {leaseStatus === 'EXPIRED'
+                                                ? 'Encerrado: entra no histórico, sem contar como vigente.'
+                                                : termOver ? 'Vigente: o término lido já passou, segue por prazo indeterminado.' : 'Vigente: entra nos contratos em vigor.'}
+                                        </p>
+                                    </div>
+                                    <div role="radiogroup" aria-label="Situação do contrato" className="inline-flex shrink-0 rounded-lg border border-border bg-background p-0.5">
+                                        {([['ACTIVE', 'Vigente'], ['EXPIRED', 'Encerrado']] as const).map(([value, label]) => (
+                                            <button
+                                                key={value}
+                                                type="button"
+                                                role="radio"
+                                                aria-checked={leaseStatus === value}
+                                                onClick={() => setStatusPick(value)}
+                                                disabled={applying}
+                                                className={cn('rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                                                    leaseStatus === value ? (value === 'ACTIVE' ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-white') : 'text-muted-foreground hover:text-foreground')}
+                                            >
+                                                {label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </section>
+                            )}
+
                             {/* ── Property ── */}
                             <section className="space-y-3 rounded-xl border border-border p-4">
                                 <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground"><Home className="h-4 w-4" /> Imóvel</h3>
@@ -712,6 +781,27 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                                         <option value="">Selecione um imóvel...</option>
                                         {propertyOptions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                                     </select>
+                                )}
+
+                                {/* a multi-unit property: which unit (or all of it) */}
+                                {units.length > 0 && (
+                                    <div>
+                                        <Label className="text-xs">Unidade deste contrato *</Label>
+                                        <select
+                                            className={cn(selectClass, unitError && !unitChoice && 'border-red-500')}
+                                            value={unitChoice}
+                                            onChange={e => { setUnitPicks(prev => ({ ...prev, [chosenPropertyId]: e.target.value })); setUnitError(null); }}
+                                            disabled={applying}
+                                        >
+                                            <option value="">Selecione a unidade...</option>
+                                            {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                                            <option value={WHOLE_PROPERTY}>Imóvel inteiro (todas as unidades)</option>
+                                        </select>
+                                        {unitGuess && unitChoice === unitGuess.id && (
+                                            <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"><Sparkles className="h-3 w-3 text-amber-500" /> Sugerida pelo que a IA leu no contrato — confira.</p>
+                                        )}
+                                        {unitError && !unitChoice && <p className="mt-1 text-xs text-red-500">{unitError}</p>}
+                                    </div>
                                 )}
 
                                 {propertyMode === 'create' && propertyDraft && (

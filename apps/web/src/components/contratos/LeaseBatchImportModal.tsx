@@ -3,22 +3,17 @@
 /**
  * "Importar contratos antigos": the PDFs of contracts that already ran (the previous tenant, the
  * contract before the renewal) go in as a batch. Each file goes through the same AI reading and
- * party matching as a new contract (LeaseImportModal), then a short settle step — which unit,
- * which status — and the lease is created with the PDF attached. Nothing is created without a
- * click per contract; a file can be skipped.
+ * party matching as a new contract (LeaseImportModal), which here also settles the unit of a
+ * multi-unit property and the Vigente | Encerrado toggle; its "Criar contrato" creates the lease with
+ * the PDF attached. Nothing is created without a click per contract; a file can be skipped.
  */
 import React, { useMemo, useRef, useState } from "react";
 import { AlertTriangle, Archive, CheckCircle2, FileText, Loader2, SkipForward, Sparkles, Trash2, Upload, X } from "lucide-react";
 import { Button } from "@kitnets/ui";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { formatDateBR } from "@/lib/dates";
 import { checkLeaseFile, LEASE_UPLOAD_ACCEPT } from "@/lib/lease-upload-client";
 import { createLeaseFromImport, type ImportedLeaseOutcome } from "@/lib/lease-import-client";
-import { brl, guessUnit, referenceNameFor, todayBRT } from "@/lib/lease-dashboard";
-import { Money } from "@/components/privacy";
-import type { LeaseStatus } from "@/types/lease";
+import { referenceNameFor } from "@/lib/lease-dashboard";
 import LeaseImportModal, { type LeaseImportResult } from "./LeaseImportModal";
 import type { LeaseFormDropdowns } from "./LeaseForm";
 
@@ -37,7 +32,7 @@ interface Props {
     fixedAgency?: { id: string; label: string };
 }
 
-type Step = "pick" | "review" | "settle" | "done";
+type Step = "pick" | "review" | "done";
 
 interface Outcome {
     file: File;
@@ -58,13 +53,6 @@ export default function LeaseBatchImportModal({ dropdowns, refreshDropdowns, onC
     /** the lists refreshed after a reading (the import creates records); until then the caller's */
     const [refreshed, setRefreshed] = useState<LeaseFormDropdowns | null>(null);
     const lists = refreshed ?? dropdowns;
-    /** what the AI read and the user settled for the current file, waiting for the unit and the status */
-    const [pending, setPending] = useState<LeaseImportResult | null>(null);
-    const [unitId, setUnitId] = useState("");
-    const [status, setStatus] = useState<LeaseStatus>("EXPIRED");
-    const [reference, setReference] = useState("");
-    const [creating, setCreating] = useState(false);
-    const [createError, setCreateError] = useState<string[]>([]);
     const input = useRef<HTMLInputElement>(null);
 
     const current = files[index] ?? null;
@@ -84,8 +72,6 @@ export default function LeaseBatchImportModal({ dropdowns, refreshDropdowns, onC
 
     const advance = (outcome: Outcome) => {
         setOutcomes(prev => [...prev, outcome]);
-        setPending(null);
-        setCreateError([]);
         if (index + 1 < files.length) {
             setIndex(index + 1);
             setStep("review");
@@ -94,44 +80,24 @@ export default function LeaseBatchImportModal({ dropdowns, refreshDropdowns, onC
         }
     };
 
-    /** The AI read the file and the parties are settled: pick the unit and the status before creating. */
-    const settle = async (result: LeaseImportResult) => {
+    /**
+     * "Criar contrato" on the review: the parties, the unit and the status are settled there. Returns the
+     * messages to show when the lease could not be created (the review then stays open), else moves on.
+     */
+    const create = async (result: LeaseImportResult): Promise<string[] | void> => {
+        if (!current) return;
+        // the import may have just created the property and the tenant: their names come from fresh lists
         const fresh = (await refreshDropdowns()) ?? lists;
         if (fresh) setRefreshed(fresh);
         const property = fresh?.properties.find(p => p.id === result.propertyId);
+        const unit = property?.units?.find(u => u.id === result.unitId) ?? null;
         const tenant = fresh?.tenants.find(t => t.id === result.primaryTenantId);
-        const units = property?.units ?? [];
-        const guess = units.length > 0 ? guessUnit(units, [result.data.property?.name, result.data.property?.address_complement]) : null;
-        const endsBeforeToday = Boolean(result.data.lease.end_date && result.data.lease.end_date < todayBRT());
-        setPending(result);
-        setUnitId(guess?.id ?? "");
-        setStatus(asHistory || endsBeforeToday ? "EXPIRED" : "ACTIVE");
-        setReference(referenceNameFor(property?.name, guess?.name, tenant?.full_name, result.data.lease.start_date));
-        setStep("settle");
-    };
-
-    const create = async () => {
-        if (!pending || !current) return;
-        const property = lists?.properties.find(p => p.id === pending.propertyId);
-        const units = property?.units ?? [];
-        if (units.length > 0 && !unitId) {
-            setCreateError(["Escolha a unidade deste contrato (ou o imóvel inteiro)."]);
-            return;
-        }
-        setCreating(true);
-        setCreateError([]);
-        const unit = units.find(u => u.id === unitId) ?? null;
-        const tenant = lists?.tenants.find(t => t.id === pending.primaryTenantId);
-        const outcome: ImportedLeaseOutcome = await createLeaseFromImport(pending, {
+        const outcome: ImportedLeaseOutcome = await createLeaseFromImport(result, {
             unitId: unit?.id ?? null,
-            referenceName: reference.trim() || referenceNameFor(property?.name, unit?.name, tenant?.full_name, pending.data.lease.start_date),
-            status,
+            referenceName: referenceNameFor(property?.name, unit?.name, tenant?.full_name, result.data.lease.start_date),
+            status: result.status ?? (asHistory ? "EXPIRED" : "ACTIVE"),
         });
-        setCreating(false);
-        if (!outcome.ok) {
-            setCreateError(outcome.errors ?? ["Não foi possível criar o contrato."]);
-            return;
-        }
+        if (!outcome.ok) return outcome.errors ?? ["Não foi possível criar o contrato."];
         advance({ file: current, result: outcome.alreadyExisted ? "existed" : "created", leaseId: outcome.leaseId, fileSkipped: outcome.fileSkipped });
     };
 
@@ -148,25 +114,20 @@ export default function LeaseBatchImportModal({ dropdowns, refreshDropdowns, onC
                 createsLease
                 fixedAgency={fixedAgency}
                 fixedProperty={fixedProperty}
+                settleLease={{ defaultStatus: asHistory ? "EXPIRED" : "ACTIVE" }}
                 onClose={skip}
-                onComplete={result => { void settle(result); }}
+                onComplete={create}
             />
         );
     }
 
-    const property = pending ? lists?.properties.find(p => p.id === pending.propertyId) : undefined;
-    const units = property?.units ?? [];
-    const tenant = pending ? lists?.tenants.find(t => t.id === pending.primaryTenantId) : undefined;
-
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !creating && onClose(createdIds)} />
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => onClose(createdIds)} />
             <div className="relative flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
-                {!creating && (
-                    <button type="button" onClick={() => onClose(createdIds)} className="absolute right-4 top-4 z-10 rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="Fechar">
-                        <X className="h-5 w-5" />
-                    </button>
-                )}
+                <button type="button" onClick={() => onClose(createdIds)} className="absolute right-4 top-4 z-10 rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="Fechar">
+                    <X className="h-5 w-5" />
+                </button>
 
                 <div className="flex items-start gap-3.5 p-6 pb-4 sm:p-7 sm:pb-4">
                     <div className="shrink-0 rounded-xl bg-amber-100 p-2.5 text-amber-600 dark:bg-amber-900/40">
@@ -174,16 +135,14 @@ export default function LeaseBatchImportModal({ dropdowns, refreshDropdowns, onC
                     </div>
                     <div className="space-y-1 pr-6">
                         <h2 className="text-xl font-bold tracking-tight text-foreground">
-                            {step === "pick" ? (mode === "current" ? "Importar contratos de locação" : "Importar contratos antigos") : step === "settle" ? `Contrato ${index + 1} de ${files.length}` : "Importação concluída"}
+                            {step === "pick" ? (mode === "current" ? "Importar contratos de locação" : "Importar contratos antigos") : "Importação concluída"}
                         </h2>
                         <p className="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                             {step === "pick"
                                 ? (mode === "current"
                                     ? <>Envie os contratos de locação{fixedProperty ? <> de <strong className="text-foreground">{fixedProperty.label}</strong></> : fixedAgency ? <> da <strong className="text-foreground">{fixedAgency.label}</strong></> : null}. A IA lê cada um, você confirma imóvel, inquilinos e corretor, e o contrato é criado com o arquivo guardado — o que já estiver cadastrado não é criado de novo.</>
                                     : <>Envie os PDFs de contratos que já rodaram (o inquilino anterior, o contrato antes da renovação). A IA lê cada um, você confirma as partes e o contrato entra no histórico com o arquivo guardado.</>)
-                                : step === "settle"
-                                    ? <>Confira a unidade e o status e crie o contrato. O arquivo <strong className="text-foreground">{current?.name}</strong> fica anexado a ele.</>
-                                    : <>O que foi criado aparece em Contratos{mode === "current" ? " → Vigentes (ou Encerrados, quando já terminou)" : " → Encerrados (ou Vigentes, quando ainda em vigor)"}.</>}
+                                : <>O que foi criado aparece em Contratos{mode === "current" ? " → Vigentes (ou Encerrados, quando já terminou)" : " → Encerrados (ou Vigentes, quando ainda em vigor)"}.</>}
                         </p>
                     </div>
                 </div>
@@ -232,64 +191,9 @@ export default function LeaseBatchImportModal({ dropdowns, refreshDropdowns, onC
                                 <input type="checkbox" className="mt-0.5" checked={asHistory} onChange={e => setAsHistory(e.target.checked)} />
                                 <span>
                                     <span className="font-medium text-foreground">Registrar como encerrados</span>
-                                    <span className="block text-xs text-muted-foreground">São contratos que já terminaram: entram no histórico sem contar como vigentes, mesmo que a data de término lida esteja no futuro. Desmarque para decidir contrato a contrato.</span>
+                                    <span className="block text-xs text-muted-foreground">São contratos que já terminaram: entram no histórico sem contar como vigentes, mesmo que a data de término lida esteja no futuro. Vale como padrão — na revisão de cada contrato dá para trocar entre vigente e encerrado.</span>
                                 </span>
                             </label>
-                        </div>
-                    )}
-
-                    {step === "settle" && pending && (
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-xl border border-border bg-muted/30 p-3 text-xs sm:grid-cols-4">
-                                <div><p className="text-muted-foreground">Aluguel</p><Money as="p" className="font-semibold text-foreground">{pending.data.lease.monthly_rent != null ? brl(pending.data.lease.monthly_rent) : "—"}</Money></div>
-                                <div><p className="text-muted-foreground">Início</p><p className="font-semibold text-foreground">{formatDateBR(pending.data.lease.start_date)}</p></div>
-                                <div><p className="text-muted-foreground">Término</p><p className="font-semibold text-foreground">{formatDateBR(pending.data.lease.end_date)}</p></div>
-                                <div><p className="text-muted-foreground">Inquilino</p><p className="break-words font-semibold text-foreground">{tenant?.full_name ?? "—"}</p></div>
-                            </div>
-
-                            <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-2.5 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">
-                                <CheckCircle2 className="h-4 w-4 shrink-0" />
-                                <span>Imóvel: <strong>{property?.name ?? "não definido"}</strong></span>
-                            </div>
-
-                            {units.length > 0 && (
-                                <div>
-                                    <Label className="text-xs">Unidade deste contrato *</Label>
-                                    <select className="flex h-9 w-full rounded-md border bg-background px-2 py-1 text-sm" value={unitId} onChange={e => {
-                                        setUnitId(e.target.value);
-                                        const u = units.find(x => x.id === e.target.value);
-                                        setReference(referenceNameFor(property?.name, u?.name, tenant?.full_name, pending.data.lease.start_date));
-                                    }}>
-                                        <option value="">Selecione a unidade…</option>
-                                        {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                                        <option value="__whole__">Imóvel inteiro (todas as unidades)</option>
-                                    </select>
-                                    {unitId && units.some(u => u.id === unitId) && guessUnit(units, [pending.data.property?.name, pending.data.property?.address_complement])?.id === unitId && (
-                                        <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"><Sparkles className="h-3 w-3 text-amber-500" /> Sugerida pelo que a IA leu no contrato — confira.</p>
-                                    )}
-                                </div>
-                            )}
-
-                            <div className="grid gap-3 sm:grid-cols-2">
-                                <div>
-                                    <Label className="text-xs">Status</Label>
-                                    <select className="flex h-9 w-full rounded-md border bg-background px-2 py-1 text-sm" value={status} onChange={e => setStatus(e.target.value as LeaseStatus)}>
-                                        <option value="EXPIRED">Encerrado (histórico)</option>
-                                        <option value="ACTIVE">Ativo (ainda em vigor)</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <Label className="text-xs">Referência</Label>
-                                    <Input className="h-9" value={reference} onChange={e => setReference(e.target.value)} />
-                                </div>
-                            </div>
-
-                            {createError.length > 0 && (
-                                <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400">
-                                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                                    <div>{createError.map(e => <p key={e}>{e}</p>)}</div>
-                                </div>
-                            )}
                         </div>
                     )}
 
@@ -318,7 +222,6 @@ export default function LeaseBatchImportModal({ dropdowns, refreshDropdowns, onC
                 <div className="flex flex-col gap-3 border-t border-border p-4 sm:flex-row sm:items-center sm:justify-between sm:px-7">
                     <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                         {step === "pick" && (files.length > 0 ? `${files.length} ${files.length === 1 ? "arquivo" : "arquivos"} · lidos um a um, você confirma cada contrato.` : "Nenhum arquivo selecionado.")}
-                        {step === "settle" && `${outcomes.length} de ${files.length} já processados.`}
                         {step === "done" && `${createdIds.length} ${createdIds.length === 1 ? "contrato criado" : "contratos criados"}.`}
                     </p>
                     <div className="flex shrink-0 justify-end gap-2">
@@ -328,15 +231,6 @@ export default function LeaseBatchImportModal({ dropdowns, refreshDropdowns, onC
                                 <Button type="button" onClick={() => { setIndex(0); setStep("review"); }} disabled={files.length === 0 || !lists}>
                                     {!lists ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
                                     Ler com IA
-                                </Button>
-                            </>
-                        )}
-                        {step === "settle" && (
-                            <>
-                                <Button type="button" variant="outline" onClick={skip} disabled={creating}><SkipForward className="mr-1 h-4 w-4" /> Pular</Button>
-                                <Button type="button" onClick={() => void create()} disabled={creating}>
-                                    {creating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                                    Criar contrato
                                 </Button>
                             </>
                         )}

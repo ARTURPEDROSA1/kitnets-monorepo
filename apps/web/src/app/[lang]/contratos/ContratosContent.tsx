@@ -20,7 +20,7 @@ import LeaseDashboard from "@/components/contratos/LeaseDashboard";
 import LeaseForm, { EMPTY_LEASE_FORM, emptyLeaseInitial, formatDateBR, leaseToInitial, maskDate, moneyToMask, parseDateBR, type LeaseFormDropdowns, type LeaseFormInitial } from "@/components/contratos/LeaseForm";
 import LeaseImportModal, { type LeaseImportResult } from "@/components/contratos/LeaseImportModal";
 import LeaseBatchImportModal from "@/components/contratos/LeaseBatchImportModal";
-import { summarizeLeases, todayBRT, viewFromParam, type LeaseRow, type LeaseView } from "@/lib/lease-dashboard";
+import { referenceNameFor, summarizeLeases, todayBRT, viewFromParam, type LeaseRow, type LeaseView } from "@/lib/lease-dashboard";
 import { leaseIndexSeriesCode, type IndexPoint } from "@/lib/lease-summary";
 import type { LeaseDashboardView, LeaseListView } from "@/lib/lease-views";
 import type { LeaseWithDetails } from "@/types/lease";
@@ -176,15 +176,17 @@ export default function ContratosContent({ lang, initial = null, initialDashboar
         // The import may have just created the property, the agency and the tenants.
         const fresh = await fetchDropdowns();
         const { lease } = result.data;
-        const propertyName = fresh?.properties.find(p => p.id === result.propertyId)?.name;
+        const property = fresh?.properties.find(p => p.id === result.propertyId);
+        const unitName = property?.units?.find(u => u.id === result.unitId)?.name;
         const tenantName = fresh?.tenants.find(t => t.id === result.primaryTenantId)?.full_name;
-        const year = lease.start_date ? lease.start_date.slice(0, 4) : new Date().getFullYear();
 
         const initialForm: LeaseFormInitial = {
             form: {
                 ...EMPTY_LEASE_FORM,
-                reference_name: propertyName && tenantName ? `${propertyName} - ${tenantName} - ${year}` : "",
+                reference_name: property?.name && tenantName ? referenceNameFor(property.name, unitName, tenantName, lease.start_date ?? String(new Date().getFullYear())) : "",
                 property_id: result.propertyId,
+                // the unit and the status picked on the import's review
+                unit_id: result.unitId ?? "",
                 primary_tenant_id: result.primaryTenantId,
                 management_type: result.agencyId ? "AGENCY" : result.agentId ? "AGENT" : "SELF_MANAGED",
                 agency_id: result.agencyId,
@@ -197,7 +199,7 @@ export default function ContratosContent({ lang, initial = null, initialDashboar
                 deposit_months: lease.deposit_months?.toString() || "",
                 adjustment_index: lease.adjustment_index || "",
                 adjustment_frequency: lease.adjustment_frequency?.toString() || "12",
-                status: lease.end_date && lease.end_date < toISODate(new Date()) ? "EXPIRED" : "ACTIVE",
+                status: result.status ?? (lease.end_date && lease.end_date < toISODate(new Date()) ? "EXPIRED" : "ACTIVE"),
                 notes: lease.notes || "",
             },
             additionalTenants: result.additionalTenants,
@@ -356,6 +358,7 @@ export default function ContratosContent({ lang, initial = null, initialDashboar
                         void fetchDropdowns();
                     }}
                     onManual={() => { setImportOpen(false); openNewForm(); }}
+                    settleLease={{ defaultStatus: "ACTIVE" }}
                     onComplete={handleImportComplete}
                 />
             )}
