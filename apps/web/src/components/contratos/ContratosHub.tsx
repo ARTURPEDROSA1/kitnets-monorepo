@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { loadAccountPreferences, readLocalPreference, saveAccountPreference, writeLocalPreference } from "@/lib/ui-preferences-client";
 import { formatDateBR } from "@/lib/dates";
-import { LEASE_VIEWS, MANAGEMENT_LABELS, attentionItems, contractsValue, hubTotals, inView, leaseManagers, matchesManager, type LeaseRow, type LeaseView } from "@/lib/lease-dashboard";
+import { LEASE_VIEWS, MANAGEMENT_LABELS, attentionItems, contractGroups, hubTotals, inView, leaseManagers, matchesManager, type LeaseRow, type LeaseView } from "@/lib/lease-dashboard";
 import type { PropertyKind } from "@/lib/lease-charges";
 import ContratosKpis from "./ContratosKpis";
 import LeaseTable, { type LeaseTableActions } from "./LeaseTable";
@@ -42,17 +42,6 @@ type Mode = "lista" | "linha";
 /** Where table-or-timeline is remembered: `view:contratos` */
 const VIEW_KEY = "contratos";
 const isMode = (v: unknown): v is Mode => v === "lista" || v === "linha";
-
-/** What the figure of the Contratos card counts, by tab: "6 em vigor", "1 encerrado", "7 no total". */
-function scopeUnit(view: LeaseView, n: number): string {
-    switch (view) {
-        case "vigentes": return "em vigor";
-        case "vencendo": return "vencendo";
-        case "encerrados": return n === 1 ? "encerrado" : "encerrados";
-        case "rascunhos": return n === 1 ? "rascunho" : "rascunhos";
-        default: return "no total";
-    }
-}
 
 /**
  * Table or timeline. It opens on the table (what the server drew), then takes this device's copy and the
@@ -129,8 +118,8 @@ export default function ContratosHub({ rows, today, propertyKinds = {}, loading,
     const filtered = Boolean(search || property || management);
     // the cards count what is shown: the tab and the filters above the table
     const totals = useMemo(() => hubTotals(visible, today, { countAll: true }), [visible, today]);
-    const value = useMemo(() => contractsValue(visible, today, { countAll: true }), [visible, today]);
-    const unit = `${scopeUnit(view, visible.length)}${filtered ? " · com filtro" : ""}`;
+    // in force, closed and drafts apart: the cards never add a closed contract to the ones running
+    const groups = useMemo(() => contractGroups(visible, today), [visible, today]);
     const viewMeta = LEASE_VIEWS.find(v => v.key === view)!;
     const shownAttention = allAttention ? attention : attention.slice(0, 4);
 
@@ -158,7 +147,7 @@ export default function ContratosHub({ rows, today, propertyKinds = {}, loading,
             </div>
 
             {/* KPI strip */}
-            {rows.length > 0 && <ContratosKpis totals={totals} value={value} unit={unit} allCount={rows.length} onOpen={actions.onOpen} />}
+            {rows.length > 0 && <ContratosKpis totals={totals} groups={groups} filtered={filtered} allCount={rows.length} onOpen={actions.onOpen} />}
 
             {/* Attention */}
             {attention.length > 0 && (
