@@ -358,7 +358,7 @@ export default function ContratosContent({ lang, initial = null, initialDashboar
                         void fetchDropdowns();
                     }}
                     onManual={() => { setImportOpen(false); openNewForm(); }}
-                    settleLease={{ defaultStatus: "ACTIVE" }}
+                    settleLease={{ defaultStatus: "ACTIVE", askStatus: false }}
                     onComplete={handleImportComplete}
                 />
             )}

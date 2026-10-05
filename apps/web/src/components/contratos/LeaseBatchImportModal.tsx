@@ -5,14 +5,17 @@
  * contract before the renewal) go in as a batch. Each file goes through the same AI reading and
  * party matching as a new contract (LeaseImportModal), which here also settles the unit of a
  * multi-unit property and the Vigente | Encerrado toggle; its "Criar contrato" creates the lease with
- * the PDF attached. Nothing is created without a click per contract; a file can be skipped.
+ * the PDF attached. Nothing is created without a click per contract; a file can be skipped ("Pular
+ * arquivo"), and closing the review stops the whole import. A contract registered as closed takes the
+ * day it ended, and its closing term (termo de encerramento) can be one of the batch's files: read by
+ * the AI for that day, attached to the contract and not read again as a contract of its own.
  */
 import React, { useMemo, useRef, useState } from "react";
 import { AlertTriangle, Archive, CheckCircle2, FileText, Loader2, SkipForward, Sparkles, Trash2, Upload, X } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { cn } from "@/lib/utils";
 import { checkLeaseFile, LEASE_UPLOAD_ACCEPT } from "@/lib/lease-upload-client";
-import { createLeaseFromImport, type ImportedLeaseOutcome } from "@/lib/lease-import-client";
+import { closeImportedLease, createLeaseFromImport, type ImportedLeaseOutcome } from "@/lib/lease-import-client";
 import { referenceNameFor } from "@/lib/lease-dashboard";
 import LeaseImportModal, { type LeaseImportResult } from "./LeaseImportModal";
 import type { LeaseFormDropdowns } from "./LeaseForm";
@@ -34,11 +37,16 @@ interface Props {
 
 type Step = "pick" | "review" | "done";
 
+const formatBR = (iso: string) => iso.slice(0, 10).split("-").reverse().join("/");
+
 interface Outcome {
     file: File;
-    result: "created" | "existed" | "skipped" | "failed";
+    /** attached: the closing term of a contract created in this batch */
+    result: "created" | "existed" | "skipped" | "failed" | "attached";
     leaseId?: string;
     fileSkipped?: boolean;
+    /** the day the contract ended, when it was registered as closed */
+    closedOn?: string;
     errors?: string[];
 }
 
@@ -55,7 +63,14 @@ export default function LeaseBatchImportModal({ dropdowns, refreshDropdowns, onC
     const lists = refreshed ?? dropdowns;
     const input = useRef<HTMLInputElement>(null);
 
+    /** files taken as another contract's closing term: attached there, never read as a contract */
+    const [consumed, setConsumed] = useState<Set<number>>(new Set());
     const current = files[index] ?? null;
+    /** where a closing term may come from: the batch's other files, but those already made into a contract */
+    const otherFiles = useMemo(
+        () => files.filter((f, i) => i !== index && !consumed.has(i) && !outcomes.some(o => o.file === f && o.result !== "skipped")),
+        [files, index, consumed, outcomes]
+    );
     const createdIds = useMemo(() => outcomes.filter(o => o.result === "created" && o.leaseId).map(o => o.leaseId as string), [outcomes]);
 
     const addFiles = (picked: File[]) => {
@@ -70,10 +85,15 @@ export default function LeaseBatchImportModal({ dropdowns, refreshDropdowns, onC
         setFileErrors(errors);
     };
 
-    const advance = (outcome: Outcome) => {
-        setOutcomes(prev => [...prev, outcome]);
-        if (index + 1 < files.length) {
-            setIndex(index + 1);
+    const advance = (outcome: Outcome, alsoConsumed: number[] = [], extras: Outcome[] = []) => {
+        const taken = new Set([...consumed, ...alsoConsumed]);
+        setConsumed(taken);
+        setOutcomes(prev => [...prev, outcome, ...extras]);
+        // the next file still to read: a closing term attached to a contract is not a contract
+        let next = index + 1;
+        while (next < files.length && taken.has(next)) next++;
+        if (next < files.length) {
+            setIndex(next);
             setStep("review");
         } else {
             setStep("done");
@@ -98,10 +118,28 @@ export default function LeaseBatchImportModal({ dropdowns, refreshDropdowns, onC
             status: result.status ?? (asHistory ? "EXPIRED" : "ACTIVE"),
         });
         if (!outcome.ok) return outcome.errors ?? ["Não foi possível criar o contrato."];
-        advance({ file: current, result: outcome.alreadyExisted ? "existed" : "created", leaseId: outcome.leaseId, fileSkipped: outcome.fileSkipped });
+
+        // a closed contract: the day it ended, and its closing term attached
+        const termIndex = result.closing?.file ? files.indexOf(result.closing.file) : -1;
+        const extra: Outcome[] = [];
+        let closedOn: string | undefined;
+        let closeErrors: string[] = [];
+        if (result.closing && outcome.leaseId) {
+            const closed = await closeImportedLease(outcome.leaseId, { date: result.closing.date, endDate: result.data.lease.end_date, file: result.closing.file, storagePath: result.closing.storagePath });
+            closedOn = result.closing.date;
+            closeErrors = closed.errors;
+            if (result.closing.file) extra.push({ file: result.closing.file, result: closed.termSkipped ? "failed" : "attached", leaseId: outcome.leaseId, errors: closed.termSkipped ? ["O termo de encerramento não pôde ser anexado ao contrato."] : undefined });
+        }
+        advance(
+            { file: current, result: outcome.alreadyExisted ? "existed" : "created", leaseId: outcome.leaseId, fileSkipped: outcome.fileSkipped, closedOn, errors: closeErrors.length > 0 ? closeErrors : undefined },
+            termIndex >= 0 ? [termIndex] : [],
+            extra
+        );
     };
 
     const skip = () => { if (current) advance({ file: current, result: "skipped" }); };
+    /** closing the review (X, Esc) stops the import: what was done so far, or nothing to show */
+    const stop = () => { if (outcomes.length > 0) setStep("done"); else onClose(createdIds); };
 
     // ── The AI step is the same modal as "Novo Contrato" ─────────
     if (step === "review" && current && lists) {
@@ -115,7 +153,10 @@ export default function LeaseBatchImportModal({ dropdowns, refreshDropdowns, onC
                 fixedAgency={fixedAgency}
                 fixedProperty={fixedProperty}
                 settleLease={{ defaultStatus: asHistory ? "EXPIRED" : "ACTIVE" }}
-                onClose={skip}
+                otherFiles={otherFiles}
+                progress={`Arquivo ${index + 1} de ${files.length} · ${current.name}`}
+                onSkip={skip}
+                onClose={stop}
                 onComplete={create}
             />
         );
@@ -201,13 +242,15 @@ export default function LeaseBatchImportModal({ dropdowns, refreshDropdowns, onC
                         <ul className="divide-y divide-border/60 rounded-xl border border-border">
                             {outcomes.map((o, i) => (
                                 <li key={`${o.file.name}-${i}`} className="flex items-center gap-2 px-3 py-2 text-sm">
-                                    {o.result === "failed" ? <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600" /> : o.result === "skipped" ? <SkipForward className="h-4 w-4 shrink-0 text-muted-foreground" /> : <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />}
+                                    {o.result === "failed" || (o.errors && o.errors.length > 0) ? <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600" /> : o.result === "skipped" ? <SkipForward className="h-4 w-4 shrink-0 text-muted-foreground" /> : <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />}
                                     <span className="min-w-0 flex-1">
                                         <span className="block break-words text-foreground">{o.file.name}</span>
                                         <span className="block text-xs text-muted-foreground">
-                                            {o.result === "created" ? `Contrato criado${o.fileSkipped ? " · o arquivo não pôde ser anexado" : " com o arquivo anexado"}`
-                                                : o.result === "existed" ? "Já estava cadastrado (mesma unidade, inquilino e início)"
-                                                : o.result === "skipped" ? "Pulado" : (o.errors ?? []).join(" ")}
+                                            {o.result === "created" ? `Contrato criado${o.fileSkipped ? " · o arquivo não pôde ser anexado" : " com o arquivo anexado"}${o.closedOn ? ` · encerrado em ${formatBR(o.closedOn)}` : ""}`
+                                                : o.result === "existed" ? `Já estava cadastrado (mesma unidade, inquilino e início)${o.closedOn ? ` · encerramento em ${formatBR(o.closedOn)}` : ""}`
+                                                : o.result === "attached" ? "Anexado ao contrato como termo de encerramento"
+                                                : o.result === "skipped" ? "Pulado" : ""}
+                                            {o.errors && o.errors.length > 0 && <span className="block text-rose-600">{o.errors.join(" ")}</span>}
                                         </span>
                                     </span>
                                     {o.leaseId && (

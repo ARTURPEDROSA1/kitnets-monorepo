@@ -125,6 +125,23 @@ describe("normalizeLeaseExtraction", () => {
     });
 });
 
+describe("closing terms", () => {
+    it("reads when the lease really ended and whether the file is only the term", () => {
+        // Bastos' "Fechamento aluguel locador": the contract ran 20/12/2024 → 20/06/2027, the property came back on 02/06/2025
+        const term = normalizeLeaseExtraction({ document_kind: "TERMINATION", lease: { start_date: "2024-12-20", end_date: "2027-06-20", termination_date: "02/06/2025" } });
+        expect(term.document_kind).toBe("TERMINATION");
+        expect(term.lease.termination_date).toBe("2025-06-02");
+        expect(term.lease.end_date).toBe("2027-06-20");
+    });
+    it("is a contract with no closing date unless the document says otherwise", () => {
+        const contract = normalizeLeaseExtraction({ lease: { start_date: "2024-12-20", end_date: "2027-06-20" } });
+        expect(contract.document_kind).toBe("CONTRACT");
+        expect(contract.lease.termination_date).toBeNull();
+        // a closing date before the start is a misread: dropped
+        expect(normalizeLeaseExtraction({ lease: { start_date: "2024-12-20", termination_date: "2024-01-01" } }).lease.termination_date).toBeNull();
+    });
+});
+
 describe("agents in the extraction", () => {
     const base = { lease: { start_date: "2026-03-01", monthly_rent: "1500" }, tenants: [{ full_name: "João", cpf: VALID_CPF }] };
 

@@ -27,9 +27,11 @@ ATENÇÃO:
 
 Retorne SOMENTE um JSON válido (sem markdown, sem explicações) com esta estrutura:
 {
+    "document_kind": "CONTRACT (o contrato de locação, com ou sem aditivos e termos anexos) | TERMINATION (somente um termo de encerramento, rescisão, distrato, fechamento ou entrega de chaves, sem o contrato)",
     "lease": {
         "start_date": "início da locação (YYYY-MM-DD) ou null",
-        "end_date": "término da locação (YYYY-MM-DD) ou null",
+        "end_date": "término da locação previsto no contrato (YYYY-MM-DD) ou null",
+        "termination_date": "data em que a locação acabou de fato (YYYY-MM-DD) — devolução do imóvel, entrega das chaves, rescisão ou distrato — SOMENTE se o documento trouxer um termo de encerramento, rescisão, distrato ou fechamento; senão null",
         "duration_months": "prazo em meses (número) ou null",
         "monthly_rent": "valor do aluguel mensal, ex: 1500.00",
         "rent_due_day": "dia do mês do vencimento do aluguel (1-31) ou null",
@@ -114,6 +116,7 @@ Regras:
 - Liste em "charges" somente os encargos que o contrato menciona.
 - ENERGIA ELÉTRICA e CONDOMÍNIO com valor fixo cobrado junto com o aluguel (comum em kitnets e imóveis com várias unidades: "taxa de energia de R$ 300,00", "condomínio de R$ 150,00") SEMPRE entram em "charges" com o "amount" e com a regra de reajuste do próprio encargo, que pode ser diferente da do aluguel. Se o contrato disser que o encargo é reajustado "pelo mesmo índice do aluguel", repita o índice do aluguel.
 - "agents": os corretores (pessoas físicas) do contrato: quem assina pela imobiliária, o corretor responsável indicado no cabeçalho, no rodapé ou na qualificação das partes (com CRECI-F), ou o corretor autônomo que intermedeia. Locador, locatário e fiador NÃO são corretores. Sem ninguém assim, use uma lista vazia.
+- TERMO DE ENCERRAMENTO / FECHAMENTO / RESCISÃO / DISTRATO: "termination_date" é a data da devolução do imóvel (ou da entrega das chaves, ou da rescisão), nunca a data de assinatura do termo nem o término previsto do contrato. Um documento que é só o termo é "document_kind": "TERMINATION"; extraia dele também início, término, imóvel, locatário e imobiliária, como num contrato.
 - "confidence" (0.0 a 1.0) reflete a qualidade geral da extração.`;
 
 // ── Extracted shape ──────────────────────────────────────────────────
@@ -190,9 +193,13 @@ export interface ExtractedCharge {
 }
 
 export interface ExtractedLease {
+    /** the contract itself, or only a closing term (termo de encerramento / rescisão / distrato) */
+    document_kind: "CONTRACT" | "TERMINATION";
     lease: {
         start_date: string | null;
         end_date: string | null;
+        /** when the lease really ended (return of the property), read from a closing term; null without one */
+        termination_date: string | null;
         monthly_rent: number | null;
         rent_due_day: number | null;
         security_deposit: number | null;
@@ -339,6 +346,7 @@ export function normalizeLeaseExtraction(raw: unknown): ExtractedLease {
     const duration = int(l.duration_months, 1, 600);
     if (!end && start && duration) end = endDateFromDuration(start, duration);
     if (start && end && end <= start) end = null;
+    const termination = isoDate(l.termination_date);
 
     const monthlyRent = money(l.monthly_rent);
     let deposit = money(l.security_deposit);
@@ -477,9 +485,12 @@ export function normalizeLeaseExtraction(raw: unknown): ExtractedLease {
     const confidence = typeof root.confidence === "number" && root.confidence >= 0 && root.confidence <= 1 ? root.confidence : null;
 
     return {
+        document_kind: root.document_kind === "TERMINATION" ? "TERMINATION" : "CONTRACT",
         lease: {
             start_date: start,
             end_date: end,
+            // a closing term ends the lease after it started
+            termination_date: termination && (!start || termination > start) ? termination : null,
             monthly_rent: monthlyRent,
             rent_due_day: int(l.rent_due_day, 1, 31),
             security_deposit: deposit,

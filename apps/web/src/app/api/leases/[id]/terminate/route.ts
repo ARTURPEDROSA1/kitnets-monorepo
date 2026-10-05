@@ -7,7 +7,8 @@ type Params = { id: string };
 
 /**
  * POST /api/leases/[id]/terminate
- * Ends a lease: sets status, date and reason without deleting it.
+ * Ends a lease: sets status, date and reason without deleting it. `status: "EXPIRED"` records the day a
+ * contract that ran its term ended (an old contract imported with its closing date); the default is a rescission.
  */
 export const POST = withAuth<typeof leaseTerminationSchema, Params>(
     { body: leaseTerminationSchema, tag: "Lease Terminate" },
@@ -20,7 +21,7 @@ export const POST = withAuth<typeof leaseTerminationSchema, Params>(
         const { data: updated, error } = await supabase
             .from("leases")
             .update({
-                status: "TERMINATED",
+                status: body.status,
                 termination_date: body.termination_date,
                 termination_reason: body.termination_reason,
                 // Keep the existing notes when the request brings none.
@@ -35,6 +36,6 @@ export const POST = withAuth<typeof leaseTerminationSchema, Params>(
             return NextResponse.json({ error: "Erro ao rescindir contrato." }, { status: 500 });
         }
 
-        return NextResponse.json({ lease: updated, message: "Contrato rescindido com sucesso." });
+        return NextResponse.json({ lease: updated, message: body.status === "EXPIRED" ? "Encerramento registrado." : "Contrato rescindido com sucesso." });
     }
 );

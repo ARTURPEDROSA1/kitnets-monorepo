@@ -1,6 +1,6 @@
 import type { LeaseImportResult } from "@/components/contratos/LeaseImportModal";
 import type { LeaseStatus, LeaseWithDetails } from "@/types/lease";
-import { attachLeaseContract } from "@/lib/lease-upload-client";
+import { attachLeaseContract, attachLeaseDocument } from "@/lib/lease-upload-client";
 
 /**
  * Turns a reviewed lease import straight into a lease, for the places that import without opening
@@ -95,4 +95,37 @@ export async function createLeaseFromImport(
 
     const attached = await attachLeaseContract(json.lease.id as string, result.file, result.storagePath);
     return { ok: true, leaseId: json.lease.id as string, warning: (json.warning as string | null) ?? null, fileSkipped: !attached };
+}
+
+/**
+ * The status a closed contract takes from the day it ended: before its term it was rescinded
+ * (TERMINATED, "Rescindido"); on or after it, it ran out (EXPIRED, "Encerrado").
+ */
+export const closedStatus = (closedOn: string, endDate: string | null | undefined): "TERMINATED" | "EXPIRED" =>
+    endDate && closedOn >= endDate.slice(0, 10) ? "EXPIRED" : "TERMINATED";
+
+/**
+ * Records the day an imported contract ended (the return of the property) and attaches its closing term
+ * (termo de encerramento) when there is one. Errors come back as messages; the lease stays created.
+ */
+export async function closeImportedLease(
+    leaseId: string,
+    closing: { date: string; endDate: string | null; file: File | null; storagePath: string | null }
+): Promise<{ ok: boolean; termSkipped: boolean; errors: string[] }> {
+    const errors: string[] = [];
+    const res = await fetch(`/api/leases/${leaseId}/terminate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            termination_date: closing.date,
+            termination_reason: closing.file ? `Termo de encerramento: ${closing.file.name}` : "Encerramento informado na importação",
+            status: closedStatus(closing.date, closing.endDate),
+        }),
+    }).catch(() => null);
+    if (!res || !res.ok) {
+        const json = res ? await res.json().catch(() => ({})) : {};
+        errors.push(typeof json.error === "string" ? json.error : "Não foi possível registrar a data de encerramento.");
+    }
+    const termSkipped = closing.file ? !("document" in (await attachLeaseDocument(leaseId, closing.file, "OTHER", closing.storagePath))) : false;
+    return { ok: errors.length === 0, termSkipped, errors };
 }
