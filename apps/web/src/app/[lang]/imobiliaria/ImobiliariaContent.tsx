@@ -187,7 +187,6 @@ export default function ImobiliariaContent({ lang, initial = null, initialDashbo
             <LeaseBatchImportModal
                 dropdowns={dropdowns}
                 refreshDropdowns={fetchDropdowns}
-                mode="current"
                 fixedAgency={importFor.agency ? { id: importFor.agency.id, label: importFor.agency.trade_name || importFor.agency.name } : undefined}
                 onClose={ids => { void closeImport(ids); }}
                 onOpenLease={id => router.push(`${contratosBase}?id=${id}`)}

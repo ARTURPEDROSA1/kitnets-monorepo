@@ -3571,7 +3571,6 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                     <LeaseBatchImportModal
                         dropdowns={leaseDropdowns}
                         refreshDropdowns={fetchLeaseDropdowns}
-                        mode="current"
                         fixedProperty={leaseImport.propIdx !== null && properties[leaseImport.propIdx]?.id
                             ? { id: properties[leaseImport.propIdx].id as string, label: properties[leaseImport.propIdx].details?.propertyName || `Propriedade ${leaseImport.propIdx + 1}` }
                             : undefined}

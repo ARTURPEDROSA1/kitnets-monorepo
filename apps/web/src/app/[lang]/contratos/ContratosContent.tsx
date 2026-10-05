@@ -3,9 +3,9 @@
 /**
  * Contratos — the hub of the account's leases, one contract's dashboard (`?id=`, the old
  * `?lease=` still works) and the form that creates or edits one. The list and the dashboard are
- * preloaded by the page on the server; refreshes go through the API. Modals — terminate, delete,
- * the AI import of a new contract, the batch import of old ones — are owned here so the hub and
- * the dashboard share them.
+ * preloaded by the page on the server; refreshes go through the API. "Novo Contrato" opens the form
+ * to type a contract in; "Importar contrato" is the AI import (one or many files, current or old).
+ * Modals — terminate, delete, the import — are owned here so the hub and the dashboard share them.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -17,26 +17,18 @@ import { PdfViewerModal } from "@/components/ui/PdfViewerModal";
 import { ReturnToPropertyLink, useReturnPropertyId } from "@/components/properties/ReturnToPropertyLink";
 import ContratosHub from "@/components/contratos/ContratosHub";
 import LeaseDashboard from "@/components/contratos/LeaseDashboard";
-import LeaseForm, { EMPTY_LEASE_FORM, emptyLeaseInitial, formatDateBR, leaseToInitial, maskDate, moneyToMask, parseDateBR, type LeaseFormDropdowns, type LeaseFormInitial } from "@/components/contratos/LeaseForm";
-import LeaseImportModal, { type LeaseImportResult } from "@/components/contratos/LeaseImportModal";
+import LeaseForm, { emptyLeaseInitial, leaseToInitial, maskDate, parseDateBR, type LeaseFormDropdowns, type LeaseFormInitial } from "@/components/contratos/LeaseForm";
 import LeaseBatchImportModal from "@/components/contratos/LeaseBatchImportModal";
-import { referenceNameFor, summarizeLeases, todayBRT, viewFromParam, type LeaseRow, type LeaseView } from "@/lib/lease-dashboard";
+import { summarizeLeases, todayBRT, viewFromParam, type LeaseRow, type LeaseView } from "@/lib/lease-dashboard";
 import { leaseIndexSeriesCode, type IndexPoint } from "@/lib/lease-summary";
 import type { LeaseDashboardView, LeaseListView } from "@/lib/lease-views";
 import type { LeaseWithDetails } from "@/types/lease";
-import { toISODate } from "@/lib/dates";
-import { LEASE_UPLOAD_MAX_SIZE } from "@/lib/lease-upload-client";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-// Files the multipart route takes when the direct upload is not available (POST /api/leases/[id]/documents).
-const ROUTE_MIME_TYPES = ["application/pdf", "image/jpeg", "image/jpg", "image/png"];
 
 interface FormState {
     editingId: string | null;
     initial: LeaseFormInitial;
-    aiImported: boolean;
-    importedFile: File | null;
-    importedStoragePath: string | null;
 }
 
 interface Props {
@@ -53,7 +45,7 @@ export default function ContratosContent({ lang, initial = null, initialDashboar
     const rawId = searchParams.get("id") ?? searchParams.get("lease");
     const selectedId = rawId && UUID.test(rawId) ? rawId : null;
     const view = viewFromParam(searchParams.get("view"));
-    // ?importar=1 (the dashboard's "Importar contrato"): the import of current contracts opens straight away
+    // ?importar=1 (the dashboard's "Importar contrato"): the import opens straight away
     const wantsImport = searchParams.get("importar") === "1";
     const today = useMemo(() => todayBRT(), []);
     const base = lang === "pt" ? "/contratos" : `/${lang}/contratos`;
@@ -135,7 +127,7 @@ export default function ContratosContent({ lang, initial = null, initialDashboar
     const [notice, setNotice] = useState<string | null>(null);
     const [dashboardKey, setDashboardKey] = useState(0);
 
-    const openNewForm = () => setFormState({ editingId: null, initial: emptyLeaseInitial(), aiImported: false, importedFile: null, importedStoragePath: null });
+    const openNewForm = () => setFormState({ editingId: null, initial: emptyLeaseInitial() });
 
     const openEdit = async (id: string, known?: LeaseWithDetails) => {
         let full = known;
@@ -150,7 +142,7 @@ export default function ContratosContent({ lang, initial = null, initialDashboar
             }
         }
         if (!full) return;
-        setFormState({ editingId: id, initial: leaseToInitial(full), aiImported: false, importedFile: null, importedStoragePath: null });
+        setFormState({ editingId: id, initial: leaseToInitial(full) });
     };
 
     const onSaved = async (id: string, warning: string | null) => {
@@ -161,63 +153,13 @@ export default function ContratosContent({ lang, initial = null, initialDashboar
         select(id);
     };
 
-    // ── AI import of a new contract ───────────────────────────────
-    const [importOpen, setImportOpen] = useState(false);
+    // ── AI import (one or many contracts, current or old) ──────────
     const [batchOpen, setBatchOpen] = useState(wantsImport);
-    /** "history" for "Importar contratos antigos"; "current" when the dashboard asked for an import */
-    const [batchMode, setBatchMode] = useState<"history" | "current">(wantsImport ? "current" : "history");
     // the parameter is consumed: a reload does not reopen the import
     useEffect(() => {
         if (wantsImport) router.replace(base, { scroll: false });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-
-    const handleImportComplete = async (result: LeaseImportResult) => {
-        // The import may have just created the property, the agency and the tenants.
-        const fresh = await fetchDropdowns();
-        const { lease } = result.data;
-        const property = fresh?.properties.find(p => p.id === result.propertyId);
-        const unitName = property?.units?.find(u => u.id === result.unitId)?.name;
-        const tenantName = fresh?.tenants.find(t => t.id === result.primaryTenantId)?.full_name;
-
-        const initialForm: LeaseFormInitial = {
-            form: {
-                ...EMPTY_LEASE_FORM,
-                reference_name: property?.name && tenantName ? referenceNameFor(property.name, unitName, tenantName, lease.start_date ?? String(new Date().getFullYear())) : "",
-                property_id: result.propertyId,
-                // the unit and the status picked on the import's review
-                unit_id: result.unitId ?? "",
-                primary_tenant_id: result.primaryTenantId,
-                management_type: result.agencyId ? "AGENCY" : result.agentId ? "AGENT" : "SELF_MANAGED",
-                agency_id: result.agencyId,
-                agent_id: result.agentId,
-                start_date: formatDateBR(lease.start_date),
-                end_date: formatDateBR(lease.end_date),
-                monthly_rent: moneyToMask(lease.monthly_rent),
-                rent_due_day: lease.rent_due_day?.toString() || "",
-                security_deposit: moneyToMask(lease.security_deposit),
-                deposit_months: lease.deposit_months?.toString() || "",
-                adjustment_index: lease.adjustment_index || "",
-                adjustment_frequency: lease.adjustment_frequency?.toString() || "12",
-                status: result.status ?? (lease.end_date && lease.end_date < toISODate(new Date()) ? "EXPIRED" : "ACTIVE"),
-                notes: lease.notes || "",
-            },
-            additionalTenants: result.additionalTenants,
-            charges: result.data.charges.map(c => ({
-                charge_type: c.charge_type,
-                label: c.label,
-                responsibility: c.responsibility,
-                amount: moneyToMask(c.amount),
-                adjustment_index: c.adjustment_index || "",
-                adjustment_notes: c.adjustment_notes || "",
-            })),
-            // Everything the AI filled must be in sight for the review.
-        };
-        // A file already in storage is adopted whatever its size; one that still has to go through the route must fit it
-        const importedFile = result.storagePath || (ROUTE_MIME_TYPES.includes(result.file.type) && result.file.size <= LEASE_UPLOAD_MAX_SIZE) ? result.file : null;
-        setImportOpen(false);
-        setFormState({ editingId: null, initial: initialForm, aiImported: true, importedFile, importedStoragePath: result.storagePath });
-    };
 
     // ── Files (open the contract PDF from the list) ───────────────
     const [viewingDoc, setViewingDoc] = useState<{ url: string; title: string; fileName: string } | null>(null);
@@ -347,26 +289,10 @@ export default function ContratosContent({ lang, initial = null, initialDashboar
                 </div>
             )}
 
-            {importOpen && dropdowns && (
-                <LeaseImportModal
-                    properties={dropdowns.properties}
-                    agencies={dropdowns.agencies}
-                    onClose={() => {
-                        setImportOpen(false);
-                        // The import may have created records before it was cancelled.
-                        void fetchDropdowns();
-                    }}
-                    onManual={() => { setImportOpen(false); openNewForm(); }}
-                    settleLease={{ defaultStatus: "ACTIVE", askStatus: false }}
-                    onComplete={handleImportComplete}
-                />
-            )}
-
             {batchOpen && (
                 <LeaseBatchImportModal
                     dropdowns={dropdowns}
                     refreshDropdowns={fetchDropdowns}
-                    mode={batchMode}
                     onClose={created => {
                         setBatchOpen(false);
                         if (created.length > 0) load().catch(() => {});
@@ -396,9 +322,6 @@ export default function ContratosContent({ lang, initial = null, initialDashboar
                     editingId={formState.editingId}
                     initial={formState.initial}
                     dropdowns={dropdowns}
-                    aiImported={formState.aiImported}
-                    importedFile={formState.importedFile}
-                    importedStoragePath={formState.importedStoragePath}
                     indexSeries={series}
                     onSaved={onSaved}
                     onCancel={() => setFormState(null)}
@@ -450,8 +373,8 @@ export default function ContratosContent({ lang, initial = null, initialDashboar
                     onOpenFile: row => { void openContractFile(row); },
                     openingFileId,
                 }}
-                onNew={() => { if (dropdowns) setImportOpen(true); else openNewForm(); }}
-                onImportOld={() => { setBatchMode("history"); setBatchOpen(true); }}
+                onNew={openNewForm}
+                onImport={() => setBatchOpen(true)}
             />
             {modals}
         </>
