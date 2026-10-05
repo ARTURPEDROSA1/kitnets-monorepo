@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { Button } from '@kitnets/ui';
 import { Input } from '@/components/ui/input';
+import { DateInput } from '@/components/ui/DateInput';
 import { Label } from '@/components/ui/label';
 import {
     AlertTriangle,
@@ -49,6 +50,35 @@ export interface LeaseImportResult {
     unitId: string | null;
     /** asked with `settleLease`: still in force or over; null when not asked */
     status: 'ACTIVE' | 'EXPIRED' | null;
+    /** a closed contract registered by the batch: the day it ended and its closing term (termo de encerramento), if any */
+    closing: { date: string; file: File | null; storagePath: string | null } | null;
+}
+
+/** A file named like a closing term: "termo de encerramento", "fechamento", "rescisão", "distrato", "entrega das chaves". */
+const TERM_NAME = /encerr|fechament|rescis|distrat|entrega|termo/i;
+
+/** Reads a file with the lease AI (POST /api/leases/extract): straight to storage, the route body for a small file when that fails. */
+async function readWithAi(file: File): Promise<{ data: ExtractedLease; storagePath: string | null } | { error: string }> {
+    try {
+        const staged = await stageLeaseFile(file);
+        let res: Response;
+        let storagePath: string | null = null;
+        if ('path' in staged) {
+            storagePath = staged.path;
+            res = await fetch('/api/leases/extract', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ storage_path: staged.path }) });
+        } else if (file.size <= ROUTE_BODY_SAFE_SIZE) {
+            const formData = new FormData();
+            formData.append('file', file);
+            res = await fetch('/api/leases/extract', { method: 'POST', body: formData });
+        } else {
+            return { error: staged.error };
+        }
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json.data) return { error: typeof json.error === 'string' ? json.error : 'Não foi possível ler o arquivo com a IA.' };
+        return { data: json.data as ExtractedLease, storagePath };
+    } catch {
+        return { error: 'Erro de conexão ao ler o arquivo. Tente novamente.' };
+    }
 }
 
 /** Value of the unit select for a contract of the whole multi-unit property. */
@@ -77,9 +107,16 @@ interface Props {
      * Also settle here which unit of a multi-unit property the contract is for and whether it is still in
      * force (a Vigente | Encerrado toggle), so nothing is asked after this screen. `defaultStatus` is where
      * the toggle starts; a term already over starts it at Encerrado either way. Left out when the unit is
-     * already known (an import from a unit card).
+     * already known (an import from a unit card). `askStatus: false` asks only the unit (the form that
+     * follows has the status). With `createsLease`, an Encerrado contract also needs the day it ended.
      */
-    settleLease?: { defaultStatus: 'ACTIVE' | 'EXPIRED' };
+    settleLease?: { defaultStatus: 'ACTIVE' | 'EXPIRED'; askStatus?: boolean };
+    /** The batch's other files: the closing term (termo de encerramento) of this contract may be one of them */
+    otherFiles?: File[];
+    /** The batch: "Pular arquivo" moves on to the next file; closing (X, Esc) stops the whole import */
+    onSkip?: () => void;
+    /** The batch: which file this is ("Arquivo 1 de 2 · contrato.pdf") */
+    progress?: string;
 }
 
 type FieldErrors = Record<string, string>;
@@ -153,7 +190,7 @@ function errorsFrom(json: Record<string, unknown>, fallback: string): FieldError
     return { _form: typeof json.error === 'string' ? json.error : fallback };
 }
 
-export default function LeaseImportModal({ properties, agencies, onClose, onManual, onComplete, fixedProperty, initialFile, createsLease, fixedAgency, settleLease }: Props) {
+export default function LeaseImportModal({ properties, agencies, onClose, onManual, onComplete, fixedProperty, initialFile, createsLease, fixedAgency, settleLease, otherFiles = [], onSkip, progress }: Props) {
     const [step, setStep] = useState<'upload' | 'review'>('upload');
     const [isExtracting, setIsExtracting] = useState(false);
     const [extractError, setExtractError] = useState<string | null>(null);
@@ -193,6 +230,16 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
     const [unitError, setUnitError] = useState<string | null>(null);
     /** Vigente | Encerrado as toggled; untouched, it follows `settleLease.defaultStatus` and the term */
     const [statusPick, setStatusPick] = useState<'ACTIVE' | 'EXPIRED' | null>(null);
+    /** the day a closed contract ended (the return of the property), and where the date came from */
+    const [closingDate, setClosingDate] = useState('');
+    const [closingSource, setClosingSource] = useState<'term' | 'document' | 'end' | null>(null);
+    const [closingError, setClosingError] = useState<string | null>(null);
+    /** the closing term picked (one of the batch's files, or one sent here) and its reading */
+    const [termFile, setTermFile] = useState<File | null>(null);
+    const [termStoragePath, setTermStoragePath] = useState<string | null>(null);
+    const [termReading, setTermReading] = useState(false);
+    const [termError, setTermError] = useState<string | null>(null);
+    const termInputRef = useRef<HTMLInputElement>(null);
 
     const busy = isExtracting || applying;
 
@@ -221,6 +268,29 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
     const unitChoice = unitPicks[chosenPropertyId] ?? unitGuess?.id ?? '';
     const termOver = !!data?.lease.end_date && data.lease.end_date < todayBRT();
     const leaseStatus = statusPick ?? (termOver ? 'EXPIRED' : settleLease?.defaultStatus ?? 'ACTIVE');
+    const askStatus = !!settleLease && settleLease.askStatus !== false;
+    /** only where this screen creates the lease can it record the day it ended */
+    const askClosing = askStatus && !!createsLease && leaseStatus === 'EXPIRED';
+
+    /** The closing term: kept to attach to the lease, and read by the AI for the day the property came back. */
+    const pickTerm = async (file: File | null) => {
+        setTermFile(file);
+        setTermStoragePath(null);
+        setTermError(null);
+        if (!file) return;
+        setTermReading(true);
+        const read = await readWithAi(file);
+        setTermReading(false);
+        if ('error' in read) { setTermError(read.error); return; }
+        setTermStoragePath(read.storagePath);
+        if (read.data.lease.termination_date) {
+            setClosingDate(read.data.lease.termination_date);
+            setClosingSource('term');
+            setClosingError(null);
+        } else {
+            setTermError('A IA não achou a data de devolução neste arquivo: informe a data de encerramento.');
+        }
+    };
 
     // ── Step 1: upload + extraction ───────────────────────────────
 
@@ -344,6 +414,16 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                 };
             }));
 
+            // the day a closed contract ended: what the document says, else the term when it is already over
+            const read = extracted.lease.termination_date;
+            const endOver = extracted.lease.end_date && extracted.lease.end_date < todayBRT() ? extracted.lease.end_date : null;
+            setClosingDate(read ?? endOver ?? '');
+            setClosingSource(read ? 'document' : endOver ? 'end' : null);
+            // a closing term among the batch's files: picked and read when the contract goes in as closed
+            const termGuess = otherFiles.find(f => TERM_NAME.test(f.name));
+            const startsClosed = !!settleLease && settleLease.askStatus !== false && !!createsLease && (!!endOver || settleLease.defaultStatus === 'EXPIRED');
+            if (termGuess && startsClosed && !read && extracted.document_kind !== 'TERMINATION') void pickTerm(termGuess);
+
             setStep('review');
         } catch {
             setExtractError('Erro de conexão ao processar o documento. Tente novamente.');
@@ -372,6 +452,11 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
         if (units.length > 0 && !unitChoice) {
             setUnitError('Escolha a unidade deste contrato (ou o imóvel inteiro).');
             return;
+        }
+        if (askClosing) {
+            if (termReading) { setClosingError('Aguarde a leitura do termo de encerramento.'); return; }
+            if (!closingDate) { setClosingError('Informe a data de encerramento (devolução do imóvel).'); return; }
+            if (data.lease.start_date && closingDate <= data.lease.start_date) { setClosingError('A data de encerramento deve ser posterior ao início do contrato.'); return; }
         }
         setApplying(true);
         setPropertyErrors({});
@@ -519,7 +604,8 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                     .map(t => ({ tenant_id: t.tenantId, role: t.role === 'OCCUPANT' ? 'OCCUPANT' : 'CO_TENANT' })),
                 // a property created just now has no units: the unit only counts for the one it was picked on
                 unitId: finalPropertyId === chosenPropertyId && units.some(u => u.id === unitChoice) ? unitChoice : null,
-                status: settleLease ? leaseStatus : null,
+                status: askStatus ? leaseStatus : null,
+                closing: askClosing && closingDate ? { date: closingDate, file: termFile, storagePath: termStoragePath } : null,
             });
             if (problems && problems.length > 0) setCompleteErrors(problems);
         } catch {
@@ -616,6 +702,7 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                         <h2 className="text-xl font-bold tracking-tight text-foreground">
                             {step === 'upload' ? 'Novo Contrato' : 'Confira o que a IA encontrou'}
                         </h2>
+                        {progress && <p className="text-xs font-medium text-amber-700 dark:text-amber-400">{progress}</p>}
                         <p className="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                             {step === 'upload'
                                 ? <>Envie o <strong className="text-foreground">contrato de locação</strong> para a IA preencher o contrato, cadastrar os inquilinos e vincular imóvel e imobiliária, ou digite manualmente.</>
@@ -710,9 +797,24 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                                 <div><p className="text-muted-foreground">Vencimento</p><p className="font-semibold text-foreground">{data.lease.rent_due_day ? `Dia ${data.lease.rent_due_day}` : '—'}</p></div>
                             </div>
 
+                            {/* ── This file is only a closing term ── */}
+                            {data.document_kind === 'TERMINATION' && (
+                                <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                                    <span>
+                                        Este arquivo é um <strong>termo de encerramento</strong>, não o contrato
+                                        {data.lease.termination_date ? <> (devolução em <strong>{formatDate(data.lease.termination_date)}</strong>)</> : null}.{' '}
+                                        {onSkip
+                                            ? <>Pule este arquivo: na revisão do contrato, escolha-o em <strong>Termo de encerramento</strong>.</>
+                                            : <>Envie o contrato e anexe este termo na revisão dele.</>}
+                                    </span>
+                                </div>
+                            )}
+
                             {/* ── In force or over ── */}
-                            {settleLease && (
-                                <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border p-4">
+                            {askStatus && (
+                                <section className="space-y-3 rounded-xl border border-border p-4">
+                                <div className="flex flex-wrap items-center justify-between gap-3">
                                     <div className="min-w-0 flex-1">
                                         <h3 className="text-sm font-semibold text-foreground">Situação do contrato</h3>
                                         <p className="mt-0.5 text-xs text-muted-foreground">
@@ -737,6 +839,53 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                                             </button>
                                         ))}
                                     </div>
+                                </div>
+
+                                {/* a closed contract: the day it ended, confirmed by the user; the closing term, read by the AI */}
+                                {askClosing && (
+                                    <div className="grid gap-3 border-t border-border/60 pt-3 sm:grid-cols-2">
+                                        <div>
+                                            <Label className="text-xs">Data de encerramento (devolução do imóvel) *</Label>
+                                            <DateInput
+                                                value={closingDate}
+                                                onChange={iso => { setClosingDate(iso); setClosingSource(null); setClosingError(null); }}
+                                                className={cn(closingError && 'border-red-500')}
+                                                disabled={applying}
+                                            />
+                                            {closingSource && !closingError && (
+                                                <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                                                    <Sparkles className="h-3 w-3 text-amber-500" />
+                                                    {closingSource === 'term' ? 'Lida do termo de encerramento — confira.' : closingSource === 'document' ? 'Lida no documento — confira.' : 'O término do contrato — confira o dia da devolução.'}
+                                                </p>
+                                            )}
+                                            {closingError && <p className="mt-1 text-xs text-red-500">{closingError}</p>}
+                                        </div>
+                                        <div>
+                                            <Label className="text-xs">Termo de encerramento</Label>
+                                            <select
+                                                className={selectClass}
+                                                value={termFile ? (otherFiles.includes(termFile) ? `f${otherFiles.indexOf(termFile)}` : 'sent') : ''}
+                                                onChange={e => {
+                                                    const v = e.target.value;
+                                                    if (v === 'new') { termInputRef.current?.click(); return; }
+                                                    if (v === 'sent') return;
+                                                    void pickTerm(v.startsWith('f') ? otherFiles[Number(v.slice(1))] ?? null : null);
+                                                }}
+                                                disabled={applying || termReading}
+                                            >
+                                                <option value="">Nenhum</option>
+                                                {otherFiles.map((f, i) => <option key={`${f.name}-${i}`} value={`f${i}`}>{f.name}</option>)}
+                                                {termFile && !otherFiles.includes(termFile) && <option value="sent">{termFile.name}</option>}
+                                                <option value="new">Enviar arquivo…</option>
+                                            </select>
+                                            <input ref={termInputRef} type="file" accept=".pdf,image/png,image/jpeg,image/webp" className="hidden" onChange={e => { const f = e.target.files?.[0] ?? null; e.target.value = ''; if (f) void pickTerm(f); }} />
+                                            {termReading
+                                                ? <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> Lendo o termo com IA…</p>
+                                                : termError ? <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">{termError}</p>
+                                                : <p className="mt-1 text-xs text-muted-foreground">{termFile ? 'Fica guardado com o contrato.' : 'Opcional: a IA lê a data de devolução e o PDF fica com o contrato.'}</p>}
+                                        </div>
+                                    </div>
+                                )}
                                 </section>
                             )}
 
@@ -1122,7 +1271,9 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                                 <span className="break-words">{createLabels.length > 0 || createsLease ? `Será criado: ${[...createLabels, createsLease ? 'contrato' : null].filter(Boolean).join(', ')}.` : 'Nenhum cadastro novo será criado.'}</span>
                             </p>
                             <div className="flex shrink-0 justify-end gap-2">
-                                <Button type="button" variant="outline" onClick={onClose} disabled={applying}>Cancelar</Button>
+                                {onSkip
+                                    ? <Button type="button" variant="outline" onClick={onSkip} disabled={applying}>Pular arquivo</Button>
+                                    : <Button type="button" variant="outline" onClick={onClose} disabled={applying}>Cancelar</Button>}
                                 <Button type="button" onClick={handleApply} disabled={applying}>
                                     {applying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
                                     {createsLease ? 'Criar contrato' : createLabels.length > 0 ? 'Criar e preencher contrato' : 'Preencher contrato'}

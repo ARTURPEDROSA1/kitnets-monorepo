@@ -134,6 +134,11 @@ export const leaseTerminationSchema = z.object({
     termination_date: requiredText("Data de rescisão é obrigatória.", 10).refine((v) => ISO_DATE.test(v), "Data de rescisão inválida."),
     termination_reason: optionalText(1000),
     notes: optionalText(5000),
+    /**
+     * TERMINATED (default): rescinded before its term. EXPIRED: a contract that ran to its term (or past it,
+     * month to month) and ended on that date — an old contract imported with its closing date.
+     */
+    status: z.enum(["TERMINATED", "EXPIRED"]).optional().transform((v) => v ?? "TERMINATED"),
 });
 
 export const LEASE_DOCUMENT_TYPES = ["CONTRACT", "ADDENDUM", "INSPECTION", "TENANT_DOC", "DEPOSIT_RECEIPT", "OTHER"] as const;

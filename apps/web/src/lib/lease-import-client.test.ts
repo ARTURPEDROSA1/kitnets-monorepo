@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { leaseInputSchema } from "@/lib/schemas/lease";
 import type { LeaseImportResult } from "@/components/contratos/LeaseImportModal";
-import { leasePayloadFromImport } from "./lease-import-client";
+import { closedStatus, leasePayloadFromImport } from "./lease-import-client";
 
 const result = {
     file: new File(["x"], "contrato.pdf", { type: "application/pdf" }),
@@ -53,5 +53,15 @@ describe("leasePayloadFromImport", () => {
         const incomplete = { ...result, data: { ...result.data, lease: { ...result.data.lease, monthly_rent: null, rent_due_day: null } } } as unknown as LeaseImportResult;
         const parsed = leaseInputSchema.safeParse(leasePayloadFromImport(incomplete, { unitId: "u", referenceName: "x", today: "2026-09-18" }));
         expect(parsed.success).toBe(false);
+    });
+});
+
+describe("closedStatus", () => {
+    it("is a rescission before the term and an expiry on or after it", () => {
+        // the Kitnet 35C: the term ran to 20/06/2027, the property came back on 02/06/2025
+        expect(closedStatus("2025-06-02", "2027-06-20")).toBe("TERMINATED");
+        expect(closedStatus("2027-06-20", "2027-06-20")).toBe("EXPIRED");
+        expect(closedStatus("2027-09-01", "2027-06-20")).toBe("EXPIRED");      // ran past the term, month to month
+        expect(closedStatus("2025-06-02", null)).toBe("TERMINATED");           // open-ended
     });
 });
