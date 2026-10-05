@@ -71,6 +71,8 @@ export interface StoredAdjustment extends AdjustmentRow {
 
 export type AdjustableLease = Pick<LeaseForSummary, "start_date" | "monthly_rent" | "adjustment_index" | "adjustment_frequency" | "next_adjustment_date"> & {
     charges?: ReadonlyArray<Pick<LeaseCharge, "charge_type" | "amount" | "adjustment_index" | "adjusts_with_rent">> | null;
+    /** the tenant gave notice of leaving that day: no adjustment from then on */
+    notice_date?: string | null;
 };
 
 /** A row a few days before an anniversary (an addendum signed ahead of it) stands for that anniversary. */
@@ -137,7 +139,8 @@ export interface DueAdjustments {
  * The calculated adjustments a lease still owes: every anniversary behind `today` that is later than
  * the last one recorded, each on top of the one before. `lease.monthly_rent` (and the followed
  * charge's amount — condominium or energy) are the values in force since the last recorded adjustment
- * — or since the start. The count stops at the first date whose cycle is not fully published.
+ * — or since the start. The count stops at the first date whose cycle is not fully published, and at
+ * the tenant's notice of leaving: no anniversary on or after the notice date is adjusted.
  */
 export function dueAdjustments(
     lease: AdjustableLease,
@@ -153,7 +156,8 @@ export function dueAdjustments(
     const recorded = byDate(rows).map(r => r.effective_date.slice(0, 10));
     const last = recorded.length > 0 ? recorded[recorded.length - 1] : null;
     const covered = (date: string) => recorded.some(d => d <= date && daysBetween(d, date) < COVER_DAYS);
-    const dates = pastAdjustmentDates(lease, today).filter(d => (!last || d > last) && !covered(d));
+    const noticeDate = lease.notice_date ? lease.notice_date.slice(0, 10) : null;
+    const dates = pastAdjustmentDates(lease, today).filter(d => (!last || d > last) && !covered(d) && (!noticeDate || d < noticeDate));
     if (dates.length === 0 || rent <= 0) return out;
 
     const code = leaseIndexSeriesCode(lease.adjustment_index);

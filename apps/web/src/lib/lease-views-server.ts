@@ -21,11 +21,14 @@ import { initialValues } from "@/lib/lease-adjustments";
 import { leaseIncome } from "@/lib/lease-dashboard";
 import { fetchAllPages } from "@/lib/accounting-server";
 import { syncLeaseAdjustments } from "@/lib/lease-adjustments-server";
+import { closeEndedNotices } from "@/lib/lease-notice-server";
 import type { LeaseWithDetails } from "@/types/lease";
 import type { LeaseDashboardView, LeaseListView, LeaseTenantContact } from "@/lib/lease-views";
 
 /** The account's leases (soft-deleted excluded) with the joined names and how many files each has. */
 export async function loadLeaseRows(supabase: AdminSupabase, profileId: string): Promise<LeaseWithDetails[]> {
+    // a tenant whose move-out day passed has gone: the lease is closed before it is read
+    await closeEndedNotices(supabase, { today: todayBRT(), profileId });
     const { data: rows, error } = await supabase
         .from("leases")
         .select(LEASE_SELECT_WITH_NAMES)
@@ -114,7 +117,7 @@ export async function loadLeaseList(supabase: AdminSupabase, profileId: string):
 const INCOME_COLUMNS =
     `id, property_id, month, unit_id, unit_name, received_on, received_amount, energy_portion, other_income, other_expenses, condo_amount, fee_on_condo, iptu_amount, agency_fee_pct, status, source, bank_reference, notes, ${INCOME_DIRECT_COLUMNS}`;
 
-const todayBRT = () => new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
+function todayBRT() { return new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10); }
 
 /**
  * Each lease with the months the property's income ledger confirmed for it — the rent before the agency's
@@ -173,6 +176,7 @@ export async function loadIncomeRows(supabase: AdminSupabase, propertyId: string
 
 /** One contract with everything its dashboard shows. Throws the 404 of `loadOwnedLease` when it is not the account's. */
 export async function loadLeaseDashboard(supabase: AdminSupabase, leaseId: string, profileId: string): Promise<LeaseDashboardView> {
+    await closeEndedNotices(supabase, { today: todayBRT(), profileId });
     const [row] = await syncLeaseUnitNames(supabase, profileId, [await loadOwnedLease(supabase, leaseId, profileId, LEASE_SELECT_WITH_NAMES)]);
     const lease = flattenLease(row) as unknown as LeaseWithDetails;
 

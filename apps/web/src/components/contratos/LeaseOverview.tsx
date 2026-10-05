@@ -263,7 +263,9 @@ export default function LeaseOverview({ lease, row, rent, monthly, featured, ten
                                 <strong className="font-bold">{row.indexLabel}</strong> <span className="text-muted-foreground">· a cada {summary.frequencyMonths} meses</span>
                             </Fact>
                             <Fact label="Próximo reajuste">
-                                {row.inForce ? (
+                                {row.notice ? (
+                                    <span className="text-xs text-orange-700 dark:text-orange-300">Nenhum: aviso de desocupação{row.notice.noticeDate ? ` em ${formatDateBR(row.notice.noticeDate)}` : ""}</span>
+                                ) : row.inForce ? (
                                     <>
                                         <strong className={cn("inline-flex items-center gap-1 font-bold tabular-nums", summary.daysToAdjustment !== null && summary.daysToAdjustment <= 30 && "text-rose-600 dark:text-rose-400")}>
                                             <CalendarClock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" /> {formatDateBR(summary.nextAdjustmentDate)}

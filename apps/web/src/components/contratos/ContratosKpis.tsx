@@ -11,7 +11,7 @@
  * The tints are the tone at low opacity, so they sit on the light and on the dark theme alike.
  */
 import React from "react";
-import { AlertTriangle, Banknote, CalendarClock, ChevronRight, DollarSign, FileCheck2, FileSignature, FileWarning, MapPin, PiggyBank, TrendingUp } from "lucide-react";
+import { AlertTriangle, Banknote, CalendarClock, ChevronRight, DollarSign, DoorOpen, FileCheck2, FileSignature, FileWarning, MapPin, PiggyBank, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDateBR } from "@/lib/dates";
 import { Money } from "@/components/privacy";
@@ -214,6 +214,7 @@ export default function ContratosKpis({ totals, groups, filtered, allCount, onOp
                     <span className="flex flex-col gap-1.5">
                         <DaysPill days={totals.nextEnd.days} tone="indigo" />
                         <Line swatch={<MapPin className="h-3 w-3 text-indigo-500" />}>{totals.nextEnd.row.place}</Line>
+                        {totals.nextEnd.row.notice && <Line swatch={<DoorOpen className="h-3 w-3 text-orange-500" />} className="text-orange-700 dark:text-orange-300">aviso de saída do inquilino</Line>}
                     </span>
                 ) : (
                     <Line swatch={<Dot className="bg-muted-foreground/40" />}>{noneInForce ?? (totals.overdueTerm > 0 ? "só contratos com o prazo vencido" : "nenhum prazo a vencer")}</Line>

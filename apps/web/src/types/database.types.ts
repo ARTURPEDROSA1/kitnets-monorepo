@@ -1435,6 +1435,7 @@ export type Database = {
           management_type: string
           monthly_rent: number
           next_adjustment_date: string | null
+          notice_date: string | null
           notes: string | null
           primary_tenant_id: string
           property_id: string
@@ -1464,6 +1465,7 @@ export type Database = {
           management_type: string
           monthly_rent: number
           next_adjustment_date?: string | null
+          notice_date?: string | null
           notes?: string | null
           primary_tenant_id: string
           property_id: string
@@ -1493,6 +1495,7 @@ export type Database = {
           management_type?: string
           monthly_rent?: number
           next_adjustment_date?: string | null
+          notice_date?: string | null
           notes?: string | null
           primary_tenant_id?: string
           property_id?: string

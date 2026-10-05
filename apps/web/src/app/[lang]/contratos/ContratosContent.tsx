@@ -9,16 +9,15 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Ban, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@kitnets/ui";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { PdfViewerModal } from "@/components/ui/PdfViewerModal";
 import { ReturnToPropertyLink, useReturnPropertyId } from "@/components/properties/ReturnToPropertyLink";
 import ContratosHub from "@/components/contratos/ContratosHub";
 import LeaseDashboard from "@/components/contratos/LeaseDashboard";
-import LeaseForm, { emptyLeaseInitial, leaseToInitial, maskDate, parseDateBR, type LeaseFormDropdowns, type LeaseFormInitial } from "@/components/contratos/LeaseForm";
+import LeaseForm, { emptyLeaseInitial, leaseToInitial, type LeaseFormDropdowns, type LeaseFormInitial } from "@/components/contratos/LeaseForm";
 import LeaseBatchImportModal from "@/components/contratos/LeaseBatchImportModal";
+import LeaseEndModal from "@/components/contratos/LeaseEndModal";
 import { summarizeLeases, todayBRT, viewFromParam, type LeaseRow, type LeaseView } from "@/lib/lease-dashboard";
 import { leaseIndexSeriesCode, type IndexPoint } from "@/lib/lease-summary";
 import type { LeaseDashboardView, LeaseListView } from "@/lib/lease-views";
@@ -181,40 +180,9 @@ export default function ContratosContent({ lang, initial = null, initialDashboar
         }
     };
 
-    // ── Terminate ─────────────────────────────────────────────────
+    // ── End: the tenant's notice of leaving, or a rescission (LeaseEndModal) ──
     const [terminateTarget, setTerminateTarget] = useState<LeaseWithDetails | null>(null);
-    const [terminateDate, setTerminateDate] = useState("");
-    const [terminateReason, setTerminateReason] = useState("");
-    const [terminating, setTerminating] = useState(false);
-    const [terminateError, setTerminateError] = useState<string | null>(null);
-
-    const openTerminate = (lease: LeaseWithDetails) => { setTerminateTarget(lease); setTerminateDate(""); setTerminateReason(""); setTerminateError(null); };
-    const handleTerminate = async () => {
-        if (!terminateTarget || !terminateDate) return;
-        const iso = parseDateBR(terminateDate);
-        if (!iso) { setTerminateError("Data inválida. Use DD/MM/AAAA."); return; }
-        setTerminating(true);
-        setTerminateError(null);
-        try {
-            const res = await fetch(`/api/leases/${terminateTarget.id}/terminate`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ termination_date: iso, termination_reason: terminateReason }),
-            });
-            const json = await res.json().catch(() => ({}));
-            if (!res.ok) {
-                setTerminateError(typeof json.error === "string" ? json.error : Object.values(json.errors ?? {})[0] as string ?? "Não foi possível rescindir o contrato.");
-                return;
-            }
-            setTerminateTarget(null);
-            setDashboardKey(k => k + 1);
-            await load().catch(() => {});
-        } catch {
-            setTerminateError("Erro de conexão. Tente novamente.");
-        } finally {
-            setTerminating(false);
-        }
-    };
+    const openTerminate = (lease: LeaseWithDetails) => setTerminateTarget(lease);
 
     // ── Delete ────────────────────────────────────────────────────
     const [deleteTarget, setDeleteTarget] = useState<LeaseWithDetails | null>(null);
@@ -240,35 +208,19 @@ export default function ContratosContent({ lang, initial = null, initialDashboar
 
     const modals = (
         <>
+            {/* how the contract ends: the tenant's notice of leaving, or a rescission now */}
             {terminateTarget && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-                    <div className="mx-4 w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">
-                        <h3 className="flex items-center gap-2 text-lg font-semibold text-foreground">
-                            <Ban className="h-5 w-5 text-amber-500" /> Rescindir Contrato
-                        </h3>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                            Rescindir <strong>&ldquo;{terminateTarget.reference_name || terminateTarget.property_name}&rdquo;</strong>. O contrato fica no histórico, marcado como rescindido.
-                        </p>
-                        <div className="mt-4 space-y-3">
-                            <div>
-                                <Label>Data de Rescisão *</Label>
-                                <Input value={terminateDate} onChange={e => setTerminateDate(maskDate(e.target.value))} placeholder="DD/MM/AAAA" maxLength={10} />
-                            </div>
-                            <div>
-                                <Label>Motivo da Rescisão</Label>
-                                <textarea className="flex min-h-[80px] w-full rounded-md border bg-background px-3 py-2 text-sm" value={terminateReason} onChange={e => setTerminateReason(e.target.value)} placeholder="Motivo (opcional)..." />
-                            </div>
-                            {terminateError && <p className="text-xs text-rose-600">{terminateError}</p>}
-                        </div>
-                        <div className="mt-6 flex justify-end gap-2">
-                            <Button variant="outline" onClick={() => setTerminateTarget(null)} disabled={terminating}>Cancelar</Button>
-                            <Button variant="destructive" onClick={handleTerminate} disabled={!terminateDate || terminating}>
-                                {terminating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Ban className="mr-2 h-4 w-4" />}
-                                Rescindir
-                            </Button>
-                        </div>
-                    </div>
-                </div>
+                <LeaseEndModal
+                    lease={terminateTarget}
+                    today={today}
+                    onClose={() => setTerminateTarget(null)}
+                    onDone={message => {
+                        setTerminateTarget(null);
+                        setNotice(message);
+                        setDashboardKey(k => k + 1);
+                        load().catch(() => {});
+                    }}
+                />
             )}
 
             {deleteTarget && (

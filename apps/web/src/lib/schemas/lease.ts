@@ -139,6 +139,8 @@ export const leaseTerminationSchema = z.object({
      * month to month) and ended on that date — an old contract imported with its closing date.
      */
     status: z.enum(["TERMINATED", "EXPIRED"]).optional().transform((v) => v ?? "TERMINATED"),
+    /** when the tenant gave notice of leaving (aviso de desocupação): a move-out day ahead keeps the lease in force until then */
+    notice_date: optionalDate("Data do aviso inválida."),
 });
 
-export const LEASE_DOCUMENT_TYPES = ["CONTRACT", "ADDENDUM", "INSPECTION", "TENANT_DOC", "DEPOSIT_RECEIPT", "OTHER"] as const;
+export const LEASE_DOCUMENT_TYPES = ["CONTRACT", "ADDENDUM", "INSPECTION", "TENANT_DOC", "DEPOSIT_RECEIPT", "NOTICE", "TERMINATION", "OTHER"] as const;

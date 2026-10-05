@@ -129,7 +129,8 @@ export async function syncLeaseAdjustments(supabase: AdminSupabase, lease: Adjus
     }
 }
 
-const LEASE_COLUMNS = "id, start_date, monthly_rent, adjustment_index, adjustment_frequency, next_adjustment_date, status";
+// `*`: notice_date arrives with its own migration; a deploy ahead of it still reads the leases
+const LEASE_COLUMNS = "*";
 
 async function loadCharges(supabase: AdminSupabase, leaseId: string): Promise<NonNullable<AdjustableLease["charges"]>> {
     // `*`: adjusts_with_rent arrives with its own migration
@@ -193,6 +194,20 @@ export async function removeAddendum(supabase: AdminSupabase, leaseId: string, p
     if (data === "NOT_ADDENDUM") throw new HttpError(409, { error: "Só um aditivo pode ser removido: o reajuste calculado é o que vale quando não há aditivo." });
     if (data === "NOT_LATEST") throw new HttpError(409, { error: "Só o último reajuste pode ser removido. Para corrigir um anterior, registre o aditivo dele." });
     if (data !== "OK") throw notFound("Reajuste não encontrado.");
+}
+
+/**
+ * The tenant gave notice of leaving that day: the calculated adjustments recorded on or after it go, and the
+ * lease's rent (and its condominium / energy) go back to what they were before them. An addendum on or after
+ * the day is an agreement: then nothing is removed. → how many rows went; 0 when the history cannot be touched.
+ */
+export async function dropAdjustmentsFrom(supabase: AdminSupabase, leaseId: string, from: string): Promise<number> {
+    const { data, error } = await supabase.rpc("lease_adjustments_drop_from", { p_lease_id: leaseId, p_from: from });
+    if (error) {
+        console.error(`[${TAG}] dropping the adjustments of lease ${leaseId} from ${from} failed:`, error.message);
+        return 0;
+    }
+    return Number(data) || 0;
 }
 
 export interface AdjustmentRunReport {

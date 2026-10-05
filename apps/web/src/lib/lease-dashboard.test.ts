@@ -326,6 +326,40 @@ describe("contractsValue", () => {
     });
 });
 
+describe("the tenant's notice of leaving", () => {
+    // Kitnet 35B: 15/09/2025 → 15/03/2028; the tenant told the agency on 15/09/2026 they leave on 15/10/2026 (TODAY = 25/09/2026)
+    const lease35b = lease({ id: "n", start_date: "2025-09-15", end_date: "2028-03-15", termination_date: "2026-10-15", notice_date: "2026-09-15" });
+    const [row] = summarizeLeases([lease35b], { ipca: IPCA }, TODAY);
+
+    it("keeps the lease in force until the move-out day and says so", () => {
+        expect(row.inForce).toBe(true);
+        expect(row.notice).toEqual({ noticeDate: "2026-09-15", moveOut: "2026-10-15", daysLeft: 20 });
+        expect(row.summary.effectiveEnd).toBe("2026-10-15");
+        expect(statusMeta(row).label).toBe("Aviso de saída");
+        expect(inView(row, "vencendo")).toBe(true);
+        expect(inView(row, "vigentes")).toBe(true);
+    });
+    it("has no next adjustment from the notice on", () => {
+        expect(row.summary.nextAdjustmentDate).toBeNull();
+        expect(row.summary.daysToAdjustment).toBeNull();
+        expect(hubTotals([row], TODAY).nextAdjustment).toBeNull();
+        expect(hubTotals([row], TODAY).nextEnd?.date).toBe("2026-10-15");
+    });
+    it("is first among what needs a look, and its timeline ends on the move-out", () => {
+        const items = attentionItems([row]);
+        expect(items[0]).toMatchObject({ kind: "notice", date: "2026-10-15" });
+        expect(items[0].text).toContain("desocupa em 20 dias");
+        expect(items.some(i => i.kind === "ending" || i.kind === "adjustment")).toBe(false);
+        const line = milestones(lease35b, TODAY);
+        expect(line.map(m => m.kind)).toEqual(["start", "notice", "move_out"]);
+        expect(line.find(m => m.kind === "move_out")).toMatchObject({ date: "2026-10-15", label: "Desocupação", done: false });
+    });
+    it("is no notice on a closed lease, nor on one without a move-out day", () => {
+        expect(summarizeLeases([lease({ status: "TERMINATED", termination_date: "2026-03-01" })], { ipca: IPCA }, TODAY)[0].notice).toBeNull();
+        expect(summarizeLeases([lease({})], { ipca: IPCA }, TODAY)[0].notice).toBeNull();
+    });
+});
+
 describe("hubTotals next adjustment", () => {
     it("picks the soonest adjustment inside a running term", () => {
         const rows = summarizeLeases(

@@ -126,6 +126,6 @@ export async function closeImportedLease(
         const json = res ? await res.json().catch(() => ({})) : {};
         errors.push(typeof json.error === "string" ? json.error : "Não foi possível registrar a data de encerramento.");
     }
-    const termSkipped = closing.file ? !("document" in (await attachLeaseDocument(leaseId, closing.file, "OTHER", closing.storagePath))) : false;
+    const termSkipped = closing.file ? !("document" in (await attachLeaseDocument(leaseId, closing.file, "TERMINATION", closing.storagePath))) : false;
     return { ok: errors.length === 0, termSkipped, errors };
 }

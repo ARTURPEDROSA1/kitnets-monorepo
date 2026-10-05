@@ -10,7 +10,7 @@
  * contract's dashboard; the icons at the end edit, terminate or delete it.
  */
 import React, { useMemo } from "react";
-import { Ban, FileText, Loader2, PenLine, Trash2 } from "lucide-react";
+import { DoorOpen, FileText, Loader2, PenLine, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDateBR } from "@/lib/dates";
 import { columnTableKey } from "@/lib/ui-preferences";
@@ -49,6 +49,11 @@ function termHint(row: LeaseRow): { text: string; tone?: string } {
     const left = row.summary.daysLeft;
     if (left === null) return { text: "prazo indeterminado" };
     if (!row.inForce) return { text: row.stored === "TERMINATED" ? "rescindido" : "encerrado" };
+    // the tenant gave notice: the end is the move-out day
+    if (row.notice) {
+        const d = row.notice.daysLeft;
+        return { text: d > 0 ? `desocupa em ${plural(d, "dia", "dias")}` : d === 0 ? "desocupa hoje" : "desocupação passou", tone: d <= 7 ? "text-rose-600 dark:text-rose-400" : "text-orange-600 dark:text-orange-400" };
+    }
     if (left < 0) return { text: `vencido há ${plural(-left, "dia", "dias")}`, tone: "text-rose-600 dark:text-rose-400" };
     if (left === 0) return { text: "termina hoje", tone: "text-amber-600 dark:text-amber-400" };
     return { text: `faltam ${plural(left, "dia", "dias")}`, tone: left <= 90 ? "text-amber-600 dark:text-amber-400" : undefined };
@@ -109,7 +114,7 @@ export default function LeaseTable({ rows, actions, propertyKinds = {} }: Props)
         { key: "file", label: "Arquivo", kind: "enum", align: "center", options: [{ value: "sim", label: "Com PDF" }, { value: "nao", label: "Sem PDF" }], get: r => (r.hasFile ? "sim" : "nao") },
         actionsColumn<LeaseRow>([
             { key: "edit", label: "Editar" },
-            { key: "terminate", label: "Rescindir", when: r => r.inForce },
+            { key: "terminate", label: "Encerrar", when: r => r.inForce },
             { key: "delete", label: "Excluir" },
         ], { className: "w-px whitespace-nowrap" }),
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -214,7 +219,7 @@ export default function LeaseTable({ rows, actions, propertyKinds = {} }: Props)
                                                 <span className={cn(hintCls, hint.tone)}>{hint.text}</span>
                                                 {progress !== null && row.inForce && (
                                                     <span className="mt-1 block h-1 w-24 overflow-hidden rounded-full bg-muted" title={`${progress}% do prazo`}>
-                                                        <span className={cn("block h-full", summary.daysLeft !== null && summary.daysLeft < 0 ? "bg-rose-500" : summary.daysLeft !== null && summary.daysLeft <= 90 ? "bg-amber-500" : "bg-emerald-500")} style={{ width: `${progress}%` }} />
+                                                        <span className={cn("block h-full", row.notice ? "bg-orange-500" : summary.daysLeft !== null && summary.daysLeft < 0 ? "bg-rose-500" : summary.daysLeft !== null && summary.daysLeft <= 90 ? "bg-amber-500" : "bg-emerald-500")} style={{ width: `${progress}%` }} />
                                                     </span>
                                                 )}
                                             </td>
@@ -230,7 +235,7 @@ export default function LeaseTable({ rows, actions, propertyKinds = {} }: Props)
                                                         </span>
                                                     </>
                                                 ) : (
-                                                    <span className="text-muted-foreground">{row.inForce ? row.indexLabel : "—"}</span>
+                                                    <span className="text-muted-foreground">{row.notice ? <>—<span className={hintCls}>sem reajuste: aviso</span></> : row.inForce ? row.indexLabel : "—"}</span>
                                                 )}
                                             </td>
                                         )}
@@ -260,8 +265,8 @@ export default function LeaseTable({ rows, actions, propertyKinds = {} }: Props)
                                                         <PenLine className="h-4 w-4" />
                                                     </button>
                                                     {row.inForce && (
-                                                        <button type="button" onClick={() => actions.onTerminate(row)} title="Rescindir contrato" aria-label={`Rescindir o contrato de ${row.place}`} className={cn(iconBtn, "hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-950/30")}>
-                                                            <Ban className="h-4 w-4" />
+                                                        <button type="button" onClick={() => actions.onTerminate(row)} title="Encerrar: aviso de desocupação ou rescisão" aria-label={`Encerrar o contrato de ${row.place}`} className={cn(iconBtn, "hover:bg-orange-50 hover:text-orange-600 dark:hover:bg-orange-950/30")}>
+                                                            <DoorOpen className="h-4 w-4" />
                                                         </button>
                                                     )}
                                                     <button type="button" onClick={() => actions.onDelete(row)} title="Excluir contrato" aria-label={`Excluir o contrato de ${row.place}`} className={cn(iconBtn, "hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/30")}>
