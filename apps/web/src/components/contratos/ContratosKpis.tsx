@@ -15,14 +15,15 @@ import { AlertTriangle, Banknote, CalendarClock, ChevronRight, DollarSign, FileC
 import { cn } from "@/lib/utils";
 import { formatDateBR } from "@/lib/dates";
 import { Money } from "@/components/privacy";
-import { brl, type ContractsValue, type HubTotals, type LeaseRow } from "@/lib/lease-dashboard";
+import { brl, type ContractGroup, type ContractGroupKey, type HubTotals, type LeaseRow } from "@/lib/lease-dashboard";
 
 interface Props {
     /** the figures of the contracts shown (the hub's tab and filters): `hubTotals(…, { countAll: true })` */
     totals: HubTotals;
-    value: ContractsValue;
-    /** what the Contratos figure counts: "em vigor", "encerrados", "no total · com filtro" */
-    unit: string;
+    /** the contracts shown apart — in force, closed, drafts — with their values (`contractGroups`) */
+    groups: ContractGroup[];
+    /** a property, management or search filter is on */
+    filtered: boolean;
     /** every contract of the account, for the tooltip */
     allCount: number;
     onOpen: (row: LeaseRow) => void;
@@ -100,18 +101,29 @@ function Line({ swatch, className, children }: { swatch: React.ReactNode; classN
 const Dot = ({ className, style }: { className?: string; style?: React.CSSProperties }) => <span className={cn("h-2 w-2 rounded-full", className)} style={style} />;
 const Strong = ({ children }: { children: React.ReactNode }) => <strong className="font-semibold text-foreground">{children}</strong>;
 
+/** How each group reads after its count, and as a label. */
+const GROUP_UNIT: Record<ContractGroupKey, (n: number) => string> = {
+    vigentes: () => "em vigor",
+    encerrados: n => (n === 1 ? "encerrado" : "encerrados"),
+    rascunhos: n => (n === 1 ? "rascunho" : "rascunhos"),
+};
+const GROUP_LABEL: Record<ContractGroupKey, string> = { vigentes: "Vigentes", encerrados: "Encerrados", rascunhos: "Rascunhos" };
+
 /** "em 259 dias", amber within 90 days (rose within 30), else in the card's colour. */
 function DaysPill({ days, tone }: { days: number; tone: Tone }) {
     const cls = days <= 30 ? "bg-rose-500/15 text-rose-600" : days <= 90 ? "bg-amber-500/15 text-amber-700" : TONES[tone].chip;
     return <span className={cn("inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[11px] font-semibold", cls)}>{days === 0 ? "hoje" : `em ${plural(days, "dia", "dias")}`}</span>;
 }
 
-export default function ContratosKpis({ totals, value, unit, allCount, onOpen }: Props) {
+export default function ContratosKpis({ totals, groups, filtered, allCount, onOpen }: Props) {
     const v = TONES.violet, e = TONES.emerald, t = TONES.teal, s = TONES.sky;
     const missingPdf = totals.counted - totals.withFileCounted;
+    // the value card leads with the first group (in force when there is one); the others follow apart
+    const [main, ...others] = groups;
+    const value = main?.value ?? { total: 0, executed: 0, forecast: 0, openEnded: 0 };
     const executedPct = value.total > 0 ? Math.round((value.executed / value.total) * 100) : 0;
-    const average = totals.counted > 0 ? totals.contractedRent / totals.counted : 0;
-    /** next end / next adjustment: only contracts in force have one */
+    const average = totals.inForce > 0 ? totals.contractedRent / totals.inForce : 0;
+    /** rent, deposit, next end, next adjustment: only contracts in force have them */
     const noneInForce = totals.inForce === 0 ? "nenhum contrato em vigor neste filtro" : null;
 
     return (
@@ -121,7 +133,19 @@ export default function ContratosKpis({ totals, value, unit, allCount, onOpen }:
                 tone="violet" icon={<FileSignature className="h-3.5 w-3.5" />} label="Contratos"
                 title={[`Contratos mostrados: ${totals.counted} (${allCount} no total)`, ...totals.managers.map(m => `${m.label}: ${plural(m.count, "contrato", "contratos")}`)].join("\n")}
             >
-                <Figure unit={unit}>{totals.counted}</Figure>
+                {/* one line per group: the first big, the others under it — never one sum */}
+                <span className="flex flex-col gap-1">
+                    {groups.length === 0 && <Figure unit="contratos">0</Figure>}
+                    {groups.map((g, i) => (i === 0
+                        ? <Figure key={g.key} unit={GROUP_UNIT[g.key](g.count)}>{g.count}</Figure>
+                        : (
+                            <span key={g.key} className="flex items-baseline gap-1">
+                                <span className="text-base font-bold leading-none tabular-nums text-foreground">{g.count}</span>
+                                <span className="text-xs font-medium text-muted-foreground">{GROUP_UNIT[g.key](g.count)}</span>
+                            </span>
+                        )))}
+                    {filtered && <span className="text-[11px] text-muted-foreground">com filtro</span>}
+                </span>
                 <Parts
                     label={`${totals.agencyManaged} via imobiliária, ${totals.selfManaged} de gestão própria${totals.agentManaged > 0 ? `, ${totals.agentManaged} via corretor` : ""}`}
                     parts={[{ value: totals.agencyManaged, className: v.solid }, { value: totals.selfManaged, className: v.soft }, { value: totals.agentManaged, style: hatch(v.rgb) }]}
@@ -140,25 +164,43 @@ export default function ContratosKpis({ totals, value, unit, allCount, onOpen }:
             </Kpi>
 
             {/* What the contracts in force bring in each month */}
-            <Kpi tone="emerald" icon={<DollarSign className="h-3.5 w-3.5" />} label="Aluguel contratado" title="Soma do aluguel de contrato dos contratos mostrados (valor bruto, antes da taxa da imobiliária)">
-                <Figure unit="/mês"><Money>{brl(totals.contractedRent, 0)}</Money></Figure>
-                <span className="flex flex-col gap-1">
-                    <Line swatch={<Dot className={e.solid} />}><Strong><Money>{brl(totals.contractedRent * 12, 0)}</Money></Strong> por ano</Line>
-                    {totals.counted > 0 && <Line swatch={<Dot className={e.soft} />}>média de <Strong><Money>{brl(average, 0)}</Money></Strong> por contrato</Line>}
-                </span>
+            <Kpi tone="emerald" icon={<DollarSign className="h-3.5 w-3.5" />} label="Aluguel contratado" title="Soma do aluguel de contrato dos contratos em vigor mostrados (valor bruto, antes da taxa da imobiliária); um contrato encerrado não entra">
+                {noneInForce ? (
+                    <>
+                        <Figure>—</Figure>
+                        <Line swatch={<Dot className="bg-muted-foreground/40" />}>{noneInForce}</Line>
+                    </>
+                ) : (
+                    <>
+                        <Figure unit="/mês"><Money>{brl(totals.contractedRent, 0)}</Money></Figure>
+                        <span className="flex flex-col gap-1">
+                            <Line swatch={<Dot className={e.solid} />}><Strong><Money>{brl(totals.contractedRent * 12, 0)}</Money></Strong> por ano</Line>
+                            <Line swatch={<Dot className={e.soft} />}>média de <Strong><Money>{brl(average, 0)}</Money></Strong> por contrato em vigor</Line>
+                        </span>
+                    </>
+                )}
             </Kpi>
 
             {/* What they add up to over their terms: executed (the ledger) and forecast (the schedule) */}
             <Kpi
                 tone="teal" icon={<Banknote className="h-3.5 w-3.5" />} label="Valor total"
-                title={`Valor total dos contratos mostrados no prazo inteiro: o executado (meses confirmados na razão de receitas — o aluguel antes da taxa da imobiliária e os encargos pagos pelo inquilino) mais o previsto (o resto do prazo pelo contrato, cada pagamento pelo valor em vigor)${value.openEnded > 0 ? `. ${plural(value.openEnded, "contrato sem prazo final conta", "contratos sem prazo final contam")} só o executado` : ""}`}
+                title={`Valor total no prazo inteiro, separado entre vigentes, encerrados e rascunhos: o executado (meses confirmados na razão de receitas — o aluguel antes da taxa da imobiliária e os encargos pagos pelo inquilino) mais o previsto (o resto do prazo pelo contrato, cada pagamento pelo valor em vigor)${value.openEnded > 0 ? `. ${plural(value.openEnded, "contrato sem prazo final conta", "contratos sem prazo final contam")} só o executado` : ""}`}
             >
-                <Figure><Money>{brl(value.total, 0)}</Money></Figure>
+                <Figure unit={main && groups.length > 1 ? GROUP_LABEL[main.key].toLowerCase() : undefined}><Money>{brl(value.total, 0)}</Money></Figure>
                 <Parts label={`${executedPct}% executado`} parts={[{ value: value.executed, className: t.solid }, { value: value.forecast, style: hatch(t.rgb) }]} />
                 <span className="flex flex-col gap-1">
                     <Line swatch={<Dot className={t.solid} />}>Executado <Strong><Money>{brl(value.executed, 0)}</Money></Strong> · {executedPct}%</Line>
                     <Line swatch={<Dot style={hatch(t.rgb)} />}>Previsto <Strong><Money>{brl(value.forecast, 0)}</Money></Strong></Line>
                 </span>
+                {/* closed contracts (and drafts) apart: their money never adds to the ones in force */}
+                {others.map(g => (
+                    <span key={g.key} className="flex flex-col gap-0.5 border-t border-teal-500/20 pt-2">
+                        <Line swatch={<Dot className="bg-slate-400" />}>
+                            {GROUP_LABEL[g.key]} ({g.count}) <Strong><Money>{brl(g.value.total, 0)}</Money></Strong>
+                        </Line>
+                        <span className="pl-4 text-[11px] text-muted-foreground">executado <Money>{brl(g.value.executed, 0)}</Money></span>
+                    </span>
+                ))}
             </Kpi>
 
             {/* The contract in force that ends first */}
@@ -204,15 +246,24 @@ export default function ContratosKpis({ totals, value, unit, allCount, onOpen }:
             {/* The deposits of the contracts in force, and who holds them */}
             <Kpi
                 tone="sky" icon={<PiggyBank className="h-3.5 w-3.5" />} label="Caução"
-                title={`Soma das cauções dos contratos mostrados: dinheiro do inquilino que volta no fim do contrato.\nImobiliária (sob a custódia dela): ${brl(totals.depositsAgency)}\nGestão própria (com o proprietário): ${brl(totals.depositsOwn)}`}
+                title={`Soma das cauções dos contratos em vigor mostrados: dinheiro do inquilino que volta no fim do contrato.\nImobiliária (sob a custódia dela): ${brl(totals.depositsAgency)}\nGestão própria (com o proprietário): ${brl(totals.depositsOwn)}`}
             >
-                <Figure><Money>{brl(totals.deposits, 0)}</Money></Figure>
-                <Parts label={`${totals.depositsAgencyCount} com a imobiliária, ${totals.depositsOwnCount} de gestão própria`} parts={[{ value: totals.depositsAgencyCount, className: s.solid }, { value: totals.depositsOwnCount, className: s.soft }]} />
-                <span className="flex flex-col gap-1">
-                    <Line swatch={<PiggyBank className="h-3 w-3 text-sky-500" />}>Com caução: <Strong>{totals.depositsCount} de {totals.counted}</Strong></Line>
-                    <Line swatch={<Dot className={s.solid} />}>Imobiliária: <Strong>{totals.depositsAgencyCount}</Strong></Line>
-                    <Line swatch={<Dot className={s.soft} />}>Gestão própria: <Strong>{totals.depositsOwnCount}</Strong></Line>
-                </span>
+                {noneInForce ? (
+                    <>
+                        <Figure>—</Figure>
+                        <Line swatch={<Dot className="bg-muted-foreground/40" />}>{noneInForce}</Line>
+                    </>
+                ) : (
+                    <>
+                        <Figure><Money>{brl(totals.deposits, 0)}</Money></Figure>
+                        <Parts label={`${totals.depositsAgencyCount} com a imobiliária, ${totals.depositsOwnCount} de gestão própria`} parts={[{ value: totals.depositsAgencyCount, className: s.solid }, { value: totals.depositsOwnCount, className: s.soft }]} />
+                        <span className="flex flex-col gap-1">
+                            <Line swatch={<PiggyBank className="h-3 w-3 text-sky-500" />}>Com caução: <Strong>{totals.depositsCount} de {totals.inForce}</Strong> em vigor</Line>
+                            <Line swatch={<Dot className={s.solid} />}>Imobiliária: <Strong>{totals.depositsAgencyCount}</Strong></Line>
+                            <Line swatch={<Dot className={s.soft} />}>Gestão própria: <Strong>{totals.depositsOwnCount}</Strong></Line>
+                        </span>
+                    </>
+                )}
             </Kpi>
         </div>
     );

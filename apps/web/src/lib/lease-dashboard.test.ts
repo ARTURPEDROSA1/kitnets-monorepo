@@ -4,6 +4,7 @@ import type { PropertyIncomeRow } from "@/lib/property-income";
 import {
     adjustmentDates,
     attentionItems,
+    contractGroups,
     contractsValue,
     displayStatus,
     guessUnit,
@@ -267,10 +268,11 @@ describe("hubTotals + contractsValue over what the hub's filters show (countAll)
         TODAY
     );
     it("counts every row given, the closed ones included; what lies ahead stays with the ones in force", () => {
+        // rent and deposits are the contracts in force's only: a closed one brings no rent and gave its deposit back
         const closed = hubTotals(rows.filter(r => r.lease.id === "e"), TODAY, { countAll: true });
-        expect(closed).toMatchObject({ counted: 1, inForce: 0, contractedRent: 1200, deposits: 1200, depositsCount: 1, withFileCounted: 0, agencyManaged: 1, nextEnd: null, nextAdjustment: null });
+        expect(closed).toMatchObject({ counted: 1, inForce: 0, closed: 1, contractedRent: 0, deposits: 0, depositsCount: 0, withFileCounted: 0, agencyManaged: 1, nextEnd: null, nextAdjustment: null });
         const all = hubTotals(rows, TODAY, { countAll: true });
-        expect(all).toMatchObject({ counted: 2, inForce: 1, contractedRent: 2500, deposits: 3800 });
+        expect(all).toMatchObject({ counted: 2, inForce: 1, closed: 1, contractedRent: 1300, deposits: 2600 });
         expect(all.nextEnd?.row.lease.id).toBe("a");
         // by default only the contracts in force count (the dashboard)
         expect(hubTotals(rows, TODAY)).toMatchObject({ counted: 1, contractedRent: 1300, deposits: 2600 });
@@ -279,6 +281,26 @@ describe("hubTotals + contractsValue over what the hub's filters show (countAll)
         const onlyClosed = rows.filter(r => r.lease.id === "e");
         expect(contractsValue(onlyClosed, TODAY).total).toBe(0);
         expect(contractsValue(onlyClosed, TODAY, { countAll: true }).total).toBeGreaterThan(0);
+    });
+});
+
+describe("contractGroups", () => {
+    it("keeps the contracts in force, the closed ones and the drafts apart, each with its value", () => {
+        const rows = summarizeLeases(
+            [
+                lease({ id: "a" }),
+                lease({ id: "e", status: "TERMINATED", termination_date: "2026-03-01" }),
+                lease({ id: "f", status: "DRAFT" }),
+            ],
+            { ipca: IPCA },
+            TODAY
+        );
+        const groups = contractGroups(rows, TODAY);
+        expect(groups.map(g => [g.key, g.count])).toEqual([["vigentes", 1], ["encerrados", 1], ["rascunhos", 1]]);
+        expect(groups[0].value).toEqual(contractsValue(rows.filter(r => r.lease.id === "a"), TODAY));
+        expect(groups[1].value.total).toBeGreaterThan(0);
+        // only the groups that have a contract
+        expect(contractGroups(rows.filter(r => r.lease.id === "a"), TODAY).map(g => g.key)).toEqual(["vigentes"]);
     });
 });
 

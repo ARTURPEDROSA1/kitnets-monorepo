@@ -235,7 +235,7 @@ export interface HubTotals {
     ending90: number;
     /** in force with the term already over */
     overdueTerm: number;
-    /** Σ monthly rent of the contracts counted */
+    /** Σ monthly rent of the contracts in force (a closed contract no longer brings rent in) */
     contractedRent: number;
     /** the contract in force that ends first */
     nextEnd: { row: LeaseRow; date: string; days: number } | null;
@@ -243,7 +243,7 @@ export interface HubTotals {
     nextAdjustment: { row: LeaseRow; date: string; days: number; accumulatedPct: number | null; monthsCounted: number } | null;
     /** adjustments falling within 90 days */
     adjustments90: number;
-    /** Σ security deposit of the contracts counted */
+    /** Σ security deposit of the contracts in force (a closed contract's was given back) */
     deposits: number;
     depositsCount: number;
     /** the deposits of the contracts an agency manages: in the agency's custody */
@@ -269,13 +269,15 @@ export interface HubTotals {
     /** who runs the contracts counted, with how many each (`leaseManagers`) */
     managers: Array<LeaseManager & { count: number }>;
     drafts: number;
+    /** closed contracts among the rows (EXPIRED, TERMINATED, CANCELLED) */
+    closed: number;
 }
 
 /**
  * The hub's figures. By default they count the contracts in force among `rows` (the dashboard's view of
  * the portfolio); with `countAll` every row given counts — the hub hands in what its tab and filters
- * show, so the cards follow them. What lies ahead (next end, next adjustment, terms ending) only ever
- * concerns the contracts in force among them.
+ * show, so the cards follow them. Rent, deposits and what lies ahead (next end, next adjustment, terms
+ * ending) only ever concern the contracts in force among them.
  */
 export function hubTotals(rows: LeaseRow[], today: string, opts: { countAll?: boolean } = {}): HubTotals {
     const inForce = rows.filter(r => r.inForce);
@@ -303,7 +305,7 @@ export function hubTotals(rows: LeaseRow[], today: string, opts: { countAll?: bo
             }
         }
     }
-    for (const row of counted) {
+    for (const row of inForce) {
         if (row.lease.security_deposit && row.lease.security_deposit > 0) {
             deposits += row.lease.security_deposit;
             depositsCount++;
@@ -323,7 +325,7 @@ export function hubTotals(rows: LeaseRow[], today: string, opts: { countAll?: bo
         counted: counted.length,
         ending90,
         overdueTerm,
-        contractedRent: round2(counted.reduce((s, r) => s + (Number(r.lease.monthly_rent) || 0), 0)),
+        contractedRent: round2(inForce.reduce((s, r) => s + (Number(r.lease.monthly_rent) || 0), 0)),
         nextEnd,
         nextAdjustment,
         adjustments90,
@@ -342,6 +344,7 @@ export function hubTotals(rows: LeaseRow[], today: string, opts: { countAll?: bo
         selfManaged: managedBy("SELF_MANAGED"),
         managers,
         drafts: rows.filter(r => r.stored === "DRAFT").length,
+        closed: rows.filter(r => CLOSED.has(r.stored)).length,
     };
 }
 
@@ -373,6 +376,29 @@ export function contractsValue(rows: LeaseRow[], today: string, opts: { countAll
         if (!term.forecastKnown) openEnded++;
     }
     return { total: round2(executed + forecast), executed: round2(executed), forecast: round2(forecast), openEnded };
+}
+
+export type ContractGroupKey = "vigentes" | "encerrados" | "rascunhos";
+
+export interface ContractGroup {
+    key: ContractGroupKey;
+    count: number;
+    /** what the group adds up to over the terms: executed + forecast */
+    value: ContractsValue;
+}
+
+/**
+ * The rows shown, apart by where they stand — in force, closed, drafts — each with its count and value:
+ * the cards show the groups side by side, never one sum (a closed contract's money is history, not what
+ * the portfolio brings in). Only the groups with a contract, in that order.
+ */
+export function contractGroups(rows: LeaseRow[], today: string): ContractGroup[] {
+    const of = (key: ContractGroupKey, picked: LeaseRow[]): ContractGroup => ({ key, count: picked.length, value: contractsValue(picked, today, { countAll: true }) });
+    return [
+        of("vigentes", rows.filter(r => r.inForce)),
+        of("encerrados", rows.filter(r => !r.inForce && CLOSED.has(r.stored))),
+        of("rascunhos", rows.filter(r => !r.inForce && r.stored === "DRAFT")),
+    ].filter(g => g.count > 0);
 }
 
 // ── Attention list ───────────────────────────────────────────────────
