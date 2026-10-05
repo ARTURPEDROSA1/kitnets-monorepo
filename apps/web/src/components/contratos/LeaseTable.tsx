@@ -123,8 +123,8 @@ export default function LeaseTable({ rows, actions, propertyKinds = {} }: Props)
 
     return (
         <div className="overflow-hidden rounded-xl border border-border/80 bg-card">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
-                <span>Clique no cabeçalho para ordenar e filtrar (botão direito: colunas) · selecione células para somar · setas movem entre as células · Ctrl+C copia</span>
+            {/* how the table works is behind the hub's "?"; the count stays */}
+            <div className="flex items-center justify-end gap-2 border-b border-border/60 bg-muted/20 px-3 py-1.5 text-[11px] text-muted-foreground">
                 <span>{cf.rows.length} de {rows.length}</span>
             </div>
             {cf.anyFilter && (

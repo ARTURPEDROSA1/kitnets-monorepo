@@ -4,14 +4,18 @@
  * The Contratos hub: the portfolio of leases at a glance — how many are in force, who manages them
  * and whether their file is attached, what they bring in each month and over their terms (executed
  * and forecast), what ends or adjusts next, the deposits and who holds them — then what needs a
- * decision, then the contracts themselves as a table or on a calendar.
- * The view (Vigentes · Vencendo · Encerrados · Rascunhos · Todos) lives in the URL.
+ * decision, then the contracts themselves as a table or on a calendar. The cards count what the tab,
+ * the property, the management and the search show.
+ * The tab (Vigentes · Vencendo · Encerrados · Rascunhos · Todos) lives in the URL; table or timeline is
+ * remembered in the account (`view:contratos` in user_ui_preferences).
  */
-import React, { useMemo, useState } from "react";
-import { AlertCircle, Archive, ChevronDown, ChevronUp, FileSignature, GanttChart, List, Loader2, Plus, Search, X } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { AlertCircle, Archive, ChevronDown, ChevronUp, FileSignature, GanttChart, HelpCircle, List, Loader2, MousePointerClick, Plus, Search, X } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { loadAccountPreferences, readLocalPreference, saveAccountPreference, writeLocalPreference } from "@/lib/ui-preferences-client";
 import { formatDateBR } from "@/lib/dates";
 import { LEASE_VIEWS, MANAGEMENT_LABELS, attentionItems, contractsValue, hubTotals, inView, leaseManagers, matchesManager, type LeaseRow, type LeaseView } from "@/lib/lease-dashboard";
 import type { PropertyKind } from "@/lib/lease-charges";
@@ -35,18 +39,64 @@ interface Props {
 }
 
 type Mode = "lista" | "linha";
+/** Where table-or-timeline is remembered: `view:contratos` */
+const VIEW_KEY = "contratos";
+const isMode = (v: unknown): v is Mode => v === "lista" || v === "linha";
+
+/** What the figure of the Contratos card counts, by tab: "6 em vigor", "1 encerrado", "7 no total". */
+function scopeUnit(view: LeaseView, n: number): string {
+    switch (view) {
+        case "vigentes": return "em vigor";
+        case "vencendo": return "vencendo";
+        case "encerrados": return n === 1 ? "encerrado" : "encerrados";
+        case "rascunhos": return n === 1 ? "rascunho" : "rascunhos";
+        default: return "no total";
+    }
+}
+
+/**
+ * Table or timeline. It opens on the table (what the server drew), then takes this device's copy and the
+ * account's — unless the user already chose in this visit; a choice is saved to both.
+ */
+function useViewMode(): [Mode, (m: Mode) => void] {
+    const [mode, setMode] = useState<Mode>("lista");
+    const touched = useRef(false);
+    useEffect(() => {
+        let alive = true;
+        const local = readLocalPreference("views", VIEW_KEY);
+        void Promise.resolve(local)
+            .then(v => { if (alive && !touched.current && isMode(v)) setMode(v); })
+            .then(() => loadAccountPreferences())
+            .then(all => {
+                const remote = all.views[VIEW_KEY];
+                if (isMode(remote)) {
+                    if (alive && !touched.current) { setMode(remote); writeLocalPreference("views", VIEW_KEY, remote); }
+                } else if (isMode(local)) {
+                    // first time the account hears of it: the choice made on this device becomes the account's
+                    saveAccountPreference("views", VIEW_KEY, local);
+                }
+            });
+        return () => { alive = false; };
+    }, []);
+    const choose = (m: Mode) => {
+        touched.current = true;
+        setMode(m);
+        writeLocalPreference("views", VIEW_KEY, m);
+        saveAccountPreference("views", VIEW_KEY, m);
+    };
+    return [mode, choose];
+}
 
 const DOT: Record<string, string> = { rose: "bg-rose-500", amber: "bg-amber-500", sky: "bg-sky-500", slate: "bg-slate-400" };
 
 export default function ContratosHub({ rows, today, propertyKinds = {}, loading, error, view, onViewChange, actions, onNew, onImportOld }: Props) {
-    const [mode, setMode] = useState<Mode>("lista");
+    const [mode, setMode] = useViewMode();
+    const [helpOpen, setHelpOpen] = useState(false);
     const [search, setSearch] = useState("");
     const [property, setProperty] = useState("");
     const [management, setManagement] = useState("");
     const [allAttention, setAllAttention] = useState(false);
 
-    const totals = useMemo(() => hubTotals(rows, today), [rows, today]);
-    const value = useMemo(() => contractsValue(rows, today), [rows, today]);
     const attention = useMemo(() => attentionItems(rows), [rows]);
     const counts = useMemo(() => Object.fromEntries(LEASE_VIEWS.map(v => [v.key, rows.filter(r => inView(r, v.key)).length])) as Record<LeaseView, number>, [rows]);
 
@@ -77,6 +127,10 @@ export default function ContratosHub({ rows, today, propertyKinds = {}, loading,
     }, [rows, view, property, management, search]);
 
     const filtered = Boolean(search || property || management);
+    // the cards count what is shown: the tab and the filters above the table
+    const totals = useMemo(() => hubTotals(visible, today, { countAll: true }), [visible, today]);
+    const value = useMemo(() => contractsValue(visible, today, { countAll: true }), [visible, today]);
+    const unit = `${scopeUnit(view, visible.length)}${filtered ? " · com filtro" : ""}`;
     const viewMeta = LEASE_VIEWS.find(v => v.key === view)!;
     const shownAttention = allAttention ? attention : attention.slice(0, 4);
 
@@ -104,7 +158,7 @@ export default function ContratosHub({ rows, today, propertyKinds = {}, loading,
             </div>
 
             {/* KPI strip */}
-            {rows.length > 0 && <ContratosKpis totals={totals} value={value} onOpen={actions.onOpen} />}
+            {rows.length > 0 && <ContratosKpis totals={totals} value={value} unit={unit} allCount={rows.length} onOpen={actions.onOpen} />}
 
             {/* Attention */}
             {attention.length > 0 && (
@@ -165,6 +219,7 @@ export default function ContratosHub({ rows, today, propertyKinds = {}, loading,
                                 </button>
                             ))}
                         </div>
+                        <div className="flex items-center gap-1.5">
                         <div className="inline-flex rounded-lg border border-border bg-background p-0.5" role="group" aria-label="Como mostrar">
                             <button type="button" onClick={() => setMode("lista")} aria-pressed={mode === "lista"} className={cn("inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs", mode === "lista" ? "bg-muted font-semibold text-foreground" : "text-muted-foreground hover:text-foreground")}>
                                 <List className="h-3.5 w-3.5" /> Lista
@@ -172,6 +227,10 @@ export default function ContratosHub({ rows, today, propertyKinds = {}, loading,
                             <button type="button" onClick={() => setMode("linha")} aria-pressed={mode === "linha"} className={cn("inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs", mode === "linha" ? "bg-muted font-semibold text-foreground" : "text-muted-foreground hover:text-foreground")}>
                                 <GanttChart className="h-3.5 w-3.5" /> Linha do tempo
                             </button>
+                        </div>
+                        <button type="button" onClick={() => setHelpOpen(true)} title="Como usar" aria-label="Como usar a lista de contratos" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
+                            <HelpCircle className="h-4 w-4" />
+                        </button>
                         </div>
                     </div>
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -237,12 +296,31 @@ export default function ContratosHub({ rows, today, propertyKinds = {}, loading,
                 <LeaseTimeline rows={visible} today={today} onOpen={actions.onOpen} />
             )}
 
-            {rows.length > 0 && (
-                <p className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Archive className="h-3.5 w-3.5" />
-                    Contratos anteriores do mesmo imóvel entram pelo &ldquo;Importar contratos antigos&rdquo; e ficam em Encerrados, com o PDF guardado.
-                </p>
-            )}
+            {/* the "?" next to Lista | Linha do tempo: how the table works, where old contracts go */}
+            <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader className="text-left sm:text-left">
+                        <DialogTitle>Como usar</DialogTitle>
+                        <DialogDescription asChild>
+                            <div className="space-y-4 text-sm text-muted-foreground">
+                                <div className="space-y-1.5">
+                                    <p className="inline-flex items-center gap-1.5 font-semibold text-foreground"><MousePointerClick className="h-4 w-4 text-emerald-600" /> Na tabela</p>
+                                    <ul className="list-disc space-y-1 pl-5">
+                                        <li>Clique no cabeçalho para ordenar e filtrar (botão direito: colunas).</li>
+                                        <li>Selecione células para somar.</li>
+                                        <li>As setas movem entre as células.</li>
+                                        <li>Ctrl+C copia.</li>
+                                    </ul>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <p className="inline-flex items-center gap-1.5 font-semibold text-foreground"><Archive className="h-4 w-4 text-amber-600" /> Contratos antigos</p>
+                                    <p>Contratos anteriores do mesmo imóvel entram pelo &ldquo;Importar contratos antigos&rdquo; e ficam em Encerrados, com o PDF guardado.</p>
+                                </div>
+                            </div>
+                        </DialogDescription>
+                    </DialogHeader>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

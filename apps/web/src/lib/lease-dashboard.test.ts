@@ -257,6 +257,31 @@ describe("hubTotals: deposits and files", () => {
     });
 });
 
+describe("hubTotals + contractsValue over what the hub's filters show (countAll)", () => {
+    const rows = summarizeLeases(
+        [
+            lease({ id: "a", monthly_rent: 1300, security_deposit: 2600 }),
+            lease({ id: "e", status: "TERMINATED", termination_date: "2026-03-01", monthly_rent: 1200, security_deposit: 1200, document_count: 0, start_date: "2024-12-20", end_date: "2027-06-20" }),
+        ],
+        { ipca: IPCA },
+        TODAY
+    );
+    it("counts every row given, the closed ones included; what lies ahead stays with the ones in force", () => {
+        const closed = hubTotals(rows.filter(r => r.lease.id === "e"), TODAY, { countAll: true });
+        expect(closed).toMatchObject({ counted: 1, inForce: 0, contractedRent: 1200, deposits: 1200, depositsCount: 1, withFileCounted: 0, agencyManaged: 1, nextEnd: null, nextAdjustment: null });
+        const all = hubTotals(rows, TODAY, { countAll: true });
+        expect(all).toMatchObject({ counted: 2, inForce: 1, contractedRent: 2500, deposits: 3800 });
+        expect(all.nextEnd?.row.lease.id).toBe("a");
+        // by default only the contracts in force count (the dashboard)
+        expect(hubTotals(rows, TODAY)).toMatchObject({ counted: 1, contractedRent: 1300, deposits: 2600 });
+    });
+    it("adds a closed contract's value when it is among the rows shown", () => {
+        const onlyClosed = rows.filter(r => r.lease.id === "e");
+        expect(contractsValue(onlyClosed, TODAY).total).toBe(0);
+        expect(contractsValue(onlyClosed, TODAY, { countAll: true }).total).toBeGreaterThan(0);
+    });
+});
+
 describe("contractsValue", () => {
     it("adds up the contracts in force over their terms: what the ledger confirmed, then the schedule", () => {
         const rows = summarizeLeases(

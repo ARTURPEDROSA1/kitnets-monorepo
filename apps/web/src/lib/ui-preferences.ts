@@ -2,13 +2,14 @@
  * Interface preferences kept in the user's account (`user_ui_preferences`), so they follow the user to any
  * device. Pure helpers shared by the API route and the client.
  *
- * Six kinds today, four per table (and per kind of property where the table differs by it):
+ * Seven kinds today, four per table (and per kind of property where the table differs by it):
  *   hidden-columns:<table>[:<variant>]   string[] of column keys           e.g. ["energy", "received"]
  *   column-widths:<table>[:<variant>]    { <column>: px }                  e.g. { notes: 320 }  (dragged header edges)
  *   sort:<table>[:<variant>]             { key, dir }                      e.g. { key: "due_on", dir: "asc" }
  *   filters:<table>:<record id>          { <column>: { text | min/max | values[] } }
  *   sidebar:collapsed-groups             string[] of menu group keys       e.g. ["contabil"]  (lib/sidebar-groups.ts)
  *   notifications:owner                  { marketing, security }           what the owner wants to receive (/proprietario)
+ *   view:<page>                          "lista" | "linha" …               how a page shows its records (Contratos: table or timeline)
  *
  * Hidden columns, widths and sort are how the user wants a kind of table to look, so they are per table. Filters
  * are a question asked of one property's (or one investment's) rows, so they are per record: a filter on
@@ -21,6 +22,7 @@ export const SORT_PREFIX = "sort:";
 export const FILTERS_PREFIX = "filters:";
 export const SIDEBAR_PREFIX = "sidebar:";
 export const NOTIFICATIONS_PREFIX = "notifications:";
+export const VIEW_PREFIX = "view:";
 /** the one sidebar setting today: the menu groups the user collapsed */
 export const SIDEBAR_GROUPS_KEY = "collapsed-groups";
 
@@ -87,6 +89,17 @@ export const tableKeyFromFiltersPrefKey = (prefKey: string) => tableKeyOf(FILTER
 export const notificationsPrefKey = (name: string) => prefKeyOf(NOTIFICATIONS_PREFIX, name);
 /** `notifications:owner` → `owner`; null for any other key. */
 export const tableKeyFromNotificationsPrefKey = (prefKey: string) => tableKeyOf(NOTIFICATIONS_PREFIX, prefKey);
+
+/** Preference key of how a page shows its records (`view:contratos`), or null when the name is not acceptable. */
+export const viewPrefKey = (page: string) => prefKeyOf(VIEW_PREFIX, page);
+/** `view:contratos` → `contratos`; null for any other key. */
+export const tableKeyFromViewPrefKey = (prefKey: string) => tableKeyOf(VIEW_PREFIX, prefKey);
+
+const VIEW_MODE = /^[a-z][a-z0-9-]{0,19}$/;
+/** A page's view as stored: a short slug ("lista", "linha"); null for anything else. The page decides which it knows. */
+export function sanitizeViewMode(value: unknown): string | null {
+    return typeof value === "string" && VIEW_MODE.test(value) ? value : null;
+}
 
 /** A clean list of column keys (no duplicates, no junk), or null when the value is not a list of them. */
 export function sanitizeHiddenColumns(value: unknown): string[] | null {

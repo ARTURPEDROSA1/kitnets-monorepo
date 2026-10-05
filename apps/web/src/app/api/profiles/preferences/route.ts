@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireProfile } from "@/lib/api-auth";
 import {
-    COLUMN_WIDTHS_PREFIX, FILTERS_PREFIX, HIDDEN_COLUMNS_PREFIX, NOTIFICATIONS_PREFIX, SIDEBAR_PREFIX, SORT_PREFIX,
-    sanitizeColumnWidths, sanitizeFilters, sanitizeHiddenColumns, sanitizeNotificationPrefs, sanitizeSort,
-    tableKeyFromColumnWidthsPrefKey, tableKeyFromFiltersPrefKey, tableKeyFromNotificationsPrefKey, tableKeyFromPrefKey, tableKeyFromSidebarPrefKey, tableKeyFromSortPrefKey,
+    COLUMN_WIDTHS_PREFIX, FILTERS_PREFIX, HIDDEN_COLUMNS_PREFIX, NOTIFICATIONS_PREFIX, SIDEBAR_PREFIX, SORT_PREFIX, VIEW_PREFIX,
+    sanitizeColumnWidths, sanitizeFilters, sanitizeHiddenColumns, sanitizeNotificationPrefs, sanitizeSort, sanitizeViewMode,
+    tableKeyFromColumnWidthsPrefKey, tableKeyFromFiltersPrefKey, tableKeyFromNotificationsPrefKey, tableKeyFromPrefKey, tableKeyFromSidebarPrefKey, tableKeyFromSortPrefKey, tableKeyFromViewPrefKey,
 } from "@/lib/ui-preferences";
 import { sanitizeCollapsedGroups } from "@/lib/sidebar-groups";
 
@@ -23,6 +23,8 @@ const SECTIONS = {
     sidebar: { prefix: SIDEBAR_PREFIX, tableKey: tableKeyFromSidebarPrefKey, sanitize: sanitizeCollapsedGroups },
     // what the owner wants to receive (/proprietario), one entry: "owner"
     notifications: { prefix: NOTIFICATIONS_PREFIX, tableKey: tableKeyFromNotificationsPrefKey, sanitize: sanitizeNotificationPrefs },
+    // how a page shows its records: "contratos" → "lista" | "linha"
+    views: { prefix: VIEW_PREFIX, tableKey: tableKeyFromViewPrefKey, sanitize: sanitizeViewMode },
 } as const;
 type Section = keyof typeof SECTIONS;
 const SECTION_NAMES = Object.keys(SECTIONS) as Section[];
@@ -49,7 +51,7 @@ export async function GET() {
         return NextResponse.json({ error: "Erro ao carregar as preferências" }, { status: 500 });
     }
 
-    const out: Record<Section, Record<string, unknown>> = { hiddenColumns: {}, columnWidths: {}, sort: {}, filters: {}, sidebar: {}, notifications: {} };
+    const out: Record<Section, Record<string, unknown>> = { hiddenColumns: {}, columnWidths: {}, sort: {}, filters: {}, sidebar: {}, notifications: {}, views: {} };
     for (const row of data ?? []) {
         for (const name of SECTION_NAMES) {
             const tableKey = SECTIONS[name].tableKey(row.key);
