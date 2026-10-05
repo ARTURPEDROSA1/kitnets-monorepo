@@ -8,7 +8,8 @@ export type ChargeType = 'CONDOMINIUM' | 'IPTU' | 'WATER' | 'ELECTRICITY' | 'GAS
 export type ChargeResponsibility = 'TENANT' | 'LANDLORD' | 'INCLUDED' | 'INCLUDED_IN_CONDO';
 /** Who bills the tenant for the rent or a charge (lib/invoice-collection.ts) */
 export type ChargeCollector = 'OWNER' | 'AGENCY' | 'THIRD_PARTY';
-export type DocumentType = 'CONTRACT' | 'ADDENDUM' | 'INSPECTION' | 'TENANT_DOC' | 'DEPOSIT_RECEIPT' | 'OTHER';
+/** NOTICE: the tenant's notice of leaving (aviso de desocupação); TERMINATION: the closing term (termo de encerramento) */
+export type DocumentType = 'CONTRACT' | 'ADDENDUM' | 'INSPECTION' | 'TENANT_DOC' | 'DEPOSIT_RECEIPT' | 'NOTICE' | 'TERMINATION' | 'OTHER';
 export type LeaseTenantRole = 'CO_TENANT' | 'OCCUPANT';
 
 // ── Database row interfaces ──────────────────────────────────────────
@@ -51,6 +52,8 @@ export interface Lease {
     // Termination
     termination_date: string | null;
     termination_reason: string | null;
+    /** when the tenant gave notice of leaving; with the lease in force, termination_date is the planned move-out day */
+    notice_date?: string | null;
 
     // Notes
     notes: string | null;

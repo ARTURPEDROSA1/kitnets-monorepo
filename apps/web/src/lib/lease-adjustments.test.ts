@@ -118,6 +118,15 @@ describe("dueAdjustments", () => {
         expect(trackedCharge([energy({ amount: 0 })])).toBeNull();
         expect(trackedCharge(null)).toBeNull();
     });
+    it("adjusts nothing from the tenant's notice of leaving on", () => {
+        const series = { ivar: flat("2025-08", 14, 0.5) };
+        // the anniversary 29/08/2026 came after the notice of 20/08/2026: not adjusted
+        const after = dueAdjustments(lease({ notice_date: "2026-08-20" }), [], series, TODAY);
+        expect(after.rows).toEqual([]);
+        expect(after.waiting).toBeNull();
+        // a notice after the anniversary leaves it alone
+        expect(dueAdjustments(lease({ notice_date: "2026-09-10" }), [], series, TODAY).rows.map(r => r.effective_date)).toEqual(["2026-08-29"]);
+    });
     it("holds the whole adjustment until the condominium's own index is out too", () => {
         const due = dueAdjustments(lease({ charges: [condo({ adjusts_with_rent: false, adjustment_index: "IPCA" })] }), [], { ivar: flat("2025-08", 14, 0.5), ipca: flat("2025-08", 11, 1) }, TODAY);
         expect(due.rows).toEqual([]);

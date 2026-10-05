@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/api-route";
 import { leaseInputSchema } from "@/lib/schemas/lease";
+import { CLOSED, IN_FORCE } from "@/lib/lease-dashboard";
+import type { LeaseStatus } from "@/types/lease";
 import {
     LEASE_DOCUMENTS_BUCKET,
     LEASE_SELECT_WITH_NAMES,
@@ -55,13 +57,15 @@ export const GET = withAuth<undefined, Params>({ tag: "Lease GET" }, async ({ pa
 export const PUT = withAuth<typeof leaseInputSchema, Params>(
     { body: leaseInputSchema, tag: "Lease PUT" },
     async ({ body, params, profileId, supabase }) => {
-        await loadOwnedLease(supabase, params.id, profileId);
+        const current = await loadOwnedLease(supabase, params.id, profileId, "id, status");
         const { unit_name } = await assertLeaseRelations(supabase, profileId, body.lease);
         const warning = await activeLeaseWarning(supabase, profileId, body.lease, params.id);
+        // a closed contract made active again runs on as before: the end that closed it (and any notice) goes away
+        const reopened = CLOSED.has(current.status as LeaseStatus) && IN_FORCE.has(body.lease.status as LeaseStatus);
 
         const { data: lease, error } = await supabase
             .from("leases")
-            .update({ ...body.lease, unit_name })
+            .update({ ...body.lease, unit_name, ...(reopened ? { termination_date: null, termination_reason: null, notice_date: null } : {}) })
             .eq("id", params.id)
             .select()
             .single();

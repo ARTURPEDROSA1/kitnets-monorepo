@@ -8,7 +8,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Ban, Building2, CalendarClock, CheckCircle2, Clock, ExternalLink, FileSignature, FileText, Home, Loader2, Mail, MessageCircle, PenLine, Trash2, TrendingUp, User, Users, Wallet, X } from "lucide-react";
+import { ArrowLeft, Building2, CalendarClock, CheckCircle2, Clock, DoorOpen, ExternalLink, FileSignature, FileText, Home, Loader2, Mail, MessageCircle, PenLine, Trash2, TrendingUp, User, Users, Wallet, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import { Button } from "@kitnets/ui";
 import { CardInfoIcon, TILE_TONES, type TileInfo } from "@/components/properties/Tile";
@@ -87,6 +87,26 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
     // "Registrar aditivo": undefined = closed, null = no adjustment chosen, a date = that adjustment's
     const [addendumFor, setAddendumFor] = useState<string | null | undefined>(undefined);
     const seededRef = useRef(preloaded !== null);
+
+    /** the tenant changed their mind: the notice goes away and the contract runs on */
+    const [cancellingNotice, setCancellingNotice] = useState(false);
+    const cancelNotice = async () => {
+        if (!window.confirm("Cancelar o aviso de desocupação? O contrato segue vigente, sem data de saída.")) return;
+        setCancellingNotice(true);
+        try {
+            const res = await fetch(`/api/leases/${leaseId}/terminate`, { method: "DELETE" });
+            if (!res.ok) {
+                const json = await res.json().catch(() => ({}));
+                setError(typeof json.error === "string" ? json.error : "Não foi possível cancelar o aviso.");
+                return;
+            }
+            await load();
+        } catch {
+            setError("Erro de conexão. Tente novamente.");
+        } finally {
+            setCancellingNotice(false);
+        }
+    };
 
     const load = useCallback(async () => {
         const res = await fetch(`/api/leases/${leaseId}/dashboard`);
@@ -195,9 +215,9 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                         <span className="hidden sm:inline">Editar</span>
                     </Button>
                     {row.inForce && (
-                        <Button variant="outline" onClick={() => onTerminate(lease)} className="border-amber-400 text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-950/30">
-                            <Ban className="h-4 w-4 sm:mr-1" />
-                            <span className="hidden sm:inline">Rescindir</span>
+                        <Button variant="outline" onClick={() => onTerminate(lease)} title="Aviso de desocupação ou rescisão" className="border-orange-400 text-orange-700 hover:bg-orange-50 dark:text-orange-300 dark:hover:bg-orange-950/30">
+                            <DoorOpen className="h-4 w-4 sm:mr-1" />
+                            <span className="hidden sm:inline">Encerrar</span>
                         </Button>
                     )}
                     <Button variant="ghost" size="icon" onClick={() => onDelete(lease)} title="Excluir contrato" aria-label="Excluir contrato" className="text-muted-foreground hover:text-rose-600">
@@ -222,6 +242,31 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                         O prazo terminou em <strong>{formatDateBR(summary.effectiveEnd)}</strong> e o contrato segue por prazo indeterminado (Lei 8.245/91, art. 46 §1º).
                         Renove com um aditivo, cadastre o novo contrato ou registre a rescisão.
                     </span>
+                </div>
+            )}
+
+            {/* The tenant's notice of leaving: in force until the move-out day */}
+            {row.notice && (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-orange-300 bg-orange-50 px-4 py-3 dark:border-orange-800 dark:bg-orange-950/30">
+                    <div className="flex min-w-0 items-start gap-3">
+                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-orange-500/15 text-orange-600"><DoorOpen className="h-5 w-5" /></span>
+                        <div className="min-w-0">
+                            <p className="text-sm font-semibold text-foreground">
+                                Aviso de desocupação{row.notice.noticeDate ? ` recebido em ${formatDateBR(row.notice.noticeDate)}` : ""}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                                {row.notice.daysLeft > 0
+                                    ? <>O inquilino desocupa em <strong className="text-foreground">{formatDateBR(row.notice.moveOut)}</strong> (em {row.notice.daysLeft} {row.notice.daysLeft === 1 ? "dia" : "dias"}). Até lá o contrato segue vigente; no dia seguinte passa a rescindido.</>
+                                    : <>A desocupação estava prevista para <strong className="text-foreground">{formatDateBR(row.notice.moveOut)}</strong>: o contrato passa a rescindido.</>}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex shrink-0 gap-2">
+                        <Button size="sm" variant="outline" onClick={() => onTerminate(lease)}>Alterar</Button>
+                        <Button size="sm" variant="ghost" onClick={() => void cancelNotice()} disabled={cancellingNotice}>
+                            {cancellingNotice && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />} Cancelar aviso
+                        </Button>
+                    </div>
                 </div>
             )}
 
@@ -352,6 +397,13 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                         <Field label="Registro">
                             <span className="text-xs text-muted-foreground">criado {formatDateBR(lease.created_at)}{lease.updated_at && lease.updated_at.slice(0, 10) !== lease.created_at.slice(0, 10) ? ` · alterado ${formatDateBR(lease.updated_at)}` : ""}</span>
                         </Field>
+                        {row.notice && (
+                            <Field label="Desocupação prevista" className="col-span-2">
+                                <span className="text-orange-700 dark:text-orange-300">{formatDateBR(row.notice.moveOut)}</span>
+                                {row.notice.noticeDate && <span className="text-xs text-muted-foreground"> · aviso em {formatDateBR(row.notice.noticeDate)}</span>}
+                                {lease.termination_reason && <p className="mt-0.5 text-xs text-muted-foreground">{lease.termination_reason}</p>}
+                            </Field>
+                        )}
                         {lease.status === "TERMINATED" && (
                             <Field label="Rescisão" className="col-span-2">
                                 <span className="text-rose-700 dark:text-rose-300">{formatDateBR(lease.termination_date)}</span>
@@ -439,8 +491,8 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
 }
 
 function MilestoneChip({ milestone, last }: { milestone: Milestone; last: boolean }) {
-    const next = milestone.kind === "next_adjustment";
-    const end = milestone.kind === "end" || milestone.kind === "termination";
+    const next = milestone.kind === "next_adjustment" || (milestone.kind === "move_out" && !milestone.done);
+    const end = milestone.kind === "end" || milestone.kind === "termination" || milestone.kind === "move_out" || milestone.kind === "notice";
     return (
         <li className="flex items-center">
             <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs",

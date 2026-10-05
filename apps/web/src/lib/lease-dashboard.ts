@@ -11,7 +11,10 @@
  *     the rent keeps coming — so it stays among the contracts in force, flagged "prazo vencido";
  *   • the **display status** adds the calendar: an ACTIVE lease ending within 30 days shows
  *     "Vencendo", one past its end date shows "Vencido". TERMINATED, CANCELLED and DRAFT are
- *     what they are.
+ *     what they are;
+ *   • a **notice of leaving** (aviso de desocupação) is a lease in force with a termination_date: the
+ *     planned move-out day. It stays in force (rent, totals) until that day and wears "Aviso de saída";
+ *     the day after, the API closes it as TERMINATED (lib/lease-notice-server.ts).
  */
 import type { LeaseManagementType, LeaseStatus, LeaseWithDetails } from "@/types/lease";
 import { LEASE_INDEX_LABELS, addMonths, daysBetween, leaseIndexSeriesCode, leaseSummary, nextAdjustment, type IndexPoint, type LeaseSummary } from "@/lib/lease-summary";
@@ -71,11 +74,15 @@ export const STATUS_META: Record<LeaseStatus, StatusMeta> = {
 /** A contract stored as EXPIRED: over, in the history — not the rose "prazo vencido" of one that keeps running. */
 export const CLOSED_META: StatusMeta = { label: "Encerrado", ...SLATE };
 
+/** A contract in force whose tenant gave notice of leaving: it ends on the move-out day. */
+export const NOTICE_META: StatusMeta = { label: "Aviso de saída", pill: "bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-300", bar: "bg-orange-500", text: "text-orange-600 dark:text-orange-400" };
+
 /**
  * What a row's pill says. The rent still due after the term is "Prazo vencido" (rose: decide something);
  * a contract closed as EXPIRED is "Encerrado" (slate, like rescindido); everything else by status.
  */
-export function statusMeta(row: { status: LeaseStatus; inForce: boolean }): StatusMeta {
+export function statusMeta(row: { status: LeaseStatus; inForce: boolean; notice?: LeaseNotice | null }): StatusMeta {
+    if (row.notice) return NOTICE_META;
     if (row.status === "EXPIRED") return row.inForce ? STATUS_META.EXPIRED : CLOSED_META;
     return STATUS_META[row.status];
 }
@@ -146,11 +153,11 @@ export const LEASE_VIEWS: Array<{ key: LeaseView; label: string; empty: string }
 ];
 export const viewFromParam = (v: string | null): LeaseView => (LEASE_VIEWS.some(x => x.key === v) ? (v as LeaseView) : DEFAULT_VIEW);
 
-/** Whether a lease belongs to a view. "Vencendo" is what needs a decision: ending soon, or past its term while still in force. */
-export function inView(row: { status: LeaseStatus; stored: LeaseStatus }, view: LeaseView): boolean {
+/** Whether a lease belongs to a view. "Vencendo" is what needs a decision: ending soon, past its term while still in force, or with the tenant's notice of leaving. */
+export function inView(row: { status: LeaseStatus; stored: LeaseStatus; notice?: LeaseNotice | null }, view: LeaseView): boolean {
     switch (view) {
         case "vigentes": return IN_FORCE.has(row.stored);
-        case "vencendo": return IN_FORCE.has(row.stored) && (row.status === "EXPIRING_SOON" || row.status === "EXPIRED");
+        case "vencendo": return IN_FORCE.has(row.stored) && (row.status === "EXPIRING_SOON" || row.status === "EXPIRED" || !!row.notice);
         case "encerrados": return CLOSED.has(row.stored);
         case "rascunhos": return row.stored === "DRAFT";
         default: return true;
@@ -179,6 +186,25 @@ export interface LeaseRow {
     /** whole months of the term; null when open-ended */
     termMonths: number | null;
     hasFile: boolean;
+    /** the tenant gave notice of leaving: in force until the move-out day */
+    notice: LeaseNotice | null;
+}
+
+/** A tenant's notice of leaving (aviso de desocupação) on a lease in force. */
+export interface LeaseNotice {
+    /** `YYYY-MM-DD` the tenant gave notice; null when it was not recorded */
+    noticeDate: string | null;
+    /** `YYYY-MM-DD` the planned move-out day: the lease's termination_date */
+    moveOut: string;
+    /** days from today to the move-out (negative once it passed and the lease was not closed yet) */
+    daysLeft: number;
+}
+
+/** The notice of a lease in force with a planned move-out day; null otherwise. */
+export function leaseNotice(lease: Pick<LeaseWithDetails, "status" | "termination_date" | "notice_date">, today: string): LeaseNotice | null {
+    if (!IN_FORCE.has(lease.status) || !lease.termination_date) return null;
+    const moveOut = lease.termination_date.slice(0, 10);
+    return { noticeDate: lease.notice_date ? lease.notice_date.slice(0, 10) : null, moveOut, daysLeft: daysBetween(today, moveOut) };
 }
 
 export const placeOf = (lease: Pick<LeaseWithDetails, "property_name" | "unit_name">) =>
@@ -206,18 +232,24 @@ const previousDay = (iso: string) => new Date(Date.parse(iso + "T00:00:00Z") - 8
 export function summarizeLease(lease: LeaseWithDetails, seriesByCode: Record<string, IndexPoint[] | null | undefined>, today: string): LeaseRow {
     const seriesCode = leaseIndexSeriesCode(lease.adjustment_index);
     const series = seriesCode ? seriesByCode[seriesCode] ?? null : null;
+    const notice = leaseNotice(lease, today);
+    const summary = leaseSummary(lease, series, today);
     return {
         lease,
         status: displayStatus(lease, today),
         stored: lease.status,
         inForce: isInForce(lease),
-        summary: leaseSummary(lease, series, today),
+        // the tenant gave notice: no adjustment from then on, so none is next
+        summary: notice && summary.nextAdjustmentDate && (!notice.noticeDate || summary.nextAdjustmentDate >= notice.noticeDate)
+            ? { ...summary, nextAdjustmentDate: null, daysToAdjustment: null, closingPct: null, closingRent: null }
+            : summary,
         seriesCode,
         place: placeOf(lease),
         title: titleOf(lease),
         indexLabel: lease.adjustment_index ? (LEASE_INDEX_LABELS[lease.adjustment_index] ?? lease.adjustment_index) : "Não informado",
         termMonths: termMonths(lease.start_date, lease.end_date),
         hasFile: (lease.document_count ?? lease.documents?.length ?? 0) > 0,
+        notice,
     };
 }
 
@@ -403,7 +435,7 @@ export function contractGroups(rows: LeaseRow[], today: string): ContractGroup[]
 
 // ── Attention list ───────────────────────────────────────────────────
 
-export type AttentionKind = "overdue_term" | "ending" | "adjustment" | "draft" | "no_file";
+export type AttentionKind = "overdue_term" | "notice" | "ending" | "adjustment" | "draft" | "no_file";
 export type AttentionTone = "rose" | "amber" | "sky" | "slate";
 
 export interface AttentionItem {
@@ -419,10 +451,12 @@ export interface AttentionItem {
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 const days = (n: number) => plural(Math.abs(n), "dia", "dias");
 const pct = (v: number) => `${v > 0 ? "+" : ""}${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+const isoBR = (iso: string) => iso.slice(0, 10).split("-").reverse().join("/");
 
 /**
- * What needs a look, most pressing first: terms already over (renew or terminate), terms ending
- * within 90 days, adjustments within 30 days, drafts never finished, contracts without their file.
+ * What needs a look, most pressing first: terms already over (renew or terminate), tenants leaving
+ * (a notice), terms ending within 90 days, adjustments within 30 days, drafts never finished,
+ * contracts without their file.
  */
 export function attentionItems(rows: LeaseRow[]): AttentionItem[] {
     const items: AttentionItem[] = [];
@@ -434,7 +468,14 @@ export function attentionItems(rows: LeaseRow[]): AttentionItem[] {
         if (!row.inForce) continue;
         const end = row.summary.effectiveEnd;
         const left = row.summary.daysLeft;
-        if (end && left !== null && left < 0) {
+        if (row.notice) {
+            const d = row.notice.daysLeft;
+            const told = row.notice.noticeDate ? ` (avisou em ${isoBR(row.notice.noticeDate)})` : "";
+            items.push({
+                kind: "notice", tone: d <= 7 ? "rose" : "amber", row, date: row.notice.moveOut,
+                text: d < 0 ? `Desocupação prevista há ${days(d)}: confirme a entrega das chaves.` : d === 0 ? `Aviso de saída: o inquilino desocupa hoje${told}.` : `Aviso de saída: o inquilino desocupa em ${days(d)}${told}.`,
+            });
+        } else if (end && left !== null && left < 0) {
             items.push({ kind: "overdue_term", tone: "rose", row, date: end, text: `Prazo vencido há ${days(left)}: o contrato segue por prazo indeterminado. Renove, prorrogue ou rescinda.` });
         } else if (end && left !== null && left <= 90) {
             items.push({ kind: "ending", tone: "amber", row, date: end, text: left === 0 ? "Termina hoje." : `Termina em ${days(left)}.` });
@@ -450,7 +491,7 @@ export function attentionItems(rows: LeaseRow[]): AttentionItem[] {
             items.push({ kind: "no_file", tone: "slate", row, date: null, text: "Sem o arquivo do contrato: anexe o PDF assinado." });
         }
     }
-    const order: Record<AttentionKind, number> = { overdue_term: 0, ending: 1, adjustment: 2, draft: 3, no_file: 4 };
+    const order: Record<AttentionKind, number> = { overdue_term: 0, notice: 1, ending: 2, adjustment: 3, draft: 4, no_file: 5 };
     return items.sort((a, b) => order[a.kind] - order[b.kind] || (a.date ?? "9999").localeCompare(b.date ?? "9999") || a.row.title.localeCompare(b.row.title));
 }
 
@@ -475,7 +516,7 @@ export function adjustmentDates(lease: Pick<LeaseWithDetails, "start_date" | "en
     return { past, next: !end || next <= end ? next : null };
 }
 
-export type MilestoneKind = "start" | "adjustment" | "next_adjustment" | "end" | "termination";
+export type MilestoneKind = "start" | "adjustment" | "next_adjustment" | "end" | "termination" | "notice" | "move_out";
 
 export interface Milestone {
     kind: MilestoneKind;
@@ -486,14 +527,20 @@ export interface Milestone {
 }
 
 /** The contract's life as a line: start, each adjustment, the next one, the end or the termination. */
-export function milestones(lease: Pick<LeaseWithDetails, "start_date" | "end_date" | "termination_date" | "adjustment_index" | "adjustment_frequency" | "next_adjustment_date" | "status">, today: string): Milestone[] {
+export function milestones(lease: Pick<LeaseWithDetails, "start_date" | "end_date" | "termination_date" | "notice_date" | "adjustment_index" | "adjustment_frequency" | "next_adjustment_date" | "status">, today: string): Milestone[] {
     const start = lease.start_date.slice(0, 10);
     const list: Milestone[] = [{ kind: "start", date: start, label: "Início", done: start <= today }];
     const closed = CLOSED.has(lease.status);
+    const notice = leaseNotice(lease, today);
     const { past, next } = adjustmentDates(lease, today);
-    past.forEach((date, i) => list.push({ kind: "adjustment", date, label: `${i + 1}º reajuste`, done: true }));
-    if (next && !closed) list.push({ kind: "next_adjustment", date: next, label: `${past.length + 1}º reajuste`, done: false });
-    if (lease.termination_date && lease.status === "TERMINATED") {
+    // an anniversary on or after the tenant's notice was not adjusted
+    past.filter(date => !notice?.noticeDate || date < notice.noticeDate).forEach((date, i) => list.push({ kind: "adjustment", date, label: `${i + 1}º reajuste`, done: true }));
+    // no adjustment from the tenant's notice on
+    if (next && !closed && (!notice || (notice.noticeDate ? next < notice.noticeDate : next <= notice.moveOut))) list.push({ kind: "next_adjustment", date: next, label: `${past.length + 1}º reajuste`, done: false });
+    if (notice) {
+        if (notice.noticeDate) list.push({ kind: "notice", date: notice.noticeDate, label: "Aviso de saída", done: notice.noticeDate <= today });
+        list.push({ kind: "move_out", date: notice.moveOut, label: "Desocupação", done: notice.moveOut <= today });
+    } else if (lease.termination_date && lease.status === "TERMINATED") {
         list.push({ kind: "termination", date: lease.termination_date.slice(0, 10), label: "Rescisão", done: true });
     } else if (lease.end_date) {
         const end = lease.end_date.slice(0, 10);

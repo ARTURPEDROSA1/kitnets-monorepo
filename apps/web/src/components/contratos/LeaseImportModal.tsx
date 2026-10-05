@@ -498,6 +498,7 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
             if (termReading) { setClosingError('Aguarde a leitura do termo de encerramento.'); return; }
             if (!closingDate) { setClosingError('Informe a data de encerramento (devolução do imóvel).'); return; }
             if (data.lease.start_date && closingDate <= data.lease.start_date) { setClosingError('A data de encerramento deve ser posterior ao início do contrato.'); return; }
+            if (closingDate > todayBRT()) { setClosingError('Data futura: deixe o contrato Vigente e registre o aviso de desocupação no painel dele (Encerrar).'); return; }
         }
         setApplying(true);
         setPropertyErrors({});

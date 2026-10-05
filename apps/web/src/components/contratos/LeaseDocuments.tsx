@@ -21,6 +21,8 @@ export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
     INSPECTION: "Laudo de vistoria",
     TENANT_DOC: "Documento do inquilino",
     DEPOSIT_RECEIPT: "Recibo de caução",
+    NOTICE: "Aviso de desocupação",
+    TERMINATION: "Termo de encerramento",
     OTHER: "Outro",
 };
 const TYPES = Object.keys(DOCUMENT_TYPE_LABELS) as DocumentType[];

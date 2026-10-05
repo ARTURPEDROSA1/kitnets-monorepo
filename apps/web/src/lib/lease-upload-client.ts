@@ -50,7 +50,7 @@ export function checkLeaseFile(file: File): string | null {
 export async function attachLeaseDocument(
     leaseId: string,
     file: File,
-    documentType: "CONTRACT" | "ADDENDUM" | "INSPECTION" | "TENANT_DOC" | "DEPOSIT_RECEIPT" | "OTHER",
+    documentType: "CONTRACT" | "ADDENDUM" | "INSPECTION" | "TENANT_DOC" | "DEPOSIT_RECEIPT" | "NOTICE" | "TERMINATION" | "OTHER",
     storagePath?: string | null
 ): Promise<{ document: Record<string, unknown> } | { error: string }> {
     const invalid = storagePath ? null : checkLeaseFile(file);
