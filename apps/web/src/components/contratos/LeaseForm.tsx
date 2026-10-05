@@ -6,9 +6,8 @@
  * of what is being registered, with the save buttons. Files are not here: they live on the contract's
  * dashboard (LeaseDocuments), which is where a saved contract lands.
  *
- * Dates are typed as DD/MM/AAAA and sent as ISO; money as "1.234,56". An AI import
- * (LeaseImportModal) prefills the form and hands over the agreement file, attached as the
- * CONTRACT document once the lease exists.
+ * Dates are typed as DD/MM/AAAA and sent as ISO; money as "1.234,56". This is where a contract is
+ * typed in; the AI import ("Importar contrato") creates contracts from its own review.
  */
 import React, { useEffect, useMemo, useState } from "react";
 import { Button } from "@kitnets/ui";
@@ -38,7 +37,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Money, Sensitive } from "@/components/privacy";
-import { attachLeaseContract } from "@/lib/lease-upload-client";
 import { chargeAdjustment } from "@/lib/lease-charges";
 import { STATUS_META, brl, termMonths, todayBRT } from "@/lib/lease-dashboard";
 import { leaseIndexSeriesCode, type IndexPoint } from "@/lib/lease-summary";
@@ -84,12 +82,6 @@ interface Props {
     editingId: string | null;
     initial: LeaseFormInitial;
     dropdowns: LeaseFormDropdowns;
-    /** the form was prefilled by the AI import */
-    aiImported?: boolean;
-    /** the imported agreement, attached as the CONTRACT document once the lease exists */
-    importedFile?: File | null;
-    /** the imported agreement when it already sits in storage (direct upload) */
-    importedStoragePath?: string | null;
     onSaved: (leaseId: string, warning: string | null) => void;
     onCancel: () => void;
     /** shown above the title (the "Voltar ao imóvel" link) */
@@ -260,7 +252,7 @@ const CHARGE_ADJUSTMENT_OPTIONS = [
 const pctText = (v: number) => `${v > 0 ? "+" : ""}${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 const amountFromMask = (masked: string) => (parseInt(masked.replace(/\D/g, ""), 10) || 0) / 100;
 
-export default function LeaseForm({ editingId, initial, dropdowns, aiImported = false, importedFile = null, importedStoragePath = null, onSaved, onCancel, topSlot, indexSeries }: Props) {
+export default function LeaseForm({ editingId, initial, dropdowns, onSaved, onCancel, topSlot, indexSeries }: Props) {
     const { properties, tenants, agencies, agents } = dropdowns;
     const [form, setForm] = useState<LeaseFormData>(() => ({ ...initial.form }));
     const [additionalTenants, setAdditionalTenants] = useState<AdditionalTenantFormItem[]>(() => initial.additionalTenants.map(t => ({ ...t })));
@@ -450,10 +442,6 @@ export default function LeaseForm({ editingId, initial, dropdowns, aiImported = 
             }
 
             const id = (data.lease?.id as string | undefined) ?? editingId;
-            if (!editingId && importedFile && data.lease?.id) {
-                const attached = await attachLeaseContract(data.lease.id, importedFile, importedStoragePath);
-                if (!attached) console.error("Error attaching imported contract");
-            }
             if (id) onSaved(id, (data.warning as string | null) ?? null);
         } catch {
             setWarning("Erro de conexão. Tente novamente.");
@@ -532,18 +520,6 @@ export default function LeaseForm({ editingId, initial, dropdowns, aiImported = 
                 <div className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-950/40">
                     <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
                     <p className="text-sm text-amber-900 dark:text-amber-200">{warning}</p>
-                </div>
-            )}
-
-            {aiImported && (
-                <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/[0.07] p-4">
-                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-amber-500/15 text-amber-600"><Sparkles className="h-5 w-5" /></span>
-                    <div className="space-y-0.5">
-                        <p className="text-sm font-semibold text-foreground">Preenchido pela IA a partir do contrato</p>
-                        <p className="text-xs leading-relaxed text-muted-foreground">
-                            Revise os campos antes de salvar.{importedFile && " O arquivo enviado fica anexado ao contrato."}
-                        </p>
-                    </div>
                 </div>
             )}
 

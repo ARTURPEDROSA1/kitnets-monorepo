@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * "Importar contratos antigos": the PDFs of contracts that already ran (the previous tenant, the
- * contract before the renewal) go in as a batch. Each file goes through the same AI reading and
+ * "Importar contrato": one or many contracts — in force or already over (the previous tenant, the
+ * contract before the renewal) — go in as a batch. Each file goes through the same AI reading and
  * party matching as a new contract (LeaseImportModal), which here also settles the unit of a
  * multi-unit property and the Vigente | Encerrado toggle; its "Criar contrato" creates the lease with
  * the PDF attached. Nothing is created without a click per contract; a file can be skipped ("Pular
@@ -27,8 +27,6 @@ interface Props {
     /** Closes the modal; the ids of the contracts created, so the caller refreshes the list. */
     onClose: (createdIds: string[]) => void;
     onOpenLease: (id: string) => void;
-    /** "history" (default): old contracts, registered as closed unless unticked; "current": contracts that may well be in force */
-    mode?: "history" | "current";
     /** Import started from a property's page (Imóveis): every contract is that property's (the unit is settled per contract) */
     fixedProperty?: { id: string; label: string };
     /** Import started from an agency's dashboard (Imobiliárias): every contract is that agency's */
@@ -50,11 +48,10 @@ interface Outcome {
     errors?: string[];
 }
 
-export default function LeaseBatchImportModal({ dropdowns, refreshDropdowns, onClose, onOpenLease, mode = "history", fixedAgency, fixedProperty }: Props) {
+export default function LeaseBatchImportModal({ dropdowns, refreshDropdowns, onClose, onOpenLease, fixedAgency, fixedProperty }: Props) {
     const [step, setStep] = useState<Step>("pick");
     const [files, setFiles] = useState<File[]>([]);
     const [fileErrors, setFileErrors] = useState<string[]>([]);
-    const [asHistory, setAsHistory] = useState(mode === "history");
     const [dragging, setDragging] = useState(false);
     const [index, setIndex] = useState(0);
     const [outcomes, setOutcomes] = useState<Outcome[]>([]);
@@ -115,7 +112,7 @@ export default function LeaseBatchImportModal({ dropdowns, refreshDropdowns, onC
         const outcome: ImportedLeaseOutcome = await createLeaseFromImport(result, {
             unitId: unit?.id ?? null,
             referenceName: referenceNameFor(property?.name, unit?.name, tenant?.full_name, result.data.lease.start_date),
-            status: result.status ?? (asHistory ? "EXPIRED" : "ACTIVE"),
+            status: result.status ?? "ACTIVE",
         });
         if (!outcome.ok) return outcome.errors ?? ["Não foi possível criar o contrato."];
 
@@ -152,7 +149,8 @@ export default function LeaseBatchImportModal({ dropdowns, refreshDropdowns, onC
                 createsLease
                 fixedAgency={fixedAgency}
                 fixedProperty={fixedProperty}
-                settleLease={{ defaultStatus: asHistory ? "EXPIRED" : "ACTIVE" }}
+                // each contract starts in force, or closed when its term is over or its closing term came along
+                settleLease={{ defaultStatus: "ACTIVE" }}
                 otherFiles={otherFiles}
                 progress={`Arquivo ${index + 1} de ${files.length} · ${current.name}`}
                 onSkip={skip}
@@ -176,14 +174,12 @@ export default function LeaseBatchImportModal({ dropdowns, refreshDropdowns, onC
                     </div>
                     <div className="space-y-1 pr-6">
                         <h2 className="text-xl font-bold tracking-tight text-foreground">
-                            {step === "pick" ? (mode === "current" ? "Importar contratos de locação" : "Importar contratos antigos") : "Importação concluída"}
+                            {step === "pick" ? "Importar contrato" : "Importação concluída"}
                         </h2>
                         <p className="text-xs leading-relaxed text-muted-foreground sm:text-sm">
                             {step === "pick"
-                                ? (mode === "current"
-                                    ? <>Envie os contratos de locação{fixedProperty ? <> de <strong className="text-foreground">{fixedProperty.label}</strong></> : fixedAgency ? <> da <strong className="text-foreground">{fixedAgency.label}</strong></> : null}. A IA lê cada um, você confirma imóvel, inquilinos e corretor, e o contrato é criado com o arquivo guardado — o que já estiver cadastrado não é criado de novo.</>
-                                    : <>Envie os PDFs de contratos que já rodaram (o inquilino anterior, o contrato antes da renovação). A IA lê cada um, você confirma as partes e o contrato entra no histórico com o arquivo guardado.</>)
-                                : <>O que foi criado aparece em Contratos{mode === "current" ? " → Vigentes (ou Encerrados, quando já terminou)" : " → Encerrados (ou Vigentes, quando ainda em vigor)"}.</>}
+                                ? <>Envie um ou vários contratos de locação{fixedProperty ? <> de <strong className="text-foreground">{fixedProperty.label}</strong></> : fixedAgency ? <> da <strong className="text-foreground">{fixedAgency.label}</strong></> : null}, vigentes ou antigos. A IA lê cada um; você confirma as partes, a unidade e se ele está vigente ou encerrado, e o contrato é criado com o arquivo guardado. Um termo de encerramento enviado junto é lido e anexado ao contrato dele.</>
+                                : <>O que foi criado aparece em Contratos → Vigentes ou Encerrados.</>}
                         </p>
                     </div>
                 </div>
@@ -228,13 +224,6 @@ export default function LeaseBatchImportModal({ dropdowns, refreshDropdowns, onC
                                 </ul>
                             )}
 
-                            <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-border p-3 text-sm">
-                                <input type="checkbox" className="mt-0.5" checked={asHistory} onChange={e => setAsHistory(e.target.checked)} />
-                                <span>
-                                    <span className="font-medium text-foreground">Registrar como encerrados</span>
-                                    <span className="block text-xs text-muted-foreground">São contratos que já terminaram: entram no histórico sem contar como vigentes, mesmo que a data de término lida esteja no futuro. Vale como padrão — na revisão de cada contrato dá para trocar entre vigente e encerrado.</span>
-                                </span>
-                            </label>
                         </div>
                     )}
 

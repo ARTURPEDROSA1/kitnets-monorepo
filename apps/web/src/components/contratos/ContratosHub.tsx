@@ -35,7 +35,8 @@ interface Props {
     onViewChange: (view: LeaseView) => void;
     actions: LeaseTableActions;
     onNew: () => void;
-    onImportOld: () => void;
+    /** the AI import of one or many contracts, current or old */
+    onImport: () => void;
 }
 
 type Mode = "lista" | "linha";
@@ -78,7 +79,7 @@ function useViewMode(): [Mode, (m: Mode) => void] {
 
 const DOT: Record<string, string> = { rose: "bg-rose-500", amber: "bg-amber-500", sky: "bg-sky-500", slate: "bg-slate-400" };
 
-export default function ContratosHub({ rows, today, propertyKinds = {}, loading, error, view, onViewChange, actions, onNew, onImportOld }: Props) {
+export default function ContratosHub({ rows, today, propertyKinds = {}, loading, error, view, onViewChange, actions, onNew, onImport }: Props) {
     const [mode, setMode] = useViewMode();
     const [helpOpen, setHelpOpen] = useState(false);
     const [search, setSearch] = useState("");
@@ -136,9 +137,9 @@ export default function ContratosHub({ rows, today, propertyKinds = {}, loading,
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                    <Button variant="outline" onClick={onImportOld} title="Envie os PDFs de contratos anteriores: a IA lê cada um e registra o contrato no histórico">
+                    <Button variant="outline" onClick={onImport} title="Envie o PDF de um ou vários contratos, vigentes ou antigos: a IA lê cada um e o contrato é criado com o arquivo guardado">
                         <Archive className="h-4 w-4 sm:mr-1" />
-                        <span className="hidden sm:inline">Importar contratos antigos</span>
+                        <span className="hidden sm:inline">Importar contrato</span>
                     </Button>
                     <Button onClick={onNew}>
                         <Plus className="mr-1 h-4 w-4" /> Novo Contrato
@@ -267,7 +268,7 @@ export default function ContratosHub({ rows, today, propertyKinds = {}, loading,
                     </p>
                     <div className="flex flex-wrap justify-center gap-2">
                         <Button onClick={onNew}><Plus className="mr-1 h-4 w-4" /> Cadastrar o primeiro</Button>
-                        <Button variant="outline" onClick={onImportOld}><Archive className="mr-1 h-4 w-4" /> Importar contratos antigos</Button>
+                        <Button variant="outline" onClick={onImport}><Archive className="mr-1 h-4 w-4" /> Importar contrato</Button>
                     </div>
                 </div>
             ) : visible.length === 0 ? (
@@ -303,7 +304,7 @@ export default function ContratosHub({ rows, today, propertyKinds = {}, loading,
                                 </div>
                                 <div className="space-y-1.5">
                                     <p className="inline-flex items-center gap-1.5 font-semibold text-foreground"><Archive className="h-4 w-4 text-amber-600" /> Contratos antigos</p>
-                                    <p>Contratos anteriores do mesmo imóvel entram pelo &ldquo;Importar contratos antigos&rdquo; e ficam em Encerrados, com o PDF guardado.</p>
+                                    <p>Contratos vigentes ou antigos entram pelo &ldquo;Importar contrato&rdquo;: a IA lê o PDF, você confirma, e os que já terminaram ficam em Encerrados, com o PDF guardado. &ldquo;Novo Contrato&rdquo; é para digitar um contrato.</p>
                                 </div>
                             </div>
                         </DialogDescription>

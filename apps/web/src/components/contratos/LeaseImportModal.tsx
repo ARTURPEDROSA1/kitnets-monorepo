@@ -57,6 +57,22 @@ export interface LeaseImportResult {
 /** A file named like a closing term: "termo de encerramento", "fechamento", "rescisão", "distrato", "entrega das chaves". */
 const TERM_NAME = /encerr|fechament|rescis|distrat|entrega|termo/i;
 
+/** A closing term is read once per file, whichever contract's review asks: the batch offers it to each of them. */
+const termReads = new WeakMap<File, Promise<{ data: ExtractedLease; storagePath: string | null } | { error: string }>>();
+function readTermOnce(file: File) {
+    let read = termReads.get(file);
+    if (!read) {
+        read = readWithAi(file);
+        termReads.set(file, read);
+        // a failed reading may be tried again
+        void read.then(r => { if ('error' in r) termReads.delete(file); });
+    }
+    return read;
+}
+
+const sameName = (a: string | null | undefined, b: string | null | undefined) =>
+    !!a && !!b && a.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase() === b.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+
 /** Reads a file with the lease AI (POST /api/leases/extract): straight to storage, the route body for a small file when that fails. */
 async function readWithAi(file: File): Promise<{ data: ExtractedLease; storagePath: string | null } | { error: string }> {
     try {
@@ -239,6 +255,8 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
     const [termStoragePath, setTermStoragePath] = useState<string | null>(null);
     const [termReading, setTermReading] = useState(false);
     const [termError, setTermError] = useState<string | null>(null);
+    /** a closing term sent in the batch is being read to see whether it is this contract's */
+    const [termChecking, setTermChecking] = useState(false);
     const termInputRef = useRef<HTMLInputElement>(null);
 
     const busy = isExtracting || applying;
@@ -279,7 +297,7 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
         setTermError(null);
         if (!file) return;
         setTermReading(true);
-        const read = await readWithAi(file);
+        const read = await readTermOnce(file);
         setTermReading(false);
         if ('error' in read) { setTermError(read.error); return; }
         setTermStoragePath(read.storagePath);
@@ -289,6 +307,29 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
             setClosingError(null);
         } else {
             setTermError('A IA não achou a data de devolução neste arquivo: informe a data de encerramento.');
+        }
+    };
+
+    /**
+     * A closing term among the batch's files: read once, and when it is this contract's (same start, or
+     * the same tenant) the contract goes in as closed, on the day the term says, with the term attached.
+     */
+    const matchTerm = async (file: File, contract: ExtractedLease) => {
+        setTermChecking(true);
+        const read = await readTermOnce(file);
+        setTermChecking(false);
+        if ('error' in read) return;
+        const term = read.data;
+        const same = (!!term.lease.start_date && term.lease.start_date === contract.lease.start_date)
+            || sameName(term.tenants[0]?.full_name, contract.tenants[0]?.full_name);
+        if (!same) return;
+        setStatusPick(prev => prev ?? 'EXPIRED');
+        setTermFile(file);
+        setTermStoragePath(read.storagePath);
+        if (term.lease.termination_date) {
+            setClosingDate(term.lease.termination_date);
+            setClosingSource('term');
+            setClosingError(null);
         }
     };
 
@@ -419,10 +460,10 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
             const endOver = extracted.lease.end_date && extracted.lease.end_date < todayBRT() ? extracted.lease.end_date : null;
             setClosingDate(read ?? endOver ?? '');
             setClosingSource(read ? 'document' : endOver ? 'end' : null);
-            // a closing term among the batch's files: picked and read when the contract goes in as closed
+            // a closing term among the batch's files: when it is this contract's, the contract goes in as closed
             const termGuess = otherFiles.find(f => TERM_NAME.test(f.name));
-            const startsClosed = !!settleLease && settleLease.askStatus !== false && !!createsLease && (!!endOver || settleLease.defaultStatus === 'EXPIRED');
-            if (termGuess && startsClosed && !read && extracted.document_kind !== 'TERMINATION') void pickTerm(termGuess);
+            const canClose = !!settleLease && settleLease.askStatus !== false && !!createsLease;
+            if (termGuess && canClose && !read && extracted.document_kind !== 'TERMINATION') void matchTerm(termGuess, extracted);
 
             setStep('review');
         } catch {
@@ -840,6 +881,10 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                                         ))}
                                     </div>
                                 </div>
+
+                                {termChecking && (
+                                    <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> Lendo o termo de encerramento enviado junto…</p>
+                                )}
 
                                 {/* a closed contract: the day it ended, confirmed by the user; the closing term, read by the AI */}
                                 {askClosing && (
@@ -1274,7 +1319,7 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                                 {onSkip
                                     ? <Button type="button" variant="outline" onClick={onSkip} disabled={applying}>Pular arquivo</Button>
                                     : <Button type="button" variant="outline" onClick={onClose} disabled={applying}>Cancelar</Button>}
-                                <Button type="button" onClick={handleApply} disabled={applying}>
+                                <Button type="button" onClick={handleApply} disabled={applying || termChecking || termReading}>
                                     {applying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
                                     {createsLease ? 'Criar contrato' : createLabels.length > 0 ? 'Criar e preencher contrato' : 'Preencher contrato'}
                                 </Button>
