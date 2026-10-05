@@ -212,7 +212,6 @@ export default function ContratosContent({ lang, initial = null, initialDashboar
                 adjustment_notes: c.adjustment_notes || "",
             })),
             // Everything the AI filled must be in sight for the review.
-            openSections: { adjustment: !!lease.adjustment_index, charges: result.data.charges.length > 0, notes: !!lease.notes },
         };
         // A file already in storage is adopted whatever its size; one that still has to go through the route must fit it
         const importedFile = result.storagePath || (ROUTE_MIME_TYPES.includes(result.file.type) && result.file.size <= LEASE_UPLOAD_MAX_SIZE) ? result.file : null;
