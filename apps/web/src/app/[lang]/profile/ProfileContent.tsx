@@ -1984,6 +1984,9 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                 });
             }
 
+            // a new property gets its `properties` row now, so Contratos and Inquilinos list it right away
+            await fetch('/api/properties/sync', { method: 'POST' }).catch(() => undefined);
+
             if (!silent) {
                 setShowSuccess(true);
                 setTimeout(() => {

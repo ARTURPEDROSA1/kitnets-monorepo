@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { ensurePropertyRows } from "@/lib/property-rows-server";
 import { signStorageUrl } from "@/lib/storage";
 import { EMPTY_PERIOD, summarizeUnitBills, type EnergyBillLike, type EnergyLatestSnapshot, type EnergyPeriodTotals } from "@/lib/energy-hub";
 
@@ -86,80 +87,14 @@ export async function getOwnerPropertiesSummary(userId: string): Promise<OwnerPr
             return [];
         }
 
-        // 3. Ensure primary property from profile has a row in properties if real property exists
-        if (hasRealPrimary) {
-            const primaryName = primaryDetails?.propertyName?.trim() || (primaryAddress?.street ? `${primaryAddress.street}, ${primaryAddress.number || ""}`.trim() : (profile.full_name ? `Imóvel de ${profile.full_name}` : "Meu Imóvel"));
-            const exists = dbProperties.find(p => {
-                let isUc = false;
-                if (p.electronic_id) {
-                    try {
-                        const parsed = JSON.parse(p.electronic_id);
-                        if (parsed.isStandaloneUc) isUc = true;
-                    } catch {}
-                }
-                if (isUc) return false;
-                return p.name.trim().toLowerCase() === primaryName.trim().toLowerCase();
-            });
-
-            if (!exists) {
-                const { data: newPrimary } = await supabase
-                    .from("properties")
-                    .insert({
-                        owner_id: profile.id,
-                        name: primaryName,
-                        address: primaryAddress?.street ? `${primaryAddress.street}, ${primaryAddress.number || ""} - ${primaryAddress.neighborhood || ""}`.trim() : null,
-                        city: primaryAddress?.city || null,
-                        state: primaryAddress?.state || null,
-                        zip: primaryAddress?.cep || null,
-                    })
-                    .select("id, name, address, city, state, zip, electronic_id")
-                    .single();
-
-                if (newPrimary) {
-                    dbProperties.unshift(newPrimary);
-                }
-            }
-        }
-
-        // 4. Ensure additional properties from profile.additional_properties are registered in properties
-        if (profile.additional_properties && Array.isArray(profile.additional_properties)) {
-            for (const ap of profile.additional_properties) {
-                const apDetails = ap?.details as Record<string, any> | null;
-                const apAddr = ap?.address as Record<string, any> | null;
-                const apName = apDetails?.propertyName?.trim() || (apAddr?.street ? `${apAddr.street}, ${apAddr.number || ""}`.trim() : null);
-
-                if (apName) {
-                    const exists = dbProperties.find(p => {
-                        let isUc = false;
-                        if (p.electronic_id) {
-                            try {
-                                const parsed = JSON.parse(p.electronic_id);
-                                if (parsed.isStandaloneUc) isUc = true;
-                            } catch {}
-                        }
-                        if (isUc) return false;
-                        return p.name.trim().toLowerCase() === apName.trim().toLowerCase();
-                    });
-                    if (!exists) {
-                        const { data: createdAp } = await supabase
-                            .from("properties")
-                            .insert({
-                                owner_id: profile.id,
-                                name: apName,
-                                address: apAddr?.street ? `${apAddr.street}, ${apAddr.number || ""} - ${apAddr.neighborhood || ""}`.trim() : null,
-                                city: apAddr?.city || null,
-                                state: apAddr?.state || null,
-                                zip: apAddr?.cep || null,
-                            })
-                            .select("id, name, address, city, state, zip, electronic_id")
-                            .single();
-
-                        if (createdAp) {
-                            dbProperties.push(createdAp);
-                        }
-                    }
-                }
-            }
+        // 3–4. Every property of the profile has its row (lib/property-rows-server.ts: same names, per-owner lock)
+        if (await ensurePropertyRows(supabase, profile.id, { profile, rows: dbProperties }) > 0) {
+            const { data: refreshed } = await supabase
+                .from("properties")
+                .select("id, name, address, city, state, zip, electronic_id")
+                .eq("owner_id", profile.id)
+                .order("created_at", { ascending: true });
+            dbProperties = refreshed || dbProperties;
         }
 
         // 5. Gather all property IDs to query energy_bills stats

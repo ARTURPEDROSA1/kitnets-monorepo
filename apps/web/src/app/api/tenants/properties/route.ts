@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/api-route";
+import { ensurePropertyRows } from "@/lib/property-rows-server";
 
 /**
  * GET /api/tenants/properties
@@ -7,6 +8,8 @@ import { withAuth } from "@/lib/api-route";
  * the tenant form's dropdown.
  */
 export const GET = withAuth({ tag: "Tenants Properties GET" }, async ({ profileId, supabase }) => {
+    // a property just registered on Imóveis lives in the profile JSON: give it its row before listing
+    await ensurePropertyRows(supabase, profileId);
     const { data: properties, error } = await supabase
         .from("properties")
         .select("id, name, electronic_id")

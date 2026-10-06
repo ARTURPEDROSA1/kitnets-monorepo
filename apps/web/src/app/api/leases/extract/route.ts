@@ -7,6 +7,7 @@ import type { AdminSupabase } from "@/lib/api-auth";
 import { HOUR } from "@/lib/rate-limit";
 import { validateUpload } from "@/lib/session";
 import { aiAvailable, extractJsonFromDocument } from "@/lib/document-ai-server";
+import { ensurePropertyRows } from "@/lib/property-rows-server";
 import {
     LEASE_EXTRACTION_PROMPT,
     isEmptyExtraction,
@@ -39,6 +40,8 @@ function isStandaloneUc(electronicId: unknown): boolean {
 
 /** The account's rentable properties, tenants, agencies and corretores, with what the matcher compares. */
 async function loadCandidates(supabase: AdminSupabase, profileId: string) {
+    // a property just registered on Imóveis lives in the profile JSON: give it its row before matching
+    await ensurePropertyRows(supabase, profileId);
     const [propertiesRes, tenantsRes, membershipsRes, profileRes, agentsRes] = await Promise.all([
         supabase.from("properties").select("id, name, address, city, zip, electronic_id").eq("owner_id", profileId),
         supabase.from("tenants").select("id, full_name, cpf").eq("user_id", profileId).is("deleted_at", null),
