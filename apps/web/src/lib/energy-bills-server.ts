@@ -130,6 +130,8 @@ export function buildBillUpdatePayload(bill: Json, now: Date = new Date()): Json
     if (dailyAvg !== undefined) out.daily_avg_kwh = dailyAvg;
     if (bill.solar_injected_kwh !== undefined) out.solar_injected_kwh = numOr(bill.solar_injected_kwh, 0);
     if (bill.solar_compensated_kwh !== undefined) out.solar_compensated_kwh = numOr(bill.solar_compensated_kwh, 0);
+    // a credit: stored negative, as printed on the bill
+    if (bill.energy_compensated_amount !== undefined) out.energy_compensated_amount = -Math.abs(numOr(bill.energy_compensated_amount, 0));
     if (bill.generation_balance_kwh !== undefined) out.generation_balance_kwh = numOr(bill.generation_balance_kwh, 0);
     if (bill.total_amount !== undefined) out.total_amount = numOr(bill.total_amount, 0);
     if (bill.availability_cost_amount !== undefined) out.availability_cost_amount = numOr(bill.availability_cost_amount, 0);
