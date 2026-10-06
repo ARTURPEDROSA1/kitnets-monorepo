@@ -144,7 +144,13 @@ export default function ContratosContent({ lang, initial = null, initialDashboar
         setFormState({ editingId: id, initial: leaseToInitial(full) });
     };
 
-    const onSaved = async (id: string, warning: string | null) => {
+    const onSaved = async (id: string, warning: string | null, status: string) => {
+        // a new lease in force (or a draft) goes on to its contract document: written from what was just
+        // typed, to review and sign; an old lease registered as closed stays in the list
+        if (!formState?.editingId && ["DRAFT", "ACTIVE", "EXPIRING_SOON"].includes(status)) {
+            router.push(`${base}/documento?id=${id}&novo=1`);
+            return;
+        }
         setFormState(null);
         setNotice(warning);
         setDashboardKey(k => k + 1);

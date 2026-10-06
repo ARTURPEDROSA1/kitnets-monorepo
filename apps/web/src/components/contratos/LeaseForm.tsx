@@ -82,7 +82,8 @@ interface Props {
     editingId: string | null;
     initial: LeaseFormInitial;
     dropdowns: LeaseFormDropdowns;
-    onSaved: (leaseId: string, warning: string | null) => void;
+    /** `status`: what the lease was saved as (a new lease in force goes on to its contract document) */
+    onSaved: (leaseId: string, warning: string | null, status: string) => void;
     onCancel: () => void;
     /** shown above the title (the "Voltar ao imóvel" link) */
     topSlot?: React.ReactNode;
@@ -442,7 +443,7 @@ export default function LeaseForm({ editingId, initial, dropdowns, onSaved, onCa
             }
 
             const id = (data.lease?.id as string | undefined) ?? editingId;
-            if (id) onSaved(id, (data.warning as string | null) ?? null);
+            if (id) onSaved(id, (data.warning as string | null) ?? null, payload.status);
         } catch {
             setWarning("Erro de conexão. Tente novamente.");
         } finally {
