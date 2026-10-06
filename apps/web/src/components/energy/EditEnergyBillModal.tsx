@@ -46,6 +46,7 @@ export function EditEnergyBillModal({
                 daily_avg_kwh: bill.daily_avg_kwh ?? 0,
                 solar_injected_kwh: bill.solar_injected_kwh ?? 0,
                 solar_compensated_kwh: bill.solar_compensated_kwh ?? 0,
+                energy_compensated_amount: bill.energy_compensated_amount ?? 0,
                 generation_balance_kwh: bill.generation_balance_kwh ?? 0,
                 total_amount: bill.total_amount ?? 0,
                 availability_cost_amount: bill.availability_cost_amount ?? 0,
@@ -255,7 +256,7 @@ export function EditEnergyBillModal({
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <Label className="text-xs text-sky-600 font-semibold">Compensada GD (kWh)</Label>
+                                    <Label className="text-xs text-sky-600 font-semibold" title="Soma de todas as linhas Energia compensada GD I / GD II">Compensada GD (kWh)</Label>
                                     <Input
                                         type="number"
                                         value={formData.solar_compensated_kwh ?? ""}
@@ -292,6 +293,15 @@ export function EditEnergyBillModal({
                                     className="font-bold text-base"
                                     value={formData.total_amount ?? ""}
                                     onChange={(e) => handleFieldChange("total_amount", parseFloat(e.target.value) || 0)}
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-xs" title="Soma dos valores das linhas Energia compensada GD I / GD II: é a Economia Solar do mês">Crédito compensado GD (R$)</Label>
+                                <Input
+                                    type="number"
+                                    step="0.01"
+                                    value={formData.energy_compensated_amount != null ? Math.abs(Number(formData.energy_compensated_amount)) : ""}
+                                    onChange={(e) => handleFieldChange("energy_compensated_amount", -Math.abs(parseFloat(e.target.value) || 0))}
                                 />
                             </div>
                             <div className="grid grid-cols-2 gap-2">

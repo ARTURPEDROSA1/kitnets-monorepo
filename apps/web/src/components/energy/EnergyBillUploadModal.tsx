@@ -22,7 +22,7 @@ import {
     Zap,
     Pencil,
 } from "lucide-react";
-import type { ExtractedEnergyBill } from "@/app/api/energy-bills/extract/route";
+import type { ExtractedEnergyBill } from "@/lib/energy-bill-extract";
 
 interface UploadModalProps {
     isOpen: boolean;
@@ -114,6 +114,8 @@ export function EnergyBillUploadModal({
 
         try {
             let processedFile = uploadFile;
+            // the PDF's text layer (digital bills): the server reads the printed lines from it, exactly
+            let pdfText = "";
 
             // If PDF, convert first page to PNG in browser for optimal Vision OCR
             if (uploadFile.type === "application/pdf") {
@@ -124,6 +126,14 @@ export function EnergyBillUploadModal({
                     const arrayBuffer = await uploadFile.arrayBuffer();
                     const pdf = await pdfjsLib.getDocument(new Uint8Array(arrayBuffer)).promise;
                     const page = await pdf.getPage(1);
+                    try {
+                        for (let n = 1; n <= pdf.numPages; n++) {
+                            const content = await (n === 1 ? page : await pdf.getPage(n)).getTextContent();
+                            pdfText += content.items.map(item => ("str" in item ? item.str + (item.hasEOL ? "\n" : "") : "")).join("") + "\n";
+                        }
+                    } catch {
+                        pdfText = "";   // no text layer: the image alone is read
+                    }
 
                     const scale = 2;
                     const viewport = page.getViewport({ scale });
@@ -155,6 +165,7 @@ export function EnergyBillUploadModal({
 
             const formData = new FormData();
             formData.append("file", processedFile);
+            if (pdfText.trim()) formData.append("pdfText", pdfText);
 
             const res = await fetch("/api/energy-bills/extract", {
                 method: "POST",
@@ -402,8 +413,13 @@ export function EnergyBillUploadModal({
                                         </div>
                                         <div className="flex justify-between py-1 border-b border-border/40">
                                             <span className="text-muted-foreground">Compensada GD:</span>
-                                            <span className="font-semibold text-sky-600 dark:text-sky-400">
+                                            <span className="text-right font-semibold text-sky-600 dark:text-sky-400">
                                                 {extracted.solarCompensatedKwh ? `${formatNumber(extracted.solarCompensatedKwh, 0)} kWh` : "—"}
+                                                {(extracted.compensationLines?.length ?? 0) > 1 && (
+                                                    <span className="block text-[10px] font-normal text-muted-foreground">
+                                                        {extracted.compensationLines!.map(l => `${l.regime} ${formatNumber(l.kwh, 0)}`).join(" + ")}
+                                                    </span>
+                                                )}
                                             </span>
                                         </div>
                                         <div className="flex justify-between py-1 bg-emerald-50 dark:bg-emerald-950/40 px-2 rounded-md">
@@ -506,6 +522,13 @@ export function EnergyBillUploadModal({
                                                 value={extracted.solarInjectedKwh ?? ""}
                                                 onChange={(e) => updateField("solarInjectedKwh", parseFloat(e.target.value) || 0)}
                                             />
+                                            <Label className="text-xs">Energia Compensada GD (kWh)</Label>
+                                            <Input
+                                                type="number"
+                                                value={extracted.solarCompensatedKwh ?? ""}
+                                                onChange={(e) => updateField("solarCompensatedKwh", parseFloat(e.target.value) || 0)}
+                                            />
+                                            <p className="text-[10px] text-muted-foreground">Soma de todas as linhas “Energia compensada GD I / GD II”.</p>
                                             <Label className="text-xs">Saldo Atual de Geração (kWh)</Label>
                                             <Input
                                                 type="number"
@@ -521,6 +544,13 @@ export function EnergyBillUploadModal({
                                                 step="0.01"
                                                 value={extracted.totalAmount ?? ""}
                                                 onChange={(e) => updateField("totalAmount", parseFloat(e.target.value) || 0)}
+                                            />
+                                            <Label className="text-xs">Crédito compensado GD (R$)</Label>
+                                            <Input
+                                                type="number"
+                                                step="0.01"
+                                                value={extracted.energyCompensatedAmount != null ? Math.abs(extracted.energyCompensatedAmount) : ""}
+                                                onChange={(e) => updateField("energyCompensatedAmount", -Math.abs(parseFloat(e.target.value) || 0))}
                                             />
                                             <Label className="text-xs">Custo Disp. (R$)</Label>
                                             <Input
