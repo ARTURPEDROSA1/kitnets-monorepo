@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/api-route";
 import { loadPropertyUnits } from "@/lib/property-units-server";
+import { ensurePropertyRows } from "@/lib/property-rows-server";
 
 /**
  * GET /api/leases/dropdowns
@@ -8,6 +9,8 @@ import { loadPropertyUnits } from "@/lib/property-units-server";
  * Agencies come through the membership table, not a direct owner column.
  */
 export const GET = withAuth({ tag: "Leases Dropdowns GET" }, async ({ profileId, supabase }) => {
+    // a property just registered on Imóveis lives in the profile JSON: give it its row before listing
+    await ensurePropertyRows(supabase, profileId);
     const [propertiesRes, tenantsRes, membershipsRes, agentsRes, unitsByProperty] = await Promise.all([
         supabase.from("properties").select("id, name, electronic_id").eq("owner_id", profileId).order("name", { ascending: true }),
         supabase.from("tenants").select("id, full_name").eq("user_id", profileId).is("deleted_at", null).order("full_name", { ascending: true }),
