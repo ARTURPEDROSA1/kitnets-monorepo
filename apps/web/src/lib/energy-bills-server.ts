@@ -3,6 +3,7 @@ import { HttpError, notFound } from "@/lib/api-route";
 import { UUID_REGEX } from "@/lib/api-auth";
 import { resolveAvailabilityKwh } from "@/lib/energy-availability";
 import { removeWaterFiles } from "@/lib/water-bills-server";
+import { syncPropertyRows } from "@/lib/property-rows-server";
 
 /**
  * Server-side pieces of the energy-bills routes: resolving which property a
@@ -172,8 +173,8 @@ const isStandaloneUc = (electronicId: unknown): boolean => {
 
 /**
  * Resolves the `propertyId` a client sends (a UUID, or a legacy alias such
- * as "primary", "0", "prop-1") to a row in `properties` owned by the profile,
- * creating the row from the profile's onboarding data when it does not exist.
+ * as "primary", "0", "prop-1") to a row in `properties` owned by the profile:
+ * the row linked to that Imóveis property (created when it has none yet).
  *
  * A UUID must belong to the caller: it never falls through to the alias logic.
  */
@@ -189,103 +190,68 @@ export async function resolvePropertyUuid(supabase: AdminSupabase, profileId: st
         throw notFound("Imóvel não encontrado");
     }
 
-    const { data: profile } = await supabase
-        .from("profiles")
-        .select("id, full_name, property_address, property_details, additional_properties")
-        .eq("id", profileId)
-        .maybeSingle();
-    if (!profile) throw new HttpError(403, { error: "Perfil de usuário não encontrado" });
+    // An alias names a profile property by slot: "primary" / "0" / "prop-0" the first, "prop-N" the Nth
+    // additional one. Its row is the one linked to that entry by id (lib/property-link.ts), never by name.
+    const indexMatch = inputId?.match(/^(?:prop-)?(\d+)$/);
+    const slot = indexMatch ? parseInt(indexMatch[1], 10) : 0;
+    const { links } = await syncPropertyRows(supabase, profileId);
+    const linked = links.find(l => l.ref.slot === slot)?.rowId;
+    if (linked) return linked;
+    if (links.length > 0) throw notFound("Imóvel não encontrado");
 
+    // An account without any property in Imóveis: its one rental row, or a new one named after the owner
+    const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", profileId).maybeSingle();
+    if (!profile) throw new HttpError(403, { error: "Perfil de usuário não encontrado" });
     const { data: ownerProps } = await supabase
         .from("properties")
-        .select("id, name, address, electronic_id, created_at")
+        .select("id, electronic_id")
         .eq("owner_id", profileId)
         .order("created_at", { ascending: true });
-
-    const existingProps = ownerProps || [];
-    const rentalProps = existingProps.filter((p) => !isStandaloneUc(p.electronic_id));
-    const byName = (name: string) => rentalProps.find((p) => (p.name as string).trim().toLowerCase() === name.trim().toLowerCase());
-
-    const addr = profile.property_address as Record<string, string> | null;
-    const details = profile.property_details as Record<string, string> | null;
-    const primaryName =
-        details?.propertyName?.trim() ||
-        (addr?.street ? `${addr.street}, ${addr.number || ""}`.trim() : profile.full_name ? `Imóvel de ${profile.full_name}` : "Meu Imóvel");
-
-    const insertFromAddress = async (name: string, a: Record<string, string> | null) => {
-        const { data, error } = await supabase
-            .from("properties")
-            .insert({
-                owner_id: profileId,
-                name,
-                address: a?.street ? `${a.street}, ${a.number || ""} - ${a.neighborhood || ""}`.trim() : null,
-                city: a?.city || null,
-                state: a?.state || null,
-                zip: a?.cep || null,
-            })
-            .select("id")
-            .single();
-        return { id: (data?.id as string | undefined) ?? null, error };
-    };
-
-    // "prop-0" / "0" is the primary property; "prop-N" is the Nth additional one from onboarding.
-    const indexMatch = inputId?.match(/^(?:prop-)?(\d+)$/);
-    if (indexMatch) {
-        const idx = parseInt(indexMatch[1], 10);
-        if (idx === 0) {
-            const match = byName(primaryName) || rentalProps[0];
-            if (match) return match.id as string;
-        } else if (Array.isArray(profile.additional_properties)) {
-            const ap = profile.additional_properties[idx - 1] as { details?: Record<string, string>; address?: Record<string, string> } | undefined;
-            if (ap) {
-                const apAddr = ap.address ?? null;
-                const apName = ap.details?.propertyName?.trim() || (apAddr?.street ? `${apAddr.street}, ${apAddr.number || ""}`.trim() : `Imóvel ${idx + 1}`);
-                const match = byName(apName);
-                if (match) return match.id as string;
-                const created = await insertFromAddress(apName, apAddr);
-                if (created.id) return created.id;
-            }
-        }
-    }
-
-    const primary = byName(primaryName) || rentalProps[0];
-    if (primary?.id) return primary.id as string;
-
-    const created = await insertFromAddress(primaryName, addr);
-    if (created.id) return created.id;
-
-    console.error("[resolvePropertyUuid] Error creating property:", created.error);
-    if (existingProps.length > 0) return existingProps[0].id as string;
+    const rental = (ownerProps ?? []).filter((p) => !isStandaloneUc(p.electronic_id));
+    if (rental.length > 0) return rental[0].id as string;
+    const { data: created, error } = await supabase
+        .from("properties")
+        .insert({ owner_id: profileId, name: profile.full_name ? `Imóvel de ${profile.full_name}` : "Meu Imóvel" })
+        .select("id")
+        .single();
+    if (created?.id) return created.id as string;
+    console.error("[resolvePropertyUuid] Error creating property:", error);
     throw new HttpError(500, { error: "Não foi possível identificar nem criar o imóvel vinculado." });
 }
 
 /**
- * Removes a property and what hangs off it. Leases (with charges, tenants
- * links and documents) and tenants are deleted; gateways are unlinked; water
- * and energy bills are orphaned so the history can be re-associated; stored
- * bill PDFs are removed. The caller must have verified ownership.
+ * Removes a rental property and what hangs off it in ONE database transaction (delete_property_cascade,
+ * migration 20261006120000): refused while a contract that is not deleted, or an invoice, points to it, and
+ * then nothing changes. Bills are kept without a property, so their history can be linked again; their
+ * stored PDFs go once the property is gone. The caller must have verified the property is the one meant.
  */
-export async function deletePropertyCascade(supabase: AdminSupabase, propertyId: string, tag: string): Promise<{ error: { message: string } | null }> {
-    await supabase.from("gateways").update({ property_id: null }).eq("property_id", propertyId);
-
-    const { data: leases } = await supabase.from("leases").select("id").eq("property_id", propertyId);
-    if (leases && leases.length > 0) {
-        const leaseIds = leases.map((l) => l.id as string);
-        await supabase.from("lease_charges").delete().in("lease_id", leaseIds);
-        await supabase.from("lease_tenants").delete().in("lease_id", leaseIds);
-        await supabase.from("lease_documents").delete().in("lease_id", leaseIds);
-        await supabase.from("leases").delete().eq("property_id", propertyId);
+export async function deletePropertyCascade(
+    supabase: AdminSupabase,
+    propertyId: string,
+    ownerId: string,
+    tag: string,
+): Promise<{ error: { message: string; status: number } | null }> {
+    const { error } = await supabase.rpc("delete_property_cascade", { p_property_id: propertyId, p_owner_id: ownerId });
+    if (error) {
+        const count = Number(error.details) || 0;
+        if (error.message === "property_has_leases") {
+            return { error: { status: 409, message: `Este imóvel tem ${count === 1 ? "1 contrato" : `${count} contratos`} em Contratos. Exclua ${count === 1 ? "o contrato" : "os contratos"} antes de excluir o imóvel — nada foi apagado.` } };
+        }
+        if (error.message === "property_has_invoices") {
+            return { error: { status: 409, message: `Este imóvel tem ${count === 1 ? "1 fatura emitida" : `${count} faturas emitidas`}: faturas são registros financeiros e o imóvel não pode ser excluído — nada foi apagado.` } };
+        }
+        if (error.code === "23503") {
+            return { error: { status: 409, message: "Um inquilino deste imóvel está em contrato de outro imóvel. Ajuste esse contrato antes de excluir — nada foi apagado." } };
+        }
+        if (error.code === "P0002" || error.message === "property_not_found") {
+            return { error: { status: 404, message: "Imóvel não encontrado." } };
+        }
+        if (error.code === "PGRST202" || /could not find the function/i.test(error.message ?? "")) {
+            return { error: { status: 503, message: "A exclusão de imóveis está sendo atualizada. Tente de novo em alguns minutos — nada foi apagado." } };
+        }
+        console.error(`[${tag}] delete_property_cascade failed:`, error.message);
+        return { error: { status: 500, message: "Não foi possível excluir o imóvel — nada foi apagado." } };
     }
-
-    const { data: tenants } = await supabase.from("tenants").select("id").eq("property_id", propertyId);
-    if (tenants && tenants.length > 0) {
-        const tenantIds = tenants.map((t) => t.id as string);
-        await supabase.from("lease_tenants").delete().in("tenant_id", tenantIds);
-        await supabase.from("tenants").delete().eq("property_id", propertyId);
-    }
-
-    await supabase.from("water_bills").update({ property_id: null }).eq("property_id", propertyId);
-    await supabase.from("energy_bills").update({ property_id: null }).eq("property_id", propertyId);
 
     try {
         const { data: files } = await supabase.storage.from(ENERGY_BILLS_BUCKET).list(propertyId);
@@ -300,7 +266,5 @@ export async function deletePropertyCascade(supabase: AdminSupabase, propertyId:
     } catch (storageErr) {
         console.warn(`[${tag}] Water storage cleanup warning:`, storageErr);
     }
-
-    const { error } = await supabase.from("properties").delete().eq("id", propertyId);
-    return { error: error ? { message: error.message } : null };
+    return { error: null };
 }

@@ -1,5 +1,6 @@
 import type { AdminSupabase } from "@/lib/api-auth";
 import { conflict } from "@/lib/api-route";
+import { PRIMARY_ROW_ID_KEY } from "@/lib/property-link";
 import type { PropertyInput } from "@/lib/schemas/property";
 import { formatCEP } from "@/lib/validators";
 
@@ -42,7 +43,7 @@ export async function createRentalProperty(
     ]);
     if (profileError || !profile) throw new Error(`profile lookup failed: ${profileError?.message}`);
 
-    // The Imóveis page pairs rows and profile entries by name, so names must stay unique.
+    // Rows and profile entries are linked by id (lib/property-link.ts); a unique name keeps the lists readable.
     const wanted = input.name.toLowerCase();
     if ((existing || []).some((p) => !isStandaloneUc(p.electronic_id) && (p.name as string).trim().toLowerCase() === wanted)) {
         throw conflict({ name: "Já existe um imóvel com este nome." });
@@ -103,7 +104,7 @@ export async function createRentalProperty(
           }
         : {
               property_type: propertyType,
-              property_details: { ...emptyPropertyDetails(input.name), isSavedProperty: true },
+              property_details: { ...emptyPropertyDetails(input.name), isSavedProperty: true, [PRIMARY_ROW_ID_KEY]: row.id },
               property_address: address,
           };
 

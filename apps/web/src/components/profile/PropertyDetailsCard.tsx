@@ -240,6 +240,8 @@ interface DetailsProps {
     onContinue?: () => void;
     onViewEnergyDashboard?: () => void;
     lang?: string;
+    /** the other properties' names: a repeated name is flagged (the lists would show two alike) */
+    takenNames?: string[];
 }
 
 export default function PropertyDetailsCard({
@@ -254,7 +256,10 @@ export default function PropertyDetailsCard({
     onContinue,
     onViewEnergyDashboard,
     lang = "pt",
+    takenNames = [],
 }: DetailsProps) {
+    const nameKey = (v: string) => v.trim().toLowerCase().replace(/\s+/g, " ");
+    const nameTaken = Boolean(details.propertyName?.trim()) && takenNames.some(n => nameKey(n) === nameKey(details.propertyName));
     const [isOpen, setIsOpen] = useState(initialOpen);
 
     const toggleOpen = () => {
@@ -334,7 +339,11 @@ export default function PropertyDetailsCard({
                             value={details.propertyName || ''}
                             onChange={(e) => updateDetail("propertyName", e.target.value)}
                             placeholder={propertyType === "garage" ? "ex: Garagem Rua Atlas, Vaga 23 Ed. Aurora" : "ex: Casa Principal, Edifício Aurora"}
+                            aria-invalid={nameTaken || undefined}
                         />
+                        {nameTaken && (
+                            <p className="text-xs text-amber-700 dark:text-amber-400">Outro imóvel já tem este nome. Use um nome que os diferencie (ex.: a rua ou o número).</p>
+                        )}
                     </div>
 
                     {/* IPTU Fields */}

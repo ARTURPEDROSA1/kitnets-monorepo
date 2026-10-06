@@ -1,16 +1,18 @@
 /**
- * Every property of the owner's profile JSON has its `properties` row.
+ * Every property of the owner's profile JSON has its `properties` row, linked by id.
  *
  * The Imóveis wizard saves a property in the profile only (`property_details` / `property_address` for
  * the first one, `additional_properties[]` for the rest); leases, tenants, bills and ledgers point to
- * `properties` rows. The row used to appear only when the energy loader ran, so a new property was
- * missing from Contratos and Inquilinos until the owner opened Energia. Whatever lists the account's
- * properties calls this first; the Imóveis page calls it after saving (POST /api/properties/sync).
+ * `properties` rows. Whatever lists the account's properties calls this first; the Imóveis page calls it
+ * after saving (POST /api/properties/sync) and takes the ids it returns.
  *
- * Rows are named as the energy loader always named them, and created through the database function
- * ensure_property_row (per-owner lock), so readers running at the same time never create one twice.
+ * Each entry carries its row id (lib/property-link.ts). An entry without a row gets one, and an entry paired
+ * the old way (by name) gets its id stamped, through the database function link_profile_property_row
+ * (per-owner lock: readers running at the same time never create a row twice). The rows follow the profile:
+ * a renamed property, or a new address, is renamed on its row, so Energia, Contratos and Água show it too.
  */
 import type { AdminSupabase } from "@/lib/api-auth";
+import { linkPropertyRows, propertyRowAddress, UUID_RE, type PropertyLink, type ProfilePropertyRef } from "@/lib/property-link";
 
 type Json = Record<string, unknown>;
 
@@ -22,7 +24,16 @@ export interface WantedPropertyRow {
     zip: string | null;
 }
 
-const asObject = (v: unknown): Json | null => (v && typeof v === "object" && !Array.isArray(v) ? (v as Json) : null);
+interface Row {
+    id: string;
+    name: string;
+    address?: string | null;
+    city?: string | null;
+    state?: string | null;
+    zip?: string | null;
+    electronic_id?: unknown;
+}
+
 const text = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
 
 function isStandaloneUc(electronicId: unknown): boolean {
@@ -34,50 +45,40 @@ function isStandaloneUc(electronicId: unknown): boolean {
     }
 }
 
-function rowOf(name: string, address: Json | null): WantedPropertyRow {
-    const street = text(address?.street);
+/** The row an entry should have: its name and address, as the energy loader always wrote them. */
+export function wantedRowOf(ref: ProfilePropertyRef): WantedPropertyRow {
     return {
-        name,
-        address: street ? `${street}, ${text(address?.number)} - ${text(address?.neighborhood)}`.trim() : null,
-        city: text(address?.city) || null,
-        state: text(address?.state) || null,
-        zip: text(address?.cep) || null,
+        name: ref.name,
+        address: propertyRowAddress(ref.address),
+        city: text(ref.address?.city) || null,
+        state: text(ref.address?.state) || null,
+        zip: text(ref.address?.cep) || null,
     };
 }
 
-/** The rows the profile's properties should have, named as the energy loader names them. */
-export function wantedPropertyRows(profile: Json): WantedPropertyRow[] {
-    const out: WantedPropertyRow[] = [];
-    const primaryDetails = asObject(profile.property_details);
-    const primaryAddress = asObject(profile.property_address);
-    const primaryName = text(primaryDetails?.propertyName);
-    const primaryStreet = text(primaryAddress?.street);
-    if (primaryName || primaryStreet) {
-        const name = primaryName || `${primaryStreet}, ${text(primaryAddress?.number)}`.trim();
-        out.push(rowOf(name, primaryAddress));
-    }
-    for (const raw of Array.isArray(profile.additional_properties) ? profile.additional_properties : []) {
-        const entry = asObject(raw);
-        if (!entry) continue;
-        const address = asObject(entry.address);
-        const street = text(address?.street);
-        const name = text(asObject(entry.details)?.propertyName) || (street ? `${street}, ${text(address?.number)}`.trim() : "");
-        if (name) out.push(rowOf(name, address));
-    }
-    return out;
+const PROFILE_COLUMNS = "property_type, property_details, property_address, additional_properties";
+const ROW_COLUMNS = "id, name, address, city, state, zip, electronic_id";
+
+export interface PropertyRowsSync {
+    /** rows created or changed (renamed, new address): a caller holding the rows reads them again */
+    changed: number;
+    /** each profile property and its row (null when it could not get one) */
+    links: PropertyLink[];
 }
 
-const PROFILE_COLUMNS = "property_details, property_address, additional_properties";
+const missingFunction = (error: { code?: string; message?: string }) =>
+    error.code === "PGRST202" || /could not find the function/i.test(error.message ?? "");
 
 /**
- * Creates the rows the profile's properties are missing; → how many it created (0 when none was).
- * Never throws: a failure is logged and the caller reads whatever rows there are.
+ * Links every profile property to its row, creating and stamping what is missing, and brings the rows'
+ * names and addresses in line with the profile. Never throws: a failure is logged and the caller reads
+ * whatever rows there are.
  */
-export async function ensurePropertyRows(
+export async function syncPropertyRows(
     supabase: AdminSupabase,
     profileId: string,
-    preloaded: { profile?: Json | null; rows?: { name: string; electronic_id?: unknown }[] } = {},
-): Promise<number> {
+    preloaded: { profile?: Json | null; rows?: Row[] } = {},
+): Promise<PropertyRowsSync> {
     try {
         const [profile, rows] = await Promise.all([
             preloaded.profile !== undefined
@@ -85,33 +86,77 @@ export async function ensurePropertyRows(
                 : supabase.from("profiles").select(PROFILE_COLUMNS).eq("id", profileId).maybeSingle().then(r => (r.data as Json | null) ?? null),
             preloaded.rows !== undefined
                 ? Promise.resolve(preloaded.rows)
-                : supabase.from("properties").select("name, electronic_id").eq("owner_id", profileId).then(r => (r.data ?? []) as { name: string; electronic_id?: unknown }[]),
+                : supabase.from("properties").select(ROW_COLUMNS).eq("owner_id", profileId).order("created_at", { ascending: true }).then(r => (r.data ?? []) as Row[]),
         ]);
-        if (!profile) return 0;
-        const have = new Set(rows.filter(r => !isStandaloneUc(r.electronic_id)).map(r => String(r.name ?? "").trim().toLowerCase()));
-        const missing = wantedPropertyRows(profile).filter((w, i, all) => {
-            const key = w.name.toLowerCase();
-            return !have.has(key) && all.findIndex(o => o.name.toLowerCase() === key) === i;
-        });
-        let created = 0;
-        for (const w of missing) {
-            const { error } = await supabase.rpc("ensure_property_row", { p_owner_id: profileId, p_name: w.name, p_address: w.address, p_city: w.city, p_state: w.state, p_zip: w.zip });
-            if (!error) {
-                created++;
+        if (!profile) return { changed: 0, links: [] };
+        const rental = rows.filter(r => !isStandaloneUc(r.electronic_id));
+        const standaloneIds = new Set(rows.filter(r => isStandaloneUc(r.electronic_id)).map(r => r.id));
+        const links = linkPropertyRows(rental.map(r => ({ id: r.id, name: String(r.name ?? ""), address: r.address ?? null })), profile);
+
+        let changed = 0;
+        for (const link of links) {
+            // linked by its id, or nothing to name a new row by
+            if (link.by === "id" || !link.ref.name) continue;
+            const stored = link.ref.storedId;
+            // the row to stamp: the one paired by name / address; else the entry's own id (its row is gone and is
+            // created again with it) unless that id is another entry's, a consumer unit's, or not an id at all
+            const ownIdUsable = !!stored && UUID_RE.test(stored) && !standaloneIds.has(stored) && !links.some(o => o !== link && o.rowId === stored);
+            const rowId = link.rowId ?? (ownIdUsable ? stored : null);
+            const want = wantedRowOf(link.ref);
+            const { data, error } = await supabase.rpc("link_profile_property_row", {
+                p_owner_id: profileId,
+                p_slot: link.ref.slot,
+                p_expected_stored: stored,
+                p_row_id: rowId,
+                p_name: want.name,
+                p_address: want.address,
+                p_city: want.city,
+                p_state: want.state,
+                p_zip: want.zip,
+            });
+            if (error) {
+                // code deployed before its migration: the rows wait for the function (never by name again)
+                if (missingFunction(error)) {
+                    console.warn("[Property rows] link_profile_property_row not deployed yet");
+                    break;
+                }
+                console.error("[Property rows] link_profile_property_row failed:", error.message);
                 continue;
             }
-            // the function not deployed yet (code before migration): insert as the energy loader did
-            if (error.code === "PGRST202" || /could not find the function/i.test(error.message ?? "")) {
-                const { error: insertError } = await supabase.from("properties").insert({ owner_id: profileId, name: w.name, address: w.address, city: w.city, state: w.state, zip: w.zip });
-                if (!insertError) created++;
-                else console.error("[Property rows] insert failed:", insertError.message);
-            } else {
-                console.error("[Property rows] ensure_property_row failed:", error.message);
-            }
+            if (typeof data !== "string") continue; // the profile changed meanwhile: the next reader links it
+            if (!link.rowId) changed++;
+            link.rowId = data;
         }
-        return created;
+
+        // the rows follow the profile (only rows linked by their id: a row paired by name already has the name)
+        for (const link of links) {
+            if (link.by !== "id" || !link.rowId || !link.ref.name) continue;
+            const row = rental.find(r => r.id === link.rowId);
+            if (!row) continue;
+            const want = wantedRowOf(link.ref);
+            const patch: Partial<WantedPropertyRow> = {};
+            if (text(row.name) !== want.name) patch.name = want.name;
+            if (want.address && text(row.address) !== want.address) patch.address = want.address;
+            if (want.city && text(row.city) !== want.city) patch.city = want.city;
+            if (want.state && text(row.state) !== want.state) patch.state = want.state;
+            if (want.zip && text(row.zip) !== want.zip) patch.zip = want.zip;
+            if (Object.keys(patch).length === 0) continue;
+            const { error } = await supabase.from("properties").update(patch).eq("id", row.id).eq("owner_id", profileId);
+            if (error) console.error("[Property rows] row update failed:", error.message);
+            else changed++;
+        }
+        return { changed, links };
     } catch (err) {
         console.error("[Property rows] sync failed:", (err as Error).message);
-        return 0;
+        return { changed: 0, links: [] };
     }
+}
+
+/** syncPropertyRows for callers that only need the rows in place; → how many rows were created or changed. */
+export async function ensurePropertyRows(
+    supabase: AdminSupabase,
+    profileId: string,
+    preloaded: { profile?: Json | null; rows?: Row[] } = {},
+): Promise<number> {
+    return (await syncPropertyRows(supabase, profileId, preloaded)).changed;
 }
