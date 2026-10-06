@@ -210,6 +210,12 @@ export default function LeaseDashboard({ leaseId, lang, today, initialBundle = n
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                    <Button variant="outline" asChild title="O contrato escrito pelo Kitnets: revisar, aceitar e assinar pelo gov.br" className="border-emerald-400 text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-950/30">
+                        <Link href={`${lang === "pt" ? "" : `/${lang}`}/contratos/documento?id=${lease.id}`}>
+                            <FileSignature className="h-4 w-4 sm:mr-1" />
+                            <span className="hidden sm:inline">Documento</span>
+                        </Link>
+                    </Button>
                     <Button variant="outline" onClick={() => onEdit(bundle)}>
                         <PenLine className="h-4 w-4 sm:mr-1" />
                         <span className="hidden sm:inline">Editar</span>

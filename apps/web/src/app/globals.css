@@ -299,3 +299,35 @@ html[data-hide-money="1"] .privacy-money.privacy-cover {
 html[data-hide-money="1"] .privacy-money-input:not(:focus) {
   filter: blur(0.45em);
 }
+
+/* The contract editor's sheet (components/contratos/documento/ContractEditor.tsx): a white page in both
+   themes, typeset like the PDF it becomes (lib/contract/pdf.ts) — Roboto, justified, clause headings in
+   bold — with the blanks still to fill in yellow. */
+.contract-paper {
+  font-family: var(--font-contract), Roboto, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #111827;
+  min-height: 60vh;
+}
+.contract-paper h1 { font-size: 18px; font-weight: 700; margin: 0 0 22px; letter-spacing: 0.01em; }
+.contract-paper h2 { font-size: 15.5px; font-weight: 500; margin: 22px 0 10px; }
+.contract-paper h3 { font-size: 14px; font-weight: 700; margin: 14px 0 6px; }
+.contract-paper p { margin: 0 0 8px; }
+.contract-paper ul { list-style: disc; padding-left: 1.6em; margin: 0 0 8px; }
+.contract-paper ol { list-style: decimal; padding-left: 1.6em; margin: 0 0 8px; }
+.contract-paper blockquote { border-left: 3px solid #d1d5db; padding-left: 12px; font-style: italic; margin: 0 0 8px; }
+.contract-paper hr { border: 0; border-top: 1px solid #d1d5db; margin: 14px 0; }
+.contract-paper mark { background: #fef08a; color: inherit; border-radius: 2px; }
+.contract-paper .contract-field {
+  background: #fef08a;
+  box-shadow: inset 0 -2px 0 #eab308;
+  border-radius: 3px;
+  padding: 0 2px;
+  font-weight: 500;
+}
+.contract-paper ::selection { background: #bae6fd; }
+/* on a phone, justified lines open wide gaps: the sheet reads left-aligned there (the PDF stays justified) */
+@media (max-width: 639px) {
+  .contract-paper p[style*="justify"] { text-align: left !important; }
+}
