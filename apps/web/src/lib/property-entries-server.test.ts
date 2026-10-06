@@ -44,9 +44,12 @@ describe("pairPropertyEntries", () => {
         expect(entries.map(e => e.index)).toEqual([1, 2, 4]);
         expect(pairPropertyEntries(rows, { property_type: "single", property_details: {}, property_address: {}, additional_properties: [] })).toEqual([]);
     });
-    it("falls back to the oldest free row for the first property and names it by the street", () => {
-        const entries = pairPropertyEntries([{ id: "r1", name: "Whatever" }], { property_type: "single", property_details: {}, property_address: { street: "Rua Z", number: "9", city: "W", state: "SP" } });
+    it("pairs a first property without an id by the address of a free row, and names it by the street", () => {
+        const first = { property_type: "single", property_details: {}, property_address: { street: "Rua Z", number: "9", city: "W", state: "SP" } };
+        const entries = pairPropertyEntries([{ id: "r0", name: "Outro", address: "Rua Y, 1 - Centro" }, { id: "r1", name: "Whatever", address: "Rua Z, 9 - Centro" }], first);
         expect(entries).toHaveLength(1);
         expect(entries[0]).toMatchObject({ id: "r1", name: "Rua Z, 9", units: 1, propertyType: "single" });
+        // a free row elsewhere is not this property's
+        expect(pairPropertyEntries([{ id: "r0", name: "Outro", address: "Rua Y, 1 - Centro" }], first)[0].id).toBeNull();
     });
 });

@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
-import { ensurePropertyRows } from "@/lib/property-rows-server";
+import { syncPropertyRows } from "@/lib/property-rows-server";
+import { linkPropertyRows, type PropertyLink } from "@/lib/property-link";
 import { signStorageUrl } from "@/lib/storage";
 import { EMPTY_PERIOD, summarizeUnitBills, type EnergyBillLike, type EnergyLatestSnapshot, type EnergyPeriodTotals } from "@/lib/energy-hub";
 
@@ -42,6 +43,15 @@ export interface OwnerPropertySummary {
     latest?: EnergyLatestSnapshot | null;
     /** the twelve months up to the newest bill */
     last12?: EnergyPeriodTotals;
+}
+
+function isStandaloneRow(electronicId: string | null | undefined): boolean {
+    if (!electronicId) return false;
+    try {
+        return !!JSON.parse(electronicId).isStandaloneUc;
+    } catch {
+        return false;
+    }
 }
 
 /**
@@ -87,8 +97,9 @@ export async function getOwnerPropertiesSummary(userId: string): Promise<OwnerPr
             return [];
         }
 
-        // 3–4. Every property of the profile has its row (lib/property-rows-server.ts: same names, per-owner lock)
-        if (await ensurePropertyRows(supabase, profile.id, { profile, rows: dbProperties }) > 0) {
+        // 3–4. Every property of the profile has its row, linked by id (lib/property-rows-server.ts, per-owner lock)
+        const sync = await syncPropertyRows(supabase, profile.id, { profile, rows: dbProperties });
+        if (sync.changed > 0) {
             const { data: refreshed } = await supabase
                 .from("properties")
                 .select("id, name, address, city, state, zip, electronic_id")
@@ -96,6 +107,13 @@ export async function getOwnerPropertiesSummary(userId: string): Promise<OwnerPr
                 .order("created_at", { ascending: true });
             dbProperties = refreshed || dbProperties;
         }
+
+        // Which row is which property of the profile: by the id each entry carries, never by name
+        const links: PropertyLink[] = sync.links.length > 0
+            ? sync.links
+            : linkPropertyRows(dbProperties.filter(p => !isStandaloneRow(p.electronic_id)).map(p => ({ id: p.id, name: p.name ?? "", address: p.address })), profile);
+        const linkByRow = new Map(links.filter(l => l.rowId).map(l => [l.rowId as string, l]));
+        const additionalEntries: any[] = Array.isArray(profile.additional_properties) ? profile.additional_properties : [];
 
         // 5. Gather all property IDs to query energy_bills stats
         const propIds = dbProperties.map(p => p.id);
@@ -226,35 +244,10 @@ export async function getOwnerPropertiesSummary(userId: string): Promise<OwnerPr
                 }
             }
 
-            // Check if matches primary rental property in profile
-            const hasPrimaryInProfile = Boolean(
-                primaryDetails?.propertyName ||
-                primaryAddress?.street ||
-                (primaryAddress && Object.values(primaryAddress).some(Boolean))
-            );
-            const isPrimary = !isStandaloneUc && hasPrimaryInProfile && (
-                (primaryDetails?.propertyName && primaryDetails.propertyName.trim().toLowerCase() === prop.name.trim().toLowerCase()) ||
-                (primaryAddress?.street && prop.name.trim().toLowerCase().includes(primaryAddress.street.trim().toLowerCase())) ||
-                (!dbProperties.some(p => {
-                    if (p.id === prop.id) return false;
-                    try {
-                        const parsed = p.electronic_id ? JSON.parse(p.electronic_id) : null;
-                        if (parsed?.isStandaloneUc) return false;
-                    } catch {}
-                    return true;
-                }))
-            );
-
-            let matchingAp: any = null;
-            if (profile.additional_properties && Array.isArray(profile.additional_properties)) {
-                matchingAp = profile.additional_properties.find((ap: any) => {
-                    const apName = ap?.details?.propertyName;
-                    const apStreet = ap?.address?.street;
-                    if (apName && apName.trim().toLowerCase() === prop.name.trim().toLowerCase()) return true;
-                    if (apStreet && prop.name.trim().toLowerCase().includes(apStreet.trim().toLowerCase())) return true;
-                    return false;
-                });
-            }
+            // The profile property this row is (lib/property-link.ts)
+            const link = isStandaloneUc ? undefined : linkByRow.get(prop.id);
+            const isPrimary = link?.ref.slot === 0;
+            const matchingAp: any = link && link.ref.slot > 0 ? additionalEntries[link.ref.slot - 1] ?? null : null;
 
             const hasRentalListing = isPrimary || Boolean(matchingAp);
             const isOrphaned = !isStandaloneUc && !hasRentalListing;

@@ -795,7 +795,7 @@
             "subtitle": "Are you sure you want to remove this property from your portfolio?",
             "energyQuestion": "What would you like to do with the solar energy management data for this property?",
             "deleteAllTitle": "Delete property and erase energy data",
-            "deleteAllDesc": "The property and all linked data (solar generation, utility bills, and consumption history) will be permanently removed.",
+            "deleteAllDesc": "The property and what belongs only to it (revenue, investment, taxes) are deleted. Energy and water bills are kept without a property, to be linked again; the current bill PDF is deleted.",
             "keepEnergyTitle": "Delete property but KEEP energy data",
             "keepEnergyDesc": "Removes the property from rental listings, but keeps utility bills and solar history as a Standalone UC in the Solar Energy tab.",
             "cancel": "Cancel",

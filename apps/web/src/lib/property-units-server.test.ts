@@ -41,10 +41,12 @@ describe("pairPropertyUnits", () => {
         expect(stored[0].subUnits[0].id).toBe(units.get("row-vale")![0].id);
     });
 
-    it("pairs a renamed first property with the oldest row no other entry claimed", () => {
-        const { units } = pairPropertyUnits(rows, {
+    it("pairs a renamed first property with the free row at its address", () => {
+        const withAddresses = [{ ...rows[0], address: "Rua A, 1 - Centro" }, { ...rows[1], address: "Rua B, 2 - Centro" }, rows[2]];
+        const { units } = pairPropertyUnits(withAddresses, {
             property_type: "multi",
             property_details: { propertyName: "Nome novo" },
+            property_address: { street: "Rua B", number: "2" },
             sub_units: [{ id: "u1", name: "Kitnet 35" }],
             additional_properties: [
                 { id: "row-santo", propertyType: "single", details: { propertyName: "SANTO ANTONIO" }, subUnits: [] },

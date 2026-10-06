@@ -12,7 +12,7 @@
 import React, { useMemo } from 'react';
 import { Building2, Car, Droplets, Flame, Home, PiggyBank, Sun, Trash2, TrendingUp, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { GARAGE_BASELINE, garageSpaces, garageSummary, type PropertyType } from '@/lib/property-type';
+import { garageSummary, type PropertyType } from '@/lib/property-type';
 import { Money, Sensitive } from '@/components/privacy';
 import { CoverCarousel, useCoverCarousel } from '@/components/ui/CoverCarousel';
 import type { PropertyDetails, SubUnit } from '@/components/profile/PropertyDetailsCard';
@@ -81,21 +81,14 @@ export function formatCurrencyBRL(value: number): string {
     });
 }
 
-const parseMoney = (v: string | undefined | null): number => {
-    if (!v) return 0;
-    const n = parseFloat(v.replace(/[^\d.,]/g, '').replace(',', '.'));
-    return Number.isNaN(n) ? 0 : n;
-};
-
 export interface CardFinancials {
-    monthlyRevenue: number;
-    totalExpenses: number;
-    noi: number;
+    /** null without a month in the income ledger: the card shows a dash, never an estimate */
+    monthlyRevenue: number | null;
+    totalExpenses: number | null;
+    noi: number | null;
     /** % */
-    margin: number;
-    /** No rent typed anywhere: a baseline guess, not the owner's figure. */
-    isEstimate: boolean;
-    /** `mmm/aaaa` of the ledger month the figures come from; null when they are estimates. */
+    margin: number | null;
+    /** `mmm/aaaa` of the ledger month the figures come from; null without one. */
     realMonth: string | null;
 }
 
@@ -105,59 +98,22 @@ export function cardUnitCount(property: Pick<PropertyCardData, 'propertyType' | 
 }
 
 /**
- * The card's monthly figures. The income ledger's latest month wins; without it, the rents typed
- * on the units (or the property's estimate), less IPTU, condomínio, a maintenance reserve and the
- * management fee. Shared with the hub's totals so the strip adds up exactly what the cards show.
+ * The card's monthly figures: the income ledger's latest month, or none — a property without revenue entered
+ * shows dashes, never an estimate (owner's call, 2026-10-06). Shared with the hub's totals so the strip adds up
+ * exactly what the cards show.
  */
-export function cardFinancials(property: Pick<PropertyCardData, 'propertyType' | 'details' | 'subUnits' | 'realIncome'>): CardFinancials {
-    const { propertyType, details, subUnits, realIncome } = property;
+export function cardFinancials(property: Pick<PropertyCardData, 'realIncome'>): CardFinancials {
+    const { realIncome } = property;
     if (realIncome && realIncome.revenue > 0) {
         return {
             monthlyRevenue: realIncome.revenue,
             totalExpenses: realIncome.opex,
             noi: realIncome.noi,
             margin: realIncome.margin,
-            isEstimate: false,
             realMonth: formatMonthShort(realIncome.month),
         };
     }
-
-    const totalUnits = cardUnitCount(property);
-    let monthlyRevenue = 0;
-    let isEstimate = false;
-    if (propertyType === 'multi') {
-        const unitRentsSum = subUnits.reduce((acc, u) => acc + parseMoney(u.rentValue), 0);
-        if (unitRentsSum > 0) monthlyRevenue = unitRentsSum;
-        else if (details.monthlyRentEstimate) monthlyRevenue = parseMoney(details.monthlyRentEstimate);
-        else { monthlyRevenue = totalUnits * 1100; isEstimate = true; }   // baseline: R$ 1.100 per kitnet
-    } else if (details.monthlyRentEstimate) {
-        monthlyRevenue = parseMoney(details.monthlyRentEstimate);
-    } else if (propertyType === 'garage') {
-        monthlyRevenue = garageSpaces(details) * GARAGE_BASELINE.rentPerSpace;
-        isEstimate = true;
-    } else {
-        const beds = parseInt(details.bedrooms || '2', 10);
-        monthlyRevenue = (Number.isNaN(beds) ? 2 : beds) * 750 + 600;
-        isEstimate = true;
-    }
-
-    // Operating expenses: IPTU, condomínio, a 5% maintenance reserve and the management fee
-    const iptuDefault = propertyType === 'garage' ? GARAGE_BASELINE.iptuMonthly : 120;
-    const iptuMonthly = details.iptuMonthly ? (parseMoney(details.iptuMonthly) || iptuDefault) : iptuDefault;
-    const condoDefault = propertyType === 'multi' ? totalUnits * 60 : 0;
-    const condoMonthly = details.condoMonthly ? (parseMoney(details.condoMonthly) || condoDefault) : condoDefault;
-    const maintenanceReserve = details.maintenanceMonthly ? (parseMoney(details.maintenanceMonthly) || Math.round(monthlyRevenue * 0.05)) : Math.round(monthlyRevenue * 0.05);
-    const adminFee = Math.round(monthlyRevenue * (parseFloat(details.managementFeePercent || '8') / 100));
-    const totalExpenses = iptuMonthly + condoMonthly + maintenanceReserve + adminFee;
-    const noi = Math.max(0, monthlyRevenue - totalExpenses);
-    return {
-        monthlyRevenue,
-        totalExpenses,
-        noi,
-        margin: monthlyRevenue > 0 ? (noi / monthlyRevenue) * 100 : 0,
-        isEstimate,
-        realMonth: null,
-    };
+    return { monthlyRevenue: null, totalExpenses: null, noi: null, margin: null, realMonth: null };
 }
 
 /** The pictures the cover slides through: the chosen one first, then the rest in upload order. */
@@ -278,15 +234,15 @@ export default function PropertySquareCard({ property, onSelect, onDelete, isDel
                 <dl className="grid grid-cols-2 gap-2 text-[11px] mt-auto">
                     <div className={cn('rounded-lg bg-muted/40 px-2 py-1.5', loadingIncome && 'animate-pulse')} aria-busy={loadingIncome}>
                         <dt className="text-muted-foreground">Receita mensal</dt>
-                        <Money as="dd" className="font-semibold text-foreground tabular-nums">{loadingIncome ? '…' : formatCurrencyBRL(financials.monthlyRevenue)}</Money>
+                        <Money as="dd" className="font-semibold text-foreground tabular-nums">{loadingIncome ? '…' : financials.monthlyRevenue === null ? '—' : formatCurrencyBRL(financials.monthlyRevenue)}</Money>
                         <dd className={cn('line-clamp-1', financials.realMonth ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground')}>
-                            {loadingIncome ? 'carregando' : financials.realMonth ? `real · ${financials.realMonth}` : financials.isEstimate ? 'estimativa base' : 'do cadastro'}
+                            {loadingIncome ? 'carregando' : financials.realMonth ? `real · ${financials.realMonth}` : 'sem receitas lançadas'}
                         </dd>
                     </div>
                     <div className={cn('rounded-lg bg-muted/40 px-2 py-1.5', loadingIncome && 'animate-pulse')}>
                         <dt className="text-muted-foreground">Resultado líquido (NOI)</dt>
-                        <Money as="dd" className="font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">{loadingIncome ? '…' : formatCurrencyBRL(financials.noi)}</Money>
-                        <dd className="text-muted-foreground tabular-nums">{loadingIncome ? '' : `margem ${financials.margin.toFixed(0)}%`}</dd>
+                        <Money as="dd" className="font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">{loadingIncome ? '…' : financials.noi === null ? '—' : formatCurrencyBRL(financials.noi)}</Money>
+                        <dd className="text-muted-foreground tabular-nums">{loadingIncome || financials.margin === null ? '' : `margem ${financials.margin.toFixed(0)}%`}</dd>
                     </div>
                 </dl>
 
@@ -297,7 +253,7 @@ export default function PropertySquareCard({ property, onSelect, onDelete, isDel
                                 ? `${totalUnits} ${totalUnits === 1 ? 'unidade' : 'unidades'}`
                                 : propertyType === 'garage'
                                     ? garageSummary(details)
-                                    : `${details.areaEdificada || details.totalSqMeters || '—'} m² · ${details.bedrooms || '2'} quartos`}
+                                    : [details.areaEdificada || details.totalSqMeters ? `${details.areaEdificada || details.totalSqMeters} m²` : null, details.bedrooms ? `${details.bedrooms} quartos` : null].filter(Boolean).join(' · ') || 'dados do imóvel a preencher'}
                         </span>
                         {details.mainMeters?.energy && <Zap className="w-3 h-3 text-amber-500 shrink-0" aria-label="Medidor de energia" />}
                         {details.mainMeters?.water && <Droplets className="w-3 h-3 text-blue-500 shrink-0" aria-label="Medidor de água" />}

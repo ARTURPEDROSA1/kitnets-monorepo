@@ -6,6 +6,7 @@
  */
 import type { AdminSupabase } from "@/lib/api-auth";
 import { loadOwnedLease } from "@/lib/leases-server";
+import { linkPropertyRows, type LinkableRow } from "@/lib/property-link";
 import { parsePropertyType, type PropertyType } from "@/lib/property-type";
 import { sanitizeAddress, sanitizeAdmin, type HoldingAddress } from "@/lib/profile-holding";
 import { formatCEP, formatCNPJ, formatCPF, formatPhone } from "@/lib/validators";
@@ -36,30 +37,16 @@ function isStandaloneUc(electronicId: unknown): boolean {
     }
 }
 
-/** The profile entry (type, details, units) of one property row — paired like lib/property-units-server.ts. */
-export function propertyEntryFor(properties: { id: string; name: string }[], profile: Json, propertyId: string): { type: PropertyType; details: Json; units: Json[] } | null {
-    const claimed = new Set<string>();
-    const additional = Array.isArray(profile.additional_properties) ? profile.additional_properties : [];
-    for (const raw of additional) {
-        const entry = asObject(raw);
-        if (!entry) continue;
-        const details = asObject(entry.details) ?? {};
-        const entryName = typeof details.propertyName === "string" ? details.propertyName.trim().toLowerCase() : "";
-        const row = properties.find(p => p.id === entry.id) ?? properties.find(p => !claimed.has(p.id) && entryName !== "" && p.name.trim().toLowerCase() === entryName);
-        if (!row) continue;
-        claimed.add(row.id);
-        if (row.id === propertyId) {
-            return { type: parsePropertyType(entry.propertyType), details, units: (Array.isArray(entry.subUnits) ? entry.subUnits : []).map(asObject).filter((u): u is Json => !!u) };
-        }
+/** The profile entry (type, details, units) of one property row — paired by lib/property-link.ts. */
+export function propertyEntryFor(properties: LinkableRow[], profile: Json, propertyId: string): { type: PropertyType; details: Json; units: Json[] } | null {
+    const link = linkPropertyRows(properties, profile).find(l => l.rowId === propertyId);
+    if (!link) return null;
+    const unitsOf = (raw: unknown) => (Array.isArray(raw) ? raw : []).map(asObject).filter((u): u is Json => !!u);
+    if (link.ref.slot === 0) {
+        return { type: parsePropertyType(profile.property_type), details: link.ref.details ?? {}, units: unitsOf(profile.sub_units) };
     }
-    const primaryDetails = asObject(profile.property_details) ?? {};
-    const primaryName = typeof primaryDetails.propertyName === "string" ? primaryDetails.propertyName.trim().toLowerCase() : "";
-    const free = properties.filter(p => !claimed.has(p.id));
-    const primary = free.find(p => primaryName !== "" && p.name.trim().toLowerCase() === primaryName) ?? free[0];
-    if (primary?.id === propertyId) {
-        return { type: parsePropertyType(profile.property_type), details: primaryDetails, units: (Array.isArray(profile.sub_units) ? profile.sub_units : []).map(asObject).filter((u): u is Json => !!u) };
-    }
-    return null;
+    const entry = asObject((profile.additional_properties as unknown[])[link.ref.slot - 1]) ?? {};
+    return { type: parsePropertyType(entry.propertyType), details: link.ref.details ?? {}, units: unitsOf(entry.subUnits) };
 }
 
 const TENANT_COLUMNS = "id, full_name, cpf, rg, occupation, email, main_phone, street, street_number, address_complement, neighborhood, city, state, postal_code";
@@ -93,7 +80,7 @@ export async function loadContractData(supabase: AdminSupabase, profileId: strin
         supabase.from("tenants").select(TENANT_COLUMNS).eq("id", String(lease.primary_tenant_id)).eq("user_id", profileId).maybeSingle(),
         supabase.from("lease_tenants").select(`role, tenant:tenants!tenant_id(${TENANT_COLUMNS})`).eq("lease_id", leaseId),
         supabase.from("lease_charges").select("charge_type, label, responsibility, amount, collected_by, adjusts_with_rent").eq("lease_id", leaseId),
-        supabase.from("profiles").select("email, phone, cnpj, business_name, address, admin_data, property_type, property_details, sub_units, additional_properties").eq("id", profileId).maybeSingle(),
+        supabase.from("profiles").select("email, phone, cnpj, business_name, address, admin_data, property_type, property_details, property_address, sub_units, additional_properties").eq("id", profileId).maybeSingle(),
         supabase.from("properties").select("id, name, address, city, state, zip, electronic_id").eq("owner_id", profileId).order("created_at", { ascending: true }),
         lease.agency_id ? supabase.from("agencies").select("name, cnpj, creci_number, creci_state, creci_type, owner_name, email, main_phone, street, street_number, address_complement, neighborhood, city, state, postal_code").eq("id", String(lease.agency_id)).maybeSingle() : Promise.resolve({ data: null }),
         supabase.from("billing_settings").select("fine_pct, interest_pct_month").eq("owner_id", profileId).maybeSingle(),
@@ -102,7 +89,7 @@ export async function loadContractData(supabase: AdminSupabase, profileId: strin
     const profile = (profileRes.data ?? {}) as Json;
     const rows = ((propertiesRes.data ?? []) as Json[]).filter(p => !isStandaloneUc(p.electronic_id));
     const row = rows.find(p => p.id === propertyId) ?? null;
-    const entry = propertyEntryFor(rows.map(p => ({ id: String(p.id), name: String(p.name ?? "") })), profile, propertyId);
+    const entry = propertyEntryFor(rows.map(p => ({ id: String(p.id), name: String(p.name ?? ""), address: str(p.address) })), profile, propertyId);
     const details = entry?.details ?? {};
     const unit = lease.unit_id ? entry?.units.find(u => u.id === lease.unit_id) ?? null : null;
     const type: PropertyType = entry?.type ?? "single";

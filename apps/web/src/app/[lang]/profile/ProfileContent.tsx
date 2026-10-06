@@ -24,6 +24,7 @@ import PhotoLightbox from '@/components/investments/PhotoLightbox';
 import PropertyCostCenterDashboard from '@/components/properties/PropertyCostCenterDashboard';
 import { cn } from '@/lib/utils';
 import { PROPERTY_TYPE_LABELS, parsePropertyType, type PropertyType } from '@/lib/property-type';
+import { linkPropertyRows, propertyRowName, samePropertyName, uniquePropertyName, PRIMARY_ROW_ID_KEY } from '@/lib/property-link';
 import { uploadPropertyPhoto, uploadPropertyVideo } from '@/lib/property-media-upload';
 import { Sensitive } from '@/components/privacy';
 import { useUser, useAuth } from '@clerk/nextjs';
@@ -111,6 +112,16 @@ interface PropertyState {
     showDescriptionCard?: boolean;
     isSavedProperty?: boolean;
 }
+
+/** The first property's `property_details` column: its details plus the id of its row (lib/property-link.ts). */
+const primaryDetailsForDb = (prop: PropertyState): Record<string, unknown> => {
+    const { [PRIMARY_ROW_ID_KEY]: _staleRowId, ...details } = prop.details as unknown as Record<string, unknown>;
+    return { ...details, isSavedProperty: prop.isSavedProperty, ...(prop.id ? { [PRIMARY_ROW_ID_KEY]: prop.id } : {}) };
+};
+
+/** What a property's row is called: its name, else "street, number" (lib/property-link.ts). */
+const rowNameOf = (prop: Pick<PropertyState, 'details' | 'address'>): string =>
+    propertyRowName(prop.details as unknown as Record<string, unknown>, prop.address as unknown as Record<string, unknown>);
 
 type ProfileView = 'proprietario' | 'imoveis' | 'full';
 
@@ -208,6 +219,8 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [propertyToDelete, setPropertyToDelete] = useState<{ idx: number; label: string } | null>(null);
+    // Each property's row id by slot, as the last sync returned them (lib/property-link.ts)
+    const rowIdsBySlotRef = useRef<Map<number, string>>(new Map());
     const [profileLoadError, setProfileLoadError] = useState<string | null>(null);
 
     // Success State
@@ -265,6 +278,29 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
     });
 
     const [properties, setProperties] = useState<PropertyState[]>([]);
+    /** Gives every saved property its `properties` row (POST /api/properties/sync) and takes the ids by slot. */
+    const syncPropertyRowIds = async () => {
+        try {
+            const syncRes = await fetch('/api/properties/sync', { method: 'POST' });
+            const sync = syncRes.ok ? await syncRes.json() : null;
+            const links: { slot: number; id: string; name: string }[] = Array.isArray(sync?.links) ? sync.links : [];
+            rowIdsBySlotRef.current = new Map(links.map(l => [l.slot, l.id]));
+            if (links.length === 0) return;
+            setProperties(current => {
+                let changed = false;
+                const next = current.map((prop, idx) => {
+                    const link = links.find(l => l.slot === idx);
+                    // the slot must still hold that property (same name): a property removed meanwhile shifts them
+                    if (!link || link.id === prop.id || !samePropertyName(link.name, rowNameOf(prop))) return prop;
+                    changed = true;
+                    return { ...prop, id: link.id };
+                });
+                return changed ? next : current;
+            });
+        } catch {
+            // the next save links them
+        }
+    };
     // False until loadProfile settles; the /imoveis grid shows cached cards or skeletons meanwhile
     const [propertiesLoaded, setPropertiesLoaded] = useState(false);
     const [expandedPropertyIdx, setExpandedPropertyIdx] = useState<number | null>(null);
@@ -703,7 +739,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                     // Proofs and public.properties only depend on profile.id: fetch them in parallel
                     const dbPropsPromise = sb
                         .from('properties')
-                        .select('id, name, electronic_id, created_at')
+                        .select('id, name, address, electronic_id, created_at')
                         .eq('owner_id', profile.id)
                         .order('created_at', { ascending: true })
                         .then(res => res.data, (dbErr) => {
@@ -739,7 +775,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                     );
 
                     // Fetch properties from public.properties to enrich PropertyState with database UUIDs
-                    let dbPropsList: Array<{ id: string; name: string; electronic_id?: any; created_at?: string }> = [];
+                    let dbPropsList: Array<{ id: string; name: string; address?: string | null; electronic_id?: any; created_at?: string }> = [];
                     const dbProps = await dbPropsPromise;
                     if (dbProps) dbPropsList = dbProps;
 
@@ -762,11 +798,16 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                     const primarySubUnits = Array.isArray(profile.sub_units) ? profile.sub_units as SubUnit[] : [];
 
                     const primaryProfilePhoto = (profile.profile_photo_url as string) || (primaryPhotos.length > 0 ? primaryPhotos[0] : null);
-                    const primaryName = primaryPropDetails?.propertyName?.trim() || (primaryPropAddr?.street ? `${primaryPropAddr.street}, ${primaryPropAddr.number || ""}`.trim() : (profile.full_name ? `Imóvel de ${profile.full_name}` : "Meu Imóvel"));
-                    const matchedPrimary = nonStandaloneDbProps.find(p => p.name.trim().toLowerCase() === primaryName.trim().toLowerCase()) || (nonStandaloneDbProps.length > 0 ? nonStandaloneDbProps[0] : undefined);
+                    // Each property's `properties` row, by the id the entry carries — never by name: two
+                    // properties may share a name, and a namesake's row is another property's (lib/property-link.ts)
+                    const rowIdBySlot = new Map(
+                        linkPropertyRows(nonStandaloneDbProps.map(p => ({ id: p.id, name: p.name ?? '', address: p.address ?? null })), profile as Record<string, unknown>)
+                            .filter(l => l.rowId)
+                            .map(l => [l.ref.slot, l.rowId as string])
+                    );
 
                     const primaryProperty: PropertyState = {
-                        id: matchedPrimary?.id,
+                        id: rowIdBySlot.get(0),
                         propertyType: parsePropertyType(profile.property_type),
                         details: primaryPropDetails ? {
                             propertyName: primaryPropDetails.propertyName || '',
@@ -840,17 +881,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             const apDetails = apTyped.details as PropertyDetails | undefined;
                             const apUnits = Array.isArray(apTyped.subUnits) ? apTyped.subUnits as SubUnit[] : [];
 
-                            let propId = typeof apTyped.id === 'string' ? apTyped.id : undefined;
-                            if (!propId) {
-                                const apName = apDetails?.propertyName?.trim() || (apTyped.address && (apTyped.address as PropertyState['address'])?.street ? `${(apTyped.address as PropertyState['address']).street}, ${(apTyped.address as PropertyState['address']).number || ""}`.trim() : null);
-                                if (apName) {
-                                    const matched = nonStandaloneDbProps.find(p => p.id !== matchedPrimary?.id && p.name.trim().toLowerCase() === apName.trim().toLowerCase());
-                                    if (matched) propId = matched.id;
-                                }
-                                if (!propId && nonStandaloneDbProps[targetPropIdx]) {
-                                    propId = nonStandaloneDbProps[targetPropIdx].id;
-                                }
-                            }
+                            const propId = rowIdBySlot.get(targetPropIdx);
 
                             additionalProps.push({
                                 id: propId,
@@ -923,6 +954,8 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             ? [primaryProperty, ...additionalProps]
                             : additionalProps;
                         setProperties(allProps);
+                        // a property saved without its row (or before the ids were stamped) gets it now
+                        if (hasPrimaryProperty && allProps.some(prop => !prop.id && rowNameOf(prop))) void syncPropertyRowIds();
 
                         // Deep link by database id (see the ?id= handling above)
                         const pendingId = pendingPropertyIdRef.current;
@@ -1708,10 +1741,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                 // When all properties are deleted, null out legacy columns to prevent ghost properties
                 property_address: props.length > 0 ? props[0].address : null,
                 property_type: props.length > 0 ? props[0].propertyType : null,
-                property_details: props.length > 0 ? {
-                    ...props[0].details,
-                    isSavedProperty: props[0].isSavedProperty,
-                } : null,
+                property_details: props.length > 0 ? primaryDetailsForDb(props[0]) : null,
                 sub_units: props.length > 0 ? props[0].subUnits : null,
                 property_photos: props.length > 0 ? props[0].savedPhotos : null,
                 property_videos: props.length > 0 ? props[0].savedVideos : null,
@@ -1967,6 +1997,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             savedVideos: prop.savedVideos,
                             savedProofs: dedupeProofs(prop.savedProofs),
                             profilePhotoUrl: prop.profilePhotoUrl,
+                            isSavedProperty: prop.isSavedProperty,
                             showAddressCard: prop.showAddressCard,
                             showDetailsCard: prop.showDetailsCard,
                             showPhotosCard: prop.showPhotosCard,
@@ -1984,8 +2015,9 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                 });
             }
 
-            // a new property gets its `properties` row now, so Contratos and Inquilinos list it right away
-            await fetch('/api/properties/sync', { method: 'POST' }).catch(() => undefined);
+            // a new property gets its `properties` row now, so Contratos and Inquilinos list it right away, and the
+            // page takes each property's row id: its Receitas, Investimento and Energia work without a reload
+            await syncPropertyRowIds();
 
             if (!silent) {
                 setShowSuccess(true);
@@ -2047,26 +2079,15 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
         const deletedProp = properties[propIdx];
         if (!deletedProp) return;
 
-        // 1. Sync deletion or conversion to standalone UC in backend properties table
-        try {
-            const propName = deletedProp.details?.propertyName || (deletedProp.address?.street ? `${deletedProp.address.street}, ${deletedProp.address.number || ''}`.trim() : null);
-            const propAddress = deletedProp.address?.street ? `${deletedProp.address.street}, ${deletedProp.address.number || ''} - ${deletedProp.address.neighborhood || ''}`.trim() : null;
-
-            await fetch('/api/energy-bills/properties/sync-deletion', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    // properties-table id resolved at load time; the backend deletes
-                    // exactly this row instead of guessing by name.
-                    propertyId: deletedProp.id ?? null,
-                    name: propName,
-                    address: propAddress,
-                    action: action,
-                }),
-            });
-        } catch (syncErr) {
-            console.error('[Profile] Error syncing property deletion with energy module:', syncErr);
-        }
+        // 1. Delete (or keep as a standalone UC) the property's own row — the one linked to this entry by id,
+        //    checked again by the server. A refusal (contracts, invoices) leaves the property where it is.
+        const res = await fetch('/api/energy-bills/properties/sync-deletion', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ slot: propIdx, name: rowNameOf(deletedProp), propertyId: deletedProp.id ?? null, action }),
+        });
+        const result = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(typeof result.error === 'string' ? result.error : 'Não foi possível excluir o imóvel — nada foi apagado.');
 
         // 2. Clean up ownership proofs for deleted property
         if (deletedProp?.savedProofs && deletedProp.savedProofs.length > 0) {
@@ -2135,16 +2156,16 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
     }, [properties, propertiesLoaded, cachedCards, imoveisFilterTab, imoveisSearch]);
 
     // The hub's dashboard adds up exactly what the cards on screen show: the ledger's latest month
-    // where there is one, the card's own estimate otherwise.
+    // where there is one (a property without revenue entered adds nothing).
     const hubIncome = useMemo<PortfolioIncomeData>(() => {
         let revenue = 0, noi = 0, realCount = 0;
         for (const { prop } of filteredProperties) {
             const realIncome = prop.id
                 ? (realIncomeLoaded ? realIncomeByProperty[prop.id] ?? null : cachedRealIncomeById.get(prop.id) ?? null)
                 : null;
-            const f = cardFinancials({ propertyType: prop.propertyType, details: prop.details, subUnits: prop.subUnits, realIncome });
-            revenue += f.monthlyRevenue;
-            noi += f.noi;
+            const f = cardFinancials({ realIncome });
+            revenue += f.monthlyRevenue ?? 0;
+            noi += f.noi ?? 0;
             if (f.realMonth) realCount += 1;
         }
         return { count: filteredProperties.length, realCount, revenue, noi };
@@ -2257,6 +2278,8 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
         const pPhotosOpen = prop.photosSectionOpen;
         const pDescOpen = prop.descriptionSectionOpen;
         const pDetailsOpen = prop.detailsInitialOpen;
+        // the other properties' names: two alike are flagged where the name is edited
+        const otherPropertyNames = properties.filter((_, i) => i !== propIdx).map(rowNameOf);
 
         const hasDocsData = (pSavedProofs.length > 0 || pOwnershipFiles.length > 0);
         const hasAddressData = Boolean(pAddr.street || pAddr.cep || pAddr.city);
@@ -2659,22 +2682,11 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
             setProperties(updatedProps);
             await handleSave(true, updatedProps);
 
-            try {
-                const res = await fetch('/api/energy-bills/properties');
-                const data = await res.json();
-                if (data.success && Array.isArray(data.properties)) {
-                    const rentalProps = data.properties.filter((p: any) => !p.isStandaloneUc && !p.isOrphaned);
-                    const currentName = pDetails.propertyName?.trim() || (pAddr.street ? `${pAddr.street}, ${pAddr.number || ''}`.trim() : null);
-                    let matched = rentalProps.find((p: any) => currentName && p.name.trim().toLowerCase() === currentName.toLowerCase());
-                    if (!matched && rentalProps[propIdx]) matched = rentalProps[propIdx];
-                    else if (!matched && propIdx === 0 && rentalProps.length > 0) matched = rentalProps[0];
-                    if (matched?.id) {
-                        router.push(`/${lang}/dashboard/energy/${matched.id}?upload=true`);
-                        return;
-                    }
-                }
-            } catch (err) {
-                console.error('[ProfileContent] Error resolving property for energy dashboard:', err);
+            // the property's own row (the save's sync returned it), never a namesake's
+            const rowId = rowIdsBySlotRef.current.get(propIdx) ?? prop.id;
+            if (rowId) {
+                router.push(`/${lang}/dashboard/energy/${rowId}?upload=true`);
+                return;
             }
             const targetParam = propIdx === 0 ? 'primary' : `prop-${propIdx}`;
             router.push(`/${lang}/dashboard/energy/${targetParam}?upload=true`);
@@ -2738,6 +2750,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             propertyType={pType}
                             propertyId={prop.id}
                             lang={lang}
+                            takenNames={otherPropertyNames}
                             initialOpen={true}
                             onOpenChange={(open) => { if (!open) { setPDetailsOpen(false); handleSave(true); } }}
                             onContinue={() => { setPDetailsOpen(false); handleSave(true); }}
@@ -2966,7 +2979,10 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                     disabled={isSaving || (!pAddr.street && !pAddr.cep)}
                                     className="gap-1.5 text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
                                     onClick={() => {
-                                        const bairro = pAddr.neighborhood?.trim();
+                                        // a name taken from the bairro is often another property's (two houses in
+                                        // SANTO ANTONIO): the default then gets the street, and can be renamed
+                                        const otherNames = properties.filter((_, i) => i !== propIdx).map(rowNameOf);
+                                        const bairro = uniquePropertyName(pAddr.neighborhood?.trim() || '', otherNames, pAddr as unknown as Record<string, unknown>);
                                         const updatedProps = properties.map((pItem, i) => {
                                             if (i !== propIdx) return pItem;
                                             const currentName = pItem.details?.propertyName?.trim();
@@ -3006,6 +3022,7 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                             propertyType={pType}
                             propertyId={prop.id}
                             lang={lang}
+                            takenNames={otherPropertyNames}
                             initialOpen={pDetailsOpen}
                             onOpenChange={(open) => setPDetailsOpen(open)}
                             onContinue={() => {
@@ -3861,6 +3878,12 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                                 onUpdateDetails={(updatedDetails) => {
                                     updateProperty(selectedPropertyIdx, prev => ({ ...prev, details: updatedDetails }));
                                     handleSave(true);
+                                }}
+                                takenNames={properties.filter((_, i) => i !== selectedPropertyIdx).map(rowNameOf)}
+                                onRename={(name) => {
+                                    const renamed = properties.map((prop, i) => i === selectedPropertyIdx ? { ...prop, details: { ...prop.details, propertyName: name } } : prop);
+                                    setProperties(renamed);
+                                    void handleSave(true, renamed);
                                 }}
                             />
 
@@ -4752,6 +4775,9 @@ export default function ProfileContent({ dict, view = 'full' }: ProfileContentPr
                     onClose={() => setPropertyToDelete(null)}
                     propertyLabel={propertyToDelete.label}
                     propertyIndex={propertyToDelete.idx}
+                    rowName={properties[propertyToDelete.idx] ? rowNameOf(properties[propertyToDelete.idx]) : ''}
+                    propertyId={properties[propertyToDelete.idx]?.id ?? null}
+                    lang={lang}
                     dict={dict}
                     onConfirm={handleConfirmDeleteProperty}
                 />

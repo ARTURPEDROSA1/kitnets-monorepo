@@ -1,8 +1,8 @@
 /**
  * The account's rental properties as the Imóveis page sees them — the profile JSON entries (the first
  * property in `property_type` / `property_details` / `property_address` / `sub_units`, the rest in
- * `additional_properties[]`) paired with the `properties` rows by id and, for the first property, by name
- * (the same rules as the units and the photos, lib/property-units-server.ts / property-photos-server.ts).
+ * `additional_properties[]`) paired with the `properties` rows by the id each entry carries
+ * (lib/property-link.ts — the same pairing as the units, the photos and the Imóveis page).
  *
  * An entry without a row (a wizard that never reached the API) keeps `id: null`: it can be counted and put
  * on the map, but nothing in the ledgers or the leases can point to it yet.
@@ -10,6 +10,7 @@
 import type { AdminSupabase } from "@/lib/api-auth";
 import { addressFromProfile, addressText, type AddressParts } from "@/lib/geocode";
 import { orderPhotos } from "@/lib/property-photos-server";
+import { linkPropertyRows, type LinkableRow } from "@/lib/property-link";
 import { parsePropertyType, type PropertyType } from "@/lib/property-type";
 
 type Json = Record<string, unknown>;
@@ -77,39 +78,18 @@ function entryOf(args: { id: string | null; index: number; type: unknown; detail
 }
 
 /**
- * Pairs the profile's entries with the property rows (oldest first). Additional entries claim a row by id,
- * then by name; the first property claims a row by name, else the oldest row still free. An entry that is
+ * Pairs the profile's entries with the property rows (oldest first) — lib/property-link.ts. An entry that is
  * not "real" (no name and no street) is skipped, as the Energia loader does.
  */
-export function pairPropertyEntries(properties: { id: string; name: string }[], profile: Json): PropertyEntry[] {
-    const entries: PropertyEntry[] = [];
-    const claimed = new Set<string>();
-
+export function pairPropertyEntries(properties: LinkableRow[], profile: Json): PropertyEntry[] {
     const additional = Array.isArray(profile.additional_properties) ? profile.additional_properties : [];
-    additional.forEach((raw, i) => {
-        const entry = asObject(raw);
-        if (!entry) return;
-        const details = asObject(entry.details);
-        const address = asObject(entry.address);
-        if (!str(details?.propertyName) && !str(address?.street)) return;
-        const entryName = str(details?.propertyName).toLowerCase();
-        const row =
-            properties.find(p => p.id === entry.id) ??
-            properties.find(p => !claimed.has(p.id) && entryName !== "" && p.name.trim().toLowerCase() === entryName);
-        if (row) claimed.add(row.id);
-        entries.push(entryOf({ id: row?.id ?? null, index: i + 1, type: entry.propertyType, details, address, subUnits: entry.subUnits, cover: entry.profilePhotoUrl, photos: entry.savedPhotos, isSaved: entry.isSavedProperty === true }));
+    return linkPropertyRows(properties, profile).filter(l => l.ref.name).map(({ ref, rowId }) => {
+        if (ref.slot === 0) {
+            return entryOf({ id: rowId, index: 0, type: profile.property_type, details: ref.details, address: ref.address, subUnits: profile.sub_units, cover: profile.profile_photo_url, photos: profile.property_photos, isSaved: true });
+        }
+        const entry = asObject(additional[ref.slot - 1]) ?? {};
+        return entryOf({ id: rowId, index: ref.slot, type: entry.propertyType, details: ref.details, address: ref.address, subUnits: entry.subUnits, cover: entry.profilePhotoUrl, photos: entry.savedPhotos, isSaved: entry.isSavedProperty === true });
     });
-
-    const primaryDetails = asObject(profile.property_details);
-    const primaryAddress = asObject(profile.property_address);
-    const hasRealPrimary = !!profile.property_type && (str(primaryDetails?.propertyName) !== "" || str(primaryAddress?.street) !== "");
-    if (hasRealPrimary) {
-        const primaryName = str(primaryDetails?.propertyName).toLowerCase();
-        const free = properties.filter(p => !claimed.has(p.id));
-        const primary = free.find(p => primaryName !== "" && p.name.trim().toLowerCase() === primaryName) ?? free[0];
-        entries.unshift(entryOf({ id: primary?.id ?? null, index: 0, type: profile.property_type, details: primaryDetails, address: primaryAddress, subUnits: profile.sub_units, cover: profile.profile_photo_url, photos: profile.property_photos, isSaved: true }));
-    }
-    return entries;
 }
 
 export interface PropertyEntriesResult {
@@ -119,14 +99,14 @@ export interface PropertyEntriesResult {
 
 export async function loadPropertyEntries(supabase: AdminSupabase, profileId: string): Promise<PropertyEntriesResult> {
     const [{ data: rows, error: rowsError }, { data, error }] = await Promise.all([
-        supabase.from("properties").select("id, name, electronic_id").eq("owner_id", profileId).order("created_at", { ascending: true }),
+        supabase.from("properties").select("id, name, address, electronic_id").eq("owner_id", profileId).order("created_at", { ascending: true }),
         supabase.from("profiles").select("full_name, email, property_type, property_details, property_address, sub_units, property_photos, profile_photo_url, additional_properties").eq("id", profileId).maybeSingle(),
     ]);
     if (rowsError) throw new Error(`properties: ${rowsError.message}`);
     if (error) throw new Error(`profile: ${error.message}`);
     const properties = (rows || [])
         .filter(p => !isStandaloneUc(p.electronic_id))
-        .map(p => ({ id: p.id as string, name: (p.name as string) || "" }));
+        .map(p => ({ id: p.id as string, name: (p.name as string) || "", address: (p.address as string | null) ?? null }));
     const profile = (data ?? {}) as Json;
     return {
         entries: pairPropertyEntries(properties, profile),

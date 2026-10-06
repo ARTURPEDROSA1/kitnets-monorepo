@@ -1,12 +1,13 @@
 import type { AdminSupabase } from "@/lib/api-auth";
+import { linkPropertyRows, rowIdsBySlot, type LinkableRow } from "@/lib/property-link";
 
 /**
  * The rentable units of the account's multi-unit properties, keyed by `properties.id`.
  *
  * Units have no table of their own: they live in the owner's profile JSON
  * (`sub_units` for the first property, `additional_properties[].subUnits` for
- * the rest), which the Imóveis page pairs with the `properties` rows by id and,
- * for the first property, by name. A lease points to one through `leases.unit_id`.
+ * the rest), paired with the `properties` rows by the id each entry carries
+ * (lib/property-link.ts). A lease points to one through `leases.unit_id`.
  */
 
 export interface PropertyUnitOption {
@@ -49,13 +50,13 @@ function isStandaloneUc(electronicId: unknown): boolean {
 
 export async function loadPropertyUnits(supabase: AdminSupabase, profileId: string): Promise<Map<string, PropertyUnitOption[]>> {
     const [{ data: rows }, { data }] = await Promise.all([
-        supabase.from("properties").select("id, name, electronic_id").eq("owner_id", profileId).order("created_at", { ascending: true }),
-        supabase.from("profiles").select("property_type, property_details, sub_units, additional_properties").eq("id", profileId).maybeSingle(),
+        supabase.from("properties").select("id, name, address, electronic_id").eq("owner_id", profileId).order("created_at", { ascending: true }),
+        supabase.from("profiles").select("property_type, property_details, property_address, sub_units, additional_properties").eq("id", profileId).maybeSingle(),
     ]);
     // Standalone consumer units are energy-only records, not rentable properties
     const properties = (rows || [])
         .filter((p) => !isStandaloneUc(p.electronic_id))
-        .map((p) => ({ id: p.id as string, name: (p.name as string) || "" }));
+        .map((p) => ({ id: p.id as string, name: (p.name as string) || "", address: (p.address as string | null) ?? null }));
     const profile = data as Json | null;
     if (!profile || properties.length === 0) return new Map();
 
@@ -75,42 +76,31 @@ export async function loadPropertyUnits(supabase: AdminSupabase, profileId: stri
  * `update` holds the profile columns that changed because a unit had no id yet.
  */
 export function pairPropertyUnits(
-    properties: { id: string; name: string }[],
+    properties: LinkableRow[],
     profile: Json
 ): { units: Map<string, PropertyUnitOption[]>; update: Json } {
     const result = new Map<string, PropertyUnitOption[]>();
     const update: Json = {};
-    const claimed = new Set<string>();
+    const rowBySlot = rowIdsBySlot(linkPropertyRows(properties, profile));
 
-    // Additional properties carry the row id
     const additional = Array.isArray(profile.additional_properties) ? profile.additional_properties : [];
     let additionalChanged = false;
-    const stampedAdditional = additional.map((raw) => {
+    const stampedAdditional = additional.map((raw, i) => {
         const entry = asObject(raw);
-        if (!entry) return raw;
-        const entryName = typeof asObject(entry.details)?.propertyName === "string" ? (asObject(entry.details)!.propertyName as string).trim().toLowerCase() : "";
-        const row =
-            properties.find((p) => p.id === entry.id) ??
-            properties.find((p) => !claimed.has(p.id) && entryName !== "" && p.name.trim().toLowerCase() === entryName);
-        if (row) claimed.add(row.id);
-        if (entry.propertyType !== "multi") return raw;
+        if (!entry || entry.propertyType !== "multi") return raw;
         const { units, stamped, changed } = readUnits(entry.subUnits);
-        if (row) result.set(row.id, units);
+        const rowId = rowBySlot.get(i + 1);
+        if (rowId) result.set(rowId, units);
         if (!changed) return raw;
         additionalChanged = true;
         return { ...entry, subUnits: stamped };
     });
     if (additionalChanged) update.additional_properties = stampedAdditional;
 
-    // The first property is paired by name, else with the oldest row left (as the Imóveis page does)
     if (profile.property_type === "multi") {
-        const primaryName = typeof asObject(profile.property_details)?.propertyName === "string"
-            ? (asObject(profile.property_details)!.propertyName as string).trim().toLowerCase()
-            : "";
-        const free = properties.filter((p) => !claimed.has(p.id));
-        const row = free.find((p) => primaryName !== "" && p.name.trim().toLowerCase() === primaryName) ?? free[0];
         const { units, stamped, changed } = readUnits(profile.sub_units);
-        if (row) result.set(row.id, units);
+        const rowId = rowBySlot.get(0);
+        if (rowId) result.set(rowId, units);
         if (changed) update.sub_units = stamped;
     }
 

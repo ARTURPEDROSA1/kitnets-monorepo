@@ -992,7 +992,7 @@
             "subtitle": "Tem certeza que deseja remover este imóvel do seu portfólio?",
             "energyQuestion": "O que você deseja fazer com a gestão de energia solar deste imóvel?",
             "deleteAllTitle": "Excluir imóvel e apagar dados de energia",
-            "deleteAllDesc": "O imóvel e todos os dados associados (geração solar, faturas e histórico de consumo) serão removidos permanentemente.",
+            "deleteAllDesc": "O imóvel e o que é só dele (receitas, investimento, tributos) são apagados. As contas de energia e água ficam guardadas sem imóvel, para vincular de novo; o PDF da conta vigente é apagado.",
             "keepEnergyTitle": "Excluir imóvel mas MANTER dados de energia",
             "keepEnergyDesc": "Remove o imóvel dos anúncios de locação, mas mantém o cadastro e as faturas como uma UC Avulsa na aba Energia.",
             "cancel": "Cancelar",

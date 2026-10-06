@@ -23,6 +23,9 @@ import {
     PieChart as PieChartIcon,
     BarChart3,
     Droplets,
+    PenLine,
+    Check,
+    X,
 } from 'lucide-react';
 import {
     ResponsiveContainer,
@@ -63,7 +66,7 @@ import type { PropertyInvestment, PropertyTransaction } from '@/lib/property-inv
 import { landlordIptuByMonth, landlordTaxTotals, taxScopeForProperty, type PropertyTax } from '@/lib/property-taxes';
 import type { PropertyValuation } from '@/lib/property-valuations';
 import { condominiumResultByMonth, type CondominiumMonth } from '@/lib/condominium';
-import { GARAGE_BASELINE, garageSpaces, garageSummary, type PropertyType } from '@/lib/property-type';
+import { garageSpaces, garageSummary, type PropertyType } from '@/lib/property-type';
 
 interface PropertyCostCenterDashboardProps {
     propertyIndex: number;
@@ -87,6 +90,10 @@ interface PropertyCostCenterDashboardProps {
     /** Renting only: kitnets.com has no sale listings (owner's call, 2026-09-24). */
     onQuickPublish: (mode: 'rent') => void;
     onUpdateDetails: (updatedDetails: PropertyDetails) => void;
+    /** renames the property (the page saves it; its row follows, so Energia, Contratos and Água show the new name) */
+    onRename?: (name: string) => void;
+    /** the other properties' names: a name must tell this property apart */
+    takenNames?: string[];
 }
 
 const formatBRL = (val: number) =>
@@ -105,7 +112,21 @@ export default function PropertyCostCenterDashboard({
     onBack,
     onQuickPublish,
     onUpdateDetails,
+    onRename,
+    takenNames = [],
 }: PropertyCostCenterDashboardProps) {
+    // Rename in place, from the header
+    const [renaming, setRenaming] = useState(false);
+    const [nameDraft, setNameDraft] = useState('');
+    const normName = (v: string) => v.trim().toLowerCase().replace(/\s+/g, ' ');
+    const draftTaken = nameDraft.trim() !== '' && takenNames.some(n => normName(n) === normName(nameDraft));
+    const startRename = () => { setNameDraft(details.propertyName?.trim() || ''); setRenaming(true); };
+    const commitRename = () => {
+        const name = nameDraft.trim();
+        if (!name || draftTaken) return;
+        if (name !== (details.propertyName ?? '').trim()) onRename?.(name);
+        setRenaming(false);
+    };
 
     // Real monthly income from the ledger (fed by PropertyIncomeLedger)
     const [incomeRows, setIncomeRows] = useState<PropertyIncomeRow[]>([]);
@@ -191,47 +212,11 @@ export default function PropertyCostCenterDashboard({
         ? Math.max(details.numberOfUnits || 0, subUnits.length || 1)
         : 1;
 
-    // Financial Analysis & Calculations
+    // Financial Analysis & Calculations — real figures only: a property without revenue entered in Receitas
+    // mensais shows empty cards and charts, never an estimate (owner's call, 2026-10-06)
     const financials = useMemo(() => {
         let grossMonthlyRevenue = 0;
         let rentedUnitsCount = 0;
-
-        if (propertyType === 'multi') {
-            let sumRents = 0;
-            subUnits.forEach((u) => {
-                if (u.rentValue) {
-                    const parsed = parseFloat(u.rentValue.replace(/[^\d.,]/g, '').replace(',', '.'));
-                    if (!isNaN(parsed) && parsed > 0) {
-                        sumRents += parsed;
-                        rentedUnitsCount++;
-                    }
-                } else if (u.status === 'rented') {
-                    rentedUnitsCount++;
-                }
-            });
-
-            if (sumRents > 0) {
-                grossMonthlyRevenue = sumRents;
-            } else if (details.monthlyRentEstimate) {
-                const parsed = parseFloat(details.monthlyRentEstimate.replace(/[^\d.,]/g, '').replace(',', '.'));
-                grossMonthlyRevenue = isNaN(parsed) ? totalUnits * 1100 : parsed;
-                rentedUnitsCount = totalUnits;
-            } else {
-                grossMonthlyRevenue = totalUnits * 1100;
-                rentedUnitsCount = totalUnits;
-            }
-        } else {
-            if (details.monthlyRentEstimate) {
-                const parsed = parseFloat(details.monthlyRentEstimate.replace(/[^\d.,]/g, '').replace(',', '.'));
-                grossMonthlyRevenue = isNaN(parsed) ? 2200 : parsed;
-            } else if (propertyType === 'garage') {
-                grossMonthlyRevenue = garageSpaces(details) * GARAGE_BASELINE.rentPerSpace;
-            } else {
-                const beds = parseInt(details.bedrooms || '2', 10);
-                grossMonthlyRevenue = (isNaN(beds) ? 2 : beds) * 750 + 600;
-            }
-            rentedUnitsCount = 1;
-        }
 
         // ── Real data from the income ledger ──
         // KPI cards and the donut show the CURRENT result: the latest confirmed month.
@@ -251,41 +236,16 @@ export default function PropertyCostCenterDashboard({
         const range = periodRange(period);
         const periodRows = filterRowsByPeriod(incomeRows, range).sort((a, b) => (a.month < b.month ? -1 : 1));
 
-        // Operational Expenses (OPEX) — estimates from "Ajustar Custos", used only without ledger data
-        const iptuDefault = propertyType === 'garage' ? GARAGE_BASELINE.iptuMonthly : 140;
-        const iptuMonthly = details.iptuMonthly
-            ? (parseFloat(details.iptuMonthly.replace(/[^\d.,]/g, '').replace(',', '.')) || iptuDefault)
-            : iptuDefault;
-
-        const condoMonthly = details.condoMonthly
-            ? (parseFloat(details.condoMonthly.replace(/[^\d.,]/g, '').replace(',', '.')) || (propertyType === 'multi' ? totalUnits * 75 : 0))
-            : (propertyType === 'multi' ? totalUnits * 75 : 0);
-
-        const maintenanceReserve = details.maintenanceMonthly
-            ? (parseFloat(details.maintenanceMonthly.replace(/[^\d.,]/g, '').replace(',', '.')) || Math.round(grossMonthlyRevenue * 0.05))
-            : Math.round(grossMonthlyRevenue * 0.05);
-
-        const adminFee = Math.round(grossMonthlyRevenue * (parseFloat(details.managementFeePercent || '8') / 100));
-
-        const otherDefault = propertyType === 'garage' ? 0 : 65;
-        const insuranceAndOther = details.otherExpensesMonthly
-            ? (parseFloat(details.otherExpensesMonthly.replace(/[^\d.,]/g, '').replace(',', '.')) || otherDefault)
-            : otherDefault;
-
-        const estimatedExpenses = iptuMonthly + condoMonthly + maintenanceReserve + adminFee + insuranceAndOther;
-
         // With ledger data: OPEX = agency fee + energy cost + other expenses + landlord IPTU paid in the month (taxes register)
         const iptuByMonth = landlordIptuByMonth(taxRows, taxScope);   // recurring tax only: ITBI and other one-off taxes are investment, not a monthly cost
         const iptuNow = latest ? (iptuByMonth.get(monthKey(latest.month)) ?? 0) : 0;
-        const totalExpenses = current ? Math.round(current.opex + iptuNow) : estimatedExpenses;
-        const noi = current ? Math.round(current.noi - iptuNow) : Math.max(0, grossMonthlyRevenue - totalExpenses);
+        const totalExpenses = current ? Math.round(current.opex + iptuNow) : 0;
+        const noi = current ? Math.round(current.noi - iptuNow) : 0;
         const margin = grossMonthlyRevenue > 0 ? (noi / grossMonthlyRevenue) * 100 : 0;
 
-        // Occupancy: lifetime, from the ledger — months with rent ÷ months since the first record
-        let occupancyRate = totalUnits > 0 ? Math.round((rentedUnitsCount / totalUnits) * 100) : 100;
-        let occupancyHint = propertyType === 'multi'
-            ? `${rentedUnitsCount}/${totalUnits} unidades ativas`
-            : 'Imóvel ativo (estimativa)';
+        // Occupancy: lifetime, from the ledger — months with rent ÷ months since the first record (none without it)
+        let occupancyRate: number | null = null;
+        let occupancyHint = 'sem receitas lançadas';
         const lifetime = incomeRows
             .filter(r => r.status === 'CONFIRMED' && monthKey(r.month) <= currentMonthKey())
             .sort((a, b) => (a.month < b.month ? -1 : 1));
@@ -308,15 +268,9 @@ export default function PropertyCostCenterDashboard({
                 { name: 'Condomínio', value: Math.round(current.condo) },
                 { name: 'IPTU', value: Math.round(iptuNow) },
             ].filter(item => item.value > 0)
-            : [
-                { name: 'IPTU', value: iptuMonthly },
-                { name: 'Manutenção Predial', value: maintenanceReserve },
-                { name: 'Taxa Administrativa', value: adminFee },
-                { name: 'Condomínio / Áreas Comuns', value: condoMonthly },
-                { name: 'Seguro & Outros', value: insuranceAndOther },
-            ].filter(item => item.value > 0);
+            : [];
 
-        // DRE data: every ledger month in the period (expected months drawn lighter), else a 6-month projection
+        // DRE data: every ledger month in the period (expected months drawn lighter); none without ledger months
         const dreData: { month: string; key?: string; receita: number; despesas: number; noi: number; previsto: boolean }[] = [];
 
         if (periodRows.length > 0) {
@@ -342,29 +296,10 @@ export default function PropertyCostCenterDashboard({
                     dreData.push({ month: formatMonthKey(m), key: m, receita: Math.round(current.revenue), despesas: Math.round(current.opex), noi: Math.round(current.noi), previsto: true });
                 }
             }
-        } else {
-            const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-            const currentMonthIdx = new Date().getMonth();
-            for (let i = 0; i < 6; i++) {
-                const mIdx = (currentMonthIdx - 3 + i + 12) % 12;
-                // Slight variance for realistic historical/projection view
-                const variance = 1 + (i === 1 ? -0.04 : i === 4 ? 0.03 : 0);
-                const rec = Math.round(grossMonthlyRevenue * variance);
-                const exp = Math.round(totalExpenses * (1 + (i === 2 ? 0.08 : 0)));
-                dreData.push({
-                    month: months[mIdx],
-                    receita: rec,
-                    despesas: exp,
-                    noi: Math.max(0, rec - exp),
-                    previsto: false,
-                });
-            }
         }
 
-        // Group the monthly DRE by quarter / year / a specific quarter (real data only: the estimate has no month keys)
-        const groupedDre = dreData.every(d => d.key)
-            ? groupMonthly(dreData.map(d => ({ ...d, key: d.key! })), dreGroup)
-            : dreData;
+        // Group the monthly DRE by quarter / year / a specific quarter
+        const groupedDre = groupMonthly(dreData.map(d => ({ ...d, key: d.key! })), dreGroup);
 
         return {
             realIncomeMonth: latest && hasRealIncome ? formatMonthKey(monthKey(latest.month)) : null,
@@ -392,7 +327,7 @@ export default function PropertyCostCenterDashboard({
             energyCost: current ? current.other : null,
             energyNet: current ? Math.round((current.energy - current.other) * 100) / 100 : null,
         };
-    }, [propertyType, details, subUnits, totalUnits, incomeRows, taxRows, period, forecastYear, dreGroup]);
+    }, [propertyType, incomeRows, taxRows, taxScope, period, forecastYear, dreGroup]);
 
     // ── explanations for the five KPI cards (icon popup) ─────────────────
     const brl = (v: number | null | undefined) => (v === null || v === undefined ? '—' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }));
@@ -516,9 +451,46 @@ export default function PropertyCostCenterDashboard({
             <div className="bg-card border border-border rounded-2xl p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="space-y-1">
                     <div className="flex items-center gap-2.5 flex-wrap">
-                        <h2 className={cn('text-2xl font-bold text-foreground tracking-tight', titleIsAddress && 'privacy-sensitive')}>
-                            {propertyTitle}
-                        </h2>
+                        {renaming ? (
+                            <form
+                                className="flex flex-wrap items-center gap-2"
+                                onSubmit={e => { e.preventDefault(); commitRename(); }}
+                            >
+                                <input
+                                    autoFocus
+                                    value={nameDraft}
+                                    onChange={e => setNameDraft(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Escape') setRenaming(false); }}
+                                    aria-label="Nome do imóvel"
+                                    aria-invalid={draftTaken || undefined}
+                                    className="h-10 min-w-0 w-72 max-w-full rounded-lg border border-input bg-background px-3 text-xl font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                />
+                                <Button type="submit" size="sm" disabled={!nameDraft.trim() || draftTaken} className="gap-1 bg-emerald-600 hover:bg-emerald-700 text-white">
+                                    <Check className="w-3.5 h-3.5" /> Salvar
+                                </Button>
+                                <Button type="button" size="sm" variant="ghost" onClick={() => setRenaming(false)} className="gap-1">
+                                    <X className="w-3.5 h-3.5" /> Cancelar
+                                </Button>
+                                {draftTaken && <p className="w-full text-xs text-amber-700 dark:text-amber-400">Outro imóvel já tem este nome. Use um nome que os diferencie (ex.: a rua ou o número).</p>}
+                            </form>
+                        ) : (
+                            <>
+                                <h2 className={cn('text-2xl font-bold text-foreground tracking-tight', titleIsAddress && 'privacy-sensitive')}>
+                                    {propertyTitle}
+                                </h2>
+                                {onRename && (
+                                    <button
+                                        type="button"
+                                        onClick={startRename}
+                                        title="Renomear o imóvel"
+                                        aria-label="Renomear o imóvel"
+                                        className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                    >
+                                        <PenLine className="w-4 h-4" />
+                                    </button>
+                                )}
+                            </>
+                        )}
                         {propertyType === 'multi' ? (
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-800">
                                 <Building2 className="w-3.5 h-3.5 text-violet-500" />
@@ -595,7 +567,7 @@ export default function PropertyCostCenterDashboard({
                     </div>
                     <div>
                         <Money as="span" className="text-xl sm:text-2xl font-bold text-foreground block">
-                            {formatBRL(financials.grossMonthlyRevenue)}
+                            {financials.realIncomeMonth ? formatBRL(financials.grossMonthlyRevenue) : '—'}
                         </Money>
                         <span className="text-xs text-muted-foreground block leading-snug">
                             {financials.realIncomeMonth ? <>
@@ -604,7 +576,7 @@ export default function PropertyCostCenterDashboard({
                                 <br />Valor m²: {areaM2 && financials.currentGrossRent ? <Money>{formatBRL2(financials.currentGrossRent / areaM2)}</Money> : <span title="Informe a área construída em Aquisição & financiamento">informe a área</span>}
                                 <br />Anual: <Money>{formatBRL(financials.annualRevenue)}</Money>
                                 <span className="mt-1 flex items-center gap-1 font-semibold text-emerald-700 dark:text-emerald-400"><TrendingUp className="w-3 h-3" /> Ver histórico</span>
-                            </> : <>Projeção anual: <Money>{formatBRL(financials.annualRevenue)}</Money></>}
+                            </> : <>Sem receitas lançadas: lance o primeiro mês em Receitas mensais, abaixo</>}
                         </span>
                     </div>
                 </div>
@@ -617,11 +589,13 @@ export default function PropertyCostCenterDashboard({
                     </div>
                     <div>
                         <Money as="span" className="text-xl sm:text-2xl font-bold text-rose-600 dark:text-rose-400 block">
-                            {formatBRL(financials.totalExpenses)}
+                            {financials.realIncomeMonth ? formatBRL(financials.totalExpenses) : '—'}
                         </Money>
                         <span className="text-xs text-muted-foreground block leading-snug">
-                            {financials.realIncomeMonth && financials.opexLabel && <>{financials.opexLabel}<br /></>}
-                            {((financials.totalExpenses / (financials.grossMonthlyRevenue || 1)) * 100).toFixed(0)}% da receita bruta
+                            {financials.realIncomeMonth ? <>
+                                {financials.opexLabel && <>{financials.opexLabel}<br /></>}
+                                {((financials.totalExpenses / (financials.grossMonthlyRevenue || 1)) * 100).toFixed(0)}% da receita bruta
+                            </> : 'sem receitas lançadas'}
                         </span>
                     </div>
                 </div>
@@ -636,10 +610,10 @@ export default function PropertyCostCenterDashboard({
                     </div>
                     <div>
                         <Money as="span" className="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400 block">
-                            {formatBRL(financials.noi)}
+                            {financials.realIncomeMonth ? formatBRL(financials.noi) : '—'}
                         </Money>
                         <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
-                            Margem Líquida: {financials.margin.toFixed(0)}%
+                            {financials.realIncomeMonth ? <>Margem Líquida: {financials.margin.toFixed(0)}%</> : 'sem receitas lançadas'}
                         </span>
                     </div>
                 </div>
@@ -652,7 +626,7 @@ export default function PropertyCostCenterDashboard({
                     </div>
                     <div>
                         <span className="text-xl sm:text-2xl font-bold text-foreground block">
-                            {financials.occupancyRate}%
+                            {financials.occupancyRate === null ? '—' : `${financials.occupancyRate}%`}
                         </span>
                         <span className="text-xs text-muted-foreground">
                             {financials.occupancyHint}
@@ -738,7 +712,7 @@ export default function PropertyCostCenterDashboard({
                             <p className="text-xs text-muted-foreground">
                                 {financials.realIncomeMonth
                                     ? `Receita (aluguel bruto + energia + condomínio pago pelo inquilino), despesas (taxa + custo de energia + outras + condomínio + IPTU pago por você no mês) e NOI reais · ${periodLabel(period)}; meses previstos em tom claro`
-                                    : 'Histórico e projeção de Receitas, Despesas Operacionais e Lucro Líquido (NOI)'}
+                                    : 'Receitas, despesas operacionais e resultado líquido (NOI) dos meses lançados'}
                             </p>
                         </div>
                         {/* toolbar on its own full-width row: the title never gets squeezed when the month pickers appear */}
@@ -758,6 +732,12 @@ export default function PropertyCostCenterDashboard({
                         </div>
                     </div>
 
+                    {financials.dreData.length === 0 ? (
+                        <div className="flex h-[280px] w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border px-6 text-center">
+                            <p className="text-sm font-medium text-foreground">Sem lançamentos no período</p>
+                            <p className="text-xs text-muted-foreground">O DRE se monta com os meses reais: lance as receitas em Receitas mensais, abaixo.</p>
+                        </div>
+                    ) : (
                     <Money as="div" className="h-[280px] w-full pt-2">
                         <ResponsiveContainer width="100%" height="100%">
                             <ComposedChart data={financials.dreData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
@@ -800,6 +780,7 @@ export default function PropertyCostCenterDashboard({
                             </ComposedChart>
                         </ResponsiveContainer>
                     </Money>
+                    )}
                 </div>
 
                 {/* Chart 2: Composição do Centro de Custos (Donut) */}
@@ -816,6 +797,12 @@ export default function PropertyCostCenterDashboard({
                         </p>
                     </div>
 
+                    {financials.expenseBreakdown.length === 0 ? (
+                        <div className="flex h-[200px] w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border px-6 text-center">
+                            <p className="text-sm font-medium text-foreground">{financials.realIncomeMonth ? 'Sem despesas no mês' : 'Sem lançamentos ainda'}</p>
+                            <p className="text-xs text-muted-foreground">As despesas vêm das receitas mensais e dos tributos do imóvel.</p>
+                        </div>
+                    ) : (
                     <Money as="div" className="h-[200px] w-full flex items-center justify-center">
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
@@ -844,6 +831,7 @@ export default function PropertyCostCenterDashboard({
                             </PieChart>
                         </ResponsiveContainer>
                     </Money>
+                    )}
 
                     <div className="space-y-1.5 pt-2 border-t border-border/60 text-xs">
                         {financials.expenseBreakdown.map((item, idx) => (

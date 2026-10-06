@@ -6,6 +6,7 @@ import {
     type UcCategory,
 } from "@/lib/energy-properties-server";
 import { deletePropertyCascade } from "@/lib/energy-bills-server";
+import { linkPropertyRows } from "@/lib/property-link";
 
 export type { OwnerPropertySummary, UcCategory };
 
@@ -82,8 +83,9 @@ export const POST = withAuth({ tag: "Energy Properties POST" }, async ({ req, pr
 
 /**
  * DELETE /api/energy-bills/properties?id=...
- * Deletes a property the account owns, with the cascade in lib/energy-bills-server.ts
- * (bills are orphaned, not deleted).
+ * Deletes a standalone (or orphaned) consumer unit the account owns, with the cascade in
+ * lib/energy-bills-server.ts (one transaction; bills are kept unlinked). A property of Imóveis is removed
+ * from Imóveis, never from here.
  */
 export const DELETE = withAuth({ tag: "Energy Properties DELETE" }, async ({ req, profileId, supabase }) => {
     const propertyId = new URL(req.url).searchParams.get("id");
@@ -91,17 +93,38 @@ export const DELETE = withAuth({ tag: "Energy Properties DELETE" }, async ({ req
         return NextResponse.json({ error: "ID da propriedade é obrigatório" }, { status: 400 });
     }
 
-    const { data: prop } = await supabase
-        .from("properties")
-        .select("id")
-        .eq("id", propertyId)
-        .eq("owner_id", profileId)
-        .maybeSingle();
+    const [{ data: rows }, { data: profile }] = await Promise.all([
+        supabase.from("properties").select("id, name, address, electronic_id").eq("owner_id", profileId).order("created_at", { ascending: true }),
+        supabase.from("profiles").select("property_type, property_details, property_address, additional_properties").eq("id", profileId).maybeSingle(),
+    ]);
+    const all = (rows ?? []) as { id: string; name: string; address: string | null; electronic_id: string | null }[];
+    const prop = all.find(r => r.id === propertyId);
     if (!prop) throw notFound("Propriedade não encontrada ou não autorizada");
 
-    const { error } = await deletePropertyCascade(supabase, propertyId, "Energy Properties DELETE");
+    const isUc = (() => {
+        try {
+            return !!prop.electronic_id && !!JSON.parse(prop.electronic_id).isStandaloneUc;
+        } catch {
+            return false;
+        }
+    })();
+    if (!isUc) {
+        const rental = all.filter(r => {
+            try {
+                return !r.electronic_id || !JSON.parse(r.electronic_id).isStandaloneUc;
+            } catch {
+                return true;
+            }
+        });
+        const linked = linkPropertyRows(rental.map(r => ({ id: r.id, name: r.name ?? "", address: r.address })), (profile ?? {}) as Record<string, unknown>).some(l => l.rowId === propertyId);
+        if (linked) {
+            return NextResponse.json({ error: "Este imóvel está cadastrado em Imóveis: exclua-o por lá — nada foi apagado." }, { status: 409 });
+        }
+    }
+
+    const { error } = await deletePropertyCascade(supabase, propertyId, profileId, "Energy Properties DELETE");
     if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: error.message }, { status: error.status });
     }
 
     return NextResponse.json({ success: true });

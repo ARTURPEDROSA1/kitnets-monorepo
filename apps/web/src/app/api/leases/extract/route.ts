@@ -8,6 +8,7 @@ import { HOUR } from "@/lib/rate-limit";
 import { validateUpload } from "@/lib/session";
 import { aiAvailable, extractJsonFromDocument } from "@/lib/document-ai-server";
 import { ensurePropertyRows } from "@/lib/property-rows-server";
+import { linkPropertyRows } from "@/lib/property-link";
 import {
     LEASE_EXTRACTION_PROMPT,
     isEmptyExtraction,
@@ -43,49 +44,34 @@ async function loadCandidates(supabase: AdminSupabase, profileId: string) {
     // a property just registered on Imóveis lives in the profile JSON: give it its row before matching
     await ensurePropertyRows(supabase, profileId);
     const [propertiesRes, tenantsRes, membershipsRes, profileRes, agentsRes] = await Promise.all([
-        supabase.from("properties").select("id, name, address, city, zip, electronic_id").eq("owner_id", profileId),
+        supabase.from("properties").select("id, name, address, city, zip, electronic_id").eq("owner_id", profileId).order("created_at", { ascending: true }),
         supabase.from("tenants").select("id, full_name, cpf").eq("user_id", profileId).is("deleted_at", null),
         supabase.from("agency_members").select("agency_id").eq("user_id", profileId),
-        supabase.from("profiles").select("property_details, property_address, additional_properties").eq("id", profileId).maybeSingle(),
+        supabase.from("profiles").select("property_type, property_details, property_address, additional_properties").eq("id", profileId).maybeSingle(),
         supabase.from("agents").select("id, full_name, cpf, creci_number, creci_state").eq("user_id", profileId).is("deleted_at", null),
     ]);
 
     // The structured address lives in the profile JSON (Imóveis page); the row only has the one-line version.
-    const profileAddresses: { id?: string; name: string; street?: string; number?: string }[] = [];
-    const profile = profileRes.data as Record<string, unknown> | null;
-    const pushProfileProperty = (id: unknown, details: unknown, address: unknown) => {
-        const d = (details ?? {}) as Record<string, unknown>;
-        const a = (address ?? {}) as Record<string, unknown>;
-        profileAddresses.push({
-            id: typeof id === "string" ? id : undefined,
-            name: typeof d.propertyName === "string" ? d.propertyName.trim().toLowerCase() : "",
-            street: typeof a.street === "string" ? a.street : undefined,
-            number: typeof a.number === "string" ? a.number : undefined,
-        });
-    };
-    if (profile) {
-        pushProfileProperty(undefined, profile.property_details, profile.property_address);
-        for (const ap of Array.isArray(profile.additional_properties) ? profile.additional_properties : []) {
-            const entry = (ap ?? {}) as Record<string, unknown>;
-            pushProfileProperty(entry.id, entry.details, entry.address);
-        }
-    }
+    // Each row is paired with its profile property by id (lib/property-link.ts).
+    const rental = (propertiesRes.data || []).filter((p) => !isStandaloneUc(p.electronic_id));
+    const links = linkPropertyRows(
+        rental.map((p) => ({ id: p.id as string, name: (p.name as string) || "", address: (p.address as string | null) ?? null })),
+        (profileRes.data ?? {}) as Record<string, unknown>,
+    );
+    const text = (v: unknown) => (typeof v === "string" ? v : null);
 
-    const properties: PropertyCandidate[] = (propertiesRes.data || [])
-        .filter((p) => !isStandaloneUc(p.electronic_id))
-        .map((p) => {
-            const name = (p.name as string) || "";
-            const fromProfile = profileAddresses.find((x) => x.id === p.id) ?? profileAddresses.find((x) => x.name && x.name === name.trim().toLowerCase());
-            return {
-                id: p.id as string,
-                name,
-                address: p.address as string | null,
-                street: fromProfile?.street ?? null,
-                street_number: fromProfile?.number ?? null,
-                city: p.city as string | null,
-                zip: p.zip as string | null,
-            };
-        });
+    const properties: PropertyCandidate[] = rental.map((p) => {
+        const address = links.find((l) => l.rowId === p.id)?.ref.address ?? null;
+        return {
+            id: p.id as string,
+            name: (p.name as string) || "",
+            address: p.address as string | null,
+            street: text(address?.street),
+            street_number: text(address?.number),
+            city: p.city as string | null,
+            zip: p.zip as string | null,
+        };
+    });
 
     let agencies: AgencyCandidate[] = [];
     const agencyIds = (membershipsRes.data || []).map((m) => m.agency_id as string);
