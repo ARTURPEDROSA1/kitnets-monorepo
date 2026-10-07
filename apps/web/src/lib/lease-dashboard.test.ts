@@ -153,6 +153,7 @@ describe("summarizeLeases + hubTotals", () => {
     it("finds the first end ahead and the terms already over", () => {
         expect(totals.overdueTerm).toBe(1);           // d ended in January 2025
         expect(totals.ending90).toBe(1);              // c ends 20/10/2026
+        expect(totals.endingSoonDays).toEqual([25]);  // "1 vence em 25 dias", not "em 90 dias"
         expect(totals.nextEnd?.row.lease.id).toBe("c");
         expect(totals.nextEnd?.days).toBe(25);
     });

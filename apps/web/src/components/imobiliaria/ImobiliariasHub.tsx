@@ -13,6 +13,7 @@ import { AlertCircle, Building2, ChevronDown, ChevronUp, DollarSign, FileSignatu
 import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { dueInDaysText } from "@/lib/dates";
 import { normalizeText } from "@/lib/lease-extract";
 import { AGENCY_VIEWS, agencyAttention, agencyHubTotals, brl, inAgencyView, type AgencyRow, type AgencyView } from "@/lib/agency-dashboard";
 import AgencySquareCard from "./AgencySquareCard";
@@ -80,9 +81,9 @@ export default function ImobiliariasHub({ rows, loading, error, view, onViewChan
     const viewMeta = AGENCY_VIEWS.find(v => v.key === view)!;
     const shownAttention = allAttention ? attention : attention.slice(0, 4);
     const agreementsHint = totals.agreementsExpired > 0
-        ? `${plural(totals.agreementsExpired, "vencido", "vencidos")}${totals.agreementsExpiring > 0 ? ` · ${plural(totals.agreementsExpiring, "vencendo", "vencendo")}` : ""}`
+        ? `${plural(totals.agreementsExpired, "vencido", "vencidos")}${totals.agreementsExpiring > 0 ? ` · ${dueInDaysText(totals.agreementsExpiringDays)}` : ""}`
         : totals.agreementsExpiring > 0
-            ? `${plural(totals.agreementsExpiring, "vence", "vencem")} em até 90 dias`
+            ? dueInDaysText(totals.agreementsExpiringDays)
             : totals.withAgreement > 0 ? "todos dentro da vigência" : "nenhum contrato anexado";
 
     return (
