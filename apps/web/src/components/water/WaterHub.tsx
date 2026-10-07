@@ -104,7 +104,6 @@ export default function WaterHub({ lang, rows, view, onViewChange, onOpen, onVie
                         icon={<Building2 className="h-3.5 w-3.5" />} tone="text-blue-600" label="Imóveis com água"
                         value={String(totals.units)}
                         hint={totals.withBills > 0 ? `${plural(totals.withBills, "com contas importadas", "com contas importadas")}` : "nenhuma conta importada ainda"}
-                        onClick={() => onViewChange("todos")}
                     />
                     <Item
                         icon={<Droplets className="h-3.5 w-3.5" />} tone="text-blue-600" label="Consumo do mês"

@@ -93,7 +93,7 @@ apps/web/src/
 │   ├── TenantSquareCard.tsx             # One card per tenant (photo cover, occupation, place, rent, contact icons)
 │   ├── TenantDashboard.tsx              # One tenant: photo, contact chips, tiles, rent chart, contracts, ficha
 │   ├── TenantPhoto.tsx                  # Round avatar with upload / remove
-│   └── TenantForm.tsx                   # Create / edit form: six numbered sections + the tenant's card beside
+│   └── TenantForm.tsx                   # Create / edit form: six colour-coded sections + the tenant's card beside
 ├── lib/
 │   ├── tenant-dashboard.ts (+ test)     # Pure maths: status meta, views, rows (place, rent, time living, birthday), totals, attention
 │   ├── tenant-views.ts                  # The list / dashboard view types (client-safe)
@@ -480,7 +480,7 @@ Three screens: the **hub** (`/inquilinos`), one tenant's **dashboard** (`?id=<te
 
 ### 6.5 TenantForm
 
-`components/inquilinos/TenantForm.tsx` — the same shape as the contract form (`LeaseForm`): six numbered, colour-coded sections always open — **Quem é** (name, CPF, RG, birth date with the age, occupation), **Contato** (WhatsApp, other phone, e-mail, Instagram as @handle or URL, LinkedIn URL — normalised by `lib/social-links.ts`, inputs with icons), **Moradia** (property, situação Atual / Futuro / Antigo as buttons, entry date, exit date shown for a former tenant or when filled), **Administração** (Gestão própria / Imobiliária cards, agency, corretor), **Endereço atual** ("Mora no imóvel alugado" switch, else CEP auto-fill) and **Emergência e observações** — beside a sticky preview of the tenant's card (initials, status pill, which contacts are filled, property, time living, management, CPF under the eye toggle), the required-fields checklist and the save buttons; on a phone the card follows the form. The photo is not in the form: it is uploaded on the dashboard, where a saved tenant lands.
+`components/inquilinos/TenantForm.tsx` — the same shape as the contract form (`LeaseForm`): six colour-coded sections always open (icon tiles, no numbers) — **Quem é** (name, CPF, RG, birth date with the age, occupation), **Contato** (WhatsApp, other phone, e-mail, Instagram as @handle or URL, LinkedIn URL — normalised by `lib/social-links.ts`, inputs with icons), **Moradia** (property, situação Atual / Futuro / Antigo as buttons, entry date, exit date shown for a former tenant or when filled), **Administração** (Gestão própria / Imobiliária cards, agency, corretor), **Endereço atual** ("Mora no imóvel alugado" switch, else CEP auto-fill) and **Emergência e observações** — beside a sticky preview of the tenant's card (initials, status pill, which contacts are filled, property, time living, management, CPF under the eye toggle), the required-fields checklist and the save buttons; on a phone the card follows the form. The photo is not in the form: it is uploaded on the dashboard, where a saved tenant lands.
 
 ---
 

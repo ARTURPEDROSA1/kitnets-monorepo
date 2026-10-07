@@ -104,7 +104,6 @@ export default function CorretoresHub({ rows, loading, error, view, onViewChange
                         icon={<UserCheck className="h-3.5 w-3.5" />} tone="text-emerald-600" label="Corretores ativos"
                         value={String(totals.active)}
                         hint={totals.inactive > 0 ? `${plural(totals.inactive, "inativo", "inativos")}` : "nenhum inativo"}
-                        onClick={() => onViewChange("ativos")}
                     />
                     <Item
                         icon={<FileSignature className="h-3.5 w-3.5" />} tone="text-emerald-600" label="Contratos em vigor"

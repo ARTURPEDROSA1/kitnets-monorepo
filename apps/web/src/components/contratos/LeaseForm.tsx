@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The lease form — "Novo contrato de locação" and "Editar contrato" — in numbered, colour-coded sections
+ * The lease form — "Novo contrato de locação" and "Editar contrato" — in colour-coded sections
  * (property & tenant, term & amounts, management, adjustment, charges, notes) beside a sticky summary
  * of what is being registered, with the save buttons. Files are not here: they live on the contract's
  * dashboard (LeaseDocuments), which is where a saved contract lands.
@@ -527,7 +527,7 @@ export default function LeaseForm({ editingId, initial, dropdowns, onSaved, onCa
             <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
                 <div className="min-w-0 space-y-5">
                     {/* ── 1. Property & tenant ─────────────────────── */}
-                    <Section n={1} tone="violet" icon={<Home className="h-4 w-4" />} title="Imóvel e inquilino" description="Onde fica e quem aluga.">
+                    <Section tone="violet" icon={<Home className="h-4 w-4" />} title="Imóvel e inquilino" description="Onde fica e quem aluga.">
                         <Field id="property_id" label="Imóvel" required error={errors.property_id}>
                             <select
                                 className={cn(control, errors.property_id && "border-red-500")}
@@ -612,7 +612,7 @@ export default function LeaseForm({ editingId, initial, dropdowns, onSaved, onCa
                     </Section>
 
                     {/* ── 2. Term and amounts ──────────────────────── */}
-                    <Section n={2} tone="emerald" icon={<Calendar className="h-4 w-4" />} title="Prazo e valores" description="Datas, aluguel, vencimento e caução.">
+                    <Section tone="emerald" icon={<Calendar className="h-4 w-4" />} title="Prazo e valores" description="Datas, aluguel, vencimento e caução.">
                         <div className="grid gap-4 sm:grid-cols-2">
                             <Field id="start_date" label="Início" required error={errors.start_date}>
                                 <Input value={form.start_date} onChange={e => updateForm("start_date", maskDate(e.target.value))} placeholder="DD/MM/AAAA" maxLength={10} className={cn(inputCls, errors.start_date && "border-red-500")} />
@@ -656,7 +656,7 @@ export default function LeaseForm({ editingId, initial, dropdowns, onSaved, onCa
                     </Section>
 
                     {/* ── 3. Management ────────────────────────────── */}
-                    <Section n={3} tone="indigo" icon={<Building2 className="h-4 w-4" />} title="Administração" description="Quem cuida do contrato.">
+                    <Section tone="indigo" icon={<Building2 className="h-4 w-4" />} title="Administração" description="Quem cuida do contrato.">
                         <Field id="management_type" label="Gestão" required error={errors.management_type}>
                             <div className="grid gap-2 sm:grid-cols-3">
                                 {([
@@ -735,7 +735,7 @@ export default function LeaseForm({ editingId, initial, dropdowns, onSaved, onCa
                     </Section>
 
                     {/* ── 4. Rent adjustment ───────────────────────── */}
-                    <Section n={4} tone="amber" icon={<TrendingUp className="h-4 w-4" />} title="Reajuste do aluguel" description="Por qual índice e a cada quantos meses.">
+                    <Section tone="amber" icon={<TrendingUp className="h-4 w-4" />} title="Reajuste do aluguel" description="Por qual índice e a cada quantos meses.">
                         <div className="grid gap-4 sm:grid-cols-2">
                             <Field id="adjustment_index" label="Índice">
                                 <select className={control} value={form.adjustment_index} onChange={e => updateForm("adjustment_index", e.target.value)}>
@@ -756,7 +756,7 @@ export default function LeaseForm({ editingId, initial, dropdowns, onSaved, onCa
                     </Section>
 
                     {/* ── 5. Charges ───────────────────────────────── */}
-                    <Section n={5} tone="sky" icon={<Zap className="h-4 w-4" />} title="Encargos" description="Condomínio, energia, IPTU, água: quem paga, quanto e quem cobra.">
+                    <Section tone="sky" icon={<Zap className="h-4 w-4" />} title="Encargos" description="Condomínio, energia, IPTU, água: quem paga, quanto e quem cobra.">
                         {charges.length === 0 && <p className="text-sm text-muted-foreground">Nenhum encargo. Adicione o condomínio, a energia ou outra conta que o contrato cite.</p>}
                         {charges.map((charge, idx) => {
                             const patch = (p: Partial<ChargeFormItem>) => setCharges(prev => prev.map((c, i) => (i === idx ? { ...c, ...p } : c)));
@@ -875,7 +875,7 @@ export default function LeaseForm({ editingId, initial, dropdowns, onSaved, onCa
                     </Section>
 
                     {/* ── 6. Notes ─────────────────────────────────── */}
-                    <Section n={6} tone="slate" icon={<PenLine className="h-4 w-4" />} title="Observações" description="Notas internas: só você vê.">
+                    <Section tone="slate" icon={<PenLine className="h-4 w-4" />} title="Observações" description="Notas internas: só você vê.">
                         <div id="field-notes">
                             <textarea
                                 className={cn(control, "h-auto min-h-[96px] py-2")}
@@ -984,14 +984,13 @@ const SECTION_TONE = {
     slate: "bg-slate-500/15 text-slate-600 dark:text-slate-300",
 } as const;
 
-/** A numbered part of the form, always open. */
-function Section({ n, tone, icon, title, description, children }: { n: number; tone: keyof typeof SECTION_TONE; icon: React.ReactNode; title: string; description: string; children: React.ReactNode }) {
+/** A part of the form, always open: its colour and icon tell it apart. */
+function Section({ tone, icon, title, description, children }: { tone: keyof typeof SECTION_TONE; icon: React.ReactNode; title: string; description: string; children: React.ReactNode }) {
     return (
         <section className="rounded-2xl border border-border bg-card shadow-xs">
             <header className="flex items-center gap-3 border-b border-border/60 px-4 py-3 sm:px-5">
-                <span className={cn("relative grid h-9 w-9 shrink-0 place-items-center rounded-xl", SECTION_TONE[tone])}>
+                <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-xl", SECTION_TONE[tone])}>
                     {icon}
-                    <span className="absolute -right-1.5 -top-1.5 grid h-4 w-4 place-items-center rounded-full bg-foreground text-[10px] font-bold text-background">{n}</span>
                 </span>
                 <div className="min-w-0">
                     <h3 className="text-sm font-semibold text-foreground">{title}</h3>

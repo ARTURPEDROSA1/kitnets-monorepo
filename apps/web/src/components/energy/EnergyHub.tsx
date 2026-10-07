@@ -115,7 +115,6 @@ export default function EnergyHub({ lang, rows, loading, error, view, onViewChan
                         icon={<Building2 className="h-3.5 w-3.5" />} tone="text-emerald-600" label="Unidades"
                         value={String(totals.units)}
                         hint={[totals.rental > 0 ? plural(totals.rental, "de aluguel", "de aluguel") : null, totals.standalone > 0 ? plural(totals.standalone, "avulsa", "avulsas") : null, totals.orphaned > 0 ? plural(totals.orphaned, "desvinculada", "desvinculadas") : null].filter(Boolean).join(" · ") || "nenhuma"}
-                        onClick={() => onViewChange("todas")}
                     />
                     <Item
                         icon={<Zap className="h-3.5 w-3.5" />} tone="text-blue-600" label="Consumo do mês"
