@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The tenant form — "Cadastrar inquilino" and "Editar inquilino" — in numbered, colour-coded sections
+ * The tenant form — "Cadastrar inquilino" and "Editar inquilino" — in colour-coded sections
  * (who they are, how to reach them, where they live, who manages, current address, emergency & notes)
  * beside a sticky preview of the tenant's card with the required fields and the save buttons, the same
  * shape as the contract form (LeaseForm). The photo is not here: it goes on the tenant's dashboard,
@@ -302,7 +302,7 @@ export default function TenantForm({ editingId, initial, dropdowns, onSaved, onC
             <form onSubmit={handleSubmit} noValidate className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
                 <div className="min-w-0 space-y-5">
                     {/* ── 1. Who ───────────────────────────────────── */}
-                    <Section n={1} tone="violet" icon={<User className="h-4 w-4" />} title="Quem é" description="Nome, documentos e o que faz.">
+                    <Section tone="violet" icon={<User className="h-4 w-4" />} title="Quem é" description="Nome, documentos e o que faz.">
                         <Field id="full_name" label="Nome completo" required error={errors.full_name}>
                             <Input id="full_name" value={form.full_name} onChange={e => updateField("full_name", e.target.value)} placeholder="Nome completo do inquilino" className={cn(inputCls, errors.full_name && "border-red-500")} />
                         </Field>
@@ -323,7 +323,7 @@ export default function TenantForm({ editingId, initial, dropdowns, onSaved, onC
                     </Section>
 
                     {/* ── 2. Contact ───────────────────────────────── */}
-                    <Section n={2} tone="emerald" icon={<Phone className="h-4 w-4" />} title="Contato" description="Telefones, e-mail e redes: viram atalhos no cartão e no painel do inquilino.">
+                    <Section tone="emerald" icon={<Phone className="h-4 w-4" />} title="Contato" description="Telefones, e-mail e redes: viram atalhos no cartão e no painel do inquilino.">
                         <div className="grid gap-4 sm:grid-cols-2">
                             <Field id="main_phone" label="Telefone principal (WhatsApp)" error={errors.main_phone} hint={phoneOk ? "Atalho do WhatsApp no cartão." : undefined}>
                                 <IconInput icon={<MessageCircle className="h-4 w-4" />} id="main_phone" inputMode="tel" value={form.main_phone} onChange={e => masked("main_phone", e.target.value, maskPhone)} placeholder="(00) 00000-0000" invalid={!!errors.main_phone} />
@@ -346,7 +346,7 @@ export default function TenantForm({ editingId, initial, dropdowns, onSaved, onC
                     </Section>
 
                     {/* ── 3. Where they live ───────────────────────── */}
-                    <Section n={3} tone="sky" icon={<Home className="h-4 w-4" />} title="Moradia" description="O imóvel que ocupa (a unidade e os valores ficam no contrato) e desde quando.">
+                    <Section tone="sky" icon={<Home className="h-4 w-4" />} title="Moradia" description="O imóvel que ocupa (a unidade e os valores ficam no contrato) e desde quando.">
                         <Field id="property_id" label="Imóvel" required error={errors.property_id}>
                             {properties.length === 0 ? (
                                 <p className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
@@ -388,7 +388,7 @@ export default function TenantForm({ editingId, initial, dropdowns, onSaved, onC
                     </Section>
 
                     {/* ── 4. Management ────────────────────────────── */}
-                    <Section n={4} tone="indigo" icon={<Building2 className="h-4 w-4" />} title="Administração" description="Quem cuida da locação deste inquilino.">
+                    <Section tone="indigo" icon={<Building2 className="h-4 w-4" />} title="Administração" description="Quem cuida da locação deste inquilino.">
                         <Field id="management_type" label="Gestão" required error={errors.management_type}>
                             <div className="grid gap-2 sm:grid-cols-2">
                                 {([
@@ -443,7 +443,7 @@ export default function TenantForm({ editingId, initial, dropdowns, onSaved, onC
                     </Section>
 
                     {/* ── 5. Current address ───────────────────────── */}
-                    <Section n={5} tone="amber" icon={<MapPin className="h-4 w-4" />} title="Endereço atual" description="Onde o inquilino mora hoje.">
+                    <Section tone="amber" icon={<MapPin className="h-4 w-4" />} title="Endereço atual" description="Onde o inquilino mora hoje.">
                         <button
                             type="button"
                             role="switch"
@@ -512,7 +512,7 @@ export default function TenantForm({ editingId, initial, dropdowns, onSaved, onC
                     </Section>
 
                     {/* ── 6. Emergency & notes ─────────────────────── */}
-                    <Section n={6} tone="slate" icon={<ShieldAlert className="h-4 w-4" />} title="Emergência e observações" description="Quem avisar se precisar, e notas internas: só você vê.">
+                    <Section tone="slate" icon={<ShieldAlert className="h-4 w-4" />} title="Emergência e observações" description="Quem avisar se precisar, e notas internas: só você vê.">
                         <div className="grid gap-4 sm:grid-cols-2">
                             <Field id="emergency_contact_name" label="Contato de emergência">
                                 <IconInput icon={<User className="h-4 w-4" />} id="emergency_contact_name" value={form.emergency_contact_name} onChange={e => updateField("emergency_contact_name", e.target.value)} placeholder="Nome e parentesco" />
@@ -613,14 +613,13 @@ const SECTION_TONE = {
     slate: "bg-slate-500/15 text-slate-600 dark:text-slate-300",
 } as const;
 
-/** A numbered part of the form, always open. */
-function Section({ n, tone, icon, title, description, children }: { n: number; tone: keyof typeof SECTION_TONE; icon: React.ReactNode; title: string; description: string; children: React.ReactNode }) {
+/** A part of the form, always open: its colour and icon tell it apart. */
+function Section({ tone, icon, title, description, children }: { tone: keyof typeof SECTION_TONE; icon: React.ReactNode; title: string; description: string; children: React.ReactNode }) {
     return (
         <section className="rounded-2xl border border-border bg-card shadow-xs">
             <header className="flex items-center gap-3 border-b border-border/60 px-4 py-3 sm:px-5">
-                <span className={cn("relative grid h-9 w-9 shrink-0 place-items-center rounded-xl", SECTION_TONE[tone])}>
+                <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-xl", SECTION_TONE[tone])}>
                     {icon}
-                    <span className="absolute -right-1.5 -top-1.5 grid h-4 w-4 place-items-center rounded-full bg-foreground text-[10px] font-bold text-background">{n}</span>
                 </span>
                 <div className="min-w-0">
                     <h2 className="text-sm font-semibold text-foreground">{title}</h2>

@@ -8,7 +8,7 @@
  * owner's connection to the bank.
  */
 import React, { useMemo, useState } from "react";
-import { AlertCircle, CalendarClock, CheckCircle2, ChevronDown, ChevronUp, Clock, FilePlus2, Info, Landmark, Loader2, Receipt, Repeat, Search, Settings2, X } from "lucide-react";
+import { AlertCircle, CalendarClock, Check, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Clock, FilePlus2, Info, Landmark, Loader2, Receipt, Repeat, Search, Settings2, X } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -63,17 +63,29 @@ interface Props {
 
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString("pt-BR")} ${n === 1 ? one : many}`;
 
-function Item({ icon, label, value, hint, tone, valueTone, onClick, title, money }: { icon: React.ReactNode; label: string; value: string; hint: React.ReactNode; tone: string; valueTone?: string; onClick?: () => void; title?: string; /** the figure is an amount in R$: value and hint get the class the dollar toggle blurs (components/privacy) */ money?: boolean }) {
-    const Tag = onClick ? "button" : "div";
+/**
+ * One KPI card. A card that filters the list below is a button with an arrow, and shows as selected
+ * (not clickable) while its list is the one on screen: a click must always change something.
+ */
+function Item({ icon, label, value, hint, tone, valueTone, onClick, active, title, money }: { icon: React.ReactNode; label: string; value: string; hint: React.ReactNode; tone: string; valueTone?: string; onClick?: () => void; /** its list is the one shown below */ active?: boolean; title?: string; /** the figure is an amount in R$: value and hint get the class the dollar toggle blurs (components/privacy) */ money?: boolean }) {
+    const clickable = !!onClick && !active;
+    const Tag = clickable ? "button" : "div";
     return (
         <Tag
-            type={onClick ? "button" : undefined}
-            onClick={onClick}
-            title={title}
-            className={cn("flex min-w-0 flex-col gap-0.5 rounded-xl border border-border/80 bg-card px-4 py-3 text-left", onClick && "cursor-pointer transition-colors hover:border-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500")}
+            type={clickable ? "button" : undefined}
+            onClick={clickable ? onClick : undefined}
+            title={active ? `${title ? `${title}. ` : ""}Já é a lista exibida abaixo.` : title}
+            aria-current={active ? "true" : undefined}
+            className={cn(
+                "flex min-w-0 flex-col gap-0.5 rounded-xl border bg-card px-4 py-3 text-left",
+                active ? "border-emerald-500/60 bg-emerald-500/[0.06] ring-1 ring-emerald-500/30" : "border-border/80",
+                clickable && "group cursor-pointer transition-colors hover:border-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+            )}
         >
             <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                <span className={tone}>{icon}</span>{label}
+                <span className={tone}>{icon}</span><span className="min-w-0 flex-1">{label}</span>
+                {clickable && <ChevronRight className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" />}
+                {active && <Check className="h-4 w-4 shrink-0 text-emerald-600" aria-label="Exibindo na lista" />}
             </span>
             <span className={cn("block break-words text-xl font-bold leading-tight", valueTone ?? "text-foreground", money && "privacy-money")}>{value}</span>
             <span className={cn("block break-words text-xs leading-snug text-muted-foreground", money && "privacy-money")}>{hint}</span>
@@ -145,6 +157,7 @@ export default function FaturasHub(props: Props) {
                     hint={totals.dueThisMonth.count > 0 ? plural(totals.dueThisMonth.count, "fatura em aberto", "faturas em aberto") : `nenhuma fatura em aberto em ${monthLabel(thisMonth)}`}
                     title="Faturas em aberto com vencimento neste mês"
                     onClick={() => { onSectionChange("faturas"); onViewChange("abertas"); }}
+                    active={section === "faturas" && view === "abertas"}
                     money
                 />
                 <Item
@@ -153,6 +166,7 @@ export default function FaturasHub(props: Props) {
                     hint={totals.receivedThisMonth.count > 0 ? plural(totals.receivedThisMonth.count, "fatura paga", "faturas pagas") : "nenhum pagamento neste mês"}
                     title="Pagamentos com data neste mês"
                     onClick={() => { onSectionChange("faturas"); onViewChange("pagas"); }}
+                    active={section === "faturas" && view === "pagas"}
                     money
                 />
                 <Item
@@ -161,6 +175,7 @@ export default function FaturasHub(props: Props) {
                     hint={totals.overdue.count > 0 ? plural(totals.overdue.count, "fatura vencida", "faturas vencidas") : "nenhuma fatura vencida"}
                     valueTone={totals.overdue.count > 0 ? "text-rose-600" : undefined}
                     onClick={() => { onSectionChange("faturas"); onViewChange("atraso"); }}
+                    active={section === "faturas" && view === "atraso"}
                     money
                 />
                 <Item
@@ -169,6 +184,7 @@ export default function FaturasHub(props: Props) {
                     hint={totals.recurring.leases > 0 ? plural(totals.recurring.leases, "contrato com cobrança sua", "contratos com cobrança sua") : "nenhum contrato com cobrança do proprietário"}
                     title="O que os contratos em vigor cobram todo mês pelo proprietário (aluguel e encargos marcados como seus)"
                     onClick={() => onSectionChange("cobrancas")}
+                    active={section === "cobrancas"}
                     money
                 />
                 <Item

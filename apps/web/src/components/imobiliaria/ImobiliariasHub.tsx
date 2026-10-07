@@ -113,7 +113,6 @@ export default function ImobiliariasHub({ rows, loading, error, view, onViewChan
                         icon={<Building2 className="h-3.5 w-3.5" />} tone="text-emerald-600" label="Imobiliárias ativas"
                         value={String(totals.active)}
                         hint={totals.inactive > 0 ? plural(totals.inactive, "em rascunho ou suspensa", "em rascunho ou suspensas") : "nenhuma suspensa"}
-                        onClick={() => onViewChange("ativas")}
                     />
                     <Item
                         icon={<FileSignature className="h-3.5 w-3.5" />} tone="text-emerald-600" label="Contratos em vigor"

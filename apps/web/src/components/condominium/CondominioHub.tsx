@@ -98,7 +98,6 @@ export default function CondominioHub({ rows, loading, error, view, onViewChange
                         icon={<Building className="h-3.5 w-3.5" />} tone="text-emerald-600" label="Condomínios"
                         value={String(totals.condos)}
                         hint={`${plural(totals.units, "unidade", "unidades")}${totals.solarPayback > 0 ? ` · ${plural(totals.solarPayback, "conta como retorno solar", "contam como retorno solar")}` : ""}`}
-                        onClick={() => onViewChange("todos")}
                     />
                     <Item
                         icon={<DollarSign className="h-3.5 w-3.5" />} tone="text-emerald-600" label="Receita do mês" money
