@@ -7,7 +7,7 @@
  * they sit under "Antigos", with their contracts and contacts, as the history of each unit.
  */
 import React, { useMemo, useState } from "react";
-import { AlertCircle, Cake, CalendarClock, ChevronDown, ChevronUp, DollarSign, FileSignature, Loader2, Phone, Plus, Search, Users, X } from "lucide-react";
+import { AlertCircle, Cake, CalendarClock, ChevronDown, ChevronRight, ChevronUp, DollarSign, FileSignature, Loader2, Phone, Plus, Search, Users, X } from "lucide-react";
 import { Button } from "@kitnets/ui";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -30,6 +30,7 @@ interface Props {
 
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString("pt-BR")} ${n === 1 ? one : many}`;
 
+/** One KPI card. With `onClick` the whole card is a button with an arrow (only where a click opens something). */
 function Item({ icon, label, value, hint, tone, valueTone, onClick, title, money }: { icon: React.ReactNode; label: string; value: string; hint: React.ReactNode; tone: string; valueTone?: string; onClick?: () => void; title?: string; /** the figure is an amount in R$: value and hint get the class the dollar toggle blurs (components/privacy) */ money?: boolean }) {
     const Tag = onClick ? "button" : "div";
     return (
@@ -37,10 +38,11 @@ function Item({ icon, label, value, hint, tone, valueTone, onClick, title, money
             type={onClick ? "button" : undefined}
             onClick={onClick}
             title={title}
-            className={cn("flex min-w-0 flex-col gap-0.5 rounded-xl border border-border/80 bg-card px-4 py-3 text-left", onClick && "cursor-pointer transition-colors hover:border-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500")}
+            className={cn("flex min-w-0 flex-col gap-0.5 rounded-xl border border-border/80 bg-card px-4 py-3 text-left", onClick && "group cursor-pointer transition-colors hover:border-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500")}
         >
             <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                <span className={tone}>{icon}</span>{label}
+                <span className={tone}>{icon}</span><span className="min-w-0 flex-1">{label}</span>
+                {onClick && <ChevronRight className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" />}
             </span>
             <span className={cn("block break-words text-xl font-bold leading-tight", valueTone ?? "text-foreground", money && "privacy-money")}>{value}</span>
             <span className={cn("block break-words text-xs leading-snug text-muted-foreground", money && "privacy-money")}>{hint}</span>
@@ -107,7 +109,6 @@ export default function InquilinosHub({ rows, today, loading, error, view, onVie
                         icon={<Users className="h-3.5 w-3.5" />} tone="text-emerald-600" label="Inquilinos atuais"
                         value={String(totals.active)}
                         hint={<>{plural(totals.future, "futuro", "futuros")} · {plural(totals.former, "antigo", "antigos")}</>}
-                        onClick={() => onViewChange("atuais")}
                     />
                     <Item
                         icon={<DollarSign className="h-3.5 w-3.5" />} tone="text-emerald-600" label="Aluguel dos atuais"
@@ -121,6 +122,7 @@ export default function InquilinosHub({ rows, today, loading, error, view, onVie
                         value={totals.avgMonths !== null ? monthsLabel(totals.avgMonths) : "—"}
                         hint={totals.longest ? <>média dos atuais<br />mais antigo: {totals.longest.row.tenant.full_name.split(" ")[0]} · {monthsLabel(totals.longest.months)}</> : "informe as datas de entrada"}
                         onClick={totals.longest ? () => onOpen(totals.longest!.row) : undefined}
+                        title={totals.longest ? `Abrir ${totals.longest.row.tenant.full_name}, o inquilino mais antigo` : undefined}
                     />
                     <Item
                         icon={<Cake className="h-3.5 w-3.5" />} tone="text-amber-600" label="Aniversários"

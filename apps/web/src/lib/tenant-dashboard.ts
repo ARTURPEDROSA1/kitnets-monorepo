@@ -176,6 +176,7 @@ export interface TenantHubTotals {
     rentCount: number;
     /** average months living, over the current tenants with a start date */
     avgMonths: number | null;
+    /** the current tenant who moved in first (the earliest `since`) and their months living */
     longest: { row: TenantRow; months: number } | null;
     /** current tenants without a contract in force */
     withoutLease: number;
@@ -190,8 +191,9 @@ export interface TenantHubTotals {
 export function tenantHubTotals(rows: TenantRow[]): TenantHubTotals {
     const active = rows.filter(r => r.status === "ACTIVE");
     const withMonths = active.filter(r => r.monthsLiving !== null);
+    // Who arrived first, by the day: whole months tie too often (20/12/2024 and 06/01/2025 are both 21 months on 07/10/2026)
     let longest: TenantHubTotals["longest"] = null;
-    for (const r of withMonths) if (!longest || (r.monthsLiving ?? 0) > longest.months) longest = { row: r, months: r.monthsLiving ?? 0 };
+    for (const r of withMonths) if (!longest || r.since! < longest.row.since!) longest = { row: r, months: r.monthsLiving ?? 0 };
     // One contract can carry several people (a co-tenant, an occupant): its rent counts once.
     const rentByLease = new Map<string, number>();
     for (const r of active) if (r.current) rentByLease.set(r.current.id, Number(r.current.monthly_rent) || 0);

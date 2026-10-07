@@ -126,6 +126,16 @@ describe("tenantRows", () => {
         expect(t.longest?.row.tenant.id).toBe("t4");
     });
 
+    it("names as the oldest tenant the one who moved in first, not the first of a tie in whole months", () => {
+        const pair = tenantRows(
+            [tenant({ id: "luiz", move_in_date: "2025-01-06" }), tenant({ id: "robson", full_name: "Robson Soares Mesquita", move_in_date: "2024-12-20" })],
+            [],
+            "2026-10-07"
+        );
+        expect(pair.map(r => r.monthsLiving)).toEqual([21, 21]);
+        expect(tenantHubTotals(pair).longest).toMatchObject({ row: { tenant: { id: "robson" } }, months: 21 });
+    });
+
     it("lists what deserves a look, most pressing first", () => {
         const items = tenantAttention(rows, TODAY);
         expect(items.map(i => `${i.kind}:${i.row.tenant.id}`)).toEqual([
