@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addMonthsClamped, dueDateInMonth, formatDateBR, nextOccurrence, parseISODateLocal, toISODate } from "./dates";
+import { addMonthsClamped, dueDateInMonth, dueInDaysText, formatDateBR, nextOccurrence, parseISODateLocal, toISODate } from "./dates";
 
 describe("formatDateBR", () => {
     it("shows a date-only string on its own day regardless of timezone", () => {
@@ -70,5 +70,23 @@ describe("dueDateInMonth", () => {
         expect(toISODate(dueDateInMonth(2026, 3, 31))).toBe("2026-04-30");
         expect(toISODate(dueDateInMonth(2026, 1, 30))).toBe("2026-02-28");
         expect(toISODate(dueDateInMonth(2026, 0, 10))).toBe("2026-01-10");
+    });
+});
+
+describe("dueInDaysText", () => {
+    it("says exactly how many days each has left, nearest first", () => {
+        expect(dueInDaysText([13])).toBe("1 vence em 13 dias");
+        expect(dueInDaysText([45, 13])).toBe("2 vencem em 13 e 45 dias");
+        expect(dueInDaysText([80, 13, 45])).toBe("3 vencem em 13, 45 e 80 dias");
+    });
+    it("says today and tomorrow in words", () => {
+        expect(dueInDaysText([0])).toBe("1 vence hoje");
+        expect(dueInDaysText([1])).toBe("1 vence amanhã");
+        expect(dueInDaysText([45, 0, 1])).toBe("3 vencem hoje, amanhã e em 45 dias");
+    });
+    it("shows the nearest three past four, and nothing for none", () => {
+        expect(dueInDaysText([5, 10, 20, 30, 60])).toBe("5 vencem em 5, 10 e 20 dias (+2)");
+        expect(dueInDaysText([])).toBe("");
+        expect(dueInDaysText([13], { one: "termina", many: "terminam" })).toBe("1 termina em 13 dias");
     });
 });

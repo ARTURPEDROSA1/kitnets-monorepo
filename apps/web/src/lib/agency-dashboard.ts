@@ -200,6 +200,8 @@ export interface AgencyHubTotals {
     agentsLinked: number;
     withAgreement: number;
     agreementsExpiring: number;
+    /** the days left of each expiring agreement, nearest first (lib/dates.ts dueInDaysText) */
+    agreementsExpiringDays: number[];
     agreementsExpired: number;
     /** active agencies without phone or e-mail */
     withoutContact: number;
@@ -235,6 +237,7 @@ export function agencyHubTotals(rows: AgencyRow[]): AgencyHubTotals {
         agentsLinked: agentIds.size,
         withAgreement: rows.filter(r => r.agreement.hasFile).length,
         agreementsExpiring: rows.filter(r => r.agreement.expiring).length,
+        agreementsExpiringDays: rows.filter(r => r.agreement.expiring && r.agreement.daysToEnd !== null).map(r => r.agreement.daysToEnd as number).sort((a, b) => a - b),
         agreementsExpired: rows.filter(r => r.agreement.expired).length,
         withoutContact: active.filter(r => !r.hasContact).length,
         idle: active.filter(r => r.inForce.length === 0 && r.activeTenants === 0).length,

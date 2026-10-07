@@ -77,3 +77,22 @@ export function nextOccurrence(startISO: string, everyMonths: number, today: Dat
 export function dueDateInMonth(year: number, monthIndex: number, dueDay: number): Date {
     return new Date(year, monthIndex, Math.min(Math.max(1, dueDay), daysInMonth(year, monthIndex)));
 }
+
+/**
+ * How many things end, and exactly when: "1 vence em 13 dias", "2 vencem em 13 e 45 dias", "1 vence hoje",
+ * "3 vencem hoje, amanhã e em 45 dias" — the days left of each, nearest first, never a vague "em 90 dias".
+ * Past four, the nearest three and "+N". `days` are whole days from today (≥ 0); empty → "".
+ */
+export function dueInDaysText(days: number[], verb: { one: string; many: string } = { one: "vence", many: "vencem" }): string {
+    const sorted = days.filter(d => Number.isFinite(d) && d >= 0).map(d => Math.round(d)).sort((a, b) => a - b);
+    if (sorted.length === 0) return "";
+    const shown = sorted.length > 4 ? sorted.slice(0, 3) : sorted;
+    const more = sorted.length - shown.length;
+    const list = (items: string[]) => (items.length <= 1 ? items.join("") : `${items.slice(0, -1).join(", ")} e ${items[items.length - 1]}`);
+    const special = shown.filter(d => d <= 1).map(d => (d === 0 ? "hoje" : "amanhã"));
+    const counted = shown.filter(d => d > 1);
+    const inDays = counted.length > 0 ? `em ${list(counted.map(String))} ${counted.length === 1 && counted[0] === 1 ? "dia" : "dias"}` : "";
+    const when = special.length > 0 && inDays ? list([...special, inDays]) : special.length > 0 ? list(special) : inDays;
+    const n = sorted.length;
+    return `${n.toLocaleString("pt-BR")} ${n === 1 ? verb.one : verb.many} ${when}${more > 0 ? ` (+${more})` : ""}`;
+}

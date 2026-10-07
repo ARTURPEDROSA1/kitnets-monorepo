@@ -265,6 +265,8 @@ export interface HubTotals {
     counted: number;
     /** in force and ending within 90 days */
     ending90: number;
+    /** the days left of each of those, nearest first (lib/dates.ts dueInDaysText) */
+    endingSoonDays: number[];
     /** in force with the term already over */
     overdueTerm: number;
     /** Σ monthly rent of the contracts in force (a closed contract no longer brings rent in) */
@@ -316,6 +318,7 @@ export function hubTotals(rows: LeaseRow[], today: string, opts: { countAll?: bo
     const counted = opts.countAll ? rows : inForce;
     let nextEnd: HubTotals["nextEnd"] = null;
     let nextAdjustment: HubTotals["nextAdjustment"] = null;
+    const endingSoonDays: number[] = [];
     let ending90 = 0, overdueTerm = 0, adjustments90 = 0, deposits = 0, depositsCount = 0, depositsAgency = 0, depositsAgencyCount = 0;
 
     for (const row of inForce) {
@@ -324,7 +327,10 @@ export function hubTotals(rows: LeaseRow[], today: string, opts: { countAll?: bo
             const days = daysBetween(today, end);
             if (days < 0) overdueTerm++;
             else {
-                if (days <= 90) ending90++;
+                if (days <= 90) {
+                    ending90++;
+                    endingSoonDays.push(days);
+                }
                 if (!nextEnd || end < nextEnd.date) nextEnd = { row, date: end, days };
             }
         }
@@ -356,6 +362,7 @@ export function hubTotals(rows: LeaseRow[], today: string, opts: { countAll?: bo
         inForce: inForce.length,
         counted: counted.length,
         ending90,
+        endingSoonDays: endingSoonDays.sort((a, b) => a - b),
         overdueTerm,
         contractedRent: round2(inForce.reduce((s, r) => s + (Number(r.lease.monthly_rent) || 0), 0)),
         nextEnd,

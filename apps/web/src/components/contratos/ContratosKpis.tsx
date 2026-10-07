@@ -13,7 +13,7 @@
 import React from "react";
 import { AlertTriangle, Banknote, CalendarClock, ChevronRight, DollarSign, DoorOpen, FileCheck2, FileSignature, FileWarning, MapPin, PiggyBank, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatDateBR } from "@/lib/dates";
+import { dueInDaysText, formatDateBR } from "@/lib/dates";
 import { Money } from "@/components/privacy";
 import { brl, type ContractGroup, type ContractGroupKey, type HubTotals, type LeaseRow } from "@/lib/lease-dashboard";
 
@@ -159,7 +159,7 @@ export default function ContratosKpis({ totals, groups, filtered, allCount, onOp
                     </Line>
                     {totals.overdueTerm > 0
                         ? <Line swatch={<AlertTriangle className="h-3 w-3 text-rose-600" />} className="text-rose-600">{plural(totals.overdueTerm, "com o prazo vencido", "com o prazo vencido")}</Line>
-                        : totals.ending90 > 0 ? <Line swatch={<AlertTriangle className="h-3 w-3 text-amber-600" />} className="text-amber-700">{plural(totals.ending90, "vence", "vencem")} em 90 dias</Line> : null}
+                        : totals.ending90 > 0 ? <Line swatch={<AlertTriangle className="h-3 w-3 text-amber-600" />} className="text-amber-700">{dueInDaysText(totals.endingSoonDays)}</Line> : null}
                 </span>
             </Kpi>
 

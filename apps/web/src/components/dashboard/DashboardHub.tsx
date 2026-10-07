@@ -16,7 +16,7 @@ import Tile, { TILE_TONES, type TileTone } from "@/components/properties/Tile";
 import { monthLabel } from "@/lib/condominium-hub";
 import { MODULE_META, isEmptyPortfolio, type DashboardAttentionItem, type DashboardTone, type DashboardTotals } from "@/lib/dashboard-hub";
 import type { DashboardLoader, DashboardView } from "@/lib/dashboard-views";
-import { formatDateBR } from "@/lib/dates";
+import { dueInDaysText, formatDateBR } from "@/lib/dates";
 import { brl } from "@/lib/lease-dashboard";
 import { monthsLabel } from "@/lib/tenant-dashboard";
 import { cn } from "@/lib/utils";
@@ -250,7 +250,7 @@ export default function DashboardHub({ base, view, totals, attention, loading, e
                             figures={[
                                 { label: "Em vigor", value: totals.contracts.inForce, hint: totals.contracts.overdueTerm > 0 ? <span className="text-rose-600">{plural(totals.contracts.overdueTerm, "com prazo vencido", "com prazo vencido")}</span> : `${totals.contracts.total} no total` },
                                 { label: "Aluguel contratado", value: `${brl(totals.contracts.contractedRent, 0)}/mês`, money: true, hint: <><Money>{brl(totals.contracts.contractedRent * 12, 0)}</Money> por ano</> },
-                                { label: "Próximo término", value: totals.contracts.nextEnd ? formatDateBR(totals.contracts.nextEnd.date) : "—", hint: totals.contracts.nextEnd ? `em ${plural(totals.contracts.nextEnd.days, "dia", "dias")} · ${totals.contracts.ending90} nos próximos 90 dias` : "nenhum término à vista" },
+                                { label: "Próximo término", value: totals.contracts.nextEnd ? formatDateBR(totals.contracts.nextEnd.date) : "—", hint: totals.contracts.nextEnd ? (totals.contracts.endingSoonDays.length > 0 ? dueInDaysText(totals.contracts.endingSoonDays) : `em ${plural(totals.contracts.nextEnd.days, "dia", "dias")}`) : "nenhum término à vista" },
                                 { label: "Caução em mãos", value: brl(totals.contracts.deposits, 0), money: true, hint: `${plural(totals.contracts.depositsCount, "contrato com caução", "contratos com caução")}` },
                             ]}
                         />
