@@ -1,6 +1,6 @@
 # Inquilinos (Tenants) Module
 
-**Version:** 1.2  
+**Version:** 1.3  
 **Last updated:** 2026-09-25  
 **Author:** Kitnets Engineering  
 
@@ -93,7 +93,7 @@ apps/web/src/
 │   ├── TenantSquareCard.tsx             # One card per tenant (photo cover, occupation, place, rent, contact icons)
 │   ├── TenantDashboard.tsx              # One tenant: photo, contact chips, tiles, rent chart, contracts, ficha
 │   ├── TenantPhoto.tsx                  # Round avatar with upload / remove
-│   └── TenantForm.tsx                   # Create / edit form (occupation and social links included)
+│   └── TenantForm.tsx                   # Create / edit form: six numbered sections + the tenant's card beside
 ├── lib/
 │   ├── tenant-dashboard.ts (+ test)     # Pure maths: status meta, views, rows (place, rent, time living, birthday), totals, attention
 │   ├── tenant-views.ts                  # The list / dashboard view types (client-safe)
@@ -480,7 +480,7 @@ Three screens: the **hub** (`/inquilinos`), one tenant's **dashboard** (`?id=<te
 
 ### 6.5 TenantForm
 
-`components/inquilinos/TenantForm.tsx` — the seven sections: Informações Pessoais (with **Profissão / ocupação**), **Redes sociais** (Instagram as @handle or URL, LinkedIn URL — normalised by `lib/social-links.ts`), Endereço Atual (CEP auto-fill), Imóvel Associado, Gestão, Ocupação do imóvel (entry, exit, status Atual / Futuro / Antigo) and Informações Adicionais. The photo is not in the form: it is uploaded on the dashboard, where a saved tenant lands.
+`components/inquilinos/TenantForm.tsx` — the same shape as the contract form (`LeaseForm`): six numbered, colour-coded sections always open — **Quem é** (name, CPF, RG, birth date with the age, occupation), **Contato** (WhatsApp, other phone, e-mail, Instagram as @handle or URL, LinkedIn URL — normalised by `lib/social-links.ts`, inputs with icons), **Moradia** (property, situação Atual / Futuro / Antigo as buttons, entry date, exit date shown for a former tenant or when filled), **Administração** (Gestão própria / Imobiliária cards, agency, corretor), **Endereço atual** ("Mora no imóvel alugado" switch, else CEP auto-fill) and **Emergência e observações** — beside a sticky preview of the tenant's card (initials, status pill, which contacts are filled, property, time living, management, CPF under the eye toggle), the required-fields checklist and the save buttons; on a phone the card follows the form. The photo is not in the form: it is uploaded on the dashboard, where a saved tenant lands.
 
 ---
 
@@ -658,3 +658,4 @@ Since v1.2 the tenant screens read the leases: `loadTenantLeases` (`lib/tenant-v
 | 2026-09-02 | 1.0 | Initial implementation: full CRUD, search/filter, form with 6 sections, soft delete |
 | 2026-09-02 | 1.1 | Date fields changed from `type="date"` to DD/MM/YYYY masked text inputs; email made optional |
 | 2026-09-25 | 1.2 | Redesign: hub with KPI strip, "Atenção" list, views in the URL and one card per tenant with the photo as the cover and contact icons (WhatsApp, phone, e-mail, Instagram, LinkedIn); tenant dashboard (`?id=`) with tiles, the rent month by month, every contract (old ones included) and the ficha; profile fields `occupation`, `instagram`, `linkedin`, `photo_path` (migration `20260925160000_tenant_profile_fields`, private `tenant-photos` bucket); `GET /api/tenants/[id]/dashboard`, `POST/DELETE /api/tenants/[id]/photo`; the form moved to `TenantForm.tsx`; `TenantProfileCard` retired; former tenants kept as a view |
+| 2026-10-07 | 1.3 | Form redesign (`TenantForm`): numbered colour-coded sections like the contract form, situação as buttons, address switch, the tenant's card with the required-fields checklist and the save buttons in a sticky column; a tenant's status follows their contracts (`lib/tenant-status.ts`, PR #277); the hub's "mais antigo" is the earliest move-in and only cards that open something are clickable (PR #278) |
