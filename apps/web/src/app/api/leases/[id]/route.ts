@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/api-route";
 import { leaseInputSchema } from "@/lib/schemas/lease";
-import { CLOSED, IN_FORCE } from "@/lib/lease-dashboard";
+import { CLOSED, IN_FORCE, todayBRT } from "@/lib/lease-dashboard";
+import { leaseTenantIds, syncTenantStatus } from "@/lib/tenant-status-server";
 import type { LeaseStatus } from "@/types/lease";
 import {
     LEASE_DOCUMENTS_BUCKET,
@@ -52,7 +53,8 @@ export const GET = withAuth<undefined, Params>({ tag: "Lease GET" }, async ({ pa
 
 /**
  * PUT /api/leases/[id]
- * Updates a lease and replaces its additional tenants and charges.
+ * Updates a lease and replaces its additional tenants and charges. The status of its tenants, and of
+ * any taken off it, follows (lib/tenant-status.ts).
  */
 export const PUT = withAuth<typeof leaseInputSchema, Params>(
     { body: leaseInputSchema, tag: "Lease PUT" },
@@ -62,6 +64,7 @@ export const PUT = withAuth<typeof leaseInputSchema, Params>(
         const warning = await activeLeaseWarning(supabase, profileId, body.lease, params.id);
         // a closed contract made active again runs on as before: the end that closed it (and any notice) goes away
         const reopened = CLOSED.has(current.status as LeaseStatus) && IN_FORCE.has(body.lease.status as LeaseStatus);
+        const tenantsBefore = await leaseTenantIds(supabase, [params.id]);
 
         const { data: lease, error } = await supabase
             .from("leases")
@@ -76,6 +79,11 @@ export const PUT = withAuth<typeof leaseInputSchema, Params>(
         }
 
         await writeLeaseChildren(supabase, profileId, params.id, body, { replace: true, tag: "Lease PUT" });
+        await syncTenantStatus(
+            supabase,
+            [...tenantsBefore, body.lease.primary_tenant_id, ...body.additional_tenants.map((t) => t.tenant_id)],
+            { today: todayBRT() }
+        );
 
         return NextResponse.json({ lease, warning });
     }

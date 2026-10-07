@@ -3,6 +3,8 @@ import { withAuth } from "@/lib/api-route";
 import { leaseInputSchema } from "@/lib/schemas/lease";
 import { activeLeaseWarning, assertLeaseRelations, writeLeaseChildren } from "@/lib/leases-server";
 import { loadLeaseRows, loadPropertyKinds, withRealizedMonths } from "@/lib/lease-views-server";
+import { syncTenantStatus } from "@/lib/tenant-status-server";
+import { todayBRT } from "@/lib/lease-dashboard";
 
 /**
  * GET /api/leases
@@ -25,6 +27,8 @@ export const GET = withAuth({ tag: "Leases GET" }, async ({ profileId, supabase 
 /**
  * POST /api/leases
  * Creates a lease with its additional tenants and charges. Validation: lib/schemas/lease.ts.
+ * Its tenants' status follows (lib/tenant-status.ts): an old contract imported as closed leaves its
+ * tenants among the former ones, a contract in force brings a former tenant back.
  */
 export const POST = withAuth({ body: leaseInputSchema, tag: "Leases POST" }, async ({ body, profileId, supabase }) => {
     const { unit_name } = await assertLeaseRelations(supabase, profileId, body.lease);
@@ -42,6 +46,7 @@ export const POST = withAuth({ body: leaseInputSchema, tag: "Leases POST" }, asy
     }
 
     await writeLeaseChildren(supabase, profileId, lease.id, body, { tag: "Leases POST" });
+    await syncTenantStatus(supabase, [body.lease.primary_tenant_id, ...body.additional_tenants.map((t) => t.tenant_id)], { today: todayBRT() });
 
     return NextResponse.json({ lease, warning }, { status: 201 });
 });

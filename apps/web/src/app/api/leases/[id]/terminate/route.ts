@@ -4,6 +4,7 @@ import { leaseTerminationSchema } from "@/lib/schemas/lease";
 import { loadOwnedLease } from "@/lib/leases-server";
 import { IN_FORCE, todayBRT } from "@/lib/lease-dashboard";
 import { dropAdjustmentsFrom } from "@/lib/lease-adjustments-server";
+import { leaseTenantIds, syncTenantStatus } from "@/lib/tenant-status-server";
 import type { LeaseStatus } from "@/types/lease";
 
 type Params = { id: string };
@@ -20,12 +21,13 @@ const fmt = (iso: string) => iso.slice(0, 10).split("-").reverse().join("/");
  *   adjustment from the notice date on: the calculated ones recorded since go, the amounts go back.
  *   Sent again, it changes the notice.
  * - Today or a day behind ends it now: `status` TERMINATED (rescinded, the default) or EXPIRED (a contract
- *   that ran its term and ended that day: an old contract imported with its closing date).
+ *   that ran its term and ended that day: an old contract imported with its closing date). Its tenants
+ *   with no other contract in force move to the former ones, out on that day (lib/tenant-status.ts).
  */
 export const POST = withAuth<typeof leaseTerminationSchema, Params>(
     { body: leaseTerminationSchema, tag: "Lease Terminate" },
     async ({ body, params, profileId, supabase }) => {
-        const lease = await loadOwnedLease(supabase, params.id, profileId, "id, status, notes, start_date");
+        const lease = await loadOwnedLease(supabase, params.id, profileId, "id, status, notes, start_date, end_date");
         const status = lease.status as LeaseStatus;
         const today = todayBRT();
 
@@ -81,6 +83,9 @@ export const POST = withAuth<typeof leaseTerminationSchema, Params>(
             console.error("[Lease Terminate] Update error:", error);
             return NextResponse.json({ error: "Erro ao rescindir contrato." }, { status: 500 });
         }
+
+        // a move-out day the tenant took from this contract's term (imported closed) gives way to the real one
+        await syncTenantStatus(supabase, await leaseTenantIds(supabase, [params.id]), { today, termOf: (lease.end_date as string | null) ?? null });
 
         return NextResponse.json({ lease: updated, message: body.status === "EXPIRED" ? "Encerramento registrado." : "Contrato rescindido com sucesso." });
     }

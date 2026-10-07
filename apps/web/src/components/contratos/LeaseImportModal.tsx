@@ -289,6 +289,8 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
     const askStatus = !!settleLease && settleLease.askStatus !== false;
     /** only where this screen creates the lease can it record the day it ended */
     const askClosing = askStatus && !!createsLease && leaseStatus === 'EXPIRED';
+    /** the lease created here is closed (Encerrado, or past its term where nobody asks): its new tenants already moved out */
+    const closesLease = !!createsLease && (askStatus ? leaseStatus === 'EXPIRED' : termOver);
 
     /** The closing term: kept to attach to the lease, and read by the AI for the day the property came back. */
     const pickTerm = async (file: File | null) => {
@@ -618,7 +620,9 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                     agency_id: finalAgencyId || null,
                     agent_id: finalAgentId || null,
                     move_in_date: data.lease.start_date,
-                    status: 'ACTIVE',
+                    // an old contract: a former tenant, out on the day it ended (the return of the property, else its term)
+                    status: closesLease ? 'FORMER' : 'ACTIVE',
+                    move_out_date: closesLease ? (askClosing && closingDate ? closingDate : data.lease.end_date) : null,
                 });
                 const created = json.tenant as { id: string } | undefined;
                 if (!ok || !created) {
@@ -1264,7 +1268,7 @@ export default function LeaseImportModal({ properties, agencies, onClose, onManu
                                             ) : (
                                                 <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs text-foreground">
                                                     <input type="checkbox" checked={t.create} disabled={applying} onChange={e => updateTenant(idx, { create: e.target.checked })} />
-                                                    Cadastrar em Inquilinos
+                                                    {closesLease ? 'Cadastrar em Inquilinos como antigo' : 'Cadastrar em Inquilinos'}
                                                 </label>
                                             )}
                                         </div>
