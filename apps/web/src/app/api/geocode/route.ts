@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/api-route";
-import { loadMapPins } from "@/lib/dashboard-views-server";
+import { loadMapPins } from "@/lib/map-pins-server";
 import { geocodeMissing } from "@/lib/geocode-server";
 import { HOUR } from "@/lib/rate-limit";
 
@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
  * Geocodes up to 25 of the account's addresses still missing from the cache (rental properties, live
  * projects, agencies with a contract in force) and returns the map pins again. The addresses come from
  * the account's own registers, never from the request, so nothing can be geocoded on someone's behalf.
- * The dashboard asks at most three times per visit; 10 calls per user per hour (≤ 250 lookups) keeps the
+ * 10 calls per user per hour (≤ 250 lookups) keeps the
  * paid geocoder within reason — the total across accounts is bounded by the Geocoding API's daily quota
  * in the Cloud console (docs/DASHBOARD_MODULE.md §5).
  */

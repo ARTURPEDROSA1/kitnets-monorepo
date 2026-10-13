@@ -2,7 +2,7 @@
  * Interface preferences kept in the user's account (`user_ui_preferences`), so they follow the user to any
  * device. Pure helpers shared by the API route and the client.
  *
- * Seven kinds today, four per table (and per kind of property where the table differs by it):
+ * Eight kinds today, four per table (and per kind of property where the table differs by it):
  *   hidden-columns:<table>[:<variant>]   string[] of column keys           e.g. ["energy", "received"]
  *   column-widths:<table>[:<variant>]    { <column>: px }                  e.g. { notes: 320 }  (dragged header edges)
  *   sort:<table>[:<variant>]             { key, dir }                      e.g. { key: "due_on", dir: "asc" }
@@ -10,6 +10,7 @@
  *   sidebar:collapsed-groups             string[] of menu group keys       e.g. ["contabil"]  (lib/sidebar-groups.ts)
  *   notifications:owner                  { marketing, security }           what the owner wants to receive (/proprietario)
  *   view:<page>                          "lista" | "linha" …               how a page shows its records (Contratos: table or timeline)
+ *   seen:<page>                          ISO timestamp                     what the user has already seen there (Dashboard: payments up to it are not "novo")
  *
  * Hidden columns, widths and sort are how the user wants a kind of table to look, so they are per table. Filters
  * are a question asked of one property's (or one investment's) rows, so they are per record: a filter on
@@ -23,6 +24,7 @@ export const FILTERS_PREFIX = "filters:";
 export const SIDEBAR_PREFIX = "sidebar:";
 export const NOTIFICATIONS_PREFIX = "notifications:";
 export const VIEW_PREFIX = "view:";
+export const SEEN_PREFIX = "seen:";
 /** the one sidebar setting today: the menu groups the user collapsed */
 export const SIDEBAR_GROUPS_KEY = "collapsed-groups";
 
@@ -99,6 +101,17 @@ const VIEW_MODE = /^[a-z][a-z0-9-]{0,19}$/;
 /** A page's view as stored: a short slug ("lista", "linha"); null for anything else. The page decides which it knows. */
 export function sanitizeViewMode(value: unknown): string | null {
     return typeof value === "string" && VIEW_MODE.test(value) ? value : null;
+}
+
+/** Preference key of what the user has seen on a page (`seen:dashboard`), or null when the name is not acceptable. */
+export const seenPrefKey = (page: string) => prefKeyOf(SEEN_PREFIX, page);
+/** `seen:dashboard` → `dashboard`; null for any other key. */
+export const tableKeyFromSeenPrefKey = (prefKey: string) => tableKeyOf(SEEN_PREFIX, prefKey);
+
+const TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/;
+/** A moment as stored: an ISO timestamp the way the database writes it ("2026-10-12T15:22:01.123+00:00"); null for anything else. */
+export function sanitizeSeenAt(value: unknown): string | null {
+    return typeof value === "string" && TIMESTAMP.test(value) && !Number.isNaN(Date.parse(value)) ? value : null;
 }
 
 /** A clean list of column keys (no duplicates, no junk), or null when the value is not a list of them. */

@@ -1,342 +1,470 @@
 "use client";
 
 /**
- * The dashboard: the headline figures of the whole portfolio, the map, the merged attention list and one
- * card per module with its own figures. It only reads: adding a property or importing a contract happens
- * in Imóveis. Everything is computed by lib/dashboard-hub.ts; this file only renders. A figure whose
- * loader failed reads "—" and says so, never zero.
+ * The dashboard answers one question first: did this month's rent come in? A four-part strip (due, in,
+ * ahead, overdue) over the month's rents, shown as a board (a spreadsheet in due-date order) or as a
+ * calendar; beside it the month's bills and instalments, the contract dates ahead and the result of the
+ * last closed month; under it the portfolio. Receipts posted since the last visit stay lit for this visit.
+ * It only reads: everything opens in its own hub. The maths is lib/dashboard-hub.ts; this file renders.
+ * A figure whose loader failed reads "—" and says so, never zero.
  */
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertCircle, ArrowRight, Building, Building2, CheckCircle2, ChevronDown, ChevronUp, Droplets, FileSignature, HardHat, Home, Landmark, LayoutDashboard, Loader2, Receipt, UserCheck, Users, Wallet, Zap } from "lucide-react";
+import { AlertCircle, ArrowRight, CalendarDays, ChevronLeft, ChevronRight, HelpCircle, Home, Rows3, Wallet } from "lucide-react";
 import { Button } from "@kitnets/ui";
-import PortfolioMap, { type GeocodeStatus } from "@/components/dashboard/PortfolioMap";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Money } from "@/components/privacy";
-import Tile, { TILE_TONES, type TileTone } from "@/components/properties/Tile";
-import { monthLabel } from "@/lib/condominium-hub";
-import { MODULE_META, isEmptyPortfolio, type DashboardAttentionItem, type DashboardTone, type DashboardTotals } from "@/lib/dashboard-hub";
-import type { DashboardLoader, DashboardView } from "@/lib/dashboard-views";
-import { dueInDaysText, formatDateBR } from "@/lib/dates";
-import { brl } from "@/lib/lease-dashboard";
-import { monthsLabel } from "@/lib/tenant-dashboard";
 import { cn } from "@/lib/utils";
+import { formatDateBR } from "@/lib/dates";
+import { brl } from "@/lib/lease-dashboard";
+import { addMonths } from "@/lib/energy-hub";
+import {
+    contractDates, contractedRent, freshRentIds, isEmptyPortfolio, latestConfirmedMonth, leaseRowsOf, monthOutflows, monthRents, monthResult, occupancyOf, rentTotals,
+    type MonthEvent, type MonthResult, type RentTotals,
+} from "@/lib/dashboard-hub";
+import type { DashboardLoader, DashboardView } from "@/lib/dashboard-views";
+import RentBoard from "./RentBoard";
+import RentCalendar, { EVENT_META } from "./RentCalendar";
+import { INK } from "./ink";
+
+export type BoardMode = "quadro" | "calendario";
 
 interface Props {
     /** "" for Portuguese, "/en" | "/es" otherwise */
     base: string;
     view: DashboardView | null;
-    totals: DashboardTotals | null;
-    attention: DashboardAttentionItem[];
+    today: string;
+    /** `YYYY-MM` shown */
+    month: string;
+    /** the months that can be shown, oldest first */
+    months: string[];
+    onMonth: (month: string) => void;
+    mode: BoardMode;
+    onMode: (mode: BoardMode) => void;
+    /** what the previous visit had seen (`seen:dashboard`); null on a first visit or before it loads */
+    seenAt: string | null;
     loading: boolean;
     error: string | null;
-    mapsApiKey: string | null;
-    mapId: string | null;
-    geocodeStatus: GeocodeStatus;
-    onOpen: (href: string) => void;
 }
 
+const MONTH_NAMES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+const monthName = (m: string) => MONTH_NAMES[Number(m.slice(5, 7)) - 1] ?? m;
+const monthLong = (m: string) => `${monthName(m)} de ${m.slice(0, 4)}`;
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString("pt-BR")} ${n === 1 ? one : many}`;
 const pct1 = (v: number | null) => (v === null ? "—" : `${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`);
-const kwh = (v: number) => `${Math.round(v).toLocaleString("pt-BR")} kWh`;
-const m3 = (v: number) => `${v.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} m³`;
-/** An attention sentence that quotes an amount (the modules build them in lib/*): the dollar toggle hides the whole sentence. */
-const hasAmount = (text: string) => /R\$\s?\d/.test(text);
-const DOT: Record<DashboardTone, string> = { rose: "bg-rose-500", amber: "bg-amber-500", sky: "bg-sky-500", emerald: "bg-emerald-500", slate: "bg-slate-400" };
+const ddmm = (d: string) => formatDateBR(d).slice(0, 5);
+const hatch = (rgb: string): React.CSSProperties => ({ backgroundImage: `repeating-linear-gradient(135deg, rgba(${rgb},0.7) 0 4px, rgba(${rgb},0.25) 4px 8px)` });
+
 const LOADER_LABELS: Record<DashboardLoader, string> = {
-    properties: "imóveis", income: "receitas", leases: "contratos", tenants: "inquilinos", agents: "corretores", agencies: "imobiliárias",
-    energy: "energia", water: "água", condominiums: "condomínio", projects: "projetos", taxes: "tributos", invoices: "faturas", map: "mapa",
+    properties: "imóveis", income: "receitas", leases: "contratos", tenants: "inquilinos", energy: "energia", water: "água", projects: "projetos", taxes: "tributos", invoices: "faturas",
 };
 
-interface Figure {
-    label: string;
-    value: React.ReactNode;
-    hint?: React.ReactNode;
-    title?: string;
-    /** the figure is an amount in R$ (hidden by the dollar toggle); amounts inside `hint` are wrapped in <Money> by the caller */
-    money?: boolean;
-}
+// ── The strip ────────────────────────────────────────────────────────
 
-function ModuleCard({ icon, tone, title, href, base, figures, note, unavailable }: { icon: React.ReactNode; tone: TileTone; title: string; href: string; base: string; figures: Figure[]; note?: React.ReactNode; unavailable?: boolean }) {
+function Segment({ dot, label, figure, tone, children }: { dot: string; label: string; figure: React.ReactNode; tone?: string; children: React.ReactNode }) {
     return (
-        <section className="flex flex-col rounded-xl border border-border/80 bg-card">
-            <header className="flex items-center justify-between gap-2 border-b border-border/60 px-4 py-2.5">
-                <h3 className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
-                    <span className={cn("shrink-0 rounded-lg p-1.5", TILE_TONES[tone])}>{icon}</span>
-                    {title}
-                </h3>
-                <Link href={`${base}${href}`} className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400">
-                    Abrir <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
-            </header>
-            {unavailable ? (
-                <p className="flex items-center gap-2 px-4 py-4 text-xs text-rose-600"><AlertCircle className="h-3.5 w-3.5 shrink-0" /> Não foi possível carregar estes dados.</p>
-            ) : (
-                <dl className="grid flex-1 grid-cols-2 gap-x-3 gap-y-3 px-4 py-3">
-                    {figures.map(f => (
-                        <div key={f.label} className="min-w-0" title={f.title}>
-                            <dt className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{f.label}</dt>
-                            <dd className={cn("break-words text-base font-bold leading-tight tabular-nums text-foreground", f.money && "privacy-money")}>{f.value}</dd>
-                            {f.hint && <dd className="break-words text-[11px] leading-snug text-muted-foreground">{f.hint}</dd>}
-                        </div>
-                    ))}
-                </dl>
-            )}
-            {note && !unavailable && <p className="border-t border-border/60 px-4 py-2 text-[11px] leading-snug text-muted-foreground">{note}</p>}
-        </section>
-    );
-}
-
-function AttentionPanel({ items, base }: { items: DashboardAttentionItem[]; base: string }) {
-    const [all, setAll] = useState(false);
-    const shown = all ? items : items.slice(0, 6);
-    return (
-        <section className="flex flex-col rounded-xl border border-border/80 bg-card">
-            <header className="flex items-center justify-between gap-2 border-b border-border/60 px-4 py-2.5">
-                <h2 className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground">
-                    <AlertCircle className="h-4 w-4 text-amber-600" /> Atenção <span className="text-xs font-normal text-muted-foreground">({items.length})</span>
-                </h2>
-                {items.length > 6 && (
-                    <button type="button" onClick={() => setAll(v => !v)} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-                        {all ? <>menos <ChevronUp className="h-3.5 w-3.5" /></> : <>ver todos <ChevronDown className="h-3.5 w-3.5" /></>}
-                    </button>
-                )}
-            </header>
-            {items.length === 0 ? (
-                <p className="flex items-center gap-2 px-4 py-6 text-sm text-muted-foreground"><CheckCircle2 className="h-4 w-4 text-emerald-600" /> Nada pendente: os módulos não apontam nada para hoje.</p>
-            ) : (
-                <ul className="divide-y divide-border/50">
-                    {shown.map((item, i) => (
-                        <li key={`${item.module}-${item.href}-${i}`} className="flex items-start gap-3 px-4 py-2 text-sm">
-                            <span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", DOT[item.tone])} />
-                            <span className="min-w-0 flex-1">
-                                <Link href={`${base}${item.href}`} className="font-semibold text-foreground underline-offset-2 hover:underline">{item.name}</Link>
-                                <span className="text-muted-foreground"> — {hasAmount(item.text) ? <Money>{item.text}</Money> : item.text}</span>
-                                <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 align-middle text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{MODULE_META[item.module].label}</span>
-                            </span>
-                            {item.date && <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{formatDateBR(item.date)}</span>}
-                        </li>
-                    ))}
-                </ul>
-            )}
-        </section>
-    );
-}
-
-export default function DashboardHub({ base, view, totals, attention, loading, error, mapsApiKey, mapId, geocodeStatus, onOpen }: Props) {
-    const name = view?.profile.fullName?.split(" ")[0] || null;
-    const failed = new Set(view?.failed ?? []);
-    const down = {
-        properties: failed.has("properties"),
-        income: failed.has("income"),
-        leases: failed.has("leases"),
-        tenants: failed.has("tenants"),
-        agents: failed.has("agents"),
-        agencies: failed.has("agencies"),
-    };
-    const unavailable = (what: string) => <span className="text-rose-600">{what} indisponíveis</span>;
-    // "2 unifamiliar · 1 multifamiliar", plus the garages when there are any
-    const mix = totals?.properties;
-    const propertyMix = mix ? [`${mix.single} unifamiliar`, `${mix.multi} multifamiliar`, mix.garage > 0 ? `${mix.garage} ${mix.garage === 1 ? "garagem" : "garagens"}` : null].filter(Boolean).join(" · ") : "";
-    return (
-        <div className="mx-auto max-w-[1600px] space-y-5 p-4 sm:p-6">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="space-y-1">
-                    <h1 className="inline-flex items-center gap-2 text-2xl font-bold text-foreground">
-                        <LayoutDashboard className="h-6 w-6 text-emerald-600" /> Dashboard
-                    </h1>
-                    <p className="text-sm text-muted-foreground">
-                        {name ? `Bem-vindo de volta, ${name}. ` : ""}A carteira inteira num só painel: o que rende, quem mora, quem trabalha e o que está por vencer.
-                    </p>
-                </div>
-            </div>
-
-            {error && (
-                <p className="flex items-start gap-2 text-sm text-rose-600"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> {error}</p>
-            )}
-            {loading && (
-                <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando…</div>
-            )}
-
-            {view && totals && (
-                <>
-                    {isEmptyPortfolio(view) && view.failed.length === 0 && (
-                        <section className="space-y-3 rounded-2xl border border-dashed border-border px-6 py-10 text-center">
-                            <Home className="mx-auto h-10 w-10 text-muted-foreground/60" />
-                            <h2 className="text-lg font-semibold text-foreground">Comece pela carteira</h2>
-                            <p className="mx-auto max-w-md text-sm text-muted-foreground">Em Imóveis, cadastre um imóvel ou envie um contrato de locação: a IA cria o imóvel, o contrato, a imobiliária, o corretor e os inquilinos. Os números aparecem aqui conforme os módulos ganham dados.</p>
-                            <Button onClick={() => onOpen("/imoveis")}>Ir para Imóveis <ArrowRight className="ml-1 h-4 w-4" /></Button>
-                        </section>
-                    )}
-
-                    {/* The headline */}
-                    <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
-                        <Tile
-                            label="Imóveis" tone="emerald" icon={<Building2 className="h-4 w-4" />}
-                            value={down.properties ? "—" : totals.properties.count.toLocaleString("pt-BR")}
-                            hint={down.properties ? unavailable("imóveis") : down.leases
-                                ? `${plural(totals.occupancy.units, "unidade", "unidades")} · ocupação indisponível`
-                                : `${plural(totals.occupancy.units, "unidade", "unidades")} · ${pct1(totals.occupancy.pct)} ocupadas`}
-                            onClick={() => onOpen("/imoveis")}
-                            info={{
-                                what: "Os imóveis de aluguel cadastrados e as unidades que eles têm.",
-                                formula: <>Ocupação = unidades com contrato em vigor ÷ unidades × 100<br />Contrato sem unidade num multifamiliar = uma unidade</>,
-                                note: `${propertyMix} · ${totals.properties.solar} com energia solar.`,
-                            }}
-                        />
-                        <Tile
-                            label="Receita do mês" tone="emerald" icon={<Wallet className="h-4 w-4" />} money
-                            value={!down.income && totals.income.withLedger > 0 ? brl(totals.income.revenue, 0) : "—"}
-                            hint={down.income
-                                ? unavailable("receitas")
-                                : totals.income.withLedger > 0
-                                    ? `NOI ${brl(totals.income.noi, 0)} · margem ${pct1(totals.income.margin)} · ${monthLabel(totals.income.month)}`
-                                    : "sem razão de receitas lançada ainda"}
-                            onClick={() => onOpen("/imoveis")}
-                            info={{
-                                what: "O mês mais recente confirmado na razão de receitas de cada imóvel, somado.",
-                                formula: <>Receita = aluguel bruto + energia recebida + condomínio pago pelo inquilino<br />NOI = receita − taxa da imobiliária − energia − outras despesas − condomínio − IPTU pago por você no mês</>,
-                                note: down.income ? undefined : `${plural(totals.income.withLedger, "imóvel com razão", "imóveis com razão")} de receitas.`,
-                            }}
-                        />
-                        <Tile
-                            label="Aluguel contratado" tone="emerald" icon={<FileSignature className="h-4 w-4" />} money
-                            value={down.leases ? "—" : `${brl(totals.contracts.contractedRent, 0)}/mês`}
-                            hint={down.leases ? unavailable("contratos") : `${plural(totals.contracts.inForce, "contrato em vigor", "contratos em vigor")}${totals.contracts.nextEnd ? ` · próximo término ${formatDateBR(totals.contracts.nextEnd.date)}` : ""}`}
-                            onClick={() => onOpen("/contratos")}
-                            info={{ what: "O valor de contrato dos contratos em vigor (ativos ou vencendo), antes da taxa da imobiliária.", formula: "Σ aluguel mensal dos contratos com status ativo ou vencendo", note: down.leases ? undefined : <><Money>{brl(totals.contracts.contractedRent * 12, 0)}</Money> por ano.</> }}
-                        />
-                        <Tile
-                            label="Pessoas abrigadas" tone="violet" icon={<Users className="h-4 w-4" />}
-                            value={down.tenants ? "—" : totals.people.housed.toLocaleString("pt-BR")}
-                            hint={down.tenants ? unavailable("inquilinos") : `${plural(totals.people.tenants.active, "inquilino atual", "inquilinos atuais")}${down.leases ? "" : ` · ${plural(totals.occupancy.occupied, "unidade ocupada", "unidades ocupadas")}`}`}
-                            onClick={() => onOpen("/inquilinos")}
-                            info={{ what: "Quantas pessoas moram hoje nos seus imóveis: titulares, co-locatários e ocupantes dos contratos em vigor, cada pessoa contada uma vez.", formula: "pessoas distintas nos contratos em vigor (titular + co-locatários + ocupantes)", note: "Dependentes que não estão no contrato não entram; cadastre-os como ocupantes para contá-los." }}
-                        />
-                        <Tile
-                            label="Empregos apoiados" tone="violet" icon={<UserCheck className="h-4 w-4" />}
-                            value={down.agents ? "—" : totals.jobs.agents.active.toLocaleString("pt-BR")}
-                            hint={down.agents ? unavailable("corretores") : `${plural(totals.jobs.agents.active - totals.jobs.agents.idle, "corretor com contrato", "corretores com contrato")}${down.agencies ? "" : ` · ${plural(totals.jobs.agenciesWithLeases, "imobiliária com contrato", "imobiliárias com contrato")}`}`}
-                            onClick={() => onOpen("/corretores")}
-                            info={{ what: "Os corretores ativos que a carteira sustenta, e as imobiliárias que administram contratos em vigor.", formula: "corretores com status ativo; com contrato = com pelo menos um contrato em vigor ou inquilino atual", note: !down.agencies && totals.jobs.agencies.monthlyFees > 0 ? <><Money>{brl(totals.jobs.agencies.monthlyFees, 0)}</Money>/mês em taxas de administração.</> : undefined }}
-                        />
-                        <Tile
-                            label={`Impostos pagos em ${totals.taxes?.year ?? new Date().getFullYear()}`} tone="amber" icon={<Landmark className="h-4 w-4" />} money
-                            value={totals.taxes ? brl(totals.taxes.iptuLandlordYtd + totals.taxes.itbiOtherYtd, 0) : "—"}
-                            hint={totals.taxes ? `IPTU ${brl(totals.taxes.iptuLandlordYtd, 0)} · ITBI e outros ${brl(totals.taxes.itbiOtherYtd, 0)} · federais em breve` : unavailable("tributos")}
-                            onClick={() => onOpen("/imoveis")}
-                            info={{ what: "Os tributos municipais que você pagou este ano, até este mês, no mês do pagamento, pelo registro Tributos do imóvel.", formula: "IPTU pago por você no ano + ITBI e outros tributos pagos por você no ano", note: "Os impostos federais (IRPF, carnê-leão, holding) chegam com o módulo Contábil & Fiscal." }}
-                        />
-                    </div>
-
-                    <div className="grid gap-4 lg:grid-cols-3">
-                        <section className="overflow-hidden rounded-xl border border-border/80 bg-card lg:col-span-2">
-                            <PortfolioMap pins={view.map.pins} pending={view.map.pending} status={geocodeStatus} apiKey={mapsApiKey} mapId={mapId} base={base} unavailable={failed.has("map")} />
-                        </section>
-                        <AttentionPanel items={attention} base={base} />
-                    </div>
-
-                    {/* One card per module */}
-                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                        <ModuleCard icon={<Building2 className="h-4 w-4" />} tone="emerald" title="Imóveis" href="/imoveis" base={base} unavailable={down.properties}
-                            figures={[
-                                { label: "Imóveis", value: totals.properties.count, hint: propertyMix },
-                                { label: "Unidades", value: totals.occupancy.units, hint: down.leases ? "contratos indisponíveis" : `${totals.occupancy.occupied} com contrato em vigor` },
-                                { label: "Ocupação", value: down.leases ? "—" : pct1(totals.occupancy.pct), hint: down.leases ? "contratos indisponíveis" : `${plural(totals.occupancy.propertiesWithLease, "imóvel alugado", "imóveis alugados")}` },
-                                { label: "Economia potencial", value: down.income ? "—" : brl(totals.income.feeAllTime, 0), money: true, hint: down.income ? "receitas indisponíveis" : "taxa de imobiliária acumulada · autogestão", title: "Σ da taxa da imobiliária retida antes do crédito, desde o início, pela razão de receitas" },
-                            ]}
-                            note={totals.properties.unlinked > 0 ? `${plural(totals.properties.unlinked, "imóvel ainda não foi salvo", "imóveis ainda não foram salvos")} até o fim: complete o cadastro em Imóveis.` : undefined}
-                        />
-                        <ModuleCard icon={<FileSignature className="h-4 w-4" />} tone="emerald" title="Contratos" href="/contratos" base={base} unavailable={down.leases}
-                            figures={[
-                                { label: "Em vigor", value: totals.contracts.inForce, hint: totals.contracts.overdueTerm > 0 ? <span className="text-rose-600">{plural(totals.contracts.overdueTerm, "com prazo vencido", "com prazo vencido")}</span> : `${totals.contracts.total} no total` },
-                                { label: "Aluguel contratado", value: `${brl(totals.contracts.contractedRent, 0)}/mês`, money: true, hint: <><Money>{brl(totals.contracts.contractedRent * 12, 0)}</Money> por ano</> },
-                                { label: "Próximo término", value: totals.contracts.nextEnd ? formatDateBR(totals.contracts.nextEnd.date) : "—", hint: totals.contracts.nextEnd ? (totals.contracts.endingSoonDays.length > 0 ? dueInDaysText(totals.contracts.endingSoonDays) : `em ${plural(totals.contracts.nextEnd.days, "dia", "dias")}`) : "nenhum término à vista" },
-                                { label: "Caução em mãos", value: brl(totals.contracts.deposits, 0), money: true, hint: `${plural(totals.contracts.depositsCount, "contrato com caução", "contratos com caução")}` },
-                            ]}
-                        />
-                        <ModuleCard icon={<Users className="h-4 w-4" />} tone="violet" title="Inquilinos" href="/inquilinos" base={base} unavailable={down.tenants}
-                            figures={[
-                                { label: "Atuais", value: totals.people.tenants.active, hint: `${totals.people.tenants.future} futuros · ${totals.people.tenants.former} antigos` },
-                                { label: "Pessoas abrigadas", value: totals.people.housed, hint: "nos contratos em vigor" },
-                                { label: "Tempo de casa", value: totals.people.tenants.avgMonths ? monthsLabel(totals.people.tenants.avgMonths) : "—", hint: "média dos atuais" },
-                                { label: "Sem contrato", value: totals.people.tenants.withoutLease, hint: totals.people.tenants.withoutPhone > 0 ? `${totals.people.tenants.withoutPhone} sem telefone` : "todos com telefone" },
-                            ]}
-                        />
-                        <ModuleCard icon={<UserCheck className="h-4 w-4" />} tone="violet" title="Corretores" href="/corretores" base={base} unavailable={down.agents}
-                            figures={[
-                                { label: "Ativos", value: totals.jobs.agents.active, hint: `${totals.jobs.agents.inactive} inativos` },
-                                { label: "Contratos em vigor", value: totals.jobs.agents.leasesInForce, hint: `${totals.jobs.agents.leasesTotal} no total` },
-                                { label: "Aluguel sob gestão", value: `${brl(totals.jobs.agents.rentManaged, 0)}/mês`, money: true, hint: `${plural(totals.jobs.agents.tenantsServed, "inquilino atendido", "inquilinos atendidos")}` },
-                                { label: "Autônomos", value: totals.jobs.agents.autonomous, hint: `${plural(totals.jobs.agents.agencies, "imobiliária", "imobiliárias")} com corretores` },
-                            ]}
-                        />
-                        <ModuleCard icon={<Building className="h-4 w-4" />} tone="blue" title="Imobiliárias" href="/imobiliaria" base={base} unavailable={down.agencies}
-                            figures={[
-                                { label: "Ativas", value: totals.jobs.agencies.active, hint: `${totals.jobs.agenciesWithLeases} com contrato em vigor` },
-                                { label: "Contratos em vigor", value: totals.jobs.agencies.leasesInForce, hint: <><Money>{brl(totals.jobs.agencies.rentManaged, 0)}</Money>/mês sob gestão</> },
-                                { label: "Taxas de administração", value: `${brl(totals.jobs.agencies.monthlyFees, 0)}/mês`, money: true, hint: <><Money>{brl(totals.jobs.agencies.monthlyFees * 12, 0)}</Money> por ano: a economia potencial com autogestão</> },
-                                { label: "Inquilinos atendidos", value: totals.jobs.agencies.tenantsServed, hint: `${plural(totals.jobs.agencies.agentsLinked, "corretor vinculado", "corretores vinculados")}` },
-                            ]}
-                        />
-                        <ModuleCard icon={<Receipt className="h-4 w-4" />} tone="emerald" title="Faturas" href="/faturas" base={base} unavailable={failed.has("invoices")}
-                            figures={totals.invoices ? [
-                                { label: "A receber no mês", value: brl(totals.invoices.dueThisMonth.amount, 0), money: true, hint: `${plural(totals.invoices.dueThisMonth.count, "fatura em aberto", "faturas em aberto")} com vencimento neste mês` },
-                                { label: "Recebido no mês", value: brl(totals.invoices.receivedThisMonth.amount, 0), money: true, hint: `${plural(totals.invoices.receivedThisMonth.count, "fatura paga", "faturas pagas")}` },
-                                { label: "Em atraso", value: <span className={totals.invoices.overdue.count > 0 ? "text-rose-600" : undefined}>{brl(totals.invoices.overdue.amount, 0)}</span>, money: true, hint: totals.invoices.overdue.count > 0 ? <span className="text-rose-600">{plural(totals.invoices.overdue.count, "fatura vencida", "faturas vencidas")}</span> : "nenhuma fatura vencida" },
-                                { label: "Próximo vencimento", value: totals.invoices.nextDue ? formatDateBR(totals.invoices.nextDue.date) : "—", hint: totals.invoices.nextDue ? <><Money>{brl(totals.invoices.nextDue.amount, 0)}</Money> · {totals.invoices.nextDue.days === 0 ? "hoje" : `em ${plural(totals.invoices.nextDue.days, "dia", "dias")}`}</> : `${plural(totals.invoices.open.count, "fatura em aberto", "faturas em aberto")}` },
-                            ] : []}
-                            note="O que você cobra direto do inquilino: aluguel, condomínio e encargos fora da imobiliária."
-                        />
-                        <ModuleCard icon={<Zap className="h-4 w-4" />} tone="amber" title="Energia" href="/dashboard/energy" base={base} unavailable={failed.has("energy")}
-                            figures={totals.energy ? [
-                                { label: "Unidades de aluguel", value: totals.energy.units, hint: `${totals.energy.withBills} com faturas` },
-                                { label: "Consumo mais recente", value: kwh(totals.energy.consumptionLatest), hint: `${kwh(totals.energy.consumption12)} em 12 meses` },
-                                { label: "Faturas mais recentes", value: brl(totals.energy.billsLatest, 0), money: true, hint: totals.energy.overdue > 0 ? <span className="text-rose-600">{plural(totals.energy.overdue, "vencida", "vencidas")}</span> : totals.energy.dueSoon > 0 ? `${plural(totals.energy.dueSoon, "vence em 7 dias", "vencem em 7 dias")}` : <><Money>{brl(totals.energy.paid12, 0)}</Money> em 12 meses</> },
-                                { label: "Economia solar", value: brl(totals.energy.savingsLatest, 0), money: true, hint: <><Money>{brl(totals.energy.savings12, 0)}</Money> em 12 meses · {plural(totals.energy.solarUnits, "unidade gerando", "unidades gerando")}</> },
-                            ] : []}
-                            note="Só os imóveis de aluguel; as unidades avulsas ficam no hub de Energia."
-                        />
-                        <ModuleCard icon={<Droplets className="h-4 w-4" />} tone="blue" title="Água" href="/dashboard/water" base={base} unavailable={failed.has("water")}
-                            figures={totals.water ? [
-                                { label: "Imóveis com água", value: totals.water.units, hint: `${totals.water.withBills} com contas` },
-                                { label: "Consumo mais recente", value: m3(totals.water.consumptionLatest), hint: `${m3(totals.water.consumption12)} em 12 meses` },
-                                { label: "Contas mais recentes", value: brl(totals.water.billsLatest, 0), money: true, hint: totals.water.overdue > 0 ? <span className="text-rose-600">{plural(totals.water.overdue, "vencida", "vencidas")}</span> : <><Money>{brl(totals.water.paid12, 0)}</Money> em 12 meses</> },
-                                { label: "Custo por m³", value: totals.water.rateLatest === null ? "—" : brl(totals.water.rateLatest), money: true, hint: totals.water.spikes > 0 ? <span className="text-amber-700 dark:text-amber-400">{plural(totals.water.spikes, "pico de consumo", "picos de consumo")}</span> : "sem picos de consumo" },
-                            ] : []}
-                        />
-                        <ModuleCard icon={<Building className="h-4 w-4" />} tone="emerald" title="Condomínio" href="/condominio" base={base} unavailable={failed.has("condominiums")}
-                            figures={totals.condo ? [
-                                { label: "Condomínios", value: totals.condo.condos, hint: `${plural(totals.condo.units, "unidade", "unidades")}` },
-                                { label: "Receita do mês", value: brl(totals.condo.revenueLatest, 0), money: true, hint: <>custos <Money>{brl(totals.condo.costLatest, 0)}</Money></> },
-                                { label: "Resultado do mês", value: <span className={totals.condo.resultLatest < 0 ? "text-rose-600" : undefined}>{brl(totals.condo.resultLatest, 0)}</span>, money: true, hint: totals.condo.negativeCondos > 0 ? <span className="text-rose-600">{plural(totals.condo.negativeCondos, "condomínio no vermelho", "condomínios no vermelho")}</span> : "todos no azul" },
-                                { label: `Resultado ${totals.condo.year}`, value: <span className={totals.condo.resultYtd < 0 ? "text-rose-600" : undefined}>{brl(totals.condo.resultYtd, 0)}</span>, money: true, hint: totals.condo.monthsWithoutCosts > 0 ? <span className="text-amber-700 dark:text-amber-400">{plural(totals.condo.monthsWithoutCosts, "mês sem custos lançados", "meses sem custos lançados")}</span> : `margem ${pct1(totals.condo.marginYtd)}` },
-                            ] : []}
-                        />
-                        <ModuleCard icon={<HardHat className="h-4 w-4" />} tone="amber" title="Projetos" href="/projetos" base={base} unavailable={failed.has("projects")}
-                            figures={totals.projects ? [
-                                { label: "Em andamento", value: totals.projects.all.active, hint: `${totals.projects.all.completed} em Imóveis · ${totals.projects.all.sold} vendidos` },
-                                { label: "Investido até agora", value: brl(totals.projects.inProgress.paid, 0), money: true, hint: <>{pct1(totals.projects.inProgress.paidPct)} do custo de <Money>{brl(totals.projects.inProgress.committed, 0)}</Money></> },
-                                { label: "Falta pagar", value: brl(totals.projects.inProgress.remaining, 0), money: true, hint: totals.projects.inProgress.nextDueOn ? <>próxima parcela {formatDateBR(totals.projects.inProgress.nextDueOn)} · <Money>{brl(totals.projects.inProgress.nextDueAmount, 0)}</Money></> : "nenhuma parcela à vista" },
-                                { label: "Parcelas em atraso", value: <span className={totals.projects.inProgress.overdue > 0 ? "text-rose-600" : undefined}>{totals.projects.inProgress.overdue}</span>, hint: totals.projects.sold.count > 0 ? <>ganho realizado nas vendas <Money>{brl(totals.projects.sold.realizedGain, 0)}</Money></> : "nenhuma venda registrada" },
-                            ] : []}
-                            note="Valores dos projetos em andamento, como no hub; os vendidos entram só no ganho realizado."
-                        />
-                        <ModuleCard icon={<Landmark className="h-4 w-4" />} tone="amber" title="Tributos" href="/imoveis" base={base} unavailable={failed.has("taxes")}
-                            figures={totals.taxes ? [
-                                { label: `IPTU pago por você (${totals.taxes.year})`, value: brl(totals.taxes.iptuLandlordYtd, 0), money: true, hint: <><Money>{brl(totals.taxes.iptuLandlordAllTime, 0)}</Money> desde o início · {plural(totals.taxes.propertiesWithIptu, "imóvel no registro", "imóveis no registro")}</> },
-                                { label: `IPTU pago por inquilinos (${totals.taxes.year})`, value: brl(totals.taxes.iptuTenantYtd, 0), money: true, hint: "não é custo seu" },
-                                { label: `ITBI e outros (${totals.taxes.year})`, value: brl(totals.taxes.itbiOtherYtd, 0), money: true, hint: <><Money>{brl(totals.taxes.itbiAllTime + totals.taxes.otherAllTime, 0)}</Money> desde o início</> },
-                                { label: "Impostos federais", value: "—", hint: "em breve, via Contábil & Fiscal" },
-                            ] : []}
-                            note="IPTU no mês do pagamento, até este mês, como na DRE; o registro fica em cada imóvel, em Tributos do imóvel."
-                        />
-                    </div>
-
-                    {view.failed.length > 0 && (
-                        <p className="flex items-start gap-2 text-xs text-rose-600"><AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> Não foi possível carregar: {view.failed.map(f => LOADER_LABELS[f]).join(", ")}. Recarregue a página; se persistir, o módulo em questão mostra o erro completo.</p>
-                    )}
-                </>
-            )}
+        <div className="min-w-0 px-4 py-3 sm:px-5">
+            <span className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
+                <span className={cn("h-2 w-2 shrink-0 rounded-full", dot)} /> {label}
+            </span>
+            <span className={cn("mt-1 block truncate text-xl font-bold leading-tight tabular-nums sm:text-2xl", tone ?? "text-foreground")}>{figure}</span>
+            <span className="mt-0.5 block text-xs text-muted-foreground sm:truncate">{children}</span>
         </div>
     );
+}
+
+function MonthStrip({ totals, month, unavailable }: { totals: RentTotals | null; month: string; unavailable: string | null }) {
+    if (!totals) {
+        return (
+            <section className="rounded-xl border border-border/80 bg-card px-5 py-4">
+                <p className={cn("flex items-start gap-2 text-sm", INK.late)}><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> {unavailable}</p>
+            </section>
+        );
+    }
+    const { expected, received, pending, overdue } = totals;
+    const parts = received.gross + pending.amount + overdue.amount;
+    const share = (v: number) => (parts > 0 ? `${(v / parts) * 100}%` : "0%");
+    const receivedPct = expected.amount > 0 ? Math.round((received.gross / expected.amount) * 100) : null;
+    return (
+        <section aria-label={`O dinheiro de ${monthName(month)}`} className="overflow-hidden rounded-xl border border-border/80 bg-card">
+            <div className="grid grid-cols-2 divide-border/60 md:grid-cols-4 md:divide-x [&>*:nth-child(-n+2)]:border-b [&>*:nth-child(-n+2)]:border-border/60 md:[&>*:nth-child(-n+2)]:border-b-0 [&>*:nth-child(odd)]:border-r [&>*:nth-child(odd)]:border-border/60 md:[&>*:nth-child(odd)]:border-r-0">
+                <Segment dot="bg-slate-400" label={`Esperado em ${monthName(month)}`} figure={<Money>{brl(expected.amount, 0)}</Money>}>
+                    {plural(expected.count, "contrato", "contratos")} · aluguel de contrato
+                </Segment>
+                <Segment dot="bg-emerald-500" label="Recebido" tone={INK.in} figure={<Money>{brl(received.gross, 0)}</Money>}>
+                    {received.count} de {expected.count}{received.net !== received.gross ? <> · líquido <Money>{brl(received.net, 0)}</Money></> : receivedPct !== null ? ` · ${receivedPct}% do esperado` : ""}
+                </Segment>
+                <Segment dot="bg-amber-400" label="A vencer" tone={pending.count > 0 ? INK.due : "text-muted-foreground"} figure={<Money>{brl(pending.amount, 0)}</Money>}>
+                    {pending.count > 0 ? <>{plural(pending.count, "contrato", "contratos")} · próximo {ddmm(pending.next!)}</> : "nada a vencer no mês"}
+                </Segment>
+                <Segment dot="bg-rose-500" label="Vencido" tone={overdue.count > 0 ? INK.late : "text-muted-foreground"} figure={<Money>{brl(overdue.amount, 0)}</Money>}>
+                    {overdue.count > 0 ? <>{plural(overdue.count, "contrato", "contratos")} · desde {ddmm(overdue.since!)}</> : "nenhum aluguel vencido"}
+                </Segment>
+            </div>
+            <div
+                role="img"
+                aria-label={`${receivedPct ?? 0}% recebido, ${plural(pending.count, "aluguel", "aluguéis")} a vencer, ${plural(overdue.count, "vencido", "vencidos")}`}
+                className="flex h-1.5 bg-muted"
+            >
+                <span className="bg-emerald-500 transition-[width] duration-300" style={{ width: share(received.gross) }} />
+                <span className="bg-amber-400 transition-[width] duration-300" style={{ width: share(pending.amount) }} />
+                <span className="bg-rose-500 transition-[width] duration-300" style={{ width: share(overdue.amount) }} />
+            </div>
+        </section>
+    );
+}
+
+// ── The side column ──────────────────────────────────────────────────
+
+function EventRow({ event, base }: { event: MonthEvent; base: string }) {
+    const meta = EVENT_META[event.kind];
+    const Icon = meta.icon;
+    return (
+        <li>
+            <Link href={`${base}${event.href}`} className="group flex items-start gap-2.5 rounded-lg px-2 py-2 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
+                <span className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-md", meta.chip)}><Icon className="h-3.5 w-3.5" /></span>
+                <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[13px] font-semibold leading-snug text-foreground">{event.title}</span>
+                    <span className={cn("block truncate text-xs leading-snug", event.late ? INK.late : "text-muted-foreground")}>
+                        {[event.place, event.detail].filter(Boolean).join(" · ")}
+                    </span>
+                </span>
+                <span className="shrink-0 text-right">
+                    {event.amount !== null && <span className="block text-[13px] font-semibold tabular-nums text-foreground"><Money>{brl(event.amount, 0)}</Money></span>}
+                    {event.date && <span className={cn("block text-xs tabular-nums", event.late ? INK.late : "text-muted-foreground")}>{ddmm(event.date)}</span>}
+                </span>
+            </Link>
+        </li>
+    );
+}
+
+function SideCard({ title, aside, children }: { title: string; aside?: React.ReactNode; children: React.ReactNode }) {
+    return (
+        <section className="rounded-xl border border-border/80 bg-card">
+            <header className="flex items-baseline justify-between gap-2 px-4 pb-1 pt-3">
+                <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+                {aside && <span className="text-xs tabular-nums text-muted-foreground">{aside}</span>}
+            </header>
+            <div className="px-2 pb-2">{children}</div>
+        </section>
+    );
+}
+
+/** One line of a card's legend: its dot and label, the amount on the right. */
+function LegendRow({ dot, label, value, ink }: { dot: string; label: string; value: number; ink?: string }) {
+    return (
+        <span className="flex items-center justify-between gap-2 text-xs">
+            <span className="flex items-center gap-1.5 text-muted-foreground"><span className={cn("h-2 w-2 shrink-0 rounded-full", dot)} /> {label}</span>
+            <strong className={cn("font-semibold tabular-nums", ink ?? "text-foreground")}><Money>{brl(value, 0)}</Money></strong>
+        </span>
+    );
+}
+
+/** A closed month: the result large, then one bar of the revenue split into the agencies' fee, the other costs and what was left. */
+function ResultGraphic({ result }: { result: MonthResult }) {
+    const other = Math.max(0, result.opex - result.fee);
+    const left = Math.max(0, result.noi);
+    const whole = result.fee + other + left;
+    const w = (v: number) => (whole > 0 ? `${(v / whole) * 100}%` : "0%");
+    return (
+        <div className="space-y-2.5 px-2 pb-1">
+            <span className="flex flex-wrap items-baseline gap-x-2">
+                <span className={cn("text-2xl font-bold tabular-nums", result.noi < 0 ? INK.late : "text-foreground")}><Money>{brl(result.noi, 0)}</Money></span>
+                <span className="text-xs text-muted-foreground">resultado (NOI) · margem {pct1(result.margin)}</span>
+            </span>
+            <span role="img" aria-label={`Receita ${brl(result.revenue, 0)}: taxa ${brl(result.fee, 0)}, outros custos ${brl(other, 0)}, resultado ${brl(result.noi, 0)}`} className="privacy-money flex h-2.5 overflow-hidden rounded-full bg-muted">
+                <span className="bg-violet-500" style={{ width: w(result.fee) }} />
+                <span className="bg-slate-400" style={{ width: w(other) }} />
+                <span className="bg-emerald-500" style={{ width: w(left) }} />
+            </span>
+            <span className="flex flex-col gap-1">
+                <LegendRow dot="bg-violet-500" label="Taxa das imobiliárias" value={result.fee} ink={INK.fee} />
+                <LegendRow dot="bg-slate-400" label="Outros custos" value={other} />
+                <LegendRow dot="bg-emerald-500" label="Resultado" value={result.noi} ink={result.noi < 0 ? INK.late : undefined} />
+            </span>
+            <span className="block border-t border-border/60 pt-1.5 text-xs text-muted-foreground">
+                receita <Money>{brl(result.revenue, 0)}</Money> · {plural(result.properties, "imóvel lançado", "imóveis lançados")}
+            </span>
+        </div>
+    );
+}
+
+// ── The portfolio ────────────────────────────────────────────────────
+
+const MAX_UNIT_CELLS = 60;
+
+function PortfolioCard({ tone, title, href, base, children }: { tone: "violet" | "emerald" | "teal"; title: string; href?: string; base: string; children: React.ReactNode }) {
+    const tint = { violet: "border-violet-500/25 bg-violet-500/[0.05]", emerald: "border-emerald-500/25 bg-emerald-500/[0.05]", teal: "border-teal-500/25 bg-teal-500/[0.05]" }[tone];
+    const body = (
+        <>
+            <span className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+                {href && <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />}
+            </span>
+            {children}
+        </>
+    );
+    const cls = cn("flex min-w-0 flex-col gap-3 rounded-xl border p-4 text-left", tint);
+    return href
+        ? <Link href={`${base}${href}`} className={cn(cls, "group transition-colors hover:border-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500")}>{body}</Link>
+        : <div className={cls}>{body}</div>;
+}
+
+function Portfolio({ view, base }: { view: DashboardView; base: string }) {
+    const leasesDown = view.failed.includes("leases");
+    const occupancy = occupancyOf(view.properties, view.leases ?? []);
+    const rent = contractedRent(view.leases ?? []);
+    const agency = rent.parts.find(p => p.type === "AGENCY")!;
+    const own = rent.parts.find(p => p.type === "SELF_MANAGED")!;
+    const agent = rent.parts.find(p => p.type === "AGENT")!;
+    const cells = Math.min(occupancy.units, MAX_UNIT_CELLS);
+    return (
+        <section className="space-y-3">
+            <h2 className="text-base font-semibold text-foreground">A carteira</h2>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <PortfolioCard tone="violet" title="Ocupação" href="/imoveis" base={base}>
+                    {leasesDown ? <p className="text-sm text-muted-foreground">— contratos indisponíveis</p> : (
+                        <>
+                            <span className="flex items-baseline gap-2">
+                                <span className="text-2xl font-bold tabular-nums text-foreground">{occupancy.occupied} de {occupancy.units}</span>
+                                <span className={cn("text-sm font-medium", INK.fee)}>{pct1(occupancy.pct)}</span>
+                            </span>
+                            {occupancy.units > 0 && occupancy.units <= MAX_UNIT_CELLS ? (
+                                <span role="img" aria-label={`${occupancy.occupied} unidades ocupadas de ${occupancy.units}`} className="flex flex-wrap gap-1">
+                                    {Array.from({ length: cells }, (_, i) => (
+                                        <span key={i} className={cn("h-3.5 w-3.5 rounded-[3px]", i < occupancy.occupied ? "bg-violet-500" : "border border-dashed border-violet-400/70")} />
+                                    ))}
+                                </span>
+                            ) : occupancy.units > 0 && (
+                                <span className="flex h-2 overflow-hidden rounded-full bg-violet-500/15"><span className="bg-violet-500" style={{ width: `${occupancy.pct ?? 0}%` }} /></span>
+                            )}
+                            <span className="text-xs text-muted-foreground">
+                                unidades com contrato em vigor{view.housed !== null ? ` · ${plural(view.housed, "pessoa abrigada", "pessoas abrigadas")}` : ""}
+                            </span>
+                        </>
+                    )}
+                </PortfolioCard>
+                <PortfolioCard tone="emerald" title="Aluguel contratado" href="/contratos" base={base}>
+                    {leasesDown ? <p className="text-sm text-muted-foreground">— contratos indisponíveis</p> : (
+                        <>
+                            <span className="flex items-baseline gap-1">
+                                <span className="text-2xl font-bold tabular-nums text-foreground"><Money>{brl(rent.total, 0)}</Money></span>
+                                <span className="text-xs font-medium text-muted-foreground">/mês</span>
+                            </span>
+                            <span role="img" aria-label={`${agency.count} via imobiliária, ${own.count} de gestão própria${agent.count ? `, ${agent.count} via corretor` : ""}`} className="flex h-2 overflow-hidden rounded-full bg-muted">
+                                {rent.total > 0 && <>
+                                    <span className="bg-emerald-500" style={{ width: `${(agency.amount / rent.total) * 100}%` }} />
+                                    <span className="bg-emerald-300 dark:bg-emerald-700" style={{ width: `${(own.amount / rent.total) * 100}%` }} />
+                                    <span style={{ width: `${(agent.amount / rent.total) * 100}%`, ...hatch("16,185,129") }} />
+                                </>}
+                            </span>
+                            <span className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Imobiliária <strong className="font-semibold text-foreground">{agency.count}</strong></span>
+                                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-300 dark:bg-emerald-700" /> Gestão própria <strong className="font-semibold text-foreground">{own.count}</strong></span>
+                                {agent.count > 0 && <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={hatch("16,185,129")} /> Corretor <strong className="font-semibold text-foreground">{agent.count}</strong></span>}
+                                <span className="col-span-2"><Money>{brl(rent.total * 12, 0)}</Money> por ano · {plural(rent.count, "contrato em vigor", "contratos em vigor")}</span>
+                            </span>
+                        </>
+                    )}
+                </PortfolioCard>
+                <PortfolioCard tone="teal" title="Economia potencial com autogestão" base={base}>
+                    {view.ledger ? (
+                        <>
+                            <span className="text-2xl font-bold tabular-nums text-foreground"><Money>{brl(view.ledger.feeAllTime, 0)}</Money></span>
+                            <span className="flex h-2 overflow-hidden rounded-full bg-teal-500/15" role="img" aria-label="Os últimos 12 meses dentro do total">
+                                <span className="bg-teal-500" style={{ width: `${view.ledger.feeAllTime > 0 ? (view.ledger.fee12m / view.ledger.feeAllTime) * 100 : 0}%` }} />
+                            </span>
+                            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <span className="h-2 w-2 rounded-full bg-teal-500" /> <strong className="font-semibold text-foreground"><Money>{brl(view.ledger.fee12m, 0)}</Money></strong> nos últimos 12 meses
+                            </span>
+                        </>
+                    ) : <p className="text-sm text-muted-foreground">— receitas indisponíveis</p>}
+                </PortfolioCard>
+            </div>
+        </section>
+    );
+}
+
+// ── Loading ──────────────────────────────────────────────────────────
+
+function Skeleton() {
+    const bar = "animate-pulse rounded-md bg-muted";
+    return (
+        <div className="space-y-5" aria-busy="true" aria-label="Carregando o painel">
+            <div className="h-24 animate-pulse rounded-xl border border-border/60 bg-card" />
+            <div className="grid grid-cols-1 gap-4 min-[85rem]:grid-cols-[minmax(0,1fr)_272px]">
+                <div className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
+                    {Array.from({ length: 8 }, (_, i) => <div key={i} className={cn(bar, "h-8")} style={{ opacity: 1 - i * 0.09 }} />)}
+                </div>
+                <div className="space-y-3">
+                    <div className="h-40 animate-pulse rounded-xl border border-border/60 bg-card" />
+                    <div className="h-28 animate-pulse rounded-xl border border-border/60 bg-card" />
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ── The page ─────────────────────────────────────────────────────────
+
+export default function DashboardHub({ base, view, today, month, months, onMonth, mode, onMode, seenAt, loading, error }: Props) {
+    const [helpOpen, setHelpOpen] = useState(false);
+    const current = today.slice(0, 7);
+    const isCurrent = month === current;
+    const failed = useMemo(() => new Set(view?.failed ?? []), [view]);
+    const moneyDown = failed.has("leases") ? "Não foi possível carregar os contratos: os aluguéis do mês ficam sem números. Recarregue a página." : failed.has("income") ? "Não foi possível carregar a razão de receitas: não dá para saber o que entrou. Recarregue a página." : null;
+
+    const rents = useMemo(() => (view && !moneyDown ? monthRents(view, month, today) : []), [view, month, today, moneyDown]);
+    const totals = useMemo(() => (view && !moneyDown ? rentTotals(rents) : null), [view, rents, moneyDown]);
+    const fresh = useMemo(() => freshRentIds(rents, seenAt), [rents, seenAt]);
+    const leaseRows = useMemo(() => (view ? leaseRowsOf(view, today) : []), [view, today]);
+    const outflows = useMemo(() => (view ? monthOutflows(view, month, today) : []), [view, month, today]);
+    // this month: the dates of the next 60 days; a past month: its own
+    const dates = useMemo(() => contractDates(leaseRows, isCurrent ? today : `${month}-01`, isCurrent ? addDays(today, 60) : `${month}-31`), [leaseRows, isCurrent, today, month]);
+    const monthDates = useMemo(() => contractDates(leaseRows, `${month}-01`, `${month}-31`), [leaseRows, month]);
+    // the result card: the month shown once it closed, else the one before it
+    const resultMonth = isCurrent ? addMonths(month, -1) : month;
+    const result = useMemo(() => (view ? monthResult(view, resultMonth) : null), [view, resultMonth]);
+    const lastPosted = view ? latestConfirmedMonth(view) : null;
+    const ledgerBehind = isCurrent && rents.length > 0 && (lastPosted === null || lastPosted < addMonths(current, -1));
+
+    const at = months.indexOf(month);
+    const prev = at > 0 ? months[at - 1] : null;
+    const next = at >= 0 && at < months.length - 1 ? months[at + 1] : null;
+    const title = month.slice(0, 4) === current.slice(0, 4) ? `Aluguéis de ${monthName(month)}` : `Aluguéis de ${monthLong(month)}`;
+
+    return (
+        <div className="mx-auto max-w-[1600px] space-y-5 p-4 sm:p-6">
+            {/* Header: the month, how to see it */}
+            <div className="flex flex-wrap items-end justify-between gap-3">
+                <div className="min-w-0 space-y-1">
+                    <div className="flex items-center gap-2">
+                        <h1 className="text-2xl font-bold text-foreground">{title}</h1>
+                        <span className="inline-flex items-center gap-0.5">
+                            <button type="button" onClick={() => prev && onMonth(prev)} disabled={!prev} aria-label={prev ? `Ver ${monthLong(prev)}` : "Sem meses anteriores"} className="rounded-md border border-border/80 bg-card p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
+                                <ChevronLeft className="h-4 w-4" />
+                            </button>
+                            <button type="button" onClick={() => next && onMonth(next)} disabled={!next} aria-label={next ? `Ver ${monthLong(next)}` : "Este é o mês atual"} className="rounded-md border border-border/80 bg-card p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
+                                <ChevronRight className="h-4 w-4" />
+                            </button>
+                        </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                        {isCurrent ? `Hoje, ${ddmm(today)}` : <>Mês encerrado · <button type="button" onClick={() => onMonth(current)} className={cn("rounded font-medium underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500", INK.in)}>voltar para {monthName(current)}</button></>}
+                        {fresh.size > 0 && <> · <span className={cn("font-semibold", INK.in)}>{plural(fresh.size, "recebimento novo", "recebimentos novos")}</span> desde a sua última visita</>}
+                    </p>
+                </div>
+                {view && !moneyDown && (
+                    <div className="flex items-center gap-1.5">
+                        <div className="inline-flex rounded-lg border border-border bg-card p-0.5" role="group" aria-label="Como mostrar os aluguéis">
+                            <button type="button" onClick={() => onMode("quadro")} aria-pressed={mode === "quadro"} className={cn("inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500", mode === "quadro" ? "bg-muted font-semibold text-foreground" : "text-muted-foreground hover:text-foreground")}>
+                                <Rows3 className="h-3.5 w-3.5" /> Quadro
+                            </button>
+                            <button type="button" onClick={() => onMode("calendario")} aria-pressed={mode === "calendario"} className={cn("inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500", mode === "calendario" ? "bg-muted font-semibold text-foreground" : "text-muted-foreground hover:text-foreground")}>
+                                <CalendarDays className="h-3.5 w-3.5" /> Calendário
+                            </button>
+                        </div>
+                        <button type="button" onClick={() => setHelpOpen(true)} title="Como ler" aria-label="Como ler o painel" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
+                            <HelpCircle className="h-4 w-4" />
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            {error && <p className={cn("flex items-start gap-2 text-sm", INK.late)}><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> {error}</p>}
+            {loading && <Skeleton />}
+
+            {view && (isEmptyPortfolio(view) && view.failed.length === 0 ? (
+                <section className="space-y-3 rounded-2xl border border-dashed border-border px-6 py-12 text-center">
+                    <Home className="mx-auto h-10 w-10 text-muted-foreground/60" />
+                    <h2 className="text-lg font-semibold text-foreground">Comece pela carteira</h2>
+                    <p className="mx-auto max-w-md text-sm text-muted-foreground">Em Imóveis, cadastre um imóvel ou envie um contrato de locação: a IA cria o imóvel, o contrato, a imobiliária e os inquilinos. A partir daí este painel mostra, a cada mês, o aluguel que vence, o que entrou e o que está atrasado.</p>
+                    <Button asChild><Link href={`${base}/imoveis`}>Ir para Imóveis <ArrowRight className="ml-1 h-4 w-4" /></Link></Button>
+                </section>
+            ) : (
+                <>
+                    <MonthStrip totals={totals} month={month} unavailable={moneyDown} />
+
+                    {ledgerBehind && (
+                        <p className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/[0.07] px-3 py-2 text-[13px] text-foreground">
+                            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                            <span>A razão de receitas tem lançamentos só até {lastPosted ? monthName(lastPosted) : "nenhum mês"}: o que não foi lançado aparece aqui como vencido. Lance os repasses na razão de cada imóvel, em <Link href={`${base}/imoveis`} className="font-semibold underline underline-offset-2">Imóveis</Link>.</span>
+                        </p>
+                    )}
+
+                    <div className="grid grid-cols-1 items-start gap-4 min-[85rem]:grid-cols-[minmax(0,1fr)_272px]">
+                        <div className="min-w-0">
+                            {moneyDown ? null : rents.length === 0 ? (
+                                <div className="space-y-2 rounded-xl border border-dashed border-border px-6 py-10 text-center">
+                                    <Wallet className="mx-auto h-8 w-8 text-muted-foreground/60" />
+                                    <p className="text-sm font-medium text-foreground">Nenhum aluguel vence em {monthName(month)}.</p>
+                                    <p className="mx-auto max-w-md text-xs text-muted-foreground">Um contrato só cobra a partir do mês seguinte ao início, e os encerrados param no fim. Os contratos ficam em <Link href={`${base}/contratos`} className="underline underline-offset-2">Contratos</Link>.</p>
+                                </div>
+                            ) : mode === "calendario" ? (
+                                <RentCalendar month={month} today={today} rents={rents} events={[...outflows, ...monthDates].filter(e => e.date)} fresh={fresh} base={base} />
+                            ) : (
+                                <RentBoard rents={rents} fresh={fresh} today={today} base={base} />
+                            )}
+                        </div>
+
+                        <aside className="grid min-w-0 grid-cols-1 items-start gap-3 md:grid-cols-2 lg:grid-cols-3 min-[85rem]:grid-cols-1">
+                            {isCurrent && (
+                                <SideCard title="Contas e parcelas" aside={outflows.some(e => e.amount !== null) ? <Money>{brl(outflows.reduce((s, e) => s + (e.amount ?? 0), 0), 0)}</Money> : undefined}>
+                                    {failed.has("energy") || failed.has("water") || failed.has("projects") ? (
+                                        <p className={cn("px-2 py-2 text-xs", INK.late)}>— não foi possível carregar: {["energy", "water", "projects"].filter(f => failed.has(f as DashboardLoader)).map(f => LOADER_LABELS[f as DashboardLoader]).join(", ")}</p>
+                                    ) : null}
+                                    {outflows.length === 0 ? (
+                                        <p className="px-2 py-2 text-xs text-muted-foreground">Nenhuma conta de energia ou água nem parcela de projeto vence em {monthName(month)}.</p>
+                                    ) : (
+                                        <ul>{outflows.map((e, i) => <EventRow key={`${e.href}-${i}`} event={e} base={base} />)}</ul>
+                                    )}
+                                </SideCard>
+                            )}
+                            <SideCard title="Datas dos contratos" aside={isCurrent ? "próximos 60 dias" : undefined}>
+                                {dates.length === 0 ? (
+                                    <p className="px-2 py-2 text-xs text-muted-foreground">Nenhum reajuste nem término {isCurrent ? "nos próximos 60 dias" : `em ${monthName(month)}`}.</p>
+                                ) : (
+                                    <ul>{dates.map((e, i) => <EventRow key={`${e.href}-${e.kind}-${i}`} event={e} base={base} />)}</ul>
+                                )}
+                            </SideCard>
+                            <SideCard title={`Resultado de ${monthName(resultMonth)}`}>
+                                {result ? <ResultGraphic result={result} /> : (
+                                    <p className="px-2 py-2 text-xs text-muted-foreground">— nenhum mês confirmado na razão de receitas em {monthName(resultMonth)}.</p>
+                                )}
+                            </SideCard>
+                        </aside>
+                    </div>
+
+                    <Portfolio view={view} base={base} />
+
+                    {view.failed.length > 0 && (
+                        <p className={cn("flex items-start gap-2 text-xs", INK.late)}><AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> Não foi possível carregar: {view.failed.map(f => LOADER_LABELS[f]).join(", ")}. Recarregue a página; se persistir, o módulo em questão mostra o erro completo.</p>
+                    )}
+                </>
+            ))}
+
+            <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader className="text-left sm:text-left">
+                        <DialogTitle>Como ler o painel</DialogTitle>
+                        <DialogDescription asChild>
+                            <div className="space-y-3 text-sm text-muted-foreground">
+                                <p><strong className="text-foreground">Esperado</strong>: o aluguel de contrato de cada contrato que vence no mês. O primeiro mês de um contrato não entra (o primeiro aluguel vence no mês seguinte), e um contrato encerrado para no fim.</p>
+                                <p><strong className="text-foreground">Recebido</strong>: o que a razão de receitas do imóvel confirma no mês, antes da taxa da imobiliária (o líquido ao lado), ou a fatura paga.</p>
+                                <p><strong className="text-foreground">Vencido</strong>: passou do vencimento e a razão não tem o recebimento. Pode ser atraso do inquilino ou um repasse ainda não lançado: lance-o na razão do imóvel, ou veja a fatura quando houver.</p>
+                                <p><strong className="text-foreground">Novo</strong>: recebimento lançado desde a sua última visita. Fica destacado durante esta visita.</p>
+                                <p><strong className="text-foreground">Economia potencial com autogestão</strong>: a taxa que as imobiliárias retiveram em todos os meses lançados na razão de receitas. É o que a gestão própria deixaria com você.</p>
+                                <p>No quadro, clique no cabeçalho para ordenar e filtrar (botão direito: colunas) e selecione células para somar.</p>
+                            </div>
+                        </DialogDescription>
+                    </DialogHeader>
+                </DialogContent>
+            </Dialog>
+        </div>
+    );
+}
+
+/** `YYYY-MM-DD` + n days */
+function addDays(date: string, n: number): string {
+    return new Date(Date.parse(`${date}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 }

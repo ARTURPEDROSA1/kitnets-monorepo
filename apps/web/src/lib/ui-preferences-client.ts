@@ -10,7 +10,7 @@
  */
 import {
     columnWidthsPrefKey, filtersPrefKey, hiddenColumnsPrefKey, sanitizeColumnWidths, sanitizeFilters, sanitizeHiddenColumns, sanitizeSort, sidebarPrefKey, sortPrefKey,
-    notificationsPrefKey, sanitizeNotificationPrefs, sanitizeViewMode, viewPrefKey, type ColumnWidths, type NotificationPrefs, type TableFilters, type TableSort,
+    notificationsPrefKey, sanitizeNotificationPrefs, sanitizeSeenAt, sanitizeViewMode, seenPrefKey, viewPrefKey, type ColumnWidths, type NotificationPrefs, type TableFilters, type TableSort,
 } from "@/lib/ui-preferences";
 import { sanitizeCollapsedGroups } from "@/lib/sidebar-groups";
 
@@ -26,19 +26,21 @@ export interface AccountPreferences {
     notifications: Record<string, NotificationPrefs>;
     /** page → how it shows its records ("contratos" → "lista" | "linha") */
     views: Record<string, string>;
+    /** page → the moment up to which the user has seen it ("dashboard" → the newest payment already shown) */
+    seen: Record<string, string>;
 }
 type Section = keyof AccountPreferences;
 
-const EMPTY: AccountPreferences = { hiddenColumns: {}, columnWidths: {}, sort: {}, filters: {}, sidebar: {}, notifications: {}, views: {} };
+const EMPTY: AccountPreferences = { hiddenColumns: {}, columnWidths: {}, sort: {}, filters: {}, sidebar: {}, notifications: {}, views: {}, seen: {} };
 const ACCOUNT_TTL_MS = 60_000;
 const SAVE_DEBOUNCE_MS = 600;
 
 let account: { at: number; load: Promise<AccountPreferences> } | null = null;
 const pendingSaves = new Map<string, ReturnType<typeof setTimeout>>();
 
-const PREF_KEY: Record<Section, (tableKey: string) => string | null> = { hiddenColumns: hiddenColumnsPrefKey, columnWidths: columnWidthsPrefKey, sort: sortPrefKey, filters: filtersPrefKey, sidebar: sidebarPrefKey, notifications: notificationsPrefKey, views: viewPrefKey };
-const SANITIZE: Record<Section, (value: unknown) => unknown> = { hiddenColumns: sanitizeHiddenColumns, columnWidths: sanitizeColumnWidths, sort: sanitizeSort, filters: sanitizeFilters, sidebar: sanitizeCollapsedGroups, notifications: sanitizeNotificationPrefs, views: sanitizeViewMode };
-const LOCAL_NAME: Record<Section, string> = { hiddenColumns: "hidden-columns", columnWidths: "column-widths", sort: "sort", filters: "filters", sidebar: "sidebar", notifications: "notifications", views: "view" };
+const PREF_KEY: Record<Section, (tableKey: string) => string | null> = { hiddenColumns: hiddenColumnsPrefKey, columnWidths: columnWidthsPrefKey, sort: sortPrefKey, filters: filtersPrefKey, sidebar: sidebarPrefKey, notifications: notificationsPrefKey, views: viewPrefKey, seen: seenPrefKey };
+const SANITIZE: Record<Section, (value: unknown) => unknown> = { hiddenColumns: sanitizeHiddenColumns, columnWidths: sanitizeColumnWidths, sort: sanitizeSort, filters: sanitizeFilters, sidebar: sanitizeCollapsedGroups, notifications: sanitizeNotificationPrefs, views: sanitizeViewMode, seen: sanitizeSeenAt };
+const LOCAL_NAME: Record<Section, string> = { hiddenColumns: "hidden-columns", columnWidths: "column-widths", sort: "sort", filters: "filters", sidebar: "sidebar", notifications: "notifications", views: "view", seen: "seen" };
 
 // ── This device's copy ─────────────────────────────────────────────────────
 
@@ -65,7 +67,7 @@ export function loadAccountPreferences(): Promise<AccountPreferences> {
     if (!account || Date.now() - account.at > ACCOUNT_TTL_MS) {
         const load = fetch("/api/profiles/preferences")
             .then(res => (res.ok ? res.json() : EMPTY))
-            .then((data: Partial<AccountPreferences>) => ({ hiddenColumns: data.hiddenColumns ?? {}, columnWidths: data.columnWidths ?? {}, sort: data.sort ?? {}, filters: data.filters ?? {}, sidebar: data.sidebar ?? {}, notifications: data.notifications ?? {}, views: data.views ?? {} }))
+            .then((data: Partial<AccountPreferences>) => ({ hiddenColumns: data.hiddenColumns ?? {}, columnWidths: data.columnWidths ?? {}, sort: data.sort ?? {}, filters: data.filters ?? {}, sidebar: data.sidebar ?? {}, notifications: data.notifications ?? {}, views: data.views ?? {}, seen: data.seen ?? {} }))
             .catch(() => EMPTY);   // signed out or offline: this device's copy still works
         account = { at: Date.now(), load };
     }

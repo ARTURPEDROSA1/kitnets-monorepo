@@ -1,0 +1,711 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-13T00:20:36+00:00",
+  "title": "Design System: Kitnets.com",
+  "extensions": {
+    "colorMeta": {
+      "canvas": {
+        "role": "neutral",
+        "displayName": "Slate Canvas",
+        "tonalRamp": [
+          "oklch(20.8% 0.042 265.755)",
+          "oklch(27.9% 0.041 260.031)",
+          "oklch(37.2% 0.044 257.287)",
+          "oklch(44.6% 0.043 257.281)",
+          "oklch(55.4% 0.046 257.417)",
+          "oklch(70.4% 0.04 256.788)",
+          "oklch(86.9% 0.022 252.894)",
+          "oklch(96.8% 0.007 247.896)"
+        ],
+        "canonical": "hsl(var(--background)) = hsl(210 20% 98%)"
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Night Ink",
+        "tonalRamp": [
+          "oklch(20.8% 0.042 265.755)",
+          "oklch(27.9% 0.041 260.031)",
+          "oklch(37.2% 0.044 257.287)",
+          "oklch(44.6% 0.043 257.281)",
+          "oklch(55.4% 0.046 257.417)",
+          "oklch(70.4% 0.04 256.788)",
+          "oklch(86.9% 0.022 252.894)",
+          "oklch(96.8% 0.007 247.896)"
+        ],
+        "canonical": "hsl(var(--foreground)) = hsl(222.2 84% 4.9%)"
+      },
+      "card": {
+        "role": "neutral",
+        "displayName": "Sheet White",
+        "tonalRamp": [
+          "oklch(20.8% 0.042 265.755)",
+          "oklch(27.9% 0.041 260.031)",
+          "oklch(37.2% 0.044 257.287)",
+          "oklch(44.6% 0.043 257.281)",
+          "oklch(55.4% 0.046 257.417)",
+          "oklch(70.4% 0.04 256.788)",
+          "oklch(86.9% 0.022 252.894)",
+          "oklch(96.8% 0.007 247.896)"
+        ],
+        "canonical": "hsl(var(--card)) = hsl(0 0% 100%)"
+      },
+      "primary": {
+        "role": "neutral",
+        "displayName": "Slate Ink",
+        "tonalRamp": [
+          "oklch(20.8% 0.042 265.755)",
+          "oklch(27.9% 0.041 260.031)",
+          "oklch(37.2% 0.044 257.287)",
+          "oklch(44.6% 0.043 257.281)",
+          "oklch(55.4% 0.046 257.417)",
+          "oklch(70.4% 0.04 256.788)",
+          "oklch(86.9% 0.022 252.894)",
+          "oklch(96.8% 0.007 247.896)"
+        ],
+        "canonical": "hsl(var(--primary)) = hsl(222.2 47.4% 11.2%)"
+      },
+      "primary-foreground": {
+        "role": "neutral",
+        "displayName": "Slate Ink Foreground",
+        "tonalRamp": [
+          "oklch(20.8% 0.042 265.755)",
+          "oklch(27.9% 0.041 260.031)",
+          "oklch(37.2% 0.044 257.287)",
+          "oklch(44.6% 0.043 257.281)",
+          "oklch(55.4% 0.046 257.417)",
+          "oklch(70.4% 0.04 256.788)",
+          "oklch(86.9% 0.022 252.894)",
+          "oklch(96.8% 0.007 247.896)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Mist",
+        "tonalRamp": [
+          "oklch(20.8% 0.042 265.755)",
+          "oklch(27.9% 0.041 260.031)",
+          "oklch(37.2% 0.044 257.287)",
+          "oklch(44.6% 0.043 257.281)",
+          "oklch(55.4% 0.046 257.417)",
+          "oklch(70.4% 0.04 256.788)",
+          "oklch(86.9% 0.022 252.894)",
+          "oklch(96.8% 0.007 247.896)"
+        ],
+        "canonical": "hsl(var(--muted)) = hsl(210 40% 96.1%)"
+      },
+      "muted-foreground": {
+        "role": "neutral",
+        "displayName": "Slate Grey Text",
+        "tonalRamp": [
+          "oklch(20.8% 0.042 265.755)",
+          "oklch(27.9% 0.041 260.031)",
+          "oklch(37.2% 0.044 257.287)",
+          "oklch(44.6% 0.043 257.281)",
+          "oklch(55.4% 0.046 257.417)",
+          "oklch(70.4% 0.04 256.788)",
+          "oklch(86.9% 0.022 252.894)",
+          "oklch(96.8% 0.007 247.896)"
+        ],
+        "canonical": "hsl(var(--muted-foreground)) = hsl(215 25% 40%)"
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "tonalRamp": [
+          "oklch(20.8% 0.042 265.755)",
+          "oklch(27.9% 0.041 260.031)",
+          "oklch(37.2% 0.044 257.287)",
+          "oklch(44.6% 0.043 257.281)",
+          "oklch(55.4% 0.046 257.417)",
+          "oklch(70.4% 0.04 256.788)",
+          "oklch(86.9% 0.022 252.894)",
+          "oklch(96.8% 0.007 247.896)"
+        ],
+        "canonical": "hsl(var(--border)) = hsl(214.3 31.8% 91.4%)"
+      },
+      "destructive": {
+        "role": "neutral",
+        "displayName": "Alarm Red",
+        "tonalRamp": [
+          "oklch(39.6% 0.141 25.723)",
+          "oklch(44.4% 0.177 26.899)",
+          "oklch(50.5% 0.213 27.518)",
+          "oklch(57.7% 0.245 27.325)",
+          "oklch(63.7% 0.237 25.331)",
+          "oklch(70.4% 0.191 22.216)",
+          "oklch(80.8% 0.114 19.571)",
+          "oklch(93.6% 0.032 17.717)"
+        ],
+        "canonical": "hsl(var(--destructive)) = hsl(0 84.2% 60.2%)"
+      },
+      "canvas-dark": {
+        "role": "neutral",
+        "displayName": "Night Canvas (dark theme)",
+        "tonalRamp": [
+          "oklch(20.8% 0.042 265.755)",
+          "oklch(27.9% 0.041 260.031)",
+          "oklch(37.2% 0.044 257.287)",
+          "oklch(44.6% 0.043 257.281)",
+          "oklch(55.4% 0.046 257.417)",
+          "oklch(70.4% 0.04 256.788)",
+          "oklch(86.9% 0.022 252.894)",
+          "oklch(96.8% 0.007 247.896)"
+        ],
+        "canonical": ".dark --background"
+      },
+      "muted-dark": {
+        "role": "neutral",
+        "displayName": "Night Mist (dark theme)",
+        "tonalRamp": [
+          "oklch(20.8% 0.042 265.755)",
+          "oklch(27.9% 0.041 260.031)",
+          "oklch(37.2% 0.044 257.287)",
+          "oklch(44.6% 0.043 257.281)",
+          "oklch(55.4% 0.046 257.417)",
+          "oklch(70.4% 0.04 256.788)",
+          "oklch(86.9% 0.022 252.894)",
+          "oklch(96.8% 0.007 247.896)"
+        ],
+        "canonical": ".dark --muted"
+      },
+      "muted-foreground-dark": {
+        "role": "neutral",
+        "displayName": "Night Grey Text (dark theme)",
+        "tonalRamp": [
+          "oklch(20.8% 0.042 265.755)",
+          "oklch(27.9% 0.041 260.031)",
+          "oklch(37.2% 0.044 257.287)",
+          "oklch(44.6% 0.043 257.281)",
+          "oklch(55.4% 0.046 257.417)",
+          "oklch(70.4% 0.04 256.788)",
+          "oklch(86.9% 0.022 252.894)",
+          "oklch(96.8% 0.007 247.896)"
+        ],
+        "canonical": ".dark --muted-foreground"
+      },
+      "money-in": {
+        "role": "primary",
+        "displayName": "Ledger Emerald",
+        "tonalRamp": [
+          "oklch(37.8% 0.077 168.94)",
+          "oklch(43.2% 0.095 166.913)",
+          "oklch(50.8% 0.118 165.612)",
+          "oklch(59.6% 0.145 163.225)",
+          "oklch(69.6% 0.17 162.48)",
+          "oklch(76.5% 0.177 163.223)",
+          "oklch(84.5% 0.143 164.978)",
+          "oklch(95% 0.052 163.051)"
+        ],
+        "canonical": "Tailwind emerald-500"
+      },
+      "money-in-soft": {
+        "role": "primary",
+        "displayName": "Soft Emerald",
+        "tonalRamp": [
+          "oklch(37.8% 0.077 168.94)",
+          "oklch(43.2% 0.095 166.913)",
+          "oklch(50.8% 0.118 165.612)",
+          "oklch(59.6% 0.145 163.225)",
+          "oklch(69.6% 0.17 162.48)",
+          "oklch(76.5% 0.177 163.223)",
+          "oklch(84.5% 0.143 164.978)",
+          "oklch(95% 0.052 163.051)"
+        ],
+        "canonical": "Tailwind emerald-300"
+      },
+      "due-soon": {
+        "role": "secondary",
+        "displayName": "Due Amber",
+        "tonalRamp": [
+          "oklch(41.4% 0.112 45.904)",
+          "oklch(47.3% 0.137 46.201)",
+          "oklch(55.5% 0.163 48.998)",
+          "oklch(66.6% 0.179 58.318)",
+          "oklch(76.9% 0.188 70.08)",
+          "oklch(82.8% 0.189 84.429)",
+          "oklch(87.9% 0.169 91.605)",
+          "oklch(96.2% 0.059 95.617)"
+        ],
+        "canonical": "Tailwind amber-400"
+      },
+      "overdue": {
+        "role": "secondary",
+        "displayName": "Overdue Rose",
+        "tonalRamp": [
+          "oklch(41% 0.159 10.272)",
+          "oklch(45.5% 0.188 13.697)",
+          "oklch(51.4% 0.222 16.935)",
+          "oklch(58.6% 0.253 17.585)",
+          "oklch(64.5% 0.246 16.439)",
+          "oklch(71.2% 0.194 13.428)",
+          "oklch(81% 0.117 11.638)",
+          "oklch(94.1% 0.03 12.58)"
+        ],
+        "canonical": "Tailwind rose-500"
+      },
+      "expected": {
+        "role": "neutral",
+        "displayName": "Expected Slate",
+        "tonalRamp": [
+          "oklch(20.8% 0.042 265.755)",
+          "oklch(27.9% 0.041 260.031)",
+          "oklch(37.2% 0.044 257.287)",
+          "oklch(44.6% 0.043 257.281)",
+          "oklch(55.4% 0.046 257.417)",
+          "oklch(70.4% 0.04 256.788)",
+          "oklch(86.9% 0.022 252.894)",
+          "oklch(96.8% 0.007 247.896)"
+        ],
+        "canonical": "Tailwind slate-400"
+      },
+      "agency-violet": {
+        "role": "secondary",
+        "displayName": "Agency Violet",
+        "tonalRamp": [
+          "oklch(38% 0.189 293.745)",
+          "oklch(43.2% 0.232 292.759)",
+          "oklch(49.1% 0.27 292.581)",
+          "oklch(54.1% 0.281 293.009)",
+          "oklch(60.6% 0.25 292.717)",
+          "oklch(70.2% 0.183 293.541)",
+          "oklch(81.1% 0.111 293.571)",
+          "oklch(94.3% 0.029 294.588)"
+        ],
+        "canonical": "Tailwind violet-500"
+      },
+      "saving-teal": {
+        "role": "tertiary",
+        "displayName": "Saving Teal",
+        "tonalRamp": [
+          "oklch(38.6% 0.063 188.416)",
+          "oklch(43.7% 0.078 188.216)",
+          "oklch(51.1% 0.096 186.391)",
+          "oklch(60% 0.118 184.704)",
+          "oklch(70.4% 0.14 182.503)",
+          "oklch(77.7% 0.152 181.912)",
+          "oklch(85.5% 0.138 181.071)",
+          "oklch(95.3% 0.051 180.801)"
+        ],
+        "canonical": "Tailwind teal-500"
+      },
+      "term-indigo": {
+        "role": "tertiary",
+        "displayName": "Term Indigo",
+        "tonalRamp": [
+          "oklch(35.9% 0.144 278.697)",
+          "oklch(39.8% 0.195 277.366)",
+          "oklch(45.7% 0.24 277.023)",
+          "oklch(51.1% 0.262 276.966)",
+          "oklch(58.5% 0.233 277.117)",
+          "oklch(67.3% 0.182 276.935)",
+          "oklch(78.5% 0.115 274.713)",
+          "oklch(93% 0.034 272.788)"
+        ],
+        "canonical": "Tailwind indigo-500"
+      },
+      "deposit-sky": {
+        "role": "tertiary",
+        "displayName": "Deposit Sky",
+        "tonalRamp": [
+          "oklch(39.1% 0.09 240.876)",
+          "oklch(44.3% 0.11 240.79)",
+          "oklch(50% 0.134 242.749)",
+          "oklch(58.8% 0.158 241.966)",
+          "oklch(68.5% 0.169 237.323)",
+          "oklch(74.6% 0.16 232.661)",
+          "oklch(82.8% 0.111 230.318)",
+          "oklch(95.1% 0.026 236.824)"
+        ],
+        "canonical": "Tailwind sky-500"
+      },
+      "works-orange": {
+        "role": "tertiary",
+        "displayName": "Works Orange",
+        "tonalRamp": [
+          "oklch(40.8% 0.123 38.172)",
+          "oklch(47% 0.157 37.304)",
+          "oklch(55.3% 0.195 38.402)",
+          "oklch(64.6% 0.222 41.116)",
+          "oklch(70.5% 0.213 47.604)",
+          "oklch(75% 0.183 55.934)",
+          "oklch(83.7% 0.128 66.29)",
+          "oklch(95.4% 0.038 75.164)"
+        ],
+        "canonical": "Tailwind orange-500"
+      },
+      "dash-in": {
+        "role": "primary",
+        "displayName": "Emerald Ink",
+        "tonalRamp": [
+          "oklch(37.8% 0.077 168.94)",
+          "oklch(43.2% 0.095 166.913)",
+          "oklch(50.8% 0.118 165.612)",
+          "oklch(59.6% 0.145 163.225)",
+          "oklch(69.6% 0.17 162.48)",
+          "oklch(76.5% 0.177 163.223)",
+          "oklch(84.5% 0.143 164.978)",
+          "oklch(95% 0.052 163.051)"
+        ],
+        "canonical": "--dash-in (light)"
+      },
+      "dash-due": {
+        "role": "secondary",
+        "displayName": "Burnt Amber",
+        "tonalRamp": [
+          "oklch(41.4% 0.112 45.904)",
+          "oklch(47.3% 0.137 46.201)",
+          "oklch(55.5% 0.163 48.998)",
+          "oklch(66.6% 0.179 58.318)",
+          "oklch(76.9% 0.188 70.08)",
+          "oklch(82.8% 0.189 84.429)",
+          "oklch(87.9% 0.169 91.605)",
+          "oklch(96.2% 0.059 95.617)"
+        ],
+        "canonical": "--dash-due (light)"
+      },
+      "dash-late": {
+        "role": "secondary",
+        "displayName": "Deep Rose",
+        "tonalRamp": [
+          "oklch(41% 0.159 10.272)",
+          "oklch(45.5% 0.188 13.697)",
+          "oklch(51.4% 0.222 16.935)",
+          "oklch(58.6% 0.253 17.585)",
+          "oklch(64.5% 0.246 16.439)",
+          "oklch(71.2% 0.194 13.428)",
+          "oklch(81% 0.117 11.638)",
+          "oklch(94.1% 0.03 12.58)"
+        ],
+        "canonical": "--dash-late (light)"
+      },
+      "dash-fee": {
+        "role": "secondary",
+        "displayName": "Fee Violet",
+        "tonalRamp": [
+          "oklch(38% 0.189 293.745)",
+          "oklch(43.2% 0.232 292.759)",
+          "oklch(49.1% 0.27 292.581)",
+          "oklch(54.1% 0.281 293.009)",
+          "oklch(60.6% 0.25 292.717)",
+          "oklch(70.2% 0.183 293.541)",
+          "oklch(81.1% 0.111 293.571)",
+          "oklch(94.3% 0.029 294.588)"
+        ],
+        "canonical": "--dash-fee (light)"
+      },
+      "dash-in-dark": {
+        "role": "primary",
+        "displayName": "Emerald Ink (dark theme)",
+        "tonalRamp": [
+          "oklch(37.8% 0.077 168.94)",
+          "oklch(43.2% 0.095 166.913)",
+          "oklch(50.8% 0.118 165.612)",
+          "oklch(59.6% 0.145 163.225)",
+          "oklch(69.6% 0.17 162.48)",
+          "oklch(76.5% 0.177 163.223)",
+          "oklch(84.5% 0.143 164.978)",
+          "oklch(95% 0.052 163.051)"
+        ],
+        "canonical": ".dark --dash-in"
+      },
+      "dash-due-dark": {
+        "role": "secondary",
+        "displayName": "Burnt Amber (dark theme)",
+        "tonalRamp": [
+          "oklch(41.4% 0.112 45.904)",
+          "oklch(47.3% 0.137 46.201)",
+          "oklch(55.5% 0.163 48.998)",
+          "oklch(66.6% 0.179 58.318)",
+          "oklch(76.9% 0.188 70.08)",
+          "oklch(82.8% 0.189 84.429)",
+          "oklch(87.9% 0.169 91.605)",
+          "oklch(96.2% 0.059 95.617)"
+        ],
+        "canonical": ".dark --dash-due"
+      },
+      "dash-late-dark": {
+        "role": "secondary",
+        "displayName": "Deep Rose (dark theme)",
+        "tonalRamp": [
+          "oklch(41% 0.159 10.272)",
+          "oklch(45.5% 0.188 13.697)",
+          "oklch(51.4% 0.222 16.935)",
+          "oklch(58.6% 0.253 17.585)",
+          "oklch(64.5% 0.246 16.439)",
+          "oklch(71.2% 0.194 13.428)",
+          "oklch(81% 0.117 11.638)",
+          "oklch(94.1% 0.03 12.58)"
+        ],
+        "canonical": ".dark --dash-late"
+      },
+      "dash-fee-dark": {
+        "role": "secondary",
+        "displayName": "Fee Violet (dark theme)",
+        "tonalRamp": [
+          "oklch(38% 0.189 293.745)",
+          "oklch(43.2% 0.232 292.759)",
+          "oklch(49.1% 0.27 292.581)",
+          "oklch(54.1% 0.281 293.009)",
+          "oklch(60.6% 0.25 292.717)",
+          "oklch(70.2% 0.183 293.541)",
+          "oklch(81.1% 0.111 293.571)",
+          "oklch(94.3% 0.029 294.588)"
+        ],
+        "canonical": ".dark --dash-fee"
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "The page title, one per page."
+      },
+      "figure": {
+        "displayName": "Figure",
+        "purpose": "The big number of a strip segment or summary card; 20px on a phone in the dashboard strip."
+      },
+      "section-title": {
+        "displayName": "Section title",
+        "purpose": "A section heading inside a page ('A carteira')."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Card headings and button text."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Help text, empty states, dialog prose."
+      },
+      "cell-strong": {
+        "displayName": "Cell strong",
+        "purpose": "Lead line of a table cell or side-card row."
+      },
+      "meta": {
+        "displayName": "Meta",
+        "purpose": "Table cells, legends, the line under a figure, dates."
+      },
+      "pill": {
+        "displayName": "Pill",
+        "purpose": "Status pills; the 'novo' badge is 10px."
+      },
+      "column-label": {
+        "displayName": "Column label",
+        "purpose": "Uppercase spreadsheet column headers and sidebar group headings only."
+      }
+    },
+    "shadows": [
+      {
+        "name": "floating-layer",
+        "value": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
+        "purpose": "Layers that float: the table cell-sum bar, column menus, popovers."
+      },
+      {
+        "name": "shared-card",
+        "value": "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
+        "purpose": "Default of the shared Card primitive; hub cards built on plain sections omit it."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-standard",
+        "value": "150ms cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "Colour, border and opacity changes on hover and focus (Tailwind default transition)."
+      },
+      {
+        "name": "bar-grow",
+        "value": "width 300ms cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "Proportional bar segments when the month changes."
+      },
+      {
+        "name": "arrow-nudge",
+        "value": "translateX(2px) on hover, 150ms",
+        "purpose": "The arrow of a clickable card."
+      },
+      {
+        "name": "sidebar-rail",
+        "value": "margin 200ms",
+        "purpose": "Content shifts when the sidebar collapses to its rail."
+      },
+      {
+        "name": "accordion",
+        "value": "height 0.2s ease-out",
+        "purpose": "Accordion open and close."
+      },
+      {
+        "name": "skeleton-pulse",
+        "value": "animate-pulse",
+        "purpose": "Loading skeletons; theme switches run without transitions."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px",
+        "purpose": "Desktop sidebar (rail allowed) replaces the top bar; page padding 24px."
+      },
+      {
+        "name": "md",
+        "value": "768px",
+        "purpose": "Dashboard strip goes four across; calendar grid replaces the day list; inputs drop the 16px iOS floor."
+      },
+      {
+        "name": "lg",
+        "value": "1024px",
+        "purpose": "Dashboard side cards flow three across under the board."
+      },
+      {
+        "name": "xl",
+        "value": "1280px",
+        "purpose": "Contratos KPI cards go six across."
+      },
+      {
+        "name": "dash-aside",
+        "value": "1360px (85rem)",
+        "purpose": "Dashboard board beside a 272px side column."
+      },
+      {
+        "name": "page-max",
+        "value": "1600px",
+        "purpose": "Maximum content width."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The shared default action: Slate Ink fill, 6px corners, 40px tall.",
+      "html": "<button class=\"ds-btn-primary\">Novo contrato</button>",
+      "css": ".ds-btn-primary { font-family: var(--font-geist-sans, Geist), Arial, Helvetica, sans-serif; display: inline-flex; align-items: center; justify-content: center; height: 40px; padding: 8px 16px; border: 0; border-radius: 6px; background: hsl(var(--primary, 222.2 47.4% 11.2%)); color: hsl(var(--primary-foreground, 210 40% 98%)); font-size: 14px; font-weight: 500; cursor: pointer; transition: background-color 150ms cubic-bezier(0.4,0,0.2,1); } .ds-btn-primary:hover { background: hsl(var(--primary, 222.2 47.4% 11.2%) / 0.9); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 2px hsl(var(--background, 210 20% 98%)), 0 0 0 4px hsl(var(--foreground, 222.2 84% 4.9%)); }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "The second action beside a primary one ('Importar contrato').",
+      "html": "<button class=\"ds-btn-outline\">Importar contrato</button>",
+      "css": ".ds-btn-outline { font-family: var(--font-geist-sans, Geist), Arial, Helvetica, sans-serif; display: inline-flex; align-items: center; height: 40px; padding: 8px 16px; border: 1px solid hsl(var(--border, 214.3 31.8% 91.4%)); border-radius: 6px; background: hsl(var(--background, 210 20% 98%)); color: hsl(var(--foreground, 222.2 84% 4.9%)); font-size: 14px; font-weight: 500; cursor: pointer; transition: background-color 150ms cubic-bezier(0.4,0,0.2,1); } .ds-btn-outline:hover { background: hsl(var(--muted, 210 40% 96.1%)); } .ds-btn-outline:focus-visible { outline: none; box-shadow: 0 0 0 2px hsl(var(--background, 210 20% 98%)), 0 0 0 4px hsl(var(--foreground, 222.2 84% 4.9%)); }"
+    },
+    {
+      "name": "View Toggle",
+      "kind": "custom",
+      "refersTo": "segmented-item-active",
+      "description": "How a view is shown (Quadro | Calendário), with the '?' help button beside it.",
+      "html": "<div class=\"ds-seg-wrap\"><div class=\"ds-seg\" role=\"group\" aria-label=\"Como mostrar os aluguéis\"><button class=\"ds-seg-item\" aria-pressed=\"true\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\"/><path d=\"M21 9H3\"/><path d=\"M21 15H3\"/></svg> Quadro</button><button class=\"ds-seg-item\" aria-pressed=\"false\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M8 2v4\"/><path d=\"M16 2v4\"/><rect width=\"18\" height=\"18\" x=\"3\" y=\"4\" rx=\"2\"/><path d=\"M3 10h18\"/></svg> Calendário</button></div><button class=\"ds-help\" aria-label=\"Como ler o painel\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3\"/><path d=\"M12 17h.01\"/></svg></button></div>",
+      "css": ".ds-seg-wrap { font-family: var(--font-geist-sans, Geist), Arial, Helvetica, sans-serif; display: inline-flex; align-items: center; gap: 6px; } .ds-seg { display: inline-flex; padding: 2px; border: 1px solid hsl(var(--border, 214.3 31.8% 91.4%)); border-radius: 8px; background: hsl(var(--card, 0 0% 100%)); } .ds-seg-item { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border: 0; border-radius: 6px; background: transparent; color: hsl(var(--muted-foreground, 215 25% 40%)); font: inherit; font-size: 12px; cursor: pointer; } .ds-seg-item:hover { color: hsl(var(--foreground, 222.2 84% 4.9%)); } .ds-seg-item[aria-pressed=\"true\"] { background: hsl(var(--muted, 210 40% 96.1%)); color: hsl(var(--foreground, 222.2 84% 4.9%)); font-weight: 600; } .ds-seg-item:focus-visible, .ds-help:focus-visible { outline: none; box-shadow: 0 0 0 2px oklch(69.6% 0.17 162.48); } .ds-help { display: grid; place-items: center; padding: 6px; border: 0; border-radius: 6px; background: transparent; color: hsl(var(--muted-foreground, 215 25% 40%)); cursor: pointer; } .ds-help:hover { background: hsl(var(--muted, 210 40% 96.1%)); color: hsl(var(--foreground, 222.2 84% 4.9%)); }"
+    },
+    {
+      "name": "Status Pills",
+      "kind": "chip",
+      "refersTo": "pill-received",
+      "description": "Rent status as a tinted pill that states the fact; ink text, 15% fill.",
+      "html": "<div class=\"ds-pills\"><span class=\"ds-pill ds-pill-in\">recebido 11/10</span><span class=\"ds-pill ds-pill-due\">vence em 3 dias</span><span class=\"ds-pill ds-pill-later\">vence em 8 dias</span><span class=\"ds-pill ds-pill-late\">vencido há 7 dias</span><span class=\"ds-pill ds-new\">novo</span></div>",
+      "css": ".ds-pills { font-family: var(--font-geist-sans, Geist), Arial, Helvetica, sans-serif; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; } .ds-pill { display: inline-flex; align-items: center; white-space: nowrap; padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; } .ds-pill-in { background: oklch(69.6% 0.17 162.48 / 0.15); color: hsl(var(--dash-in, 163 94% 24%)); } .ds-pill-due { background: oklch(76.9% 0.188 70.08 / 0.2); color: hsl(var(--dash-due, 26 90% 37%)); } .ds-pill-later { background: oklch(55.4% 0.046 257.417 / 0.1); color: hsl(var(--muted-foreground, 215 25% 40%)); } .ds-pill-late { background: oklch(64.5% 0.246 16.439 / 0.15); color: hsl(var(--dash-late, 345 83% 41%)); } .ds-new { padding: 0 6px; font-size: 10px; background: oklch(69.6% 0.17 162.48 / 0.15); color: hsl(var(--dash-in, 163 94% 24%)); }"
+    },
+    {
+      "name": "Money Strip",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "The dashboard's four money states over one proportional bar.",
+      "html": "<section class=\"ds-strip\" aria-label=\"O dinheiro de outubro\"><div class=\"ds-strip-grid\"><div class=\"ds-seg-cell\"><span class=\"ds-lbl\"><i style=\"background:oklch(70.4% 0.04 256.788)\"></i>Esperado em outubro</span><b class=\"ds-fig\">R$ 26.730</b><small>22 contratos · aluguel de contrato</small></div><div class=\"ds-seg-cell\"><span class=\"ds-lbl\"><i style=\"background:oklch(69.6% 0.17 162.48)\"></i>Recebido</span><b class=\"ds-fig ds-in\">R$ 15.870</b><small>12 de 22 · líquido R$ 14.874</small></div><div class=\"ds-seg-cell\"><span class=\"ds-lbl\"><i style=\"background:oklch(82.8% 0.189 84.429)\"></i>A vencer</span><b class=\"ds-fig ds-due\">R$ 7.860</b><small>8 contratos · próximo 15/10</small></div><div class=\"ds-seg-cell\"><span class=\"ds-lbl\"><i style=\"background:oklch(64.5% 0.246 16.439)\"></i>Vencido</span><b class=\"ds-fig ds-late\">R$ 3.000</b><small>2 contratos · desde 05/10</small></div></div><div class=\"ds-bar\" role=\"img\" aria-label=\"59% recebido\"><span style=\"width:59%;background:oklch(69.6% 0.17 162.48)\"></span><span style=\"width:30%;background:oklch(82.8% 0.189 84.429)\"></span><span style=\"width:11%;background:oklch(64.5% 0.246 16.439)\"></span></div></section>",
+      "css": ".ds-strip { font-family: var(--font-geist-sans, Geist), Arial, Helvetica, sans-serif; overflow: hidden; border: 1px solid hsl(var(--border, 214.3 31.8% 91.4%) / 0.8); border-radius: 12px; background: hsl(var(--card, 0 0% 100%)); } .ds-strip-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); } .ds-seg-cell { min-width: 0; padding: 12px 20px; } .ds-seg-cell + .ds-seg-cell { border-left: 1px solid hsl(var(--border, 214.3 31.8% 91.4%) / 0.6); } .ds-lbl { display: flex; align-items: center; gap: 6px; font-size: 13px; color: hsl(var(--muted-foreground, 215 25% 40%)); } .ds-lbl i { width: 8px; height: 8px; border-radius: 9999px; flex: none; } .ds-fig { display: block; margin-top: 4px; font-size: 24px; font-weight: 700; line-height: 1.25; font-variant-numeric: tabular-nums; color: hsl(var(--foreground, 222.2 84% 4.9%)); } .ds-in { color: hsl(var(--dash-in, 163 94% 24%)); } .ds-due { color: hsl(var(--dash-due, 26 90% 37%)); } .ds-late { color: hsl(var(--dash-late, 345 83% 41%)); } .ds-seg-cell small { display: block; margin-top: 2px; font-size: 12px; color: hsl(var(--muted-foreground, 215 25% 40%)); } .ds-bar { display: flex; height: 6px; background: hsl(var(--muted, 210 40% 96.1%)); } .ds-bar span { transition: width 300ms cubic-bezier(0.4,0,0.2,1); } @media (max-width: 767px) { .ds-strip-grid { grid-template-columns: 1fr 1fr; } .ds-fig { font-size: 20px; } }"
+    },
+    {
+      "name": "Module Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "A summary card in one module tone: big figure, one bar, dotted legend; arrow only when it opens something.",
+      "html": "<a class=\"ds-mod\" href=\"#\"><span class=\"ds-mod-head\"><h3>Aluguel contratado</h3><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/></svg></span><span class=\"ds-mod-fig\"><b>R$ 26.730</b><small>/mês</small></span><span class=\"ds-mod-bar\"><span style=\"width:82%;background:oklch(69.6% 0.17 162.48)\"></span><span style=\"width:18%;background:oklch(84.5% 0.143 164.978)\"></span></span><span class=\"ds-mod-legend\"><span><i style=\"background:oklch(69.6% 0.17 162.48)\"></i>Imobiliária <strong>18</strong></span><span><i style=\"background:oklch(84.5% 0.143 164.978)\"></i>Gestão própria <strong>4</strong></span></span></a>",
+      "css": ".ds-mod { font-family: var(--font-geist-sans, Geist), Arial, Helvetica, sans-serif; display: flex; flex-direction: column; gap: 12px; max-width: 360px; padding: 16px; border: 1px solid oklch(69.6% 0.17 162.48 / 0.25); border-radius: 12px; background: oklch(69.6% 0.17 162.48 / 0.05); color: hsl(var(--foreground, 222.2 84% 4.9%)); text-decoration: none; transition: border-color 150ms cubic-bezier(0.4,0,0.2,1); } .ds-mod:hover { border-color: hsl(var(--foreground, 222.2 84% 4.9%) / 0.2); } .ds-mod:focus-visible { outline: none; box-shadow: 0 0 0 2px oklch(69.6% 0.17 162.48); } .ds-mod-head { display: flex; align-items: center; justify-content: space-between; color: hsl(var(--muted-foreground, 215 25% 40%)); } .ds-mod-head h3 { margin: 0; font-size: 14px; font-weight: 600; color: hsl(var(--foreground, 222.2 84% 4.9%)); } .ds-mod-head svg { transition: transform 150ms cubic-bezier(0.4,0,0.2,1); } .ds-mod:hover .ds-mod-head svg { transform: translateX(2px); } .ds-mod-fig { display: flex; align-items: baseline; gap: 4px; } .ds-mod-fig b { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; } .ds-mod-fig small { font-size: 12px; font-weight: 500; color: hsl(var(--muted-foreground, 215 25% 40%)); } .ds-mod-bar { display: flex; height: 8px; overflow: hidden; border-radius: 9999px; background: hsl(var(--muted, 210 40% 96.1%)); } .ds-mod-legend { display: flex; gap: 16px; font-size: 12px; color: hsl(var(--muted-foreground, 215 25% 40%)); } .ds-mod-legend span { display: flex; align-items: center; gap: 6px; } .ds-mod-legend i { width: 8px; height: 8px; border-radius: 9999px; } .ds-mod-legend strong { font-weight: 600; color: hsl(var(--foreground, 222.2 84% 4.9%)); }"
+    },
+    {
+      "name": "Spreadsheet Table",
+      "kind": "custom",
+      "refersTo": "table-header",
+      "description": "The shared table machinery as the rent board renders it: uppercase sortable headers, status dots and pills, a 'hoje' rule, a fresh row lit emerald, sums in the footer.",
+      "html": "<div class=\"ds-tbl-wrap\"><table class=\"ds-tbl\"><thead><tr><th>Venc. ↑</th><th>Contrato</th><th>Situação</th><th class=\"r\">Aluguel</th><th class=\"r\">Recebido</th></tr></thead><tbody><tr class=\"ds-fresh\"><td><span class=\"ds-due-d\"><i style=\"background:oklch(69.6% 0.17 162.48)\"></i>08/10</span></td><td><a href=\"#\">Kitnet 1</a><small>Ed. Bela Vista · Ana Clara</small></td><td><span class=\"ds-p ds-p-in\">recebido 11/10</span></td><td class=\"r\">R$ 1.050,00</td><td class=\"r b\">R$ 1.050,00</td></tr><tr class=\"ds-late-row\"><td><span class=\"ds-due-d\"><i style=\"background:oklch(64.5% 0.246 16.439)\"></i>10/10</span></td><td><a href=\"#\">Kitnet 3</a><small>Ed. Santo Antônio · Thiago</small></td><td><span class=\"ds-p ds-p-late\">vencido há 2 dias</span></td><td class=\"r\">R$ 1.100,00</td><td class=\"r muted\">—</td></tr><tr class=\"ds-today\"><td colspan=\"5\"><span>hoje, 12/10</span></td></tr><tr><td><span class=\"ds-due-d\"><i style=\"background:oklch(82.8% 0.189 84.429)\"></i>15/10</span></td><td><a href=\"#\">Kitnet 9</a><small>Ed. Santo Antônio · Felipe</small></td><td><span class=\"ds-p ds-p-due\">vence em 3 dias</span></td><td class=\"r\">R$ 1.150,00</td><td class=\"r muted\">—</td></tr></tbody><tfoot><tr><td class=\"b\">Soma</td><td>3 aluguéis</td><td>1 de 3 recebidos</td><td class=\"r b\">R$ 3.300,00</td><td class=\"r b\">R$ 1.050,00</td></tr></tfoot></table></div>",
+      "css": ".ds-tbl-wrap { font-family: var(--font-geist-sans, Geist), Arial, Helvetica, sans-serif; overflow-x: auto; border: 1px solid hsl(var(--border, 214.3 31.8% 91.4%) / 0.8); border-radius: 12px; background: hsl(var(--card, 0 0% 100%)); } .ds-tbl { width: 100%; border-collapse: collapse; font-size: 12px; color: hsl(var(--foreground, 222.2 84% 4.9%)); } .ds-tbl thead { background: hsl(var(--muted, 210 40% 96.1%) / 0.3); } .ds-tbl th { padding: 8px; text-align: left; font-size: 10px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: hsl(var(--muted-foreground, 215 25% 40%)); border-bottom: 1px solid hsl(var(--border, 214.3 31.8% 91.4%)); cursor: pointer; } .ds-tbl th:hover { color: hsl(var(--foreground, 222.2 84% 4.9%)); } .ds-tbl td { padding: 8px 12px; border-bottom: 1px solid hsl(var(--border, 214.3 31.8% 91.4%) / 0.5); vertical-align: middle; } .ds-tbl .r { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; } .ds-tbl .b { font-weight: 600; } .ds-tbl .muted { color: hsl(var(--muted-foreground, 215 25% 40%)); } .ds-tbl tbody tr:hover { background: hsl(var(--muted, 210 40% 96.1%) / 0.3); } .ds-tbl a { display: block; font-size: 13px; font-weight: 600; color: hsl(var(--foreground, 222.2 84% 4.9%)); text-decoration: none; } .ds-tbl a:hover { text-decoration: underline; text-underline-offset: 2px; } .ds-tbl a:focus-visible { outline: none; box-shadow: 0 0 0 2px oklch(69.6% 0.17 162.48); } .ds-tbl small { display: block; font-size: 11px; color: hsl(var(--muted-foreground, 215 25% 40%)); } .ds-due-d { display: flex; align-items: center; gap: 6px; font-weight: 600; font-variant-numeric: tabular-nums; } .ds-due-d i { width: 8px; height: 8px; border-radius: 9999px; } .ds-p { display: inline-flex; padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; white-space: nowrap; } .ds-p-in { background: oklch(69.6% 0.17 162.48 / 0.15); color: hsl(var(--dash-in, 163 94% 24%)); } .ds-p-late { background: oklch(64.5% 0.246 16.439 / 0.15); color: hsl(var(--dash-late, 345 83% 41%)); } .ds-p-due { background: oklch(76.9% 0.188 70.08 / 0.2); color: hsl(var(--dash-due, 26 90% 37%)); } .ds-fresh { background: oklch(69.6% 0.17 162.48 / 0.07); } .ds-late-row { background: oklch(64.5% 0.246 16.439 / 0.05); } .ds-today td { padding: 4px 12px; border-bottom: 0; } .ds-today span { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; color: hsl(var(--dash-in, 163 94% 24%)); } .ds-today span::after { content: ''; flex: 1; height: 1px; background: oklch(69.6% 0.17 162.48 / 0.5); } .ds-tbl tfoot { background: hsl(var(--muted, 210 40% 96.1%) / 0.2); border-top: 1px solid hsl(var(--border, 214.3 31.8% 91.4%)); } .ds-tbl tfoot td { border-bottom: 0; color: hsl(var(--muted-foreground, 215 25% 40%)); } .ds-tbl tfoot .b { color: hsl(var(--foreground, 222.2 84% 4.9%)); }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "The shared field: 48px tall, 12px corners, ring on focus.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Buscar contrato, imóvel ou inquilino\" />",
+      "css": ".ds-input { font-family: var(--font-geist-sans, Geist), Arial, Helvetica, sans-serif; display: flex; width: 100%; max-width: 360px; height: 48px; padding: 8px 12px; border: 1px solid hsl(var(--border, 214.3 31.8% 91.4%)); border-radius: 12px; background: hsl(var(--background, 210 20% 98%)); color: hsl(var(--foreground, 222.2 84% 4.9%)); font-size: 16px; transition: box-shadow 150ms cubic-bezier(0.4,0,0.2,1); } .ds-input::placeholder { color: hsl(var(--muted-foreground, 215 25% 40%)); } .ds-input:focus-visible { outline: none; box-shadow: 0 0 0 2px hsl(var(--background, 210 20% 98%)), 0 0 0 4px hsl(var(--foreground, 222.2 84% 4.9%)); } .ds-input:disabled { opacity: 0.5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Sidebar Navigation",
+      "kind": "nav",
+      "refersTo": "nav-item-active",
+      "description": "A collapsible group under an uppercase heading; 44px items, Mist fill on hover and for the current page.",
+      "html": "<nav class=\"ds-nav\"><span class=\"ds-nav-group\">Operação</span><a class=\"ds-nav-item\" aria-current=\"page\" href=\"#\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect width=\"7\" height=\"9\" x=\"3\" y=\"3\" rx=\"1\"/><rect width=\"7\" height=\"5\" x=\"14\" y=\"3\" rx=\"1\"/><rect width=\"7\" height=\"9\" x=\"14\" y=\"12\" rx=\"1\"/><rect width=\"7\" height=\"5\" x=\"3\" y=\"16\" rx=\"1\"/></svg><span>Painel</span></a><a class=\"ds-nav-item\" href=\"#\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\"/><path d=\"M21 9H3\"/><path d=\"M21 15H3\"/></svg><span>Contratos</span></a></nav>",
+      "css": ".ds-nav { font-family: var(--font-geist-sans, Geist), Arial, Helvetica, sans-serif; display: flex; flex-direction: column; gap: 2px; width: 240px; padding: 8px; background: hsl(var(--background, 210 20% 98%)); } .ds-nav-group { padding: 6px 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: hsl(var(--muted-foreground, 215 25% 40%)); } .ds-nav-item { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 8px; border-radius: 8px; color: hsl(var(--foreground, 222.2 84% 4.9%)); text-decoration: none; font-size: 16px; } .ds-nav-item:hover, .ds-nav-item[aria-current=\"page\"] { background: hsl(var(--muted, 210 40% 96.1%)); } .ds-nav-item:focus-visible { outline: none; box-shadow: 0 0 0 2px hsl(var(--foreground, 222.2 84% 4.9%)); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Owner's Ledger",
+    "overview": "Kitnets.com reads like a landlord's own books laid open on a clean desk: slate paper, white sheets with hairline edges, and figures in a firm sans with tabular digits. Colour is not decoration; it is the state of the money. Emerald is money that came in (and the brand), amber is money about to fall due, rose is money past due, violet is what the agency kept, slate grey is what was merely expected. Every other hue belongs to one module and stays inside it.\n\nThe authenticated app is dense but calm. Rows of figures live in spreadsheet-like tables the owner can sort, filter, sum and reshape; summaries live in a few big graphic cards (a large figure, one proportional bar, a dotted legend) rather than grids of label/value pairs. Nothing is invented: a figure without data is an honest dash, and a failed source says which one failed. Any amount or identifier can be blurred with one click, so every value is wrapped for privacy from the start.\n\nThe dashboard (`/dashboard`, \"Aluguéis de outubro\") is one surface of this world, built as an extension with a new layout and the same look: a four-part money strip over the month's rents, shown as a board (the spreadsheet) or a calendar, a narrow side column of bills, contract dates and last month's result, and portfolio cards below. The North Star name is proposed by this pass from the built system; the owner has not confirmed it.",
+    "keyCharacteristics": [
+      "Geist sans throughout; bold figures with tabular numerals; sentence-case labels in plain pt-BR.",
+      "Slate neutrals on a near-white canvas; white cards with a hairline border and no shadow at rest.",
+      "Emerald brand and money-in; amber, rose, violet and slate as fixed money states.",
+      "One tinted colour per module (violet, emerald, teal, indigo, amber, sky) for hub cards and icon chips.",
+      "Status as tinted pills and 8px dots, never as stripes.",
+      "Spreadsheet tables for rows of figures; big graphic cards for summaries; \"?\" for every formula.",
+      "Privacy wrappers on every amount and identifier; \"—\" whenever a figure is unknown."
+    ],
+    "rules": [
+      {
+        "name": "The Money Has a Colour Rule",
+        "body": "Emerald means in, amber means due, rose means overdue, violet means the agency's cut, slate means merely expected. These five hues never change meaning and never appear as decoration.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Tint per Module Rule",
+        "body": "A hub card or chip carries exactly one tone: its border at 25% opacity, its fill at 5 to 6%, its icon chip at 15%, its bar at full strength with a lighter step or a 135° hatch for a third part. Two tones in one card is a defect.",
+        "section": "colors"
+      },
+      {
+        "name": "The Theme-Class Ink Rule",
+        "body": "Coloured text that must stay legible in both themes is a CSS variable defined under `:root` and `.dark` (the `--dash-*` and `--calc-ink-*` families), applied as `text-[hsl(var(--dash-in))]`. The theme is a class on `<html>`; Tailwind's `dark:` variant follows the operating system instead, so it is not used for new colour decisions.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Figures Rule",
+        "body": "Every amount, date, count and percentage is set with tabular numerals, so columns and month-to-month comparisons align.",
+        "section": "typography"
+      },
+      {
+        "name": "The Quiet Label Rule",
+        "body": "A label above a figure is sentence case at 13px in muted text, led by an 8px dot in its state colour. Uppercase micro-type is reserved for column headers and sidebar group headings.",
+        "section": "typography"
+      },
+      {
+        "name": "The Hairline Rule",
+        "body": "A card is separated from the canvas by its border (Hairline at 80%), not by a shadow. If a card needs a shadow to be seen, its fill or border is wrong.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** wrap every amount in `<Money>` and every identifier or tenant name in `<Sensitive>`, and keep those values out of `title` attributes, which are not blurred.",
+      "**Do** show an unknown figure as a muted \"—\" and name the source that failed in Deep Rose ink; never show zero for missing data.",
+      "**Do** put rows of figures in the spreadsheet table machinery, with sums in the footer.",
+      "**Do** set every amount, date and count with tabular numerals.",
+      "**Do** mark status with a tinted pill (15% fill, state ink) and an 8px dot in the 500 hue.",
+      "**Do** define coloured text as theme variables under `:root` and `.dark` (the `--dash-*` pattern) so it follows the theme class.",
+      "**Do** give each module card one tone: 25% border, 5 to 6% fill, 15% icon chip, full-strength bar.",
+      "**Do** keep gross rent, the agency fee and net rent as separate figures.",
+      "**Do** put formulas and definitions behind a \"?\" that opens a \"Como ler\" dialog."
+    ],
+    "donts": [
+      "**Don't** mark the status of a row, card or day with a coloured side stripe; status is a pill and a dot.",
+      "**Don't** summarise rows of figures in grids of KPI tiles or label/value pairs.",
+      "**Don't** show mock, sample or estimated figures on any dashboard.",
+      "**Don't** use emerald, amber, rose or violet decoratively; each one is a money state.",
+      "**Don't** add new colour decisions with Tailwind's `dark:` variant; it follows the operating system, not the app's theme class.",
+      "**Don't** make a card clickable without an arrow, or show an arrow on a card that opens nothing.",
+      "**Don't** add shadows to cards at rest."
+    ]
+  }
+}
